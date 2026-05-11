@@ -1,0 +1,29 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="波波攒之王"
+config/version="0.1.0"
+run/main_scene="res://src/ui/start_screen.tscn"
+config/features=PackedStringArray("4.6")
+
+[autoload]
+
+BattleSetup="*res://src/battle/battle_setup.gd"
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+
+[rendering]
+
+textures/canvas_textures/default_texture_filter=0
