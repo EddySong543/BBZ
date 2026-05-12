@@ -1,6 +1,6 @@
 extends Node
 
-## Autoload — passes hero picks between scenes.
+## Autoload — passes hero lineups between scenes.
 
-var p1_hero: HeroData
-var p2_hero: HeroData
+var p1_heroes: Array[HeroData] = []
+var p2_heroes: Array[HeroData] = []
