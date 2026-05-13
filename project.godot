@@ -18,6 +18,7 @@ config/features=PackedStringArray("4.6")
 [autoload]
 
 BattleSetup="*res://src/battle/battle_setup.gd"
+FontManager="*res://src/core/font_manager.gd"
 
 [display]
 

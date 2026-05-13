@@ -58,6 +58,8 @@ var p1_frames: Array[Panel] = []
 var p2_frames: Array[Panel] = []
 var p1_frame_hp_labels: Array[Label] = []
 var p2_frame_hp_labels: Array[Label] = []
+var p1_frame_shield_labels: Array[Label] = []
+var p2_frame_shield_labels: Array[Label] = []
 var p1_frame_slots: Array = []
 var p2_frame_slots: Array = []
 
@@ -182,10 +184,10 @@ func _build_ui() -> void:
 	big_turn_label = Label.new()
 	big_turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	big_turn_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	big_turn_label.add_theme_font_size_override("font_size", 72)
+	FontManager.apply(big_turn_label, 48)
 	big_turn_label.add_theme_color_override("font_color", Color("#f5c518"))
 	big_turn_label.position = Vector2(460, 350)
-	big_turn_label.size = Vector2(1000, 120)
+	big_turn_label.size = Vector2(1000, 64)
 	big_turn_label.visible = false
 	add_child(big_turn_label)
 
@@ -216,6 +218,7 @@ func _build_ui() -> void:
 func _create_hero_frames(player: int, start_x: float) -> void:
 	var frames: Array[Panel] = []
 	var hp_labels: Array[Label] = []
+	var shield_labels: Array[Label] = []
 	var slots: Array = []
 	var border_color := Color("#3388dd") if player == 0 else Color("#dd3333")
 
@@ -232,6 +235,10 @@ func _create_hero_frames(player: int, start_x: float) -> void:
 	large_hp.size = Vector2(FRAME_L, 16)
 	large_hp.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hp_labels.append(large_hp)
+	var large_sd := _make_label("", 11, Color("#44ccff"), Vector2(start_x, FRAME_Y + FRAME_L + 20), self)
+	large_sd.size = Vector2(FRAME_L, 14)
+	large_sd.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	shield_labels.append(large_sd)
 	slots.append(-1)
 
 	for i in range(2):
@@ -249,15 +256,21 @@ func _create_hero_frames(player: int, start_x: float) -> void:
 		small_hp.size = Vector2(FRAME_S, 16)
 		small_hp.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		hp_labels.append(small_hp)
+		var small_sd := _make_label("", 10, Color("#44ccff"), Vector2(sx, FRAME_Y + FRAME_L + 20), self)
+		small_sd.size = Vector2(FRAME_S, 14)
+		small_sd.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		shield_labels.append(small_sd)
 		slots.append(-1)
 
 	if player == 0:
 		p1_frames = frames
 		p1_frame_hp_labels = hp_labels
+		p1_frame_shield_labels = shield_labels
 		p1_frame_slots = slots
 	else:
 		p2_frames = frames
 		p2_frame_hp_labels = hp_labels
+		p2_frame_shield_labels = shield_labels
 		p2_frame_slots = slots
 
 
@@ -313,7 +326,7 @@ func _create_energy_labels() -> void:
 	var p1_energy_x := 30.0 + FRAMES_TOTAL_W + 14.0
 	for row in range(2):
 		var lbl := _make_label("", 16, Color("#f5c518"), Vector2(p1_energy_x, FRAME_Y + row * 18), self)
-		lbl.size = Vector2(400, 18)
+		lbl.size = Vector2(400, 22)
 		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		p1_energy_labels.append(lbl)
 
@@ -321,7 +334,7 @@ func _create_energy_labels() -> void:
 	var p2_energy_end := p2_frames_start - 14.0
 	for row in range(2):
 		var lbl := _make_label("", 16, Color("#f5c518"), Vector2(p2_energy_end - 400, FRAME_Y + row * 18), self)
-		lbl.size = Vector2(400, 18)
+		lbl.size = Vector2(400, 22)
 		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		p2_energy_labels.append(lbl)
 
@@ -362,7 +375,7 @@ func _make_circle(text: String) -> Button:
 	btn.add_theme_stylebox_override("hover", _circle_style_hover)
 	btn.add_theme_stylebox_override("pressed", _circle_style_hover)
 	btn.add_theme_stylebox_override("disabled", _circle_style_disabled)
-	btn.add_theme_font_size_override("font_size", 16)
+	FontManager.apply_btn(btn, 16)
 	btn.clip_text = true
 	add_child(btn)
 	return btn
@@ -374,10 +387,16 @@ func _layout_circles() -> void:
 	if state in [State.P1_TURN, State.P2_TURN]:
 		has_skill = battle.active_hero(player).has_skill_type(HeroData.SkillType.EXTRA_ACTION)
 
-	var buttons: Array[Button] = [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend]
-	if has_skill:
-		buttons.append(btn_special)
+	var is_fool: bool = has_skill and battle.active_hero(player).hero_id == "h13"
+	var buttons: Array[Button]
+	if is_fool:
+		buttons = [btn_special]
 		btn_special.text = battle.get_action_name(battle.active_hero(player).extra_action_id)
+	else:
+		buttons = [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend]
+		if has_skill:
+			buttons.append(btn_special)
+			btn_special.text = battle.get_action_name(battle.active_hero(player).extra_action_id)
 	buttons.append(btn_confirm)
 
 	var n := buttons.size()
@@ -388,12 +407,15 @@ func _layout_circles() -> void:
 		buttons[i].position = Vector2(start_x + i * (CIRCLE_D + CIRCLE_GAP), CIRCLE_Y)
 		buttons[i].visible = true
 	btn_special.visible = has_skill
+	if is_fool:
+		for b in [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend]:
+			b.visible = false
 
 
 func _make_label(text: String, size: int, color: Color, pos: Vector2, parent: Node) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", size)
+	FontManager.apply(l, size)
 	l.add_theme_color_override("font_color", color)
 	l.position = pos
 	parent.add_child(l)
@@ -604,32 +626,35 @@ func _update_hero_frames() -> void:
 		var frames := p1_frames if p == 0 else p2_frames
 		var hp_labels := p1_frame_hp_labels if p == 0 else p2_frame_hp_labels
 		var frame_slots: Array = p1_frame_slots if p == 0 else p2_frame_slots
+		var shield_labels := p1_frame_shield_labels if p == 0 else p2_frame_shield_labels
 		var active_idx: int = battle.active_hero_index[p]
 		var reserves := _get_reserve_slots(p)
 
 		var slot0: int = active_idx
 		frame_slots[0] = slot0
-		_update_single_frame(frames[0], hp_labels[0], p, slot0, true)
+		_update_single_frame(frames[0], hp_labels[0], shield_labels[0], p, slot0, true)
 
 		for j in range(2):
 			var fi := j + 1
 			if j < reserves.size():
 				var slot: int = reserves[j]
 				frame_slots[fi] = slot
-				_update_single_frame(frames[fi], hp_labels[fi], p, slot, false)
+				_update_single_frame(frames[fi], hp_labels[fi], shield_labels[fi], p, slot, false)
 			else:
 				frame_slots[fi] = -1
 				frames[fi].visible = false
 				hp_labels[fi].visible = false
 
 
-func _update_single_frame(frame: Panel, hp_label: Label, player: int, slot: int, is_active: bool) -> void:
+func _update_single_frame(frame: Panel, hp_label: Label, shield_label: Label, player: int, slot: int, is_active: bool) -> void:
 	if slot < 0 or slot >= battle.heroes[player].size():
 		frame.visible = false
 		hp_label.visible = false
+		shield_label.visible = false
 		return
 
 	frame.visible = true
+	shield_label.visible = true
 	hp_label.visible = true
 
 	var sb := frame.get_theme_stylebox("panel", "Panel") as StyleBoxFlat
@@ -659,28 +684,15 @@ func _update_single_frame(frame: Panel, hp_label: Label, player: int, slot: int,
 		var hl := Label.new()
 		hl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		hl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		hl.add_theme_font_size_override("font_size", 14 if is_active else 10)
+		FontManager.apply(hl, 12)
 		hl.add_theme_color_override("font_color", Color.WHITE)
 		hl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		frame.add_child(hl)
+	var sh: int = battle.shield[player][slot]
+	shield_label.text = "🛡%d" % sh if sh > 0 else ""
 	var hl := frame.get_child(0) as Label
 	hl.text = battle.heroes[player][slot].hero_name.substr(0, 2)
 
-	if frame.get_child_count() < 2:
-		var sl := Label.new()
-		sl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		sl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		sl.add_theme_font_size_override("font_size", 9)
-		sl.add_theme_color_override("font_color", Color("#44ccff"))
-		sl.position = Vector2(0, frame.size.y - 14)
-		sl.size = Vector2(frame.size.x, 14)
-		frame.add_child(sl)
-	var sl := frame.get_child(1) as Label
-	var has_shield: bool = battle.shield[player][slot] > 0
-	sl.text = "🛡" if has_shield else ""
-	sl.visible = has_shield
-	sl.position = Vector2(0, frame.size.y - 14 if is_active else frame.size.y - 12)
-	sl.size = Vector2(frame.size.x, 12)
 
 
 func _update_energy_labels() -> void:
@@ -716,12 +728,14 @@ func _update_hp_labels() -> void:
 	p2_char_rect.visible = not clones2
 
 	if not clones1:
-		p1_hp_label.text = "❤%d" % h1
+		var s1: int = battle.shield[0][battle.active_hero_index[0]]
+		p1_hp_label.text = "❤%d  🛡%d" % [h1, s1] if s1 > 0 else "❤%d" % h1
 		var ratio1 := clampf(float(h1) / float(battle.current_max_hp(0)), 0.0, 1.0)
 		p1_hp_label.add_theme_color_override("font_color", _hp_color(ratio1))
 		p1_char_rect.modulate = Color("#663355") if (state == State.RESOLVING and p1_hit) else Color.WHITE
 	if not clones2:
-		p2_hp_label.text = "❤%d" % h2
+		var s2: int = battle.shield[1][battle.active_hero_index[1]]
+		p2_hp_label.text = "❤%d  🛡%d" % [h2, s2] if s2 > 0 else "❤%d" % h2
 		var ratio2 := clampf(float(h2) / float(battle.current_max_hp(1)), 0.0, 1.0)
 		p2_hp_label.add_theme_color_override("font_color", _hp_color(ratio2))
 		p2_char_rect.modulate = Color("#663333") if (state == State.RESOLVING and p2_hit) else Color.WHITE

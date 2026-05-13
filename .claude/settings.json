@@ -5,6 +5,7 @@
     "command": "bash .claude/statusline.sh"
   },
   "permissions": {
+    "defaultMode": "dontAsk",
     "allow": [
       "Bash(git *)",
       "Bash(ls *)",
@@ -32,7 +33,10 @@
       "Task(*)",
       "TaskCreate(*)",
       "TaskUpdate(*)",
-      "AskUserQuestion(*)"
+      "AskUserQuestion(*)",
+      "Bash(*)",
+      "Agent(*)",
+      "Skill(*)"
     ],
     "deny": [
       "Bash(rm -rf *)",

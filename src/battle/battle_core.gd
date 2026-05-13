@@ -5,7 +5,7 @@ extends RefCounted
 
 enum Action {
 	CHARGE, ATTACK, DEFEND, BIG_ATTACK, BIG_DEFEND, SWITCH,
-	JIN_JIAO, YIN_HU, JIAO_TU, SHE_TUI, XIAN_JI, SHEN_WAI
+	FAN_GE, BAI_SHOU, JIAO_TU, SHE_TUI, SHE_SHEN, SHEN_WAI, CAI_JIN, YU_ZHE
 }
 
 const BASE_ACTION_DEF := {
@@ -18,17 +18,19 @@ const BASE_ACTION_DEF := {
 }
 
 const EXTRA_ACTION_DEF := {
-	Action.JIN_JIAO: {name="金角", cost=2, damage=0},
-	Action.YIN_HU:   {name="虎袭", cost=-1, damage=0},
-	Action.JIAO_TU:  {name="狡兔", cost=1, damage=0},
-	Action.SHE_TUI:  {name="蛇蜕", cost=1, damage=0},
-	Action.XIAN_JI:  {name="献祭", cost=0, damage=0},
+	Action.FAN_GE:   {name="反戈", cost=2, damage=0},
+	Action.BAI_SHOU: {name="百兽", cost=-1, damage=0},
+	Action.JIAO_TU:  {name="狡兔三窟", cost=3, damage=0},
+	Action.SHE_TUI:  {name="蛇蜕", cost=2, damage=0},
+	Action.SHE_SHEN: {name="舍身", cost=0, damage=0},
 	Action.SHEN_WAI: {name="身外化身", cost=3, damage=0},
+	Action.CAI_JIN:  {name="财源广进", cost=0, damage=0},
+	Action.YU_ZHE:   {name="不可知之权柄", cost=0, damage=0},
 }
 
 const MAX_ENERGY := 20
-const YIN_HU_DAMAGE_CAP := 6
-const YIN_HU_MIN_COST := 1
+const BAI_SHOU_DAMAGE_CAP := 6
+const BAI_SHOU_MIN_COST := 1
 
 var energy := [0, 0]
 var selected_action := [-1, -1]
@@ -43,10 +45,13 @@ var winner: int = -1
 var last_result: Dictionary = {}
 var switch_used: Array[bool] = [false, false]
 
-var _yinhu_spent: Array[int] = [0, 0]
+var _baishou_spent: Array[int] = [0, 0]
 var _jiaotu_immune: Array[bool] = [false, false]
-var _jiaotu_no_energy: Array[bool] = [false, false]
+var _jiaotu_free_switch: Array[bool] = [false, false]
+var _jiaotu_used_count: Array[int] = [0, 0]
 var _shetui_active: Array[bool] = [false, false]
+var _shetui_owner: Array[int] = [-1, -1]
+var _shetui_empowered: Array[bool] = [false, false]
 
 var shield: Array = []
 var _wuma_pending_shield: Array[bool] = [false, false]
@@ -58,6 +63,9 @@ var clone_order: Array = [[], []]
 var selected_target: Array[int] = [-1, -1]
 var _shenwai_used: Array[bool] = [false, false]
 var _fallen_teammates: Array[int] = [0, 0]
+var _caijin_cooldown: Array[bool] = [false, false]
+var _caijin_buff: Array[bool] = [false, false]
+var _raw_dmg_to: Array[int] = [0, 0]
 
 
 func setup(p1_heroes: Array, p2_heroes: Array) -> void:
@@ -73,6 +81,13 @@ func setup(p1_heroes: Array, p2_heroes: Array) -> void:
 		hero_hp.append(hps)
 		hero_max_hp.append(max_hps)
 	shield = [[0, 0, 0], [0, 0, 0]]
+	# 愚者 HP randomization (8-14)
+	for player in [0, 1]:
+		for i in range(heroes[player].size()):
+			if heroes[player][i].hero_id == "h13":
+				var rng_hp := randi_range(8, 14)
+				hero_hp[player][i] = rng_hp
+				hero_max_hp[player][i] = rng_hp
 	_wuma_pending_shield = [false, false]
 	clone_count = [0, 0]
 	clone_hp = [[], []]
@@ -80,6 +95,13 @@ func setup(p1_heroes: Array, p2_heroes: Array) -> void:
 	selected_target = [-1, -1]
 	_shenwai_used = [false, false]
 	_fallen_teammates = [0, 0]
+	_jiaotu_free_switch = [false, false]
+	_jiaotu_used_count = [0, 0]
+	_shetui_empowered = [false, false]
+	_shetui_owner = [-1, -1]
+	_caijin_cooldown = [false, false]
+	_caijin_buff = [false, false]
+	_raw_dmg_to = [0, 0]
 	energy = [0, 0]
 	selected_action = [-1, -1]
 	switch_used = [false, false]
@@ -110,10 +132,12 @@ func alive_hero_count(player: int) -> int:
 
 
 func _get_action_cost(player: int, action: int) -> int:
-	if action == Action.YIN_HU:
-		return maxi(energy[player], YIN_HU_MIN_COST)
+	if action == Action.BAI_SHOU:
+		return maxi(energy[player], BAI_SHOU_MIN_COST)
 	if action in EXTRA_ACTION_DEF:
 		return EXTRA_ACTION_DEF[action]["cost"]
+	if action == Action.SWITCH and _jiaotu_free_switch[player]:
+		return 0
 	return BASE_ACTION_DEF[action]["cost"]
 
 
@@ -124,12 +148,16 @@ func _get_action_damage(player: int, action: int) -> int:
 
 
 func can_afford(player: int, action: int) -> bool:
-	if action == Action.YIN_HU:
-		return energy[player] >= YIN_HU_MIN_COST
-	if action == Action.XIAN_JI:
+	if action == Action.BAI_SHOU:
+		return energy[player] >= BAI_SHOU_MIN_COST
+	if action == Action.SHE_SHEN:
 		return current_hp(player) > 2
 	if action == Action.SHEN_WAI:
 		return energy[player] >= 3 and clone_count[player] < 2
+	if action == Action.CAI_JIN:
+		return not _caijin_cooldown[player]
+	if action == Action.JIAO_TU:
+		return _jiaotu_used_count[player] < 3 and energy[player] >= _get_action_cost(player, action)
 	return energy[player] >= _get_action_cost(player, action)
 
 
@@ -157,13 +185,15 @@ func get_available_actions(player: int) -> Array:
 
 func _hero_extra_action_id(h: HeroData) -> int:
 	match h.hero_id:
-		"h02": return Action.JIN_JIAO
-		"h03": return Action.YIN_HU
+		"h01": return Action.CAI_JIN
+		"h02": return Action.FAN_GE
+		"h03": return Action.BAI_SHOU
 		"h04": return Action.JIAO_TU
 		"h05": return -1
 		"h06": return Action.SHE_TUI
-		"h08": return Action.XIAN_JI
+		"h08": return Action.SHE_SHEN
 		"h09": return Action.SHEN_WAI
+		"h13": return Action.YU_ZHE
 	return h.extra_action_id
 
 
@@ -194,6 +224,8 @@ func select_switch_target(player: int, hero_slot: int) -> bool:
 	if leaving_hero.hero_id == "h09":
 		_clear_clones(player)
 	energy[player] -= cost
+	if _jiaotu_free_switch[player]:
+		_jiaotu_free_switch[player] = false
 	active_hero_index[player] = hero_slot
 	switch_used[player] = true
 	if _wuma_pending_shield[player]:
@@ -229,86 +261,82 @@ func resolve() -> Dictionary:
 	var a1: int = selected_action[0]
 	var a2: int = selected_action[1]
 
-	_yinhu_spent = [0, 0]
+	_baishou_spent = [0, 0]
 	_jiaotu_immune = [false, false]
 	_shetui_active = [false, false]
+	_raw_dmg_to = [0, 0]
 
 	var energy_before := energy.duplicate()
 
 	# === Phase 1: Apply costs & energy gains ===
 	for p in [0, 1]:
 		var a: int = selected_action[p]
+		# 愚者: random basic action
+		var yuzhe_used := false
+		if a == Action.YU_ZHE:
+			var pool := [Action.CHARGE, Action.ATTACK, Action.DEFEND, Action.BIG_ATTACK, Action.BIG_DEFEND]
+			a = pool[randi_range(0, 4)]
+			selected_action[p] = a
+			yuzhe_used = true
+			events.append("P%d [不可知之权柄] → %s" % [p + 1, get_action_name(a)])
 
 		if a == Action.JIAO_TU:
 			_jiaotu_immune[p] = true
 		if a == Action.SHE_TUI:
+			_shetui_owner[p] = active_hero_index[p]
 			_shetui_active[p] = true
 		if a == Action.SHEN_WAI:
 			_shenwai_used[p] = true
 
-		if a == Action.YIN_HU:
-			var spent := clampi(energy[p], YIN_HU_MIN_COST, YIN_HU_DAMAGE_CAP)
+		if a == Action.BAI_SHOU:
+			var spent := clampi(energy[p], BAI_SHOU_MIN_COST, BAI_SHOU_DAMAGE_CAP)
 			energy[p] -= spent
-			_yinhu_spent[p] = spent
-			events.append("P%d 虎袭消耗 %d 能量" % [p + 1, spent])
-		else:
+			_baishou_spent[p] = spent
+			events.append("P%d 百兽消耗 %d 能量" % [p + 1, spent])
+		elif not yuzhe_used:
 			var cost := _get_action_cost(p, a)
 			energy[p] -= cost
 
-		if a == Action.CHARGE and not _jiaotu_no_energy[p]:
-			energy[p] = mini(energy[p] + 1, MAX_ENERGY)
-			events.append("P%d 攒 +1能量" % (p + 1))
+		if a == Action.CHARGE:
+			var gain: int = BASE_ACTION_DEF[Action.CHARGE]["energy_gain"]
+			if _caijin_buff[p]:
+				gain *= 2
+				_caijin_buff[p] = false
+				events.append("P%d [财源广进] 攒能量翻倍！" % (p + 1))
+			energy[p] = mini(energy[p] + gain, MAX_ENERGY)
+			events.append("P%d 攒 +%d能量" % [p + 1, gain])
 
-		if a == Action.XIAN_JI:
+		if a == Action.SHE_SHEN:
 			hero_hp[p][active_hero_index[p]] -= 2
 			energy[p] = mini(energy[p] + 3, MAX_ENERGY)
-			events.append("P%d [献祭] -2HP +3能量" % (p + 1))
+			events.append("P%d [舍身] -2HP +3能量" % (p + 1))
+		# 财源广进: set buff for next charge
+		if a == Action.CAI_JIN:
+			_caijin_buff[p] = true
+			events.append("P%d [财源广进] 下次攒能量翻倍" % (p + 1))
 
-	# 子鼠
-	if a1 == Action.CHARGE and a2 == Action.CHARGE:
-		for p in [0, 1]:
-			if active_hero(p).passive_id == "zishu" and not _jiaotu_no_energy[p]:
-				energy[p] = mini(energy[p] + 1, MAX_ENERGY)
-				events.append("P%d [子鼠] 双方攒 +1额外能量" % (p + 1))
 
-	# === Phase 2: Mutual attack cancellation ===
-	var a1_negated := false
-	var a2_negated := false
-
-	var ea1: int = _effective_attack(0, a1)
-	var ea2: int = _effective_attack(1, a2)
-
-	if _is_attack(ea1) and _is_attack(ea2):
-		if ea1 == Action.ATTACK and ea2 == Action.ATTACK:
-			a1_negated = true
-			a2_negated = true
-			events.append("双方波互相抵消")
-		elif ea1 == Action.BIG_ATTACK and ea2 == Action.BIG_ATTACK:
-			a1_negated = true
-			a2_negated = true
-			events.append("双方大波互相抵消")
-		elif ea1 == Action.ATTACK and ea2 == Action.BIG_ATTACK:
-			a1_negated = true
-		elif ea2 == Action.ATTACK and ea1 == Action.BIG_ATTACK:
-			a2_negated = true
-
-	# === Phase 3: Resolve attacks + specials ===
-	if _is_attack(a1) and not a1_negated:
+	a1 = selected_action[0]
+	a2 = selected_action[1]
+	# === Phase 2: Resolve attacks + specials ===
+	if _is_attack(a1):
 		var dmg := _calc_attack_raw(0, a1, a2, events, "P1", "P2", energy_before)
 		if _resolve_target(0, 1) == 1:
-			dmg = _apply_defense(dmg, a1, a2, events, "P1")
+			_raw_dmg_to[1] = dmg
+			dmg = _apply_defense(dmg, a1, _effective_defense(1, a2), events, "P1")
 		p2_dmg += _route_damage(0, 1, dmg, events, "攻击")
-	if _is_attack(a2) and not a2_negated:
+	if _is_attack(a2):
 		var dmg := _calc_attack_raw(1, a2, a1, events, "P2", "P1", energy_before)
 		if _resolve_target(1, 0) == 1:
-			dmg = _apply_defense(dmg, a2, a1, events, "P2")
+			_raw_dmg_to[0] = dmg
+			dmg = _apply_defense(dmg, a2, _effective_defense(0, a1), events, "P2")
 		p1_dmg += _route_damage(1, 0, dmg, events, "攻击")
 
-	# 寅虎 damage — multihit: 1 damage per hit, random target per hit
+	# 百兽 damage — multihit: 1 damage per hit, random target per hit
 	for p in [0, 1]:
-		if selected_action[p] == Action.YIN_HU:
+		if selected_action[p] == Action.BAI_SHOU:
 			var opp: int = 1 - p
-			var hits: int = _yinhu_spent[p]
+			var hits: int = _baishou_spent[p]
 			var hero_dmg := 0
 			var clone_kills := 0
 			for _h in range(hits):
@@ -328,36 +356,34 @@ func resolve() -> Dictionary:
 						_rebuild_clone_order(opp)
 						clone_kills += 1
 			if clone_kills > 0:
-				events.append("P%d 虎袭摧毁 %d 个分身！" % [(p + 1), clone_kills])
+				events.append("P%d 百兽摧毁 %d 个分身！" % [(p + 1), clone_kills])
 			if hero_dmg == 0 and clone_kills == 0:
-				events.append("P%d 虎袭被大防格挡" % (p + 1))
+				events.append("P%d 百兽被大防格挡" % (p + 1))
 			elif hero_dmg > 0:
 				if p == 0:
 					p2_dmg += hero_dmg
 				else:
 					p1_dmg += hero_dmg
-				events.append("P%d 虎袭造成 %d 次1点伤害" % [p + 1, hero_dmg])
+				events.append("P%d 百兽造成 %d 次1点伤害" % [p + 1, hero_dmg])
 
-	# 金角 reflect (after all damage sources accumulated)
+	# 反戈 reflect — raw damage, pierces defense (cannot pierce 无敌)
 	for p in [0, 1]:
-		if selected_action[p] == Action.JIN_JIAO:
-			var dmg_taken := p1_dmg if p == 0 else p2_dmg
-			if dmg_taken > 0:
+		if selected_action[p] == Action.FAN_GE:
+			var raw_taken := _raw_dmg_to[p]
+			if raw_taken > 0:
 				var opp: int = 1 - p
-				var reflected := _route_damage(p, opp, dmg_taken, events, "金角反弹")
-				if p == 0:
-					p2_dmg += reflected
+				if not _jiaotu_immune[opp]:
+					hero_hp[opp][active_hero_index[opp]] -= raw_taken
+					events.append("P%d [反戈] 无视防御，反弹%d伤害" % [p + 1, raw_taken])
 				else:
-					p1_dmg += reflected
-				if reflected > 0:
-					events.append("P%d [金角] 反弹%d伤害" % [p + 1, dmg_taken])
+					events.append("P%d [反戈] 被无敌免疫！" % (p + 1))
 
 	# 身外化身 — after all attacks resolved
 	for p in [0, 1]:
 		if _shenwai_used[p]:
 			_create_clones(p, events)
 
-	# === Phase 4: Apply damage (shield + immunity check) ===
+	# === Phase 3: Apply damage (shield + immunity check) ===
 	if not _jiaotu_immune[0]:
 		var s0: int = shield[0][active_hero_index[0]]
 		if active_hero(0).passive_id == "xugou":
@@ -396,14 +422,15 @@ func resolve() -> Dictionary:
 				energy[1] = mini(energy[1] + p2_dmg, MAX_ENERGY)
 				events.append("P2 [亥猪] 纳福 +%d能量" % p2_dmg)
 
-	# 蛇蜕: if dead, revive with 1HP 1 energy
+	# 蛇蜕: if dead, revive with 1HP, permanently upgrade 波/防
 	for p in [0, 1]:
-		if _shetui_active[p] and hero_hp[p][active_hero_index[p]] <= 0:
-			hero_hp[p][active_hero_index[p]] = 1
-			energy[p] = maxi(energy[p], 1)
-			events.append("P%d [蛇蜕] 复活！1HP 1能量" % (p + 1))
+		var idx: int = _shetui_owner[p]
+		if idx >= 0 and _shetui_active[p] and hero_hp[p][idx] <= 0:
+			hero_hp[p][idx] = 1
+			_shetui_empowered[p] = true
+			events.append("P%d [蛇蜕] 复活！1HP，波/防永久升级" % (p + 1))
 
-	# === Phase 5: Game over check ===
+	# === Phase 4: Game over check ===
 	if alive_hero_count(0) == 0 and alive_hero_count(1) == 0:
 		game_over = true
 		winner = 0
@@ -417,7 +444,7 @@ func resolve() -> Dictionary:
 		winner = 1
 		events.append("P2 全灭，P1 获胜！")
 
-	# === Phase 6: Force-switch dead hero ===
+	# === Phase 5: Force-switch dead hero ===
 	if not game_over:
 		for p in [0, 1]:
 			if hero_hp[p][active_hero_index[p]] <= 0:
@@ -425,26 +452,22 @@ func resolve() -> Dictionary:
 				_clear_clones(p)
 				_force_switch(p, events)
 
-	# === Phase 7: Cleanup ===
+	# === Phase 6: Cleanup ===
 	for p in [0, 1]:
 		if selected_action[p] == Action.JIAO_TU:
-			var alive_slots: Array = []
-			for i in range(hero_hp[p].size()):
-				if hero_hp[p][i] > 0 and i != active_hero_index[p]:
-					alive_slots.append(i)
-			if alive_slots.size() > 0:
-				active_hero_index[p] = alive_slots[randi_range(0, alive_slots.size() - 1)]
-				events.append("P%d [狡兔] 随机切换至 %s" % [(p + 1), active_hero(p).hero_name])
-			_jiaotu_no_energy[p] = true
+			_jiaotu_used_count[p] += 1
+			_jiaotu_free_switch[p] = true
+			events.append("P%d [狡兔三窟] 下回合免费切换" % (p + 1))
 		else:
-			_jiaotu_no_energy[p] = false
+			_jiaotu_free_switch[p] = false
 
 	turn_number += 1
 	selected_action = [-1, -1]
 	switch_used = [false, false]
-	shield = [[0, 0, 0], [0, 0, 0]]
 	selected_target = [-1, -1]
 	_shenwai_used = [false, false]
+	_caijin_cooldown[0] = a1 == Action.CAI_JIN
+	_caijin_cooldown[1] = a2 == Action.CAI_JIN
 
 	last_result = {
 		p1_hp=current_hp(0), p2_hp=current_hp(1),
@@ -527,6 +550,14 @@ func _is_attack(action: int) -> bool:
 func _effective_attack(player: int, action: int) -> int:
 	if action == Action.ATTACK and active_hero(player).passive_id == "sichen" and (turn_number + 1) % 3 == 0:
 		return Action.BIG_ATTACK
+	if action == Action.ATTACK and _shetui_empowered[player] and active_hero(player).hero_id == "h06":
+		return Action.BIG_ATTACK
+	return action
+
+
+func _effective_defense(player: int, action: int) -> int:
+	if action == Action.DEFEND and _shetui_empowered[player] and active_hero(player).hero_id == "h06":
+		return Action.BIG_DEFEND
 	return action
 
 
@@ -539,14 +570,6 @@ func _calc_attack_raw(player: int, atk: int, def: int, events: Array, atk_name: 
 			dmg += diff / 2
 	if active_hero(player).passive_id == "xugou":
 		dmg += _fallen_teammates[player]
-	var big := atk == Action.BIG_ATTACK
-
-	if big and def == Action.ATTACK:
-		var press_dmg := 1
-		if active_hero(player).passive_id == "xugou":
-			press_dmg += _fallen_teammates[player]
-		events.append("%s 大波压制 %s 波，造成 %d 伤害" % [atk_name, def_name, press_dmg])
-		return press_dmg
 	return dmg
 
 
@@ -554,14 +577,10 @@ func _apply_defense(dmg: int, atk: int, def: int, events: Array, atk_name: Strin
 	if def == Action.BIG_DEFEND:
 		events.append("%s 被大防格挡" % atk_name)
 		return 0
-	var big := atk == Action.BIG_ATTACK
-	if not big and def == Action.DEFEND:
+	if def == Action.DEFEND and atk == Action.ATTACK:
 		events.append("%s 被防格挡" % atk_name)
 		return 0
-	if big and def == Action.DEFEND:
-		events.append("%s 穿透防御！%d 伤害" % [atk_name, dmg])
-	else:
-		events.append("%s 命中，%d 伤害" % [atk_name, dmg])
+	events.append("%s 命中，%d 伤害" % [atk_name, dmg])
 	return dmg
 
 
@@ -572,6 +591,7 @@ func _resolve_target(attacker: int, defender: int) -> int:
 	if target < 0 or target >= clone_order[defender].size():
 		target = 0
 	return clone_order[defender][target]
+
 func _force_switch(player: int, events: Array) -> void:
 	var pname := "P1" if player == 0 else "P2"
 	for i in range(hero_hp[player].size()):

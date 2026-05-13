@@ -56,24 +56,24 @@ func _build_title_ui() -> void:
 	var title := Label.new()
 	title.text = "波波攒之王"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 64)
+	FontManager.apply(title, 48)
 	title.add_theme_color_override("font_color", Color("#f5c518"))
 	title.position = Vector2(460, 300)
-	title.size = Vector2(1000, 80)
+	title.size = Vector2(1000, 64)
 	add_child(title)
 
 	var subtitle := Label.new()
 	subtitle.text = "1v1 同时回合制英雄对战"
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	subtitle.add_theme_font_size_override("font_size", 24)
+	FontManager.apply(subtitle, 24)
 	subtitle.add_theme_color_override("font_color", Color("#888899"))
 	subtitle.position = Vector2(460, 380)
-	subtitle.size = Vector2(1000, 36)
+	subtitle.size = Vector2(1000, 32)
 	add_child(subtitle)
 
 	var btn := Button.new()
 	btn.text = "开始匹配"
-	btn.add_theme_font_size_override("font_size", 32)
+	FontManager.apply_btn(btn, 32)
 	btn.position = Vector2(810, 500)
 	btn.size = Vector2(300, 80)
 	btn.pressed.connect(_on_start_pressed)
@@ -99,27 +99,27 @@ func _build_bp_ui() -> void:
 
 	phase_label = Label.new()
 	phase_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	phase_label.add_theme_font_size_override("font_size", 28)
+	FontManager.apply(phase_label, 24)
 	phase_label.add_theme_color_override("font_color", Color("#f5c518"))
 	phase_label.position = Vector2(460, 10)
-	phase_label.size = Vector2(1000, 40)
+	phase_label.size = Vector2(1000, 32)
 	bp_root.add_child(phase_label)
 
 	info_label = Label.new()
 	info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	info_label.add_theme_font_size_override("font_size", 16)
+	FontManager.apply(info_label, 16)
 	info_label.add_theme_color_override("font_color", Color("#777799"))
-	info_label.position = Vector2(460, 48)
+	info_label.position = Vector2(460, 44)
 	info_label.size = Vector2(1000, 22)
 	bp_root.add_child(info_label)
 
 	# Timer label
 	timer_label = Label.new()
 	timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	timer_label.add_theme_font_size_override("font_size", 22)
+	FontManager.apply(timer_label, 24)
 	timer_label.add_theme_color_override("font_color", Color("#ffaa00"))
-	timer_label.position = Vector2(810, 75)
-	timer_label.size = Vector2(300, 30)
+	timer_label.position = Vector2(810, 70)
+	timer_label.size = Vector2(300, 32)
 	bp_root.add_child(timer_label)
 
 	_build_preview_panel(0, 30, 120)
@@ -138,7 +138,7 @@ func _build_bp_ui() -> void:
 
 	confirm_btn = Button.new()
 	confirm_btn.text = "确认选择"
-	confirm_btn.add_theme_font_size_override("font_size", 24)
+	FontManager.apply_btn(confirm_btn, 24)
 	confirm_btn.position = Vector2(810, 970)
 	confirm_btn.size = Vector2(300, 60)
 	confirm_btn.pressed.connect(_on_confirm)
@@ -156,10 +156,10 @@ func _build_preview_panel(player: int, px: float, py: float) -> void:
 	var title := Label.new()
 	title.text = "P%d 阵容" % (player + 1)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 18)
+	FontManager.apply(title, 16)
 	title.add_theme_color_override("font_color", color)
 	title.position = Vector2(px, py)
-	title.size = Vector2(180, 28)
+	title.size = Vector2(180, 24)
 	bp_root.add_child(title)
 
 	for i in range(3):
@@ -182,7 +182,7 @@ func _build_preview_panel(player: int, px: float, py: float) -> void:
 		lbl.text = "英雄 %d" % (i + 1)
 		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		lbl.add_theme_font_size_override("font_size", 14)
+		FontManager.apply(lbl, 12)
 		lbl.add_theme_color_override("font_color", Color("#aaaacc"))
 		lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		slot.add_child(lbl)
@@ -228,9 +228,9 @@ func _build_hero_cards() -> void:
 		card.add_theme_stylebox_override("hover", sb_hover)
 
 		_add_card_label(card, h.hero_name, 16, Color.WHITE, 8, 22)
-		_add_card_label(card, "❤ %d" % h.max_hp, 14, Color("#ff6666"), 32, 20)
-		_add_card_label(card, h.role, 12, _role_color(h.role), 54, 18)
-		_add_card_label(card, h.position, 11, Color("#777799"), 70, 16)
+		_add_card_label(card, "❤ %d" % h.max_hp, 12, Color("#ff6666"), 32, 18)
+		_add_card_label(card, h.role, 12, _role_color(h.role), 52, 18)
+		_add_card_label(card, h.position, 12, Color("#777799"), 70, 16)
 
 		card_area.add_child(card)
 		card_buttons.append(card)
@@ -241,7 +241,7 @@ func _add_card_label(card: Button, text: String, size: int, color: Color, y: flo
 	var lbl := Label.new()
 	lbl.text = text
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.add_theme_font_size_override("font_size", size)
+	FontManager.apply(lbl, size)
 	lbl.add_theme_color_override("font_color", color)
 	lbl.position = Vector2(0, y)
 	lbl.size = Vector2(CARD_W, h)
