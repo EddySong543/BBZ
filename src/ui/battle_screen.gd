@@ -694,7 +694,6 @@ func _update_single_frame(frame: Panel, hp_label: Label, shield_label: Label, pl
 	hl.text = battle.heroes[player][slot].hero_name.substr(0, 2)
 
 
-
 func _update_energy_labels() -> void:
 	var e1: int = battle.energy[0]
 	var e2: int = battle.energy[1]

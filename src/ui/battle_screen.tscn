@@ -1,12 +1,222 @@
-[gd_scene format=3 uid="uid://cyr3lm0b5kjf5"]
+[gd_scene load_steps=46 format=3 uid="uid://btt1escr3en000001"]
 
-[ext_resource type="Script" uid="uid://uwkgowbdtjd7" path="res://src/ui/battle_screen.gd" id="1"]
+[ext_resource type="Script" path="res://src/ui/battle_screen.gd" id="1_battle_gd"]
 
-[node name="BattleScreen" type="Control" unique_id=568385317]
+[node name="BattleScreen" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("1")
+script = ExtResource("1_battle_gd")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.102, 0.102, 0.18, 1)
+
+[node name="Floor" type="ColorRect" parent="."]
+layout_mode = 0
+offset_left = 120.0
+offset_top = 750.0
+offset_right = 1800.0
+offset_bottom = 756.0
+color = Color(0.2, 0.2, 0.333, 1)
+
+[node name="P1CharSlot" type="Control" parent="."]
+layout_mode = 0
+offset_left = 400.0
+offset_top = 490.0
+offset_right = 560.0
+offset_bottom = 750.0
+mouse_filter = 2
+
+[node name="P2CharSlot" type="Control" parent="."]
+layout_mode = 0
+offset_left = 1360.0
+offset_top = 490.0
+offset_right = 1520.0
+offset_bottom = 750.0
+mouse_filter = 2
+
+[node name="P1Name" type="Label" parent="."]
+layout_mode = 0
+offset_left = 380.0
+offset_top = 422.0
+offset_right = 580.0
+offset_bottom = 448.0
+horizontal_alignment = 1
+mouse_filter = 2
+
+[node name="P2Name" type="Label" parent="."]
+layout_mode = 0
+offset_left = 1340.0
+offset_top = 422.0
+offset_right = 1540.0
+offset_bottom = 448.0
+horizontal_alignment = 1
+mouse_filter = 2
+
+[node name="P1HP" type="Label" parent="."]
+layout_mode = 0
+offset_left = 410.0
+offset_top = 448.0
+offset_right = 550.0
+offset_bottom = 482.0
+horizontal_alignment = 1
+mouse_filter = 2
+
+[node name="P2HP" type="Label" parent="."]
+layout_mode = 0
+offset_left = 1370.0
+offset_top = 448.0
+offset_right = 1510.0
+offset_bottom = 482.0
+horizontal_alignment = 1
+mouse_filter = 2
+
+[node name="TurnLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 760.0
+offset_top = 4.0
+offset_right = 1160.0
+offset_bottom = 34.0
+horizontal_alignment = 1
+mouse_filter = 2
+
+[node name="TimerLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 760.0
+offset_top = 30.0
+offset_right = 1160.0
+offset_bottom = 56.0
+horizontal_alignment = 1
+mouse_filter = 2
+
+[node name="StatusLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 460.0
+offset_top = 280.0
+offset_right = 1460.0
+offset_bottom = 316.0
+horizontal_alignment = 1
+mouse_filter = 2
+
+[node name="EventLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 460.0
+offset_top = 820.0
+offset_right = 1460.0
+offset_bottom = 880.0
+horizontal_alignment = 1
+mouse_filter = 2
+visible = false
+
+[node name="BigTurnLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 460.0
+offset_top = 350.0
+offset_right = 1460.0
+offset_bottom = 414.0
+horizontal_alignment = 1
+vertical_alignment = 1
+mouse_filter = 2
+visible = false
+
+[node name="P1Frames" type="Control" parent="."]
+layout_mode = 0
+offset_left = 30.0
+offset_top = 0.0
+offset_right = 218.0
+offset_bottom = 120.0
+mouse_filter = 2
+
+[node name="P2Frames" type="Control" parent="."]
+layout_mode = 0
+offset_left = 1702.0
+offset_top = 0.0
+offset_right = 1890.0
+offset_bottom = 120.0
+mouse_filter = 2
+
+[node name="Buttons" type="Control" parent="."]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 810.0
+offset_right = 1920.0
+offset_bottom = 1080.0
+mouse_filter = 2
+
+[node name="BtnCharge" type="Button" parent="Buttons"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 160.0
+offset_bottom = 160.0
+
+[node name="BtnAttack" type="Button" parent="Buttons"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 160.0
+offset_bottom = 160.0
+
+[node name="BtnBigAttack" type="Button" parent="Buttons"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 160.0
+offset_bottom = 160.0
+
+[node name="BtnDefend" type="Button" parent="Buttons"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 160.0
+offset_bottom = 160.0
+
+[node name="BtnBigDefend" type="Button" parent="Buttons"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 160.0
+offset_bottom = 160.0
+
+[node name="BtnSpecial" type="Button" parent="Buttons"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 160.0
+offset_bottom = 160.0
+visible = false
+
+[node name="BtnConfirm" type="Button" parent="Buttons"]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 160.0
+offset_bottom = 160.0
+
+[node name="P1CloneArea" type="Control" parent="."]
+layout_mode = 0
+offset_left = 320.0
+offset_top = 490.0
+offset_right = 640.0
+offset_bottom = 750.0
+mouse_filter = 2
+
+[node name="P2CloneArea" type="Control" parent="."]
+layout_mode = 0
+offset_left = 1280.0
+offset_top = 490.0
+offset_right = 1600.0
+offset_bottom = 750.0
+mouse_filter = 2
+
+[node name="GameTimer" type="Timer" parent="."]
+one_shot = false

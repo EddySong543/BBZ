@@ -15,6 +15,8 @@ enum SkillType { PASSIVE, EXTRA_ACTION, ENHANCED_ACTION }
 @export var role: String = ""
 @export var position: String = ""
 @export var action_overrides: Dictionary = {}
+@export var portrait_path: String = ""
+@export var spritesheet_path: String = ""
 
 
 func has_skill_type(t: int) -> bool:
@@ -37,6 +39,14 @@ func get_damage_override(action: int, default_damage: int) -> int:
 	return v if v != null else default_damage
 
 
+static func get_portrait_path(hero_id: String) -> String:
+	return "res://assets/sprites/heroes/%s/%s_portrait.png" % [hero_id, hero_id]
+
+
+static func get_spritesheet_path(hero_id: String) -> String:
+	return "res://assets/sprites/heroes/%s/%s_spritesheet.png" % [hero_id, hero_id]
+
+
 # --- 46-hero pool (placeholder — user will replace with real designs) ---
 
 static func create_pool_heroes() -> Array[HeroData]:
@@ -53,13 +63,15 @@ static func create_pool_heroes() -> Array[HeroData]:
 		h.position = d.get("position", "灵活")
 		h.passive_id = d.get("passive_id", "")
 		h.extra_action_id = d.get("extra_action", -1)
+		h.portrait_path = d.get("portrait_path", "")
+		h.spritesheet_path = d.get("spritesheet_path", "")
 		pool.append(h)
 	return pool
 
 
 static func _hero_defs() -> Array[Dictionary]:
 	return [
-		{id="h01", name="子鼠", hp=8,  role="经济型", position="首发",   skill_type=SkillType.EXTRA_ACTION, extra_action=12, desc="【财源广进】主动技能。记录一次「双倍攒」机会（全队通用），下一次「攒」获得的能量翻倍。使用后下回合无法连续使用"},
+		{id="h01", name="子鼠", hp=8,  role="经济型", position="首发",   skill_type=SkillType.EXTRA_ACTION, extra_action=12, portrait_path="res://assets/sprites/heroes/h01/h01_portrait.png", spritesheet_path="res://assets/sprites/heroes/h01/h01_spritesheet.png", desc="【财源广进】主动技能。记录一次「双倍攒」机会（全队通用），下一次「攒」获得的能量翻倍。使用后下回合无法连续使用"},
 		{id="h02", name="丑牛", hp=11, role="防御型", position="中核",   skill_type=SkillType.EXTRA_ACTION, extra_action=6, desc="【反戈】消耗2能。本回合若受伤害，对对手造成等量伤害（无视防御，无法击穿无敌）"},
 		{id="h03", name="寅虎", hp=9,  role="爆发型", position="后期",   skill_type=SkillType.EXTRA_ACTION, extra_action=7, desc="【百兽】消耗全部能量(上限6)，造成等量次数的1点伤害，可被大防格挡"},
 		{id="h04", name="卯兔", hp=8,  role="防御型", position="轮转",   skill_type=SkillType.EXTRA_ACTION, extra_action=8, desc="【狡兔三窟】消耗3能，每局最多3次。本回合免疫所有伤害，下回合可免费切换英雄"},

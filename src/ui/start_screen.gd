@@ -1,6 +1,6 @@
 extends Control
 
-## Title screen + Ban/Pick with 10s countdown per phase. 1920x1080.
+## Title screen (tscn) + Ban/Pick (code-built — children of BPGroup don't resolve from tscn in 4.6).
 
 enum Phase {
 	P1_BAN1, P2_BAN1, P1_PICK1, P2_PICK1,
@@ -16,183 +16,162 @@ const GAP := 10
 const BP_TIME := 10
 
 var all_heroes: Array[HeroData] = []
-var p1_picks: Array = []
-var p2_picks: Array = []
-var banned: Array = []
+var p1_picks: Array[int] = []
+var p2_picks: Array[int] = []
+var banned: Array[int] = []
 var phase: int = -1
 var selected_idx: int = -1
 
-var bp_root: Control
+# Title screen (from tscn — these work)
+@onready var title_group: Control = $TitleGroup
+@onready var title_label: Label = $TitleGroup/TitleLabel
+@onready var subtitle_label: Label = $TitleGroup/SubtitleLabel
+@onready var start_button: Button = $TitleGroup/StartButton
+
+# BP UI (created in code)
+@onready var bp_group: Control = $BPGroup
 var phase_label: Label
 var info_label: Label
 var timer_label: Label
 var confirm_btn: Button
-var scroll: ScrollContainer
 var card_area: Control
-var card_buttons: Array[Button] = []
-var card_data: Array = []
+var p1_title: Label
+var p2_title: Label
 var p1_slots: Array[Panel] = []
-var p1_slot_labels: Array[Label] = []
 var p2_slots: Array[Panel] = []
+var p1_slot_labels: Array[Label] = []
 var p2_slot_labels: Array[Label] = []
 
+var card_cards: Array[HeroCard] = []
+var card_data: Array[int] = []
 var bp_timer: Timer
 var bp_timer_seconds: int = BP_TIME
+var _portrait_cache: Dictionary = {}
 
 
 func _ready() -> void:
 	all_heroes = HeroData.create_pool_heroes()
-	_build_title_ui()
+	title_group.visible = true
+	bp_group.visible = false
+	_setup_title_ui()
 
 
-func _build_title_ui() -> void:
-	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+func _setup_title_ui() -> void:
+	title_label.text = "波波攒之王"
+	FontManager.apply(title_label, 48)
+	title_label.add_theme_color_override("font_color", Color("#f5c518"))
 
-	var bg := ColorRect.new()
-	bg.color = Color("#1a1a2e")
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
+	subtitle_label.text = "1v1 同时回合制英雄对战"
+	FontManager.apply(subtitle_label, 24)
+	subtitle_label.add_theme_color_override("font_color", Color("#888899"))
 
-	var title := Label.new()
-	title.text = "波波攒之王"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	FontManager.apply(title, 48)
-	title.add_theme_color_override("font_color", Color("#f5c518"))
-	title.position = Vector2(460, 300)
-	title.size = Vector2(1000, 64)
-	add_child(title)
-
-	var subtitle := Label.new()
-	subtitle.text = "1v1 同时回合制英雄对战"
-	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	FontManager.apply(subtitle, 24)
-	subtitle.add_theme_color_override("font_color", Color("#888899"))
-	subtitle.position = Vector2(460, 380)
-	subtitle.size = Vector2(1000, 32)
-	add_child(subtitle)
-
-	var btn := Button.new()
-	btn.text = "开始匹配"
-	FontManager.apply_btn(btn, 32)
-	btn.position = Vector2(810, 500)
-	btn.size = Vector2(300, 80)
-	btn.pressed.connect(_on_start_pressed)
-	add_child(btn)
+	start_button.text = "开始匹配"
+	FontManager.apply_btn(start_button, 32)
+	start_button.pressed.connect(_on_start_pressed)
 
 
 func _on_start_pressed() -> void:
-	for c in get_children():
-		c.queue_free()
+	title_group.visible = false
+	bp_group.visible = true
 	_build_bp_ui()
 	_enter_phase(Phase.P1_BAN1)
 
 
 func _build_bp_ui() -> void:
-	bp_root = Control.new()
-	bp_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(bp_root)
+	# Clear any existing BP children
+	for c in bp_group.get_children():
+		c.queue_free()
 
-	var bg := ColorRect.new()
-	bg.color = Color("#1a1a2e")
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	bp_root.add_child(bg)
+	var bp_bg := ColorRect.new()
+	bp_bg.color = Color(0.102, 0.102, 0.18, 1)
+	bp_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bp_group.add_child(bp_bg)
 
-	phase_label = Label.new()
-	phase_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	FontManager.apply(phase_label, 24)
-	phase_label.add_theme_color_override("font_color", Color("#f5c518"))
-	phase_label.position = Vector2(460, 10)
-	phase_label.size = Vector2(1000, 32)
-	bp_root.add_child(phase_label)
+	# Phase / info / timer labels
+	phase_label = _make_label("PhaseLabel", "", 24, Color("#f5c518"), Vector2(460, 10), Vector2(1000, 32), bp_group)
+	info_label = _make_label("InfoLabel", "", 16, Color("#777799"), Vector2(460, 44), Vector2(1000, 22), bp_group)
+	timer_label = _make_label("TimerLabel", "", 24, Color("#ffaa00"), Vector2(810, 70), Vector2(300, 32), bp_group)
 
-	info_label = Label.new()
-	info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	FontManager.apply(info_label, 16)
-	info_label.add_theme_color_override("font_color", Color("#777799"))
-	info_label.position = Vector2(460, 44)
-	info_label.size = Vector2(1000, 22)
-	bp_root.add_child(info_label)
+	# Preview panels
+	_build_preview_panel(0, Vector2(30, 120))
+	_build_preview_panel(1, Vector2(30, 340))
 
-	# Timer label
-	timer_label = Label.new()
-	timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	FontManager.apply(timer_label, 24)
-	timer_label.add_theme_color_override("font_color", Color("#ffaa00"))
-	timer_label.position = Vector2(810, 70)
-	timer_label.size = Vector2(300, 32)
-	bp_root.add_child(timer_label)
-
-	_build_preview_panel(0, 30, 120)
-	_build_preview_panel(1, 30, 350)
-
-	scroll = ScrollContainer.new()
+	# Scroll + card area
+	var scroll := ScrollContainer.new()
+	scroll.name = "ScrollContainer"
 	scroll.position = Vector2(240, 120)
 	scroll.size = Vector2(1650, 850)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	bp_root.add_child(scroll)
+	bp_group.add_child(scroll)
 
 	card_area = Control.new()
+	card_area.name = "CardArea"
 	scroll.add_child(card_area)
 
-	_build_hero_cards()
-
+	# Confirm button
 	confirm_btn = Button.new()
 	confirm_btn.text = "确认选择"
-	FontManager.apply_btn(confirm_btn, 24)
 	confirm_btn.position = Vector2(810, 970)
 	confirm_btn.size = Vector2(300, 60)
+	FontManager.apply_btn(confirm_btn, 24)
 	confirm_btn.pressed.connect(_on_confirm)
-	bp_root.add_child(confirm_btn)
+	bp_group.add_child(confirm_btn)
 
+	# Timer
 	bp_timer = Timer.new()
 	bp_timer.one_shot = false
 	bp_timer.timeout.connect(_on_bp_timer_tick)
-	bp_root.add_child(bp_timer)
+	bp_group.add_child(bp_timer)
+
+	# Hero cards
+	_build_hero_cards()
 
 
-func _build_preview_panel(player: int, px: float, py: float) -> void:
+func _build_preview_panel(player: int, pos: Vector2) -> void:
 	var color := Color("#3388dd") if player == 0 else Color("#dd3333")
+	var title_lbl := _make_label("P%dTitle" % (player + 1), "P%d 阵容" % (player + 1), 16, color, Vector2(0, 0), Vector2(180, 24), bp_group)
+	title_lbl.position = pos
+	if player == 0:
+		p1_title = title_lbl
+	else:
+		p2_title = title_lbl
 
-	var title := Label.new()
-	title.text = "P%d 阵容" % (player + 1)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	FontManager.apply(title, 16)
-	title.add_theme_color_override("font_color", color)
-	title.position = Vector2(px, py)
-	title.size = Vector2(180, 24)
-	bp_root.add_child(title)
+	var slots: Array[Panel] = []
+	var labels: Array[Label] = []
 
 	for i in range(3):
-		var slot_y := py + 36 + i * 58
+		var slot_y := pos.y + 36 + i * 58
 		var slot := Panel.new()
-		slot.position = Vector2(px, slot_y)
+		slot.position = Vector2(pos.x, slot_y)
 		slot.size = Vector2(180, 50)
 		var sb := StyleBoxFlat.new()
 		sb.bg_color = Color("#1e1e36")
-		sb.border_width_left = 2
-		sb.border_width_right = 2
-		sb.border_width_top = 2
-		sb.border_width_bottom = 2
+		sb.border_width_left = 2; sb.border_width_right = 2
+		sb.border_width_top = 2; sb.border_width_bottom = 2
 		sb.border_color = Color("#444466")
 		sb.set_corner_radius_all(6)
 		slot.add_theme_stylebox_override("panel", sb)
-		bp_root.add_child(slot)
+		bp_group.add_child(slot)
+		slots.append(slot)
 
 		var lbl := Label.new()
 		lbl.text = "英雄 %d" % (i + 1)
 		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		lbl.position = Vector2(pos.x, slot_y)
+		lbl.size = Vector2(180, 50)
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		FontManager.apply(lbl, 12)
 		lbl.add_theme_color_override("font_color", Color("#aaaacc"))
-		lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		slot.add_child(lbl)
+		bp_group.add_child(lbl)
+		labels.append(lbl)
 
-		if player == 0:
-			p1_slots.append(slot)
-			p1_slot_labels.append(lbl)
-		else:
-			p2_slots.append(slot)
-			p2_slot_labels.append(lbl)
+	if player == 0:
+		p1_slots = slots
+		p1_slot_labels = labels
+	else:
+		p2_slots = slots
+		p2_slot_labels = labels
 
 
 func _build_hero_cards() -> void:
@@ -207,59 +186,124 @@ func _build_hero_cards() -> void:
 		var y := row * (CARD_H + GAP)
 
 		var h := all_heroes[i]
-		var card := Button.new()
+		var card := HeroCard.new()
+		card.hero_id = h.hero_id
+		card.hero_name = h.hero_name
+		card.max_hp = h.max_hp
+		card.role_text = h.role
+		card.position_text = h.position
+		card.portrait_path = h.portrait_path
 		card.position = Vector2(x, y)
-		card.size = Vector2(CARD_W, CARD_H)
 		card.pressed.connect(_on_card_clicked.bind(i))
-
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color("#252540")
-		sb.border_width_left = 2
-		sb.border_width_right = 2
-		sb.border_width_top = 2
-		sb.border_width_bottom = 2
-		sb.border_color = Color("#3a3a5a")
-		sb.set_corner_radius_all(6)
-		card.add_theme_stylebox_override("normal", sb)
-
-		var sb_hover := sb.duplicate() as StyleBoxFlat
-		sb_hover.bg_color = Color("#303055")
-		sb_hover.border_color = Color("#5a5a8a")
-		card.add_theme_stylebox_override("hover", sb_hover)
-
-		_add_card_label(card, h.hero_name, 16, Color.WHITE, 8, 22)
-		_add_card_label(card, "❤ %d" % h.max_hp, 12, Color("#ff6666"), 32, 18)
-		_add_card_label(card, h.role, 12, _role_color(h.role), 52, 18)
-		_add_card_label(card, h.position, 12, Color("#777799"), 70, 16)
-
 		card_area.add_child(card)
-		card_buttons.append(card)
+		card_cards.append(card)
 		card_data.append(i)
 
 
-func _add_card_label(card: Button, text: String, size: int, color: Color, y: float, h: float) -> void:
+func _make_label(nm: String, text: String, size_px: int, color: Color, pos: Vector2, sz: Vector2, parent: Node) -> Label:
 	var lbl := Label.new()
+	lbl.name = nm
 	lbl.text = text
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	FontManager.apply(lbl, size)
+	lbl.position = pos
+	lbl.size = sz
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	FontManager.apply(lbl, size_px)
 	lbl.add_theme_color_override("font_color", color)
-	lbl.position = Vector2(0, y)
-	lbl.size = Vector2(CARD_W, h)
-	card.add_child(lbl)
+	parent.add_child(lbl)
+	return lbl
 
 
-func _role_color(role: String) -> Color:
-	match role:
-		"进攻型": return Color("#dd4444")
-		"防御型": return Color("#4488dd")
-		"反制型": return Color("#dd8833")
-		"经济型": return Color("#33aa33")
-		"骗招型": return Color("#aa44aa")
-		"爆发型": return Color("#dd3333")
-		"赌博型": return Color("#ddaa33")
-		"切换型": return Color("#33aaaa")
-		"蓄势型": return Color("#8888cc")
-	return Color("#888899")
+func _get_portrait_tex(portrait_path: String) -> Texture2D:
+	if portrait_path == "" or not ResourceLoader.exists(portrait_path):
+		return null
+	if _portrait_cache.has(portrait_path):
+		return _portrait_cache[portrait_path]
+	var tex: Texture2D = load(portrait_path)
+	_portrait_cache[portrait_path] = tex
+	return tex
+
+
+func _ensure_slot_portrait(slot: Panel, portrait_path: String) -> void:
+	for child in slot.get_children():
+		if child is TextureRect:
+			var tex := _get_portrait_tex(portrait_path)
+			if tex:
+				(child as TextureRect).texture = tex
+				(child as TextureRect).visible = true
+			return
+	var tex := _get_portrait_tex(portrait_path)
+	if tex:
+		var portrait := TextureRect.new()
+		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		portrait.position = Vector2(4, 5)
+		portrait.size = Vector2(40, 40)
+		portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		portrait.texture = tex
+		slot.add_child(portrait)
+
+
+func _clear_slot_portrait(slot: Panel) -> void:
+	for child in slot.get_children():
+		if child is TextureRect:
+			(child as TextureRect).visible = false
+
+
+func _on_card_clicked(idx: int) -> void:
+	if idx in banned or idx in p1_picks or idx in p2_picks:
+		return
+	selected_idx = idx if selected_idx != idx else -1
+	_update_all_cards()
+	confirm_btn.disabled = selected_idx < 0
+
+
+func _update_all_cards() -> void:
+	for i in range(card_cards.size()):
+		var card := card_cards[i]
+		var hero_idx: int = card_data[i]
+		if hero_idx in banned:
+			card.card_state = HeroCard.CardState.BANNED
+		elif hero_idx in p1_picks:
+			card.card_state = HeroCard.CardState.PICKED_P1
+		elif hero_idx in p2_picks:
+			card.card_state = HeroCard.CardState.PICKED_P2
+		elif hero_idx == selected_idx:
+			card.card_state = HeroCard.CardState.SELECTED
+		else:
+			card.card_state = HeroCard.CardState.NORMAL
+
+
+func _update_previews() -> void:
+	_update_slot_previews(0, p1_picks, p1_slots, p1_slot_labels)
+	_update_slot_previews(1, p2_picks, p2_slots, p2_slot_labels)
+
+
+func _update_slot_previews(player: int, picks: Array[int], slots: Array[Panel], labels: Array[Label]) -> void:
+	for i in range(3):
+		if i >= slots.size():
+			continue
+		var slot := slots[i]
+		var label := labels[i]
+		var sb := slot.get_theme_stylebox("panel", "Panel") as StyleBoxFlat
+		if not sb:
+			continue
+
+		if i < picks.size():
+			var h := all_heroes[picks[i]]
+			_ensure_slot_portrait(slot, h.portrait_path)
+			label.text = "%s\n❤%d" % [h.hero_name, h.max_hp]
+			label.add_theme_color_override("font_color", Color.WHITE)
+			sb.border_color = Color("#3388dd") if player == 0 else Color("#dd3333")
+			sb.border_width_left = 3; sb.border_width_right = 3
+			sb.border_width_top = 3; sb.border_width_bottom = 3
+		else:
+			_clear_slot_portrait(slot)
+			label.text = "英雄 %d" % (i + 1)
+			label.add_theme_color_override("font_color", Color("#aaaacc"))
+			sb.border_color = Color("#444466")
+			sb.border_width_left = 2; sb.border_width_right = 2
+			sb.border_width_top = 2; sb.border_width_bottom = 2
 
 
 func _enter_phase(new_phase: int) -> void:
@@ -284,6 +328,37 @@ func _enter_phase(new_phase: int) -> void:
 		bp_timer.start(1.0)
 
 
+func _update_phase_label() -> void:
+	var player := "P1" if _phase_player() == 0 else "P2"
+	var action := "禁用" if _is_ban_phase() else "选择"
+	var nth := ""
+	match phase:
+		Phase.P1_PICK1, Phase.P2_PICK1: nth = "第1个"
+		Phase.P2_PICK2, Phase.P1_PICK2: nth = "第2个"
+		Phase.P1_BAN3, Phase.P2_BAN3: nth = "第3个"
+		Phase.P1_PICK3, Phase.P2_PICK3: nth = "第3个"
+		Phase.P1_BAN1, Phase.P2_BAN1: nth = "第1个"
+		Phase.P2_BAN2, Phase.P1_BAN2: nth = "第2个"
+
+	phase_label.text = "%s — %s%s英雄" % [player, action, nth]
+	var remaining := 0
+	for i in range(all_heroes.size()):
+		if not (i in banned or i in p1_picks or i in p2_picks):
+			remaining += 1
+	info_label.text = "可选: %d | 已禁: %d | P1: %d | P2: %d" % [remaining, banned.size(), p1_picks.size(), p2_picks.size()]
+
+
+func _is_ban_phase() -> bool:
+	return phase in [Phase.P1_BAN1, Phase.P2_BAN1, Phase.P2_BAN2, Phase.P1_BAN2, Phase.P1_BAN3, Phase.P2_BAN3]
+
+
+func _phase_player() -> int:
+	match phase:
+		Phase.P1_BAN1, Phase.P1_PICK1, Phase.P1_BAN2, Phase.P1_PICK2, Phase.P1_BAN3, Phase.P1_PICK3:
+			return 0
+	return 1
+
+
 func _on_bp_timer_tick() -> void:
 	bp_timer_seconds -= 1
 	_update_timer_label()
@@ -301,136 +376,15 @@ func _update_timer_label() -> void:
 
 
 func _auto_random_select() -> void:
-	var available: Array = []
+	var available: Array[int] = []
 	for i in range(all_heroes.size()):
-		if not _is_unavailable(i):
+		if not (i in banned or i in p1_picks or i in p2_picks):
 			available.append(i)
 	if available.size() == 0:
 		return
 	selected_idx = available[randi_range(0, available.size() - 1)]
 	_update_all_cards()
 	_on_confirm()
-
-
-func _update_phase_label() -> void:
-	var player := "P1" if _phase_player() == 0 else "P2"
-	var action := "禁用" if _is_ban_phase() else "选择"
-	var nth := ""
-	match phase:
-		Phase.P1_PICK1, Phase.P2_PICK1: nth = "第1个"
-		Phase.P2_PICK2, Phase.P1_PICK2: nth = "第2个"
-		Phase.P1_BAN3, Phase.P2_BAN3: nth = "第3个"
-		Phase.P1_PICK3, Phase.P2_PICK3: nth = "第3个"
-		Phase.P1_BAN1, Phase.P2_BAN1: nth = "第1个"
-		Phase.P2_BAN2, Phase.P1_BAN2: nth = "第2个"
-
-	phase_label.text = "%s — %s%s英雄" % [player, action, nth]
-	var remaining := _available_count()
-	info_label.text = "可选: %d | 已禁: %d | P1: %d | P2: %d" % [remaining, banned.size(), p1_picks.size(), p2_picks.size()]
-
-
-func _is_ban_phase() -> bool:
-	return phase in [Phase.P1_BAN1, Phase.P2_BAN1, Phase.P2_BAN2, Phase.P1_BAN2, Phase.P1_BAN3, Phase.P2_BAN3]
-
-
-func _phase_player() -> int:
-	match phase:
-		Phase.P1_BAN1, Phase.P1_PICK1, Phase.P1_BAN2, Phase.P1_PICK2, Phase.P1_BAN3, Phase.P1_PICK3:
-			return 0
-	return 1
-
-
-func _available_count() -> int:
-	var count := 0
-	for i in range(all_heroes.size()):
-		if not _is_unavailable(i):
-			count += 1
-	return count
-
-
-func _is_unavailable(idx: int) -> bool:
-	return idx in banned or idx in p1_picks or idx in p2_picks
-
-
-func _on_card_clicked(idx: int) -> void:
-	if _is_unavailable(idx):
-		return
-	selected_idx = idx if selected_idx != idx else -1
-	_update_all_cards()
-	confirm_btn.disabled = selected_idx < 0
-
-
-func _update_all_cards() -> void:
-	for i in range(card_buttons.size()):
-		var btn := card_buttons[i]
-		var hero_idx: int = card_data[i]
-		var sb := btn.get_theme_stylebox("normal", "Button") as StyleBoxFlat
-		if not sb:
-			continue
-
-		sb.bg_color = Color("#252540")
-		sb.border_color = Color("#3a3a5a")
-		sb.border_width_left = 2
-		sb.border_width_right = 2
-		sb.border_width_top = 2
-		sb.border_width_bottom = 2
-
-		if hero_idx in banned:
-			sb.bg_color = Color("#1a1a1a")
-			sb.border_color = Color("#442222")
-		elif hero_idx in p1_picks:
-			sb.border_color = Color("#4488ff")
-			sb.border_width_left = 3
-			sb.border_width_right = 3
-			sb.border_width_top = 3
-			sb.border_width_bottom = 3
-		elif hero_idx in p2_picks:
-			sb.border_color = Color("#ff4444")
-			sb.border_width_left = 3
-			sb.border_width_right = 3
-			sb.border_width_top = 3
-			sb.border_width_bottom = 3
-
-		if hero_idx == selected_idx:
-			sb.border_color = Color("#ffdd44")
-			sb.border_width_left = 4
-			sb.border_width_right = 4
-			sb.border_width_top = 4
-			sb.border_width_bottom = 4
-
-
-func _update_previews() -> void:
-	_update_player_preview(0, p1_picks, p1_slots, p1_slot_labels)
-	_update_player_preview(1, p2_picks, p2_slots, p2_slot_labels)
-
-
-func _update_player_preview(player: int, picks: Array, slots: Array[Panel], labels: Array[Label]) -> void:
-	for i in range(3):
-		if i >= slots.size():
-			continue
-		var slot := slots[i]
-		var label := labels[i]
-		var sb := slot.get_theme_stylebox("panel", "Panel") as StyleBoxFlat
-		if not sb:
-			continue
-
-		if i < picks.size():
-			var h := all_heroes[picks[i]]
-			label.text = "%s\n❤%d" % [h.hero_name, h.max_hp]
-			label.add_theme_color_override("font_color", Color.WHITE)
-			sb.border_color = Color("#3388dd") if player == 0 else Color("#dd3333")
-			sb.border_width_left = 3
-			sb.border_width_right = 3
-			sb.border_width_top = 3
-			sb.border_width_bottom = 3
-		else:
-			label.text = "英雄 %d" % (i + 1)
-			label.add_theme_color_override("font_color", Color("#aaaacc"))
-			sb.border_color = Color("#444466")
-			sb.border_width_left = 2
-			sb.border_width_right = 2
-			sb.border_width_top = 2
-			sb.border_width_bottom = 2
 
 
 func _on_confirm() -> void:
