@@ -1,0 +1,85 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/ui/bp_screen.gd" id="1_bp_gd"]
+[ext_resource type="PackedScene" path="res://src/ui/components/bp_preview_panel.tscn" id="2_preview"]
+
+[node name="BPScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_bp_gd")
+
+[node name="BPBackground" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.102, 0.102, 0.18, 1)
+mouse_filter = 2
+
+[node name="PhaseLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 460.0
+offset_top = 10.0
+offset_right = 1460.0
+offset_bottom = 42.0
+horizontal_alignment = 1
+mouse_filter = 2
+
+[node name="InfoLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 460.0
+offset_top = 44.0
+offset_right = 1460.0
+offset_bottom = 66.0
+horizontal_alignment = 1
+mouse_filter = 2
+
+[node name="TimerLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 810.0
+offset_top = 70.0
+offset_right = 1110.0
+offset_bottom = 102.0
+horizontal_alignment = 1
+mouse_filter = 2
+
+[node name="P1PreviewPanel" parent="." instance=ExtResource("2_preview")]
+offset_left = 30.0
+offset_top = 120.0
+offset_right = 210.0
+offset_bottom = 340.0
+player = 0
+
+[node name="P2PreviewPanel" parent="." instance=ExtResource("2_preview")]
+offset_left = 30.0
+offset_top = 340.0
+offset_right = 210.0
+offset_bottom = 560.0
+player = 1
+
+[node name="CardScrollContainer" type="ScrollContainer" parent="."]
+layout_mode = 0
+offset_left = 240.0
+offset_top = 120.0
+offset_right = 1890.0
+offset_bottom = 970.0
+horizontal_scroll_mode = 0
+
+[node name="CardArea" type="Control" parent="CardScrollContainer"]
+layout_mode = 2
+
+[node name="ConfirmButton" type="Button" parent="."]
+layout_mode = 0
+offset_left = 810.0
+offset_top = 970.0
+offset_right = 1110.0
+offset_bottom = 1030.0
+text = "确认选择"
+
+[node name="BPTimer" type="Timer" parent="."]

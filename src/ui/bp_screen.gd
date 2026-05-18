@@ -1,7 +1,8 @@
 extends Control
 
-## Title screen + Ban/Pick — 全部容器节点在 start_screen.tscn 内可视编辑。
-## 卡片（HeroCard）仍由代码动态填充，因为数量由 HeroData pool 决定。
+## BP (Ban/Pick) 屏（P1-4e: 从 start_screen 拆出）。
+## 进入：title_screen StartButton 切场。
+## 退出：BP 完成 → 设置 BattleSetup → 切场到 battle_screen。
 
 enum Phase {
 	P1_BAN1, P2_BAN1, P1_PICK1, P2_PICK1,
@@ -23,22 +24,14 @@ var banned: Array[int] = []
 var phase: int = -1
 var selected_idx: int = -1
 
-# ---- @onready: Title screen ----
-@onready var title_group: Control = $TitleGroup
-@onready var title_label: Label = $TitleGroup/TitleLabel
-@onready var subtitle_label: Label = $TitleGroup/SubtitleLabel
-@onready var start_button: Button = $TitleGroup/StartButton
-
-# ---- @onready: BP screen ----
-@onready var bp_group: Control = $BPGroup
-@onready var phase_label: Label = $BPGroup/PhaseLabel
-@onready var info_label: Label = $BPGroup/InfoLabel
-@onready var timer_label: Label = $BPGroup/TimerLabel
-@onready var p1_preview: BPPreviewPanel = $BPGroup/P1PreviewPanel
-@onready var p2_preview: BPPreviewPanel = $BPGroup/P2PreviewPanel
-@onready var card_area: Control = $BPGroup/CardScrollContainer/CardArea
-@onready var confirm_btn: Button = $BPGroup/ConfirmButton
-@onready var bp_timer: Timer = $BPGroup/BPTimer
+@onready var phase_label: Label = $PhaseLabel
+@onready var info_label: Label = $InfoLabel
+@onready var timer_label: Label = $TimerLabel
+@onready var p1_preview: BPPreviewPanel = $P1PreviewPanel
+@onready var p2_preview: BPPreviewPanel = $P2PreviewPanel
+@onready var card_area: Control = $CardScrollContainer/CardArea
+@onready var confirm_btn: Button = $ConfirmButton
+@onready var bp_timer: Timer = $BPTimer
 
 var card_cards: Array[HeroCard] = []
 var card_data: Array[int] = []
@@ -47,28 +40,11 @@ var bp_timer_seconds: int = BP_TIME
 
 func _ready() -> void:
 	all_heroes = HeroData.create_pool_heroes()
-	title_group.visible = true
-	bp_group.visible = false
-	_setup_title_ui()
-	_setup_bp_ui()
+	_setup_ui()
+	_enter_phase(Phase.P1_BAN1)
 
 
-func _setup_title_ui() -> void:
-	title_label.text = "波波攒之王"
-	FontManager.apply(title_label, 48)
-	title_label.add_theme_color_override("font_color", Color("#f5c518"))
-
-	subtitle_label.text = "1v1 同时回合制英雄对战"
-	FontManager.apply(subtitle_label, 24)
-	subtitle_label.add_theme_color_override("font_color", Color("#888899"))
-
-	start_button.text = "开始匹配"
-	FontManager.apply_btn(start_button, 32)
-	start_button.pressed.connect(_on_start_pressed)
-
-
-func _setup_bp_ui() -> void:
-	# 字体需要在 runtime 调 FontManager.apply（.tscn 无法直接引用 autoload 字体）
+func _setup_ui() -> void:
 	FontManager.apply(phase_label, 24)
 	phase_label.add_theme_color_override("font_color", Color("#f5c518"))
 	FontManager.apply(info_label, 16)
@@ -82,12 +58,6 @@ func _setup_bp_ui() -> void:
 	bp_timer.timeout.connect(_on_bp_timer_tick)
 
 	_build_hero_cards()
-
-
-func _on_start_pressed() -> void:
-	title_group.visible = false
-	bp_group.visible = true
-	_enter_phase(Phase.P1_BAN1)
 
 
 func _build_hero_cards() -> void:
@@ -251,7 +221,7 @@ func _start_battle() -> void:
 		all_heroes[p2_picks[1]],
 		all_heroes[p2_picks[2]],
 	]
-	# P1-4a: 必须先 set BattleSetup，再切场景；否则 battle_screen._ready() 可能拿到空 lineup
+	# 必须先 set BattleSetup，再切场景；否则 battle_screen._ready() 可能拿到空 lineup
 	BattleSetup.p1_heroes = p1_lineup
 	BattleSetup.p2_heroes = p2_lineup
 	get_tree().change_scene_to_file("res://src/ui/battle_screen.tscn")
