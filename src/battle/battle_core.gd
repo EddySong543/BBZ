@@ -163,6 +163,51 @@ func alive_hero_count(player: int) -> int:
 	return count
 
 
+# === Read-only views (P1-5f UI decoupling) ===
+
+func get_energy(player: int) -> int:
+	return energy[player]
+
+func get_active_slot(player: int) -> int:
+	return active_hero_index[player]
+
+func get_hero_at(player: int, slot: int) -> HeroData:
+	return heroes[player][slot]
+
+func get_hero_hp(player: int, slot: int) -> int:
+	return hero_hp[player][slot]
+
+func get_hero_max_hp(player: int, slot: int) -> int:
+	return hero_max_hp[player][slot]
+
+func get_hero_shield(player: int, slot: int) -> int:
+	return shield[player][slot]
+
+func get_clone_count(player: int) -> int:
+	return clone_count[player]
+
+func get_clone_order_array(player: int) -> Array:
+	return clone_order[player]
+
+func get_clone_hp_array(player: int) -> Array:
+	return clone_hp[player]
+
+func get_turn_number() -> int:
+	return turn_number
+
+func is_game_over() -> bool:
+	return game_over
+
+func get_winner() -> int:
+	return winner
+
+func get_pending_death_switch(player: int) -> int:
+	return pending_death_switch[player]
+
+func get_team_size(player: int) -> int:
+	return heroes[player].size()
+
+
 func _get_action_cost(player: int, action: int) -> int:
 	if action == Action.BAI_SHOU:
 		# B-005 Resolved 2026-05-18: 与 resolve() 内 spent = clampi(...) 保持一致，cap 到 6

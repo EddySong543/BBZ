@@ -231,9 +231,9 @@ func _try_switch_hero(player: int, frame_idx: int) -> void:
 
 	if hero_slot < 0:
 		return
-	if hero_slot == battle.active_hero_index[player]:
+	if hero_slot == battle.get_active_slot(player):
 		return
-	if battle.hero_hp[player][hero_slot] <= 0:
+	if battle.get_hero_hp(player, hero_slot) <= 0:
 		return
 	if not battle.can_afford(player, BattleCore.Action.SWITCH):
 		return
@@ -251,7 +251,7 @@ func _show_turn_intro() -> void:
 	event_label.visible = false
 	timer_label.text = ""
 
-	big_turn_label.text = "回合 %d" % (battle.turn_number + 1)
+	big_turn_label.text = "回合 %d" % (battle.get_turn_number() + 1)
 	big_turn_label.visible = true
 
 	await get_tree().create_timer(1.2).timeout
@@ -326,7 +326,7 @@ func _on_confirm_pressed() -> void:
 	var player: int = 0 if state == State.P1_TURN else 1
 	var opp: int = 1 - player
 	if selected_action in [BattleCore.Action.ATTACK, BattleCore.Action.BIG_ATTACK]:
-		if battle.clone_count[opp] > 0 and _clone_target < 0:
+		if battle.get_clone_count(opp) > 0 and _clone_target < 0:
 			status_label.text = "请选择攻击对象！"
 			return
 
@@ -354,16 +354,16 @@ func _resolve() -> void:
 
 	var hp1_before: int = battle.current_hp(0)
 	var hp2_before: int = battle.current_hp(1)
-	var active1_before: int = battle.active_hero_index[0]
-	var active2_before: int = battle.active_hero_index[1]
+	var active1_before: int = battle.get_active_slot(0)
+	var active2_before: int = battle.get_active_slot(1)
 	var r: Dictionary = battle.resolve()
 
 	# Detect death — hero_hp at the old active slot is now 0 or below
-	var p1_dead: bool = battle.hero_hp[0][active1_before] <= 0
-	var p2_dead: bool = battle.hero_hp[1][active2_before] <= 0
+	var p1_dead: bool = battle.get_hero_hp(0, active1_before) <= 0
+	var p2_dead: bool = battle.get_hero_hp(1, active2_before) <= 0
 
-	p1_hit = battle.hero_hp[0][active1_before] < hp1_before
-	p2_hit = battle.hero_hp[1][active2_before] < hp2_before
+	p1_hit = battle.get_hero_hp(0, active1_before) < hp1_before
+	p2_hit = battle.get_hero_hp(1, active2_before) < hp2_before
 
 	# Play battle animations
 	await _play_battle_anims(r.p1_action, r.p2_action, p1_hit, p2_hit, p1_dead, p2_dead)
@@ -385,9 +385,9 @@ func _resolve() -> void:
 		state = State.GAME_OVER
 		status_label.text = "游戏结束！"
 	else:
-		if battle.pending_death_switch[0] > 0:
+		if battle.get_pending_death_switch(0) > 0:
 			await _show_death_switch_selection(0)
-		if battle.pending_death_switch[1] > 0:
+		if battle.get_pending_death_switch(1) > 0:
 			await _show_death_switch_selection(1)
 		await get_tree().create_timer(1.8).timeout
 		_show_turn_intro()
@@ -402,7 +402,7 @@ func _show_death_switch_selection(player: int) -> void:
 	# P1-5b: 浮窗逻辑搬到 DeathSwitchOverlay 组件，这里只准备数据 + await selection
 	var reserves: Array = []
 	for slot in battle.get_living_reserves(player):
-		reserves.append([slot, battle.heroes[player][slot], battle.hero_hp[player][slot]])
+		reserves.append([slot, battle.get_hero_at(player, slot), battle.get_hero_hp(player, slot)])
 
 	_death_switch_overlay.show_selection(player, reserves)
 	var selected_slot: int = await _death_switch_overlay.selection_made
@@ -439,8 +439,8 @@ func _play_battle_anims(a1: int, a2: int, hit1: bool, hit2: bool, dead1: bool = 
 			await get_tree().create_timer(anim_phase_duration - 0.45).timeout
 
 	# Hit animation — skip if dead (already played defeat)
-	var clones1: bool = battle.clone_count[0] > 0
-	var clones2: bool = battle.clone_count[1] > 0
+	var clones1: bool = battle.get_clone_count(0) > 0
+	var clones2: bool = battle.get_clone_count(1) > 0
 	if hit1 and not dead1 and not clones1:
 		p1_char_display.play_animation("hit")
 		p1_char_display.set_hit_flash(true)
@@ -513,7 +513,7 @@ func _reset_button_styles() -> void:
 func _update_button_states() -> void:
 	_layout_circles()
 	var player: int = 0 if state in [State.P1_TURN] else 1
-	var en: int = battle.energy[player]
+	var en: int = battle.get_energy(player)
 
 	for btn in action_btn_list:
 		if not btn.visible:
@@ -540,7 +540,7 @@ func _update_button_states() -> void:
 # ---- Update all ----
 
 func _update_all() -> void:
-	turn_label.text = "回合 %d" % (battle.turn_number + 1)
+	turn_label.text = "回合 %d" % (battle.get_turn_number() + 1)
 	_update_hero_frames()
 	_update_character_displays()
 	_update_energy_labels()
@@ -567,8 +567,8 @@ func _update_character_displays() -> void:
 
 func _get_reserve_slots(player: int) -> Array:
 	var result: Array = []
-	for i in range(battle.heroes[player].size()):
-		if i != battle.active_hero_index[player]:
+	for i in range(battle.get_team_size(player)):
+		if i != battle.get_active_slot(player):
 			result.append(i)
 	return result
 
@@ -579,7 +579,7 @@ func _update_hero_frames() -> void:
 		var hp_labels := p1_frame_hp_labels if p == 0 else p2_frame_hp_labels
 		var frame_slots: Array = p1_frame_slots if p == 0 else p2_frame_slots
 		var shield_labels := p1_frame_shield_labels if p == 0 else p2_frame_shield_labels
-		var active_idx: int = battle.active_hero_index[p]
+		var active_idx: int = battle.get_active_slot(p)
 		var reserves := _get_reserve_slots(p)
 		var pcolor := Color("#3388dd") if p == 0 else Color("#dd3333")
 
@@ -602,7 +602,7 @@ func _update_hero_frames() -> void:
 
 
 func _update_single_frame(frame: HeroFrame, hp_label: Label, shield_label: Label, player: int, slot: int, is_active: bool, pcolor: Color) -> void:
-	if slot < 0 or slot >= battle.heroes[player].size():
+	if slot < 0 or slot >= battle.get_team_size(player):
 		frame.visible = false
 		hp_label.visible = false
 		shield_label.visible = false
@@ -612,8 +612,8 @@ func _update_single_frame(frame: HeroFrame, hp_label: Label, shield_label: Label
 	hp_label.visible = true
 	shield_label.visible = true
 
-	var h: HeroData = battle.heroes[player][slot]
-	var dead: bool = battle.hero_hp[player][slot] <= 0
+	var h: HeroData = battle.get_hero_at(player, slot)
+	var dead: bool = battle.get_hero_hp(player, slot) <= 0
 
 	frame.hero_name = h.hero_name
 	frame.portrait_path = h.portrait_path
@@ -622,26 +622,26 @@ func _update_single_frame(frame: HeroFrame, hp_label: Label, shield_label: Label
 	frame.player_color = pcolor
 	frame.frame_size = Vector2(72, 72) if is_active else Vector2(48, 48)
 
-	hp_label.text = "❤%d" % battle.hero_hp[player][slot]
-	var hp_ratio := clampf(float(battle.hero_hp[player][slot]) / float(battle.hero_max_hp[player][slot]), 0.0, 1.0)
+	hp_label.text = "❤%d" % battle.get_hero_hp(player, slot)
+	var hp_ratio := clampf(float(battle.get_hero_hp(player, slot)) / float(battle.get_hero_max_hp(player, slot)), 0.0, 1.0)
 	hp_label.add_theme_color_override("font_color", _hp_color(hp_ratio))
 	hp_label.add_theme_font_size_override("font_size", 13 if is_active else 11)
 
-	var sh: int = battle.shield[player][slot]
+	var sh: int = battle.get_hero_shield(player, slot)
 	shield_label.text = "🛡%d" % sh if sh > 0 else ""
 	shield_label.add_theme_font_size_override("font_size", 11 if is_active else 10)
 
 
 func _update_energy_labels() -> void:
-	p1_energy_bar.set_energy(battle.energy[0])
-	p2_energy_bar.set_energy(battle.energy[1])
+	p1_energy_bar.set_energy(battle.get_energy(0))
+	p2_energy_bar.set_energy(battle.get_energy(1))
 
 
 func _update_hp_labels() -> void:
 	var h1: int = battle.current_hp(0)
 	var h2: int = battle.current_hp(1)
-	var clones1: bool = battle.clone_count[0] > 0
-	var clones2: bool = battle.clone_count[1] > 0
+	var clones1: bool = battle.get_clone_count(0) > 0
+	var clones2: bool = battle.get_clone_count(1) > 0
 
 	p1_hp_label.visible = not clones1
 	p2_hp_label.visible = not clones2
@@ -649,12 +649,12 @@ func _update_hp_labels() -> void:
 	p2_char_display.visible = not clones2
 
 	if not clones1:
-		var s1: int = battle.shield[0][battle.active_hero_index[0]]
+		var s1: int = battle.get_hero_shield(0, battle.get_active_slot(0))
 		p1_hp_label.text = "❤%d  🛡%d" % [h1, s1] if s1 > 0 else "❤%d" % h1
 		var ratio1 := clampf(float(h1) / float(battle.current_max_hp(0)), 0.0, 1.0)
 		p1_hp_label.add_theme_color_override("font_color", _hp_color(ratio1))
 	if not clones2:
-		var s2: int = battle.shield[1][battle.active_hero_index[1]]
+		var s2: int = battle.get_hero_shield(1, battle.get_active_slot(1))
 		p2_hp_label.text = "❤%d  🛡%d" % [h2, s2] if s2 > 0 else "❤%d" % h2
 		var ratio2 := clampf(float(h2) / float(battle.current_max_hp(1)), 0.0, 1.0)
 		p2_hp_label.add_theme_color_override("font_color", _hp_color(ratio2))
@@ -683,11 +683,11 @@ const CLONE_GAP := 5.0
 func _update_clone_display() -> void:
 	for player in [0, 1]:
 		var area: CloneArea = p1_clone_area if player == 0 else p2_clone_area
-		var cnt: int = battle.clone_count[player]
+		var cnt: int = battle.get_clone_count(player)
 		if cnt == 0:
 			area.set_state([], [], 0)
 		else:
-			area.set_state(battle.clone_order[player], battle.clone_hp[player], battle.current_hp(player))
+			area.set_state(battle.get_clone_order_array(player), battle.get_clone_hp_array(player), battle.current_hp(player))
 	_update_clone_target_highlight()
 
 
@@ -695,7 +695,7 @@ func _update_clone_target_highlight() -> void:
 	var current: int = 0 if state == State.P1_TURN else 1
 	var opp: int = 1 - current
 	var is_attack := selected_action in [BattleCore.Action.ATTACK, BattleCore.Action.BIG_ATTACK]
-	var show_targets := is_attack and battle.clone_count[opp] > 0
+	var show_targets := is_attack and battle.get_clone_count(opp) > 0
 	p1_clone_area.set_target_mode(show_targets and current == 1)
 	p2_clone_area.set_target_mode(show_targets and current == 0)
 	if not show_targets:
@@ -707,7 +707,7 @@ func _on_clone_target_clicked(area_player: int, display_pos: int) -> void:
 	var opp: int = 1 - current
 	if area_player != opp:
 		return
-	if battle.clone_count[area_player] == 0:
+	if battle.get_clone_count(area_player) == 0:
 		return
 	_clone_target = display_pos
 	battle.select_attack_target(current, display_pos)
