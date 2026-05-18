@@ -1,7 +1,10 @@
+@abstract
 class_name HeroSkill
 extends RefCounted
 
 ## 英雄技能组件极简基类。
+## P1-E10: 使用 Godot 4.5+ @abstract 标记 — HeroSkill 不可直接实例化，
+## 必须通过子类（如 HeroSkillChenlong）使用。
 ##
 ## 设计原则（见 docs/architecture/battlecore-risk-notes.md §3）：
 ##   - 仅放当前迁移需要的 hook
