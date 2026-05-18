@@ -19,6 +19,11 @@ Desktop.ini
 # Ark Pixel font full-language pack is 158 MB — only 2 TTFs are actually used (in assets/font/).
 /font/
 
+# === Godot Plugins / Addons (installed via AssetLib by each developer) ===
+# GUT (Godot Unit Test) is installed locally via AssetLib to keep third-party
+# code out of git history. New devs: re-install via Project → AssetLib → search "Gut".
+/addons/gut/
+
 # === Malformed / Quarantine ===
 # Catch any future `cp ... "path"` accidents whose target name contains a stray quote.
 assets/font" *

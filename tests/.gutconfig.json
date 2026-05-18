@@ -1,0 +1,18 @@
+{
+  "_comment_purpose": "GUT 9.x 全局配置。在编辑器底部 GUT 面板点 'Run All' 时自动读取。",
+  "_comment_cli": "CLI 跑法： godot --headless -s res://addons/gut/gut_cmdln.gd -gconfig=res://tests/.gutconfig.json",
+
+  "dirs": [
+    "res://tests/unit"
+  ],
+  "include_subdirs": true,
+  "prefix": "test_",
+  "suffix": ".gd",
+
+  "log_level": 1,
+  "should_exit": false,
+  "should_exit_on_success": false,
+  "should_maximize": false,
+
+  "_comment_future": "Phase 1.3 加入英雄集成测试时新增 res://tests/integration 到 dirs。"
+}
