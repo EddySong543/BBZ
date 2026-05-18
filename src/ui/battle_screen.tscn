@@ -1,8 +1,71 @@
-[gd_scene format=3 uid="uid://bn0rjf1qjld17"]
+[gd_scene load_steps=12 format=3 uid="uid://bn0rjf1qjld17"]
 
 [ext_resource type="Script" uid="uid://uwkgowbdtjd7" path="res://src/ui/battle_screen.gd" id="1_battle_gd"]
 [ext_resource type="PackedScene" uid="uid://ccx2qeqk5rvx5" path="res://src/ui/components/character_display.tscn" id="2_char_display"]
 [ext_resource type="PackedScene" uid="uid://b6i5h2alff53a" path="res://src/ui/components/hero_frame.tscn" id="3_hero_frame"]
+[ext_resource type="PackedScene" path="res://src/ui/components/energy_bar.tscn" id="4_energy"]
+[ext_resource type="PackedScene" path="res://src/ui/components/clone_area.tscn" id="5_clone"]
+[ext_resource type="PackedScene" path="res://src/ui/components/death_switch_overlay.tscn" id="6_death"]
+
+[sub_resource type="StyleBoxFlat" id="CircleNormal"]
+bg_color = Color(0.164706, 0.164706, 0.290196, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.290196, 0.290196, 0.415686, 1)
+corner_radius_top_left = 80
+corner_radius_top_right = 80
+corner_radius_bottom_right = 80
+corner_radius_bottom_left = 80
+
+[sub_resource type="StyleBoxFlat" id="CircleHover"]
+bg_color = Color(0.239216, 0.239216, 0.4, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.415686, 0.415686, 0.8, 1)
+corner_radius_top_left = 80
+corner_radius_top_right = 80
+corner_radius_bottom_right = 80
+corner_radius_bottom_left = 80
+
+[sub_resource type="StyleBoxFlat" id="CircleDisabled"]
+bg_color = Color(0.101961, 0.101961, 0.164706, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.164706, 0.164706, 0.227451, 1)
+corner_radius_top_left = 80
+corner_radius_top_right = 80
+corner_radius_bottom_right = 80
+corner_radius_bottom_left = 80
+
+[sub_resource type="StyleBoxFlat" id="ConfirmNormal"]
+bg_color = Color(0.164706, 0.290196, 0.164706, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.266667, 0.666667, 0.266667, 1)
+corner_radius_top_left = 80
+corner_radius_top_right = 80
+corner_radius_bottom_right = 80
+corner_radius_bottom_left = 80
+
+[sub_resource type="StyleBoxFlat" id="ConfirmActive"]
+bg_color = Color(0.227451, 0.415686, 0.227451, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.266667, 1, 0.266667, 1)
+corner_radius_top_left = 80
+corner_radius_top_right = 80
+corner_radius_bottom_right = 80
+corner_radius_bottom_left = 80
 
 [node name="BattleScreen" type="Control" unique_id=1618077294]
 layout_mode = 3
@@ -120,6 +183,20 @@ offset_right = 1460.0
 offset_bottom = 414.0
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="P1EnergyBar" parent="." instance=ExtResource("4_energy")]
+offset_left = 232.0
+offset_top = 8.0
+offset_right = 632.0
+offset_bottom = 48.0
+player = 0
+
+[node name="P2EnergyBar" parent="." instance=ExtResource("4_energy")]
+offset_left = 1288.0
+offset_top = 8.0
+offset_right = 1688.0
+offset_bottom = 48.0
+player = 1
 
 [node name="P1Frame0" parent="." unique_id=2129820687 instance=ExtResource("3_hero_frame")]
 offset_left = 30.0
@@ -266,6 +343,10 @@ offset_left = 220.0
 offset_top = 80.0
 offset_right = 380.0
 offset_bottom = 240.0
+theme_override_styles/normal = SubResource("CircleNormal")
+theme_override_styles/hover = SubResource("CircleHover")
+theme_override_styles/pressed = SubResource("CircleHover")
+theme_override_styles/disabled = SubResource("CircleDisabled")
 text = "攒"
 
 [node name="BtnAttack" type="Button" parent="Buttons" unique_id=1348519698]
@@ -274,6 +355,10 @@ offset_left = 440.0
 offset_top = 80.0
 offset_right = 600.0
 offset_bottom = 240.0
+theme_override_styles/normal = SubResource("CircleNormal")
+theme_override_styles/hover = SubResource("CircleHover")
+theme_override_styles/pressed = SubResource("CircleHover")
+theme_override_styles/disabled = SubResource("CircleDisabled")
 text = "波"
 
 [node name="BtnBigAttack" type="Button" parent="Buttons" unique_id=1182840675]
@@ -282,6 +367,10 @@ offset_left = 660.0
 offset_top = 80.0
 offset_right = 820.0
 offset_bottom = 240.0
+theme_override_styles/normal = SubResource("CircleNormal")
+theme_override_styles/hover = SubResource("CircleHover")
+theme_override_styles/pressed = SubResource("CircleHover")
+theme_override_styles/disabled = SubResource("CircleDisabled")
 text = "大波"
 
 [node name="BtnDefend" type="Button" parent="Buttons" unique_id=1455563286]
@@ -290,6 +379,10 @@ offset_left = 880.0
 offset_top = 80.0
 offset_right = 1040.0
 offset_bottom = 240.0
+theme_override_styles/normal = SubResource("CircleNormal")
+theme_override_styles/hover = SubResource("CircleHover")
+theme_override_styles/pressed = SubResource("CircleHover")
+theme_override_styles/disabled = SubResource("CircleDisabled")
 text = "防"
 
 [node name="BtnBigDefend" type="Button" parent="Buttons" unique_id=772727519]
@@ -298,6 +391,10 @@ offset_left = 1100.0
 offset_top = 80.0
 offset_right = 1260.0
 offset_bottom = 240.0
+theme_override_styles/normal = SubResource("CircleNormal")
+theme_override_styles/hover = SubResource("CircleHover")
+theme_override_styles/pressed = SubResource("CircleHover")
+theme_override_styles/disabled = SubResource("CircleDisabled")
 text = "大防"
 
 [node name="BtnSpecial" type="Button" parent="Buttons" unique_id=581864479]
@@ -307,6 +404,10 @@ offset_left = 1320.0
 offset_top = 80.0
 offset_right = 1480.0
 offset_bottom = 240.0
+theme_override_styles/normal = SubResource("CircleNormal")
+theme_override_styles/hover = SubResource("CircleHover")
+theme_override_styles/pressed = SubResource("CircleHover")
+theme_override_styles/disabled = SubResource("CircleDisabled")
 
 [node name="BtnConfirm" type="Button" parent="Buttons" unique_id=2072422273]
 layout_mode = 0
@@ -314,22 +415,25 @@ offset_left = 1540.0
 offset_top = 80.0
 offset_right = 1700.0
 offset_bottom = 240.0
+theme_override_styles/normal = SubResource("ConfirmNormal")
+theme_override_styles/hover = SubResource("ConfirmActive")
+theme_override_styles/pressed = SubResource("ConfirmActive")
 text = "结束"
 
-[node name="P1CloneArea" type="Control" parent="." unique_id=1018482449]
-anchors_preset = 0
+[node name="P1CloneArea" parent="." instance=ExtResource("5_clone")]
 offset_left = 320.0
 offset_top = 490.0
 offset_right = 640.0
 offset_bottom = 750.0
-mouse_filter = 2
+player = 0
 
-[node name="P2CloneArea" type="Control" parent="." unique_id=884697962]
-anchors_preset = 0
+[node name="P2CloneArea" parent="." instance=ExtResource("5_clone")]
 offset_left = 1290.0
 offset_top = 490.0
 offset_right = 1610.0
 offset_bottom = 750.0
-mouse_filter = 2
+player = 1
+
+[node name="DeathSwitchOverlay" parent="." instance=ExtResource("6_death")]
 
 [node name="GameTimer" type="Timer" parent="." unique_id=1116178472]

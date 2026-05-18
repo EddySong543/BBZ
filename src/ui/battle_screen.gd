@@ -8,6 +8,10 @@ const CIRCLE_D := 160.0
 const CIRCLE_GAP := 60.0
 const CIRCLE_Y := 890.0
 
+## P1-5d: UI 坐标常量（避免散落的 1920.0 / 1080.0 魔法数字）
+const SCREEN_W := 1920.0
+const SCREEN_H := 1080.0
+
 ## Duration (seconds) to wait for each animation phase. Tune in Inspector.
 @export var anim_phase_duration: float = 2.0
 @export var action_phase_duration: float = 0.8
@@ -45,8 +49,9 @@ var p1_frame_slots: Array = [-1, -1, -1]
 var p2_frame_slots: Array = [-1, -1, -1]
 
 @onready var buttons_ctrl: Control = $Buttons
-@onready var p1_clone_area: Control = $P1CloneArea
-@onready var p2_clone_area: Control = $P2CloneArea
+@onready var p1_clone_area: CloneArea = $P1CloneArea
+@onready var p2_clone_area: CloneArea = $P2CloneArea
+@onready var _death_switch_overlay: DeathSwitchOverlay = $DeathSwitchOverlay
 @onready var game_timer: Timer = $GameTimer
 
 # Button references (from .tscn)
@@ -62,24 +67,20 @@ var p2_frame_slots: Array = [-1, -1, -1]
 var action_btn_list: Array[Button] = []
 var selected_action: int = -1
 var selected_btn: Button = null
+# Stylebox：normal/disabled/hover/pressed 已在 .tscn theme_override_styles 内 set。
+# 这里保留 normal/confirm reference 供 runtime 切换 normal ↔ selected 用；
+# selected 是逻辑层"用户选中"反馈，非 Button 自带 state，仍 code 构造。
 var _circle_style_normal: StyleBoxFlat
-var _circle_style_hover: StyleBoxFlat
 var _circle_style_selected: StyleBoxFlat
-var _circle_style_disabled: StyleBoxFlat
 var _confirm_style: StyleBoxFlat
 var _confirm_style_active: StyleBoxFlat
 
-# Energy labels (dynamic, placed absolutely)
-var p1_energy_labels: Array[Label] = []
-var p2_energy_labels: Array[Label] = []
+# Energy bars (P1-5g 抽组件)
+@onready var p1_energy_bar: EnergyBar = $P1EnergyBar
+@onready var p2_energy_bar: EnergyBar = $P2EnergyBar
 
-# Clone display (dynamic, inside P1CloneArea/P2CloneArea)
-var p1_clone_rects: Array[ColorRect] = []
-var p2_clone_rects: Array[ColorRect] = []
-var p1_clone_hp_labels: Array[Label] = []
-var p2_clone_hp_labels: Array[Label] = []
+# Clone display (P1-5c: CloneArea 组件接管 slot/label/event)
 var _clone_target: int = -1
-var _clone_target_rects: Array = []
 
 # State
 var timer_seconds: int = 0
@@ -94,7 +95,6 @@ func _ready() -> void:
 	battle.setup(BattleSetup.p1_heroes, BattleSetup.p2_heroes)
 	_init_styles()
 	_connect_frame_signals()
-	_init_energy_labels()
 	_init_clone_rects()
 	_init_buttons()
 	game_timer.timeout.connect(_on_timer_tick)
@@ -103,49 +103,22 @@ func _ready() -> void:
 
 
 func _init_styles() -> void:
-	var r := CIRCLE_D / 2.0
+	# Stylebox 主要在 battle_screen.tscn 内 set（CircleNormal/Hover/Disabled,
+	# ConfirmNormal/Active SubResource）。这里只:
+	#   1. 取 normal/confirm reference 供 runtime 切换 normal ↔ selected 用
+	#   2. 构造 selected style（逻辑层反馈，非 Button 自带 state）
+	_circle_style_normal = btn_charge.get_theme_stylebox("normal") as StyleBoxFlat
+	_confirm_style = btn_confirm.get_theme_stylebox("normal") as StyleBoxFlat
+	_confirm_style_active = btn_confirm.get_theme_stylebox("hover") as StyleBoxFlat
 
-	_circle_style_normal = StyleBoxFlat.new()
-	_circle_style_normal.bg_color = Color("#2a2a4a")
-	_circle_style_normal.set_corner_radius_all(int(r))
-	_circle_style_normal.border_width_left = 3
-	_circle_style_normal.border_width_right = 3
-	_circle_style_normal.border_width_top = 3
-	_circle_style_normal.border_width_bottom = 3
-	_circle_style_normal.border_color = Color("#4a4a6a")
-
-	_circle_style_hover = _circle_style_normal.duplicate() as StyleBoxFlat
-	_circle_style_hover.bg_color = Color("#3d3d66")
-	_circle_style_hover.border_color = Color("#6a6acc")
-
-	_circle_style_selected = _circle_style_normal.duplicate() as StyleBoxFlat
+	_circle_style_selected = StyleBoxFlat.new()
+	_circle_style_selected.bg_color = Color("#3a3a5a")
 	_circle_style_selected.border_color = Color("#ffdd44")
 	_circle_style_selected.border_width_left = 5
 	_circle_style_selected.border_width_right = 5
 	_circle_style_selected.border_width_top = 5
 	_circle_style_selected.border_width_bottom = 5
-	_circle_style_selected.bg_color = Color("#3a3a5a")
-
-	_circle_style_disabled = _circle_style_normal.duplicate() as StyleBoxFlat
-	_circle_style_disabled.bg_color = Color("#1a1a2a")
-	_circle_style_disabled.border_color = Color("#2a2a3a")
-
-	_confirm_style = StyleBoxFlat.new()
-	_confirm_style.bg_color = Color("#2a4a2a")
-	_confirm_style.set_corner_radius_all(int(r))
-	_confirm_style.border_width_left = 3
-	_confirm_style.border_width_right = 3
-	_confirm_style.border_width_top = 3
-	_confirm_style.border_width_bottom = 3
-	_confirm_style.border_color = Color("#44aa44")
-
-	_confirm_style_active = _confirm_style.duplicate() as StyleBoxFlat
-	_confirm_style_active.bg_color = Color("#3a6a3a")
-	_confirm_style_active.border_color = Color("#44ff44")
-	_confirm_style_active.border_width_left = 4
-	_confirm_style_active.border_width_right = 4
-	_confirm_style_active.border_width_top = 4
-	_confirm_style_active.border_width_bottom = 4
+	_circle_style_selected.set_corner_radius_all(int(CIRCLE_D / 2.0))
 
 
 # ---- Dynamic UI construction ----
@@ -156,52 +129,10 @@ func _connect_frame_signals() -> void:
 		p2_frames[i].gui_input.connect(_on_frame_gui_input.bind(1, i))
 
 
-func _init_energy_labels() -> void:
-	var p1_energy_x := 232.0
-	for row in range(2):
-		var lbl := _make_label("", 16, Color("#f5c518"), Vector2(p1_energy_x, 8.0 + row * 18), self)
-		lbl.size = Vector2(400, 22)
-		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		p1_energy_labels.append(lbl)
-
-	var p2_energy_end := 1688.0
-	for row in range(2):
-		var lbl := _make_label("", 16, Color("#f5c518"), Vector2(p2_energy_end - 400, 8.0 + row * 18), self)
-		lbl.size = Vector2(400, 22)
-		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		p2_energy_labels.append(lbl)
-
-
 func _init_clone_rects() -> void:
-	for player in [0, 1]:
-		var area: Control = p1_clone_area if player == 0 else p2_clone_area
-		var rects: Array[ColorRect] = []
-		var hp_labels: Array[Label] = []
-		var base_color := Color("#3388dd") if player == 0 else Color("#dd3333")
-		var offsets := [-CLONE_W - CLONE_GAP, 0.0, CLONE_W + CLONE_GAP]
-		for i in range(3):
-			var r := ColorRect.new()
-			r.color = base_color if i == 1 else Color("#555555")
-			r.position = Vector2(offsets[i], 0)
-			r.size = Vector2(CLONE_W, CLONE_H)
-			r.visible = false
-			r.mouse_filter = Control.MOUSE_FILTER_STOP
-			r.gui_input.connect(_on_clone_target_input.bind(player, i))
-			area.add_child(r)
-			rects.append(r)
-
-			var lbl := _make_label("", 12, Color("#ff6666"), Vector2(offsets[i], -18), area)
-			lbl.size = Vector2(CLONE_W, 16)
-			lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			lbl.visible = false
-			hp_labels.append(lbl)
-
-		if player == 0:
-			p1_clone_rects = rects
-			p1_clone_hp_labels = hp_labels
-		else:
-			p2_clone_rects = rects
-			p2_clone_hp_labels = hp_labels
+	# P1-5c: CloneArea 内部已有 slot/label 节点；这里只 connect target_clicked signal
+	p1_clone_area.target_clicked.connect(func(display_pos: int) -> void: _on_clone_target_clicked(0, display_pos))
+	p2_clone_area.target_clicked.connect(func(display_pos: int) -> void: _on_clone_target_clicked(1, display_pos))
 
 
 func _init_buttons() -> void:
@@ -223,17 +154,12 @@ func _init_buttons() -> void:
 	btn_big_defend.text = "大防"
 	btn_special.text = ""
 	btn_confirm.text = "结束"
+	# stylebox 已在 .tscn theme_override_styles set (P1-5a)；这里只 set size/font/clip
 	for btn in [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend, btn_special]:
 		btn.size = Vector2(CIRCLE_D, CIRCLE_D)
-		btn.add_theme_stylebox_override("normal", _circle_style_normal.duplicate())
-		btn.add_theme_stylebox_override("hover", _circle_style_hover)
-		btn.add_theme_stylebox_override("pressed", _circle_style_hover)
-		btn.add_theme_stylebox_override("disabled", _circle_style_disabled)
 		FontManager.apply_btn(btn, 16)
 		btn.clip_text = true
 	btn_confirm.size = Vector2(CIRCLE_D, CIRCLE_D)
-	btn_confirm.add_theme_stylebox_override("normal", _confirm_style)
-	btn_confirm.add_theme_stylebox_override("hover", _confirm_style_active)
 	FontManager.apply_btn(btn_confirm, 16)
 	btn_confirm.clip_text = true
 
@@ -473,94 +399,15 @@ func _show_death_switch_selection(player: int) -> void:
 	status_label.text = "%s 英雄阵亡，选择替补英雄" % pname
 	status_label.visible = true
 
-	var overlay := ColorRect.new()
-	overlay.color = Color(0, 0, 0, 0.6)
-	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(overlay)
+	# P1-5b: 浮窗逻辑搬到 DeathSwitchOverlay 组件，这里只准备数据 + await selection
+	var reserves: Array = []
+	for slot in battle.get_living_reserves(player):
+		reserves.append([slot, battle.heroes[player][slot], battle.hero_hp[player][slot]])
 
-	var prompt := Label.new()
-	prompt.text = "%s 选择替补英雄" % pname
-	FontManager.apply(prompt, 28)
-	prompt.add_theme_color_override("font_color", Color.WHITE)
-	prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	prompt.position = Vector2(660, 300)
-	prompt.size = Vector2(600, 40)
-	overlay.add_child(prompt)
-
-	var living := battle.get_living_reserves(player)
-	var card_w := 160
-	var card_h := 200
-	var gap := 40
-	var total_w: float = living.size() * card_w + (living.size() - 1) * gap
-	var start_x: float = (1920.0 - total_w) / 2.0
-	var card_y: float = 380.0
-
-	# Waiter node — we await its tree_exited signal (fires when overlay is freed)
-	var waiter := Node.new()
-	waiter.name = "_SwitchWaiter"
-	overlay.add_child(waiter)
-
-	for j in range(living.size()):
-		var slot: int = living[j]
-		var h: HeroData = battle.heroes[player][slot]
-		var captured_slot: int = slot
-
-		var card := Button.new()
-		card.position = Vector2(start_x + j * (card_w + gap), card_y)
-		card.size = Vector2(card_w, card_h)
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color("#252540")
-		sb.border_color = Color("#4488ff") if player == 0 else Color("#ff4444")
-		sb.border_width_left = 3
-		sb.border_width_right = 3
-		sb.border_width_top = 3
-		sb.border_width_bottom = 3
-		sb.set_corner_radius_all(8)
-		card.add_theme_stylebox_override("normal", sb)
-		var sb_hover := sb.duplicate() as StyleBoxFlat
-		sb_hover.bg_color = Color("#3a3a5a")
-		sb_hover.border_color = Color("#ffdd44")
-		card.add_theme_stylebox_override("hover", sb_hover)
-		overlay.add_child(card)
-
-		if h.portrait_path != "" and ResourceLoader.exists(h.portrait_path):
-			var tex: Texture2D = load(h.portrait_path)
-			var tr := TextureRect.new()
-			tr.texture = tex
-			tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			tr.position = Vector2(10, 10)
-			tr.size = Vector2(card_w - 20, card_h - 48)
-			tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			card.add_child(tr)
-
-		var name_lbl := Label.new()
-		name_lbl.text = h.hero_name
-		name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		name_lbl.position = Vector2(0, card_h - 36)
-		name_lbl.size = Vector2(card_w, 20)
-		FontManager.apply(name_lbl, 16)
-		name_lbl.add_theme_color_override("font_color", Color.WHITE)
-		name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		card.add_child(name_lbl)
-
-		var hp_lbl := Label.new()
-		hp_lbl.text = "❤ %d" % battle.hero_hp[player][slot]
-		hp_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		hp_lbl.position = Vector2(0, card_h - 18)
-		hp_lbl.size = Vector2(card_w, 16)
-		FontManager.apply(hp_lbl, 13)
-		hp_lbl.add_theme_color_override("font_color", Color("#ff6666"))
-		hp_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		card.add_child(hp_lbl)
-
-		card.pressed.connect(func():
-			battle.execute_death_switch(player, captured_slot)
-			overlay.queue_free()
-			_update_all()
-		)
-
-	await waiter.tree_exited
+	_death_switch_overlay.show_selection(player, reserves)
+	var selected_slot: int = await _death_switch_overlay.selection_made
+	battle.execute_death_switch(player, selected_slot)
+	_update_all()
 
 
 func _play_battle_anims(a1: int, a2: int, hit1: bool, hit2: bool, dead1: bool = false, dead2: bool = false) -> void:
@@ -646,7 +493,7 @@ func _layout_circles() -> void:
 
 	var n := buttons.size()
 	var total_w := n * CIRCLE_D + (n - 1) * CIRCLE_GAP
-	var start_x := (1920.0 - total_w) / 2.0
+	var start_x := (SCREEN_W - total_w) / 2.0
 
 	for i in range(n):
 		buttons[i].position = Vector2(start_x + i * (CIRCLE_D + CIRCLE_GAP), CIRCLE_Y - buttons_ctrl.position.y)
@@ -786,24 +633,8 @@ func _update_single_frame(frame: HeroFrame, hp_label: Label, shield_label: Label
 
 
 func _update_energy_labels() -> void:
-	var e1: int = battle.energy[0]
-	var e2: int = battle.energy[1]
-
-	for row in range(2):
-		var start := row * 10
-		var count := clampi(e1 - start, 0, 10)
-		var txt := ""
-		for _j in range(count):
-			txt += "O "
-		p1_energy_labels[row].text = txt
-
-	for row in range(2):
-		var start := row * 10
-		var count := clampi(e2 - start, 0, 10)
-		var txt := ""
-		for _j in range(count):
-			txt += "O "
-		p2_energy_labels[row].text = txt
+	p1_energy_bar.set_energy(battle.energy[0])
+	p2_energy_bar.set_energy(battle.energy[1])
 
 
 func _update_hp_labels() -> void:
@@ -851,79 +682,34 @@ const CLONE_GAP := 5.0
 
 func _update_clone_display() -> void:
 	for player in [0, 1]:
-		var rects: Array = p1_clone_rects if player == 0 else p2_clone_rects
-		var hp_labels: Array = p1_clone_hp_labels if player == 0 else p2_clone_hp_labels
+		var area: CloneArea = p1_clone_area if player == 0 else p2_clone_area
 		var cnt: int = battle.clone_count[player]
-
-		var show_all := cnt > 0
-		for i in range(3):
-			rects[i].visible = show_all
-			hp_labels[i].visible = show_all
-
-		if not show_all:
-			continue
-
-		var order: Array = battle.clone_order[player]
-		var clone_hps: Array = battle.clone_hp[player]
-		var base_color := Color("#3388dd") if player == 0 else Color("#dd3333")
-		var n: int = order.size()
-		var total_w: float = n * CLONE_W + (n - 1) * CLONE_GAP
-		var start_x: float = -total_w / 2.0
-
-		for display_pos in range(3):
-			if display_pos >= n:
-				rects[display_pos].visible = false
-				hp_labels[display_pos].visible = false
-				continue
-			rects[display_pos].visible = true
-			hp_labels[display_pos].visible = true
-			rects[display_pos].position.x = start_x + display_pos * (CLONE_W + CLONE_GAP)
-			hp_labels[display_pos].position.x = start_x + display_pos * (CLONE_W + CLONE_GAP)
-
-			var actual: int = order[display_pos]
-			if actual == 1:
-				rects[display_pos].color = base_color
-				hp_labels[display_pos].text = "❤%d" % battle.current_hp(player)
-			else:
-				rects[display_pos].color = Color("#555555")
-				var ci: int = 0 if actual == 0 else 1
-				var chp: int = clone_hps[ci] if ci < clone_hps.size() else 0
-				hp_labels[display_pos].text = "❤%d" % chp
-
+		if cnt == 0:
+			area.set_state([], [], 0)
+		else:
+			area.set_state(battle.clone_order[player], battle.clone_hp[player], battle.current_hp(player))
 	_update_clone_target_highlight()
 
 
 func _update_clone_target_highlight() -> void:
-	var player: int = 0 if state == State.P1_TURN else 1
-	var opp: int = 1 - player
-	var sel: int = selected_action
-	var is_attack := sel in [BattleCore.Action.ATTACK, BattleCore.Action.BIG_ATTACK]
+	var current: int = 0 if state == State.P1_TURN else 1
+	var opp: int = 1 - current
+	var is_attack := selected_action in [BattleCore.Action.ATTACK, BattleCore.Action.BIG_ATTACK]
 	var show_targets := is_attack and battle.clone_count[opp] > 0
-
-	var target_rects: Array = p2_clone_rects if state == State.P1_TURN else p1_clone_rects
-	_clone_target_rects = target_rects if show_targets else []
-
-	for r in target_rects:
-		if show_targets:
-			r.mouse_filter = Control.MOUSE_FILTER_STOP
-		else:
-			r.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
+	p1_clone_area.set_target_mode(show_targets and current == 1)
+	p2_clone_area.set_target_mode(show_targets and current == 0)
 	if not show_targets:
 		_clone_target = -1
 
 
-func _on_clone_target_input(event: InputEvent, player: int, display_pos: int) -> void:
-	if not (event is InputEventMouseButton):
+func _on_clone_target_clicked(area_player: int, display_pos: int) -> void:
+	var current: int = 0 if state == State.P1_TURN else 1
+	var opp: int = 1 - current
+	if area_player != opp:
 		return
-	if not event.pressed or event.button_index != MOUSE_BUTTON_LEFT:
-		return
-	var opp: int = 1 if state == State.P1_TURN else 0
-	if player != opp:
-		return
-	if battle.clone_count[player] == 0:
+	if battle.clone_count[area_player] == 0:
 		return
 	_clone_target = display_pos
-	battle.select_attack_target(1 - opp, display_pos)
+	battle.select_attack_target(current, display_pos)
 	var pname := "P1" if state == State.P1_TURN else "P2"
 	status_label.text = "%s - 已选攻击目标 #%d" % [pname, display_pos + 1]
