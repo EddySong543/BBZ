@@ -181,26 +181,22 @@ func test_jiaotu_three_uses_per_game() -> void:
 # 百兽 (h03) cost 动态计算
 # ============================================================================
 
-func test_baishou_cost_uses_max_of_energy_and_one() -> void:
-	# CURRENT-BEHAVIOR (B-005 候选):
-	#   _get_action_cost(BAI_SHOU) = maxi(energy, BAI_SHOU_MIN_COST=1)，不 clamp 到 6。
-	#   但 resolve() 内实际花费 spent = clampi(energy, 1, 6)，即 cap 在 6。
-	#   两者不一致 → 调用方若读 _get_action_cost 推断花费，会与实际 resolve() 行为偏离。
-	#   当前 UI 不直接读 _get_action_cost(BAI_SHOU)，所以无可见影响。
-	#   详见 BEHAVIOR_NOTES B-005。
+func test_baishou_cost_uses_clamped_energy() -> void:
+	# B-005 Resolved (Code Fixed) 2026-05-18:
+	#   _get_action_cost(BAI_SHOU) 现在与 resolve() 内一致，
+	#   返回 clampi(energy, 1, BAI_SHOU_DAMAGE_CAP=6)。
 	# Arrange
 	var battle := _hero_battle(["h03", "h03", "h03"], ["h03", "h03", "h03"])
-	# Act + Assert: 能量 0
+	# Act + Assert: 能量 0 → cost = max(0, 1) = 1
 	BattleFactory.set_energy(battle, 0, 0)
-	assert_eq(battle._get_action_cost(0, BattleCore.Action.BAI_SHOU), 1, "0 能 → cost = max(0, 1) = 1")
-	# Act + Assert: 能量 4
+	assert_eq(battle._get_action_cost(0, BattleCore.Action.BAI_SHOU), 1, "0 能 → cost = 1")
+	# Act + Assert: 能量 4 → cost = 4（在 [1, 6] 范围内）
 	BattleFactory.set_energy(battle, 0, 4)
 	assert_eq(battle._get_action_cost(0, BattleCore.Action.BAI_SHOU), 4)
-	# Act + Assert: 能量 10 — cost 未 clamp 到 6
+	# Act + Assert: 能量 10 → cost cap 到 6
 	BattleFactory.set_energy(battle, 0, 10)
-	# LOCKED-FOR-REFACTOR (B-005): 若 _get_action_cost 改为 clamp 到 6，下面应改为 6。
-	assert_eq(battle._get_action_cost(0, BattleCore.Action.BAI_SHOU), 10,
-		"_get_action_cost 不 clamp 到 BAI_SHOU_DAMAGE_CAP — 与 resolve() 内 clamp 不一致")
+	assert_eq(battle._get_action_cost(0, BattleCore.Action.BAI_SHOU), BattleCore.BAI_SHOU_DAMAGE_CAP,
+		"_get_action_cost 现已 cap 到 BAI_SHOU_DAMAGE_CAP=6（B-005 Resolved）")
 
 
 func test_baishou_can_afford_only_needs_one_energy() -> void:

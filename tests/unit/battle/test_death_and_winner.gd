@@ -119,7 +119,7 @@ func test_winner_2_when_p1_all_dead() -> void:
 	BattleFactory.choose_and_resolve(battle, BattleCore.Action.CHARGE, BattleCore.Action.CHARGE)
 	# Assert
 	assert_true(battle.game_over)
-	assert_eq(battle.winner, 2, "P1 全灭 → P2 (winner=2) 胜利")
+	assert_eq(battle.winner, BattleCore.WINNER_P2, "P1 全灭 → WINNER_P2")
 
 
 func test_winner_1_when_p2_all_dead() -> void:
@@ -127,22 +127,19 @@ func test_winner_1_when_p2_all_dead() -> void:
 	battle.hero_hp[1] = [0, 0, 0]
 	BattleFactory.choose_and_resolve(battle, BattleCore.Action.CHARGE, BattleCore.Action.CHARGE)
 	assert_true(battle.game_over)
-	assert_eq(battle.winner, 1, "P2 全灭 → P1 (winner=1) 胜利")
+	assert_eq(battle.winner, BattleCore.WINNER_P1, "P2 全灭 → WINNER_P1")
 
 
 func test_draw_when_both_sides_die_same_turn() -> void:
-	# CURRENT-BEHAVIOR (B-007 候选):
-	#   battle_core.gd:438 双方同时全灭 → game_over=true, winner=0, events 添加 "双方全灭 — 平局"。
-	#   但 winner=0 在初始化时也是常见占位值（虽然 setup 用的是 -1）。
-	#   语义建议：用专门常量 (DRAW=-2) 或 winner=0 表示平局并写注释。
-	#   详见 BEHAVIOR_NOTES B-007。
+	# B-007 Resolved (Code Fixed) 2026-05-18:
+	#   引入 WINNER_DRAW / WINNER_P1 / WINNER_P2 / WINNER_UNDECIDED 常量。
+	#   WINNER_DRAW = 0 保持原值（避免破坏可能依赖此值的外部代码），仅改用常量自解释。
 	var battle := BattleFactory.plain_battle()
 	battle.hero_hp[0] = [0, 0, 0]
 	battle.hero_hp[1] = [0, 0, 0]
 	BattleFactory.choose_and_resolve(battle, BattleCore.Action.CHARGE, BattleCore.Action.CHARGE)
 	assert_true(battle.game_over)
-	# LOCKED-FOR-REFACTOR (B-007): 若引入 DRAW 常量，下面应改为 BattleCore.DRAW (或类似)。
-	assert_eq(battle.winner, 0, "双方同回合全灭 → winner=0 表示平局")
+	assert_eq(battle.winner, BattleCore.WINNER_DRAW, "双方同回合全灭 → WINNER_DRAW")
 
 
 # ============================================================================

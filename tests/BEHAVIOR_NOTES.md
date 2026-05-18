@@ -47,7 +47,7 @@
 
 ### B-001 ATTACK × ATTACK 不抵消，双方各受 1 伤
 
-- **Status**：Undecided
+- **Status**：✅ Resolved (Design Updated) — 2026-05-18 by Eddy
 - **Impact**：高
 - **位置**：`battle_core.gd:578 _apply_defense`
 - **Design Intent**：`design/gdd/game-concept.md §3.2 同时出手结算矩阵` 与 `§5 边界情况` 第 1 条，原文：
@@ -60,7 +60,7 @@
 
 ### B-002 BIG_ATTACK × BIG_ATTACK 不抵消，双方各受 2 伤
 
-- **Status**：Undecided
+- **Status**：✅ Resolved (Design Updated) — 2026-05-18 by Eddy
 - **Impact**：中
 - **位置**：`battle_core.gd:578 _apply_defense`（与 B-001 同一处）
 - **Design Intent**：`§3.2`、`§5 边界情况` 第 2 条：
@@ -73,7 +73,7 @@
 
 ### B-003 ATTACK vs BIG_ATTACK 双向都解算
 
-- **Status**：Undecided
+- **Status**：✅ Resolved (Design Updated) — 2026-05-18 by Eddy
 - **Impact**：高
 - **位置**：`battle_core.gd:323-335 resolve()` Phase 2 + `_apply_defense`
 - **Design Intent**：`§3.2` 与 `§5` 第 3 条：
@@ -90,7 +90,7 @@
 
 ### B-004 `select_action` 拒绝后 `selected_action=-1` 会让 `resolve()` 崩溃
 
-- **Status**：Undecided
+- **Status**：✅ Resolved (Code Fixed) — 2026-05-18 by Eddy. resolve() 开头加 guard：若 selected_action[p] < 0，push_warning 并 fallback 到 CHARGE
 - **Impact**：低（UI 当前兜底）/ 高（网络/AI 接入后）
 - **位置**：`battle_core.gd:202 select_action` + `resolve()` Phase 1 cost lookup
 - **Design Intent**：`§5 边界情况`："能量不足时选择消耗动作 → 动作不可选择（按钮置灰）"。设计假设 UI 会阻止这种状态进入 resolve()
@@ -102,7 +102,7 @@
 
 ### B-005 `_get_action_cost(BAI_SHOU)` 未 clamp 到 `BAI_SHOU_DAMAGE_CAP`
 
-- **Status**：Undecided
+- **Status**：✅ Resolved (Code Fixed) — 2026-05-18 by Eddy. `_get_action_cost(BAI_SHOU)` 改为 `clampi(energy, BAI_SHOU_MIN_COST, BAI_SHOU_DAMAGE_CAP)`，与 resolve() 内一致
 - **Impact**：低（当前无调用方读取，UI 不基于此值显示）；中（未来 AI / 网络 / UI 显示真实成本时会偏离）
 - **位置**：`battle_core.gd:137 _get_action_cost` vs `battle_core.gd:294 resolve()` Phase 1 内 `spent = clampi(energy[p], 1, BAI_SHOU_DAMAGE_CAP)`
 - **Design Intent**：`design/heroes.md` h03 寅虎："**百兽**（消耗全部能量(上限6)），造成等量次数的1点伤害"
@@ -116,7 +116,7 @@
 
 ### B-006 `setup()` 未重置三个 transient 标志数组
 
-- **Status**：Undecided
+- **Status**：✅ Accepted as Canonical — 2026-05-18 by Eddy. setup() 内加注释说明三个 transient 标志由 resolve() Phase 1 开头重置，故意不在 setup 重置
 - **Impact**：低（BattleCore 实例每场新建，且 resolve() 开头会重置这三个数组）；中（若调用方复用 BattleCore 跨多场战斗、且未走 resolve() 路径）
 - **位置**：`battle_core.gd:72-113 setup()` 未涉及 `_baishou_spent`、`_jiaotu_immune`、`_shetui_active`
 - **Design Intent**：N/A（私有实现细节，无对应设计文档）
@@ -131,7 +131,7 @@
 
 ### B-007 双方同回合全灭时 `winner = 0`，语义与 winner=1/2 不平行
 
-- **Status**：Undecided
+- **Status**：✅ Resolved (Code Fixed) — 2026-05-18 by Eddy. 新增 `WINNER_UNDECIDED=-1 / WINNER_DRAW=0 / WINNER_P1=1 / WINNER_P2=2` 常量，winner 数值保持不变（避免破坏外部读取），仅改用常量自解释
 - **Impact**：低（events 文本会写明"平局"）；中（任何读 winner 字段判定输赢的代码必须特判 0）
 - **位置**：`battle_core.gd:438-447 resolve()` Phase 4 game_over_check
 - **Design Intent**：`design/gdd/game-concept.md §5`："双方同时击杀对方最后英雄 → 平局"

@@ -32,6 +32,12 @@ const MAX_ENERGY := 20
 const BAI_SHOU_DAMAGE_CAP := 6
 const BAI_SHOU_MIN_COST := 1
 
+# Winner 取值常量（B-007 Resolved 2026-05-18）
+const WINNER_UNDECIDED := -1
+const WINNER_DRAW := 0
+const WINNER_P1 := 1
+const WINNER_P2 := 2
+
 # 英雄技能注册中心 — 仅列已迁移到 HeroSkill 组件的英雄
 # 未在此 dict 中的 hero_id 仍走 BattleCore 内 hardcoded if 分支（如 xugou/haizhu 等）
 # 详见 docs/architecture/battlecore-risk-notes.md §3
@@ -119,8 +125,13 @@ func setup(p1_heroes: Array, p2_heroes: Array) -> void:
 	pending_death_switch = [-1, -1]
 	active_hero_index = [0, 0]
 	game_over = false
-	winner = -1
+	winner = WINNER_UNDECIDED
 	turn_number = 0
+	# B-006 Accepted as Canonical 2026-05-18:
+	#   _baishou_spent / _jiaotu_immune / _shetui_active 三个 transient 标志
+	#   故意不在 setup() 重置 — 它们由 resolve() Phase 1 开头重置（见下）。
+	#   当前 UI 每场新建 BattleCore，所以即使首次 setup 后这三个保留 var 声明初值
+	#   也无可见影响。详见 tests/BEHAVIOR_NOTES.md B-006。
 	_build_hero_skills()
 
 
@@ -154,7 +165,8 @@ func alive_hero_count(player: int) -> int:
 
 func _get_action_cost(player: int, action: int) -> int:
 	if action == Action.BAI_SHOU:
-		return maxi(energy[player], BAI_SHOU_MIN_COST)
+		# B-005 Resolved 2026-05-18: 与 resolve() 内 spent = clampi(...) 保持一致，cap 到 6
+		return clampi(energy[player], BAI_SHOU_MIN_COST, BAI_SHOU_DAMAGE_CAP)
 	if action in EXTRA_ACTION_DEF:
 		return EXTRA_ACTION_DEF[action]["cost"]
 	if action == Action.SWITCH and _jiaotu_free_switch[player]:
@@ -275,6 +287,15 @@ func get_clone_hp(player: int) -> Array:
 
 
 func resolve() -> Dictionary:
+	# B-004 Resolved 2026-05-18: 防御性 guard — 若调用方未先用 select_action() 设置动作
+	# (selected_action[p] == -1)，下游 _get_action_cost(p, -1) 会查 BASE_ACTION_DEF[-1] 崩溃。
+	# 此处 fallback 到 CHARGE 是安全选择（cost=0, +1能量），让对局继续而非崩溃。
+	# UI 当前会兜底，但联网/AI 接入后调用方多样化，此 guard 是必要保护。
+	for _p in [0, 1]:
+		if selected_action[_p] < 0:
+			push_warning("BattleCore.resolve(): P%d 未选择动作，fallback 到 CHARGE" % (_p + 1))
+			selected_action[_p] = Action.CHARGE
+
 	var events: Array = []
 	var p1_dmg := 0
 	var p2_dmg := 0
@@ -452,17 +473,18 @@ func resolve() -> Dictionary:
 			events.append("P%d [蛇蜕] 复活！1HP，波/防永久升级" % (p + 1))
 
 	# === Phase 4: Game over check ===
+	# B-007 Resolved 2026-05-18: 使用 WINNER_* 常量代替魔法数字
 	if alive_hero_count(0) == 0 and alive_hero_count(1) == 0:
 		game_over = true
-		winner = 0
+		winner = WINNER_DRAW
 		events.append("双方全灭 — 平局！")
 	elif alive_hero_count(0) == 0:
 		game_over = true
-		winner = 2
+		winner = WINNER_P2
 		events.append("P1 全灭，P2 获胜！")
 	elif alive_hero_count(1) == 0:
 		game_over = true
-		winner = 1
+		winner = WINNER_P1
 		events.append("P2 全灭，P1 获胜！")
 
 	# === Phase 5: Force-switch dead hero ===

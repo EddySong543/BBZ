@@ -107,13 +107,13 @@ func test_attack_vs_attack_both_take_1_damage() -> void:
 	#   实际代码 battle_core.gd:_apply_defense 没有 ATTACK vs ATTACK 的抵消分支 —
 	#   双向攻击都被解算，双方都受 1 伤。
 	#   未来 Phase 3 重构若决定按设计文档改，本测试将变红，请同步更新 BEHAVIOR_NOTES B-001。
+	# B-001 Resolved (Design Updated) 2026-05-18: 设计文档已改为"双方各受 1 伤"
 	var battle := _battle()
 	BattleFactory.choose_and_resolve(battle, BattleCore.Action.ATTACK, BattleCore.Action.ATTACK)
 	assert_eq(battle.energy[0], E_INIT - 1)
 	assert_eq(battle.energy[1], E_INIT - 1)
-	# LOCKED-FOR-REFACTOR (B-001): 若按设计文档"互相抵消"修复，下面两行需改为 HP_INIT。
-	assert_eq(battle.current_hp(0), HP_INIT - 1, "P1 受 1 伤 (与设计文档'互相抵消'不一致)")
-	assert_eq(battle.current_hp(1), HP_INIT - 1, "P2 受 1 伤 (与设计文档'互相抵消'不一致)")
+	assert_eq(battle.current_hp(0), HP_INIT - 1, "P1 受 1 伤")
+	assert_eq(battle.current_hp(1), HP_INIT - 1, "P2 受 1 伤")
 
 
 func test_attack_vs_defend_blocked() -> void:
@@ -131,14 +131,13 @@ func test_attack_vs_big_attack_both_take_damage() -> void:
 	#   即只有大波方造成伤害；波方的波被大波压制不造成伤害。
 	#   实际代码：双向都解算 — 波方受 2 伤 (BIG_ATTACK)，大波方受 1 伤 (ATTACK)。
 	#   详见 BEHAVIOR_NOTES B-003。
+	# B-003 Resolved (Design Updated) 2026-05-18: 设计文档已改为"双向都解算，无压制"
 	var battle := _battle()
 	BattleFactory.choose_and_resolve(battle, BattleCore.Action.ATTACK, BattleCore.Action.BIG_ATTACK)
 	assert_eq(battle.energy[0], E_INIT - 1)
 	assert_eq(battle.energy[1], E_INIT - 3)
-	# LOCKED-FOR-REFACTOR (B-003): 若按设计"大波压制波"修复，
-	#   下面 P1 hp 应改为 HP_INIT - 1，P2 hp 应改为 HP_INIT。
 	assert_eq(battle.current_hp(0), HP_INIT - 2, "P1 受 2 伤 (大波)")
-	assert_eq(battle.current_hp(1), HP_INIT - 1, "P2 受 1 伤 (波) — 设计文档说波被压制不应造成伤害")
+	assert_eq(battle.current_hp(1), HP_INIT - 1, "P2 受 1 伤 (波)")
 
 
 func test_attack_vs_big_defend_blocked() -> void:
@@ -215,13 +214,12 @@ func test_big_attack_vs_charge_p2_takes_2_damage() -> void:
 
 func test_big_attack_vs_attack_both_take_damage() -> void:
 	# 镜像 test_attack_vs_big_attack。同一个 CURRENT-BEHAVIOR (B-003)。
+	# B-003 Resolved (Design Updated) 2026-05-18: 镜像 test_attack_vs_big_attack
 	var battle := _battle()
 	BattleFactory.choose_and_resolve(battle, BattleCore.Action.BIG_ATTACK, BattleCore.Action.ATTACK)
 	assert_eq(battle.energy[0], E_INIT - 3)
 	assert_eq(battle.energy[1], E_INIT - 1)
-	# LOCKED-FOR-REFACTOR (B-003): 若按设计"大波压制波"修复，
-	#   下面 P1 hp 应改为 HP_INIT，P2 hp 应改为 HP_INIT - 1。
-	assert_eq(battle.current_hp(0), HP_INIT - 1, "P1 受 1 伤 (波) — 设计文档说波被大波压制不应造成伤害")
+	assert_eq(battle.current_hp(0), HP_INIT - 1, "P1 受 1 伤 (波)")
 	assert_eq(battle.current_hp(1), HP_INIT - 2, "P2 受 2 伤 (大波)")
 
 
@@ -239,13 +237,13 @@ func test_big_attack_vs_big_attack_both_take_2_damage() -> void:
 	#   设计文档 §3.2 写"大波×大波 = 互相抵消，双方各-3能"。
 	#   实际代码：双向都解算，双方各受 2 伤。
 	#   详见 BEHAVIOR_NOTES B-002。
+	# B-002 Resolved (Design Updated) 2026-05-18: 设计文档已改为"双方各受 2 伤"
 	var battle := _battle()
 	BattleFactory.choose_and_resolve(battle, BattleCore.Action.BIG_ATTACK, BattleCore.Action.BIG_ATTACK)
 	assert_eq(battle.energy[0], E_INIT - 3)
 	assert_eq(battle.energy[1], E_INIT - 3)
-	# LOCKED-FOR-REFACTOR (B-002): 若按设计"互相抵消"修复，下面两行需改为 HP_INIT。
-	assert_eq(battle.current_hp(0), HP_INIT - 2, "P1 受 2 伤 (与设计文档'互相抵消'不一致)")
-	assert_eq(battle.current_hp(1), HP_INIT - 2, "P2 受 2 伤 (与设计文档'互相抵消'不一致)")
+	assert_eq(battle.current_hp(0), HP_INIT - 2, "P1 受 2 伤")
+	assert_eq(battle.current_hp(1), HP_INIT - 2, "P2 受 2 伤")
 
 
 func test_big_attack_vs_big_defend_blocked() -> void:
