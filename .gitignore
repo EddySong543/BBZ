@@ -9,6 +9,21 @@
 Thumbs.db
 Desktop.ini
 
+# === Local Tooling (per-machine paths / proxy configs / launcher scripts) ===
+# Never commit scripts containing local absolute paths, proxy IPs, or env-specific config.
+*.bat
+*.cmd
+*.ps1.local
+
+# === Asset Source Packs (kept locally, only curated files copied into assets/) ===
+# Ark Pixel font full-language pack is 158 MB — only 2 TTFs are actually used (in assets/font/).
+/font/
+
+# === Malformed / Quarantine ===
+# Catch any future `cp ... "path"` accidents whose target name contains a stray quote.
+assets/font" *
+**/* && cp *
+
 # === Claude Code Local ===
 .claude/settings.local.json
 .claude/docs/UPGRADE-PLAN.md
