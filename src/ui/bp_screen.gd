@@ -140,14 +140,7 @@ func _enter_phase(new_phase: int) -> void:
 func _update_phase_label() -> void:
 	var player := "P1" if _phase_player() == 0 else "P2"
 	var action := "禁用" if _is_ban_phase() else "选择"
-	var nth := ""
-	match phase:
-		Phase.P1_PICK1, Phase.P2_PICK1: nth = "第1个"
-		Phase.P2_PICK2, Phase.P1_PICK2: nth = "第2个"
-		Phase.P1_BAN3, Phase.P2_BAN3: nth = "第3个"
-		Phase.P1_PICK3, Phase.P2_PICK3: nth = "第3个"
-		Phase.P1_BAN1, Phase.P2_BAN1: nth = "第1个"
-		Phase.P2_BAN2, Phase.P1_BAN2: nth = "第2个"
+	var nth := "第%d个" % (phase / 4 + 1)
 
 	phase_label.text = "%s — %s%s英雄" % [player, action, nth]
 	var remaining := 0
@@ -157,15 +150,17 @@ func _update_phase_label() -> void:
 	info_label.text = "可选: %d | 已禁: %d | P1: %d | P2: %d" % [remaining, banned.size(), p1_picks.size(), p2_picks.size()]
 
 
+# P1-4f: 12 个 Phase 的数学规律（phase ∈ [0, 11]，DONE=12 不会调到这两个 helper）
+# - 是否 ban：phase % 4 < 2（每 4 个一轮，前 2 个是 ban，后 2 个是 pick）
+# - 哪方：第 2 轮 (phase / 4 == 1) P2 先，其他轮 P1 先；轮内 phase % 2 == 0 是先手
+
 func _is_ban_phase() -> bool:
-	return phase in [Phase.P1_BAN1, Phase.P2_BAN1, Phase.P2_BAN2, Phase.P1_BAN2, Phase.P1_BAN3, Phase.P2_BAN3]
+	return (phase % 4) < 2
 
 
 func _phase_player() -> int:
-	match phase:
-		Phase.P1_BAN1, Phase.P1_PICK1, Phase.P1_BAN2, Phase.P1_PICK2, Phase.P1_BAN3, Phase.P1_PICK3:
-			return 0
-	return 1
+	var round_starter := 1 if (phase / 4) == 1 else 0
+	return round_starter ^ (phase % 2)
 
 
 func _on_bp_timer_tick() -> void:
