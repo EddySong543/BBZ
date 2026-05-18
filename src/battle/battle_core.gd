@@ -320,7 +320,7 @@ func resolve() -> Dictionary:
 			a = pool[randi_range(0, 4)]
 			selected_action[p] = a
 			yuzhe_used = true
-			events.append("P%d [不可知之权柄] → %s" % [p + 1, get_action_name(a)])
+			events.append({id="yuzhe_random", player=p, action_name=get_action_name(a)})
 
 		if a == Action.JIAO_TU:
 			_jiaotu_immune[p] = true
@@ -334,7 +334,7 @@ func resolve() -> Dictionary:
 			var spent := clampi(energy[p], BAI_SHOU_MIN_COST, BAI_SHOU_DAMAGE_CAP)
 			energy[p] -= spent
 			_baishou_spent[p] = spent
-			events.append("P%d 百兽消耗 %d 能量" % [p + 1, spent])
+			events.append({id="baishou_spent", player=p, amount=spent})
 		elif not yuzhe_used:
 			var cost := _get_action_cost(p, a)
 			energy[p] -= cost
@@ -344,35 +344,35 @@ func resolve() -> Dictionary:
 			if _caijin_buff[p]:
 				gain *= 2
 				_caijin_buff[p] = false
-				events.append("P%d [财源广进] 攒能量翻倍！" % (p + 1))
+				events.append({id="caijin_triggered", player=p})
 			energy[p] = mini(energy[p] + gain, MAX_ENERGY)
-			events.append("P%d 攒 +%d能量" % [p + 1, gain])
+			events.append({id="charge_gain", player=p, amount=gain})
 
 		if a == Action.SHE_SHEN:
 			hero_hp[p][active_hero_index[p]] -= 2
 			energy[p] = mini(energy[p] + 3, MAX_ENERGY)
-			events.append("P%d [舍身] -2HP +3能量" % (p + 1))
+			events.append({id="sheshen_used", player=p})
 		# 财源广进: set buff for next charge
 		if a == Action.CAI_JIN:
 			_caijin_buff[p] = true
-			events.append("P%d [财源广进] 下次攒能量翻倍" % (p + 1))
+			events.append({id="caijin_buff_set", player=p})
 
 
 	a1 = selected_action[0]
 	a2 = selected_action[1]
 	# === Phase 2: Resolve attacks + specials ===
 	if _is_attack(a1):
-		var dmg := _calc_attack_raw(0, a1, a2, events, "P1", "P2", energy_before)
+		var dmg := _calc_attack_raw(0, a1, a2, events, energy_before)
 		if _resolve_target(0, 1) == 1:
 			_raw_dmg_to[1] = dmg
-			dmg = _apply_defense(dmg, a1, _effective_defense(1, a2), events, "P1")
-		p2_dmg += _route_damage(0, 1, dmg, events, "攻击")
+			dmg = _apply_defense(dmg, a1, _effective_defense(1, a2), events, 0)
+		p2_dmg += _route_damage(0, 1, dmg, events, "attack")
 	if _is_attack(a2):
-		var dmg := _calc_attack_raw(1, a2, a1, events, "P2", "P1", energy_before)
+		var dmg := _calc_attack_raw(1, a2, a1, events, energy_before)
 		if _resolve_target(1, 0) == 1:
 			_raw_dmg_to[0] = dmg
-			dmg = _apply_defense(dmg, a2, _effective_defense(0, a1), events, "P2")
-		p1_dmg += _route_damage(1, 0, dmg, events, "攻击")
+			dmg = _apply_defense(dmg, a2, _effective_defense(0, a1), events, 1)
+		p1_dmg += _route_damage(1, 0, dmg, events, "attack")
 
 	# 百兽 damage — multihit: 1 damage per hit, random target per hit
 	for p in [0, 1]:
@@ -398,15 +398,15 @@ func resolve() -> Dictionary:
 						_rebuild_clone_order(opp)
 						clone_kills += 1
 			if clone_kills > 0:
-				events.append("P%d 百兽摧毁 %d 个分身！" % [(p + 1), clone_kills])
+				events.append({id="baishou_destroy_clones", player=p, count=clone_kills})
 			if hero_dmg == 0 and clone_kills == 0:
-				events.append("P%d 百兽被大防格挡" % (p + 1))
+				events.append({id="baishou_blocked", player=p})
 			elif hero_dmg > 0:
 				if p == 0:
 					p2_dmg += hero_dmg
 				else:
 					p1_dmg += hero_dmg
-				events.append("P%d 百兽造成 %d 次1点伤害" % [p + 1, hero_dmg])
+				events.append({id="baishou_hits", player=p, count=hero_dmg})
 
 	# 反戈 reflect — raw damage, pierces defense (cannot pierce 无敌)
 	for p in [0, 1]:
@@ -416,9 +416,9 @@ func resolve() -> Dictionary:
 				var opp: int = 1 - p
 				if not _jiaotu_immune[opp]:
 					hero_hp[opp][active_hero_index[opp]] -= raw_taken
-					events.append("P%d [反戈] 无视防御，反弹%d伤害" % [p + 1, raw_taken])
+					events.append({id="fange_reflect", player=p, amount=raw_taken})
 				else:
-					events.append("P%d [反戈] 被无敌免疫！" % (p + 1))
+					events.append({id="fange_immune", player=p})
 
 	# 身外化身 — after all attacks resolved
 	for p in [0, 1]:
@@ -434,7 +434,7 @@ func resolve() -> Dictionary:
 			var absorbed0 := mini(s0, p1_dmg)
 			shield[0][active_hero_index[0]] = maxi(0, shield[0][active_hero_index[0]] - absorbed0)
 			p1_dmg -= absorbed0
-			events.append("P1 护盾吸收%d伤害" % absorbed0)
+			events.append({id="shield_absorb", player=0, amount=absorbed0})
 		hero_hp[0][active_hero_index[0]] -= p1_dmg
 	if not _jiaotu_immune[1]:
 		var s1: int = shield[1][active_hero_index[1]]
@@ -444,25 +444,25 @@ func resolve() -> Dictionary:
 			var absorbed1 := mini(s1, p2_dmg)
 			shield[1][active_hero_index[1]] = maxi(0, shield[1][active_hero_index[1]] - absorbed1)
 			p2_dmg -= absorbed1
-			events.append("P2 护盾吸收%d伤害" % absorbed1)
+			events.append({id="shield_absorb", player=1, amount=absorbed1})
 		hero_hp[1][active_hero_index[1]] -= p2_dmg
 
 	if p1_dmg > 0:
 		if _jiaotu_immune[0]:
-			events.append("P1 [狡兔] 免疫了 %d 伤害" % p1_dmg)
+			events.append({id="jiaotu_immune", player=0, amount=p1_dmg})
 		else:
-			events.append("P1 受到 %d 伤害" % p1_dmg)
+			events.append({id="damage_taken", player=0, amount=p1_dmg})
 			if active_hero(0).passive_id == "haizhu":
 				energy[0] = mini(energy[0] + p1_dmg, MAX_ENERGY)
-				events.append("P1 [亥猪] 纳福 +%d能量" % p1_dmg)
+				events.append({id="haizhu_energy_gain", player=0, amount=p1_dmg})
 	if p2_dmg > 0:
 		if _jiaotu_immune[1]:
-			events.append("P2 [狡兔] 免疫了 %d 伤害" % p2_dmg)
+			events.append({id="jiaotu_immune", player=1, amount=p2_dmg})
 		else:
-			events.append("P2 受到 %d 伤害" % p2_dmg)
+			events.append({id="damage_taken", player=1, amount=p2_dmg})
 			if active_hero(1).passive_id == "haizhu":
 				energy[1] = mini(energy[1] + p2_dmg, MAX_ENERGY)
-				events.append("P2 [亥猪] 纳福 +%d能量" % p2_dmg)
+				events.append({id="haizhu_energy_gain", player=1, amount=p2_dmg})
 
 	# 蛇蜕: if dead, revive with 1HP, permanently upgrade 波/防
 	for p in [0, 1]:
@@ -470,22 +470,22 @@ func resolve() -> Dictionary:
 		if idx >= 0 and _shetui_active[p] and hero_hp[p][idx] <= 0:
 			hero_hp[p][idx] = 1
 			_shetui_empowered[p] = true
-			events.append("P%d [蛇蜕] 复活！1HP，波/防永久升级" % (p + 1))
+			events.append({id="shetui_revive", player=p})
 
 	# === Phase 4: Game over check ===
 	# B-007 Resolved 2026-05-18: 使用 WINNER_* 常量代替魔法数字
 	if alive_hero_count(0) == 0 and alive_hero_count(1) == 0:
 		game_over = true
 		winner = WINNER_DRAW
-		events.append("双方全灭 — 平局！")
+		events.append({id="draw"})
 	elif alive_hero_count(0) == 0:
 		game_over = true
 		winner = WINNER_P2
-		events.append("P1 全灭，P2 获胜！")
+		events.append({id="victory", winner=WINNER_P2})
 	elif alive_hero_count(1) == 0:
 		game_over = true
 		winner = WINNER_P1
-		events.append("P2 全灭，P1 获胜！")
+		events.append({id="victory", winner=WINNER_P1})
 
 	# === Phase 5: Force-switch dead hero ===
 	if not game_over:
@@ -500,7 +500,7 @@ func resolve() -> Dictionary:
 		if selected_action[p] == Action.JIAO_TU:
 			_jiaotu_used_count[p] += 1
 			_jiaotu_free_switch[p] = true
-			events.append("P%d [狡兔三窟] 下回合免费切换" % (p + 1))
+			events.append({id="jiaotu_free_switch", player=p})
 		else:
 			_jiaotu_free_switch[p] = false
 
@@ -540,7 +540,7 @@ func _create_clones(player: int, events: Array) -> void:
 			clone_count[player] += 1
 			break
 	_rebuild_clone_order(player)
-	events.append("P%d [身外化身] 创建1个分身！(共%d个)" % [(player + 1), clone_count[player]])
+	events.append({id="shenwai_create", player=player, total=clone_count[player]})
 
 
 func _clear_clones(player: int) -> void:
@@ -564,7 +564,7 @@ func _rebuild_clone_order(player: int) -> void:
 	clone_order[player] = entries
 
 
-func _route_damage(attacker: int, defender: int, dmg: int, events: Array, source_name: String) -> int:
+func _route_damage(attacker: int, defender: int, dmg: int, events: Array, source_id: String) -> int:
 	if dmg <= 0:
 		return 0
 	if clone_count[defender] == 0:
@@ -580,7 +580,7 @@ func _route_damage(attacker: int, defender: int, dmg: int, events: Array, source
 		clone_hp[defender][ci] = 0
 		clone_count[defender] -= 1
 		_rebuild_clone_order(defender)
-		events.append("P%d [分身] 假身被%s摧毁！" % [(defender + 1), source_name])
+		events.append({id="clone_destroyed", player=defender, source=source_id})
 	return 0
 
 
@@ -604,7 +604,7 @@ func _effective_defense(player: int, action: int) -> int:
 	return action
 
 
-func _calc_attack_raw(player: int, atk: int, def: int, events: Array, atk_name: String, def_name: String, energy_before: Array) -> int:
+func _calc_attack_raw(player: int, atk: int, def: int, events: Array, energy_before: Array) -> int:
 	atk = _effective_attack(player, atk)
 	var dmg := _get_action_damage(player, atk)
 	# h05 chenlong 已迁移至 HeroSkillChenlong (skills/chenlong.gd)
@@ -617,14 +617,14 @@ func _calc_attack_raw(player: int, atk: int, def: int, events: Array, atk_name: 
 	return dmg
 
 
-func _apply_defense(dmg: int, atk: int, def: int, events: Array, atk_name: String) -> int:
+func _apply_defense(dmg: int, atk: int, def: int, events: Array, player: int) -> int:
 	if def == Action.BIG_DEFEND:
-		events.append("%s 被大防格挡" % atk_name)
+		events.append({id="big_defend_block", player=player})
 		return 0
 	if def == Action.DEFEND and atk == Action.ATTACK:
-		events.append("%s 被防格挡" % atk_name)
+		events.append({id="defend_block", player=player})
 		return 0
-	events.append("%s 命中，%d 伤害" % [atk_name, dmg])
+	events.append({id="attack_hit", player=player, amount=dmg})
 	return dmg
 
 
@@ -637,12 +637,11 @@ func _resolve_target(attacker: int, defender: int) -> int:
 	return clone_order[defender][target]
 
 func _force_switch(player: int, events: Array) -> void:
-	var pname := "P1" if player == 0 else "P2"
 	if get_living_reserves(player).size() > 0:
 		pending_death_switch[player] = 1
-		events.append("%s 英雄阵亡，请选择替补英雄" % pname)
+		events.append({id="force_switch_prompt", player=player})
 	else:
-		events.append("%s 无存活英雄可切换" % pname)
+		events.append({id="no_switch_available", player=player})
 
 
 func get_living_reserves(player: int) -> Array:

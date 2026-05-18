@@ -110,7 +110,7 @@ func test_route_damage_no_clones_returns_full_dmg() -> void:
 	var battle := BattleFactory.plain_battle()
 	var events: Array = []
 	# Act
-	var result: int = battle._route_damage(0, 1, 2, events, "测试")
+	var result: int = battle._route_damage(0, 1, 2, events, "test")
 	# Assert
 	assert_eq(result, 2, "无分身 → 全伤害命中本体 (return dmg)")
 
@@ -122,7 +122,7 @@ func test_route_damage_hits_clone_returns_zero_and_destroys_clone() -> void:
 	battle.selected_target[0] = 1
 	var events: Array = []
 	# Act
-	var result: int = battle._route_damage(0, 1, 2, events, "测试")
+	var result: int = battle._route_damage(0, 1, 2, events, "test")
 	# Assert
 	assert_eq(result, 0, "击中分身时返回 0 (本体不受伤)")
 	assert_eq(battle.clone_hp[1][0], 0, "分身 0 HP 归零")
@@ -136,7 +136,7 @@ func test_route_damage_hits_hero_returns_full_dmg_when_clones_exist() -> void:
 	battle.selected_target[0] = 0
 	var events: Array = []
 	# Act
-	var result: int = battle._route_damage(0, 1, 2, events, "测试")
+	var result: int = battle._route_damage(0, 1, 2, events, "test")
 	# Assert
 	assert_eq(result, 2, "命中本体时返回完整伤害")
 	assert_eq(battle.clone_count[1], 2, "分身计数不变")
@@ -150,7 +150,7 @@ func test_route_damage_zero_dmg_short_circuits() -> void:
 	var clones_before: int = battle.clone_count[1]
 	var events: Array = []
 	# Act
-	var result: int = battle._route_damage(0, 1, 0, events, "测试")
+	var result: int = battle._route_damage(0, 1, 0, events, "test")
 	# Assert
 	assert_eq(result, 0)
 	assert_eq(battle.clone_count[1], clones_before, "0 伤害不消耗分身")

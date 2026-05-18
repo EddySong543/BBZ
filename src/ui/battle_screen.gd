@@ -449,7 +449,7 @@ func _resolve() -> void:
 
 	var txt := ""
 	for ev in r.events:
-		txt += ev + "\n"
+		txt += EventFormatter.format(ev) + "\n"
 	event_label.text = txt.strip_edges()
 	event_label.visible = true
 
