@@ -8,25 +8,8 @@ enum Action {
 	FAN_GE, BAI_SHOU, JIAO_TU, SHE_TUI, SHE_SHEN, SHEN_WAI, CAI_JIN, YU_ZHE
 }
 
-const BASE_ACTION_DEF := {
-	Action.CHARGE:     {id="charge",     cost=0, damage=0, energy_gain=1},
-	Action.ATTACK:     {id="attack",     cost=1, damage=1, energy_gain=0},
-	Action.DEFEND:     {id="defend",     cost=0, damage=0, energy_gain=0},
-	Action.BIG_ATTACK: {id="big_attack", cost=3, damage=2, energy_gain=0},
-	Action.BIG_DEFEND: {id="big_defend", cost=2, damage=0, energy_gain=0},
-	Action.SWITCH:     {id="switch",     cost=1, damage=0, energy_gain=0},
-}
-
-const EXTRA_ACTION_DEF := {
-	Action.FAN_GE:   {id="fange",   cost=2, damage=0},
-	Action.BAI_SHOU: {id="baishou", cost=-1, damage=0},
-	Action.JIAO_TU:  {id="jiaotu",  cost=3, damage=0},
-	Action.SHE_TUI:  {id="shetui",  cost=2, damage=0},
-	Action.SHE_SHEN: {id="sheshen", cost=0, damage=0},
-	Action.SHEN_WAI: {id="shenwai", cost=3, damage=0},
-	Action.CAI_JIN:  {id="caijin",  cost=0, damage=0},
-	Action.YU_ZHE:   {id="yuzhe",   cost=0, damage=0},
-}
+# BASE_ACTION_DEF / EXTRA_ACTION_DEF 已移到 ActionDef (P1-E2)
+# 内部引用见 ActionDef.BASE_ACTION_DEF / ActionDef.EXTRA_ACTION_DEF
 
 const MAX_ENERGY := 20
 const BAI_SHOU_DAMAGE_CAP := 6
@@ -212,17 +195,17 @@ func _get_action_cost(player: int, action: int) -> int:
 	if action == Action.BAI_SHOU:
 		# B-005 Resolved 2026-05-18: 与 resolve() 内 spent = clampi(...) 保持一致，cap 到 6
 		return clampi(energy[player], BAI_SHOU_MIN_COST, BAI_SHOU_DAMAGE_CAP)
-	if action in EXTRA_ACTION_DEF:
-		return EXTRA_ACTION_DEF[action]["cost"]
+	if action in ActionDef.EXTRA_ACTION_DEF:
+		return ActionDef.EXTRA_ACTION_DEF[action]["cost"]
 	if action == Action.SWITCH and _jiaotu_free_switch[player]:
 		return 0
-	return BASE_ACTION_DEF[action]["cost"]
+	return ActionDef.BASE_ACTION_DEF[action]["cost"]
 
 
 func _get_action_damage(player: int, action: int) -> int:
-	if action in EXTRA_ACTION_DEF:
-		return EXTRA_ACTION_DEF[action]["damage"]
-	return BASE_ACTION_DEF[action]["damage"]
+	if action in ActionDef.EXTRA_ACTION_DEF:
+		return ActionDef.EXTRA_ACTION_DEF[action]["damage"]
+	return ActionDef.BASE_ACTION_DEF[action]["damage"]
 
 
 func can_afford(player: int, action: int) -> bool:
@@ -342,11 +325,6 @@ func resolve() -> Dictionary:
 			selected_action[_p] = Action.CHARGE
 
 	var events: Array = []
-	var p1_dmg := 0
-	var p2_dmg := 0
-
-	var a1: int = selected_action[0]
-	var a2: int = selected_action[1]
 
 	_baishou_spent = [0, 0]
 	_jiaotu_immune = [false, false]
@@ -355,7 +333,39 @@ func resolve() -> Dictionary:
 
 	var energy_before := energy.duplicate()
 
-	# === Phase 1: Apply costs & energy gains ===
+	# P1-E2: 6 phase 拆为私有方法，便于单 phase 阅读 / 调试 / 修改
+	_resolve_phase1_costs_and_energy(events)
+	var dmg := _resolve_phase2_attacks_specials(events, energy_before)
+	_resolve_phase3_apply_damage(events, dmg[0], dmg[1])
+	_resolve_phase4_check_game_over(events)
+	_resolve_phase5_force_switch_dead(events)
+
+	# Phase 6 cleanup 会 reset selected_action，故缓存 a1/a2 给 cleanup + last_result 用
+	var a1: int = selected_action[0]
+	var a2: int = selected_action[1]
+	_resolve_phase6_cleanup(events, a1, a2)
+
+	last_result = {
+		p1_hp=current_hp(0), p2_hp=current_hp(1),
+		p1_max_hp=current_max_hp(0), p2_max_hp=current_max_hp(1),
+		p1_energy=energy[0], p2_energy=energy[1],
+		p1_action=a1, p2_action=a2,
+		p1_hero_name=active_hero(0).hero_name,
+		p2_hero_name=active_hero(1).hero_name,
+		events=events,
+		game_over=game_over,
+		winner=winner,
+		turn=turn_number,
+	}
+	return last_result
+
+
+# === Resolve flow: 6 phases (P1-E2 抽出) ===
+
+## Phase 1: 应用动作消耗能量、获取能量；设置 transient 标志
+## (jiaotu_immune / shetui_active / shenwai_used)。
+## YU_ZHE 在此 phase 内被替换为随机基础动作（修改 selected_action[p]）。
+func _resolve_phase1_costs_and_energy(events: Array) -> void:
 	for p in [0, 1]:
 		var a: int = selected_action[p]
 		# 愚者: random basic action
@@ -385,7 +395,7 @@ func resolve() -> Dictionary:
 			energy[p] -= cost
 
 		if a == Action.CHARGE:
-			var gain: int = BASE_ACTION_DEF[Action.CHARGE]["energy_gain"]
+			var gain: int = ActionDef.BASE_ACTION_DEF[Action.CHARGE]["energy_gain"]
 			if _caijin_buff[p]:
 				gain *= 2
 				_caijin_buff[p] = false
@@ -403,9 +413,14 @@ func resolve() -> Dictionary:
 			events.append({id="caijin_buff_set", player=p})
 
 
-	a1 = selected_action[0]
-	a2 = selected_action[1]
-	# === Phase 2: Resolve attacks + specials ===
+## Phase 2: 结算攻击伤害（普通攻击 + 百兽 multi-hit + 反戈反伤）+ 身外化身分身创建。
+## 返回 [p1_dmg, p2_dmg]（伤害先累计，phase 3 才扣 HP）。
+func _resolve_phase2_attacks_specials(events: Array, energy_before: Array) -> Array:
+	var p1_dmg := 0
+	var p2_dmg := 0
+	var a1: int = selected_action[0]
+	var a2: int = selected_action[1]
+
 	if _is_attack(a1):
 		var dmg := _calc_attack_raw(0, a1, a2, events, energy_before)
 		if _resolve_target(0, 1) == 1:
@@ -470,7 +485,11 @@ func resolve() -> Dictionary:
 		if _shenwai_used[p]:
 			_create_clones(p, events)
 
-	# === Phase 3: Apply damage (shield + immunity check) ===
+	return [p1_dmg, p2_dmg]
+
+
+## Phase 3: 应用累计伤害 — 先护盾吸收 + 狡兔免疫检查 + 亥猪受伤获能 + 蛇蜕复活检查。
+func _resolve_phase3_apply_damage(events: Array, p1_dmg: int, p2_dmg: int) -> void:
 	if not _jiaotu_immune[0]:
 		var s0: int = shield[0][active_hero_index[0]]
 		if active_hero(0).passive_id == "xugou":
@@ -517,8 +536,9 @@ func resolve() -> Dictionary:
 			_shetui_empowered[p] = true
 			events.append({id="shetui_revive", player=p})
 
-	# === Phase 4: Game over check ===
-	# B-007 Resolved 2026-05-18: 使用 WINNER_* 常量代替魔法数字
+
+## Phase 4: 胜负判定 (B-007 Resolved 2026-05-18: 使用 WINNER_* 常量)
+func _resolve_phase4_check_game_over(events: Array) -> void:
 	if alive_hero_count(0) == 0 and alive_hero_count(1) == 0:
 		game_over = true
 		winner = WINNER_DRAW
@@ -532,7 +552,9 @@ func resolve() -> Dictionary:
 		winner = WINNER_P1
 		events.append({id="victory", winner=WINNER_P1})
 
-	# === Phase 5: Force-switch dead hero ===
+
+## Phase 5: 强制切换阵亡英雄（仅当游戏未结束）
+func _resolve_phase5_force_switch_dead(events: Array) -> void:
 	if not game_over:
 		for p in [0, 1]:
 			if hero_hp[p][active_hero_index[p]] <= 0:
@@ -540,7 +562,11 @@ func resolve() -> Dictionary:
 				_clear_clones(p)
 				_force_switch(p, events)
 
-	# === Phase 6: Cleanup ===
+
+## Phase 6: 清理 transient state (jiaotu_free_switch) + reset 回合输入字段。
+## 参数 a1/a2 是 cleanup 前缓存的本回合动作；cleanup 会 reset selected_action，
+## 但 _caijin_cooldown 设置需要原 a1/a2 判断。
+func _resolve_phase6_cleanup(events: Array, a1: int, a2: int) -> void:
 	for p in [0, 1]:
 		if selected_action[p] == Action.JIAO_TU:
 			_jiaotu_used_count[p] += 1
@@ -556,20 +582,6 @@ func resolve() -> Dictionary:
 	_shenwai_used = [false, false]
 	_caijin_cooldown[0] = a1 == Action.CAI_JIN
 	_caijin_cooldown[1] = a2 == Action.CAI_JIN
-
-	last_result = {
-		p1_hp=current_hp(0), p2_hp=current_hp(1),
-		p1_max_hp=current_max_hp(0), p2_max_hp=current_max_hp(1),
-		p1_energy=energy[0], p2_energy=energy[1],
-		p1_action=a1, p2_action=a2,
-		p1_hero_name=active_hero(0).hero_name,
-		p2_hero_name=active_hero(1).hero_name,
-		events=events,
-		game_over=game_over,
-		winner=winner,
-		turn=turn_number,
-	}
-	return last_result
 
 
 # --- Clone helpers ---
@@ -710,9 +722,6 @@ func execute_death_switch(player: int, slot: int) -> bool:
 
 
 ## 返回 action 对应的 id (string)，UI 显示由 EventFormatter.action_name(id) 翻译。
+## P1-E2: 实现委托给 ActionDef.get_action_id；保留 wrapper 让 UI 调用方不需改动。
 func get_action_id(action: int) -> String:
-	if action in BASE_ACTION_DEF:
-		return BASE_ACTION_DEF[action]["id"]
-	if action in EXTRA_ACTION_DEF:
-		return EXTRA_ACTION_DEF[action]["id"]
-	return "unknown"
+	return ActionDef.get_action_id(action)
