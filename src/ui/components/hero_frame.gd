@@ -47,7 +47,6 @@ static var _cache: Dictionary = {}
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	size = frame_size
 	_setup_children()
 	_refresh_portrait()
 	_refresh_style()
@@ -73,7 +72,7 @@ func _find_or_create_texture_rect(cname: String) -> TextureRect:
 	var tr := TextureRect.new()
 	tr.name = cname
 	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tr.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(tr)
@@ -108,28 +107,37 @@ func _refresh_portrait() -> void:
 
 func _refresh_style() -> void:
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color("#334466")
 	sb.set_corner_radius_all(4)
-	add_theme_stylebox_override("panel", sb)
 
 	if is_dead:
+		sb.bg_color = Color("#1a1a1a")
 		sb.border_color = Color("#444444")
 		sb.border_width_left = 2
 		sb.border_width_right = 2
 		sb.border_width_top = 2
 		sb.border_width_bottom = 2
+		if _portrait:
+			(_portrait as TextureRect).modulate = Color(0.35, 0.35, 0.35)
 	elif is_active:
+		sb.bg_color = Color("#334466")
 		sb.border_color = Color("#ffdd44")
 		sb.border_width_left = 5
 		sb.border_width_right = 5
 		sb.border_width_top = 5
 		sb.border_width_bottom = 5
+		if _portrait:
+			(_portrait as TextureRect).modulate = Color.WHITE
 	else:
+		sb.bg_color = Color("#334466")
 		sb.border_color = player_color
 		sb.border_width_left = 2
 		sb.border_width_right = 2
 		sb.border_width_top = 2
 		sb.border_width_bottom = 2
+		if _portrait:
+			(_portrait as TextureRect).modulate = Color.WHITE
+
+	add_theme_stylebox_override("panel", sb)
 
 	if _name_label:
 		(_name_label as Label).text = hero_name.substr(0, 2) if hero_name != "" else ""

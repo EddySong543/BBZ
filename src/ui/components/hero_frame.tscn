@@ -18,7 +18,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 expand_mode = 1
-stretch_mode = 2
+stretch_mode = 5
 mouse_filter = 2
 
 [node name="NameLabel" type="Label" parent="."]

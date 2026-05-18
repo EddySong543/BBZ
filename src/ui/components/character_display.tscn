@@ -1,20 +1,35 @@
-[gd_scene load_steps=5 format=3 uid="uid://bch4rd1sp1ay00001"]
+[gd_scene format=3 uid="uid://ccx2qeqk5rvx5"]
 
-[ext_resource type="Script" path="res://src/ui/components/character_display.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://cvq2a5vbrb2k6" path="res://src/ui/components/character_display.gd" id="1_script"]
+[ext_resource type="SpriteFrames" uid="uid://bddyqm1vbecmg" path="res://assets/sprites/heroes/h01/h01_idle.tres" id="2_3v6dl"]
 
-[node name="CharacterDisplay" type="SubViewportContainer"]
-layout_mode = 0
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 160.0
+[node name="CharacterDisplay" type="SubViewportContainer" unique_id=406521637]
+offset_right = 166.0
 offset_bottom = 260.0
 script = ExtResource("1_script")
+frame_size = 256
+shield_spritesheet_path = "res://assets/sprites/vfx/defend_shield.png"
 
-[node name="SubViewport" type="SubViewport" parent="."]
-size = Vector2i(128, 128)
+[node name="SubViewport" type="SubViewport" parent="." unique_id=1325957388]
 transparent_bg = true
-render_target_update_mode = 3
+handle_input_locally = false
+size = Vector2i(500, 500)
+render_target_update_mode = 4
 
-[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="SubViewport"]
-position = Vector2(64, 120)
-scale = Vector2(2, 2)
+[node name="ViewportBorder" type="ReferenceRect" parent="SubViewport" unique_id=1625547335]
+offset_right = 166.0
+offset_bottom = 260.0
+border_color = Color(0, 1, 0, 0.6)
+border_width = 2.0
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="SubViewport" unique_id=1622338484]
+position = Vector2(101.00001, 154)
+scale = Vector2(1.9, 1.9)
+sprite_frames = ExtResource("2_3v6dl")
+animation = &"idle"
+frame_progress = 0.5612711
+
+[node name="DefendShield" type="AnimatedSprite2D" parent="SubViewport" unique_id=3782946513]
+position = Vector2(101.00001, 154)
+scale = Vector2(1.9, 1.9)
+visible = false

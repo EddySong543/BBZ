@@ -49,7 +49,7 @@ static var _portrait_cache: Dictionary = {}
 
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(160, 90)
+	custom_minimum_size = Vector2(130, 130)
 	_setup_children()
 	_load_portrait()
 	_refresh_style()
@@ -57,10 +57,10 @@ func _ready() -> void:
 
 func _setup_children() -> void:
 	_portrait = _find_or_create_texture_rect("PortraitThumb", Vector2(4, 4), Vector2(40, 40))
-	_name_label = _create_label("NameLabel", hero_name, 16, Color.WHITE, Vector2(0, 8), Vector2(160, 22))
-	_hp_label = _create_label("HPLabel", "❤ %d" % max_hp, 12, Color("#ff6666"), Vector2(0, 32), Vector2(160, 18))
-	_role_label = _create_label("RoleLabel", role_text, 12, _role_color(role_text), Vector2(0, 52), Vector2(160, 18))
-	_pos_label = _create_label("PosLabel", position_text, 12, Color("#777799"), Vector2(0, 70), Vector2(160, 16))
+	_name_label = _create_label("NameLabel", hero_name, 16, Color.WHITE, Vector2(0, 8), Vector2(130, 22))
+	_hp_label = _create_label("HPLabel", "❤ %d" % max_hp, 12, Color("#ff6666"), Vector2(0, 32), Vector2(130, 18))
+	_role_label = _create_label("RoleLabel", role_text, 12, _role_color(role_text), Vector2(0, 52), Vector2(130, 18))
+	_pos_label = _create_label("PosLabel", position_text, 12, Color("#777799"), Vector2(0, 70), Vector2(130, 16))
 
 
 func _find_or_create_texture_rect(cname: String, pos: Vector2, sz: Vector2) -> TextureRect:
@@ -70,7 +70,7 @@ func _find_or_create_texture_rect(cname: String, pos: Vector2, sz: Vector2) -> T
 	var tr := TextureRect.new()
 	tr.name = cname
 	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	tr.position = pos
 	tr.size = sz
 	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -98,6 +98,9 @@ func _load_portrait() -> void:
 		return
 	if portrait_path == "" or not ResourceLoader.exists(portrait_path):
 		(_portrait as TextureRect).visible = false
+		(_portrait as TextureRect).position = Vector2(4, 4)
+		(_portrait as TextureRect).size = Vector2(40, 40)
+		_set_labels_visible(true)
 		return
 	var tex: Texture2D
 	if _portrait_cache.has(portrait_path):
@@ -107,6 +110,20 @@ func _load_portrait() -> void:
 		_portrait_cache[portrait_path] = tex
 	(_portrait as TextureRect).texture = tex
 	(_portrait as TextureRect).visible = true
+	(_portrait as TextureRect).position = Vector2(8, 8)
+	(_portrait as TextureRect).size = Vector2(114, 114)
+	_set_labels_visible(false)
+
+
+func _set_labels_visible(vis: bool) -> void:
+	if _name_label:
+		(_name_label as Label).visible = vis
+	if _hp_label:
+		(_hp_label as Label).visible = vis
+	if _role_label:
+		(_role_label as Label).visible = vis
+	if _pos_label:
+		(_pos_label as Label).visible = vis
 
 
 func _refresh_style() -> void:

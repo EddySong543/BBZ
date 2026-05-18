@@ -9,8 +9,8 @@ enum Phase {
 	DONE
 }
 
-const CARD_W := 160
-const CARD_H := 90
+const CARD_W := 130
+const CARD_H := 130
 const COLS := 8
 const GAP := 10
 const BP_TIME := 10
@@ -231,6 +231,8 @@ func _ensure_slot_portrait(slot: Panel, portrait_path: String) -> void:
 			if tex:
 				(child as TextureRect).texture = tex
 				(child as TextureRect).visible = true
+			else:
+				(child as TextureRect).visible = false
 			return
 	var tex := _get_portrait_tex(portrait_path)
 	if tex:

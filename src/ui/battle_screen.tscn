@@ -1,8 +1,10 @@
-[gd_scene load_steps=46 format=3 uid="uid://btt1escr3en000001"]
+[gd_scene format=3 uid="uid://bn0rjf1qjld17"]
 
-[ext_resource type="Script" path="res://src/ui/battle_screen.gd" id="1_battle_gd"]
+[ext_resource type="Script" uid="uid://uwkgowbdtjd7" path="res://src/ui/battle_screen.gd" id="1_battle_gd"]
+[ext_resource type="PackedScene" uid="uid://ccx2qeqk5rvx5" path="res://src/ui/components/character_display.tscn" id="2_char_display"]
+[ext_resource type="PackedScene" uid="uid://b6i5h2alff53a" path="res://src/ui/components/hero_frame.tscn" id="3_hero_frame"]
 
-[node name="BattleScreen" type="Control"]
+[node name="BattleScreen" type="Control" unique_id=1618077294]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -11,7 +13,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_battle_gd")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="Background" type="ColorRect" parent="." unique_id=1304325271]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -20,7 +22,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.102, 0.102, 0.18, 1)
 
-[node name="Floor" type="ColorRect" parent="."]
+[node name="Floor" type="ColorRect" parent="." unique_id=1815044567]
 layout_mode = 0
 offset_left = 120.0
 offset_top = 750.0
@@ -28,96 +30,89 @@ offset_right = 1800.0
 offset_bottom = 756.0
 color = Color(0.2, 0.2, 0.333, 1)
 
-[node name="P1CharSlot" type="Control" parent="."]
+[node name="P1CharDisplay" parent="." unique_id=1642938575 instance=ExtResource("2_char_display")]
 layout_mode = 0
-offset_left = 400.0
+offset_left = 385.0
 offset_top = 490.0
-offset_right = 560.0
+offset_right = 551.0
 offset_bottom = 750.0
-mouse_filter = 2
+anim_fps = 12.0
 
-[node name="P2CharSlot" type="Control" parent="."]
+[node name="P2CharDisplay" parent="." unique_id=915119977 instance=ExtResource("2_char_display")]
 layout_mode = 0
-offset_left = 1360.0
+offset_left = 1365.0
 offset_top = 490.0
-offset_right = 1520.0
+offset_right = 1531.0
 offset_bottom = 750.0
-mouse_filter = 2
+anim_fps = 12.0
 
-[node name="P1Name" type="Label" parent="."]
+[node name="P1Name" type="Label" parent="." unique_id=1021025025]
 layout_mode = 0
 offset_left = 380.0
 offset_top = 422.0
 offset_right = 580.0
 offset_bottom = 448.0
 horizontal_alignment = 1
-mouse_filter = 2
 
-[node name="P2Name" type="Label" parent="."]
+[node name="P2Name" type="Label" parent="." unique_id=2066825246]
 layout_mode = 0
 offset_left = 1340.0
 offset_top = 422.0
 offset_right = 1540.0
 offset_bottom = 448.0
 horizontal_alignment = 1
-mouse_filter = 2
 
-[node name="P1HP" type="Label" parent="."]
+[node name="P1HP" type="Label" parent="." unique_id=73731842]
 layout_mode = 0
 offset_left = 410.0
 offset_top = 448.0
 offset_right = 550.0
 offset_bottom = 482.0
 horizontal_alignment = 1
-mouse_filter = 2
 
-[node name="P2HP" type="Label" parent="."]
+[node name="P2HP" type="Label" parent="." unique_id=877393746]
 layout_mode = 0
 offset_left = 1370.0
 offset_top = 448.0
 offset_right = 1510.0
 offset_bottom = 482.0
 horizontal_alignment = 1
-mouse_filter = 2
 
-[node name="TurnLabel" type="Label" parent="."]
+[node name="TurnLabel" type="Label" parent="." unique_id=1408631385]
 layout_mode = 0
 offset_left = 760.0
 offset_top = 4.0
 offset_right = 1160.0
 offset_bottom = 34.0
 horizontal_alignment = 1
-mouse_filter = 2
 
-[node name="TimerLabel" type="Label" parent="."]
+[node name="TimerLabel" type="Label" parent="." unique_id=2111037196]
 layout_mode = 0
 offset_left = 760.0
 offset_top = 30.0
 offset_right = 1160.0
 offset_bottom = 56.0
 horizontal_alignment = 1
-mouse_filter = 2
 
-[node name="StatusLabel" type="Label" parent="."]
+[node name="StatusLabel" type="Label" parent="." unique_id=1445958864]
 layout_mode = 0
 offset_left = 460.0
 offset_top = 280.0
 offset_right = 1460.0
 offset_bottom = 316.0
 horizontal_alignment = 1
-mouse_filter = 2
 
-[node name="EventLabel" type="Label" parent="."]
+[node name="EventLabel" type="Label" parent="." unique_id=1759448775]
+visible = false
 layout_mode = 0
 offset_left = 460.0
 offset_top = 820.0
 offset_right = 1460.0
 offset_bottom = 880.0
 horizontal_alignment = 1
-mouse_filter = 2
-visible = false
 
-[node name="BigTurnLabel" type="Label" parent="."]
+[node name="BigTurnLabel" type="Label" parent="." unique_id=1507963641]
+visible = false
 layout_mode = 0
 offset_left = 460.0
 offset_top = 350.0
@@ -125,98 +120,216 @@ offset_right = 1460.0
 offset_bottom = 414.0
 horizontal_alignment = 1
 vertical_alignment = 1
-mouse_filter = 2
-visible = false
 
-[node name="P1Frames" type="Control" parent="."]
+[node name="P1Frame0" parent="." unique_id=2129820687 instance=ExtResource("3_hero_frame")]
+offset_left = 30.0
+offset_top = 8.0
+offset_right = 102.0
+offset_bottom = 80.0
+
+[node name="P1Frame0Hp" type="Label" parent="." unique_id=1715166685]
 layout_mode = 0
 offset_left = 30.0
-offset_top = 0.0
-offset_right = 218.0
-offset_bottom = 120.0
-mouse_filter = 2
+offset_top = 82.0
+offset_right = 102.0
+offset_bottom = 98.0
+horizontal_alignment = 1
 
-[node name="P2Frames" type="Control" parent="."]
+[node name="P1Frame0Shield" type="Label" parent="." unique_id=934402041]
+layout_mode = 0
+offset_left = 30.0
+offset_top = 100.0
+offset_right = 102.0
+offset_bottom = 114.0
+horizontal_alignment = 1
+
+[node name="P1Frame1" parent="." unique_id=1566007647 instance=ExtResource("3_hero_frame")]
+offset_left = 112.0
+offset_top = 20.0
+offset_right = 160.0
+offset_bottom = 68.0
+
+[node name="P1Frame1Hp" type="Label" parent="." unique_id=1952929696]
+layout_mode = 0
+offset_left = 112.0
+offset_top = 82.0
+offset_right = 160.0
+offset_bottom = 98.0
+horizontal_alignment = 1
+
+[node name="P1Frame1Shield" type="Label" parent="." unique_id=1568155607]
+layout_mode = 0
+offset_left = 112.0
+offset_top = 100.0
+offset_right = 160.0
+offset_bottom = 114.0
+horizontal_alignment = 1
+
+[node name="P1Frame2" parent="." unique_id=1208252427 instance=ExtResource("3_hero_frame")]
+offset_left = 170.0
+offset_top = 20.0
+offset_right = 218.0
+offset_bottom = 68.0
+
+[node name="P1Frame2Hp" type="Label" parent="." unique_id=1859547373]
+layout_mode = 0
+offset_left = 170.0
+offset_top = 82.0
+offset_right = 218.0
+offset_bottom = 98.0
+horizontal_alignment = 1
+
+[node name="P1Frame2Shield" type="Label" parent="." unique_id=87371090]
+layout_mode = 0
+offset_left = 170.0
+offset_top = 100.0
+offset_right = 218.0
+offset_bottom = 114.0
+horizontal_alignment = 1
+
+[node name="P2Frame0" parent="." unique_id=1770616061 instance=ExtResource("3_hero_frame")]
+offset_left = 1702.0
+offset_top = 8.0
+offset_right = 1774.0
+offset_bottom = 80.0
+
+[node name="P2Frame0Hp" type="Label" parent="." unique_id=641229813]
 layout_mode = 0
 offset_left = 1702.0
-offset_top = 0.0
-offset_right = 1890.0
-offset_bottom = 120.0
-mouse_filter = 2
+offset_top = 82.0
+offset_right = 1774.0
+offset_bottom = 98.0
+horizontal_alignment = 1
 
-[node name="Buttons" type="Control" parent="."]
+[node name="P2Frame0Shield" type="Label" parent="." unique_id=1837203129]
 layout_mode = 0
-offset_left = 0.0
+offset_left = 1702.0
+offset_top = 100.0
+offset_right = 1774.0
+offset_bottom = 114.0
+horizontal_alignment = 1
+
+[node name="P2Frame1" parent="." unique_id=1621653890 instance=ExtResource("3_hero_frame")]
+offset_left = 1784.0
+offset_top = 20.0
+offset_right = 1832.0
+offset_bottom = 68.0
+
+[node name="P2Frame1Hp" type="Label" parent="." unique_id=35987408]
+layout_mode = 0
+offset_left = 1784.0
+offset_top = 82.0
+offset_right = 1832.0
+offset_bottom = 98.0
+horizontal_alignment = 1
+
+[node name="P2Frame1Shield" type="Label" parent="." unique_id=1018620117]
+layout_mode = 0
+offset_left = 1784.0
+offset_top = 100.0
+offset_right = 1832.0
+offset_bottom = 114.0
+horizontal_alignment = 1
+
+[node name="P2Frame2" parent="." unique_id=1695379356 instance=ExtResource("3_hero_frame")]
+offset_left = 1842.0
+offset_top = 20.0
+offset_right = 1890.0
+offset_bottom = 68.0
+
+[node name="P2Frame2Hp" type="Label" parent="." unique_id=1691399540]
+layout_mode = 0
+offset_left = 1842.0
+offset_top = 82.0
+offset_right = 1890.0
+offset_bottom = 98.0
+horizontal_alignment = 1
+
+[node name="P2Frame2Shield" type="Label" parent="." unique_id=145419997]
+layout_mode = 0
+offset_left = 1842.0
+offset_top = 100.0
+offset_right = 1890.0
+offset_bottom = 114.0
+horizontal_alignment = 1
+
+[node name="Buttons" type="Control" parent="." unique_id=1866875046]
+anchors_preset = 0
 offset_top = 810.0
 offset_right = 1920.0
 offset_bottom = 1080.0
 mouse_filter = 2
 
-[node name="BtnCharge" type="Button" parent="Buttons"]
+[node name="BtnCharge" type="Button" parent="Buttons" unique_id=1005743617]
 layout_mode = 0
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 160.0
-offset_bottom = 160.0
+offset_left = 220.0
+offset_top = 80.0
+offset_right = 380.0
+offset_bottom = 240.0
+text = "攒"
 
-[node name="BtnAttack" type="Button" parent="Buttons"]
+[node name="BtnAttack" type="Button" parent="Buttons" unique_id=1348519698]
 layout_mode = 0
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 160.0
-offset_bottom = 160.0
+offset_left = 440.0
+offset_top = 80.0
+offset_right = 600.0
+offset_bottom = 240.0
+text = "波"
 
-[node name="BtnBigAttack" type="Button" parent="Buttons"]
+[node name="BtnBigAttack" type="Button" parent="Buttons" unique_id=1182840675]
 layout_mode = 0
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 160.0
-offset_bottom = 160.0
+offset_left = 660.0
+offset_top = 80.0
+offset_right = 820.0
+offset_bottom = 240.0
+text = "大波"
 
-[node name="BtnDefend" type="Button" parent="Buttons"]
+[node name="BtnDefend" type="Button" parent="Buttons" unique_id=1455563286]
 layout_mode = 0
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 160.0
-offset_bottom = 160.0
+offset_left = 880.0
+offset_top = 80.0
+offset_right = 1040.0
+offset_bottom = 240.0
+text = "防"
 
-[node name="BtnBigDefend" type="Button" parent="Buttons"]
+[node name="BtnBigDefend" type="Button" parent="Buttons" unique_id=772727519]
 layout_mode = 0
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 160.0
-offset_bottom = 160.0
+offset_left = 1100.0
+offset_top = 80.0
+offset_right = 1260.0
+offset_bottom = 240.0
+text = "大防"
 
-[node name="BtnSpecial" type="Button" parent="Buttons"]
-layout_mode = 0
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 160.0
-offset_bottom = 160.0
+[node name="BtnSpecial" type="Button" parent="Buttons" unique_id=581864479]
 visible = false
-
-[node name="BtnConfirm" type="Button" parent="Buttons"]
 layout_mode = 0
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 160.0
-offset_bottom = 160.0
+offset_left = 1320.0
+offset_top = 80.0
+offset_right = 1480.0
+offset_bottom = 240.0
 
-[node name="P1CloneArea" type="Control" parent="."]
+[node name="BtnConfirm" type="Button" parent="Buttons" unique_id=2072422273]
 layout_mode = 0
+offset_left = 1540.0
+offset_top = 80.0
+offset_right = 1700.0
+offset_bottom = 240.0
+text = "结束"
+
+[node name="P1CloneArea" type="Control" parent="." unique_id=1018482449]
+anchors_preset = 0
 offset_left = 320.0
 offset_top = 490.0
 offset_right = 640.0
 offset_bottom = 750.0
 mouse_filter = 2
 
-[node name="P2CloneArea" type="Control" parent="."]
-layout_mode = 0
-offset_left = 1280.0
+[node name="P2CloneArea" type="Control" parent="." unique_id=884697962]
+anchors_preset = 0
+offset_left = 1290.0
 offset_top = 490.0
-offset_right = 1600.0
+offset_right = 1610.0
 offset_bottom = 750.0
 mouse_filter = 2
 
-[node name="GameTimer" type="Timer" parent="."]
-one_shot = false
+[node name="GameTimer" type="Timer" parent="." unique_id=1116178472]

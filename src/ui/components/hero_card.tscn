@@ -6,9 +6,9 @@
 layout_mode = 0
 offset_left = 0.0
 offset_top = 0.0
-offset_right = 160.0
-offset_bottom = 90.0
-custom_minimum_size = Vector2(160, 90)
+offset_right = 130.0
+offset_bottom = 130.0
+custom_minimum_size = Vector2(130, 130)
 script = ExtResource("1_script")
 
 [node name="PortraitThumb" type="TextureRect" parent="."]
@@ -18,7 +18,7 @@ offset_top = 4.0
 offset_right = 44.0
 offset_bottom = 44.0
 expand_mode = 1
-stretch_mode = 2
+stretch_mode = 5
 mouse_filter = 2
 
 [node name="NameLabel" type="Label" parent="."]

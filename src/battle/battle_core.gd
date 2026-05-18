@@ -66,6 +66,7 @@ var _fallen_teammates: Array[int] = [0, 0]
 var _caijin_cooldown: Array[bool] = [false, false]
 var _caijin_buff: Array[bool] = [false, false]
 var _raw_dmg_to: Array[int] = [0, 0]
+var pending_death_switch: Array[int] = [-1, -1]
 
 
 func setup(p1_heroes: Array, p2_heroes: Array) -> void:
@@ -105,6 +106,7 @@ func setup(p1_heroes: Array, p2_heroes: Array) -> void:
 	energy = [0, 0]
 	selected_action = [-1, -1]
 	switch_used = [false, false]
+	pending_death_switch = [-1, -1]
 	active_hero_index = [0, 0]
 	game_over = false
 	winner = -1
@@ -594,12 +596,31 @@ func _resolve_target(attacker: int, defender: int) -> int:
 
 func _force_switch(player: int, events: Array) -> void:
 	var pname := "P1" if player == 0 else "P2"
+	if get_living_reserves(player).size() > 0:
+		pending_death_switch[player] = 1
+		events.append("%s 英雄阵亡，请选择替补英雄" % pname)
+	else:
+		events.append("%s 无存活英雄可切换" % pname)
+
+
+func get_living_reserves(player: int) -> Array:
+	var result: Array = []
 	for i in range(hero_hp[player].size()):
 		if hero_hp[player][i] > 0 and i != active_hero_index[player]:
-			active_hero_index[player] = i
-			events.append("%s 英雄阵亡，强制切换至 %s" % [pname, heroes[player][i].hero_name])
-			return
-	events.append("%s 无存活英雄可切换" % pname)
+			result.append(i)
+	return result
+
+
+func execute_death_switch(player: int, slot: int) -> bool:
+	if pending_death_switch[player] <= 0:
+		return false
+	if hero_hp[player][slot] <= 0:
+		return false
+	if slot == active_hero_index[player]:
+		return false
+	active_hero_index[player] = slot
+	pending_death_switch[player] = -1
+	return true
 
 
 func get_action_name(action: int) -> String:
