@@ -204,6 +204,17 @@ func _make_label(text: String, size: int, color: Color, pos: Vector2, parent: No
 	return l
 
 
+# --- State machine helpers (P1-5e) ---
+
+func _current_player() -> int:
+	if state == State.P1_TURN:
+		return 0
+	return 1
+
+func _is_player_turn() -> bool:
+	return state == State.P1_TURN or state == State.P2_TURN
+
+
 # --- Frame interaction ---
 
 func _on_frame_gui_input(event: InputEvent, player: int, frame_idx: int) -> void:
@@ -215,9 +226,9 @@ func _on_frame_gui_input(event: InputEvent, player: int, frame_idx: int) -> void
 
 
 func _try_switch_hero(player: int, frame_idx: int) -> void:
-	if not state in [State.P1_TURN, State.P2_TURN]:
+	if not _is_player_turn():
 		return
-	var current_player := 0 if state == State.P1_TURN else 1
+	var current_player := _current_player()
 	if player != current_player:
 		return
 
@@ -298,7 +309,7 @@ func _update_timer_label() -> void:
 
 
 func _on_circle_pressed(action: int, btn: Button) -> void:
-	var player: int = 0 if state in [State.P1_TURN] else 1
+	var player: int = _current_player()
 
 	if action == -1 and btn == btn_special:
 		action = battle.active_hero(player).extra_action_id
@@ -323,7 +334,7 @@ func _on_confirm_pressed() -> void:
 	if selected_action < 0:
 		selected_action = BattleCore.Action.CHARGE
 
-	var player: int = 0 if state == State.P1_TURN else 1
+	var player: int = _current_player()
 	var opp: int = 1 - player
 	if selected_action in [BattleCore.Action.ATTACK, BattleCore.Action.BIG_ATTACK]:
 		if battle.get_clone_count(opp) > 0 and _clone_target < 0:
@@ -332,7 +343,7 @@ func _on_confirm_pressed() -> void:
 
 	game_timer.stop()
 	_reset_button_styles()
-	battle.select_action(0 if state == State.P1_TURN else 1, selected_action)
+	battle.select_action(_current_player(), selected_action)
 	selected_action = -1
 	selected_btn = null
 	_clone_target = -1
@@ -474,9 +485,9 @@ func _set_buttons_active(active: bool) -> void:
 
 
 func _layout_circles() -> void:
-	var player: int = 0 if state in [State.P1_TURN] else 1
+	var player: int = _current_player()
 	var has_skill := false
-	if state in [State.P1_TURN, State.P2_TURN]:
+	if _is_player_turn():
 		has_skill = battle.active_hero(player).has_skill_type(HeroData.SkillType.EXTRA_ACTION)
 
 	var is_fool: bool = has_skill and battle.active_hero(player).hero_id == "h13"
@@ -512,7 +523,7 @@ func _reset_button_styles() -> void:
 
 func _update_button_states() -> void:
 	_layout_circles()
-	var player: int = 0 if state in [State.P1_TURN] else 1
+	var player: int = _current_player()
 	var en: int = battle.get_energy(player)
 
 	for btn in action_btn_list:
@@ -547,7 +558,7 @@ func _update_all() -> void:
 	_update_hp_labels()
 	_update_hero_names()
 	_update_clone_display()
-	if state in [State.P1_TURN, State.P2_TURN]:
+	if _is_player_turn():
 		_update_button_states()
 
 
@@ -692,7 +703,7 @@ func _update_clone_display() -> void:
 
 
 func _update_clone_target_highlight() -> void:
-	var current: int = 0 if state == State.P1_TURN else 1
+	var current: int = _current_player()
 	var opp: int = 1 - current
 	var is_attack := selected_action in [BattleCore.Action.ATTACK, BattleCore.Action.BIG_ATTACK]
 	var show_targets := is_attack and battle.get_clone_count(opp) > 0
@@ -703,7 +714,7 @@ func _update_clone_target_highlight() -> void:
 
 
 func _on_clone_target_clicked(area_player: int, display_pos: int) -> void:
-	var current: int = 0 if state == State.P1_TURN else 1
+	var current: int = _current_player()
 	var opp: int = 1 - current
 	if area_player != opp:
 		return
