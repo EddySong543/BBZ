@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="HeroData" load_steps=2 format=3]
+
+[ext_resource type="Script" uid="uid://ciiovppuu1rft" path="res://src/battle/hero_data.gd" id="1_hero"]
+
+[resource]
+script = ExtResource("1_hero")
+hero_id = "h03"
+hero_name = "寅虎"
+max_hp = 9
+skill_type = 1
+skill_description = "【百兽】消耗全部能量(上限6)，造成等量次数的1点伤害，可被大防格挡"
+extra_action_id = 7
+passive_id = ""
+role = "爆发型"
+position = "后期"
+action_overrides = {}
+portrait_path = ""
+spritesheet_path = ""
+sprite_frames_path = ""
+attack_spritesheet_path = ""
+hit_spritesheet_path = ""
+defend_spritesheet_path = ""
+defeat_spritesheet_path = ""

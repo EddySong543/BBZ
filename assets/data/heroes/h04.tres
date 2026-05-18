@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="HeroData" load_steps=2 format=3]
+
+[ext_resource type="Script" uid="uid://ciiovppuu1rft" path="res://src/battle/hero_data.gd" id="1_hero"]
+
+[resource]
+script = ExtResource("1_hero")
+hero_id = "h04"
+hero_name = "卯兔"
+max_hp = 8
+skill_type = 1
+skill_description = "【狡兔三窟】消耗3能，每局最多3次。本回合免疫所有伤害，下回合可免费切换英雄"
+extra_action_id = 8
+passive_id = ""
+role = "防御型"
+position = "轮转"
+action_overrides = {}
+portrait_path = ""
+spritesheet_path = ""
+sprite_frames_path = ""
+attack_spritesheet_path = ""
+hit_spritesheet_path = ""
+defend_spritesheet_path = ""
+defeat_spritesheet_path = ""
