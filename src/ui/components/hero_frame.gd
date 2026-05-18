@@ -42,12 +42,14 @@ extends Panel
 
 var _portrait: TextureRect
 var _name_label: Label
+var _base_stylebox: StyleBoxFlat  # P1-NEW2: 从 .tscn 取 default，state 切换基于此 duplicate
 static var _cache: Dictionary = {}
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_setup_children()
+	_base_stylebox = get_theme_stylebox("panel", "Panel") as StyleBoxFlat
 	_refresh_portrait()
 	_refresh_style()
 
@@ -106,20 +108,18 @@ func _refresh_portrait() -> void:
 
 
 func _refresh_style() -> void:
-	var sb := StyleBoxFlat.new()
-	sb.set_corner_radius_all(4)
+	# P1-NEW2: base stylebox 来自 .tscn theme_override_styles/panel (FrameBase SubResource)
+	# 美术换素材 → 改 .tscn FrameBase；state 差异（颜色/宽度）由下方 code 派生
+	if _base_stylebox == null:
+		return
+	var sb := _base_stylebox.duplicate() as StyleBoxFlat
 
 	if is_dead:
 		sb.bg_color = Color("#1a1a1a")
 		sb.border_color = Color("#444444")
-		sb.border_width_left = 2
-		sb.border_width_right = 2
-		sb.border_width_top = 2
-		sb.border_width_bottom = 2
 		if _portrait:
 			(_portrait as TextureRect).modulate = Color(0.35, 0.35, 0.35)
 	elif is_active:
-		sb.bg_color = Color("#334466")
 		sb.border_color = Color("#ffdd44")
 		sb.border_width_left = 5
 		sb.border_width_right = 5
@@ -128,12 +128,7 @@ func _refresh_style() -> void:
 		if _portrait:
 			(_portrait as TextureRect).modulate = Color.WHITE
 	else:
-		sb.bg_color = Color("#334466")
 		sb.border_color = player_color
-		sb.border_width_left = 2
-		sb.border_width_right = 2
-		sb.border_width_top = 2
-		sb.border_width_bottom = 2
 		if _portrait:
 			(_portrait as TextureRect).modulate = Color.WHITE
 

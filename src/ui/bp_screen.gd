@@ -16,6 +16,7 @@ const CARD_H := 130
 const COLS := 8
 const GAP := 10
 const BP_TIME := 10
+const HERO_CARD_SCENE := preload("res://src/ui/components/hero_card.tscn")
 
 var all_heroes: Array[HeroData] = []
 var p1_picks: Array[int] = []
@@ -72,7 +73,8 @@ func _build_hero_cards() -> void:
 		var y := row * (CARD_H + GAP)
 
 		var h := all_heroes[i]
-		var card := HeroCard.new()
+		# P1-NEW2 fix: 必须 instantiate .tscn 才会应用 CardBase SubResource
+		var card := HERO_CARD_SCENE.instantiate() as HeroCard
 		card.hero_id = h.hero_id
 		card.hero_name = h.hero_name
 		card.max_hp = h.max_hp

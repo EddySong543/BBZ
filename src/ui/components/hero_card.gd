@@ -45,12 +45,14 @@ var _name_label: Label
 var _hp_label: Label
 var _role_label: Label
 var _pos_label: Label
+var _base_stylebox: StyleBoxFlat  # P1-NEW2: 从 .tscn 取 default，state 切换基于此 duplicate
 static var _portrait_cache: Dictionary = {}
 
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(130, 130)
 	_setup_children()
+	_base_stylebox = get_theme_stylebox("normal", "Button") as StyleBoxFlat
 	_load_portrait()
 	_refresh_style()
 
@@ -127,15 +129,11 @@ func _set_labels_visible(vis: bool) -> void:
 
 
 func _refresh_style() -> void:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color("#252540")
-	sb.border_color = Color("#3a3a5a")
-	sb.border_width_left = 2
-	sb.border_width_right = 2
-	sb.border_width_top = 2
-	sb.border_width_bottom = 2
-	sb.set_corner_radius_all(6)
-
+	# P1-NEW2: base stylebox 来自 .tscn theme_override_styles/normal (CardBase SubResource)
+	# 美术换素材 → 改 .tscn CardBase；state 差异（边框颜色/宽度）由下方 code 派生
+	if _base_stylebox == null:
+		return
+	var sb := _base_stylebox.duplicate() as StyleBoxFlat
 	match card_state:
 		CardState.SELECTED:
 			sb.border_color = Color("#ffdd44")
@@ -161,7 +159,7 @@ func _refresh_style() -> void:
 
 	add_theme_stylebox_override("normal", sb)
 
-	var sb_hover: StyleBoxFlat = sb.duplicate() as StyleBoxFlat
+	var sb_hover := _base_stylebox.duplicate() as StyleBoxFlat
 	sb_hover.bg_color = Color("#303055")
 	sb_hover.border_color = Color("#5a5a8a")
 	add_theme_stylebox_override("hover", sb_hover)

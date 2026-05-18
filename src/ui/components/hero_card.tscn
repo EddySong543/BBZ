@@ -1,6 +1,18 @@
-[gd_scene load_steps=5 format=3 uid="uid://bhcrd000000000001"]
+[gd_scene load_steps=3 format=3 uid="uid://bhcrd000000000001"]
 
 [ext_resource type="Script" path="res://src/ui/components/hero_card.gd" id="1_script"]
+
+[sub_resource type="StyleBoxFlat" id="CardBase"]
+bg_color = Color(0.145098, 0.145098, 0.25098, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.227451, 0.227451, 0.352941, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
 
 [node name="HeroCard" type="Button"]
 layout_mode = 0
@@ -9,6 +21,7 @@ offset_top = 0.0
 offset_right = 130.0
 offset_bottom = 130.0
 custom_minimum_size = Vector2(130, 130)
+theme_override_styles/normal = SubResource("CardBase")
 script = ExtResource("1_script")
 
 [node name="PortraitThumb" type="TextureRect" parent="."]
@@ -19,13 +32,4 @@ offset_right = 44.0
 offset_bottom = 44.0
 expand_mode = 1
 stretch_mode = 5
-mouse_filter = 2
-
-[node name="NameLabel" type="Label" parent="."]
-layout_mode = 0
-offset_left = 0.0
-offset_top = 8.0
-offset_right = 160.0
-offset_bottom = 30.0
-horizontal_alignment = 1
 mouse_filter = 2

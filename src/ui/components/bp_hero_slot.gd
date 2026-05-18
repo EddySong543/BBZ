@@ -66,21 +66,17 @@ func _apply_border() -> void:
 
 
 func _set_border_active(active: bool) -> void:
-	var sb := get_theme_stylebox("panel", "Panel") as StyleBoxFlat
-	if sb == null:
-		sb = StyleBoxFlat.new()
-		sb.bg_color = Color("#1e1e36")
-		sb.set_corner_radius_all(6)
-		add_theme_stylebox_override("panel", sb)
+	# P1-NEW2: base stylebox 是 .tscn 内 StyleBoxFlat_default SubResource。
+	# inactive 状态 = base (灰边 2px); active = duplicate base + 改 border_color/width
+	remove_theme_stylebox_override("panel")
 	if active:
+		var base := get_theme_stylebox("panel", "Panel") as StyleBoxFlat
+		if base == null:
+			return
+		var sb := base.duplicate() as StyleBoxFlat
 		sb.border_color = player_color
 		sb.border_width_left = 3
 		sb.border_width_right = 3
 		sb.border_width_top = 3
 		sb.border_width_bottom = 3
-	else:
-		sb.border_color = Color("#444466")
-		sb.border_width_left = 2
-		sb.border_width_right = 2
-		sb.border_width_top = 2
-		sb.border_width_bottom = 2
+		add_theme_stylebox_override("panel", sb)

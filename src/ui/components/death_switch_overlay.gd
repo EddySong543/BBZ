@@ -39,6 +39,10 @@ func show_selection(player: int, reserves: Array) -> void:
 	visible = true
 
 
+## P1-NEW2 TODO: card 仍 runtime code-built，stylebox 也 code 构造。
+## 未来美术接入时应抽 DeathSwitchHeroCard 为独立 .tscn 组件
+## （类似 HeroCard / BPHeroSlot 模式），stylebox 进 .tscn SubResource。
+## 现状作为 placeholder 接受 — overlay 弹出频率低且每场战斗 0-N 次。
 func _create_card(h: HeroData, hp: int, border_color: Color) -> Button:
 	var card := Button.new()
 	card.custom_minimum_size = Vector2(CARD_W, CARD_H)
