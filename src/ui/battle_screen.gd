@@ -379,8 +379,8 @@ func _resolve() -> void:
 	# Play battle animations
 	await _play_battle_anims(r.p1_action, r.p2_action, p1_hit, p2_hit, p1_dead, p2_dead)
 
-	var a1_name: String = battle.get_action_name(r.p1_action)
-	var a2_name: String = battle.get_action_name(r.p2_action)
+	var a1_name: String = EventFormatter.action_name(battle.get_action_id(r.p1_action))
+	var a2_name: String = EventFormatter.action_name(battle.get_action_id(r.p2_action))
 	status_label.text = "P1: %s    vs    P2: %s" % [a1_name, a2_name]
 	status_label.visible = true
 
@@ -494,12 +494,12 @@ func _layout_circles() -> void:
 	var buttons: Array[Button]
 	if is_fool:
 		buttons = [btn_special]
-		btn_special.text = battle.get_action_name(battle.active_hero(player).extra_action_id)
+		btn_special.text = EventFormatter.action_name(battle.get_action_id(battle.active_hero(player).extra_action_id))
 	else:
 		buttons = [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend]
 		if has_skill:
 			buttons.append(btn_special)
-			btn_special.text = battle.get_action_name(battle.active_hero(player).extra_action_id)
+			btn_special.text = EventFormatter.action_name(battle.get_action_id(battle.active_hero(player).extra_action_id))
 	buttons.append(btn_confirm)
 
 	var n := buttons.size()

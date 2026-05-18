@@ -9,23 +9,23 @@ enum Action {
 }
 
 const BASE_ACTION_DEF := {
-	Action.CHARGE:     {name="攒",   cost=0, damage=0, energy_gain=1},
-	Action.ATTACK:     {name="波",   cost=1, damage=1, energy_gain=0},
-	Action.DEFEND:     {name="防",   cost=0, damage=0, energy_gain=0},
-	Action.BIG_ATTACK: {name="大波", cost=3, damage=2, energy_gain=0},
-	Action.BIG_DEFEND: {name="大防", cost=2, damage=0, energy_gain=0},
-	Action.SWITCH:     {name="切换", cost=1, damage=0, energy_gain=0},
+	Action.CHARGE:     {id="charge",     cost=0, damage=0, energy_gain=1},
+	Action.ATTACK:     {id="attack",     cost=1, damage=1, energy_gain=0},
+	Action.DEFEND:     {id="defend",     cost=0, damage=0, energy_gain=0},
+	Action.BIG_ATTACK: {id="big_attack", cost=3, damage=2, energy_gain=0},
+	Action.BIG_DEFEND: {id="big_defend", cost=2, damage=0, energy_gain=0},
+	Action.SWITCH:     {id="switch",     cost=1, damage=0, energy_gain=0},
 }
 
 const EXTRA_ACTION_DEF := {
-	Action.FAN_GE:   {name="反戈", cost=2, damage=0},
-	Action.BAI_SHOU: {name="百兽", cost=-1, damage=0},
-	Action.JIAO_TU:  {name="狡兔三窟", cost=3, damage=0},
-	Action.SHE_TUI:  {name="蛇蜕", cost=2, damage=0},
-	Action.SHE_SHEN: {name="舍身", cost=0, damage=0},
-	Action.SHEN_WAI: {name="身外化身", cost=3, damage=0},
-	Action.CAI_JIN:  {name="财源广进", cost=0, damage=0},
-	Action.YU_ZHE:   {name="不可知之权柄", cost=0, damage=0},
+	Action.FAN_GE:   {id="fange",   cost=2, damage=0},
+	Action.BAI_SHOU: {id="baishou", cost=-1, damage=0},
+	Action.JIAO_TU:  {id="jiaotu",  cost=3, damage=0},
+	Action.SHE_TUI:  {id="shetui",  cost=2, damage=0},
+	Action.SHE_SHEN: {id="sheshen", cost=0, damage=0},
+	Action.SHEN_WAI: {id="shenwai", cost=3, damage=0},
+	Action.CAI_JIN:  {id="caijin",  cost=0, damage=0},
+	Action.YU_ZHE:   {id="yuzhe",   cost=0, damage=0},
 }
 
 const MAX_ENERGY := 20
@@ -365,7 +365,7 @@ func resolve() -> Dictionary:
 			a = pool[randi_range(0, 4)]
 			selected_action[p] = a
 			yuzhe_used = true
-			events.append({id="yuzhe_random", player=p, action_name=get_action_name(a)})
+			events.append({id="yuzhe_random", player=p, action_id=get_action_id(a)})
 
 		if a == Action.JIAO_TU:
 			_jiaotu_immune[p] = true
@@ -709,9 +709,10 @@ func execute_death_switch(player: int, slot: int) -> bool:
 	return true
 
 
-func get_action_name(action: int) -> String:
+## 返回 action 对应的 id (string)，UI 显示由 EventFormatter.action_name(id) 翻译。
+func get_action_id(action: int) -> String:
 	if action in BASE_ACTION_DEF:
-		return BASE_ACTION_DEF[action]["name"]
+		return BASE_ACTION_DEF[action]["id"]
 	if action in EXTRA_ACTION_DEF:
-		return EXTRA_ACTION_DEF[action]["name"]
-	return "未知"
+		return EXTRA_ACTION_DEF[action]["id"]
+	return "unknown"

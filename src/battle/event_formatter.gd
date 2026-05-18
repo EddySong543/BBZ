@@ -25,7 +25,7 @@ static func format(e: Dictionary) -> String:
 		"sheshen_used":
 			return "%s [舍身] -2HP +3能量" % p_label
 		"yuzhe_random":
-			return "%s [不可知之权柄] → %s" % [p_label, e.action_name]
+			return "%s [不可知之权柄] → %s" % [p_label, action_name(e.action_id)]
 		"baishou_spent":
 			return "%s 百兽消耗 %d 能量" % [p_label, e.amount]
 		"baishou_destroy_clones":
@@ -80,3 +80,25 @@ static func _source_label(source_id: String) -> String:
 		"baishou": return "百兽"
 		"test": return "测试"
 	return source_id
+
+
+## P1-NEW1: 把 action id (来自 BattleCore.get_action_id) 翻译为中文显示文本。
+## i18n 时整体替换本 match 即可。
+static func action_name(action_id: String) -> String:
+	match action_id:
+		"charge": return "攒"
+		"attack": return "波"
+		"defend": return "防"
+		"big_attack": return "大波"
+		"big_defend": return "大防"
+		"switch": return "切换"
+		"fange": return "反戈"
+		"baishou": return "百兽"
+		"jiaotu": return "狡兔三窟"
+		"shetui": return "蛇蜕"
+		"sheshen": return "舍身"
+		"shenwai": return "身外化身"
+		"caijin": return "财源广进"
+		"yuzhe": return "不可知之权柄"
+	push_warning("EventFormatter: unknown action_id %s" % action_id)
+	return "[未知动作: %s]" % action_id
