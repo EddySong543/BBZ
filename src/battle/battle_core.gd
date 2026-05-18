@@ -32,6 +32,13 @@ const MAX_ENERGY := 20
 const BAI_SHOU_DAMAGE_CAP := 6
 const BAI_SHOU_MIN_COST := 1
 
+# 英雄技能注册中心 — 仅列已迁移到 HeroSkill 组件的英雄
+# 未在此 dict 中的 hero_id 仍走 BattleCore 内 hardcoded if 分支（如 xugou/haizhu 等）
+# 详见 docs/architecture/battlecore-risk-notes.md §3
+const _HERO_SKILL_SCRIPTS := {
+	"h05": preload("res://src/battle/skills/chenlong.gd"),
+}
+
 var energy := [0, 0]
 var selected_action := [-1, -1]
 var heroes: Array = []
@@ -67,6 +74,9 @@ var _caijin_cooldown: Array[bool] = [false, false]
 var _caijin_buff: Array[bool] = [false, false]
 var _raw_dmg_to: Array[int] = [0, 0]
 var pending_death_switch: Array[int] = [-1, -1]
+
+# 每个英雄槽位对应的 HeroSkill 实例（null = 未迁移到组件，走旧 if 分支）
+var _hero_skills: Array = [[null, null, null], [null, null, null]]
 
 
 func setup(p1_heroes: Array, p2_heroes: Array) -> void:
@@ -111,6 +121,15 @@ func setup(p1_heroes: Array, p2_heroes: Array) -> void:
 	game_over = false
 	winner = -1
 	turn_number = 0
+	_build_hero_skills()
+
+
+func _build_hero_skills() -> void:
+	_hero_skills = [[], []]
+	for p in [0, 1]:
+		for h in heroes[p]:
+			var script: Script = _HERO_SKILL_SCRIPTS.get(h.hero_id, null)
+			_hero_skills[p].append(script.new() if script else null)
 
 
 func active_hero(player: int) -> HeroData:
@@ -566,10 +585,11 @@ func _effective_defense(player: int, action: int) -> int:
 func _calc_attack_raw(player: int, atk: int, def: int, events: Array, atk_name: String, def_name: String, energy_before: Array) -> int:
 	atk = _effective_attack(player, atk)
 	var dmg := _get_action_damage(player, atk)
-	if active_hero(player).passive_id == "chenlong":
-		var diff: int = energy_before[player] - energy_before[1 - player]
-		if diff >= 2:
-			dmg += diff / 2
+	# h05 chenlong 已迁移至 HeroSkillChenlong (skills/chenlong.gd)
+	# 通过 _hero_skills 数组在下方 hook 调用中生效
+	var skill: HeroSkill = _hero_skills[player][active_hero_index[player]]
+	if skill:
+		dmg = skill.on_attack_calc(dmg, atk, self, player, energy_before)
 	if active_hero(player).passive_id == "xugou":
 		dmg += _fallen_teammates[player]
 	return dmg
