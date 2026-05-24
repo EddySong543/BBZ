@@ -18,7 +18,7 @@ if [ -f "$STATE_FILE" ]; then
         echo "---"
         echo ""
     } >> "$SESSION_LOG_DIR/session-log.md" 2>/dev/null
-    rm "$STATE_FILE" 2>/dev/null
+    # rm "$STATE_FILE" 2>/dev/null  # 2026-05-19 Eddy 决议：保留便利贴，仅归档不删除
 fi
 
 if [ -n "$RECENT_COMMITS" ] || [ -n "$MODIFIED_FILES" ]; then
