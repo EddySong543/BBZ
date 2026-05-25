@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="HeroData" format=3]
+
+[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_nh4ru"]
+
+[resource]
+script = ExtResource("1_nh4ru")
+hero_id = "h34"
+hero_name = "世界"
+max_hp = 4
+skill_description = "寰宇同寂"
+portrait_path = "res://assets/sprites/heroes/h34/h34_portrait.png"
+sprite_frames_path = "res://assets/sprites/heroes/h34/h34_idle.tres"

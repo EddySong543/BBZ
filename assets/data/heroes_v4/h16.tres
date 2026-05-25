@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="HeroData" format=3]
+
+[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_pxk1e"]
+
+[resource]
+script = ExtResource("1_pxk1e")
+hero_id = "h16"
+hero_name = "皇后"
+max_hp = 5
+skill_description = "泽被苍生"
+portrait_path = "res://assets/sprites/heroes/h16/h16_portrait.png"
+sprite_frames_path = "res://assets/sprites/heroes/h16/h16_idle.tres"

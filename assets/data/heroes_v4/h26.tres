@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="HeroData" format=3]
+
+[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_r1mrc"]
+
+[resource]
+script = ExtResource("1_r1mrc")
+hero_id = "h26"
+hero_name = "死神"
+max_hp = 4
+skill_description = "向死而生"
+portrait_path = "res://assets/sprites/heroes/h26/h26_portrait.png"
+sprite_frames_path = "res://assets/sprites/heroes/h26/h26_idle.tres"

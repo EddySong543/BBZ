@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="HeroData" format=3]
+
+[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_hy0pe"]
+
+[resource]
+script = ExtResource("1_hy0pe")
+hero_id = "h05"
+hero_name = "辰龙"
+max_hp = 6
+skill_description = "天威"
+portrait_path = "res://assets/sprites/heroes/h05/h05_portrait.png"
+sprite_frames_path = "res://assets/sprites/heroes/h05/h05_idle.tres"

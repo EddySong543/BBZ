@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="HeroData" format=3]
+
+[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_7275j"]
+
+[resource]
+script = ExtResource("1_7275j")
+hero_id = "h17"
+hero_name = "皇帝"
+max_hp = 6
+skill_description = "君命难违"
+portrait_path = "res://assets/sprites/heroes/h17/h17_portrait.png"
+sprite_frames_path = "res://assets/sprites/heroes/h17/h17_idle.tres"

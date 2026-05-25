@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="HeroData" format=3]
+
+[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_eobmn"]
+
+[resource]
+script = ExtResource("1_eobmn")
+hero_id = "h18"
+hero_name = "教皇"
+max_hp = 6
+skill_description = "万民归心"
+portrait_path = "res://assets/sprites/heroes/h18/h18_portrait.png"
+sprite_frames_path = "res://assets/sprites/heroes/h18/h18_idle.tres"

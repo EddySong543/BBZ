@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="HeroData" format=3]
+
+[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_efxrg"]
+
+[resource]
+script = ExtResource("1_efxrg")
+hero_id = "h14"
+hero_name = "魔术师"
+max_hp = 5
+skill_description = "梅开二度"
+portrait_path = "res://assets/sprites/heroes/h14/h14_portrait.png"
+sprite_frames_path = "res://assets/sprites/heroes/h14/h14_idle.tres"

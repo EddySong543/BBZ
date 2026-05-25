@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="HeroData" format=3]
+
+[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_43ert"]
+
+[resource]
+script = ExtResource("1_43ert")
+hero_id = "h19"
+hero_name = "恋人"
+max_hp = 6
+skill_description = "至死不渝"
+portrait_path = "res://assets/sprites/heroes/h19/h19_portrait.png"
+sprite_frames_path = "res://assets/sprites/heroes/h19/h19_idle.tres"

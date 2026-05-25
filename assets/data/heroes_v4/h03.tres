@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="HeroData" format=3]
+
+[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_682cf"]
+
+[resource]
+script = ExtResource("1_682cf")
+hero_id = "h03"
+hero_name = "寅虎"
+max_hp = 5
+skill_description = "渴血"
+portrait_path = "res://assets/sprites/heroes/h03/h03_portrait.png"
+sprite_frames_path = "res://assets/sprites/heroes/h03/h03_idle.tres"

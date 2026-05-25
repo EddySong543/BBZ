@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="HeroData" format=3]
+
+[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_t15sl"]
+
+[resource]
+script = ExtResource("1_t15sl")
+hero_id = "h06"
+hero_name = "巳蛇"
+max_hp = 4
+skill_description = "蛇蜕"
+portrait_path = "res://assets/sprites/heroes/h06/h06_portrait.png"
+sprite_frames_path = "res://assets/sprites/heroes/h06/h06_idle.tres"
