@@ -7,7 +7,6 @@
 offset_right = 166.0
 offset_bottom = 260.0
 script = ExtResource("1_script")
-frame_size = 256
 shield_spritesheet_path = "res://assets/sprites/vfx/defend_shield.png"
 
 [node name="SubViewport" type="SubViewport" parent="." unique_id=1325957388]
@@ -27,9 +26,8 @@ position = Vector2(101.00001, 154)
 scale = Vector2(1.9, 1.9)
 sprite_frames = ExtResource("2_3v6dl")
 animation = &"idle"
-frame_progress = 0.5612711
 
-[node name="DefendShield" type="AnimatedSprite2D" parent="SubViewport" unique_id=3782946513]
+[node name="DefendShield" type="AnimatedSprite2D" parent="SubViewport" unique_id=-512020783]
+visible = false
 position = Vector2(101.00001, 154)
 scale = Vector2(1.9, 1.9)
-visible = false

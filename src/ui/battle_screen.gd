@@ -100,6 +100,7 @@ func _ready() -> void:
 	game_timer.timeout.connect(_on_timer_tick)
 	_update_all()
 	_show_turn_intro()
+	_create_debug_buttons()  # placeholder — 调试用，发布前删除
 
 
 func _init_styles() -> void:
@@ -724,3 +725,59 @@ func _on_clone_target_clicked(area_player: int, display_pos: int) -> void:
 	battle.select_attack_target(current, display_pos)
 	var pname := "P1" if state == State.P1_TURN else "P2"
 	status_label.text = "%s - 已选攻击目标 #%d" % [pname, display_pos + 1]
+
+
+# ============================================================================
+# DEBUG — placeholder，发布前删除整个 region
+# ============================================================================
+
+func _create_debug_buttons() -> void:
+	var panel := VBoxContainer.new()
+	panel.name = "DebugPanel"
+	panel.position = Vector2(10, 10)
+	panel.add_theme_constant_override("separation", 6)
+	add_child(panel)
+
+	var btn_energy := Button.new()
+	btn_energy.text = "[DBG] 双方满能量"
+	btn_energy.custom_minimum_size = Vector2(180, 36)
+	btn_energy.pressed.connect(_on_debug_fill_energy)
+	panel.add_child(btn_energy)
+
+	var btn_dmg := Button.new()
+	btn_dmg.text = "[DBG] P2 -20HP"
+	btn_dmg.custom_minimum_size = Vector2(180, 36)
+	btn_dmg.pressed.connect(_on_debug_damage_p2)
+	panel.add_child(btn_dmg)
+
+
+func _on_debug_fill_energy() -> void:
+	if not battle:
+		return
+	# debug write — 绕过封装直接 set 字段，placeholder hack 性质
+	battle.energy[0] = BattleCore.MAX_ENERGY
+	battle.energy[1] = BattleCore.MAX_ENERGY
+	_update_all()
+
+
+func _on_debug_damage_p2() -> void:
+	if not battle or state == State.GAME_OVER:
+		return
+	var defender := 1
+	var idx: int = battle.get_active_slot(defender)
+	# debug write — 绕过封装直接 set 字段
+	battle.hero_hp[defender][idx] = max(0, battle.get_hero_hp(defender, idx) - 20)
+	_update_all()
+
+	# 复制 BattleCore.resolve() phase 4-5 简化版以触发完整后效
+	if battle.alive_hero_count(defender) == 0:
+		battle.game_over = true
+		battle.winner = BattleCore.WINNER_P1
+		state = State.GAME_OVER
+		status_label.text = "游戏结束！[DBG]"
+		status_label.visible = true
+	elif battle.get_hero_hp(defender, idx) <= 0:
+		battle._fallen_teammates[defender] += 1
+		battle.pending_death_switch[defender] = 1
+		await _show_death_switch_selection(defender)
+		_update_all()
