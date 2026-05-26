@@ -1,29 +1,31 @@
 extends Control
 
-## BP (Ban/Pick) 屏（P1-4e: 从 start_screen 拆出）。
-## 进入：title_screen StartButton 切场。
-## 退出：BP 完成 → 设置 BattleSetup → 切场到 battle_screen。
+## BP 选人屏 —— 联机正式形态（同时盲选，2 步），单机由 AI 扮演对手（决策 Q1=b/Q2=b/Q3=b）。
+## 3 态：BAN（双方盲选 3 禁用 → 取并集，撞车合并）→ PICK（双方盲选 3 出战，允许双方重复=镜像）
+##        → REVEAL（亮出双方阵容，点「开始战斗」进 battle_screen）。
+## 池 = heroes_v4 全 34（h18-h34 暂名字占位）。保留 bp_screen.tscn 布局。
+## 最新方案出处：design/heroes-schools.md §8.3。
 
-enum Phase {
-	P1_BAN1, P2_BAN1, P1_PICK1, P2_PICK1,
-	P2_BAN2, P1_BAN2, P2_PICK2, P1_PICK2,
-	P1_BAN3, P2_BAN3, P1_PICK3, P2_PICK3,
-	DONE
-}
+enum Step { BAN, PICK, REVEAL }
 
+const V4_DIR := "res://assets/data/heroes_v4/"
 const CARD_W := 130
 const CARD_H := 130
 const COLS := 8
 const GAP := 10
-const BP_TIME := 10
+const STEP_TIME := 30        # 每步思考时限（秒），超时自动随机补满
+const BAN_COUNT := 3
+const PICK_COUNT := 3
 const HERO_CARD_SCENE := preload("res://src/ui/components/hero_card.tscn")
 
 var all_heroes: Array[HeroData] = []
-var p1_picks: Array[int] = []
-var p2_picks: Array[int] = []
-var banned: Array[int] = []
-var phase: int = -1
-var selected_idx: int = -1
+var step: int = Step.BAN
+var my_sel: Array[int] = []          # 当前步玩家多选（待确认）
+var my_bans: Array[int] = []
+var ai_bans: Array[int] = []
+var banned: Array[int] = []          # 双方 ban 并集（撞车去重）
+var my_picks: Array[int] = []
+var ai_picks: Array[int] = []
 
 @onready var phase_label: Label = $PhaseLabel
 @onready var info_label: Label = $InfoLabel
@@ -35,14 +37,13 @@ var selected_idx: int = -1
 @onready var bp_timer: Timer = $BPTimer
 
 var card_cards: Array[HeroCard] = []
-var card_data: Array[int] = []
-var bp_timer_seconds: int = BP_TIME
+var timer_seconds: int = STEP_TIME
 
 
 func _ready() -> void:
-	all_heroes = HeroData.create_pool_heroes()
+	all_heroes = HeroData.create_pool_heroes(V4_DIR)
 	_setup_ui()
-	_enter_phase(Phase.P1_BAN1)
+	_enter_step(Step.BAN)
 
 
 func _setup_ui() -> void:
@@ -56,7 +57,7 @@ func _setup_ui() -> void:
 
 	confirm_btn.pressed.connect(_on_confirm)
 	bp_timer.one_shot = false
-	bp_timer.timeout.connect(_on_bp_timer_tick)
+	bp_timer.timeout.connect(_on_timer_tick)
 
 	_build_hero_cards()
 
@@ -71,9 +72,7 @@ func _build_hero_cards() -> void:
 		var col := i % COLS
 		var x := 150 + col * (CARD_W + GAP)
 		var y := row * (CARD_H + GAP)
-
 		var h := all_heroes[i]
-		# P1-NEW2 fix: 必须 instantiate .tscn 才会应用 CardBase SubResource
 		var card := HERO_CARD_SCENE.instantiate() as HeroCard
 		card.hero_id = h.hero_id
 		card.hero_name = h.hero_name
@@ -85,140 +84,174 @@ func _build_hero_cards() -> void:
 		card.pressed.connect(_on_card_clicked.bind(i))
 		card_area.add_child(card)
 		card_cards.append(card)
-		card_data.append(i)
+
+
+func _need() -> int:
+	return BAN_COUNT if step == Step.BAN else PICK_COUNT
 
 
 func _on_card_clicked(idx: int) -> void:
-	if idx in banned or idx in p1_picks or idx in p2_picks:
+	if step == Step.REVEAL:
 		return
-	selected_idx = idx if selected_idx != idx else -1
+	if step == Step.PICK and idx in banned:
+		return
+	# toggle 多选，上限 _need()
+	if idx in my_sel:
+		my_sel.erase(idx)
+	elif my_sel.size() < _need():
+		my_sel.append(idx)
 	_update_all_cards()
-	confirm_btn.disabled = selected_idx < 0
+	_update_info()
+	confirm_btn.disabled = my_sel.size() != _need()
 
 
 func _update_all_cards() -> void:
 	for i in range(card_cards.size()):
 		var card := card_cards[i]
-		var hero_idx: int = card_data[i]
-		if hero_idx in banned:
+		if i in banned:
 			card.card_state = HeroCard.CardState.BANNED
-		elif hero_idx in p1_picks:
+		elif i in my_picks:
 			card.card_state = HeroCard.CardState.PICKED_P1
-		elif hero_idx in p2_picks:
+		elif i in ai_picks:
 			card.card_state = HeroCard.CardState.PICKED_P2
-		elif hero_idx == selected_idx:
+		elif i in my_sel:
 			card.card_state = HeroCard.CardState.SELECTED
 		else:
 			card.card_state = HeroCard.CardState.NORMAL
 
 
 func _update_previews() -> void:
-	p1_preview.set_picks(p1_picks, all_heroes)
-	p2_preview.set_picks(p2_picks, all_heroes)
+	p1_preview.set_picks(my_picks, all_heroes)
+	p2_preview.set_picks(ai_picks, all_heroes)
 
 
-func _enter_phase(new_phase: int) -> void:
+func _enter_step(s: int) -> void:
 	bp_timer.stop()
-	phase = new_phase
-	selected_idx = -1
-	bp_timer_seconds = BP_TIME
+	step = s
+	my_sel.clear()
 	_update_all_cards()
 	_update_previews()
 	_update_phase_label()
+	_update_info()
 
-	if phase == Phase.DONE:
-		confirm_btn.visible = false
-		timer_label.visible = false
-		_start_battle()
-	else:
-		confirm_btn.visible = true
-		confirm_btn.disabled = true
-		confirm_btn.text = "确认选择"
-		timer_label.visible = true
-		_update_timer_label()
-		bp_timer.start(1.0)
+	match s:
+		Step.BAN, Step.PICK:
+			confirm_btn.visible = true
+			confirm_btn.disabled = true
+			confirm_btn.text = "确认禁用" if s == Step.BAN else "确认出战"
+			timer_label.visible = true
+			timer_seconds = STEP_TIME
+			_update_timer_label()
+			bp_timer.start(1.0)
+		Step.REVEAL:
+			confirm_btn.visible = true
+			confirm_btn.disabled = false
+			confirm_btn.text = "开始战斗"
+			timer_label.visible = false
 
 
 func _update_phase_label() -> void:
-	var player := "P1" if _phase_player() == 0 else "P2"
-	var action := "禁用" if _is_ban_phase() else "选择"
-	var nth := "第%d个" % (phase / 4 + 1)
-
-	phase_label.text = "%s — %s%s英雄" % [player, action, nth]
-	var remaining := 0
-	for i in range(all_heroes.size()):
-		if not (i in banned or i in p1_picks or i in p2_picks):
-			remaining += 1
-	info_label.text = "可选: %d | 已禁: %d | P1: %d | P2: %d" % [remaining, banned.size(), p1_picks.size(), p2_picks.size()]
+	match step:
+		Step.BAN:
+			phase_label.text = "禁用阶段 — 盲选 3 名英雄禁用（与对手同时）"
+		Step.PICK:
+			phase_label.text = "选人阶段 — 选择你的 3 名出战英雄"
+		Step.REVEAL:
+			phase_label.text = "对阵已定！"
 
 
-# P1-4f: 12 个 Phase 的数学规律（phase ∈ [0, 11]，DONE=12 不会调到这两个 helper）
-# - 是否 ban：phase % 4 < 2（每 4 个一轮，前 2 个是 ban，后 2 个是 pick）
-# - 哪方：第 2 轮 (phase / 4 == 1) P2 先，其他轮 P1 先；轮内 phase % 2 == 0 是先手
-
-func _is_ban_phase() -> bool:
-	return (phase % 4) < 2
-
-
-func _phase_player() -> int:
-	var round_starter := 1 if (phase / 4) == 1 else 0
-	return round_starter ^ (phase % 2)
-
-
-func _on_bp_timer_tick() -> void:
-	bp_timer_seconds -= 1
-	_update_timer_label()
-	if bp_timer_seconds <= 0:
-		bp_timer.stop()
-		_auto_random_select()
-
-
-func _update_timer_label() -> void:
-	timer_label.text = "剩余 %ds" % bp_timer_seconds
-	if bp_timer_seconds <= 3:
-		timer_label.add_theme_color_override("font_color", Color("#ff4444"))
-	else:
-		timer_label.add_theme_color_override("font_color", Color("#ffaa00"))
-
-
-func _auto_random_select() -> void:
-	var available: Array[int] = []
-	for i in range(all_heroes.size()):
-		if not (i in banned or i in p1_picks or i in p2_picks):
-			available.append(i)
-	if available.size() == 0:
-		return
-	selected_idx = available[randi_range(0, available.size() - 1)]
-	_update_all_cards()
-	_on_confirm()
+func _update_info() -> void:
+	match step:
+		Step.BAN:
+			info_label.text = "已选禁用 %d / %d" % [my_sel.size(), BAN_COUNT]
+		Step.PICK:
+			var collide := _intersect_count(my_bans, ai_bans)
+			var ban_note := "（与对手撞车 %d）" % collide if collide > 0 else ""
+			info_label.text = "已禁用 %d 名%s | 已选出战 %d / %d" % [banned.size(), ban_note, my_sel.size(), PICK_COUNT]
+		Step.REVEAL:
+			info_label.text = "你的阵容 vs 对手阵容 — 点「开始战斗」进场"
 
 
 func _on_confirm() -> void:
 	bp_timer.stop()
-	if selected_idx < 0:
-		return
-	match phase:
-		Phase.P1_BAN1, Phase.P2_BAN1, Phase.P2_BAN2, Phase.P1_BAN2, Phase.P1_BAN3, Phase.P2_BAN3:
-			banned.append(selected_idx)
-		Phase.P1_PICK1, Phase.P1_PICK2, Phase.P1_PICK3:
-			p1_picks.append(selected_idx)
-		Phase.P2_PICK1, Phase.P2_PICK2, Phase.P2_PICK3:
-			p2_picks.append(selected_idx)
-	_enter_phase(phase + 1)
+	match step:
+		Step.BAN:
+			if my_sel.size() != BAN_COUNT:
+				return
+			my_bans = my_sel.duplicate()
+			ai_bans = _ai_choose(BAN_COUNT, [])
+			banned = my_bans.duplicate()
+			for b in ai_bans:
+				if not b in banned:
+					banned.append(b)
+			_enter_step(Step.PICK)
+		Step.PICK:
+			if my_sel.size() != PICK_COUNT:
+				return
+			my_picks = my_sel.duplicate()
+			ai_picks = _ai_choose(PICK_COUNT, banned)   # 不排除 my_picks → 允许镜像
+			_enter_step(Step.REVEAL)
+		Step.REVEAL:
+			_start_battle()
+
+
+## AI 盲选：从合法池（排除 exclude）随机选 n 个不同。单机临时实现，联机时换网络对手。
+func _ai_choose(n: int, exclude: Array[int]) -> Array[int]:
+	var pool: Array[int] = []
+	for i in range(all_heroes.size()):
+		if not i in exclude:
+			pool.append(i)
+	pool.shuffle()
+	return pool.slice(0, mini(n, pool.size()))
+
+
+func _intersect_count(a: Array[int], b: Array[int]) -> int:
+	var c := 0
+	for x in a:
+		if x in b:
+			c += 1
+	return c
+
+
+func _on_timer_tick() -> void:
+	timer_seconds -= 1
+	_update_timer_label()
+	if timer_seconds <= 0:
+		bp_timer.stop()
+		_auto_fill()
+
+
+## 超时自动随机补满当前步选择并确认。
+func _auto_fill() -> void:
+	while my_sel.size() < _need():
+		var pool: Array[int] = []
+		for i in range(all_heroes.size()):
+			if i in my_sel:
+				continue
+			if step == Step.PICK and i in banned:
+				continue
+			pool.append(i)
+		if pool.is_empty():
+			break
+		my_sel.append(pool[randi() % pool.size()])
+	_update_all_cards()
+	if my_sel.size() == _need():
+		_on_confirm()
+
+
+func _update_timer_label() -> void:
+	timer_label.text = "剩余 %ds" % maxi(timer_seconds, 0)
+	timer_label.add_theme_color_override("font_color", Color("#ff4444") if timer_seconds <= 5 else Color("#ffaa00"))
 
 
 func _start_battle() -> void:
-	var p1_lineup: Array[HeroData] = [
-		all_heroes[p1_picks[0]],
-		all_heroes[p1_picks[1]],
-		all_heroes[p1_picks[2]],
-	]
-	var p2_lineup: Array[HeroData] = [
-		all_heroes[p2_picks[0]],
-		all_heroes[p2_picks[1]],
-		all_heroes[p2_picks[2]],
-	]
-	# 必须先 set BattleSetup，再切场景；否则 battle_screen._ready() 可能拿到空 lineup
+	var p1_lineup: Array[HeroData] = []
+	for idx in my_picks:
+		p1_lineup.append(all_heroes[idx])
+	var p2_lineup: Array[HeroData] = []
+	for idx in ai_picks:
+		p2_lineup.append(all_heroes[idx])
+	# 必须先 set BattleSetup 再切场，否则 battle_screen._ready() 拿到空 lineup
 	BattleSetup.p1_heroes = p1_lineup
 	BattleSetup.p2_heroes = p2_lineup
 	get_tree().change_scene_to_file("res://src/ui/battle_screen.tscn")

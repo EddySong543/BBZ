@@ -57,11 +57,11 @@ static func get_spritesheet_path(hero_id: String) -> String:
 
 ## 从 assets/data/heroes/*.tres 加载所有英雄。
 ## 按文件名字典序排序（h01 < h02 < ... < h13），保证稳定顺序。
-static func create_pool_heroes() -> Array[HeroData]:
+static func create_pool_heroes(heroes_dir: String = HEROES_DIR) -> Array[HeroData]:
 	var pool: Array[HeroData] = []
-	var dir := DirAccess.open(HEROES_DIR)
+	var dir := DirAccess.open(heroes_dir)
 	if dir == null:
-		push_error("HeroData: 无法打开目录 %s" % HEROES_DIR)
+		push_error("HeroData: 无法打开目录 %s" % heroes_dir)
 		return pool
 
 	var filenames: Array[String] = []
@@ -75,7 +75,7 @@ static func create_pool_heroes() -> Array[HeroData]:
 	filenames.sort()
 
 	for f in filenames:
-		var path := HEROES_DIR + f
+		var path := heroes_dir + f
 		var res: Resource = load(path)
 		if res is HeroData:
 			pool.append(res)
