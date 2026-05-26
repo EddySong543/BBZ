@@ -3,6 +3,8 @@
 本文件记录 **`src/battle/battle_core.gd` 当前实现** 与
 **`design/gdd/game-concept.md` / `design/heroes.md` 设计文档** 之间的不一致点。
 
+> **⚠️ v3 历史（2026-05-25）**：以下 B-001~B-007 锁定的是**已删除的 v3 实现**的行为，其代码行号/函数名（`_apply_defense`/`select_action`/`_baishou_spent` 等）均已失效。B-001/2/3（同时攻击不抵消、双向独立解算）的结论已作为正式行为迁入 v4（数值更新：大波 2 能）；其余条目（百兽 kit / clone / v3 transient 数组等）所涉机制已在 v4 重做。**当前 v4 行为的真相源 = `tests/unit/battle/v4/` 的 10 个 `*_v4.gd`。** 本文作历史溯源保留。
+
 ---
 
 ## 用法 / 协作约定
@@ -11,7 +13,7 @@
 |------|---------|
 | **Phase 1（测试编写）** | 测试**一律锁定代码当前行为**。所有 `# CURRENT-BEHAVIOR` 测试断言对应一个本文档条目。绝不"先改代码再写测试"。 |
 | **Phase 1 末** | 由 Eddy 逐条裁决 → 修代码 / 改设计文档 / 接受为正式行为。 |
-| **Phase 2 (ADR)** | 已裁决条目的最终结论写入 `docs/architecture/ADR-001-battlecore-responsibility.md` 附录。 |
+| **Phase 2 (ADR)** | 已裁决条目的最终结论写入 `docs/architecture/ADR-001-battlecore-boundary.md` 附录。 |
 | **Phase 3 (重构)** | 重构后若条目状态为 "修代码"，则测试断言同步翻转，并把该条目移到下方"已解决"区。 |
 
 ---

@@ -1,5 +1,7 @@
 # ADR-002: Battle Core v4 架构（英雄重写）
 
+> **✅ 实施状态（2026-05-25 更新）**：S1-S3 swap 已全部落地 —— v4 上移到 `src/battle/`、类名去 V4 后缀（`BattleCore`/`ActionDef`/`HeroSkill`）、`battle_engine.gd`→`battle_core.gd`、v3 旧核全删。下文"待实施/将/重写"等措辞为决策当时的计划态，现已完成；正文作决策溯源保留。真相源 = `src/battle/` + `tests/unit/battle/v4/`。
+
 | 字段 | 值 |
 |------|-----|
 | **Status** | ✅ Accepted（Eddy 审批 2026-05-25，Q1–Q5 已裁定） |
