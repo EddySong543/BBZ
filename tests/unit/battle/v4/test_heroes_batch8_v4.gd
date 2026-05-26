@@ -1,7 +1,7 @@
 extends GutTest
 
 ## ============================================================================
-## BattleEngineV4 英雄第八批（收尾）—— 杂项
+## BattleCore 英雄第八批（收尾）—— 杂项
 ##   h26 死神 —— 变身（form+1.0 伤 / 击杀回血）
 ##   h28 恶魔 —— 契约（队友 +1.0 / 恶魔付 HP）
 ##   h31 月亮 —— 四相 turn%4（造成/受到 ×0.5 / ×2）
@@ -10,9 +10,9 @@ extends GutTest
 ##   h07 当先 —— 免费切换不占槽 + 同回合行动
 ## ============================================================================
 
-const ATTACK := ActionDefV4.Action.ATTACK
-const BIG := ActionDefV4.Action.BIG_ATTACK
-const CHARGE := ActionDefV4.Action.CHARGE
+const ATTACK := ActionDef.Action.ATTACK
+const BIG := ActionDef.Action.BIG_ATTACK
+const CHARGE := ActionDef.Action.CHARGE
 
 
 func _hero(id: String, hp: int) -> HeroData:
@@ -33,14 +33,14 @@ func _team(specs: Array) -> Array:
 	return t
 
 
-func _battle2(p0: Array, p1: Array, e: int = 6) -> BattleEngineV4:
-	var b := BattleEngineV4.new()
+func _battle2(p0: Array, p1: Array, e: int = 6) -> BattleCore:
+	var b := BattleCore.new()
 	b.setup(_team(p0), _team(p1), 555)
 	b.energy = [e, e]
 	return b
 
 
-func _aa(b: BattleEngineV4, a0: int, a1: int) -> void:
+func _aa(b: BattleCore, a0: int, a1: int) -> void:
 	b.select_action(0, a0)
 	b.select_action(1, a1)
 	b.resolve()

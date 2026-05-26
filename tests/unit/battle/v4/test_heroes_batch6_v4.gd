@@ -1,17 +1,17 @@
 extends GutTest
 
 ## ============================================================================
-## BattleEngineV4 英雄第六批（Step 2.2c）—— 状态 debuff
+## BattleCore 英雄第六批（Step 2.2c）—— 状态 debuff
 ##   h32 太阳 —— 燃烧（易伤 +1.0 / 禁回血 / 2 回合 tick）
 ##   h15 女祭司 —— 沉默（被动失效）+ 抹除叠层
 ##   h17 皇帝 —— 禁用动作系列（下回合）
 ## ============================================================================
 
-const ATTACK := ActionDefV4.Action.ATTACK
-const BIG := ActionDefV4.Action.BIG_ATTACK
-const CHARGE := ActionDefV4.Action.CHARGE
-const DEFEND := ActionDefV4.Action.DEFEND
-const SWITCH := ActionDefV4.Action.SWITCH
+const ATTACK := ActionDef.Action.ATTACK
+const BIG := ActionDef.Action.BIG_ATTACK
+const CHARGE := ActionDef.Action.CHARGE
+const DEFEND := ActionDef.Action.DEFEND
+const SWITCH := ActionDef.Action.SWITCH
 
 
 func _hero(id: String, hp: int) -> HeroData:
@@ -32,14 +32,14 @@ func _team(specs: Array) -> Array:
 	return t
 
 
-func _battle2(p0: Array, p1: Array, e: int = 6) -> BattleEngineV4:
-	var b := BattleEngineV4.new()
+func _battle2(p0: Array, p1: Array, e: int = 6) -> BattleCore:
+	var b := BattleCore.new()
 	b.setup(_team(p0), _team(p1), 555)
 	b.energy = [e, e]
 	return b
 
 
-func _aa(b: BattleEngineV4, a0: int, a1: int) -> void:
+func _aa(b: BattleCore, a0: int, a1: int) -> void:
 	b.select_action(0, a0)
 	b.select_action(1, a1)
 	b.resolve()
@@ -69,7 +69,7 @@ func test_h32_burn_blocks_heal() -> void:
 	var b := _battle2([["h32", 4], ["t01", 10], ["t02", 10]], [["t10", 10], ["t11", 10], ["t12", 10]])
 	b.set_status(0, 0, "burn", 2)
 	b.hp[0][0] = 4
-	var healed: int = b._heal(0, 0, ActionDefV4.HP_UNIT)
+	var healed: int = b._heal(0, 0, ActionDef.HP_UNIT)
 	assert_eq(healed, 0, "燃烧期间禁回血")
 	assert_eq(b.hp[0][0], 4, "HP 未变")
 

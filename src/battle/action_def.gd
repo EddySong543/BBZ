@@ -1,41 +1,64 @@
 class_name ActionDef
 extends RefCounted
 
-## Battle 动作定义 — id / 能量消耗 / 伤害值
-## 从 battle_core.gd 拆出 (P1-E2: god class 缓解)
+## Battle 动作定义 —— 数值框架 (ADR-002 §D10) + 半点伤害 (§D3)。
 ##
-## 说明：dict key 是 BattleCore.Action enum 的 int 值。直接用 int 字面量
-## 避免循环依赖 (BattleCore 引用 ActionDef.* 而 ActionDef 不引用 BattleCore.Action)。
-## 如修改 BattleCore.Action enum 顺序，同步此处：
-##   0=CHARGE   1=ATTACK    2=DEFEND     3=BIG_ATTACK  4=BIG_DEFEND  5=SWITCH
-##   6=FAN_GE   7=BAI_SHOU  8=JIAO_TU    9=SHE_TUI    10=SHE_SHEN
-##  11=SHEN_WAI 12=CAI_JIN  13=YU_ZHE
+## 半点制：内部 1 HP = HP_UNIT(2) 半点，最小伤害 0.5 = 1 半点。
+##   本表 damage 字段以【半点】为单位（波 = 2 半点 = 1.0 HP）。
+##   能量（cost / energy_gain）是独立整数资源，不走半点。
+##
+## 数值要点：
+##   - 大波消耗 2 能（与大防对称）
+##   - 切换 0 能（占动作槽，h07 唯一例外，在引擎处理）
+##   - 初始能量 1
+##   - 英雄专属主动技不进全局 Action enum；改由英雄组件声明 (§D9)。
 
+enum Action {
+	CHARGE,      # 攒：+能量
+	ATTACK,      # 波
+	DEFEND,      # 防
+	BIG_ATTACK,  # 大波
+	BIG_DEFEND,  # 大防
+	SWITCH,      # 切换
+}
+
+## 英雄主动技哨兵动作（§D9）：玩家选"用本英雄主动技"。
+## 每个英雄至多 1 个主动技，故单一哨兵即可；具体效果/费用由英雄组件声明。
+## 取值远离 Action enum，避免与基础动作冲突。
+const ACTIVE := 100
+
+const HP_UNIT := 2       # 1 HP = 2 半点
+const MIN_DAMAGE := 1    # 最小伤害 = 1 半点 = 0.5 HP
+
+const INITIAL_ENERGY := 1
+const MAX_ENERGY := 20
+
+## key = Action enum int；damage 单位为半点。
 const BASE_ACTION_DEF := {
-	0: {id="charge",     cost=0, damage=0, energy_gain=1},  # CHARGE
-	1: {id="attack",     cost=1, damage=1, energy_gain=0},  # ATTACK
-	2: {id="defend",     cost=0, damage=0, energy_gain=0},  # DEFEND
-	3: {id="big_attack", cost=3, damage=2, energy_gain=0},  # BIG_ATTACK
-	4: {id="big_defend", cost=2, damage=0, energy_gain=0},  # BIG_DEFEND
-	5: {id="switch",     cost=1, damage=0, energy_gain=0},  # SWITCH
+	Action.CHARGE:     {id = "charge",     cost = 0, damage = 0, energy_gain = 1},
+	Action.ATTACK:     {id = "attack",     cost = 1, damage = 2, energy_gain = 0},  # 1.0 HP
+	Action.DEFEND:     {id = "defend",     cost = 0, damage = 0, energy_gain = 0},
+	Action.BIG_ATTACK: {id = "big_attack", cost = 2, damage = 4, energy_gain = 0},  # 2.0 HP
+	Action.BIG_DEFEND: {id = "big_defend", cost = 2, damage = 0, energy_gain = 0},
+	Action.SWITCH:     {id = "switch",     cost = 0, damage = 0, energy_gain = 0},
 }
 
-const EXTRA_ACTION_DEF := {
-	6:  {id="fange",   cost=2, damage=0},   # FAN_GE
-	7:  {id="baishou", cost=-1, damage=0},  # BAI_SHOU
-	8:  {id="jiaotu",  cost=3, damage=0},   # JIAO_TU
-	9:  {id="shetui",  cost=2, damage=0},   # SHE_TUI
-	10: {id="sheshen", cost=0, damage=0},   # SHE_SHEN
-	11: {id="shenwai", cost=3, damage=0},   # SHEN_WAI
-	12: {id="caijin",  cost=0, damage=0},   # CAI_JIN
-	13: {id="yuzhe",   cost=0, damage=0},   # YU_ZHE
-}
+## 攻击类动作（用于压制/防御判定）。
+const ATTACK_ACTIONS := [Action.ATTACK, Action.BIG_ATTACK]
+const DEFEND_ACTIONS := [Action.DEFEND, Action.BIG_DEFEND]
 
 
-## 返回 action 对应的 id (string)，UI 显示由 EventFormatter.action_name(id) 翻译。
+static func is_attack(action: int) -> bool:
+	return action in ATTACK_ACTIONS
+
+
 static func get_action_id(action: int) -> String:
 	if action in BASE_ACTION_DEF:
 		return BASE_ACTION_DEF[action]["id"]
-	if action in EXTRA_ACTION_DEF:
-		return EXTRA_ACTION_DEF[action]["id"]
 	return "unknown"
+
+
+static func get_base_damage(action: int) -> int:
+	if action in BASE_ACTION_DEF:
+		return BASE_ACTION_DEF[action]["damage"]
+	return 0

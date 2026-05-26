@@ -1,15 +1,15 @@
 extends GutTest
 
 ## ============================================================================
-## BattleEngineV4 英雄第五批（Step 2.2c）—— 伤害型主动技（走伤害管线）
+## BattleCore 英雄第五批（Step 2.2c）—— 伤害型主动技（走伤害管线）
 ##   h12 吞噬 —— 一次"波"+ 命中吸血（active_is_attack + on_active_attack_resolved）
 ##   h13 孤注 —— 66% 翻倍豪赌（RNG，穿防）
 ##   h20 倾力 —— 耗光能量造等量伤（穿防、被大防挡）
 ## ============================================================================
 
-const CHARGE := ActionDefV4.Action.CHARGE
-const DEFEND := ActionDefV4.Action.DEFEND
-const BIG_DEFEND := ActionDefV4.Action.BIG_DEFEND
+const CHARGE := ActionDef.Action.CHARGE
+const DEFEND := ActionDef.Action.DEFEND
+const BIG_DEFEND := ActionDef.Action.BIG_DEFEND
 
 
 func _hero(id: String, hp: int) -> HeroData:
@@ -30,8 +30,8 @@ func _team(specs: Array) -> Array:
 	return t
 
 
-func _battle2(p0: Array, p1: Array, e: int = 6) -> BattleEngineV4:
-	var b := BattleEngineV4.new()
+func _battle2(p0: Array, p1: Array, e: int = 6) -> BattleCore:
+	var b := BattleCore.new()
 	b.setup(_team(p0), _team(p1), 555)
 	b.energy = [e, e]
 	return b

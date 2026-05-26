@@ -4,7 +4,6 @@
 [ext_resource type="PackedScene" uid="uid://ccx2qeqk5rvx5" path="res://src/ui/components/character_display.tscn" id="2_char_display"]
 [ext_resource type="PackedScene" uid="uid://b6i5h2alff53a" path="res://src/ui/components/hero_frame.tscn" id="3_hero_frame"]
 [ext_resource type="PackedScene" path="res://src/ui/components/energy_bar.tscn" id="4_energy"]
-[ext_resource type="PackedScene" path="res://src/ui/components/clone_area.tscn" id="5_clone"]
 [ext_resource type="PackedScene" path="res://src/ui/components/death_switch_overlay.tscn" id="6_death"]
 
 [sub_resource type="StyleBoxFlat" id="CircleNormal"]
@@ -420,21 +419,6 @@ theme_override_styles/normal = SubResource("ConfirmNormal")
 theme_override_styles/pressed = SubResource("ConfirmActive")
 theme_override_styles/hover = SubResource("ConfirmActive")
 text = "结束"
-
-[node name="P1CloneArea" parent="." unique_id=128068125 instance=ExtResource("5_clone")]
-anchors_preset = 0
-offset_left = 320.0
-offset_top = 490.0
-offset_right = 640.0
-offset_bottom = 750.0
-
-[node name="P2CloneArea" parent="." unique_id=84868264 instance=ExtResource("5_clone")]
-anchors_preset = 0
-offset_left = 1290.0
-offset_top = 490.0
-offset_right = 1610.0
-offset_bottom = 750.0
-player = 1
 
 [node name="DeathSwitchOverlay" parent="." unique_id=812501744 instance=ExtResource("6_death")]
 layout_mode = 1

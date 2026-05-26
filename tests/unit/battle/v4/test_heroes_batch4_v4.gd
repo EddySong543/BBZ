@@ -1,17 +1,17 @@
 extends GutTest
 
 ## ============================================================================
-## BattleEngineV4 英雄第四批（Step 2.2c）
+## BattleCore 英雄第四批（Step 2.2c）
 ##   h08 替罪 —— 主动耗 HP 换团队能量（active + 自定前置）
 ##   h10 啼晓 —— 回合触发被动（modify_outgoing + turn_number）
 ##   h16 皇后 —— 团队治疗含替补（active 写替补 HP）
 ##   h19 恋人 —— on_setup 绑定挚爱 + on_ally_death 殉情（穿透）+ 连锁死亡
 ## ============================================================================
 
-const ATTACK := ActionDefV4.Action.ATTACK
-const BIG := ActionDefV4.Action.BIG_ATTACK
-const CHARGE := ActionDefV4.Action.CHARGE
-const DEFEND := ActionDefV4.Action.DEFEND
+const ATTACK := ActionDef.Action.ATTACK
+const BIG := ActionDef.Action.BIG_ATTACK
+const CHARGE := ActionDef.Action.CHARGE
+const DEFEND := ActionDef.Action.DEFEND
 
 
 func _hero(id: String, hp: int) -> HeroData:
@@ -32,14 +32,14 @@ func _team(specs: Array) -> Array:
 	return t
 
 
-func _battle2(p0: Array, p1: Array, e: int = 6) -> BattleEngineV4:
-	var b := BattleEngineV4.new()
+func _battle2(p0: Array, p1: Array, e: int = 6) -> BattleCore:
+	var b := BattleCore.new()
 	b.setup(_team(p0), _team(p1), 555)
 	b.energy = [e, e]
 	return b
 
 
-func _aa(b: BattleEngineV4, a0: int, a1: int) -> void:
+func _aa(b: BattleCore, a0: int, a1: int) -> void:
 	b.select_action(0, a0)
 	b.select_action(1, a1)
 	b.resolve()

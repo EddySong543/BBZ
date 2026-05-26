@@ -1,7 +1,7 @@
 extends GutTest
 
 ## ============================================================================
-## BattleEngineV4 英雄第二批（Step 2.2c）
+## BattleCore 英雄第二批（Step 2.2c）
 ##   h04 三窟   —— on_switch_out + 状态随切保留 + 受伤消层
 ##   h09 凶兽   —— on_resolve_end + 连段状态（被挡仍计）
 ##   h25 蓄势   —— on_resolve_end + "本回合造成伤害" 追踪 + 跨切保留
@@ -9,10 +9,10 @@ extends GutTest
 ## 半点制：1.0 = 2 半点。
 ## ============================================================================
 
-const ATTACK := ActionDefV4.Action.ATTACK
-const BIG := ActionDefV4.Action.BIG_ATTACK
-const CHARGE := ActionDefV4.Action.CHARGE
-const DEFEND := ActionDefV4.Action.DEFEND
+const ATTACK := ActionDef.Action.ATTACK
+const BIG := ActionDef.Action.BIG_ATTACK
+const CHARGE := ActionDef.Action.CHARGE
+const DEFEND := ActionDef.Action.DEFEND
 
 
 func _hero(id: String, hp: int) -> HeroData:
@@ -26,16 +26,16 @@ func _hero(id: String, hp: int) -> HeroData:
 	return h
 
 
-func _battle_p0(hero_id: String, hp: int, opp_hp: int = 10, e: int = 6) -> BattleEngineV4:
+func _battle_p0(hero_id: String, hp: int, opp_hp: int = 10, e: int = 6) -> BattleCore:
 	var p1: Array = [_hero(hero_id, hp), _hero("test_p1_1", 10), _hero("test_p1_2", 10)]
 	var p2: Array = [_hero("test_p2_0", opp_hp), _hero("test_p2_1", 10), _hero("test_p2_2", 10)]
-	var b := BattleEngineV4.new()
+	var b := BattleCore.new()
 	b.setup(p1, p2, 555)
 	b.energy = [e, e]
 	return b
 
 
-func _aa(b: BattleEngineV4, a0: int, a1: int) -> void:
+func _aa(b: BattleCore, a0: int, a1: int) -> void:
 	b.select_action(0, a0)
 	b.select_action(1, a1)
 	b.resolve()
@@ -139,11 +139,11 @@ func test_h25_blocked_attack_keeps_charge() -> void:
 
 # ---- h23 周而复始（RNG 祝福）----
 
-func _battle_h23_raw(seed_value: int) -> BattleEngineV4:
+func _battle_h23_raw(seed_value: int) -> BattleCore:
 	# 不覆盖 energy，保留登场 roll 的 +1能 效果
 	var p1: Array = [_hero("h23", 5), _hero("test_p1_1", 10), _hero("test_p1_2", 10)]
 	var p2: Array = [_hero("test_p2_0", 10), _hero("test_p2_1", 10), _hero("test_p2_2", 10)]
-	var b := BattleEngineV4.new()
+	var b := BattleCore.new()
 	b.setup(p1, p2, seed_value)
 	return b
 
@@ -153,7 +153,7 @@ func test_h23_setup_roll_applies_exactly_one_blessing() -> void:
 	var atk := 1 if b.get_status(0, 0, "wheel_atk", false) else 0
 	var df := 1 if b.get_status(0, 0, "wheel_def", false) else 0
 	var sh := 1 if b.shield[0][0] > 0 else 0
-	var en := 1 if b.energy[0] > ActionDefV4.INITIAL_ENERGY else 0
+	var en := 1 if b.energy[0] > ActionDef.INITIAL_ENERGY else 0
 	assert_eq(atk + df + sh + en, 1, "登场恰好抽中 1 个祝福")
 
 

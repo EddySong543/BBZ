@@ -1,7 +1,7 @@
 extends GutTest
 
 ## ============================================================================
-## BattleEngineV4 英雄第七批（Step 2.2c）—— 管线类
+## BattleCore 英雄第七批（Step 2.2c）—— 管线类
 ##   h27 节制 —— 延迟伤害（>1.0 截到 1.0，溢出下回合 Phase 0 结算）
 ##   h30 星星 —— 替补参战，伤害对半转移到后排星星
 ##   h29 塔   —— 直接击杀溢出分摊给对手剩余队友（splash 不再触发 on_kill）
@@ -9,9 +9,9 @@ extends GutTest
 ##   h33 审判 —— 处决 HP≤2.0（切换之后判定）
 ## ============================================================================
 
-const ATTACK := ActionDefV4.Action.ATTACK
-const BIG := ActionDefV4.Action.BIG_ATTACK
-const CHARGE := ActionDefV4.Action.CHARGE
+const ATTACK := ActionDef.Action.ATTACK
+const BIG := ActionDef.Action.BIG_ATTACK
+const CHARGE := ActionDef.Action.CHARGE
 
 
 func _hero(id: String, hp: int) -> HeroData:
@@ -32,14 +32,14 @@ func _team(specs: Array) -> Array:
 	return t
 
 
-func _battle2(p0: Array, p1: Array, e: int = 6) -> BattleEngineV4:
-	var b := BattleEngineV4.new()
+func _battle2(p0: Array, p1: Array, e: int = 6) -> BattleCore:
+	var b := BattleCore.new()
 	b.setup(_team(p0), _team(p1), 555)
 	b.energy = [e, e]
 	return b
 
 
-func _aa(b: BattleEngineV4, a0: int, a1: int) -> void:
+func _aa(b: BattleCore, a0: int, a1: int) -> void:
 	b.select_action(0, a0)
 	b.select_action(1, a1)
 	b.resolve()

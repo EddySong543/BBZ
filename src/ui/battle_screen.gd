@@ -1,13 +1,13 @@
 extends Control
 
 ## 1920x1080. 布局在 battle_screen.tscn 可视化编辑（保留，勿动节点）。
-## v4 引擎（BattleEngineV4）+ 同时盲选 vs AI（决策 B1）。
+## v4 引擎（BattleCore）+ 同时盲选 vs AI（决策 B1）。
 ## 你 = P0（下），对手 = P1（上，AI）。玩家选动作 → 确认 → AI 后台选 → 同时结算。
 ##
 ## 半点制：HP/护盾内部为半点，显示用 battle.hp_display()。
 
-const A := ActionDefV4.Action
-const ACTIVE := ActionDefV4.ACTIVE
+const A := ActionDef.Action
+const ACTIVE := ActionDef.ACTIVE
 
 const CIRCLE_D := 160.0
 const CIRCLE_GAP := 60.0
@@ -27,7 +27,7 @@ const DEFAULT_P1 := ["h02", "h09", "h16"]   # 怒目 / 凶兽 / 泽被苍生（�
 
 enum State { TURN_INTRO, PLAYER_SELECT, RESOLVING, HERO_SELECT, GAME_OVER }
 
-var battle: BattleEngineV4
+var battle: BattleCore
 var state: int = State.TURN_INTRO
 var timer_seconds: int = 0
 
@@ -60,8 +60,6 @@ var p1_frame_slots: Array[int] = [-1, -1, -1]
 var p2_frame_slots: Array[int] = [-1, -1, -1]
 
 @onready var buttons_ctrl: Control = $Buttons
-@onready var p1_clone_area: CloneArea = $P1CloneArea   # v4 无分身，隐藏保留
-@onready var p2_clone_area: CloneArea = $P2CloneArea
 @onready var _death_switch_overlay: DeathSwitchOverlay = $DeathSwitchOverlay
 @onready var game_timer: Timer = $GameTimer
 
@@ -97,14 +95,10 @@ var _cd_home: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]  # 立绘原位（�
 # ============================================================
 
 func _ready() -> void:
-	battle = BattleEngineV4.new()
+	battle = BattleCore.new()
 	var p0: Array = _resolve_team(BattleSetup.p1_heroes, DEFAULT_P0)
 	var p1: Array = _resolve_team(BattleSetup.p2_heroes, DEFAULT_P1)
 	battle.setup(p0, p1, randi())
-
-	# CloneArea 在 v4 无意义，隐藏（节点保留以维持 .tscn 布局）。
-	p1_clone_area.visible = false
-	p2_clone_area.visible = false
 
 	_init_styles()
 	_init_buttons()
@@ -120,7 +114,6 @@ func _ready() -> void:
 
 	_update_all()
 	_show_turn_intro()
-	_create_debug_buttons()  # placeholder — 调试用，S3 发布前删除
 
 
 ## BattleSetup 有阵容就用，否则用默认（直接跑 battle_screen.tscn 测试）。
@@ -352,8 +345,8 @@ func _resolve() -> void:
 
 	if r.get("game_over", false):
 		state = State.GAME_OVER
-		var w: int = r.get("winner", BattleEngineV4.WINNER_UNDECIDED)
-		status_label.text = "游戏结束！" + ("平局" if w == BattleEngineV4.WINNER_DRAW else ("你胜利！" if w == BattleEngineV4.WINNER_P1 else "你失败"))
+		var w: int = r.get("winner", BattleCore.WINNER_UNDECIDED)
+		status_label.text = "游戏结束！" + ("平局" if w == BattleCore.WINNER_DRAW else ("你胜利！" if w == BattleCore.WINNER_P1 else "你失败"))
 		status_label.visible = true
 		return
 
@@ -469,7 +462,7 @@ func _layout_circles() -> void:
 
 ## 出战英雄是否有主动技（访问 _skills，下划线约定但可读）。
 func _player_has_active() -> bool:
-	var sk: HeroSkillV4 = battle._skills[PLAYER][battle.active_index[PLAYER]]
+	var sk: HeroSkill = battle._skills[PLAYER][battle.active_index[PLAYER]]
 	return sk != null and sk.has_active()
 
 
@@ -792,43 +785,3 @@ func _event_text(ev: Dictionary) -> String:
 		"hero_died": return "%s 一名英雄阵亡" % who
 		"victory", "draw": return "胜负已分"
 	return ""
-
-
-# ============================================================
-# DEBUG — placeholder，S3 发布前删除整个 region
-# ============================================================
-
-func _create_debug_buttons() -> void:
-	var panel := VBoxContainer.new()
-	panel.name = "DebugPanel"
-	panel.position = Vector2(10, 10)
-	panel.add_theme_constant_override("separation", 6)
-	add_child(panel)
-
-	var btn_energy := Button.new()
-	btn_energy.text = "[DBG] 双方满能量"
-	btn_energy.custom_minimum_size = Vector2(180, 36)
-	btn_energy.pressed.connect(_on_debug_fill_energy)
-	panel.add_child(btn_energy)
-
-	var btn_dmg := Button.new()
-	btn_dmg.text = "[DBG] 对手 -2HP"
-	btn_dmg.custom_minimum_size = Vector2(180, 36)
-	btn_dmg.pressed.connect(_on_debug_damage_ai)
-	panel.add_child(btn_dmg)
-
-
-func _on_debug_fill_energy() -> void:
-	if not battle:
-		return
-	battle.energy[0] = ActionDefV4.MAX_ENERGY
-	battle.energy[1] = ActionDefV4.MAX_ENERGY
-	_update_all()
-
-
-func _on_debug_damage_ai() -> void:
-	if not battle or state == State.GAME_OVER:
-		return
-	var idx: int = battle.active_index[AI]
-	battle.hp[AI][idx] = maxi(0, battle.hp[AI][idx] - 4)  # -2.0 HP（半点）
-	_update_all()

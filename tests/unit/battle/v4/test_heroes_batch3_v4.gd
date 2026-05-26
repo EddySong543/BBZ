@@ -1,7 +1,7 @@
 extends GutTest
 
 ## ============================================================================
-## BattleEngineV4 英雄第三批（Step 2.2c）—— 死亡链 + 穿透 + 首个半血
+## BattleCore 英雄第三批（Step 2.2c）—— 死亡链 + 穿透 + 首个半血
 ##   h03 渴血  —— on_kill + on_death + modify_team_outgoing（团队层 buff）
 ##   h06 蛇蜕  —— on_before_death（致死拦截重生）
 ##   h11 穷追  —— on_enemy_switch_out（穿透防御+护盾）
@@ -9,10 +9,10 @@ extends GutTest
 ##   h22 隐者  —— on_ally_death（阵亡叠攻）
 ## ============================================================================
 
-const ATTACK := ActionDefV4.Action.ATTACK
-const BIG := ActionDefV4.Action.BIG_ATTACK
-const CHARGE := ActionDefV4.Action.CHARGE
-const DEFEND := ActionDefV4.Action.DEFEND
+const ATTACK := ActionDef.Action.ATTACK
+const BIG := ActionDef.Action.BIG_ATTACK
+const CHARGE := ActionDef.Action.CHARGE
+const DEFEND := ActionDef.Action.DEFEND
 
 
 func _hero(id: String, hp: int) -> HeroData:
@@ -33,14 +33,14 @@ func _team(specs: Array) -> Array:
 	return t
 
 
-func _battle2(p0: Array, p1: Array, e: int = 6) -> BattleEngineV4:
-	var b := BattleEngineV4.new()
+func _battle2(p0: Array, p1: Array, e: int = 6) -> BattleCore:
+	var b := BattleCore.new()
 	b.setup(_team(p0), _team(p1), 555)
 	b.energy = [e, e]
 	return b
 
 
-func _aa(b: BattleEngineV4, a0: int, a1: int) -> void:
+func _aa(b: BattleCore, a0: int, a1: int) -> void:
 	b.select_action(0, a0)
 	b.select_action(1, a1)
 	b.resolve()
