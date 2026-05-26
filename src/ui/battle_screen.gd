@@ -16,7 +16,7 @@ const SCREEN_W := 1920.0
 const SCREEN_H := 1080.0
 
 ## 默认阵容 fallback：直接打开 battle_screen.tscn(F6) 测试用，BattleSetup 为空时启用。
-const HERO_V4_DIR := "res://assets/data/heroes_v4/"
+const HERO_DATA_DIR := "res://assets/data/heroes/"
 const DEFAULT_P0 := ["h01", "h05", "h13"]   # 窃运 / 天威 / 孤注（均有美术 h01-h17）
 const DEFAULT_P1 := ["h02", "h09", "h16"]   # 怒目 / 凶兽 / 泽被苍生（均有美术）
 
@@ -122,7 +122,7 @@ func _resolve_team(setup_heroes: Array, fallback_ids: Array) -> Array:
 		return setup_heroes
 	var t: Array = []
 	for id in fallback_ids:
-		var path: String = HERO_V4_DIR + str(id) + ".tres"
+		var path: String = HERO_DATA_DIR + str(id) + ".tres"
 		if ResourceLoader.exists(path):
 			t.append(load(path))
 		else:

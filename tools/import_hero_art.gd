@@ -8,7 +8,7 @@ extends SceneTree
 ## 头像：立绘已是透明背景 → alpha bbox → 从人物顶部裁正方形(头+肩) → 缩放 THUMB。
 
 const DST := "res://assets/sprites/heroes/"
-const V4 := "res://assets/data/heroes_v4/"
+const HERO_DATA := "res://assets/data/heroes/"
 const FIRST := 1
 const LAST := 17
 
@@ -130,9 +130,9 @@ func _gen_portrait(id: String) -> bool:
 	return err == OK
 
 
-## 回填 v4 .tres 的 portrait_path + sprite_frames_path。
+## 回填英雄 .tres 的 portrait_path + sprite_frames_path。
 func _update_v4_tres(id: String) -> bool:
-	var path := "%s%s.tres" % [V4, id]
+	var path := "%s%s.tres" % [HERO_DATA, id]
 	if not ResourceLoader.exists(path):
 		push_warning("%s: v4 .tres 不存在，跳过回填 %s" % [id, path])
 		return true  # 不阻塞（h14-h17 v4 数据可能尚未生成）

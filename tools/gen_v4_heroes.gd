@@ -2,7 +2,7 @@ extends SceneTree
 
 ## v4 英雄数据生成器（一次性工具）。
 ## 按 ADR-002 / hero-mechanics-hook-matrix 的 HP 与角色名，生成 34 个 HeroData .tres。
-## 放 assets/data/heroes_v4/（不动 v3 的 assets/data/heroes/）。
+## 放 assets/data/heroes/（34 英雄数据）。
 ## 运行：godot --headless --path <proj> --script res://tools/gen_v4_heroes.gd
 ##
 ## [hero_id, 角色名, 技能名, HP]
@@ -21,7 +21,7 @@ const ROWS := [
 	["h34", "世界", "寰宇同寂", 4],
 ]
 
-const OUT_DIR := "res://assets/data/heroes_v4/"
+const OUT_DIR := "res://assets/data/heroes/"
 
 
 func _initialize() -> void:

@@ -3,12 +3,12 @@ extends Control
 ## BP 选人屏 —— 联机正式形态（同时盲选，2 步），单机由 AI 扮演对手（决策 Q1=b/Q2=b/Q3=b）。
 ## 3 态：BAN（双方盲选 3 禁用 → 取并集，撞车合并）→ PICK（双方盲选 3 出战，允许双方重复=镜像）
 ##        → REVEAL（亮出双方阵容，点「开始战斗」进 battle_screen）。
-## 池 = heroes_v4 全 34（h18-h34 暂名字占位）。保留 bp_screen.tscn 布局。
+## 池 = assets/data/heroes 全 34（h18-h34 暂名字占位）。保留 bp_screen.tscn 布局。
 ## 最新方案出处：design/heroes-schools.md §8.3。
 
 enum Step { BAN, PICK, REVEAL }
 
-const V4_DIR := "res://assets/data/heroes_v4/"
+const HERO_DATA_DIR := "res://assets/data/heroes/"
 const CARD_W := 130
 const CARD_H := 130
 const COLS := 8
@@ -41,7 +41,7 @@ var timer_seconds: int = STEP_TIME
 
 
 func _ready() -> void:
-	all_heroes = HeroData.create_pool_heroes(V4_DIR)
+	all_heroes = HeroData.create_pool_heroes(HERO_DATA_DIR)
 	_setup_ui()
 	_enter_step(Step.BAN)
 
