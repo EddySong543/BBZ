@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://ccx2qeqk5rvx5"]
 
 [ext_resource type="Script" uid="uid://cvq2a5vbrb2k6" path="res://src/ui/components/character_display.gd" id="1_script"]
-[ext_resource type="SpriteFrames" uid="uid://bddyqm1vbecmg" path="res://assets/sprites/heroes/h01/h01_idle.tres" id="2_3v6dl"]
+[ext_resource type="SpriteFrames" uid="uid://c6ekxjq8c7hwx" path="res://assets/sprites/heroes/h01/h01_idle.tres" id="2_3v6dl"]
 
 [node name="CharacterDisplay" type="SubViewportContainer" unique_id=406521637]
 offset_right = 166.0

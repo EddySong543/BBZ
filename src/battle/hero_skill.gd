@@ -116,7 +116,7 @@ func has_active() -> bool:
 	return false
 
 
-## 主动技动作 id（字符串，UI 由 EventFormatter 翻译）。仅 has_active() 为 true 时有意义。
+## 主动技动作 id（字符串，UI 文案由 battle_screen 内联翻译）。仅 has_active() 为 true 时有意义。
 func active_action_id() -> String:
 	return ""
 
