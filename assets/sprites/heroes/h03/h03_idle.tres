@@ -1,0 +1,46 @@
+[gd_resource type="SpriteFrames" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/sprites/heroes/h03/h03_idle.png" id="1_lcnao"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p43ar"]
+atlas = ExtResource("1_lcnao")
+region = Rect2(0, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_i04pk"]
+atlas = ExtResource("1_lcnao")
+region = Rect2(256, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_qupna"]
+atlas = ExtResource("1_lcnao")
+region = Rect2(512, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_sc5vh"]
+atlas = ExtResource("1_lcnao")
+region = Rect2(768, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_cru1c"]
+atlas = ExtResource("1_lcnao")
+region = Rect2(0, 256, 256, 256)
+
+[resource]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p43ar")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_i04pk")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_qupna")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_sc5vh")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_cru1c")
+}],
+"loop": true,
+"name": &"idle",
+"speed": 8.0
+}]

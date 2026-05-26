@@ -16,13 +16,14 @@ size = Vector2i(500, 500)
 render_target_update_mode = 4
 
 [node name="ViewportBorder" type="ReferenceRect" parent="SubViewport" unique_id=1625547335]
-offset_right = 166.0
-offset_bottom = 260.0
+offset_right = 340.0
+offset_bottom = 360.0
 border_color = Color(0, 1, 0, 0.6)
 border_width = 2.0
+editor_only = true
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="SubViewport" unique_id=1622338484]
-position = Vector2(101.00001, 154)
+position = Vector2(170, 154)
 scale = Vector2(1.9, 1.9)
 sprite_frames = ExtResource("2_3v6dl")
 animation = &"idle"

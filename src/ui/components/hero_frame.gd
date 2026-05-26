@@ -40,6 +40,13 @@ extends Panel
 		if is_node_ready():
 			size = v
 
+## 头像水平翻转（P2 对手头像朝左用）。
+@export var flip_h: bool = false:
+	set(v):
+		flip_h = v
+		if is_node_ready() and _portrait:
+			(_portrait as TextureRect).flip_h = v
+
 var _portrait: TextureRect
 var _name_label: Label
 var _base_stylebox: StyleBoxFlat  # P1-NEW2: 从 .tscn 取 default，state 切换基于此 duplicate
@@ -105,6 +112,7 @@ func _refresh_portrait() -> void:
 		_cache[portrait_path] = tex
 	(_portrait as TextureRect).texture = tex
 	(_portrait as TextureRect).visible = true
+	(_portrait as TextureRect).flip_h = flip_h
 
 
 func _refresh_style() -> void:

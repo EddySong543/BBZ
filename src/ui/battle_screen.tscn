@@ -95,18 +95,18 @@ color = Color(0.2, 0.2, 0.333, 1)
 
 [node name="P1CharDisplay" parent="." unique_id=1642938575 instance=ExtResource("2_char_display")]
 layout_mode = 0
-offset_left = 385.0
+offset_left = 310.0
 offset_top = 490.0
-offset_right = 551.0
-offset_bottom = 750.0
+offset_right = 650.0
+offset_bottom = 850.0
 anim_fps = 12.0
 
 [node name="P2CharDisplay" parent="." unique_id=915119977 instance=ExtResource("2_char_display")]
 layout_mode = 0
-offset_left = 1365.0
+offset_left = 1270.0
 offset_top = 490.0
-offset_right = 1531.0
-offset_bottom = 750.0
+offset_right = 1610.0
+offset_bottom = 850.0
 anim_fps = 12.0
 
 [node name="P1Name" type="Label" parent="." unique_id=1021025025]

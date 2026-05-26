@@ -33,6 +33,13 @@ extends SubViewportContainer
 		if is_node_ready() and _sprite:
 			_sprite.position = v
 
+## 水平翻转（P2 对手立绘朝左用）。
+@export var flip_h: bool = false:
+	set(v):
+		flip_h = v
+		if is_node_ready() and _sprite:
+			_sprite.flip_h = v
+
 @export var anim_fps: float = 8.0:
 	set(v):
 		anim_fps = v
@@ -132,6 +139,14 @@ func _ready() -> void:
 
 	if not _sprite.animation_finished.is_connected(_on_anim_finished):
 		_sprite.animation_finished.connect(_on_anim_finished)
+
+	_sprite.flip_h = flip_h
+	# 受击白闪 shader（A 方案 juice）
+	if _sprite.material == null:
+		var fmat := ShaderMaterial.new()
+		fmat.shader = preload("res://assets/shaders/hit_flash.gdshader")
+		fmat.set_shader_parameter("flash_amount", 0.0)
+		_sprite.material = fmat
 
 
 func _build_nodes() -> void:
@@ -241,6 +256,18 @@ func _on_anim_finished() -> void:
 
 func set_hit_flash(on: bool) -> void:
 	modulate = Color("#dd2233") if on else Color.WHITE
+
+
+## 受击白闪（A 方案 juice）：flash_amount 1→0，把立绘瞬间染白再恢复。
+func flash_white(duration: float = 0.18) -> void:
+	if not _sprite or _sprite.material == null:
+		return
+	var mat := _sprite.material as ShaderMaterial
+	mat.set_shader_parameter("flash_amount", 1.0)
+	var tw := create_tween()
+	tw.tween_method(
+		func(v: float) -> void: mat.set_shader_parameter("flash_amount", v),
+		1.0, 0.0, duration).set_trans(Tween.TRANS_SINE)
 
 
 func _load_shield_spritesheet() -> void:
