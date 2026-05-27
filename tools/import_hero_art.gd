@@ -1,6 +1,6 @@
 extends SceneTree
 
-## 英雄美术导入（A 方案）：为 h01-h17 生成 idle.tres + 方形头像，并回填 v4 .tres 路径。
+## 英雄美术导入（A 方案）：为 h01-h34 生成 idle.tres + 方形头像，并回填 .tres 路径。
 ## 前置：hXX.png(立绘) + hXX_idle.png(sheet) 已复制到 heroes/hXX/ 且已 --import。
 ## 运行：godot --headless --path <proj> --script res://tools/import_hero_art.gd
 ##
@@ -10,7 +10,7 @@ extends SceneTree
 const DST := "res://assets/sprites/heroes/"
 const HERO_DATA := "res://assets/data/heroes/"
 const FIRST := 1
-const LAST := 17
+const LAST := 34
 
 const CELL := 256
 const COLS := 4

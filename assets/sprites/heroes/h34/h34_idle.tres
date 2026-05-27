@@ -1,0 +1,39 @@
+[gd_resource type="SpriteFrames" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/sprites/heroes/h34/h34_idle.png" id="1_3vgmg"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_og3l6"]
+atlas = ExtResource("1_3vgmg")
+region = Rect2(0, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_wwjel"]
+atlas = ExtResource("1_3vgmg")
+region = Rect2(256, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_arpit"]
+atlas = ExtResource("1_3vgmg")
+region = Rect2(512, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_066n7"]
+atlas = ExtResource("1_3vgmg")
+region = Rect2(768, 0, 256, 256)
+
+[resource]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_og3l6")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_wwjel")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_arpit")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_066n7")
+}],
+"loop": true,
+"name": &"idle",
+"speed": 8.0
+}]
