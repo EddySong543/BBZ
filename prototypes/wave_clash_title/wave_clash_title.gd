@@ -9,7 +9,6 @@ extends Control
 ## 文字层不走网格：原生高分辨率 Label，用项目像素字体 Ark Pixel 整数倍字号（清晰）。
 ## 仅原型用，不接入游戏。
 
-const FONT16 := "res://assets/font/ark-pixel-16px-proportional-zh_cn.ttf"
 const LOAD_TIME := 1.2    # 模拟加载时长（秒）
 const SWEEP_TIME := 0.85  # 点击后盖过时长（秒）
 
@@ -41,14 +40,12 @@ func _update_aspect() -> void:
 		_mat.set_shader_parameter("aspect", s.x / s.y)
 
 
-## 文字：原生高分辨率，字号取 Ark Pixel 原生 16 的整数倍（96=6× / 32=2×，清晰）。
+## 文字：用项目自带 FontManager（Ark Pixel 像素字体，已关抗锯齿）。
+## 字号取 12 的整数倍（FontManager 会选 12px 字体）：标题 96=8× / 提示 36=3×。
 func _build_labels() -> void:
-	var font := load(FONT16) as FontFile
-
 	_title = Label.new()
 	_title.text = "波波攒之王"
-	_title.add_theme_font_override("font", font)
-	_title.add_theme_font_size_override("font_size", 96)
+	FontManager.apply(_title, 96)
 	_title.add_theme_color_override("font_color", Color("#fdf3d0"))
 	_title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
 	_title.add_theme_constant_override("outline_size", 6)
@@ -60,8 +57,7 @@ func _build_labels() -> void:
 
 	_prompt = Label.new()
 	_prompt.text = "加载中"
-	_prompt.add_theme_font_override("font", font)
-	_prompt.add_theme_font_size_override("font_size", 32)
+	FontManager.apply(_prompt, 36)
 	_prompt.add_theme_color_override("font_color", Color("#e8eef7"))
 	_prompt.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
 	_prompt.add_theme_constant_override("outline_size", 4)

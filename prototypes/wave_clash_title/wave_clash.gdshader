@@ -65,7 +65,7 @@ vec3 field(vec2 uv) {
 
 	float side = step(d, 0.0);            // 硬边：1 蓝侧 / 0 红侧（无 smoothstep）
 	float flood = abs(clash_pos - 0.5) * 2.0;
-	float base_fill = mix(0.10, 0.6, flood);
+	float base_fill = mix(0.28, 0.72, flood);   // 抬高两侧底色 → 整体更亮
 
 	float blue_amt = side * (base_fill + (0.25 + 0.9 * band_l) * front_l);
 	float red_amt  = (1.0 - side) * (base_fill + (0.25 + 0.9 * band_r) * front_r);
@@ -74,12 +74,12 @@ vec3 field(vec2 uv) {
 	float glow = exp(-abs(d) * 8.0);
 
 	vec3 col = vec3(0.02, 0.02, 0.05);
-	col += blue_color.rgb * blue_amt * 1.4;
-	col += red_color.rgb  * red_amt  * 1.4;
+	col += blue_color.rgb * blue_amt * 1.6;
+	col += red_color.rgb  * red_amt  * 1.6;
 	col += mix(blue_color.rgb, red_color.rgb, side) * glow * 0.5;
 	col += vec3(1.0, 0.95, 0.85) * core * 2.0;
 
-	float vig = clamp(1.0 - length((uv - 0.5) * vec2(aspect, 1.0)) * 0.6, 0.0, 1.0);
+	float vig = clamp(1.0 - length((uv - 0.5) * vec2(aspect, 1.0)) * 0.45, 0.0, 1.0);  // 暗角减弱
 	col *= vig;
 	col *= intensity;
 

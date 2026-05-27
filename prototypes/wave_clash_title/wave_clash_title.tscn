@@ -7,14 +7,14 @@
 shader = ExtResource("1")
 shader_parameter/clash_pos = 0.5
 shader_parameter/aspect = 1.777
-shader_parameter/cells_x = 24.0
+shader_parameter/cells_x = 32.0
 shader_parameter/intensity = 1.0
 shader_parameter/edge_jitter = 1.0
 shader_parameter/wave_freq = 9.0
 shader_parameter/wave_speed = 3.0
 shader_parameter/color_levels = 14
-shader_parameter/blue_color = Color(0.18, 0.55, 1, 1)
-shader_parameter/red_color = Color(1, 0.27, 0.16, 1)
+shader_parameter/blue_color = Color(0.4, 0.72, 1, 1)
+shader_parameter/red_color = Color(1, 0.42, 0.3, 1)
 
 [node name="WaveClashTitle" type="Control"]
 layout_mode = 3
