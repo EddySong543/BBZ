@@ -64,9 +64,13 @@ vec3 red_color_at(float L) {
 
 // 每格中心算亮度 L (0~1)
 float energy(vec2 cuv) {
-	// 1) 底色：盖过越多越亮（flood）→ 自动实现"盖过逐渐高亮"
+	float row_idx = floor(cuv.y * 36.0);
+	float row_hash = fract(sin(row_idx * 12.9898 + 4.2) * 43758.5453);
+
+	// 1) 底色：盖过越多越亮（flood）+ 微 hash 扰动（全屏每行 ±0.025 → 跨 1 档颗粒）
+	//    方格颗粒"全屏底座"：与 wave 解耦，单道波之外的列也保留颗粒
 	float flood = abs(clash_pos - 0.5) * 2.0;
-	float L_base = mix(0.35, 0.72, flood);
+	float L_base = mix(0.35, 0.72, flood) + (row_hash - 0.5) * 0.05;
 
 	// 2) 大波（推进期主角）：高斯衰减 30 让波宽 ~10 格 → 多格明暗渐变
 	float dl = cuv.x - pulse_l_x;
@@ -74,21 +78,36 @@ float energy(vec2 cuv) {
 	float L_pulse_l = exp(-dl * dl * 30.0) * pulse_amp;
 	float L_pulse_r = exp(-dr * dr * 30.0) * pulse_amp;
 
-	// 3) 中央白柱（僵持期主角）。衰减系数 14→10.5 让"对峙发光带"加宽约 +33%
-	float L_center = exp(-abs(cuv.x - clash_pos) * 10.5) * center_amp;
+	// 3) 中央白柱（僵持期主角）。衰减 8.1 让"对峙发光带"宽 ~7-8 格
+	float L_center = exp(-abs(cuv.x - clash_pos) * 8.1) * center_amp;
 
-	// 4) 持续涌入的小波（僵持期 wave_time 持续推进 → 永不静止）
-	//    波峰严格竖直：相位只依赖 cuv.x，同一列所有格子同相位同时到达波峰
-	//    ⚠ 预期副作用：纵向 36 行同色 → 失去 64×36 方格颗粒（颗粒需另一个纵向调制源）
+	// 4) 持续涌入小波（双 cycle 重叠触发 + 左右错相位）
+	//    每侧 2 个相位差 0.5 的 cycle，一道接近中央被 envelope 压扁时另一道已从边缘出发
+	//    → 过渡期短暂两道并存，平稳期一道主导，max() 合并避免重合爆亮
+	//    红侧整体偏移 0.25 周期（~0.83s @WAVE_SPEED=1.5）让左右节奏不同步
+	//    单波包高斯衰减 220 ≈ 4 格宽；波相位严格只依赖 cuv.x 和 wave_time（同列同相不变）
+	//    y_amp 振幅纵向调制：sin 漂浮 + hash 扰动 0.45（窗帘不刺眼）
 	float side = step(cuv.x - clash_pos, 0.0);
-	float ph_l = sin(cuv.x * wave_freq - wave_time) * 0.5 + 0.5;
-	float ph_r = sin((1.0 - cuv.x) * wave_freq - wave_time) * 0.5 + 0.5;
+	float t_phase = wave_time * 0.3;
+	// 蓝侧：A 主、B 半周期错开
+	float posA_l = fract(t_phase) * 0.55;
+	float posB_l = fract(t_phase + 0.5) * 0.55;
+	float dA_l = cuv.x - posA_l;
+	float dB_l = cuv.x - posB_l;
+	float ph_l = max(exp(-dA_l * dA_l * 220.0), exp(-dB_l * dB_l * 220.0));
+	// 红侧：整体偏移 0.25 周期，与蓝侧错开不同步
+	float posA_r = 1.0 - fract(t_phase + 0.25) * 0.55;
+	float posB_r = 1.0 - fract(t_phase + 0.75) * 0.55;
+	float dA_r = cuv.x - posA_r;
+	float dB_r = cuv.x - posB_r;
+	float ph_r = max(exp(-dA_r * dA_r * 220.0), exp(-dB_r * dB_r * 220.0));
+	float y_amp = 0.75 + sin(cuv.y * 15.0 + wave_time * 0.3) * 0.15 + (row_hash - 0.5) * 0.45;
 	float dist_l = max(clash_pos - cuv.x, 0.0);
 	float dist_r = max(cuv.x - clash_pos, 0.0);
-	float L_wave_l = ph_l * wave_amp * smoothstep(0.0, 0.25, dist_l) * side;
-	float L_wave_r = ph_r * wave_amp * smoothstep(0.0, 0.25, dist_r) * (1.0 - side);
+	float L_wave_l = ph_l * wave_amp * y_amp * smoothstep(0.0, 0.25, dist_l) * side;
+	float L_wave_r = ph_r * wave_amp * y_amp * smoothstep(0.0, 0.25, dist_r) * (1.0 - side);
 
-	// base + wave 让两侧版图持续波动；pulse / center 通过 max 在关键位置主导
+	// base + wave 让单道波涌过；pulse / center 通过 max 在关键位置主导
 	float L_base_modulated = L_base + L_wave_l + L_wave_r;
 	float L = max(L_base_modulated, max(max(L_pulse_l, L_pulse_r), L_center));
 	return clamp(L * intensity, 0.0, 0.9999);

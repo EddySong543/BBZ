@@ -20,9 +20,9 @@ extends Control
 const ADVANCE_TIME := 0.85
 const IMPACT_TIME := 0.20
 const SWEEP_TIME := 0.85
-const WAVE_SPEED := 6.0       # 持续涌入小波的相位推进速度
+const WAVE_SPEED := 1.5       # 持续涌入小波的相位推进速度（2026-05-28 再慢一倍，3.0→1.5）
 const WAVE_AMP_INTRO := 0.10  # 推进期小波（背景纹理让方格颗粒可见，被 pulse 主导）
-const WAVE_AMP_TARGET := 0.25 # 撞击后小波稳态振幅
+const WAVE_AMP_TARGET := 0.18 # 撞击后单道波包稳态振幅（2026-05-28 收 0.25→0.18 让波舒缓涌过）
 
 @onready var _wave: ColorRect = $Wave
 
@@ -126,8 +126,8 @@ func _process(_delta: float) -> void:
 	_mat.set_shader_parameter("wave_time", _wave_t)
 	if _phase == "ready":
 		_struggle()
-		# 中央白柱微脉动 0.9-1.1 → 局部脉动，不全屏闪
-		var c := 1.0 + sin(_t * 3.2) * 0.10
+		# 中央白柱微脉动 1.0-1.20 → 中心微上调一档；clamp 后不爆白
+		var c := 1.10 + sin(_t * 3.2) * 0.10
 		_mat.set_shader_parameter("center_amp", c)
 		_prompt.modulate.a = 0.55 + 0.45 * sin(_t * 3.0)
 
