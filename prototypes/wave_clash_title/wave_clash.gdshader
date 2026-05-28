@@ -74,17 +74,15 @@ float energy(vec2 cuv) {
 	float L_pulse_l = exp(-dl * dl * 30.0) * pulse_amp;
 	float L_pulse_r = exp(-dr * dr * 30.0) * pulse_amp;
 
-	// 3) 中央白柱（僵持期主角）
-	float L_center = exp(-abs(cuv.x - clash_pos) * 14.0) * center_amp;
+	// 3) 中央白柱（僵持期主角）。衰减系数 14→10.5 让"对峙发光带"加宽约 +33%
+	float L_center = exp(-abs(cuv.x - clash_pos) * 10.5) * center_amp;
 
-	// 4) 持续涌入的小波（僵持期 wave_time 持续推进 → 永不静止 + 让相邻格 L 跨档显色差）
-	//    关键：① wave 加在 base 上（不是 max）→ base 区每格都有 L 波动 → 颜色丰富
-	//          ② 相位加 cuv.y * 6.0 纵向偏移 → 相邻列同行也有 L 差 → 显 64×36 方格颗粒
-	//          ③ y_phase 系数 6 让波峰倾斜 ~0.4° 几乎不可见，视觉仍是"竖直波峰水平推进"
+	// 4) 持续涌入的小波（僵持期 wave_time 持续推进 → 永不静止）
+	//    波峰严格竖直：相位只依赖 cuv.x，同一列所有格子同相位同时到达波峰
+	//    ⚠ 预期副作用：纵向 36 行同色 → 失去 64×36 方格颗粒（颗粒需另一个纵向调制源）
 	float side = step(cuv.x - clash_pos, 0.0);
-	float y_phase = cuv.y * 6.0;
-	float ph_l = sin(cuv.x * wave_freq - wave_time + y_phase) * 0.5 + 0.5;
-	float ph_r = sin((1.0 - cuv.x) * wave_freq - wave_time + y_phase) * 0.5 + 0.5;
+	float ph_l = sin(cuv.x * wave_freq - wave_time) * 0.5 + 0.5;
+	float ph_r = sin((1.0 - cuv.x) * wave_freq - wave_time) * 0.5 + 0.5;
 	float dist_l = max(clash_pos - cuv.x, 0.0);
 	float dist_r = max(cuv.x - clash_pos, 0.0);
 	float L_wave_l = ph_l * wave_amp * smoothstep(0.0, 0.25, dist_l) * side;
