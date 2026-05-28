@@ -1,95 +1,112 @@
 shader_type canvas_item;
 
-// ── 波波攒 · 对波加载界面 背景层 shader（原型 · 网格纯色版）─────────────────
-// 机制：把屏幕切成固定方格（横 cells_x 格，格高按 aspect 算出 → 正方形）。
-// 每个片元先把 UV【吸附到所在格子的中心点】，整格只用该中心点算一次颜色、填成纯色。
-// 一格 = 一块纯色：格内无渐变 / 无抗锯齿 / 无抖动。波纹靠整格整格切换颜色表现。
-// 不使用任何贴图采样 → 在原生分辨率直接输出方块，不存在放大平滑问题。
-// 左蓝 / 右红 竖直波列在 clash_pos 处对撞；clash_pos 由脚本驱动（僵持→盖过）。仅原型用。
+// ── 波波攒 · 对波加载界面（多档颜色渐变 + 持续涌入小波 版）─────
+//
+// 核心机制（认知纠偏后的正确路线）：
+//   1) 大方格 64 列，每格中心采样、整格纯色，无渐变无噪点
+//   2) 亮度量化 levels=40 档（不是 5 档！）→ 蓝/红各 40 个由暗到亮的层次
+//   3) 颜色 ramp 在 5 个关键色之间用 mix 插值；L 量化后查 ramp → 40 种蓝 + 40 种红
+//   4) 相邻格 cuv 差 1/64 → energy 差 0.01-0.03 → 跨多档 → 相邻格自然显色差
+//      → 不需要任何边框/暗缝/描边来"勾勒"格子（前几版都弃）
+//
+// 时间轴 uniforms（脚本驱动）：
+//   pulse_l_x / pulse_r_x : 大波位置（推进期 0→0.5 / 1→0.5）
+//   pulse_amp             : 大波振幅（推进期 1，撞击后衰减到 0）
+//   center_amp            : 中央白柱（撞击后 tween 起，僵持期 0.9-1.1 微脉动）
+//   wave_amp              : 持续涌入小波振幅（撞击后 0→0.22 维持）
+//   wave_time             : 小波相位（脚本每帧持续推进 → 波向中心传播）
+//   clash_pos             : 中央边界（僵持期 _struggle 小幅游走；sweep 期 tween 到 0/1）
 
-uniform float clash_pos : hint_range(0.0, 1.0) = 0.5;   // 对波边界（UV.x）
-uniform float aspect = 1.777;                            // 宽高比（算正方形格高 + 暗角）
-uniform float cells_x = 24.0;                            // 横向格数（粗细旋钮）
-uniform float intensity : hint_range(0.0, 2.0) = 1.0;    // 总强度（淡入 / 盖过闪光）
-uniform float edge_jitter : hint_range(0.0, 2.0) = 1.0;  // 边界抖动（盖过时收紧）
-uniform float wave_freq = 9.0;                           // 竖直波列密度（按格数语义）
-uniform float wave_speed = 3.0;                          // 波列推进速度
-uniform int color_levels : hint_range(2, 64) = 14;       // 色阶量化（限色纯块，无抖动）
-uniform vec4 blue_color : source_color = vec4(0.18, 0.55, 1.0, 1.0);
-uniform vec4 red_color  : source_color = vec4(1.0, 0.27, 0.16, 1.0);
+uniform float clash_pos : hint_range(0.0, 1.0) = 0.5;
+uniform float aspect = 1.777;
+uniform float cells_x = 64.0;
+uniform float intensity : hint_range(0.0, 2.0) = 1.0;   // 撞击短促闪用；僵持期固定 1.0 不再全屏脉动
 
-float hash21(vec2 p) {
-	p = fract(p * vec2(123.34, 456.21));
-	p += dot(p, p + 45.32);
-	return fract(p.x * p.y);
+uniform float pulse_l_x : hint_range(0.0, 1.0) = 0.0;
+uniform float pulse_r_x : hint_range(0.0, 1.0) = 1.0;
+uniform float pulse_amp : hint_range(0.0, 2.0) = 1.0;
+uniform float center_amp : hint_range(0.0, 1.5) = 0.0;
+
+uniform float wave_amp : hint_range(0.0, 0.6) = 0.0;
+uniform float wave_time = 0.0;
+uniform float wave_freq = 60.0;                          // 相邻格相位差 ~0.94 弧度 → 跨多档色差
+
+uniform int levels : hint_range(8, 96) = 40;             // 颜色档位数（关键旋钮）
+
+// ── 蓝色 ramp：5 个关键色之间 mix（输入量化后的 L 0~1）─────
+vec3 blue_color_at(float L) {
+	vec3 c0 = vec3(0.04, 0.07, 0.18);
+	vec3 c1 = vec3(0.08, 0.20, 0.42);
+	vec3 c2 = vec3(0.16, 0.36, 0.74);
+	vec3 c3 = vec3(0.30, 0.60, 1.00);
+	vec3 c4 = vec3(0.70, 0.88, 1.00);
+	vec3 cW = vec3(1.00, 1.00, 1.00);
+	if (L < 0.20) return mix(c0, c1, L / 0.20);
+	if (L < 0.40) return mix(c1, c2, (L - 0.20) / 0.20);
+	if (L < 0.60) return mix(c2, c3, (L - 0.40) / 0.20);
+	if (L < 0.80) return mix(c3, c4, (L - 0.60) / 0.20);
+	return mix(c4, cW, min((L - 0.80) / 0.20, 1.0));
 }
 
-float vnoise(vec2 p) {
-	vec2 i = floor(p);
-	vec2 f = fract(p);
-	float a = hash21(i);
-	float b = hash21(i + vec2(1.0, 0.0));
-	float c = hash21(i + vec2(0.0, 1.0));
-	float d = hash21(i + vec2(1.0, 1.0));
-	vec2 u = f * f * (3.0 - 2.0 * f);
-	return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+vec3 red_color_at(float L) {
+	vec3 c0 = vec3(0.12, 0.04, 0.03);
+	vec3 c1 = vec3(0.32, 0.10, 0.06);
+	vec3 c2 = vec3(0.62, 0.18, 0.12);
+	vec3 c3 = vec3(0.95, 0.32, 0.22);
+	vec3 c4 = vec3(1.00, 0.65, 0.45);
+	vec3 cW = vec3(1.00, 1.00, 1.00);
+	if (L < 0.20) return mix(c0, c1, L / 0.20);
+	if (L < 0.40) return mix(c1, c2, (L - 0.20) / 0.20);
+	if (L < 0.60) return mix(c2, c3, (L - 0.40) / 0.20);
+	if (L < 0.80) return mix(c3, c4, (L - 0.60) / 0.20);
+	return mix(c4, cW, min((L - 0.80) / 0.20, 1.0));
 }
 
-float fbm(vec2 p) {
-	float s = 0.0;
-	float a = 0.5;
-	for (int i = 0; i < 4; i++) {
-		s += a * vnoise(p);
-		p *= 2.0;
-		a *= 0.5;
-	}
-	return s;
-}
-
-// 用（已吸附到格心的）uv 算该格的单一纯色。
-vec3 field(vec2 uv) {
-	// 竖直对波边界（带轻微纵向电弧抖动）
-	float jit = (fbm(vec2(uv.y * 5.0, TIME * 0.7)) - 0.5) * 2.0;
-	float bx = clash_pos + jit * 0.02 * edge_jitter;
-	float d = uv.x - bx;                  // <0 蓝侧 / >0 红侧
-
-	float front_l = exp(min(d, 0.0) * 5.0);
-	float front_r = exp(min(-d, 0.0) * 5.0);
-
-	// 竖直波列：相位只依赖横向 x（+ 极轻 y 扰动），随时间向中心推进
-	float wob = sin(uv.y * 8.0 + TIME * 1.5) * 0.012;
-	float ph_l = (uv.x + wob) * wave_freq - TIME * wave_speed;
-	float ph_r = (1.0 - uv.x + wob) * wave_freq - TIME * wave_speed;
-	float band_l = pow(0.5 + 0.5 * sin(ph_l), 2.5);
-	float band_r = pow(0.5 + 0.5 * sin(ph_r), 2.5);
-
-	float side = step(d, 0.0);            // 硬边：1 蓝侧 / 0 红侧（无 smoothstep）
+// 每格中心算亮度 L (0~1)
+float energy(vec2 cuv) {
+	// 1) 底色：盖过越多越亮（flood）→ 自动实现"盖过逐渐高亮"
 	float flood = abs(clash_pos - 0.5) * 2.0;
-	float base_fill = mix(0.28, 0.72, flood);   // 抬高两侧底色 → 整体更亮
+	float L_base = mix(0.35, 0.72, flood);
 
-	float blue_amt = side * (base_fill + (0.25 + 0.9 * band_l) * front_l);
-	float red_amt  = (1.0 - side) * (base_fill + (0.25 + 0.9 * band_r) * front_r);
+	// 2) 大波（推进期主角）：高斯衰减 30 让波宽 ~10 格 → 多格明暗渐变
+	float dl = cuv.x - pulse_l_x;
+	float dr = pulse_r_x - cuv.x;
+	float L_pulse_l = exp(-dl * dl * 30.0) * pulse_amp;
+	float L_pulse_r = exp(-dr * dr * 30.0) * pulse_amp;
 
-	float core = exp(-abs(d) * 40.0);     // 白热缝（按格采样后呈纯白格列）
-	float glow = exp(-abs(d) * 8.0);
+	// 3) 中央白柱（僵持期主角）
+	float L_center = exp(-abs(cuv.x - clash_pos) * 14.0) * center_amp;
 
-	vec3 col = vec3(0.02, 0.02, 0.05);
-	col += blue_color.rgb * blue_amt * 1.6;
-	col += red_color.rgb  * red_amt  * 1.6;
-	col += mix(blue_color.rgb, red_color.rgb, side) * glow * 0.5;
-	col += vec3(1.0, 0.95, 0.85) * core * 2.0;
+	// 4) 持续涌入的小波（僵持期 wave_time 持续推进 → 永不静止 + 让相邻格 L 跨档显色差）
+	//    关键：① wave 加在 base 上（不是 max）→ base 区每格都有 L 波动 → 颜色丰富
+	//          ② 相位加 cuv.y * 6.0 纵向偏移 → 相邻列同行也有 L 差 → 显 64×36 方格颗粒
+	//          ③ y_phase 系数 6 让波峰倾斜 ~0.4° 几乎不可见，视觉仍是"竖直波峰水平推进"
+	float side = step(cuv.x - clash_pos, 0.0);
+	float y_phase = cuv.y * 6.0;
+	float ph_l = sin(cuv.x * wave_freq - wave_time + y_phase) * 0.5 + 0.5;
+	float ph_r = sin((1.0 - cuv.x) * wave_freq - wave_time + y_phase) * 0.5 + 0.5;
+	float dist_l = max(clash_pos - cuv.x, 0.0);
+	float dist_r = max(cuv.x - clash_pos, 0.0);
+	float L_wave_l = ph_l * wave_amp * smoothstep(0.0, 0.25, dist_l) * side;
+	float L_wave_r = ph_r * wave_amp * smoothstep(0.0, 0.25, dist_r) * (1.0 - side);
 
-	float vig = clamp(1.0 - length((uv - 0.5) * vec2(aspect, 1.0)) * 0.45, 0.0, 1.0);  // 暗角减弱
-	col *= vig;
-	col *= intensity;
-
-	// 色阶量化（无抖动）→ 干净限色纯块
-	col = floor(col * float(color_levels)) / float(color_levels);
-	return col;
+	// base + wave 让两侧版图持续波动；pulse / center 通过 max 在关键位置主导
+	float L_base_modulated = L_base + L_wave_l + L_wave_r;
+	float L = max(L_base_modulated, max(max(L_pulse_l, L_pulse_r), L_center));
+	return clamp(L * intensity, 0.0, 0.9999);
 }
 
 void fragment() {
-	vec2 grid = vec2(cells_x, cells_x / aspect);   // 正方形格
-	vec2 cuv = (floor(UV * grid) + 0.5) / grid;    // 吸附到格子中心
-	COLOR = vec4(field(cuv), 1.0);                 // 整格填同一纯色
+	vec2 grid = vec2(cells_x, cells_x / aspect);
+	vec2 ci = floor(UV * grid);
+	vec2 cuv = (ci + 0.5) / grid;
+
+	float L = energy(cuv);
+	// 多档量化：L 落到 0/levels, 1/levels, ..., (levels-1)/levels 之一
+	L = floor(L * float(levels)) / float(levels);
+
+	float side = step(cuv.x - clash_pos, 0.0);
+	vec3 col = mix(red_color_at(L), blue_color_at(L), side);
+
+	COLOR = vec4(col, 1.0);
 }

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dmbbiu5icei84"
-path="res://.godot/imported/shot_3_flood.png-9726b93720b760f42ee74ad693cf4563.ctex"
+uid="uid://b55y55lo227cr"
+path="res://.godot/imported/shot_6_settle_b.png-f6dd6a3ca3d5aa9f7dfb5288d4dc1cbc.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://prototypes/wave_clash_title/shot_3_flood.png"
-dest_files=["res://.godot/imported/shot_3_flood.png-9726b93720b760f42ee74ad693cf4563.ctex"]
+source_file="res://prototypes/wave_clash_title/shot_6_settle_b.png"
+dest_files=["res://.godot/imported/shot_6_settle_b.png-f6dd6a3ca3d5aa9f7dfb5288d4dc1cbc.ctex"]
 
 [params]
 

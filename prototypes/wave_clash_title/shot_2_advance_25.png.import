@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://chu5q6x4kd8vb"
-path="res://.godot/imported/shot_1_clash.png-bf9947813892070483f1455c92569f0e.ctex"
+uid="uid://ccwvocgwfxdj4"
+path="res://.godot/imported/shot_2_advance_25.png-8764a818ecee78d7a1e164318499cbe5.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://prototypes/wave_clash_title/shot_1_clash.png"
-dest_files=["res://.godot/imported/shot_1_clash.png-bf9947813892070483f1455c92569f0e.ctex"]
+source_file="res://prototypes/wave_clash_title/shot_2_advance_25.png"
+dest_files=["res://.godot/imported/shot_2_advance_25.png-8764a818ecee78d7a1e164318499cbe5.ctex"]
 
 [params]
 
