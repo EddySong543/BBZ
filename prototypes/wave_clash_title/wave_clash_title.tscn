@@ -14,9 +14,13 @@ shader_parameter/pulse_r_x = 1.0
 shader_parameter/pulse_amp = 1.0
 shader_parameter/center_amp = 0.0
 shader_parameter/wave_amp = 0.10
+shader_parameter/phase_l = 0.0
+shader_parameter/phase_r = 0.25
 shader_parameter/wave_time = 0.0
-shader_parameter/wave_freq = 32.0
 shader_parameter/levels = 40
+shader_parameter/dither_amt = 1.0
+shader_parameter/hit_flash = 0.0
+shader_parameter/burst = 0.0
 
 [node name="WaveClashTitle" type="Control"]
 layout_mode = 3
