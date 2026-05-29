@@ -21,6 +21,7 @@ shader_parameter/levels = 40
 shader_parameter/dither_amt = 1.0
 shader_parameter/hit_flash = 0.0
 shader_parameter/burst = 0.0
+shader_parameter/shake = Vector2(0, 0)
 
 [node name="WaveClashTitle" type="Control"]
 layout_mode = 3

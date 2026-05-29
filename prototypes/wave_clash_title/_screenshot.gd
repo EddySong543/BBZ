@@ -75,12 +75,12 @@ const SHOTS := [
 		},
 	},
 	{
-		"name": "shot_8_burst",       # 崩溃：白闪回落后、扩散环向外扩张中（验证环可见性）
+		"name": "shot_8_burst",       # 崩溃：全屏光从中央对波点散发、扩展中（验证 glow 全屏光）
 		"params": {
 			"pulse_l_x": 0.5, "pulse_r_x": 0.5, "pulse_amp": 0.0,
 			"center_amp": 1.0, "wave_amp": 0.18, "wave_time": 6.0,
-			"phase_l": 0.40, "phase_r": 0.60, "clash_pos": 0.80,
-			"intensity": 1.0, "hit_flash": 0.0, "burst": 0.45, "dither_amt": 1.0,
+			"phase_l": 0.40, "phase_r": 0.60, "clash_pos": 0.62,
+			"intensity": 1.0, "hit_flash": 0.0, "burst": 0.40, "dither_amt": 1.0,
 		},
 	},
 	{

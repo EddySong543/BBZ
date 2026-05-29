@@ -20,7 +20,8 @@ shader_type canvas_item;
 //   phase_l / phase_r     : 蓝/红侧小波累积相位（脚本每帧累加，盖过期胜方加速）
 //   wave_time             : 仅用于波纹纵向漂浮（与推进相位解耦）
 //   hit_flash             : 连击撞击瞬间的中央局部闪（每击 0→1→0）
-//   burst                 : 最终崩溃扩散环 0→1（向外扩张的能量环）
+//   burst                 : 最终崩溃全屏光爆发 0→1.3（以中央为心向外散发、自然衰落）
+//   shake                 : 受击屏幕抖动（UV 偏移；连击轻微、崩溃强，脚本驱动衰减）
 
 uniform float clash_pos : hint_range(0.0, 1.0) = 0.5;
 uniform float aspect = 1.777;
@@ -42,6 +43,7 @@ uniform float dither_amt : hint_range(0.0, 2.0) = 1.0;
 
 uniform float hit_flash : hint_range(0.0, 1.0) = 0.0;
 uniform float burst : hint_range(0.0, 1.5) = 0.0;
+uniform vec2 shake = vec2(0.0);
 
 // Bayer 4x4 有序抖动矩阵（值 0..15，用于档位边界棋盘交错）
 const float BAYER[16] = float[16](
@@ -135,20 +137,24 @@ float energy(vec2 cuv, vec2 ci) {
 	// 5) 连击撞击闪：clash_pos 处局部高亮带（每击 hit_flash 脉冲）
 	float hit = exp(-abs(cuv.x - clash_pos) * 13.0) * hit_flash;
 
-	// 6) 崩溃扩散环：从 clash_pos 向外扩张的亮环（burst 0→1 时环半径扩大并消散）
-	float ring_r = burst * 0.75;
-	float q = (abs(cuv.x - clash_pos) - ring_r) * 8.0;
-	float ring = exp(-q * q) * (1.0 - smoothstep(0.55, 1.4, burst));
+	// 6) 崩溃全屏光爆发：以 clash_pos 为中心向左右散发的宽光晕，
+	//    随 burst 从中央小光团扩展到全屏、并在 burst 后期整体自然衰落（替代旧窄扩散环）
+	float glow_w = 0.12 + burst * 1.25;             // 光晕半宽随 burst 扩展到全屏
+	float gdist = (cuv.x - clash_pos) / glow_w;
+	// fade：burst 0→0.15 淡入、0.55→1.25 淡出 → burst=0（平时/僵持期）完全无 glow，仅崩溃时爆发
+	float glow_fade = smoothstep(0.0, 0.15, burst) * (1.0 - smoothstep(0.55, 1.25, burst));
+	float glow = exp(-gdist * gdist * 2.2) * glow_fade * 1.25;
 
 	float L_base_mod = L_base + L_wave_l + L_wave_r;
 	float L = max(L_base_mod, max(max(L_pulse_l, L_pulse_r), L_center));
-	L = max(L, max(hit, ring));
+	L = max(L, max(hit, glow));
 	return clamp(L * intensity, 0.0, 0.9999);
 }
 
 void fragment() {
+	vec2 uv = UV + shake;  // 受击 shake：整屏 UV 偏移（幅度小，越界由 energy 平滑延续不穿帮）
 	vec2 grid = vec2(cells_x, cells_x / aspect);
-	vec2 ci = floor(UV * grid);
+	vec2 ci = floor(uv * grid);
 	vec2 cuv = (ci + 0.5) / grid;
 
 	float L = energy(cuv, ci);

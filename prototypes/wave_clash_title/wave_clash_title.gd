@@ -29,6 +29,9 @@ const Y_DRIFT_SPEED := 1.2     # 波纹纵向漂浮速度（与推进相位解�
 const BASE_PHASE_SPEED := 0.45 # 僵持期两侧波相位推进速度
 const CHARGE_PHASE_SPEED := 2.4 # 盖过期胜方加速冲锋的相位速度
 const LOSER_PHASE_SPEED := 0.18 # 盖过期败方被压制（波变疏弱）
+const SHAKE_DECAY := 0.05       # shake 幅度衰减速度（UV/秒）
+const SHAKE_HIT := 0.0045       # 连击每击的轻微 shake
+const SHAKE_BURST := 0.016      # 崩溃决堤的强 shake
 
 @onready var _wave: ColorRect = $Wave
 
@@ -39,6 +42,7 @@ var _phase_l := 0.0            # 蓝侧波累积相位
 var _phase_r := 0.25           # 红侧波累积相位（初始偏移 → 左右不同步）
 var _speed_l := BASE_PHASE_SPEED
 var _speed_r := BASE_PHASE_SPEED
+var _shake_amt := 0.0          # 当前 shake 幅度（_process 每帧衰减）
 var _phase := "advance"
 var _title: Label
 var _prompt: Label
@@ -66,6 +70,7 @@ func _ready() -> void:
 	_mat.set_shader_parameter("intensity", 1.0)
 	_mat.set_shader_parameter("hit_flash", 0.0)
 	_mat.set_shader_parameter("burst", 0.0)
+	_mat.set_shader_parameter("shake", Vector2.ZERO)
 	_run_intro()
 
 
@@ -142,6 +147,14 @@ func _process(delta: float) -> void:
 	_mat.set_shader_parameter("wave_time", _wave_t)
 	_mat.set_shader_parameter("phase_l", _phase_l)
 	_mat.set_shader_parameter("phase_r", _phase_r)
+	# 受击 shake：随机抖动 UV，按 SHAKE_DECAY 衰减归零
+	if _shake_amt > 0.0:
+		_shake_amt = max(0.0, _shake_amt - delta * SHAKE_DECAY)
+		if _shake_amt <= 0.0:
+			_mat.set_shader_parameter("shake", Vector2.ZERO)
+		else:
+			var off := Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * _shake_amt
+			_mat.set_shader_parameter("shake", off)
 	if _phase == "ready":
 		_struggle()
 		# 中央白柱微脉动 1.0-1.20 → 中心微上调一档；clamp 后不爆白
@@ -186,46 +199,49 @@ func _trigger_sweep() -> void:
 	_run_combo(blue_wins)
 
 
-## 连击序列：4 击猛攻（中线小范围受击震颤 + 每击局部闪蓄力）→ 第 5 下崩溃决堤。
+## 连击序列：4 击猛攻（中线阻尼震颤 + 每击局部闪/轻 shake 蓄力）→ 第 5 下崩溃决堤。
 func _run_combo(blue_wins: bool) -> void:
-	# 4 击蓄力：中线 clash_pos 围绕中央(0.5)小范围受击震颤（朝胜方弹一小截再回弹，
-	# 守住、不单向移动），配合胜方波加速冲锋 + 每击 hit_flash 局部闪体现"一道道猛攻"；
+	# 4 击蓄力：中线 clash_pos 围绕中央(0.5)做阻尼震颤（被撞后来回摆动、幅度衰减，丝滑），
+	# 配合胜方波加速冲锋 + 每击 hit_flash 局部闪 + 轻微 shake 体现"一道道猛攻"；
 	# 张力累积到第 5 下才崩溃决堤。
 	var strikes := 4
 	var dir := 1.0 if blue_wins else -1.0
 	for i in strikes:
-		var dur := 0.13 - i * 0.018  # 每击的持续（越往后越快）
-		var kick := 0.022 + i * 0.004  # 震幅随击数略增（越撞越猛）
+		var dur := 0.13 - i * 0.018   # 每击的持续（越往后越快）
+		var kick := 0.024 + i * 0.005  # 震幅随击数略增（越撞越猛）
 		_set_hit(1.0)
+		_shake_amt = SHAKE_HIT         # 每击轻微 shake
 		var tw := create_tween()
 		tw.tween_method(_set_hit, 1.0, 0.0, dur + 0.06)
-		# 中线受击震颤：朝胜方弹出一小截，再回弹到中央（围绕 0.5 抖动，不单向移动）
+		# 中线受击震颤：阻尼正弦来回摆动并衰减（丝滑，无急停转折）
 		var kt := create_tween()
-		kt.tween_method(_set_clash, 0.5, 0.5 + dir * kick, dur * 0.4) \
-			.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
-		kt.tween_method(_set_clash, 0.5 + dir * kick, 0.5, dur * 0.6) \
-			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		kt.tween_method(_apply_kick.bind(dir, kick), 0.0, 1.0, dur * 2.2)
 		await tw.finished
 		# 蓄力顿挫（越往后越短）；此期 _process 仍在涌波，非死帧
 		var pause := 0.13 - i * 0.022
 		await get_tree().create_timer(pause).timeout
 
-	# ── 第 5 下：崩溃爆发 ─────
+	# ── 第 5 下：崩溃决堤——中线从中央一鼓作气冲到底盖过 ─────
 	var target := 1.0 if blue_wins else 0.0
 	var cur2 := _mat.get_shader_parameter("clash_pos") as float
 	_set_hit(1.0)
+	_shake_amt = SHAKE_BURST          # 崩溃强 shake（随 _process 自然衰减）
 	var bt := create_tween().set_parallel(true)
-	bt.tween_method(_set_clash, cur2, target, 0.38) \
+	bt.tween_method(_set_clash, cur2, target, 0.42) \
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	bt.tween_method(_set_hit, 1.0, 0.0, 0.18)
-	bt.tween_method(_set_burst, 0.0, 1.2, 0.55) \
+	# 全屏光爆发：burst 0→1.3 驱动中央光晕扩展到全屏再自然衰落（shader 内 glow，取代旧白闪）
+	bt.tween_method(_set_burst, 0.0, 1.3, 0.6) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	# 白闪：短促"砰"一下（0.07s 冲到 1.30 再落回），避免长时间过曝糊白
-	bt.tween_method(_set_intensity, 1.0, 1.30, 0.07)
-	bt.tween_method(_set_intensity, 1.30, 1.0, 0.33).set_delay(0.07)
 	await bt.finished
 	_set_burst(0.0)
 	_on_swept(blue_wins)
+
+
+## 受击震颤：u(0→1) 驱动阻尼正弦，中线围绕中央 0.5 来回摆动并衰减（丝滑）。
+func _apply_kick(u: float, dir: float, amp: float) -> void:
+	var osc := sin(u * PI * 2.6) * exp(-u * 3.0)
+	_set_clash(0.5 + dir * amp * osc)
 
 
 func _on_swept(blue_wins: bool) -> void:
