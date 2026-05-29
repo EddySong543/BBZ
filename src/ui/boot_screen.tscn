@@ -1,0 +1,43 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Shader" path="res://assets/shaders/wave_clash.gdshader" id="1"]
+[ext_resource type="Script" path="res://src/ui/boot_screen.gd" id="2"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_1"]
+shader = ExtResource("1")
+shader_parameter/clash_pos = 0.5
+shader_parameter/aspect = 1.777
+shader_parameter/cells_x = 64.0
+shader_parameter/intensity = 1.0
+shader_parameter/pulse_l_x = 0.0
+shader_parameter/pulse_r_x = 1.0
+shader_parameter/pulse_amp = 1.0
+shader_parameter/center_amp = 0.0
+shader_parameter/wave_amp = 0.10
+shader_parameter/phase_l = 0.0
+shader_parameter/phase_r = 0.25
+shader_parameter/wave_time = 0.0
+shader_parameter/levels = 40
+shader_parameter/dither_amt = 1.0
+shader_parameter/hit_flash = 0.0
+shader_parameter/burst = 0.0
+shader_parameter/shake = Vector2(0, 0)
+
+[node name="BootScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("2")
+
+[node name="Wave" type="ColorRect" parent="."]
+material = SubResource("ShaderMaterial_1")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 1)
