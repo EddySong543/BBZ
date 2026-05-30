@@ -40,6 +40,7 @@ uniform float dither_amt : hint_range(0.0, 2.0) = 1.0;
 
 uniform float hit_flash : hint_range(0.0, 1.0) = 0.0;
 uniform float burst : hint_range(0.0, 1.5) = 0.0;
+uniform float ripple : hint_range(0.0, 1.0) = 0.0;  // 初撞涟漪：两道竖直亮带自 clash_pos 向左右荡开
 uniform vec2 shake = vec2(0.0);
 
 // Bayer 4x4 有序抖动矩阵（值 0..15，用于档位边界棋盘交错）
@@ -142,9 +143,18 @@ float energy(vec2 cuv, vec2 ci) {
 	float glow_fade = smoothstep(0.0, 0.15, burst) * (1.0 - smoothstep(0.55, 1.25, burst));
 	float glow = exp(-gdist * gdist * 2.2) * glow_fade * 1.25;
 
+	// 7) 初撞涟漪：以 clash_pos 为心，两道【竖直】亮带分别向左 / 右荡开并消散
+	//    （竖直保持对波主题、非圆形；两侧对称各一道；仅随 x 变化 → 满高竖线）
+	float r_offset = ripple * 0.6;                         // 每道带从中央向外行进 0→0.6（出屏）
+	float r_dl = (cuv.x - (clash_pos - r_offset)) / 0.06;  // 向左行进的带（带宽 ~0.06，加宽显格子列）
+	float r_dr = (cuv.x - (clash_pos + r_offset)) / 0.06;  // 向右行进的带
+	float r_fade = smoothstep(0.0, 0.12, ripple) * (1.0 - ripple); // 起始淡入 + 扩张中消散
+	float ripple_ring = max(exp(-r_dl * r_dl), exp(-r_dr * r_dr)) * r_fade * 0.65;
+
 	float L_base_mod = L_base + L_wave_l + L_wave_r;
 	float L = max(L_base_mod, max(max(L_pulse_l, L_pulse_r), L_center));
 	L = max(L, max(hit, glow));
+	L = max(L, ripple_ring);
 	return clamp(L * intensity, 0.0, 0.9999);
 }
 

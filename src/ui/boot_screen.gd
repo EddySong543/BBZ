@@ -28,7 +28,7 @@ const SHAKE_DECAY := 0.05       # shake 幅度衰减速度（UV/秒）
 const SHAKE_HIT := 0.0045       # 连击每击的轻微 shake
 const SHAKE_BURST := 0.016      # 崩溃决堤的强 shake
 const SHAKE_IMPACT := 0.014     # 初次对撞的强 shake（≈崩溃，略弱让结局更猛）
-const BURST_IMPACT := 1.0       # 初次对撞的高亮光爆发峰值（< 崩溃 1.3，呼应但不盖过结局）
+const RIPPLE_TIME := 1.2        # 初次对撞涟漪向外荡开的时长（放慢 → 看清格子逐列步进）
 
 @onready var _wave: ColorRect = $Wave
 
@@ -63,6 +63,7 @@ func _ready() -> void:
 	_mat.set_shader_parameter("intensity", 1.0)
 	_mat.set_shader_parameter("hit_flash", 0.0)
 	_mat.set_shader_parameter("burst", 0.0)
+	_mat.set_shader_parameter("ripple", 0.0)
 	_mat.set_shader_parameter("shake", Vector2.ZERO)
 	_run_intro()
 
@@ -113,26 +114,18 @@ func _run_intro() -> void:
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	await tw_a.finished
 
-	# ── 2) 撞击：脉冲消散 + center 起 + 小波起 + intensity 短促闪 + 高亮burst + 强shake ─────
-	#   高亮 + shake 复用结局"崩溃决堤"同款机制（_set_burst / _shake_amt），峰值略低让结局更猛。
+	# ── 2) 撞击：脉冲消散 + center 起 + 小波起 + 轻 shake ─────
+	#   （涟漪 + intensity 轻闪均暂去除——对比观感中；机制保留，可随时加回。）
 	_phase = "impact"
-	_shake_amt = SHAKE_IMPACT       # 初次对撞强 shake（_process 内自然衰减）
+	_shake_amt = SHAKE_IMPACT       # 初次对撞 shake（_process 内自然衰减）
 	var tw_i := create_tween().set_parallel(true)
 	tw_i.tween_method(_set_pulse_amp, 1.0, 0.0, IMPACT_TIME)
 	tw_i.tween_method(_set_center, 0.0, 1.0, IMPACT_TIME) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tw_i.tween_method(_set_wave_amp, WAVE_AMP_INTRO, WAVE_AMP_TARGET, IMPACT_TIME) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw_i.tween_method(_set_intensity, 1.0, 1.18, 0.08)
-	tw_i.tween_method(_set_intensity, 1.18, 1.0, IMPACT_TIME - 0.08).set_delay(0.08)
-	# 高亮光爆发：快速冲到峰值再回落到 0（撞击结束前归零，不漏入僵持期）
-	tw_i.tween_method(_set_burst, 0.0, BURST_IMPACT, 0.07) \
-		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw_i.tween_method(_set_burst, BURST_IMPACT, 0.0, IMPACT_TIME - 0.07).set_delay(0.07) \
-		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tw_i.tween_property(_title, "modulate:a", 1.0, IMPACT_TIME)
 	await tw_i.finished
-	_set_burst(0.0)                 # 兜底归零
 
 	# ── 3) 僵持：_process 接管 ─────
 	_phase = "ready"
@@ -278,3 +271,6 @@ func _set_hit(v: float) -> void:
 
 func _set_burst(v: float) -> void:
 	_mat.set_shader_parameter("burst", v)
+
+func _set_ripple(v: float) -> void:
+	_mat.set_shader_parameter("ripple", v)
