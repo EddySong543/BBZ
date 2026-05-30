@@ -289,6 +289,72 @@ func both_ready() -> bool:
 	return selected_action[0] >= 0 and selected_action[1] >= 0
 
 
+# === AI / 模拟支持（纯加法，不改任何结算行为）===
+#
+# clone(): 深拷当前战局供前瞻模拟（AI 枚举各动作后果）。
+# legal_actions(): 枚举合法动作。apply_choice(): 按 {action,target} 分派提交。
+# 三者均只读/封装既有逻辑，结算结果与手动 select_* 完全一致。
+
+## 深拷战局。状态容器全部独立深拷；HeroData（只读资源）/ HeroSkill（无状态组件 §D2）
+## 共享引用（duplicate(true) 不复制 Object）；rng 独立复制（seed+state）→ 推演不扰动本局序列。
+func clone() -> BattleCore:
+	var c := BattleCore.new()
+	c.heroes = heroes.duplicate(true)
+	c.active_index = active_index.duplicate()
+	c.energy = energy.duplicate()
+	c.hp = hp.duplicate(true)
+	c.max_hp = max_hp.duplicate(true)
+	c.shield = shield.duplicate(true)
+	c.form = form.duplicate(true)
+	c.pending_damage = pending_damage.duplicate(true)
+	c.statuses = statuses.duplicate(true)
+	c.link = link.duplicate(true)
+	c.disabled_group = disabled_group.duplicate()
+	c._disabled_on_turn = _disabled_on_turn.duplicate()
+	c.selected_action = selected_action.duplicate()
+	c.selected_target = selected_target.duplicate()
+	c._switch_to = _switch_to.duplicate()
+	c.pending_death_switch = pending_death_switch.duplicate()
+	c._death_processed = _death_processed.duplicate(true)
+	c._dmg_dealt = _dmg_dealt.duplicate()
+	c._energy_before = _energy_before.duplicate()
+	c._killer = _killer.duplicate(true)
+	c.turn_number = turn_number
+	c.game_over = game_over
+	c.winner = winner
+	c.rng = RandomNumberGenerator.new()
+	c.rng.seed = rng.seed
+	c.rng.state = rng.state
+	c._skills = _skills.duplicate(true)
+	return c
+
+
+## 枚举该玩家当前所有合法动作。返回 Array[{action:int, target:int}]，
+## target 仅 SWITCH 有效（替补槽位），其余 -1。CHARGE 恒合法 → 列表非空。
+func legal_actions(player: int) -> Array:
+	var out: Array = []
+	for a in [ActionDef.Action.CHARGE, ActionDef.Action.ATTACK, ActionDef.Action.DEFEND,
+			ActionDef.Action.BIG_ATTACK, ActionDef.Action.BIG_DEFEND]:
+		if not is_action_disabled(player, a) and can_afford(player, a):
+			out.append({action = a, target = -1})
+	if can_afford(player, ActionDef.Action.SWITCH):
+		for t in living_reserves(player):
+			out.append({action = ActionDef.Action.SWITCH, target = t})
+	if can_use_active(player):
+		out.append({action = ActionDef.ACTIVE, target = -1})
+	return out
+
+
+## 按 {action,target} 提交该玩家动作（封装 select_* 分派）。返回是否合法成功。
+func apply_choice(player: int, choice: Dictionary) -> bool:
+	var a: int = int(choice["action"])
+	if a == ActionDef.ACTIVE:
+		return select_active(player)
+	if a == ActionDef.Action.SWITCH:
+		return select_switch(player, int(choice["target"]))
+	return select_action(player, a)
+
+
 # === resolve ===
 #
 # 保留 v3 同时独立结算（B-001/2/3）：双方攻击各自走一遍管线、不抵消。
