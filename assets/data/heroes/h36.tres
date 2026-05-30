@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="HeroData" format=3]
+
+[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_xitra"]
+
+[resource]
+script = ExtResource("1_xitra")
+hero_id = "h36"
+hero_name = "金牛"
+max_hp = 5
+skill_description = "待设计"
+portrait_path = "res://assets/sprites/heroes/h36/h36_portrait.png"
+sprite_frames_path = "res://assets/sprites/heroes/h36/h36_idle.tres"
