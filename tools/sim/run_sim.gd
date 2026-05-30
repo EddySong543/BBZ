@@ -25,6 +25,7 @@ var max_turns := 120
 var out_dir := "res://tools/sim/out/"
 var use_draft := true   # true=DraftAI 选人 / false=随机阵容
 var depth := 2          # 对战 AI 搜索深度
+var profile := 0        # 对战 AI 评估档：0=基础 / 1=v3 牌感(熟练优秀玩家)
 
 var _hero_data := {}    # hero_id → HeroData（加载一次复用）
 var _pool_hd: Array = []  # Array[HeroData]，与 ids 平行（drafter 用，返回索引）
@@ -39,8 +40,9 @@ func _initialize() -> void:
 		return
 
 	print("=== AI 自对弈模拟 ===")
-	print("对局=%d  种子=%d  池=h%02d–h%02d(%d)  回合上限=%d  选人=%s  AI深度=%d" % [
-		games, base_seed, pool_first, pool_last, pool.size(), max_turns, ("drafter" if use_draft else "随机"), depth])
+	print("对局=%d  种子=%d  池=h%02d–h%02d(%d)  回合上限=%d  选人=%s  AI深度=%d  评估=%s" % [
+		games, base_seed, pool_first, pool_last, pool.size(), max_turns,
+		("drafter" if use_draft else "随机"), depth, ("v3牌感" if profile == 1 else "基础")])
 
 	# 聚合容器
 	var csv_rows: Array = []
@@ -76,8 +78,8 @@ func _initialize() -> void:
 
 		var b := BattleCore.new()
 		b.setup(_to_heroes(r0), _to_heroes(r1), seed_g)
-		var ai0 := BattleAI.new(seed_g + 1, depth)
-		var ai1 := BattleAI.new(seed_g + 2, depth)
+		var ai0 := BattleAI.new(seed_g + 1, depth, profile)
+		var ai1 := BattleAI.new(seed_g + 2, depth, profile)
 
 		var res: Dictionary = _play(b, ai0, ai1, action_count)
 		var w: int = res["winner"]
@@ -209,8 +211,9 @@ func _write_outputs(csv_rows: Array, win: Dictionary, turns_list: Array,
 	var total: int = csv_rows.size()
 	md.store_line("# AI 自对弈模拟汇总\n")
 	md.store_line("- 对局数：**%d**" % total)
-	md.store_line("- 基础种子：%d ｜ 英雄池：h%02d–h%02d ｜ 回合上限：%d ｜ 选人：%s ｜ AI深度：%d\n" % [
-		base_seed, pool_first, pool_last, max_turns, ("drafter" if use_draft else "随机"), depth])
+	md.store_line("- 基础种子：%d ｜ 英雄池：h%02d–h%02d ｜ 回合上限：%d ｜ 选人：%s ｜ AI深度：%d ｜ 评估：%s\n" % [
+		base_seed, pool_first, pool_last, max_turns, ("drafter" if use_draft else "随机"), depth,
+		("v3牌感" if profile == 1 else "基础")])
 
 	md.store_line("## 胜负分布")
 	md.store_line("| 结果 | 局数 | 占比 |")
@@ -301,6 +304,7 @@ func _parse_args() -> void:
 			"--seed": base_seed = int(val)
 			"--max-turns": max_turns = int(val)
 			"--depth": depth = int(val)
+			"--profile": profile = int(val)
 			"--draft": use_draft = int(val) != 0
 			"--out": out_dir = val
 			"--pool":

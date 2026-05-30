@@ -17,15 +17,17 @@ const RM_ITERS_ROOT := 600    # 根节点 regret-matching 迭代（出抽样策�
 const RM_ITERS_INNER := 120   # 深层节点迭代（只取博弈值，近似即可）
 
 var search_depth: int = 2
+var eval_profile: int = 0   # 0=基础评估(v2) / 1=v3 牌感评估(熟练优秀玩家)
 var rng := RandomNumberGenerator.new()        # 动作抽样
 var _eval_rng := RandomNumberGenerator.new()  # 推演重播种：解除"预知真实 rng 未来"的透视
 
 
-func _init(seed_value: int = 0, depth: int = 2) -> void:
+func _init(seed_value: int = 0, depth: int = 2, profile: int = 0) -> void:
 	var s: int = seed_value if seed_value != 0 else randi()
 	rng.seed = s
 	_eval_rng.seed = s ^ 0x9E3779B9
 	search_depth = maxi(depth, 1)
+	eval_profile = profile
 
 
 ## 为 player 选一个动作。返回 {action:int, target:int}。
@@ -61,7 +63,7 @@ func choose_death_switch(b: BattleCore, player: int) -> int:
 		if b.hp[player][slot] > 0 and slot != b.active_index[player]:
 			var sim := b.clone()
 			sim.execute_death_switch(player, slot)
-			var sc := BattleEval.score(sim, player)
+			var sc := _eval(sim, player)
 			if sc > best_score:
 				best_score = sc
 				best = slot
@@ -70,6 +72,11 @@ func choose_death_switch(b: BattleCore, player: int) -> int:
 
 # === 搜索 ===
 
+## 局面评估分派：profile 1 用 v3 牌感评估，否则基础评估。
+func _eval(b: BattleCore, p: int) -> float:
+	return BattleEvalV3.score(b, p) if eval_profile == 1 else BattleEval.score(b, p)
+
+
 ## 提交 (我=ca, 对手=cb) 结算一回合后，从 player 视角的子局价值（递归 depth 层）。
 func _value_after(b: BattleCore, player: int, opp: int, ca: Dictionary, cb: Dictionary, depth: int) -> float:
 	var sim := b.clone()
@@ -77,23 +84,26 @@ func _value_after(b: BattleCore, player: int, opp: int, ca: Dictionary, cb: Dict
 	sim.apply_choice(player, ca)
 	sim.apply_choice(opp, cb)
 	if not sim.both_ready():
-		return BattleEval.score(b, player)
+		return _eval(b, player)
 	sim.resolve()
 	_auto_death_switch(sim)            # 自动补位 → 子局是干净的决策态
 	return _state_value(sim, player, depth)
 
 
+# (注：非法组合兜底 / 终局 / 空动作集 均走 _eval 分派)
+
+
 ## 从 perspective 视角评估状态：终局/深度耗尽 → 静态评估；否则解一层子博弈取博弈值。
 func _state_value(b: BattleCore, perspective: int, depth: int) -> float:
 	if b.game_over or depth <= 0:
-		return BattleEval.score(b, perspective)
+		return _eval(b, perspective)
 	var opp: int = 1 - perspective
 	var my: Array = _shortlist(b, perspective)
 	var opp_acts: Array = _shortlist(b, opp)
 	var n: int = my.size()
 	var m: int = opp_acts.size()
 	if n == 0 or m == 0:
-		return BattleEval.score(b, perspective)
+		return _eval(b, perspective)
 	var payoff: Array = []
 	for i in range(n):
 		var row: Array[float] = []
