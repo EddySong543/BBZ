@@ -15,19 +15,22 @@ extends RefCounted
 
 const RM_ITERS_ROOT := 600    # 根节点 regret-matching 迭代（出抽样策略，要准）
 const RM_ITERS_INNER := 120   # 深层节点迭代（只取博弈值，近似即可）
+const STOCHASTIC_SAMPLES := 3 # 随机技（h13/h23）格的多采样次数 → 按期望值判断、去运气噪声（T3）
 
 var search_depth: int = 2
 var eval_profile: int = 0   # 0=基础评估(v2) / 1=v3 牌感评估(熟练优秀玩家)
+var weights: Dictionary = {} # 评估权重覆盖（空=用默认常量）；A/B 校准用（T1）
 var rng := RandomNumberGenerator.new()        # 动作抽样
 var _eval_rng := RandomNumberGenerator.new()  # 推演重播种：解除"预知真实 rng 未来"的透视
 
 
-func _init(seed_value: int = 0, depth: int = 2, profile: int = 0) -> void:
+func _init(seed_value: int = 0, depth: int = 2, profile: int = 0, weight_overrides: Dictionary = {}) -> void:
 	var s: int = seed_value if seed_value != 0 else randi()
 	rng.seed = s
 	_eval_rng.seed = s ^ 0x9E3779B9
 	search_depth = maxi(depth, 1)
 	eval_profile = profile
+	weights = weight_overrides
 
 
 ## 为 player 选一个动作。返回 {action:int, target:int}。
@@ -55,7 +58,8 @@ func choose_action(b: BattleCore, player: int) -> Dictionary:
 	return my[_sample(strat)]
 
 
-## 出战阵亡后选替补上场：选使己方局面分最高的存活替补。返回槽位（无可换返回 -1）。
+## 出战阵亡后选替补上场：**对位感知**——模拟换入每个替补 + 前瞻下一轮交手，选局面最优者
+## （而非只看血量）。复用 _state_value 深搜机器；search_depth=1 时退化为静态评估(=旧血量行为)。
 func choose_death_switch(b: BattleCore, player: int) -> int:
 	var best := -1
 	var best_score := -INF
@@ -63,7 +67,8 @@ func choose_death_switch(b: BattleCore, player: int) -> int:
 		if b.hp[player][slot] > 0 and slot != b.active_index[player]:
 			var sim := b.clone()
 			sim.execute_death_switch(player, slot)
-			var sc := _eval(sim, player)
+			_auto_death_switch(sim)   # 解析对手可能的同时阵亡换人 → 干净决策态
+			var sc := _state_value(sim, player, search_depth - 1)
 			if sc > best_score:
 				best_score = sc
 				best = slot
@@ -72,25 +77,39 @@ func choose_death_switch(b: BattleCore, player: int) -> int:
 
 # === 搜索 ===
 
-## 局面评估分派：profile 1 用 v3 牌感评估，否则基础评估。
+## 局面评估分派：profile 1 用 v3 牌感评估，否则基础评估。权重覆盖透传（T1 校准）。
 func _eval(b: BattleCore, p: int) -> float:
-	return BattleEvalV3.score(b, p) if eval_profile == 1 else BattleEval.score(b, p)
+	return BattleEvalV3.score(b, p, weights) if eval_profile == 1 else BattleEval.score(b, p, weights)
 
 
 ## 提交 (我=ca, 对手=cb) 结算一回合后，从 player 视角的子局价值（递归 depth 层）。
+## 随机技（h13/h23）格：多次采样取均值 → 按期望值判断、去运气噪声（T3）。
+## 仅对真消耗 rng 的格多采样（结算后比对 rng 状态检测）；确定性格 1 次即精确，零额外开销。
 func _value_after(b: BattleCore, player: int, opp: int, ca: Dictionary, cb: Dictionary, depth: int) -> float:
+	var first: Dictionary = _rollout_once(b, player, opp, ca, cb, depth)
+	if not first["stochastic"]:
+		return first["value"]
+	var total: float = first["value"]
+	for _k in range(STOCHASTIC_SAMPLES - 1):
+		total += float(_rollout_once(b, player, opp, ca, cb, depth)["value"])
+	return total / float(STOCHASTIC_SAMPLES)
+
+
+## 单次推演：克隆 → 重播种(随机技独立采样，不预知真实未来) → 结算 → 子局价值。
+## 返回 {value:float, stochastic:bool}（stochastic = 本格结算/补位是否消耗了 rng）。
+## 非法组合兜底 / 终局 / 空动作集 均走 _eval 分派。
+func _rollout_once(b: BattleCore, player: int, opp: int, ca: Dictionary, cb: Dictionary, depth: int) -> Dictionary:
 	var sim := b.clone()
-	sim.rng.seed = _eval_rng.randi()   # 随机技独立采样，不预知真实未来
+	sim.rng.seed = _eval_rng.randi()
+	var rng_before: int = sim.rng.state
 	sim.apply_choice(player, ca)
 	sim.apply_choice(opp, cb)
 	if not sim.both_ready():
-		return _eval(b, player)
+		return {value = _eval(b, player), stochastic = false}
 	sim.resolve()
 	_auto_death_switch(sim)            # 自动补位 → 子局是干净的决策态
-	return _state_value(sim, player, depth)
-
-
-# (注：非法组合兜底 / 终局 / 空动作集 均走 _eval 分派)
+	var stochastic: bool = sim.rng.state != rng_before
+	return {value = _state_value(sim, player, depth), stochastic = stochastic}
 
 
 ## 从 perspective 视角评估状态：终局/深度耗尽 → 静态评估；否则解一层子博弈取博弈值。
@@ -114,21 +133,16 @@ func _state_value(b: BattleCore, perspective: int, depth: int) -> float:
 	return _security_value(payoff, strat, n, m)
 
 
-## 深层剪枝：返回 ≤5 个代表性动作（攒 / 最大可负担攻击 / 最大可负担防御 / 主动技 / 最优切换）。
+## 深层剪枝：返回代表性动作集（攒 / 波 / 大波 / 防 / 大防 / 主动技 / 最优切换，仅合法可负担者）。
+## T4 放宽：波与大波、防与大防均【独立】纳入（不再只留最大档）→ 深层能完整考虑攻防克制 RPS
+## （波被"防"挡、大波被"大防"挡，错配则穿）。深层矩阵 ~5×5→~7×7（约 2× 慢），换取深层评估更全面。
 func _shortlist(b: BattleCore, player: int) -> Array:
 	var out: Array = []
 	out.append({action = ActionDef.Action.CHARGE, target = -1})   # 攒恒合法
-	# 攻击：优先大波，否则波
-	if b.can_afford(player, ActionDef.Action.BIG_ATTACK) and not b.is_action_disabled(player, ActionDef.Action.BIG_ATTACK):
-		out.append({action = ActionDef.Action.BIG_ATTACK, target = -1})
-	elif b.can_afford(player, ActionDef.Action.ATTACK) and not b.is_action_disabled(player, ActionDef.Action.ATTACK):
-		out.append({action = ActionDef.Action.ATTACK, target = -1})
-	# 防御：优先大防，否则防
-	if b.can_afford(player, ActionDef.Action.BIG_DEFEND) and not b.is_action_disabled(player, ActionDef.Action.BIG_DEFEND):
-		out.append({action = ActionDef.Action.BIG_DEFEND, target = -1})
-	elif not b.is_action_disabled(player, ActionDef.Action.DEFEND):
-		out.append({action = ActionDef.Action.DEFEND, target = -1})
-	# 主动技
+	for a in [ActionDef.Action.ATTACK, ActionDef.Action.BIG_ATTACK,
+			ActionDef.Action.DEFEND, ActionDef.Action.BIG_DEFEND]:
+		if b.can_afford(player, a) and not b.is_action_disabled(player, a):
+			out.append({action = a, target = -1})
 	if b.can_use_active(player):
 		out.append({action = ActionDef.ACTIVE, target = -1})
 	# 最优切换（换到血最高替补）

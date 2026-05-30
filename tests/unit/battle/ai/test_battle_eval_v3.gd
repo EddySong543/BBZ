@@ -77,3 +77,48 @@ func test_v3_is_antisymmetric() -> void:
 	# Assert：score(0) ≈ -score(1)
 	assert_almost_eq(BattleEvalV3.score(b, 0), -BattleEvalV3.score(b, 1), 0.001,
 		"v3 应反对称（双方各解同一矩阵自洽）")
+
+
+# ---- 效果信用项（T5）----
+
+func test_v3_credits_opponent_disabled() -> void:
+	# Arrange：对手出战系列被禁（h17 效果，不留 buff 叠层 → 基础 eval 看不见）
+	var b := _neutral()
+	var base := BattleEval.score(b, 0)
+	b.disabled_group[1] = 0                  # 对手某动作系列被禁
+	b._disabled_on_turn[1] = b.turn_number   # 作用于即将到来的回合
+
+	# Assert：v3 比基础高出 DISABLE_W
+	assert_almost_eq(BattleEvalV3.score(b, 0) - base, BattleEvalV3.DISABLE_W, 0.001,
+		"对手被禁招应加 DISABLE_W（基础 eval 看不见此控制效果）")
+
+
+func test_v3_credits_active_contract() -> void:
+	# Arrange：己方生效契约（h28，契约队友槽1 + 恶魔槽0 均存活）
+	var b := _neutral()
+	var base := BattleEval.score(b, 0)
+	b.link[0] = {"contract": 1, "demon": 0}
+
+	# Assert：v3 比基础高出 CONTRACT_W
+	assert_almost_eq(BattleEvalV3.score(b, 0) - base, BattleEvalV3.CONTRACT_W, 0.001,
+		"己方生效契约应加 CONTRACT_W")
+
+
+# ---- 权重覆盖机制（T1 工具地基）----
+
+func test_weight_override_changes_base_score() -> void:
+	# Arrange：制造存活数领先（对手出战阵亡）
+	var b := _neutral()
+	b.hp[1][0] = 0
+	# Act + Assert：提高 W_ALIVE → 存活领先局面分更高（仅该权重变）
+	var s_default := BattleEval.score(b, 0)
+	var s_override := BattleEval.score(b, 0, {"W_ALIVE": 1000.0})
+	assert_gt(s_override, s_default, "提高 W_ALIVE → 存活领先局面分更高（权重覆盖生效）")
+
+
+func test_v3_forwards_weight_override_to_base() -> void:
+	var b := _neutral()
+	b.hp[1][0] = 0
+	var s_default := BattleEvalV3.score(b, 0)
+	var s_override := BattleEvalV3.score(b, 0, {"W_ALIVE": 1000.0})
+	assert_gt(s_override, s_default, "v3 应把权重覆盖透传给基础评估")

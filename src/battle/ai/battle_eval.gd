@@ -22,10 +22,11 @@ const W_ENERGY_EXTRA := 3.0  # 超过 2 能后每点价值（边际递减）
 const ENERGY_FULL_CAP := 2   # 满价能量上限（= 大波费用）
 
 
-static func score(b: BattleCore, player: int) -> float:
+## w（可选）= 权重覆盖字典（键同上方常量名）→ 校准用；缺省走常量默认（T1）。
+static func score(b: BattleCore, player: int, w: Dictionary = {}) -> float:
 	var opp: int = 1 - player
 
-	# 终局：压倒一切
+	# 终局：压倒一切（W_WIN 不参与校准，恒定）
 	if b.game_over:
 		if b.winner == player + 1:
 			return W_WIN
@@ -33,27 +34,35 @@ static func score(b: BattleCore, player: int) -> float:
 			return -W_WIN
 		return 0.0  # 平局
 
+	var w_alive: float = w.get("W_ALIVE", W_ALIVE)
+	var w_hp: float = w.get("W_HP", W_HP)
+	var w_shield: float = w.get("W_SHIELD", W_SHIELD)
+	var w_active: float = w.get("W_ACTIVE_HP", W_ACTIVE_HP)
+	var w_burn: float = w.get("W_BURN", W_BURN)
+	var w_en: float = w.get("W_ENERGY", W_ENERGY)
+	var w_en_x: float = w.get("W_ENERGY_EXTRA", W_ENERGY_EXTRA)
+
 	var s := 0.0
-	s += W_ALIVE * float(b.alive_count(player) - b.alive_count(opp))
-	s += W_HP * float(_hp_sum(b, player) - _hp_sum(b, opp))
-	s += _energy_value(b.energy[player]) - _energy_value(b.energy[opp])
-	s += W_SHIELD * float(_shield_sum(b, player) - _shield_sum(b, opp))
-	s += W_ACTIVE_HP * float(_active_hp(b, player) - _active_hp(b, opp))
+	s += w_alive * float(b.alive_count(player) - b.alive_count(opp))
+	s += w_hp * float(_hp_sum(b, player) - _hp_sum(b, opp))
+	s += _energy_value(b.energy[player], w_en, w_en_x) - _energy_value(b.energy[opp], w_en, w_en_x)
+	s += w_shield * float(_shield_sum(b, player) - _shield_sum(b, opp))
+	s += w_active * float(_active_hp(b, player) - _active_hp(b, opp))
 
 	# 燃烧：对手出战中烧 = 利好；自己出战中烧 = 不利
 	if int(b.get_status(opp, b.active_index[opp], "burn", 0)) > 0:
-		s += W_BURN
+		s += w_burn
 	if int(b.get_status(player, b.active_index[player], "burn", 0)) > 0:
-		s -= W_BURN
+		s -= w_burn
 
 	return s
 
 
-## 能量的边际递减价值：前 2 能满价，之后廉价。
-static func _energy_value(e: int) -> float:
+## 能量的边际递减价值：前 2 能满价，之后廉价（权重可由 w 覆盖）。
+static func _energy_value(e: int, w_energy: float, w_extra: float) -> float:
 	var full: int = mini(e, ENERGY_FULL_CAP)
 	var extra: int = maxi(e - ENERGY_FULL_CAP, 0)
-	return W_ENERGY * float(full) + W_ENERGY_EXTRA * float(extra)
+	return w_energy * float(full) + w_extra * float(extra)
 
 
 static func _hp_sum(b: BattleCore, p: int) -> int:

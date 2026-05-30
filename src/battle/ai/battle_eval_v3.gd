@@ -30,17 +30,26 @@ const SETUP_W := {
 const FORM_W := 50.0     # h26 收割形态（所有伤害 +1，永久不可逆）
 const THREAT_W := 80.0   # 对手出战在大波斩杀线内（≤2HP）且我有 2 能 → 致命威胁压力
 const PENDING_W := 8.0   # 延迟伤害（将落在某方头上）/半点
+const DISABLE_W := 40.0  # 对手下回合一动作系列被禁（h17，不留 buff → 基础 eval 看不见）
+const CONTRACT_W := 12.0 # 有利契约生效（h28：给契约队友 +攻）
 
 
-static func score(b: BattleCore, player: int) -> float:
+## w（可选）= 权重覆盖，透传给基础评估校准（T1）；v3 自身项首轮暂用默认。
+static func score(b: BattleCore, player: int, w: Dictionary = {}) -> float:
 	if b.game_over:
-		return BattleEval.score(b, player)   # 终局与基础一致
+		return BattleEval.score(b, player, w)   # 终局与基础一致
 	var opp: int = 1 - player
-	var s := BattleEval.score(b, player)
+	var s := BattleEval.score(b, player, w)
 	s += _setup(b, player) - _setup(b, opp)
 	s += _form(b, player) - _form(b, opp)
 	s += _threat(b, player, opp) - _threat(b, opp, player)
 	s += PENDING_W * float(_pending(b, opp) - _pending(b, player))
+	# 效果信用（T5）：不留 buff 叠层、基础 eval 看不见的主动技效果
+	if _disabled_pending(b, opp):
+		s += DISABLE_W       # 对手被禁招（h17）→ 利好
+	if _disabled_pending(b, player):
+		s -= DISABLE_W
+	s += _contract_value(b, player) - _contract_value(b, opp)   # 有利契约（h28）
 	return s
 
 
@@ -67,6 +76,22 @@ static func _threat(b: BattleCore, attacker: int, defender: int) -> float:
 	var ds: int = b.active_index[defender]
 	if b.hp[defender][ds] > 0 and b.hp[defender][ds] <= 2 * HP_UNIT and b.energy[attacker] >= 2:
 		return THREAT_W
+	return 0.0
+
+
+## 该方是否处于"下回合被禁招"状态（h17，作用于即将到来的回合 → eval 时 turn_number 已自增）。
+static func _disabled_pending(b: BattleCore, who: int) -> bool:
+	return b.disabled_group[who] >= 0 and b._disabled_on_turn[who] == b.turn_number
+
+
+## 该方是否有生效中的有利契约（h28：契约队友 + 恶魔均存活 → 契约者 +攻）。
+static func _contract_value(b: BattleCore, p: int) -> float:
+	var lk: Dictionary = b.link[p]
+	if lk.has("contract") and lk.has("demon"):
+		var c: int = int(lk["contract"])
+		var d: int = int(lk["demon"])
+		if c >= 0 and d >= 0 and b.hp[p][c] > 0 and b.hp[p][d] > 0:
+			return CONTRACT_W
 	return 0.0
 
 

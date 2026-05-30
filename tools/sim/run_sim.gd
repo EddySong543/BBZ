@@ -17,6 +17,16 @@ extends SceneTree
 const HERO_DATA_DIR := "res://assets/data/heroes/"
 const ROSTER_SIZE := 3
 
+## A/B 权重校准变体（B 侧用；A 侧恒为默认权重=空字典）。键 = BattleEval 常量名（T1）。
+const AB_VARIANTS := {
+	"energy_up": {"W_ENERGY": 18.0},          # 能量更值钱（更爱屯能）
+	"energy_down": {"W_ENERGY": 6.0},         # 能量更不值（更激进出手）
+	"alive_up": {"W_ALIVE": 900.0},           # 更重存活（更保守保人）
+	"alive_down": {"W_ALIVE": 400.0},         # 更轻存活（更敢换）
+	"hp_up": {"W_HP": 16.0},                  # 更重血量
+	"flat_energy": {"W_ENERGY_EXTRA": 8.0},   # 屯多能不再廉价（弱化边际递减）
+}
+
 var games := 200
 var base_seed := 12345
 var pool_first := 1
@@ -26,6 +36,7 @@ var out_dir := "res://tools/sim/out/"
 var use_draft := true   # true=DraftAI 选人 / false=随机阵容
 var depth := 2          # 对战 AI 搜索深度
 var profile := 0        # 对战 AI 评估档：0=基础 / 1=v3 牌感(熟练优秀玩家)
+var ab_variant := ""    # A/B 校准：非空=A(默认权重) vs B(此变体) 头对头（见 AB_VARIANTS）
 
 var _hero_data := {}    # hero_id → HeroData（加载一次复用）
 var _pool_hd: Array = []  # Array[HeroData]，与 ids 平行（drafter 用，返回索引）
@@ -51,6 +62,13 @@ func _initialize() -> void:
 	var action_count := {}                  # action int → 次数
 	var hero_present := {}                   # hero_id → 出场局数
 	var hero_win := {}                       # hero_id → 所在队获胜局数
+	var ab_a := 0      # A/B：A(默认权重)胜
+	var ab_b := 0      # A/B：B(变体权重)胜
+	var ab_draw := 0   # A/B：平/未决
+
+	if use_ab():
+		print("【A/B 校准】A=默认权重  vs  B=变体「%s」=%s （交替先后手）" % [
+			ab_variant, str(AB_VARIANTS.get(ab_variant, {}))])
 
 	var setup_rng := RandomNumberGenerator.new()
 	setup_rng.seed = base_seed
@@ -78,13 +96,30 @@ func _initialize() -> void:
 
 		var b := BattleCore.new()
 		b.setup(_to_heroes(r0), _to_heroes(r1), seed_g)
-		var ai0 := BattleAI.new(seed_g + 1, depth, profile)
-		var ai1 := BattleAI.new(seed_g + 2, depth, profile)
+		# A/B 校准：A=默认权重、B=变体；偶数局 A=P0、奇数局 A=P1 → 抵消位置偏差
+		var w0: Dictionary = {}
+		var w1: Dictionary = {}
+		if use_ab():
+			var wb: Dictionary = AB_VARIANTS.get(ab_variant, {})
+			if g % 2 == 0:
+				w1 = wb   # A=P0, B=P1
+			else:
+				w0 = wb   # A=P1, B=P0
+		var ai0 := BattleAI.new(seed_g + 1, depth, profile, w0)
+		var ai1 := BattleAI.new(seed_g + 2, depth, profile, w1)
 
 		var res: Dictionary = _play(b, ai0, ai1, action_count)
 		var w: int = res["winner"]
 		win[w] = win.get(w, 0) + 1
 		turns_list.append(res["turns"])
+		if use_ab():
+			var a_side: int = 1 if (g % 2 == 0) else 2   # A 所在 player+1
+			if w == a_side:
+				ab_a += 1
+			elif w == 1 or w == 2:
+				ab_b += 1
+			else:
+				ab_draw += 1
 
 		# 各英雄出场 / 胜场
 		for id in r0:
@@ -104,10 +139,46 @@ func _initialize() -> void:
 
 		if (g + 1) % 50 == 0:
 			print("  ...%d/%d 局完成" % [g + 1, games])
+			_write_progress(g + 1)
 
 	_write_outputs(csv_rows, win, turns_list, action_count, hero_present, hero_win)
+	if use_ab():
+		_write_ab(ab_a, ab_b, ab_draw)
+	_write_progress(games)
 	print("=== 完成 ===")
 	quit()
+
+
+func use_ab() -> bool:
+	return ab_variant != ""
+
+
+## 进度文件（每 50 局刷新，随时可 Read 查看进度；解决 stdout 缓冲不可见问题）。
+func _write_progress(done: int) -> void:
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(out_dir))
+	var f := FileAccess.open(out_dir + "progress.txt", FileAccess.WRITE)
+	if f != null:
+		f.store_line("%d / %d 局完成 (%.1f%%)" % [done, games, 100.0 * float(done) / float(games)])
+		f.close()
+
+
+## A/B 校准结果（B 的 decisive 胜率 >50% → 变体更强）。
+func _write_ab(a: int, b: int, draw: int) -> void:
+	var total: int = a + b + draw
+	var decisive: int = a + b
+	var f := FileAccess.open(out_dir + "ab_result.md", FileAccess.WRITE)
+	if f != null:
+		f.store_line("# A/B 权重校准结果\n")
+		f.store_line("- A=默认权重 ｜ B=变体「%s」=%s" % [ab_variant, str(AB_VARIANTS.get(ab_variant, {}))])
+		f.store_line("- 对局=%d（交替先后手抵消位置偏差）\n" % total)
+		f.store_line("| 侧 | 胜 | 总占比 | decisive 占比 |")
+		f.store_line("|----|----|------|------|")
+		f.store_line("| A(默认) | %d | %s | %s |" % [a, _pct(a, total), _pct(a, decisive)])
+		f.store_line("| B(%s) | %d | %s | %s |" % [ab_variant, b, _pct(b, total), _pct(b, decisive)])
+		f.store_line("| 平/未决 | %d | %s | — |" % [draw, _pct(draw, total)])
+		f.store_line("\n> 判读：B 的 decisive 胜率显著 >50% → 变体更强、可纳入新权重；<50% → 更弱、弃。")
+		f.close()
+	print("【A/B】A(默认) %d 胜 / B(%s) %d 胜 / 平%d → %sab_result.md" % [a, ab_variant, b, draw, out_dir])
 
 
 ## 跑一局到结束或回合上限。返回 {winner, turns, p0_alive, p1_alive, p0_hp, p1_hp}。
@@ -306,6 +377,7 @@ func _parse_args() -> void:
 			"--depth": depth = int(val)
 			"--profile": profile = int(val)
 			"--draft": use_draft = int(val) != 0
+			"--ab": ab_variant = val
 			"--out": out_dir = val
 			"--pool":
 				var parts := val.split("-")
