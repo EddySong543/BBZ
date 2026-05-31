@@ -24,8 +24,8 @@ uniform float glow_intensity : hint_range(0.0, 2.0) = 0.18;
 group_uniforms;
 
 group_uniforms breath;
-uniform float breath_amount : hint_range(0.0, 0.2) = 0.06;   // 呼吸明暗幅度（极微）
-uniform float breath_speed : hint_range(0.0, 0.3) = 0.035;   // 横向流动速度（极慢）
+uniform float breath_amount : hint_range(0.0, 0.5) = 0.22;   // 呼吸明暗幅度（深夜暗天空需较大才看得出）
+uniform float breath_speed : hint_range(0.0, 0.3) = 0.08;    // 横向流动速度
 uniform float breath_scale : hint_range(0.3, 4.0) = 1.4;     // 云影起伏尺度
 group_uniforms;
 
@@ -35,13 +35,6 @@ uniform int posterize_steps : hint_range(2, 64) = 64;
 uniform vec2 pixel_grid = vec2(1920.0, 1080.0);
 group_uniforms;
 
-const float BAYER_4X4[16] = float[](
-	0.0,  8.0,  2.0, 10.0, 12.0, 4.0, 14.0, 6.0,
-	3.0, 11.0, 1.0,  9.0, 15.0, 7.0, 13.0, 5.0);
-float bayer_dither(vec2 frag) {
-	ivec2 p = ivec2(mod(frag, 4.0));
-	return (BAYER_4X4[p.y * 4 + p.x] / 16.0) - 0.5;
-}
 float hash(vec2 p) {
 	p = fract(p * vec2(123.34, 345.45));
 	p += dot(p, p + 34.345);
@@ -72,9 +65,10 @@ void fragment() {
 	col *= 1.0 + (br - 0.5) * breath_amount;
 
 	// 先抖后量化（dither 防色带，posterize 高 → 平滑半精细）
+	// 用随机 hash 抖动（无 Bayer 4×4 方块 pattern → 不再有"无处不在的小正方形"）
 	vec2 frag = UV * pixel_grid;
 	float steps = float(posterize_steps);
-	col += bayer_dither(frag) * dither_amount;
+	col += (hash(frag) - 0.5) * dither_amount;
 	col = floor(col * steps + 0.5) / steps;
 
 	COLOR = vec4(col, 1.0);

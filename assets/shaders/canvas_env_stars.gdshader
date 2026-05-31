@@ -27,7 +27,7 @@ uniform float twinkle_depth : hint_range(0.0, 1.0) = 0.35;   // 闪烁深度（�
 group_uniforms;
 
 group_uniforms moon_avoid;
-uniform vec2 moon_pos = vec2(0.72, 0.20);                    // 月心（应与月亮位置一致）
+uniform vec2 moon_pos = vec2(0.745, 0.16);                   // 月心（应与月亮位置一致）
 uniform float moon_clear : hint_range(0.0, 0.5) = 0.13;     // 月亮周围清空星的半径
 group_uniforms;
 
