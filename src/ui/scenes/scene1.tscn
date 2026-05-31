@@ -1,30 +1,68 @@
-[gd_scene format=3 uid="uid://cscn1rftp00a"]
+[gd_scene load_steps=17 format=3 uid="uid://cscn1rftp00a"]
+
+; 场景 1 — 午夜·武侠屋顶对决。复用 battle_stage.gd 视差引擎。
+; 层次（底→顶）：NightSky → Stars → MoonHalo → Moon(图) → Clouds → Rooftop → Dust
+; 夜空层不挂 parallax_factor = 静止（星月无限远，浮尘粒子自飘）；Rooftop 挂 1.0（地面）。
+; 动态：天空呼吸 / 星星微闪 / 月晕脉动 / 薄云缓飘 / 浮尘飘动（破"太静"）。
+; 整体调色/像素颗粒统一留给最后全屏滤镜，故此处不放 CanvasModulate。
+; moon_pos 一致性：Stars / MoonHalo 都默认 (0.72,0.20)，对应右上的月亮图——挪月亮后需同步这两处。
 
 [ext_resource type="Script" uid="uid://di0qh6ki88n6e" path="res://src/ui/components/battle_stage.gd" id="1_stage"]
 [ext_resource type="Texture2D" uid="uid://dpg4lc5cnwa07" path="res://assets/scenes/scene1/Scene1_Rooftop.png" id="2_roof"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_env_night_sky.gdshader" id="3_sky"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_env_stars.gdshader" id="4_stars"]
+[ext_resource type="Texture2D" path="res://assets/scenes/scene1/Scene1_moon.png" id="5_moon"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_env_moon_halo.gdshader" id="6_halo"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_env_clouds.gdshader" id="7_clouds"]
 
-[sub_resource type="Gradient" id="SkyGrad"]
-offsets = PackedFloat32Array(0, 0.55, 1)
-colors = PackedColorArray(0.09, 0.1, 0.2, 1, 0.05, 0.06, 0.13, 1, 0.02, 0.03, 0.07, 1)
+[sub_resource type="ShaderMaterial" id="SkyMat"]
+shader = ExtResource("3_sky")
 
-[sub_resource type="GradientTexture2D" id="SkyTex"]
-gradient = SubResource("SkyGrad")
-height = 256
-fill_to = Vector2(0, 1)
+[sub_resource type="ShaderMaterial" id="StarsMat"]
+shader = ExtResource("4_stars")
 
-[sub_resource type="Gradient" id="MoonGrad"]
-offsets = PackedFloat32Array(0, 0.55, 0.8, 1)
-colors = PackedColorArray(1, 0.99, 0.92, 1, 0.96, 0.95, 0.82, 0.95, 0.8, 0.85, 0.7, 0.25, 1, 1, 1, 0)
+[sub_resource type="ShaderMaterial" id="MoonHaloMat"]
+shader = ExtResource("6_halo")
 
-[sub_resource type="GradientTexture2D" id="MoonTex"]
-gradient = SubResource("MoonGrad")
-width = 128
-height = 128
+[sub_resource type="ShaderMaterial" id="CloudsMat"]
+shader = ExtResource("7_clouds")
+
+[sub_resource type="Gradient" id="DustDot"]
+offsets = PackedFloat32Array(0, 0.45, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0.35, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture2D" id="DustTex"]
+gradient = SubResource("DustDot")
+width = 16
+height = 16
 fill = 1
 fill_from = Vector2(0.5, 0.5)
 fill_to = Vector2(1, 0.5)
 
-[node name="Scene1" type="Control" unique_id=1462456200]
+[sub_resource type="Gradient" id="DustLife"]
+offsets = PackedFloat32Array(0, 0.2, 0.8, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="DustRamp"]
+gradient = SubResource("DustLife")
+
+[sub_resource type="ParticleProcessMaterial" id="DustMat"]
+emission_shape = 3
+emission_box_extents = Vector3(960, 560, 1)
+direction = Vector3(0, -1, 0)
+spread = 40.0
+initial_velocity_min = 3.0
+initial_velocity_max = 10.0
+gravity = Vector3(0, -4, 0)
+scale_min = 0.5
+scale_max = 1.8
+color = Color(0.75, 0.83, 1.0, 0.6)
+color_ramp = SubResource("DustRamp")
+turbulence_enabled = true
+turbulence_noise_strength = 2.5
+turbulence_noise_scale = 1.0
+
+[node name="Scene1" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -33,30 +71,60 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_stage")
 
-[node name="MoonGrade" type="CanvasModulate" parent="." unique_id=1315248927]
-color = Color(0.82, 0.88, 1, 1)
+[node name="NightSky" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+material = SubResource("SkyMat")
+color = Color(0, 0, 0, 1)
 
-[node name="Sky" type="TextureRect" parent="." unique_id=1895195943]
-layout_mode = 0
-offset_left = -120.0
-offset_top = -120.0
-offset_right = 2040.0
-offset_bottom = 1200.0
-texture = SubResource("SkyTex")
-expand_mode = 1
-metadata/parallax_factor = 0.0
+[node name="Stars" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+material = SubResource("StarsMat")
+color = Color(0, 0, 0, 0)
 
-[node name="Moon" type="TextureRect" parent="." unique_id=1941920385]
+[node name="MoonHalo" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+material = SubResource("MoonHaloMat")
+color = Color(0, 0, 0, 0)
+
+[node name="Moon" type="TextureRect" parent="."]
 layout_mode = 0
-offset_left = 1360.0
-offset_top = 90.0
-offset_right = 1600.0
+offset_left = 1270.0
+offset_top = 110.0
+offset_right = 1490.0
 offset_bottom = 330.0
-texture = SubResource("MoonTex")
+mouse_filter = 2
+texture = ExtResource("5_moon")
 expand_mode = 1
-metadata/parallax_factor = 0.08
 
-[node name="Rooftop" type="TextureRect" parent="." unique_id=1713836091]
+[node name="Clouds" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+material = SubResource("CloudsMat")
+color = Color(0, 0, 0, 0)
+
+[node name="Rooftop" type="TextureRect" parent="."]
 layout_mode = 0
 offset_left = -383.0
 offset_top = 520.0
@@ -65,3 +133,11 @@ offset_bottom = 1319.9995
 texture = ExtResource("2_roof")
 expand_mode = 1
 metadata/parallax_factor = 1.0
+
+[node name="Dust" type="GPUParticles2D" parent="."]
+position = Vector2(960, 540)
+amount = 60
+lifetime = 11.0
+preprocess = 8.0
+texture = SubResource("DustTex")
+process_material = SubResource("DustMat")
