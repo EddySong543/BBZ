@@ -141,6 +141,11 @@ func _ready() -> void:
 		_sprite.animation_finished.connect(_on_anim_finished)
 
 	_sprite.flip_h = flip_h
+	# 像素清晰：SubViewport 内默认是 Linear 过滤会把精灵放大糊掉，强制 Nearest（容器 + 精灵）
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	if _shield_sprite:
+		_shield_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	# 受击白闪 shader（A 方案 juice）
 	if _sprite.material == null:
 		var fmat := ShaderMaterial.new()
