@@ -1,0 +1,67 @@
+[gd_scene format=3 uid="uid://cscn1rftp00a"]
+
+[ext_resource type="Script" uid="uid://di0qh6ki88n6e" path="res://src/ui/components/battle_stage.gd" id="1_stage"]
+[ext_resource type="Texture2D" uid="uid://dpg4lc5cnwa07" path="res://assets/scenes/scene1/Scene1_Rooftop.png" id="2_roof"]
+
+[sub_resource type="Gradient" id="SkyGrad"]
+offsets = PackedFloat32Array(0, 0.55, 1)
+colors = PackedColorArray(0.09, 0.1, 0.2, 1, 0.05, 0.06, 0.13, 1, 0.02, 0.03, 0.07, 1)
+
+[sub_resource type="GradientTexture2D" id="SkyTex"]
+gradient = SubResource("SkyGrad")
+height = 256
+fill_to = Vector2(0, 1)
+
+[sub_resource type="Gradient" id="MoonGrad"]
+offsets = PackedFloat32Array(0, 0.55, 0.8, 1)
+colors = PackedColorArray(1, 0.99, 0.92, 1, 0.96, 0.95, 0.82, 0.95, 0.8, 0.85, 0.7, 0.25, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture2D" id="MoonTex"]
+gradient = SubResource("MoonGrad")
+width = 128
+height = 128
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[node name="Scene1" type="Control" unique_id=1462456200]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_stage")
+
+[node name="MoonGrade" type="CanvasModulate" parent="." unique_id=1315248927]
+color = Color(0.82, 0.88, 1, 1)
+
+[node name="Sky" type="TextureRect" parent="." unique_id=1895195943]
+layout_mode = 0
+offset_left = -120.0
+offset_top = -120.0
+offset_right = 2040.0
+offset_bottom = 1200.0
+texture = SubResource("SkyTex")
+expand_mode = 1
+metadata/parallax_factor = 0.0
+
+[node name="Moon" type="TextureRect" parent="." unique_id=1941920385]
+layout_mode = 0
+offset_left = 1360.0
+offset_top = 90.0
+offset_right = 1600.0
+offset_bottom = 330.0
+texture = SubResource("MoonTex")
+expand_mode = 1
+metadata/parallax_factor = 0.08
+
+[node name="Rooftop" type="TextureRect" parent="." unique_id=1713836091]
+layout_mode = 0
+offset_left = -383.0
+offset_top = 520.0
+offset_right = 2317.0
+offset_bottom = 1319.9995
+texture = ExtResource("2_roof")
+expand_mode = 1
+metadata/parallax_factor = 1.0

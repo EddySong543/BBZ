@@ -35,8 +35,6 @@ const PLAYER := 0   # 本地玩家固定 P0
 const AI := 1       # 对手 AI
 
 # ---- @onready: battle_screen.tscn 内预置节点（布局保留，路径勿改）----
-@onready var bg: ColorRect = $Background
-@onready var floor_line: ColorRect = $Floor
 @onready var p1_name_label: Label = $P1Name
 @onready var p2_name_label: Label = $P2Name
 @onready var p1_hp_label: Label = $P1HP
