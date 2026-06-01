@@ -10,8 +10,8 @@
 [ext_resource type="Shader" uid="uid://cldul26ik2rgm" path="res://assets/shaders/canvas_post_godray.gdshader" id="9_godray"]
 
 [sub_resource type="Gradient" id="ShadowGradient"]
-offsets = PackedFloat32Array(0, 0.49278846, 0.95913464, 1)
-colors = PackedColorArray(0, 0, 0, 0.6, 0, 0, 0, 0.07932693, 0, 0, 0, 0.024519205, 0, 0, 0, 0)
+offsets = PackedFloat32Array(0, 0.95913464, 0.99759614, 1)
+colors = PackedColorArray(0, 0, 0, 0.6, 0, 0, 0, 0.024519205, 0, 0, 0, 0.07932693, 0, 0, 0, 0)
 
 [sub_resource type="GradientTexture2D" id="ShadowTex"]
 gradient = SubResource("ShadowGradient")
@@ -60,11 +60,14 @@ shader_parameter/density = 1.00000004424012
 shader_parameter/decay = 0.8880000161009299
 shader_parameter/weight = 0.4
 shader_parameter/exposure = 0.03600000171
-shader_parameter/threshold = 0.5
+shader_parameter/threshold = 0.72
 shader_parameter/ray_tint = Color(0.6, 0.78, 1, 1)
 
 [sub_resource type="ShaderMaterial" id="PostFXMat"]
 shader = ExtResource("8_postfx")
+shader_parameter/barrel_amount = 0.11100000760156997
+shader_parameter/edge_blur_amount = 2.5550001213625
+shader_parameter/edge_blur_start = 0.3330000158175
 shader_parameter/brightness = 1.16000003135
 shader_parameter/contrast = 1.0600000266
 shader_parameter/saturation = 1.0000000475
@@ -74,8 +77,8 @@ shader_parameter/shadow_tint = Color(0.88, 0.94, 1.08, 1)
 shader_parameter/highlight_tint = Color(1.06, 1, 0.9, 1)
 shader_parameter/split_strength = 0.2
 shader_parameter/vignette_color = Color(0.012, 0.02, 0.047, 1)
-shader_parameter/vignette_strength = 0.45
-shader_parameter/vignette_radius = 0.9
+shader_parameter/vignette_strength = 0.3650000173375
+shader_parameter/vignette_radius = 0.91100004094343
 shader_parameter/vignette_softness = 0.55
 shader_parameter/grain_amount = 0.018
 shader_parameter/grain_scale = 1.6
@@ -157,10 +160,12 @@ demo_click_shake = false
 [node name="P1Shadow" type="TextureRect" parent="." unique_id=329774492]
 texture_filter = 2
 layout_mode = 0
-offset_left = 375.0
-offset_top = 715.0
-offset_right = 585.0
-offset_bottom = 785.0
+offset_left = 320.0
+offset_top = 711.0
+offset_right = 570.00146
+offset_bottom = 811.0
+rotation = -0.35
+pivot_offset = Vector2(160, 35)
 mouse_filter = 2
 texture = SubResource("ShadowTex")
 expand_mode = 1
@@ -168,10 +173,12 @@ expand_mode = 1
 [node name="P2Shadow" type="TextureRect" parent="." unique_id=1318395873]
 texture_filter = 2
 layout_mode = 0
-offset_left = 1335.0
-offset_top = 715.0
-offset_right = 1545.0
-offset_bottom = 785.0
+offset_left = 1278.0
+offset_top = 710.0
+offset_right = 1528.0
+offset_bottom = 810.0
+rotation = -0.35
+pivot_offset = Vector2(160, 35)
 mouse_filter = 2
 texture = SubResource("ShadowTex")
 expand_mode = 1
@@ -183,9 +190,10 @@ offset_top = 490.0
 offset_right = 650.0
 offset_bottom = 850.0
 anim_fps = 12.0
-rim_strength = 0.3
-rim_width = 6.0
-backlight = 0.125
+rim_strength = 0.9
+rim_width = 5.2
+backlight = 0.05
+warmth_amount = 1.0
 
 [node name="P2CharDisplay" parent="." unique_id=915119977 instance=ExtResource("2_char_display")]
 layout_mode = 0
@@ -194,6 +202,11 @@ offset_top = 490.0
 offset_right = 1610.0
 offset_bottom = 850.0
 anim_fps = 12.0
+rim_strength = 2.0
+rim_width = 5.105
+backlight = 0.125
+light_dir = Vector2(1.6, -1.6)
+warmth_amount = 1.0
 
 [node name="ForeDust" type="GPUParticles2D" parent="." unique_id=844619574]
 position = Vector2(960, 540)

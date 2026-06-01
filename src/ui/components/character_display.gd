@@ -126,6 +126,16 @@ extends SubViewportContainer
 	set(v):
 		light_dir = v
 		_apply_light()
+## 皮肤暖补偿色（抵消全屏冷滤镜，让皮肤回正）。
+@export var skin_warmth: Color = Color(1.08, 1.0, 0.9, 1.0):
+	set(v):
+		skin_warmth = v
+		_apply_light()
+## 暖补偿强度（越大皮肤越暖、越抵消夜色蓝；0=不补偿）。
+@export_range(0.0, 1.0) var warmth_amount: float = 0.3:
+	set(v):
+		warmth_amount = v
+		_apply_light()
 
 var _sprite: AnimatedSprite2D
 var _shield_sprite: AnimatedSprite2D
@@ -318,6 +328,8 @@ func _apply_light() -> void:
 	mat.set_shader_parameter("rim_width", rim_width)
 	mat.set_shader_parameter("backlight", backlight)
 	mat.set_shader_parameter("shadow_tint", shadow_tint)
+	mat.set_shader_parameter("skin_warmth", skin_warmth)
+	mat.set_shader_parameter("warmth_amount", warmth_amount)
 	var ldx: float = -light_dir.x if flip_h else light_dir.x
 	mat.set_shader_parameter("light_dir", Vector2(ldx, light_dir.y))
 

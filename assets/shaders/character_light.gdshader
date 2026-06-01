@@ -23,6 +23,11 @@ uniform float backlight : hint_range(0.0, 1.0) = 0.25;              // 背光强
 uniform vec4 shadow_tint : source_color = vec4(0.45, 0.55, 0.80, 1.0); // 背光阴影色(冷)
 group_uniforms;
 
+group_uniforms ambient;  // 暖补偿：抵消全屏 PostFX 冷滤镜对皮肤的染色（角色专属，不波及背景）
+uniform vec4 skin_warmth : source_color = vec4(1.08, 1.0, 0.9, 1.0);
+uniform float warmth_amount : hint_range(0.0, 1.0) = 0.3;
+group_uniforms;
+
 group_uniforms rim;  // 月光边缘光
 uniform vec4 rim_color : source_color = vec4(0.62, 0.78, 1.0, 1.0); // 月光描边色(冷蓝白)
 uniform float rim_strength : hint_range(0.0, 2.0) = 0.5;
@@ -41,6 +46,9 @@ void fragment() {
 	float shade = smoothstep(-0.35, 0.35, lit);   // 0(背月,暗) → 1(朝月,亮)
 	vec3 shaded = mix(col * shadow_tint.rgb, col, shade);
 	col = mix(col, shaded, backlight);
+
+	// 1.5) 暖补偿：抵消全屏冷滤镜，让皮肤回正（在 rim 之前，不影响月光边）
+	col = mix(col, col * skin_warmth.rgb, warmth_amount);
 
 	// 2) 月光边缘光 rim：朝月外移一截若已透明 → 当前像素是"朝月的轮廓"
 	vec2 px = TEXTURE_PIXEL_SIZE * rim_width;

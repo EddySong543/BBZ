@@ -47,6 +47,8 @@ const AI := 1       # 对手 AI
 
 @onready var p1_char_display: CharacterDisplay = $P1CharDisplay
 @onready var p2_char_display: CharacterDisplay = $P2CharDisplay
+@onready var p1_shadow: TextureRect = $P1Shadow
+@onready var p2_shadow: TextureRect = $P2Shadow
 
 @onready var p1_frames: Array[HeroFrame] = [$P1Frame0, $P1Frame1, $P1Frame2]
 @onready var p2_frames: Array[HeroFrame] = [$P2Frame0, $P2Frame1, $P2Frame2]
@@ -86,6 +88,7 @@ var _confirm_style_active: StyleBoxFlat
 # ---- juice ----
 var _shake := 0.0
 var _cd_home: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]  # 立绘原位（前冲 juice 复位用）
+var _shadow_home: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]  # 阴影原位（跟随角色水平位移用）
 
 
 # ============================================================
@@ -106,6 +109,8 @@ func _ready() -> void:
 	# P2（对手）立绘 + 头像朝左（面向中间）；记录立绘原位供前冲 juice 复位
 	_cd_home[0] = p1_char_display.position
 	_cd_home[1] = p2_char_display.position
+	_shadow_home[0] = p1_shadow.position
+	_shadow_home[1] = p2_shadow.position
 	p2_char_display.flip_h = true
 	for f in p2_frames:
 		f.flip_h = true
@@ -734,6 +739,9 @@ func _process(delta: float) -> void:
 		_shake = maxf(0.0, _shake - 40.0 * delta)
 		if _shake <= 0.0:
 			position = Vector2.ZERO
+	# 阴影跟随角色水平位移（攻击前冲时影子跟着移；垂直跳跃影子贴地不跟）
+	p1_shadow.position.x = _shadow_home[0].x + (p1_char_display.position.x - _cd_home[0].x)
+	p2_shadow.position.x = _shadow_home[1].x + (p2_char_display.position.x - _cd_home[1].x)
 
 
 # ============================================================
