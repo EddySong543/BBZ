@@ -95,6 +95,38 @@ extends SubViewportContainer
 @export var frame_cols: int = 4
 @export var frame_rows: int = 4
 
+@export_group("环境光照 (Backlight / Rim)")
+## 月光描边颜色（冷蓝白）。
+@export var rim_color: Color = Color(0.62, 0.78, 1.0, 1.0):
+	set(v):
+		rim_color = v
+		_apply_light()
+## 月光描边强度。
+@export_range(0.0, 2.0) var rim_strength: float = 0.5:
+	set(v):
+		rim_strength = v
+		_apply_light()
+## 描边检测宽度（纹理像素）。
+@export_range(1.0, 8.0) var rim_width: float = 3.0:
+	set(v):
+		rim_width = v
+		_apply_light()
+## 背光强度（背月侧压暗程度）。
+@export_range(0.0, 1.0) var backlight: float = 0.25:
+	set(v):
+		backlight = v
+		_apply_light()
+## 背光阴影色（冷）。
+@export var shadow_tint: Color = Color(0.45, 0.55, 0.8, 1.0):
+	set(v):
+		shadow_tint = v
+		_apply_light()
+## 朝月方向（UV 空间，右上；P2 flip_h 时自动镜像 x）。
+@export var light_dir: Vector2 = Vector2(0.6, -0.6):
+	set(v):
+		light_dir = v
+		_apply_light()
+
 var _sprite: AnimatedSprite2D
 var _shield_sprite: AnimatedSprite2D
 var _return_to_idle: bool = false
@@ -146,12 +178,13 @@ func _ready() -> void:
 	_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	if _shield_sprite:
 		_shield_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	# 受击白闪 shader（A 方案 juice）
+	# 角色光照 shader（背光 + 月光边缘光 rim + 受击白闪）。
 	if _sprite.material == null:
 		var fmat := ShaderMaterial.new()
-		fmat.shader = preload("res://assets/shaders/hit_flash.gdshader")
+		fmat.shader = preload("res://assets/shaders/character_light.gdshader")
 		fmat.set_shader_parameter("flash_amount", 0.0)
 		_sprite.material = fmat
+	_apply_light()  # 应用 rim/背光 export 参数（含 flip_h 朝向）
 
 
 func _build_nodes() -> void:
@@ -273,6 +306,20 @@ func flash_white(duration: float = 0.18) -> void:
 	tw.tween_method(
 		func(v: float) -> void: mat.set_shader_parameter("flash_amount", v),
 		1.0, 0.0, duration).set_trans(Tween.TRANS_SINE)
+
+
+## 把当前光照 export 参数应用到角色 shader（_ready 后建立 / Inspector 实时调用）。
+func _apply_light() -> void:
+	if not _sprite or _sprite.material == null:
+		return
+	var mat := _sprite.material as ShaderMaterial
+	mat.set_shader_parameter("rim_color", rim_color)
+	mat.set_shader_parameter("rim_strength", rim_strength)
+	mat.set_shader_parameter("rim_width", rim_width)
+	mat.set_shader_parameter("backlight", backlight)
+	mat.set_shader_parameter("shadow_tint", shadow_tint)
+	var ldx: float = -light_dir.x if flip_h else light_dir.x
+	mat.set_shader_parameter("light_dir", Vector2(ldx, light_dir.y))
 
 
 func _load_shield_spritesheet() -> void:

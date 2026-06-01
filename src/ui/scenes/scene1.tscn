@@ -1,27 +1,107 @@
-[gd_scene load_steps=16 format=3 uid="uid://cscn1rftp00a"]
-
-; 场景 1 — 午夜·武侠屋顶对决。复用 battle_stage.gd 视差引擎。
-; 层次（底→顶）：NightSky → Stars → MoonHalo → Moon(图) → Rooftop → Dust
-; 夜空层不挂 parallax_factor = 静止（星月无限远，浮尘粒子自飘）；Rooftop 挂 1.0（地面）。
-; 动态：天空呼吸 / 星星微闪 / 月晕脉动 / 浮尘飘动（破"太静"）。
-; 整体调色/像素颗粒统一留给最后全屏滤镜，故此处不放 CanvasModulate。
-; moon_pos 一致性：Stars / MoonHalo 都默认 (0.72,0.20)，对应右上的月亮图——挪月亮后需同步这两处。
+[gd_scene format=3 uid="uid://cscn1rftp00a"]
 
 [ext_resource type="Script" uid="uid://di0qh6ki88n6e" path="res://src/ui/components/battle_stage.gd" id="1_stage"]
 [ext_resource type="Texture2D" uid="uid://dpg4lc5cnwa07" path="res://assets/scenes/scene1/Scene1_Rooftop.png" id="2_roof"]
-[ext_resource type="Shader" path="res://assets/shaders/canvas_env_night_sky.gdshader" id="3_sky"]
-[ext_resource type="Shader" path="res://assets/shaders/canvas_env_stars.gdshader" id="4_stars"]
-[ext_resource type="Texture2D" path="res://assets/scenes/scene1/Scene1_moon.png" id="5_moon"]
-[ext_resource type="Shader" path="res://assets/shaders/canvas_env_moon_halo.gdshader" id="6_halo"]
+[ext_resource type="Shader" uid="uid://c5xjdx10sg3xe" path="res://assets/shaders/canvas_env_night_sky.gdshader" id="3_sky"]
+[ext_resource type="Shader" uid="uid://byjlefsgiyyte" path="res://assets/shaders/canvas_env_stars.gdshader" id="4_stars"]
+[ext_resource type="Texture2D" uid="uid://bnoqmmqjiq38l" path="res://assets/scenes/scene1/Scene1_moon.png" id="5_moon"]
+[ext_resource type="Shader" uid="uid://dpaogff5yo8xt" path="res://assets/shaders/canvas_env_moon_halo.gdshader" id="6_halo"]
+[ext_resource type="Shader" uid="uid://dfpu6s7sf3cba" path="res://assets/shaders/canvas_fx_blur.gdshader" id="9_blur"]
+[ext_resource type="Shader" uid="uid://coh7sfy7jmc26" path="res://assets/shaders/canvas_env_horizon_haze.gdshader" id="10_haze"]
+[ext_resource type="Shader" uid="uid://clhfkajcds46m" path="res://assets/shaders/canvas_env_clouds.gdshader" id="11_clouds"]
+[ext_resource type="Texture2D" uid="uid://cs6rtnmt7nn3" path="res://assets/scenes/NewAssets/scene1_mountain.png" id="12_mtntex"]
+[ext_resource type="Texture2D" uid="uid://nb106ifrsave" path="res://assets/scenes/NewAssets/scene1_frontRooftop1.png" id="13_front1"]
+[ext_resource type="Texture2D" uid="uid://bgybtupsa42ml" path="res://assets/scenes/NewAssets/Scene1_frontRooftop2.png" id="14_front2"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_env_meteor.gdshader" id="15_meteor"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_fx_edge_soften.gdshader" id="16_edgesoft"]
+
+[sub_resource type="ShaderMaterial" id="EdgeSoftenMat"]
+shader = ExtResource("16_edgesoft")
+shader_parameter/edge_blur = 4.0
 
 [sub_resource type="ShaderMaterial" id="SkyMat"]
 shader = ExtResource("3_sky")
+shader_parameter/zenith_color = Color(0.012, 0.02, 0.047, 1)
+shader_parameter/horizon_color = Color(0.043, 0.063, 0.122, 1)
+shader_parameter/gradient_curve = 1.5
+shader_parameter/horizon_pos = 1.0
+shader_parameter/glow_color = Color(0.118, 0.196, 0.294, 1)
+shader_parameter/glow_width = 0.28
+shader_parameter/glow_intensity = 0.18
+shader_parameter/breath_amount = 0.06
+shader_parameter/breath_speed = 0.08
+shader_parameter/breath_scale = 1.4
+shader_parameter/dither_amount = 0.012
+shader_parameter/posterize_steps = 64
+shader_parameter/pixel_grid = Vector2(1920, 1080)
 
 [sub_resource type="ShaderMaterial" id="StarsMat"]
 shader = ExtResource("4_stars")
+shader_parameter/grid = Vector2(32, 18)
+shader_parameter/star_amount = 0.95
+shader_parameter/star_color = Color(0.85, 0.92, 1, 1)
+shader_parameter/star_size = 1.6
+shader_parameter/brightness = 0.9
+shader_parameter/twinkle_speed = 0.7
+shader_parameter/twinkle_depth = 0.35
+shader_parameter/moon_pos = Vector2(0.774, 0.385)
+shader_parameter/moon_clear = 0.4
 
 [sub_resource type="ShaderMaterial" id="MoonHaloMat"]
 shader = ExtResource("6_halo")
+shader_parameter/moon_pos = Vector2(0.774, 0.385)
+shader_parameter/core_color = Color(0.8, 0.92, 1, 1)
+shader_parameter/core_size = 0.2
+shader_parameter/core_intensity = 0.8
+shader_parameter/glow_color = Color(0.3, 0.55, 0.85, 1)
+shader_parameter/glow_size = 0.72
+shader_parameter/glow_intensity = 0.48
+shader_parameter/glow_falloff = 2.0
+shader_parameter/flicker_amount = 0.04
+shader_parameter/flicker_speed = 0.6
+
+[sub_resource type="ShaderMaterial" id="MountainBlurMat"]
+shader = ExtResource("9_blur")
+shader_parameter/blur_radius = 0.0
+shader_parameter/atmosphere_color = Color(0.1368666, 0.20048398, 0.4392497, 1)
+shader_parameter/atmosphere_amount = 0.0
+
+[sub_resource type="ShaderMaterial" id="CloudsMat"]
+shader = ExtResource("11_clouds")
+shader_parameter/cloud_color = Color(0.3, 0.36, 0.5, 1)
+shader_parameter/coverage = 0.58
+shader_parameter/softness = 0.45
+shader_parameter/opacity = 0.42
+shader_parameter/cloud_scale = Vector2(2.5, 3.5)
+shader_parameter/drift_speed = 0.012
+shader_parameter/warp_amount = 0.15
+shader_parameter/top_bias = 0.55
+shader_parameter/fade_span = 0.3
+
+[sub_resource type="ShaderMaterial" id="HazeMat"]
+shader = ExtResource("10_haze")
+shader_parameter/haze_color = Color(0.16, 0.22, 0.34, 1)
+shader_parameter/haze_top = 0.42
+shader_parameter/haze_bottom = 0.66
+shader_parameter/haze_intensity = 0.5
+shader_parameter/noise_scale = 3.0
+shader_parameter/noise_amount = 0.55
+shader_parameter/edge_wobble = 0.06
+shader_parameter/flow_speed = 0.02
+
+[sub_resource type="ShaderMaterial" id="MeteorMat"]
+shader = ExtResource("15_meteor")
+shader_parameter/period = 7.0
+shader_parameter/duration = 1.8
+shader_parameter/spawn_chance = 0.8
+shader_parameter/travel_dir = Vector2(-0.85, 0.5)
+shader_parameter/travel_len = 0.6
+shader_parameter/trail_len = 0.14
+shader_parameter/thickness = 0.0018
+shader_parameter/meteor_color = Color(0.85, 0.93, 1, 1)
+shader_parameter/brightness = 1.0
+shader_parameter/spawn_top = 0.05
+shader_parameter/spawn_band = 0.45
 
 [sub_resource type="Gradient" id="DustDot"]
 offsets = PackedFloat32Array(0, 0.55, 1)
@@ -46,13 +126,12 @@ gradient = SubResource("DustLife")
 emission_shape = 3
 emission_box_extents = Vector3(960, 560, 1)
 direction = Vector3(0, -1, 0)
-spread = 45.0
 initial_velocity_min = 8.0
 initial_velocity_max = 22.0
 gravity = Vector3(0, -10, 0)
 scale_min = 0.3
 scale_max = 0.75
-color = Color(0.78, 0.85, 1.0, 0.5)
+color = Color(0.78, 0.85, 1, 0.5)
 color_ramp = SubResource("DustRamp")
 turbulence_enabled = true
 turbulence_noise_strength = 2.0
@@ -61,20 +140,20 @@ turbulence_noise_scale = 1.2
 [sub_resource type="ParticleProcessMaterial" id="MoonDustMat"]
 emission_shape = 3
 emission_box_extents = Vector3(480, 340, 1)
-direction = Vector3(-0.4, 1, 0)
+direction = Vector3(0, 1, 0)
 spread = 25.0
 initial_velocity_min = 6.0
 initial_velocity_max = 16.0
-gravity = Vector3(-3, 8, 0)
+gravity = Vector3(0, 8, 0)
 scale_min = 0.35
 scale_max = 0.8
-color = Color(0.82, 0.9, 1.0, 0.75)
+color = Color(0.82, 0.9, 1, 0.75)
 color_ramp = SubResource("DustRamp")
 turbulence_enabled = true
 turbulence_noise_strength = 1.5
 turbulence_noise_scale = 1.0
 
-[node name="Scene1" type="Control"]
+[node name="Scene1" type="Control" unique_id=1035084574]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -83,28 +162,18 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_stage")
 
-[node name="NightSky" type="ColorRect" parent="."]
+[node name="NightSky" type="ColorRect" parent="." unique_id=1801934283]
+material = SubResource("SkyMat")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-material = SubResource("SkyMat")
 color = Color(0, 0, 0, 1)
 
-[node name="Stars" type="ColorRect" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
+[node name="Stars" type="ColorRect" parent="." unique_id=2140858299]
 material = SubResource("StarsMat")
-color = Color(0, 0, 0, 0)
-
-[node name="MoonHalo" type="ColorRect" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -112,20 +181,117 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-material = SubResource("MoonHaloMat")
 color = Color(0, 0, 0, 0)
 
-[node name="Moon" type="TextureRect" parent="."]
+[node name="Meteor" type="ColorRect" parent="."]
+material = SubResource("MeteorMat")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+
+[node name="MoonHalo" type="ColorRect" parent="." unique_id=1529634319]
+material = SubResource("MoonHaloMat")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+
+[node name="Moon" type="TextureRect" parent="." unique_id=1860577512]
 layout_mode = 0
-offset_left = 1320.0
-offset_top = 65.0
-offset_right = 1540.0
-offset_bottom = 285.0
+offset_left = 1085.825
+offset_top = 16.22
+offset_right = 1885.8242
+offset_bottom = 816.2201
 mouse_filter = 2
 texture = ExtResource("5_moon")
 expand_mode = 1
 
-[node name="Rooftop" type="TextureRect" parent="."]
+[node name="Mountain_left" type="TextureRect" parent="." unique_id=470350264]
+self_modulate = Color(0.8, 0.85, 1, 1)
+texture_filter = 2
+material = SubResource("EdgeSoftenMat")
+layout_mode = 0
+offset_left = -1390.545
+offset_top = 285.01
+offset_right = 1109.455
+offset_bottom = 885.01
+mouse_filter = 2
+texture = ExtResource("12_mtntex")
+expand_mode = 1
+
+[node name="Mountain_right" type="TextureRect" parent="." unique_id=2101690780]
+self_modulate = Color(0.58, 0.65, 0.88, 1)
+texture_filter = 2
+material = SubResource("EdgeSoftenMat")
+layout_mode = 0
+offset_left = 1097.95
+offset_top = 416.675
+offset_right = 2697.9487
+offset_bottom = 836.6752
+mouse_filter = 2
+texture = ExtResource("12_mtntex")
+expand_mode = 1
+
+[node name="Clouds" type="ColorRect" parent="." unique_id=786085262]
+visible = false
+material = SubResource("CloudsMat")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+
+[node name="HorizonHaze" type="ColorRect" parent="." unique_id=1841776131]
+material = SubResource("HazeMat")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+
+[node name="RooftopL" type="TextureRect" parent="." unique_id=111504973]
+self_modulate = Color(0.4, 0.46, 0.6, 1)
+texture_filter = 2
+layout_mode = 0
+offset_left = -302.0
+offset_top = 623.0
+offset_right = 258.0
+offset_bottom = 903.0
+mouse_filter = 2
+texture = ExtResource("14_front2")
+expand_mode = 1
+flip_h = true
+metadata/parallax_factor = 0.85
+
+[node name="RooftopR" type="TextureRect" parent="." unique_id=50263200]
+self_modulate = Color(0.4, 0.46, 0.6, 1)
+texture_filter = 2
+layout_mode = 0
+offset_left = 1781.0
+offset_top = 810.19
+offset_right = 1991.0
+offset_bottom = 903.19
+mouse_filter = 2
+texture = ExtResource("13_front1")
+expand_mode = 1
+metadata/parallax_factor = 0.85
+
+[node name="Rooftop" type="TextureRect" parent="." unique_id=2002299607]
 layout_mode = 0
 offset_left = -383.0
 offset_top = 520.0
@@ -135,18 +301,10 @@ texture = ExtResource("2_roof")
 expand_mode = 1
 metadata/parallax_factor = 1.0
 
-[node name="Dust" type="GPUParticles2D" parent="."]
-position = Vector2(960, 540)
-amount = 60
-lifetime = 11.0
-preprocess = 8.0
-texture = SubResource("DustTex")
-process_material = SubResource("DustMat")
-
-[node name="MoonDust" type="GPUParticles2D" parent="."]
+[node name="MoonDust" type="GPUParticles2D" parent="." unique_id=171542226]
 position = Vector2(1140, 480)
-amount = 20
+amount = 12
+texture = SubResource("DustTex")
 lifetime = 9.0
 preprocess = 6.0
-texture = SubResource("DustTex")
 process_material = SubResource("MoonDustMat")
