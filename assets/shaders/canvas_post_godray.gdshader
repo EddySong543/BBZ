@@ -7,7 +7,8 @@ render_mode blend_add;
 //   从月亮位置 light_pos 向外做径向散射：沿"像素→光源"方向多步采样画面，累加其中的
 //   亮部(月辉)并衰减 → 形成光束。月被山遮挡时，光束自然从月盘露出部分/山缝射出（丁达尔）。
 //   render_mode blend_add → additive 叠加到已绘制的世界上；放在 WorldGrab 之前，最终一并被 PostFX 调色。
-// 目标平台: PC (Windows D3D12 / Forward+)。复杂度: 48 次屏幕采样/像素、全屏 → 中。
+// 目标平台: PC (Windows D3D12 / Forward+)。复杂度: 24 次屏幕采样/像素、全屏 → 中。
+//   注: decay=0.888 时，第 24 步后 illum≈0.05 已可忽略 → 48→24 采样肉眼无差、开销减半。
 // 渲染管线: Godot 4.6 Forward+（2D canvas_item，配合 BackBufferCopy 读 SCREEN_TEXTURE）。
 // =============================================================
 
@@ -20,7 +21,7 @@ uniform float exposure : hint_range(0.0, 1.0) = 0.22;   // 光束总强度
 uniform float threshold : hint_range(0.0, 1.0) = 0.5;   // 亮部阈值(只散射够亮的月辉)
 uniform vec4 ray_tint : source_color = vec4(0.6, 0.78, 1.0, 1.0); // 光束染色(月光冷蓝)
 
-const int SAMPLES = 48;
+const int SAMPLES = 24;
 
 void fragment() {
 	vec2 uv = SCREEN_UV;
