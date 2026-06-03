@@ -101,6 +101,7 @@ func _ready() -> void:
 	battle = BattleCore.new()
 	var p0: Array = _resolve_team(BattleSetup.p1_heroes, DEFAULT_P0)
 	var p1: Array = _resolve_team(BattleSetup.p2_heroes, DEFAULT_P1)
+	BattleSetup.reset()   # 消费即清空：防止下一局（未经 BP）复用本局阵容
 	battle.setup(p0, p1, randi())
 
 	_init_styles()

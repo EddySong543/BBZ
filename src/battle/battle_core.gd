@@ -94,6 +94,9 @@ const _HERO_SKILL_SCRIPTS := {
 	"h31": preload("res://src/battle/skills/h31_yueliang.gd"),
 }
 
+## 注册表整体校验只跑一次（静态守卫）。
+static var _registry_validated := false
+
 
 ## seed_value = 0 时用随机 seed（单机）；联机/测试传入确定 seed。
 func setup(p1_heroes: Array, p2_heroes: Array, seed_value: int = 0) -> void:
@@ -135,6 +138,7 @@ func setup(p1_heroes: Array, p2_heroes: Array, seed_value: int = 0) -> void:
 	winner = WINNER_UNDECIDED
 
 	_build_skills()
+	_validate_skills()
 	for p in [0, 1]:
 		for s in range(heroes[p].size()):
 			if _skills[p][s] != null:
@@ -147,6 +151,25 @@ func _build_skills() -> void:
 		for h in heroes[p]:
 			var script: Script = _HERO_SKILL_SCRIPTS.get(h.hero_id, null)
 			_skills[p].append(script.new() if script != null else null)
+
+
+## 校验技能装配，及早暴露注册表 id 拼写/漏注册（联机准备）。
+## 注册表整体只校验一次：key 须 hXX 格式、value 须 HeroSkill 子类。
+## 本局阵容每次 setup 都查：数据有技能描述却装配出 null = 多半 key 拼错/漏注册。
+func _validate_skills() -> void:
+	if not _registry_validated:
+		_registry_validated = true
+		for id in _HERO_SKILL_SCRIPTS:
+			var sid := str(id)
+			if not (sid.length() == 3 and sid.begins_with("h") and sid.substr(1).is_valid_int()):
+				push_error("BattleCore: 技能注册表 key 非法 hero_id（应为 hXX）：%s" % sid)
+			if not (_HERO_SKILL_SCRIPTS[id].new() is HeroSkill):
+				push_error("BattleCore: 技能注册表 %s 的脚本不是 HeroSkill 子类" % sid)
+	for p in [0, 1]:
+		for s in range(heroes[p].size()):
+			var h: HeroData = heroes[p][s]
+			if _skills[p][s] == null and h.skill_description != "" and h.skill_description != "待设计":
+				push_warning("BattleCore: 英雄 %s 数据标注有技能但未注册（检查 _HERO_SKILL_SCRIPTS 的 key 拼写）" % h.hero_id)
 
 
 # === 只读视图（UI / 测试用；半点 → 显示）===
@@ -325,7 +348,11 @@ func clone() -> BattleCore:
 	c.rng = RandomNumberGenerator.new()
 	c.rng.seed = rng.seed
 	c.rng.state = rng.state
-	c._skills = _skills.duplicate(true)
+	# §D2 锁死：重建【无状态】技能实例，而非 duplicate(true) 共享同一引用
+	# （Array[Object].duplicate(true) 并不复制 Object，原本是浅拷）。
+	# → 推演局与真实局零共享，即便将来某技能误加实例成员变量也不会破坏确定性。
+	# 技能无状态，重建与共享行为等价；statuses 已在上面深拷，故不重跑 on_setup。
+	c._build_skills()
 	return c
 
 
