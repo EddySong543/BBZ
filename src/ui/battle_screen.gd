@@ -164,19 +164,14 @@ func _init_buttons() -> void:
 	btn_special.pressed.connect(_on_circle_pressed.bind(ACTIVE, btn_special))
 	btn_confirm.pressed.connect(_on_confirm_pressed)
 
-	btn_charge.text = "攒"
-	btn_attack.text = "波"
-	btn_big_attack.text = "大波"
-	btn_defend.text = "防"
-	btn_big_defend.text = "大防"
-	btn_special.text = "技能"
+	# 攒/波/大波/防/大防 用 HoverIcon 美术图标（节点在 battle_screen.tscn 内，编辑器可见可调）；
+	# 技能按钮不显示文字（说明改放 tooltip，见 _layout_circles）。位置/尺寸全部由 .tscn 决定。
+	btn_special.text = ""
 	btn_confirm.text = "结束"
 
 	for btn in [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend, btn_special]:
-		btn.size = Vector2(CIRCLE_D, CIRCLE_D)
 		FontManager.apply_btn(btn, 16)
 		btn.clip_text = true
-	btn_confirm.size = Vector2(CIRCLE_D, CIRCLE_D)
 	FontManager.apply_btn(btn_confirm, 16)
 	btn_confirm.clip_text = true
 
@@ -448,22 +443,17 @@ func _set_buttons_active(active: bool) -> void:
 		_update_button_states()
 
 
+## 编辑器可摆位：按钮位置/尺寸全部读 .tscn，代码只管显隐与技能 tooltip，不再覆盖坐标。
+## 在 Godot 里随意移动/缩放 Buttons 下的按钮即可，运行时不会被弹回。
 func _layout_circles() -> void:
 	var has_active: bool = _player_has_active()
-	var buttons: Array[Button] = [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend]
-	if has_active:
-		buttons.append(btn_special)
-		btn_special.text = battle.active_hero(PLAYER).skill_description
-	buttons.append(btn_confirm)
-
 	btn_special.visible = has_active
-
-	var n := buttons.size()
-	var total_w := n * CIRCLE_D + (n - 1) * CIRCLE_GAP
-	var start_x := (SCREEN_W - total_w) / 2.0
-	for i in range(n):
-		buttons[i].position = Vector2(start_x + i * (CIRCLE_D + CIRCLE_GAP), CIRCLE_Y - buttons_ctrl.position.y)
-		buttons[i].visible = true
+	if has_active:
+		# 技能按钮无文字，技能说明放 tooltip（悬停可见，信息不丢）。
+		btn_special.tooltip_text = battle.active_hero(PLAYER).skill_description
+	for btn in [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend]:
+		btn.visible = true
+	btn_confirm.visible = true
 
 
 ## 出战英雄是否有主动技（访问 _skills，下划线约定但可读）。
@@ -703,6 +693,8 @@ func _act_juice(player: int, action: int) -> void:
 			tw.tween_property(cd, "position", home + Vector2(-28.0 * dir, 0), 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 			tw.tween_property(cd, "position", home + Vector2(reach * dir, 0), 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 			tw.tween_property(cd, "position", home, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			# A3：出招瞬间被自己的招式照亮（月光描边增强）。
+			cd.pulse_rim(1.4 if action == A.BIG_ATTACK else 0.9, 0.3)
 		A.DEFEND, A.BIG_DEFEND:
 			var glow := Color(0.55, 0.8, 1.4) if action == A.BIG_DEFEND else Color(0.7, 0.85, 1.2)
 			var tw := create_tween()
@@ -724,9 +716,20 @@ func _act_juice(player: int, action: int) -> void:
 func _impact(target_player: int, dmg_half: int) -> void:
 	var cd := _cd(target_player)
 	cd.flash_white(0.18)
+	cd.pulse_rim(0.7, 0.22)   # A3：被弧光照亮
+	_char_pop(target_player, 0.08)   # A3：受击退弹（scale 弹一下）
 	_spawn_slash(target_player)
 	if dmg_half > 0:
 		_pop_damage(target_player, float(dmg_half) / 2.0)
+
+
+## A3：受击 scale-pop（绕立绘中心快速放大再回弹）。pivot 每次按当前尺寸取中心，稳健。
+func _char_pop(player: int, amount: float) -> void:
+	var cd := _cd(player)
+	cd.pivot_offset = cd.size * 0.5
+	var tw := create_tween()
+	tw.tween_property(cd, "scale", Vector2(1.0 + amount, 1.0 + amount), 0.06).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.tween_property(cd, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func _spawn_slash(target_player: int) -> void:
@@ -764,29 +767,68 @@ func _process(delta: float) -> void:
 		_shake = maxf(0.0, _shake - 40.0 * delta)
 		if _shake <= 0.0:
 			position = Vector2.ZERO
-	# 阴影跟随角色水平位移（攻击前冲时影子跟着移；垂直跳跃影子贴地不跟）
-	p1_shadow.position.x = _shadow_home[0].x + (p1_char_display.position.x - _cd_home[0].x)
-	p2_shadow.position.x = _shadow_home[1].x + (p2_char_display.position.x - _cd_home[1].x)
+	# 阴影对角色动作反应：水平位移跟随 + 离地缩小淡出 + 冲刺拉长（接地/重量感）。
+	_update_shadow(0)
+	_update_shadow(1)
+
+
+## A3：阴影随角色动作变形。
+## - 水平位移：前冲时影子跟着横移；
+## - 离地（攒上浮 / 前冲腾身，position.y < home.y）：影子缩小 + 变淡（角色离地）；
+## - 横向冲刺：影子沿地面拉长（速度感）。
+func _update_shadow(p: int) -> void:
+	var cd: CharacterDisplay = p1_char_display if p == 0 else p2_char_display
+	var sh: TextureRect = p1_shadow if p == 0 else p2_shadow
+	var home: Vector2 = _cd_home[p]
+	var dx: float = cd.position.x - home.x
+	var lift: float = maxf(home.y - cd.position.y, 0.0)          # 上抬量（离地）
+	sh.position.x = _shadow_home[p].x + dx
+	var k: float = clampf(1.0 - lift / 140.0, 0.5, 1.0)          # 离地越多越小
+	var stretch: float = 1.0 + clampf(absf(dx) / 190.0, 0.0, 1.0) * 0.4
+	sh.scale = Vector2(k * stretch, k)
+	sh.modulate.a = lerpf(0.4, 1.0, k)
 
 
 # ============================================================
 # 头顶招式圆圈（揭示盲选出招，占位待美术）/ 动作名
 # ============================================================
 
-## 双方各在角色头顶显示一个占位圆圈(招式名+按钮配色)，显示 1.2s 后消失。
+## 双方各在角色头顶弹出一个气泡（揭示盲选出招）：有美术图标用图标、否则用文字。
+## 进场带 pop 动画（缩放回弹 + 淡入），显示 1.2s 后收起淡出，告别"直接冒出来"的僵硬。
 func _show_action_indicators(a0: int, a1: int) -> void:
 	status_label.visible = false
 	event_label.visible = false
 	var c0 := _spawn_action_circle(0, a0)
 	var c1 := _spawn_action_circle(1, a1)
 	await get_tree().create_timer(1.2).timeout
-	if is_instance_valid(c0):
-		c0.queue_free()
-	if is_instance_valid(c1):
-		c1.queue_free()
+	for c in [c0, c1]:
+		if is_instance_valid(c):
+			var tw := create_tween()
+			tw.tween_property(c, "scale", Vector2(0.5, 0.5), 0.14).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+			tw.parallel().tween_property(c, "modulate:a", 0.0, 0.14)
+			tw.tween_callback(c.queue_free)
 
 
-## 在 player 角色头顶生成占位招式圆圈（之后替换美术素材）。
+## 找动作对应的动作按钮（攒/波/大波/防/大防 有；技能/切换 无 → null）。
+func _btn_for_action(action: int) -> Button:
+	match action:
+		A.CHARGE: return btn_charge
+		A.ATTACK: return btn_attack
+		A.BIG_ATTACK: return btn_big_attack
+		A.DEFEND: return btn_defend
+		A.BIG_DEFEND: return btn_big_defend
+	return null
+
+
+## 取动作按钮上的 HoverIcon（图标/帧/缩放的单一来源，在 .tscn 配置）；无则 null。
+func _hover_icon_for(action: int) -> HoverIcon:
+	var btn := _btn_for_action(action)
+	if btn == null:
+		return null
+	return btn.get_node_or_null("HoverIcon") as HoverIcon
+
+
+## 在 player 角色头顶生成揭示气泡（圆底 + 美术图标 / 文字回退）。
 func _spawn_action_circle(player: int, action: int) -> Control:
 	var cd := _cd(player)
 	var sz := 92.0
@@ -799,21 +841,51 @@ func _spawn_action_circle(player: int, action: int) -> Control:
 	circ.add_theme_stylebox_override("panel", sb)
 	circ.size = Vector2(sz, sz)
 	circ.position = cd.position + Vector2(cd.size.x * 0.5 - sz * 0.5, -sz - 12.0)
+	circ.pivot_offset = Vector2(sz, sz) * 0.5   # 从中心 pop
 	circ.z_index = 80
 	circ.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var lbl := Label.new()
-	lbl.text = _action_name(action)
-	FontManager.apply(lbl, 28)
-	lbl.add_theme_color_override("font_color", Color.WHITE)
-	lbl.add_theme_color_override("font_outline_color", Color.BLACK)
-	lbl.add_theme_constant_override("outline_size", 3)
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	circ.add_child(lbl)
+
+	var hi := _hover_icon_for(action)
+	if hi != null and hi.sheet != null:
+		# 复用按钮图标的帧0 + 相同 inset/content_scale，气泡里与按钮里观感一致。
+		var inset := sz * hi.inset_ratio
+		var side := (sz - inset * 2.0) * hi.content_scale
+		var tr := TextureRect.new()
+		tr.texture = hi.make_frame_texture(0)
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tr.size = Vector2(side, side)
+		tr.position = (Vector2(sz, sz) - tr.size) * 0.5
+		circ.add_child(tr)
+	else:
+		var lbl := Label.new()
+		lbl.text = _action_name(action)
+		FontManager.apply(lbl, 28)
+		lbl.add_theme_color_override("font_color", Color.WHITE)
+		lbl.add_theme_color_override("font_outline_color", Color.BLACK)
+		lbl.add_theme_constant_override("outline_size", 3)
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		circ.add_child(lbl)
+
 	add_child(circ)
+	_animate_bubble_pop(circ)
 	return circ
+
+
+## 气泡 pop 进场：从小放大（回弹）+ 淡入。
+func _animate_bubble_pop(node: Control) -> void:
+	node.scale = Vector2(0.2, 0.2)
+	node.modulate.a = 0.0
+	var tw := create_tween()
+	tw.tween_property(node, "scale", Vector2(1.14, 1.14), 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(node, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_SINE)
+	var tw2 := create_tween()
+	tw2.tween_property(node, "modulate:a", 1.0, 0.14).set_ease(Tween.EASE_OUT)
 
 
 func _action_name(act: int) -> String:

@@ -13,6 +13,12 @@
 [ext_resource type="PackedScene" uid="uid://bforedustcmp" path="res://src/ui/components/fore_dust.tscn" id="12_foredust"]
 [ext_resource type="Texture2D" uid="uid://cq7w4kpww2rkq" path="res://assets/ui/newAssets/heart_idle.png" id="13_heart"]
 [ext_resource type="Texture2D" uid="uid://dmk21cawlx7uf" path="res://assets/ui/newAssets/energy_idle.png" id="14_coin"]
+[ext_resource type="Script" uid="uid://cel6yroklcse5" path="res://src/ui/components/hover_icon.gd" id="15_hovericon"]
+[ext_resource type="Texture2D" uid="uid://cbwxfqjpi8q5r" path="res://assets/ui/newAssets/Zan_idle.png" id="16_zan"]
+[ext_resource type="Texture2D" uid="uid://clwpo0nw0io3c" path="res://assets/ui/newAssets/Bo_idle.png" id="17_bo"]
+[ext_resource type="Texture2D" uid="uid://bi2d2aupxvtke" path="res://assets/ui/newAssets/DaBo_idle.png" id="18_dabo"]
+[ext_resource type="Texture2D" uid="uid://1wrmooe2eynb" path="res://assets/ui/newAssets/Fang_idle.png" id="19_fang"]
+[ext_resource type="Texture2D" uid="uid://bg6qynpwqkgmw" path="res://assets/ui/newAssets/DaFang_idle.png" id="20_dafang"]
 
 [sub_resource type="Gradient" id="ShadowGradient"]
 offsets = PackedFloat32Array(0, 0.95913464, 0.99759614, 1)
@@ -345,7 +351,6 @@ horizontal_alignment = 1
 [node name="TimerLabel" type="Label" parent="." unique_id=2111037196]
 layout_mode = 0
 offset_left = 760.0
-offset_top = 0.0
 offset_right = 1160.0
 offset_bottom = 92.0
 horizontal_alignment = 1
@@ -588,7 +593,21 @@ theme_override_styles/normal = SubResource("CircleNormal")
 theme_override_styles/pressed = SubResource("CircleHover")
 theme_override_styles/hover = SubResource("CircleHover")
 theme_override_styles/disabled = SubResource("CircleDisabled")
-text = "攒"
+
+[node name="HoverIcon" type="Control" parent="Buttons/BtnCharge" unique_id=1082315755]
+texture_filter = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("15_hovericon")
+sheet = ExtResource("16_zan")
+hframes = 4
+vframes = 2
+frame_count = 5
 
 [node name="BtnAttack" type="Button" parent="Buttons" unique_id=1348519698]
 layout_mode = 0
@@ -600,7 +619,26 @@ theme_override_styles/normal = SubResource("CircleNormal")
 theme_override_styles/pressed = SubResource("CircleHover")
 theme_override_styles/hover = SubResource("CircleHover")
 theme_override_styles/disabled = SubResource("CircleDisabled")
-text = "波"
+
+[node name="HoverIcon" type="Control" parent="Buttons/BtnAttack" unique_id=513874469]
+texture_filter = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 4.0
+offset_top = 4.005
+offset_right = -6.0
+offset_bottom = -5.994995
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("15_hovericon")
+sheet = ExtResource("17_bo")
+hframes = 4
+vframes = 2
+frame_count = 5
+content_scale = 1.08
 
 [node name="BtnBigAttack" type="Button" parent="Buttons" unique_id=1182840675]
 layout_mode = 0
@@ -612,7 +650,28 @@ theme_override_styles/normal = SubResource("CircleNormal")
 theme_override_styles/pressed = SubResource("CircleHover")
 theme_override_styles/hover = SubResource("CircleHover")
 theme_override_styles/disabled = SubResource("CircleDisabled")
-text = "大波"
+
+[node name="HoverIcon" type="Control" parent="Buttons/BtnBigAttack" unique_id=1492395735]
+texture_filter = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -14.0
+offset_top = -14.000008
+offset_right = 6.0
+offset_bottom = 6.0
+grow_horizontal = 2
+grow_vertical = 2
+scale = Vector2(1, 1.1)
+mouse_filter = 2
+script = ExtResource("15_hovericon")
+sheet = ExtResource("18_dabo")
+hframes = 4
+vframes = 2
+frame_count = 7
+fps = 12.0
+content_scale = 1.05
 
 [node name="BtnDefend" type="Button" parent="Buttons" unique_id=1455563286]
 layout_mode = 0
@@ -624,7 +683,27 @@ theme_override_styles/normal = SubResource("CircleNormal")
 theme_override_styles/pressed = SubResource("CircleHover")
 theme_override_styles/hover = SubResource("CircleHover")
 theme_override_styles/disabled = SubResource("CircleDisabled")
-text = "防"
+
+[node name="HoverIcon" type="Control" parent="Buttons/BtnDefend" unique_id=432668711]
+texture_filter = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -33.0
+offset_top = -28.0
+offset_right = 29.0
+offset_bottom = 34.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("15_hovericon")
+sheet = ExtResource("19_fang")
+hframes = 4
+vframes = 3
+frame_count = 12
+fps = 12.0
+content_scale = 1.15
 
 [node name="BtnBigDefend" type="Button" parent="Buttons" unique_id=772727519]
 layout_mode = 0
@@ -636,7 +715,27 @@ theme_override_styles/normal = SubResource("CircleNormal")
 theme_override_styles/pressed = SubResource("CircleHover")
 theme_override_styles/hover = SubResource("CircleHover")
 theme_override_styles/disabled = SubResource("CircleDisabled")
-text = "大防"
+
+[node name="HoverIcon" type="Control" parent="Buttons/BtnBigDefend" unique_id=1785205266]
+texture_filter = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -44.0
+offset_top = -28.0
+offset_right = 46.0
+offset_bottom = 34.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("15_hovericon")
+sheet = ExtResource("20_dafang")
+hframes = 4
+vframes = 3
+frame_count = 12
+fps = 12.0
+content_scale = 1.15
 
 [node name="BtnSpecial" type="Button" parent="Buttons" unique_id=581864479]
 visible = false

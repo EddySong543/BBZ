@@ -318,6 +318,19 @@ func flash_white(duration: float = 0.18) -> void:
 		1.0, 0.0, duration).set_trans(Tween.TRANS_SINE)
 
 
+## A3 juice：月光描边瞬时增强再回落（出招被自己的招式照亮 / 受击被弧光照亮）。
+## 以 export 的 rim_strength 为基准，临时拉高 boost 后缓回基准；不改 export 值。
+func pulse_rim(boost: float = 0.8, duration: float = 0.25) -> void:
+	if not _sprite or _sprite.material == null:
+		return
+	var mat := _sprite.material as ShaderMaterial
+	var base: float = rim_strength
+	var tw := create_tween()
+	tw.tween_method(
+		func(v: float) -> void: mat.set_shader_parameter("rim_strength", v),
+		base + boost, base, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+
 ## 把当前光照 export 参数应用到角色 shader（_ready 后建立 / Inspector 实时调用）。
 func _apply_light() -> void:
 	if not _sprite or _sprite.material == null:
