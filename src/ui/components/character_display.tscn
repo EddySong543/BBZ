@@ -30,7 +30,7 @@ sprite_frames = ExtResource("2_3v6dl")
 animation = &"idle"
 
 [node name="DefendShield" type="AnimatedSprite2D" parent="SubViewport" unique_id=-512020783]
-texture_filter = 1
 visible = false
+texture_filter = 1
 position = Vector2(101.00001, 154)
 scale = Vector2(1.9, 1.9)

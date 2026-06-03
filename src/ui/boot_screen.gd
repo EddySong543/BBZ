@@ -13,7 +13,7 @@ extends Control
 ## 像素机制：shader 64 列大格、每格纯色；亮度量化 40 档 + Bayer 抖动 → 复古像素渐变。
 ## 波形：非对称浪头（陡前缘 + 长拖尾）；颗粒：2D 格点 hash（非水平长条）。
 
-const NEXT_SCENE := "res://src/ui/title_screen.tscn"
+const NEXT_SCENE := "res://src/ui/main_menu.tscn"
 
 const ADVANCE_TIME := 0.85
 const IMPACT_TIME := 0.20

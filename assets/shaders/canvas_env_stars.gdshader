@@ -41,6 +41,10 @@ uniform vec2 moon_pos = vec2(0.745, 0.16);
 uniform float moon_clear : hint_range(0.0, 0.5) = 0.13;
 group_uniforms;
 
+group_uniforms edge;  // 画面四边留空：每边一条 edge_margin 宽的渐隐带(四角因 x、y 两因子相乘缩得更多) → 边缘无锐利亮星被战斗 PostFX 拉成长条
+uniform float edge_margin : hint_range(0.0, 0.45) = 0.14;   // 每边渐隐带宽度(UV比例)；0=星布满到边，越大留空越多
+group_uniforms;
+
 float hash21(vec2 p) {
 	p = fract(p * vec2(123.34, 456.21));
 	p += dot(p, p + 45.32);
@@ -102,5 +106,10 @@ void fragment() {
 	md.x *= aspect;
 	float moon_mask = smoothstep(moon_clear * 0.5, moon_clear, length(md));
 
-	COLOR = vec4(star_color.rgb, clamp(accum * moon_mask, 0.0, 1.0));
+	// 四边矩形遮罩：每边留 edge_margin 宽的渐隐带；四角因 x、y 两因子相乘缩得更多。
+	// 边缘无锐利亮星 → 战斗 PostFX 的边缘模糊/畸变没有亮星可拉成长条。
+	vec2 em = smoothstep(vec2(0.0), vec2(edge_margin), uv) * smoothstep(vec2(0.0), vec2(edge_margin), 1.0 - uv);
+	float edge_mask = em.x * em.y;
+
+	COLOR = vec4(star_color.rgb, clamp(accum * moon_mask * edge_mask, 0.0, 1.0));
 }

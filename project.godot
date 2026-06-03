@@ -13,8 +13,8 @@ config_version=5
 config/name="波波攒之王"
 config/version="0.1.0"
 run/main_scene="res://src/ui/boot_screen.tscn"
-run/max_fps=60
 config/features=PackedStringArray("4.6")
+run/max_fps=60
 
 [autoload]
 

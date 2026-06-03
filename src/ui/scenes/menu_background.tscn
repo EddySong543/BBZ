@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://cscn1rftp00a"]
+[gd_scene format=3 uid="uid://ddiu7ck5le8p3"]
 
 [ext_resource type="Script" uid="uid://di0qh6ki88n6e" path="res://src/ui/components/battle_stage.gd" id="1_stage"]
 [ext_resource type="Texture2D" uid="uid://dpg4lc5cnwa07" path="res://assets/scenes/scene1/Scene1_Rooftop.png" id="2_roof"]
@@ -14,7 +14,8 @@
 [ext_resource type="Shader" uid="uid://bxudpdq6445n7" path="res://assets/shaders/canvas_env_meteor.gdshader" id="15_meteor"]
 [ext_resource type="Shader" uid="uid://8nr5wbxavv34" path="res://assets/shaders/canvas_fx_edge_soften.gdshader" id="16_edgesoft"]
 [ext_resource type="Shader" uid="uid://u0mpca3l8lig" path="res://assets/shaders/canvas_fx_moonlight.gdshader" id="17_moonlight"]
-[ext_resource type="Shader" uid="uid://ds1lag0nmchpk" path="res://assets/shaders/canvas_fx_box_blur.gdshader" id="20_boxblur"]
+[ext_resource type="Texture2D" uid="uid://d1522s6a5yegg" path="res://assets/scenes/NewAssets/Scene1_tower.png" id="18_tower"]
+[ext_resource type="Shader" uid="uid://b3ng2d6n5tfti" path="res://assets/shaders/canvas_fx_window_light.gdshader" id="19_winlight"]
 
 [sub_resource type="ShaderMaterial" id="SkyMat"]
 shader = ExtResource("3_sky")
@@ -47,9 +48,8 @@ shader_parameter/flash_min_interval = 8.0
 shader_parameter/flash_max_interval = 24.0
 shader_parameter/flash_duration = 0.3
 shader_parameter/flash_boost = 0.7
-shader_parameter/moon_pos = Vector2(0.774, 0.385)
+shader_parameter/moon_pos = Vector2(0.359, 0.55)
 shader_parameter/moon_clear = 0.4
-shader_parameter/edge_margin = 0.14
 
 [sub_resource type="ShaderMaterial" id="MeteorMat"]
 shader = ExtResource("15_meteor")
@@ -67,14 +67,14 @@ shader_parameter/spawn_band = 0.45
 
 [sub_resource type="ShaderMaterial" id="MoonHaloMat"]
 shader = ExtResource("6_halo")
-shader_parameter/moon_pos = Vector2(0.774, 0.385)
+shader_parameter/moon_pos = Vector2(0.359, 0.55)
 shader_parameter/core_color = Color(0.8, 0.92, 1, 1)
 shader_parameter/core_size = 0.2
 shader_parameter/core_intensity = 0.8
 shader_parameter/glow_color = Color(0.3, 0.55, 0.85, 1)
-shader_parameter/glow_size = 0.72
-shader_parameter/glow_intensity = 0.48
-shader_parameter/glow_falloff = 2.0
+shader_parameter/glow_size = 0.82800003281023
+shader_parameter/glow_intensity = 0.6750000320625
+shader_parameter/glow_falloff = 2.7210001054975
 shader_parameter/flicker_amount = 0.04
 shader_parameter/flicker_speed = 0.6
 
@@ -105,6 +105,27 @@ shader_parameter/noise_amount = 0.55
 shader_parameter/edge_wobble = 0.06
 shader_parameter/flow_speed = 0.02
 
+[sub_resource type="ShaderMaterial" id="TowerSoftenMat"]
+shader = ExtResource("16_edgesoft")
+shader_parameter/edge_blur = 2.0
+
+[sub_resource type="ShaderMaterial" id="WindowLightMat"]
+shader = ExtResource("19_winlight")
+shader_parameter/win1 = Vector2(0.4, 0.46)
+shader_parameter/win2 = Vector2(0.535, 0.46)
+shader_parameter/win3 = Vector2(0.26, 0.64)
+shader_parameter/win4 = Vector2(0.245, 0.82)
+shader_parameter/aspect = 1.273
+shader_parameter/light_color = Color(1, 0.58, 0.26, 1)
+shader_parameter/glow_radius = 0.03500000166249
+shader_parameter/glow_intensity = 0.8030000381425
+shader_parameter/shaft_dir = Vector2(0.05, 1)
+shader_parameter/shaft_length = 0.1600000076
+shader_parameter/shaft_width = 0.00400000018999
+shader_parameter/shaft_intensity = 0.0
+shader_parameter/flicker_amount = 0.08
+shader_parameter/flicker_speed = 2.3
+
 [sub_resource type="ShaderMaterial" id="RooftopMoonMat"]
 shader = ExtResource("17_moonlight")
 shader_parameter/moon_dir = Vector2(0.6, -0.8)
@@ -116,30 +137,6 @@ shader_parameter/highlight_threshold = 0.0
 shader_parameter/highlight_softness = 0.4
 shader_parameter/moon_tint = Color(0.78, 0.88, 1, 1)
 shader_parameter/tint_strength = 0.6
-
-[sub_resource type="ShaderMaterial" id="RfMat1"]
-shader = ExtResource("20_boxblur")
-shader_parameter/blur_amount = 1.50000007125
-shader_parameter/silhouette = 0.2150000102125
-shader_parameter/brightness = 1.0
-
-[sub_resource type="ShaderMaterial" id="RfMat2"]
-shader = ExtResource("20_boxblur")
-shader_parameter/blur_amount = 1.50000007125
-shader_parameter/silhouette = 0.2150000102125
-shader_parameter/brightness = 1.0
-
-[sub_resource type="ShaderMaterial" id="RfMat3"]
-shader = ExtResource("20_boxblur")
-shader_parameter/blur_amount = 1.50000007125
-shader_parameter/silhouette = 0.2150000102125
-shader_parameter/brightness = 1.0
-
-[sub_resource type="ShaderMaterial" id="RfMat4"]
-shader = ExtResource("20_boxblur")
-shader_parameter/blur_amount = 1.50000007125
-shader_parameter/silhouette = 0.2150000102125
-shader_parameter/brightness = 1.0
 
 [sub_resource type="Gradient" id="DustDot"]
 offsets = PackedFloat32Array(0, 0.55, 1)
@@ -176,7 +173,7 @@ turbulence_enabled = true
 turbulence_noise_strength = 1.5
 turbulence_noise_scale = 1.0
 
-[node name="Scene1" type="Control" unique_id=1035084574]
+[node name="MenuBackground" type="Control" unique_id=1035084574]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -198,6 +195,7 @@ offset_bottom = 48.0
 grow_horizontal = 2
 grow_vertical = 2
 color = Color(0, 0, 0, 1)
+metadata/_edit_lock_ = true
 
 [node name="Stars" type="ColorRect" parent="." unique_id=2140858299]
 material = SubResource("StarsMat")
@@ -209,6 +207,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 color = Color(0, 0, 0, 0)
+metadata/_edit_lock_ = true
 
 [node name="Meteor" type="ColorRect" parent="." unique_id=1903008001]
 material = SubResource("MeteorMat")
@@ -220,6 +219,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 color = Color(0, 0, 0, 0)
+metadata/_edit_lock_ = true
 
 [node name="MoonHalo" type="ColorRect" parent="." unique_id=1529634319]
 material = SubResource("MoonHaloMat")
@@ -227,6 +227,10 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = -104.04
+offset_top = 86.4
+offset_right = -104.04004
+offset_bottom = 86.400024
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
@@ -234,10 +238,11 @@ color = Color(0, 0, 0, 0)
 
 [node name="Moon" type="TextureRect" parent="." unique_id=1860577512]
 layout_mode = 0
-offset_left = 1085.825
-offset_top = 16.22
-offset_right = 1885.8242
-offset_bottom = 816.2201
+offset_left = 319.51
+offset_top = 359.39
+offset_right = 1119.5099
+offset_bottom = 1159.3901
+scale = Vector2(0.66, 0.66)
 mouse_filter = 2
 texture = ExtResource("5_moon")
 expand_mode = 1
@@ -248,22 +253,23 @@ texture_filter = 2
 material = SubResource("EdgeSoftenMat")
 layout_mode = 0
 offset_left = -1390.545
-offset_top = 285.01
+offset_top = 553.29
 offset_right = 1109.455
-offset_bottom = 885.01
+offset_bottom = 1153.2891
 mouse_filter = 2
 texture = ExtResource("12_mtntex")
 expand_mode = 1
+metadata/_edit_lock_ = true
 
 [node name="Mountain_right" type="TextureRect" parent="." unique_id=2101690780]
 self_modulate = Color(0.58, 0.65, 0.88, 1)
 texture_filter = 2
 material = SubResource("EdgeSoftenMat")
 layout_mode = 0
-offset_left = 1097.95
-offset_top = 416.675
-offset_right = 2697.9487
-offset_bottom = 836.6752
+offset_left = 1054.0
+offset_top = 707.0
+offset_right = 2653.9988
+offset_bottom = 1127.0002
 mouse_filter = 2
 texture = ExtResource("12_mtntex")
 expand_mode = 1
@@ -279,6 +285,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 color = Color(0, 0, 0, 0)
+metadata/_edit_lock_ = true
 
 [node name="HorizonHaze" type="ColorRect" parent="." unique_id=1841776131]
 material = SubResource("HazeMat")
@@ -290,8 +297,39 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 color = Color(0, 0, 0, 0)
+metadata/_edit_lock_ = true
+
+[node name="Tower" type="TextureRect" parent="." unique_id=299192421]
+visible = false
+self_modulate = Color(1, 0.82, 0.55, 1)
+texture_filter = 2
+material = SubResource("TowerSoftenMat")
+layout_mode = 0
+offset_left = 233.0
+offset_top = 406.0
+offset_right = 562.99976
+offset_bottom = 758.0
+mouse_filter = 2
+texture = ExtResource("18_tower")
+expand_mode = 1
+metadata/parallax_factor = 0.8
+metadata/_edit_lock_ = true
+
+[node name="TowerWindows" type="ColorRect" parent="." unique_id=1196873822]
+visible = false
+material = SubResource("WindowLightMat")
+layout_mode = 0
+offset_left = 261.75
+offset_top = 440.845
+offset_right = 591.74976
+offset_bottom = 792.845
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+metadata/parallax_factor = 0.8
+metadata/_edit_lock_ = true
 
 [node name="RooftopL" type="TextureRect" parent="." unique_id=111504973]
+visible = false
 self_modulate = Color(0.4, 0.46, 0.6, 1)
 texture_filter = 2
 layout_mode = 0
@@ -304,8 +342,10 @@ texture = ExtResource("14_front2")
 expand_mode = 1
 flip_h = true
 metadata/parallax_factor = 0.85
+metadata/_edit_lock_ = true
 
 [node name="RooftopR" type="TextureRect" parent="." unique_id=50263200]
+visible = false
 self_modulate = Color(0.4, 0.46, 0.6, 1)
 texture_filter = 2
 layout_mode = 0
@@ -317,72 +357,25 @@ mouse_filter = 2
 texture = ExtResource("13_front1")
 expand_mode = 1
 metadata/parallax_factor = 0.85
+metadata/_edit_lock_ = true
 
 [node name="Rooftop" type="TextureRect" parent="." unique_id=2002299607]
 material = SubResource("RooftopMoonMat")
 layout_mode = 0
-offset_left = -383.0
+offset_left = -1400.0
 offset_top = 520.0
-offset_right = 2317.0
+offset_right = 1300.0
 offset_bottom = 1319.9995
 texture = ExtResource("2_roof")
 expand_mode = 1
 metadata/parallax_factor = 1.0
-
-[node name="closeRf1" type="TextureRect" parent="." unique_id=1278310740]
-self_modulate = Color(0.34, 0.4, 0.52, 1)
-material = SubResource("RfMat1")
-layout_mode = 0
-offset_left = -246.0
-offset_top = 803.0
-offset_right = 2454.0
-offset_bottom = 1602.9995
-texture = ExtResource("2_roof")
-expand_mode = 1
-metadata/parallax_factor = 1.4
 metadata/_edit_lock_ = true
 
-[node name="closeRf2" type="TextureRect" parent="." unique_id=2070914387]
-self_modulate = Color(0.34, 0.4, 0.52, 1)
-material = SubResource("RfMat2")
-layout_mode = 0
-offset_left = -1704.0
-offset_top = 804.0
-offset_right = 950.91504
-offset_bottom = 1603.9995
-texture = ExtResource("2_roof")
-expand_mode = 1
-metadata/parallax_factor = 1.4
-
-[node name="closeRf3" type="TextureRect" parent="." unique_id=1825121946]
-self_modulate = Color(0.34, 0.4, 0.52, 1)
-material = SubResource("RfMat3")
-layout_mode = 0
-offset_left = 239.0
-offset_top = 867.0
-offset_right = 2939.0
-offset_bottom = 1666.9995
-texture = ExtResource("2_roof")
-expand_mode = 1
-metadata/parallax_factor = 1.4
-
-[node name="closeRf4" type="TextureRect" parent="." unique_id=387504312]
-self_modulate = Color(0.34, 0.4, 0.52, 1)
-material = SubResource("RfMat4")
-layout_mode = 0
-offset_left = 782.0
-offset_top = 719.0
-offset_right = 3482.0
-offset_bottom = 1519.0004
-texture = ExtResource("2_roof")
-expand_mode = 1
-flip_h = true
-metadata/parallax_factor = 1.4
-
 [node name="MoonDust" type="GPUParticles2D" parent="." unique_id=171542226]
-position = Vector2(1140, 480)
+position = Vector2(690, 580)
 amount = 12
 texture = SubResource("DustTex")
 lifetime = 9.0
 preprocess = 6.0
 process_material = SubResource("MoonDustMat")
+metadata/_edit_lock_ = true

@@ -1,0 +1,43 @@
+[gd_scene format=3 uid="uid://bforedustcmp"]
+
+[sub_resource type="Gradient" id="DustDot"]
+offsets = PackedFloat32Array(0, 0.55, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0.8, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture2D" id="DustTex"]
+gradient = SubResource("DustDot")
+width = 8
+height = 8
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[sub_resource type="Gradient" id="DustLife"]
+offsets = PackedFloat32Array(0, 0.2, 0.8, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="DustRamp"]
+gradient = SubResource("DustLife")
+
+[sub_resource type="ParticleProcessMaterial" id="ForeDustMat"]
+emission_shape = 3
+emission_box_extents = Vector3(980, 560, 1)
+direction = Vector3(0, 1, 0)
+initial_velocity_min = 6.0
+initial_velocity_max = 16.0
+gravity = Vector3(0, 8, 0)
+scale_min = 0.3
+scale_max = 0.75
+color = Color(0.78, 0.85, 1, 0.5)
+color_ramp = SubResource("DustRamp")
+turbulence_enabled = true
+turbulence_noise_strength = 2.0
+turbulence_noise_scale = 1.2
+
+[node name="ForeDust" type="GPUParticles2D"]
+position = Vector2(960, 540)
+amount = 64
+texture = SubResource("DustTex")
+lifetime = 11.0
+preprocess = 8.0
+process_material = SubResource("ForeDustMat")

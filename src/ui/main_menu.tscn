@@ -1,0 +1,262 @@
+[gd_scene format=3 uid="uid://c30gewh5owlck"]
+
+[ext_resource type="Script" uid="uid://hq4i5dkrj42d" path="res://src/ui/main_menu.gd" id="1_menu"]
+[ext_resource type="PackedScene" uid="uid://ddiu7ck5le8p3" path="res://src/ui/scenes/menu_background.tscn" id="2_bg"]
+[ext_resource type="PackedScene" uid="uid://ccx2qeqk5rvx5" path="res://src/ui/components/character_display.tscn" id="3_char"]
+[ext_resource type="PackedScene" uid="uid://bforedustcmp" path="res://src/ui/components/fore_dust.tscn" id="4_foredust"]
+[ext_resource type="Texture2D" uid="uid://d2elpwcm7vwqa" path="res://assets/ui/newAssets/longTab.png" id="5_long"]
+[ext_resource type="Texture2D" uid="uid://dvy2idovern52" path="res://assets/ui/newAssets/midTab.png" id="6_mid"]
+[ext_resource type="Texture2D" uid="uid://cxmfnlkqnveeu" path="res://assets/ui/newAssets/orangeButton.png" id="7_orange"]
+
+[sub_resource type="StyleBoxFlat" id="BtnNormal"]
+bg_color = Color(0.13, 0.14, 0.22, 0.82)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.34, 0.4, 0.62, 0.85)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="BtnHover"]
+bg_color = Color(0.2, 0.22, 0.34, 0.9)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.5, 0.6, 0.9, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="Theme" id="MenuTheme"]
+Button/styles/focus = SubResource("BtnNormal")
+Button/styles/hover = SubResource("BtnHover")
+Button/styles/normal = SubResource("BtnNormal")
+Button/styles/pressed = SubResource("BtnHover")
+
+[sub_resource type="StyleBoxTexture" id="SbLong"]
+texture = ExtResource("5_long")
+texture_margin_left = 16.0
+texture_margin_top = 16.0
+texture_margin_right = 16.0
+texture_margin_bottom = 16.0
+
+[sub_resource type="StyleBoxTexture" id="SbLongHover"]
+texture = ExtResource("5_long")
+texture_margin_left = 16.0
+texture_margin_top = 16.0
+texture_margin_right = 16.0
+texture_margin_bottom = 16.0
+modulate_color = Color(1.2, 1.2, 1.2, 1)
+
+[sub_resource type="StyleBoxTexture" id="SbMid"]
+texture = ExtResource("6_mid")
+texture_margin_left = 14.0
+texture_margin_top = 14.0
+texture_margin_right = 14.0
+texture_margin_bottom = 14.0
+
+[sub_resource type="StyleBoxTexture" id="SbMidHover"]
+texture = ExtResource("6_mid")
+texture_margin_left = 14.0
+texture_margin_top = 14.0
+texture_margin_right = 14.0
+texture_margin_bottom = 14.0
+modulate_color = Color(1.2, 1.2, 1.2, 1)
+
+[sub_resource type="StyleBoxTexture" id="SbOrange"]
+texture = ExtResource("7_orange")
+texture_margin_left = 11.0
+texture_margin_top = 11.0
+texture_margin_right = 11.0
+texture_margin_bottom = 11.0
+
+[sub_resource type="StyleBoxTexture" id="SbOrangeHover"]
+texture = ExtResource("7_orange")
+texture_margin_left = 11.0
+texture_margin_top = 11.0
+texture_margin_right = 11.0
+texture_margin_bottom = 11.0
+modulate_color = Color(1.2, 1.2, 1.2, 1)
+
+[sub_resource type="Gradient" id="ShadowGradient"]
+offsets = PackedFloat32Array(0, 0.95913464, 0.99759614, 1)
+colors = PackedColorArray(0, 0, 0, 0.6, 0, 0, 0, 0.024519205, 0, 0, 0, 0.07932693, 0, 0, 0, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_ljhhu"]
+gradient = SubResource("ShadowGradient")
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[node name="MainMenu" type="Control" unique_id=1380324739]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_menu")
+
+[node name="Background" parent="." unique_id=1648253891 instance=ExtResource("2_bg")]
+layout_mode = 1
+mouse_filter = 2
+pointer_parallax = true
+demo_click_shake = false
+metadata/_edit_lock_ = true
+
+[node name="CharacterDisplay" parent="." unique_id=254844239 instance=ExtResource("3_char")]
+layout_mode = 0
+offset_left = 352.0
+offset_top = 491.0
+offset_right = 852.0
+offset_bottom = 991.0
+sprite_frames_path = "res://assets/sprites/heroes/h10/h10_idle.tres"
+
+[node name="ForeDust" parent="." unique_id=385473930 instance=ExtResource("4_foredust")]
+metadata/_edit_lock_ = true
+
+[node name="UI" type="Control" parent="." unique_id=980088302]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme = SubResource("MenuTheme")
+metadata/_edit_lock_ = true
+
+[node name="ProfileButton" type="Button" parent="UI" unique_id=1412246042]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = 384.0
+offset_bottom = 128.0
+theme_override_styles/normal = SubResource("SbLong")
+theme_override_styles/pressed = SubResource("SbLongHover")
+theme_override_styles/hover = SubResource("SbLongHover")
+theme_override_styles/focus = SubResource("SbLong")
+text = "个人资料"
+
+[node name="SettingsButton" type="Button" parent="UI" unique_id=1134874206]
+layout_mode = 0
+offset_left = 1736.0
+offset_top = 24.0
+offset_right = 1896.0
+offset_bottom = 128.0
+theme_override_styles/normal = SubResource("SbMid")
+theme_override_styles/pressed = SubResource("SbMidHover")
+theme_override_styles/hover = SubResource("SbMidHover")
+theme_override_styles/focus = SubResource("SbMid")
+text = "设置"
+
+[node name="TowerButton" type="Button" parent="UI" unique_id=259911884]
+layout_mode = 0
+offset_left = 1147.0
+offset_top = 188.0
+offset_right = 1887.0
+offset_bottom = 388.0
+theme_override_styles/normal = SubResource("SbLong")
+theme_override_styles/pressed = SubResource("SbLongHover")
+theme_override_styles/hover = SubResource("SbLongHover")
+theme_override_styles/focus = SubResource("SbLong")
+text = "爬塔模式"
+
+[node name="StoryButton" type="Button" parent="UI" unique_id=1942689673]
+layout_mode = 0
+offset_left = 1147.0
+offset_top = 417.415
+offset_right = 1887.0
+offset_bottom = 617.41516
+theme_override_styles/normal = SubResource("SbLong")
+theme_override_styles/pressed = SubResource("SbLongHover")
+theme_override_styles/hover = SubResource("SbLongHover")
+theme_override_styles/focus = SubResource("SbLong")
+text = "故事模式"
+
+[node name="MatchButton" type="Button" parent="UI" unique_id=27347961]
+layout_mode = 0
+offset_left = 1134.0
+offset_top = 764.0
+offset_right = 1874.0
+offset_bottom = 1024.0
+theme_override_styles/normal = SubResource("SbOrange")
+theme_override_styles/pressed = SubResource("SbOrangeHover")
+theme_override_styles/hover = SubResource("SbOrangeHover")
+theme_override_styles/focus = SubResource("SbOrange")
+text = "匹配对战"
+
+[node name="NavHeroes" type="Button" parent="UI" unique_id=269698226]
+layout_mode = 0
+offset_left = 51.0
+offset_top = 933.0
+offset_right = 251.0
+offset_bottom = 1033.0
+theme_override_styles/normal = SubResource("SbMid")
+theme_override_styles/pressed = SubResource("SbMidHover")
+theme_override_styles/hover = SubResource("SbMidHover")
+theme_override_styles/focus = SubResource("SbMid")
+text = "英雄"
+
+[node name="NavSquad" type="Button" parent="UI" unique_id=277022598]
+layout_mode = 0
+offset_left = 281.0
+offset_top = 933.0
+offset_right = 481.0
+offset_bottom = 1033.0
+theme_override_styles/normal = SubResource("SbMid")
+theme_override_styles/pressed = SubResource("SbMidHover")
+theme_override_styles/hover = SubResource("SbMidHover")
+theme_override_styles/focus = SubResource("SbMid")
+text = "小队"
+
+[node name="NavItems" type="Button" parent="UI" unique_id=1172473453]
+layout_mode = 0
+offset_left = 511.0
+offset_top = 933.0
+offset_right = 711.0
+offset_bottom = 1033.0
+theme_override_styles/normal = SubResource("SbMid")
+theme_override_styles/pressed = SubResource("SbMidHover")
+theme_override_styles/hover = SubResource("SbMidHover")
+theme_override_styles/focus = SubResource("SbMid")
+text = "道具"
+
+[node name="NavShop" type="Button" parent="UI" unique_id=1969062780]
+layout_mode = 0
+offset_left = 741.0
+offset_top = 933.0
+offset_right = 941.0
+offset_bottom = 1033.0
+theme_override_styles/normal = SubResource("SbMid")
+theme_override_styles/pressed = SubResource("SbMidHover")
+theme_override_styles/hover = SubResource("SbMidHover")
+theme_override_styles/focus = SubResource("SbMid")
+text = "商店"
+
+[node name="ComingSoon" type="Label" parent="UI" unique_id=1322435827]
+layout_mode = 0
+offset_left = 560.0
+offset_top = 470.0
+offset_right = 1360.0
+offset_bottom = 560.0
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="P2Shadow" type="TextureRect" parent="." unique_id=269976416]
+texture_filter = 2
+layout_mode = 0
+offset_left = 351.745
+offset_top = 717.0
+offset_right = 601.74536
+offset_bottom = 817.0
+rotation = -0.35
+pivot_offset = Vector2(160, 35)
+mouse_filter = 2
+texture = SubResource("GradientTexture2D_ljhhu")
+expand_mode = 1

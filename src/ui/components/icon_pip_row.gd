@@ -1,0 +1,298 @@
+@tool
+class_name IconPipRow
+extends Control
+
+## 横排"图标点"组件：用一张逐帧精灵图(spritesheet)画一排图标点。
+## 战斗 HUD 的血量(心形)与能量(金币)用它显示，替换旧 ArcHealthBar / EnergyBar。
+##
+## **idle 行为**：每个图标点平时停在第 0 帧（静止），**偶尔**才播一次完整动画
+## （心跳一下 / 金币转一圈），间隔随机、每个点错峰 → 活而不呆，绝非持续 loop。
+##
+## 美术换素材：在 Inspector 换 sheet + 改 hframes/vframes/fps 即可，无需改代码。
+##
+## 取值（半点制小数 OK）：
+##  - 血量：set_value(hp, max_hp, shield)。allow_half=true 末尾半血裁半颗；show_empty=true
+##    身后用暗色空心补到 max_hp（空心不跳动）；shield 作青色"额外心"追加。
+##  - 能量：set_value(energy, energy)。allow_half=false / show_empty=false → 画 energy 枚金币。
+##  - 纯图标：set_value(1, 1) → 画 1 个图标（待选英雄头像下的心形标记用）。
+##
+## 排布：从节点原点(0,0)起横排；right_to_left=true 时从原点往**左**排（P2 对手镜像，
+## 此时把节点 offset_left 摆在"右锚点"）。per_row_cap>0 时超出换行。
+
+@export_group("精灵图")
+@export var sheet: Texture2D:
+	set(v):
+		sheet = v
+		queue_redraw()
+## 横向帧数（heart_idle=4，energy_idle=4）。
+@export var hframes: int = 1:
+	set(v):
+		hframes = maxi(v, 1)
+		queue_redraw()
+## 纵向帧数（heart_idle=1，energy_idle=4）。
+@export var vframes: int = 1:
+	set(v):
+		vframes = maxi(v, 1)
+		queue_redraw()
+## 播放一次动画时的速度（帧/秒）。
+@export var fps: float = 8.0
+
+@export_group("idle 节奏")
+## 两次播放之间的静止时长（秒）下限，每个点在 [min,max] 间随机取。
+@export var idle_rest_min: float = 2.5
+## 两次播放之间的静止时长（秒）上限。
+@export var idle_rest_max: float = 6.0
+
+@export_group("波纹律动")
+## 开启=按索引依次跳动的"波"(血条用)；关闭=随机偶发(金币/标记用，默认)。
+## 绘制方向天然镜像：左侧(LTR)从左到右、右侧(right_to_left)从右到左。
+@export var wave_idle: bool = false
+## 波纹相邻图标点起跳间隔(秒)，越小波传播越快。
+@export var wave_stagger: float = 0.12
+
+@export_group("排布")
+## 单个图标点的绘制边长（物理像素，正方形）。
+@export var pip_size: float = 26.0:
+	set(v):
+		pip_size = v
+		queue_redraw()
+## 相邻图标点间距（像素）。
+@export var spacing: float = 3.0:
+	set(v):
+		spacing = v
+		queue_redraw()
+## 从右往左排（P2 对手镜像用；节点 offset_left 摆右锚点）。
+@export var right_to_left: bool = false:
+	set(v):
+		right_to_left = v
+		queue_redraw()
+## 每行最多几个，超出换行；0 = 不换行。
+@export var per_row_cap: int = 0:
+	set(v):
+		per_row_cap = maxi(v, 0)
+		queue_redraw()
+## 换行时的行间距（像素）。
+@export var row_spacing: float = 6.0:
+	set(v):
+		row_spacing = v
+		queue_redraw()
+
+@export_group("满/空/半")
+## 是否在当前值之后用暗色空心补到 max（血量 true；能量 false）。
+@export var show_empty: bool = true:
+	set(v):
+		show_empty = v
+		queue_redraw()
+## 是否支持半颗（血量半点制 true；能量整数 false）。
+@export var allow_half: bool = true:
+	set(v):
+		allow_half = v
+		queue_redraw()
+## 满图标点色调（默认白=原图色）。
+@export var full_modulate: Color = Color.WHITE:
+	set(v):
+		full_modulate = v
+		queue_redraw()
+## 空心占位色调（暗）。
+@export var empty_modulate: Color = Color(0.16, 0.14, 0.2, 0.8):
+	set(v):
+		empty_modulate = v
+		queue_redraw()
+## 额外段（护盾）色调（青）。
+@export var extra_modulate: Color = Color(0.42, 0.78, 1.0, 1.0):
+	set(v):
+		extra_modulate = v
+		queue_redraw()
+
+@export_group("编辑器预览")
+## @tool 下无数据时用这组值预览，便于可视化摆位；运行时被实际值覆盖。
+@export var preview_cur: float = 4.5:
+	set(v):
+		preview_cur = v
+		queue_redraw()
+@export var preview_max: float = 6.0:
+	set(v):
+		preview_max = v
+		queue_redraw()
+@export var preview_extra: float = 0.0:
+	set(v):
+		preview_extra = v
+		queue_redraw()
+
+var _cur: float = 0.0
+var _max: float = 0.0
+var _extra: float = 0.0
+
+# 每个图标点独立的 idle 状态（错峰、偶发播放）。索引 = 槽位。
+var _phase: PackedFloat32Array = PackedFloat32Array()   # 当前段已过时间
+var _dwell: PackedFloat32Array = PackedFloat32Array()   # 本次静止时长（到点后播一遍）
+var _playing: PackedByteArray = PackedByteArray()       # 0=静止 1=播放中
+var _pip_frame: PackedInt32Array = PackedInt32Array()   # 当前帧
+var _slot_count: int = 0                                # 当前绘制的图标点数
+var _wave_time: float = 0.0                             # 波纹律动累计时间
+
+
+func _ready() -> void:
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	set_process(true)
+
+
+func _process(delta: float) -> void:
+	if Engine.is_editor_hint():
+		return                                  # 编辑器里静止显示第 0 帧，避免无谓重绘
+	var total := hframes * vframes
+	if total <= 1 or fps <= 0.0 or _slot_count <= 0:
+		return
+	_ensure_slots(_slot_count)
+	if wave_idle:
+		_process_wave(delta, total)
+	else:
+		_process_random(delta, total)
+
+
+## 波纹律动：一道波沿索引(0→N)依次点亮 → 停顿(idle_rest_min) → 循环。
+## 索引顺序天然给出 左血条"左→右"、右血条(right_to_left)"右→左"。
+func _process_wave(delta: float, total: int) -> void:
+	_wave_time += delta
+	var anim_dur := float(total) / fps
+	var cycle := maxf(float(_slot_count - 1) * wave_stagger + anim_dur + maxf(idle_rest_min, 0.1), 0.1)
+	var cyc := fmod(_wave_time, cycle)
+	var changed := false
+	for i in range(_slot_count):
+		var local := cyc - float(i) * wave_stagger
+		var nf := 0
+		if local >= 0.0 and local < anim_dur:
+			nf = int(local * fps)
+			if nf >= total:
+				nf = 0
+		if _pip_frame[i] != nf:
+			_pip_frame[i] = nf
+			changed = true
+	if changed:
+		queue_redraw()
+
+
+## 随机偶发：每个点平时停第 0 帧，间隔随机各自播一遍(金币/标记用)。
+func _process_random(delta: float, total: int) -> void:
+	var changed := false
+	for i in range(_slot_count):
+		_phase[i] += delta
+		var nf := 0
+		if _playing[i] == 0:
+			if _phase[i] >= _dwell[i]:           # 静止到点 → 开播
+				_playing[i] = 1
+				_phase[i] = 0.0
+		else:
+			var f := int(_phase[i] * fps)
+			if f >= total:                       # 播完一遍 → 回静止，抽新的静止时长
+				_playing[i] = 0
+				_phase[i] = 0.0
+				_dwell[i] = _rand_dwell()
+			else:
+				nf = f
+		if _pip_frame[i] != nf:
+			_pip_frame[i] = nf
+			changed = true
+	if changed:
+		queue_redraw()
+
+
+## 设置显示值（半点制小数）。能量用 set_value(e, e)；纯图标用 set_value(1, 1)。
+func set_value(cur: float, max_val: float, extra: float = 0.0) -> void:
+	_cur = maxf(cur, 0.0)
+	_max = maxf(max_val, 0.0)
+	_extra = maxf(extra, 0.0)
+	queue_redraw()
+
+
+func _rand_dwell() -> float:
+	return randf_range(idle_rest_min, maxf(idle_rest_max, idle_rest_min))
+
+
+## 扩容每点状态数组，新点给随机初相位（错峰）+ 随机静止时长。
+func _ensure_slots(n: int) -> void:
+	while _phase.size() < n:
+		var dw := _rand_dwell()
+		_dwell.append(dw)
+		_phase.append(randf() * dw if not Engine.is_editor_hint() else 0.0)
+		_playing.append(0)
+		_pip_frame.append(0)
+
+
+func _draw() -> void:
+	var cur := _cur
+	var maxv := _max
+	var extra := _extra
+	if Engine.is_editor_hint() and maxv <= 0.0 and cur <= 0.0:   # 编辑器无数据 → 预览值
+		cur = preview_cur
+		maxv = preview_max
+		extra = preview_extra
+	if sheet == null:
+		return
+
+	var full_n := int(floor(cur + 0.0001))
+	var has_half := allow_half and (cur - float(full_n)) >= 0.49
+	var filled := full_n + (1 if has_half else 0)
+	var empties := 0
+	if show_empty:
+		empties = maxi(int(ceil(maxv - 0.0001)) - filled, 0)
+
+	var extra_full := int(floor(extra + 0.0001))
+	var extra_half := allow_half and (extra - float(extra_full)) >= 0.49
+
+	# 估算总点数 → 同步 idle 状态数组（空心不跳，但仍占槽位以对齐索引）
+	_slot_count = filled + empties + extra_full + (1 if extra_half else 0)
+	_ensure_slots(_slot_count)
+
+	var slot := 0
+	for _i in range(full_n):                 # 满
+		_draw_pip(slot, 1.0, full_modulate, true)
+		slot += 1
+	if has_half:                             # 半
+		_draw_pip(slot, 0.5, full_modulate, true)
+		slot += 1
+	for _i in range(empties):                # 暗色空心占位（不跳动）
+		_draw_pip(slot, 1.0, empty_modulate, false)
+		slot += 1
+	for _i in range(extra_full):             # 护盾满
+		_draw_pip(slot, 1.0, extra_modulate, true)
+		slot += 1
+	if extra_half:                           # 护盾半
+		_draw_pip(slot, 0.5, extra_modulate, true)
+		slot += 1
+
+
+## 画第 index 个图标点。fill<1 = 半颗（裁靠内一侧）；animate=false 强制第 0 帧（空心用）。
+func _draw_pip(index: int, fill: float, mod: Color, animate: bool) -> void:
+	var step := pip_size + spacing
+	var col := index
+	var row := 0
+	if per_row_cap > 0:
+		col = index % per_row_cap
+		row = index / per_row_cap
+	var x := col * step
+	if right_to_left:
+		x = -step * float(col + 1) + spacing   # 从右锚点往左排
+	var y := row * (pip_size + row_spacing)
+
+	var frame := 0
+	if animate and index < _pip_frame.size():
+		frame = _pip_frame[index]
+	var fw := sheet.get_width() / hframes
+	var fh := sheet.get_height() / vframes
+	var fcol := frame % hframes
+	var frow := frame / hframes
+	var src := Rect2(fcol * fw, frow * fh, fw, fh)
+	var dst := Rect2(x, y, pip_size, pip_size)
+	if fill < 0.999:
+		# 半颗：裁靠"内侧/满侧"的半边（LTR 留左半，RTL 留右半）
+		if right_to_left:
+			src.position.x += fw * 0.5
+			src.size.x *= 0.5
+			dst.position.x += pip_size * 0.5
+			dst.size.x *= 0.5
+		else:
+			src.size.x *= 0.5
+			dst.size.x *= 0.5
+	draw_texture_rect_region(sheet, dst, src, mod)

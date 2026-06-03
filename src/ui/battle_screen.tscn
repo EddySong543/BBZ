@@ -3,13 +3,16 @@
 [ext_resource type="Script" uid="uid://uwkgowbdtjd7" path="res://src/ui/battle_screen.gd" id="1_battle_gd"]
 [ext_resource type="PackedScene" uid="uid://ccx2qeqk5rvx5" path="res://src/ui/components/character_display.tscn" id="2_char_display"]
 [ext_resource type="PackedScene" uid="uid://b6i5h2alff53a" path="res://src/ui/components/hero_frame.tscn" id="3_hero_frame"]
-[ext_resource type="PackedScene" path="res://src/ui/components/energy_bar.tscn" id="4_energy"]
+[ext_resource type="PackedScene" uid="uid://b1iconpiprow0" path="res://src/ui/components/icon_pip_row.tscn" id="4_piprow"]
 [ext_resource type="PackedScene" path="res://src/ui/components/death_switch_overlay.tscn" id="6_death"]
 [ext_resource type="PackedScene" uid="uid://cscn1rftp00a" path="res://src/ui/scenes/scene1.tscn" id="7_stage"]
 [ext_resource type="Shader" uid="uid://dnycv6j3wn0ot" path="res://assets/shaders/post_fx_color_grade.gdshader" id="8_postfx"]
 [ext_resource type="Shader" uid="uid://cldul26ik2rgm" path="res://assets/shaders/canvas_post_godray.gdshader" id="9_godray"]
 [ext_resource type="Texture2D" uid="uid://xcqh16w8t4ia" path="res://assets/scenes/NewAssets/scene1_leaf.png" id="10_leaf"]
-[ext_resource type="Shader" path="res://assets/shaders/canvas_fx_motion_blur.gdshader" id="11_leafblur"]
+[ext_resource type="Shader" uid="uid://hol4eldshbb0" path="res://assets/shaders/canvas_fx_motion_blur.gdshader" id="11_leafblur"]
+[ext_resource type="PackedScene" uid="uid://bforedustcmp" path="res://src/ui/components/fore_dust.tscn" id="12_foredust"]
+[ext_resource type="Texture2D" uid="uid://cq7w4kpww2rkq" path="res://assets/ui/newAssets/heart_idle.png" id="13_heart"]
+[ext_resource type="Texture2D" uid="uid://dmk21cawlx7uf" path="res://assets/ui/newAssets/energy_idle.png" id="14_coin"]
 
 [sub_resource type="Gradient" id="ShadowGradient"]
 offsets = PackedFloat32Array(0, 0.95913464, 0.99759614, 1)
@@ -21,79 +24,20 @@ fill = 1
 fill_from = Vector2(0.5, 0.5)
 fill_to = Vector2(1, 0.5)
 
-[sub_resource type="Gradient" id="DustDot"]
-offsets = PackedFloat32Array(0, 0.55, 1)
-colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0.8, 1, 1, 1, 0)
-
-[sub_resource type="GradientTexture2D" id="DustTex"]
-gradient = SubResource("DustDot")
-width = 8
-height = 8
-fill = 1
-fill_from = Vector2(0.5, 0.5)
-fill_to = Vector2(1, 0.5)
-
-[sub_resource type="Gradient" id="DustLife"]
-offsets = PackedFloat32Array(0, 0.2, 0.8, 1)
-colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
-
-[sub_resource type="GradientTexture1D" id="DustRamp"]
-gradient = SubResource("DustLife")
-
-[sub_resource type="ParticleProcessMaterial" id="ForeDustMat"]
-emission_shape = 3
-emission_box_extents = Vector3(980, 560, 1)
-direction = Vector3(0, 1, 0)
-initial_velocity_min = 6.0
-initial_velocity_max = 16.0
-gravity = Vector3(0, 8, 0)
-scale_min = 0.3
-scale_max = 0.75
-color = Color(0.78, 0.85, 1, 0.5)
-color_ramp = SubResource("DustRamp")
-turbulence_enabled = true
-turbulence_noise_strength = 2.0
-turbulence_noise_scale = 1.2
-
-[sub_resource type="ParticleProcessMaterial" id="LeafMat"]
-emission_shape = 3
-emission_box_extents = Vector3(250, 180, 1)
-direction = Vector3(0.87, 0.49, 0)
-spread = 10.0
-initial_velocity_min = 1900.0
-initial_velocity_max = 2500.0
-angle_min = -180.0
-angle_max = 180.0
-angular_velocity_min = -140.0
-angular_velocity_max = 140.0
-gravity = Vector3(0, 150, 0)
-scale_min = 0.25
-scale_max = 0.5
-color = Color(1, 1, 1, 1)
-turbulence_enabled = true
-turbulence_noise_strength = 8.0
-turbulence_noise_scale = 1.0
-turbulence_influence_min = 0.05
-turbulence_influence_max = 0.15
-
-[sub_resource type="ShaderMaterial" id="LeafBlurMat"]
-shader = ExtResource("11_leafblur")
-shader_parameter/blur_dir = Vector2(0.87, 0.49)
-shader_parameter/blur_amount = 0.06
-
 [sub_resource type="ShaderMaterial" id="GodRayMat"]
 shader = ExtResource("9_godray")
 shader_parameter/light_pos = Vector2(0.774, 0.385)
 shader_parameter/density = 1.00000004424012
 shader_parameter/decay = 0.8880000161009299
 shader_parameter/weight = 0.4
-shader_parameter/exposure = 0.03600000171
-shader_parameter/threshold = 0.72
+shader_parameter/exposure = 0.0230000010925
+shader_parameter/threshold = 0.9250000439375
 shader_parameter/ray_tint = Color(0.6, 0.78, 1, 1)
 
 [sub_resource type="ShaderMaterial" id="PostFXMat"]
 shader = ExtResource("8_postfx")
 shader_parameter/barrel_amount = 0.11100000760156996
+shader_parameter/barrel_edge_margin = 0.15
 shader_parameter/edge_blur_amount = 2.5550001213625
 shader_parameter/edge_blur_start = 0.3330000158175
 shader_parameter/brightness = 1.16000003135
@@ -110,6 +54,31 @@ shader_parameter/vignette_radius = 0.91100004094343
 shader_parameter/vignette_softness = 0.55
 shader_parameter/grain_amount = 0.018
 shader_parameter/grain_scale = 1.6
+
+[sub_resource type="ShaderMaterial" id="LeafBlurMat"]
+shader = ExtResource("11_leafblur")
+shader_parameter/blur_dir = Vector2(0.87, 0.49)
+shader_parameter/blur_amount = 0.06
+
+[sub_resource type="ParticleProcessMaterial" id="LeafMat"]
+emission_shape = 3
+emission_box_extents = Vector3(250, 180, 1)
+angle_min = -180.0
+angle_max = 180.0
+direction = Vector3(0.87, 0.49, 0)
+spread = 10.0
+initial_velocity_min = 1900.0
+initial_velocity_max = 2500.0
+angular_velocity_min = -140.0
+angular_velocity_max = 140.0
+gravity = Vector3(0, 150, 0)
+scale_min = 0.25
+scale_max = 0.5
+turbulence_enabled = true
+turbulence_noise_strength = 8.0
+turbulence_noise_scale = 1.0
+turbulence_influence_min = 0.05
+turbulence_influence_max = 0.15
 
 [sub_resource type="StyleBoxFlat" id="CircleNormal"]
 bg_color = Color(0.164706, 0.164706, 0.290196, 1)
@@ -236,13 +205,11 @@ backlight = 0.125
 light_dir = Vector2(1.6, -1.6)
 warmth_amount = 0.0
 
-[node name="ForeDust" type="GPUParticles2D" parent="." unique_id=844619574]
-position = Vector2(960, 540)
-amount = 64
-texture = SubResource("DustTex")
-lifetime = 11.0
-preprocess = 8.0
-process_material = SubResource("ForeDustMat")
+[node name="ForeDust" parent="." unique_id=844619574 instance=ExtResource("12_foredust")]
+
+[node name="LowerDust" parent="." unique_id=802756316 instance=ExtResource("12_foredust")]
+position = Vector2(960, 900)
+amount = 60
 
 [node name="GodRayGrab" type="BackBufferCopy" parent="." unique_id=2107110591]
 copy_mode = 2
@@ -253,6 +220,10 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = -48.0
+offset_top = -48.0
+offset_right = 48.0
+offset_bottom = 48.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
@@ -267,12 +238,16 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = -48.0
+offset_top = -48.0
+offset_right = 48.0
+offset_bottom = 48.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 color = Color(0, 0, 0, 1)
 
-[node name="FallingLeaves" type="GPUParticles2D" parent="."]
+[node name="FallingLeaves" type="GPUParticles2D" parent="." unique_id=2039469610]
 visible = false
 material = SubResource("LeafBlurMat")
 position = Vector2(150, -80)
@@ -284,39 +259,82 @@ randomness = 1.0
 visibility_rect = Rect2(-2000, -2000, 6000, 5000)
 process_material = SubResource("LeafMat")
 
-[node name="P1Name" type="Label" parent="." unique_id=1021025025]
-layout_mode = 0
-offset_left = 380.0
-offset_top = 422.0
-offset_right = 580.0
-offset_bottom = 448.0
-horizontal_alignment = 1
+[node name="P1HeartRow" parent="." unique_id=140100001 instance=ExtResource("4_piprow")]
+texture_filter = 1
+anchors_preset = 0
+offset_left = 95.2
+offset_top = -24.435
+offset_right = 449.2
+offset_bottom = 21.564985
+sheet = ExtResource("13_heart")
+hframes = 4
+idle_rest_min = 2.0
+idle_rest_max = 5.0
+wave_idle = true
+pip_size = 100.0
+spacing = -50.0
 
-[node name="P2Name" type="Label" parent="." unique_id=2066825246]
-layout_mode = 0
-offset_left = 1340.0
-offset_top = 422.0
-offset_right = 1540.0
-offset_bottom = 448.0
-horizontal_alignment = 1
+[node name="P2HeartRow" parent="." unique_id=140100002 instance=ExtResource("4_piprow")]
+texture_filter = 1
+anchors_preset = 0
+offset_left = 1827.005
+offset_top = -24.68
+offset_right = 2027.005
+offset_bottom = 21.319992
+sheet = ExtResource("13_heart")
+hframes = 4
+idle_rest_min = 2.0
+idle_rest_max = 5.0
+wave_idle = true
+pip_size = 100.0
+spacing = -50.0
+right_to_left = true
 
-[node name="P1HP" type="Label" parent="." unique_id=73731842]
-layout_mode = 0
-offset_left = 410.0
-offset_top = 448.0
-offset_right = 550.0
-offset_bottom = 482.0
-horizontal_alignment = 1
+[node name="P1CoinRow" parent="." unique_id=1966048575 instance=ExtResource("4_piprow")]
+texture_filter = 1
+anchors_preset = 0
+offset_left = 122.985
+offset_top = 47.42
+offset_right = 476.985
+offset_bottom = 89.42003
+sheet = ExtResource("14_coin")
+hframes = 4
+vframes = 4
+fps = 18.0
+idle_rest_min = 4.0
+idle_rest_max = 9.0
+pip_size = 45.0
+spacing = 5.0
+per_row_cap = 10
+row_spacing = -20.0
+show_empty = false
+allow_half = false
+preview_cur = 20.0
 
-[node name="P2HP" type="Label" parent="." unique_id=877393746]
-layout_mode = 0
-offset_left = 1370.0
-offset_top = 448.0
-offset_right = 1510.0
-offset_bottom = 482.0
-horizontal_alignment = 1
+[node name="P2CoinRow" parent="." unique_id=1708577516 instance=ExtResource("4_piprow")]
+texture_filter = 1
+anchors_preset = 0
+offset_left = 1799.74
+offset_top = 47.145
+offset_right = 1999.74
+offset_bottom = 89.14494
+sheet = ExtResource("14_coin")
+hframes = 4
+vframes = 4
+fps = 18.0
+idle_rest_min = 4.0
+idle_rest_max = 9.0
+pip_size = 45.0
+spacing = 4.7
+right_to_left = true
+per_row_cap = 10
+row_spacing = -20.0
+show_empty = false
+allow_half = false
+preview_cur = 20.0
 
 [node name="TurnLabel" type="Label" parent="." unique_id=1408631385]
+visible = false
 layout_mode = 0
 offset_left = 760.0
 offset_top = 4.0
@@ -327,18 +345,20 @@ horizontal_alignment = 1
 [node name="TimerLabel" type="Label" parent="." unique_id=2111037196]
 layout_mode = 0
 offset_left = 760.0
-offset_top = 30.0
+offset_top = 0.0
 offset_right = 1160.0
-offset_bottom = 56.0
+offset_bottom = 92.0
 horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="StatusLabel" type="Label" parent="." unique_id=1445958864]
 layout_mode = 0
 offset_left = 460.0
-offset_top = 280.0
+offset_top = 320.0
 offset_right = 1460.0
-offset_bottom = 316.0
+offset_bottom = 384.0
 horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="EventLabel" type="Label" parent="." unique_id=1759448775]
 visible = false
@@ -353,26 +373,11 @@ horizontal_alignment = 1
 visible = false
 layout_mode = 0
 offset_left = 460.0
-offset_top = 350.0
+offset_top = 318.0
 offset_right = 1460.0
-offset_bottom = 414.0
+offset_bottom = 402.0
 horizontal_alignment = 1
 vertical_alignment = 1
-
-[node name="P1EnergyBar" parent="." unique_id=1969134274 instance=ExtResource("4_energy")]
-anchors_preset = 0
-offset_left = 232.0
-offset_top = 8.0
-offset_right = 632.0
-offset_bottom = 48.0
-
-[node name="P2EnergyBar" parent="." unique_id=249655658 instance=ExtResource("4_energy")]
-anchors_preset = 0
-offset_left = 1288.0
-offset_top = 8.0
-offset_right = 1688.0
-offset_bottom = 48.0
-player = 1
 
 [node name="P1Frame0" parent="." unique_id=2129820687 instance=ExtResource("3_hero_frame")]
 offset_left = 30.0
@@ -397,113 +402,173 @@ offset_bottom = 114.0
 horizontal_alignment = 1
 
 [node name="P1Frame1" parent="." unique_id=1566007647 instance=ExtResource("3_hero_frame")]
-offset_left = 112.0
-offset_top = 20.0
-offset_right = 160.0
-offset_bottom = 68.0
+offset_left = 796.0
+offset_top = 6.0
+offset_right = 864.0
+offset_bottom = 74.0
+
+[node name="P1Frame1Heart" parent="." unique_id=1500000001 instance=ExtResource("4_piprow")]
+texture_filter = 1
+anchors_preset = 0
+offset_left = 800.0
+offset_top = 76.0
+offset_right = 822.0
+offset_bottom = 98.0
+sheet = ExtResource("13_heart")
+hframes = 4
+idle_rest_min = 3.0
+idle_rest_max = 7.0
+pip_size = 22.0
+spacing = 0.0
+show_empty = false
+allow_half = false
 
 [node name="P1Frame1Hp" type="Label" parent="." unique_id=1952929696]
 layout_mode = 0
-offset_left = 112.0
-offset_top = 82.0
-offset_right = 160.0
+offset_left = 824.0
+offset_top = 76.0
+offset_right = 862.0
 offset_bottom = 98.0
-horizontal_alignment = 1
 
 [node name="P1Frame1Shield" type="Label" parent="." unique_id=1568155607]
 layout_mode = 0
-offset_left = 112.0
-offset_top = 100.0
-offset_right = 160.0
-offset_bottom = 114.0
+offset_left = 796.0
+offset_top = 98.0
+offset_right = 864.0
+offset_bottom = 112.0
 horizontal_alignment = 1
 
 [node name="P1Frame2" parent="." unique_id=1208252427 instance=ExtResource("3_hero_frame")]
-offset_left = 170.0
-offset_top = 20.0
-offset_right = 218.0
-offset_bottom = 68.0
+offset_left = 716.0
+offset_top = 6.0
+offset_right = 784.0
+offset_bottom = 74.0
+
+[node name="P1Frame2Heart" parent="." unique_id=1500000002 instance=ExtResource("4_piprow")]
+texture_filter = 1
+anchors_preset = 0
+offset_left = 720.0
+offset_top = 76.0
+offset_right = 742.0
+offset_bottom = 98.0
+sheet = ExtResource("13_heart")
+hframes = 4
+idle_rest_min = 3.0
+idle_rest_max = 7.0
+pip_size = 22.0
+spacing = 0.0
+show_empty = false
+allow_half = false
 
 [node name="P1Frame2Hp" type="Label" parent="." unique_id=1859547373]
 layout_mode = 0
-offset_left = 170.0
-offset_top = 82.0
-offset_right = 218.0
+offset_left = 744.0
+offset_top = 76.0
+offset_right = 782.0
 offset_bottom = 98.0
-horizontal_alignment = 1
 
 [node name="P1Frame2Shield" type="Label" parent="." unique_id=87371090]
 layout_mode = 0
-offset_left = 170.0
-offset_top = 100.0
-offset_right = 218.0
-offset_bottom = 114.0
+offset_left = 716.0
+offset_top = 98.0
+offset_right = 784.0
+offset_bottom = 112.0
 horizontal_alignment = 1
 
 [node name="P2Frame0" parent="." unique_id=1770616061 instance=ExtResource("3_hero_frame")]
-offset_left = 1702.0
+offset_left = 1818.0
 offset_top = 8.0
-offset_right = 1774.0
+offset_right = 1890.0
 offset_bottom = 80.0
 
 [node name="P2Frame0Hp" type="Label" parent="." unique_id=641229813]
 layout_mode = 0
-offset_left = 1702.0
+offset_left = 1818.0
 offset_top = 82.0
-offset_right = 1774.0
+offset_right = 1890.0
 offset_bottom = 98.0
 horizontal_alignment = 1
 
 [node name="P2Frame0Shield" type="Label" parent="." unique_id=1837203129]
 layout_mode = 0
-offset_left = 1702.0
+offset_left = 1818.0
 offset_top = 100.0
-offset_right = 1774.0
+offset_right = 1890.0
 offset_bottom = 114.0
 horizontal_alignment = 1
 
 [node name="P2Frame1" parent="." unique_id=1621653890 instance=ExtResource("3_hero_frame")]
-offset_left = 1784.0
-offset_top = 20.0
-offset_right = 1832.0
-offset_bottom = 68.0
+offset_left = 1056.0
+offset_top = 6.0
+offset_right = 1124.0
+offset_bottom = 74.0
+
+[node name="P2Frame1Heart" parent="." unique_id=1500000003 instance=ExtResource("4_piprow")]
+texture_filter = 1
+anchors_preset = 0
+offset_left = 1060.0
+offset_top = 76.0
+offset_right = 1082.0
+offset_bottom = 98.0
+sheet = ExtResource("13_heart")
+hframes = 4
+idle_rest_min = 3.0
+idle_rest_max = 7.0
+pip_size = 22.0
+spacing = 0.0
+show_empty = false
+allow_half = false
 
 [node name="P2Frame1Hp" type="Label" parent="." unique_id=35987408]
 layout_mode = 0
-offset_left = 1784.0
-offset_top = 82.0
-offset_right = 1832.0
+offset_left = 1084.0
+offset_top = 76.0
+offset_right = 1122.0
 offset_bottom = 98.0
-horizontal_alignment = 1
 
 [node name="P2Frame1Shield" type="Label" parent="." unique_id=1018620117]
 layout_mode = 0
-offset_left = 1784.0
-offset_top = 100.0
-offset_right = 1832.0
-offset_bottom = 114.0
+offset_left = 1056.0
+offset_top = 98.0
+offset_right = 1124.0
+offset_bottom = 112.0
 horizontal_alignment = 1
 
 [node name="P2Frame2" parent="." unique_id=1695379356 instance=ExtResource("3_hero_frame")]
-offset_left = 1842.0
-offset_top = 20.0
-offset_right = 1890.0
-offset_bottom = 68.0
+offset_left = 1136.0
+offset_top = 6.0
+offset_right = 1204.0
+offset_bottom = 74.0
+
+[node name="P2Frame2Heart" parent="." unique_id=1500000004 instance=ExtResource("4_piprow")]
+texture_filter = 1
+anchors_preset = 0
+offset_left = 1140.0
+offset_top = 76.0
+offset_right = 1162.0
+offset_bottom = 98.0
+sheet = ExtResource("13_heart")
+hframes = 4
+idle_rest_min = 3.0
+idle_rest_max = 7.0
+pip_size = 22.0
+spacing = 0.0
+show_empty = false
+allow_half = false
 
 [node name="P2Frame2Hp" type="Label" parent="." unique_id=1691399540]
 layout_mode = 0
-offset_left = 1842.0
-offset_top = 82.0
-offset_right = 1890.0
+offset_left = 1164.0
+offset_top = 76.0
+offset_right = 1202.0
 offset_bottom = 98.0
-horizontal_alignment = 1
 
 [node name="P2Frame2Shield" type="Label" parent="." unique_id=145419997]
 layout_mode = 0
-offset_left = 1842.0
-offset_top = 100.0
-offset_right = 1890.0
-offset_bottom = 114.0
+offset_left = 1136.0
+offset_top = 98.0
+offset_right = 1204.0
+offset_bottom = 112.0
 horizontal_alignment = 1
 
 [node name="Buttons" type="Control" parent="." unique_id=1866875046]

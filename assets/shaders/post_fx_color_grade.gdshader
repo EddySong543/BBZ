@@ -13,6 +13,7 @@ uniform sampler2D screen_tex : hint_screen_texture, filter_linear, repeat_disabl
 
 group_uniforms lens;  // 光学畸变 + 边缘模糊（聚焦中心）
 uniform float barrel_amount : hint_range(-0.3, 0.3) = 0.06;     // 桶形畸变(正=中央外凸鱼眼，负=内凹)
+uniform float barrel_edge_margin : hint_range(0.02, 0.4) = 0.15; // 畸变在四边这么宽内渐隐到0 → 不往屏外采样(消除震动时四角夹边小黑块)
 uniform float edge_blur_amount : hint_range(0.0, 4.0) = 1.2;    // 边缘模糊强度
 uniform float edge_blur_start : hint_range(0.0, 1.0) = 0.45;   // 模糊起始半径(此半径内保持清晰)
 group_uniforms;
@@ -54,17 +55,23 @@ void fragment() {
 	float r2 = dot(cen, cen);
 	float dist = length(cen) * 1.4142;   // 0 中心 → ~1 画角
 
-	// 0) 桶形畸变：按到中心距离向外推采样坐标 → 中央外凸（clamp 防越界灰块）
-	vec2 duv = clamp(SCREEN_UV + cen * r2 * barrel_amount, vec2(0.0), vec2(1.0));
+	// 0) 桶形畸变：按到中心距离向外推采样坐标 → 中央外凸。
+	//    ★ 推移按"离每条边的距离"在四边渐隐到 0(barrel_edge_margin) → duv 不会被推出屏外，
+	//    彻底消除四角"夹边涂抹"(震动时表现为会动的小黑块)；clamp 仅作最终保险。
+	vec2 edge_t = smoothstep(vec2(0.0), vec2(barrel_edge_margin), SCREEN_UV)
+		* smoothstep(vec2(0.0), vec2(barrel_edge_margin), vec2(1.0) - SCREEN_UV);
+	vec2 duv = clamp(SCREEN_UV + cen * r2 * barrel_amount * edge_t, vec2(0.0), vec2(1.0));
 
 	// 1) 边缘径向模糊：离中心越远越糊（中心保持清晰，聚焦）
 	float bw = smoothstep(edge_blur_start, 1.0, dist) * edge_blur_amount;
 	vec2 bpx = SCREEN_PIXEL_SIZE * bw * 2.5;
-	vec3 col = texture(screen_tex, duv).rgb * 0.4;
-	col += texture(screen_tex, duv + vec2(bpx.x, 0.0)).rgb * 0.15;
-	col += texture(screen_tex, duv - vec2(bpx.x, 0.0)).rgb * 0.15;
-	col += texture(screen_tex, duv + vec2(0.0, bpx.y)).rgb * 0.15;
-	col += texture(screen_tex, duv - vec2(0.0, bpx.y)).rgb * 0.15;
+	// 把模糊采样中心收进屏内 bpx → 上下左右 4 个偏移采样都不越界(不再夹到单个暗边缘像素 → 消除残留小黑块)
+	vec2 sdv = clamp(duv, bpx, vec2(1.0) - bpx);
+	vec3 col = texture(screen_tex, sdv).rgb * 0.4;
+	col += texture(screen_tex, sdv + vec2(bpx.x, 0.0)).rgb * 0.15;
+	col += texture(screen_tex, sdv - vec2(bpx.x, 0.0)).rgb * 0.15;
+	col += texture(screen_tex, sdv + vec2(0.0, bpx.y)).rgb * 0.15;
+	col += texture(screen_tex, sdv - vec2(0.0, bpx.y)).rgb * 0.15;
 
 	// 2) 亮度 → 对比(绕 0.5) → 饱和(绕 luma)
 	col *= brightness;

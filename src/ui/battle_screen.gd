@@ -35,10 +35,6 @@ const PLAYER := 0   # 本地玩家固定 P0
 const AI := 1       # 对手 AI
 
 # ---- @onready: battle_screen.tscn 内预置节点（布局保留，路径勿改）----
-@onready var p1_name_label: Label = $P1Name
-@onready var p2_name_label: Label = $P2Name
-@onready var p1_hp_label: Label = $P1HP
-@onready var p2_hp_label: Label = $P2HP
 @onready var turn_label: Label = $TurnLabel
 @onready var timer_label: Label = $TimerLabel
 @onready var status_label: Label = $StatusLabel
@@ -56,6 +52,9 @@ const AI := 1       # 对手 AI
 @onready var p2_frame_hp_labels: Array[Label] = [$P2Frame0Hp, $P2Frame1Hp, $P2Frame2Hp]
 @onready var p1_frame_shield_labels: Array[Label] = [$P1Frame0Shield, $P1Frame1Shield, $P1Frame2Shield]
 @onready var p2_frame_shield_labels: Array[Label] = [$P2Frame0Shield, $P2Frame1Shield, $P2Frame2Shield]
+# 待选英雄头像下的心形标记（美术资产，替代旧 ❤ 文字）。index 0 = 出战位 → null（出战血量看大心条）。
+@onready var p1_frame_heart_icons: Array = [null, $P1Frame1Heart, $P1Frame2Heart]
+@onready var p2_frame_heart_icons: Array = [null, $P2Frame1Heart, $P2Frame2Heart]
 var p1_frame_slots: Array[int] = [-1, -1, -1]
 var p2_frame_slots: Array[int] = [-1, -1, -1]
 
@@ -71,8 +70,11 @@ var p2_frame_slots: Array[int] = [-1, -1, -1]
 @onready var btn_special: Button = $Buttons/BtnSpecial
 @onready var btn_confirm: Button = $Buttons/BtnConfirm
 
-@onready var p1_energy_bar: EnergyBar = $P1EnergyBar
-@onready var p2_energy_bar: EnergyBar = $P2EnergyBar
+# 新美术 HUD：心形血珠 + 金币能量点（替换旧 EnergyBar / ArcHealthBar）。
+@onready var p1_heart_row: IconPipRow = $P1HeartRow
+@onready var p2_heart_row: IconPipRow = $P2HeartRow
+@onready var p1_coin_row: IconPipRow = $P1CoinRow
+@onready var p2_coin_row: IconPipRow = $P2CoinRow
 
 # ---- 选择 / 样式 ----
 var action_btn_list: Array[Button] = []
@@ -179,25 +181,15 @@ func _init_buttons() -> void:
 
 	action_btn_list = [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend, btn_special]
 
-	FontManager.apply(turn_label, 24)
+	FontManager.apply(turn_label, 22)
 	turn_label.add_theme_color_override("font_color", Color.WHITE)
-	FontManager.apply(timer_label, 20)
-	timer_label.add_theme_color_override("font_color", Color("#aaccee"))
-	FontManager.apply(status_label, 26)
+	FontManager.apply(timer_label, 80)
+	timer_label.add_theme_color_override("font_color", Color.WHITE)
+	FontManager.apply(status_label, 44)
 	status_label.add_theme_color_override("font_color", Color.WHITE)
-	FontManager.apply(event_label, 22)
-	event_label.add_theme_color_override("font_color", Color.WHITE)
-	FontManager.apply(big_turn_label, 48)
-	big_turn_label.add_theme_color_override("font_color", Color("#f5c518"))
-	FontManager.apply(p1_name_label, 20)
-	p1_name_label.add_theme_color_override("font_color", Color.WHITE)
-	FontManager.apply(p2_name_label, 20)
-	p2_name_label.add_theme_color_override("font_color", Color.WHITE)
-	FontManager.apply(p1_hp_label, 28)
-	p1_hp_label.add_theme_color_override("font_color", Color("#ff6666"))
-	FontManager.apply(p2_hp_label, 28)
-	p2_hp_label.add_theme_color_override("font_color", Color("#ff6666"))
-
+	FontManager.apply(big_turn_label, 44)
+	big_turn_label.add_theme_color_override("font_color", Color.WHITE)
+	event_label.visible = false
 	for lbl in p1_frame_hp_labels + p2_frame_hp_labels:
 		FontManager.apply(lbl, 13)
 		lbl.add_theme_color_override("font_color", Color("#ff6666"))
@@ -258,8 +250,7 @@ func _on_timer_tick() -> void:
 
 
 func _update_timer_label() -> void:
-	timer_label.text = "⏱ %d" % maxi(timer_seconds, 0)
-	timer_label.add_theme_color_override("font_color", Color("#ff6666") if timer_seconds <= 5 else Color("#aaccee"))
+	timer_label.text = "%d" % maxi(timer_seconds, 0)
 
 
 func _on_circle_pressed(action: int, btn: Button) -> void:
@@ -327,6 +318,7 @@ func _resolve() -> void:
 	state = State.RESOLVING
 	_set_buttons_active(false)
 	timer_label.text = ""
+	status_label.visible = false
 
 	var a0_before: int = battle.active_index[0]
 	var a1_before: int = battle.active_index[1]
@@ -342,14 +334,24 @@ func _resolve() -> void:
 		if ev.get("id", "") == "damage_taken":
 			dmg[int(ev.get("player", 0))] += int(ev.get("amount", 0))
 
+	# 头顶招式圆圈（揭示双方盲选出招）→ 消失 → 再播打斗动画
+	await _show_action_indicators(r.get("p1_action", -1), r.get("p2_action", -1))
 	await _play_battle_anims(r.get("p1_action", -1), r.get("p2_action", -1), dmg, [p0_dead, p1_dead])
-	_show_events(r)
 	_update_all()
 
 	if r.get("game_over", false):
 		state = State.GAME_OVER
 		var w: int = r.get("winner", BattleCore.WINNER_UNDECIDED)
-		status_label.text = "游戏结束！" + ("平局" if w == BattleCore.WINNER_DRAW else ("你胜利！" if w == BattleCore.WINNER_P1 else "你失败"))
+		var msg := "平局"
+		var col := Color("#dddddd")
+		if w == BattleCore.WINNER_P1:
+			msg = "你胜利！"
+			col = Color("#5fd86b")
+		elif w != BattleCore.WINNER_DRAW:
+			msg = "你失败"
+			col = Color("#e0574b")
+		status_label.text = msg
+		status_label.add_theme_color_override("font_color", col)
 		status_label.visible = true
 		return
 
@@ -504,12 +506,10 @@ func _btn_action(btn: Button) -> int:
 # ============================================================
 
 func _update_all() -> void:
-	turn_label.text = "回合 %d" % (battle.turn_number + 1)
 	_update_hero_frames()
 	_update_character_displays()
 	_update_energy_labels()
 	_update_hp_labels()
-	_update_hero_names()
 	if state == State.PLAYER_SELECT:
 		_update_button_states()
 
@@ -543,37 +543,42 @@ func _update_hero_frames() -> void:
 		var frames := p1_frames if p == 0 else p2_frames
 		var hp_labels := p1_frame_hp_labels if p == 0 else p2_frame_hp_labels
 		var shield_labels := p1_frame_shield_labels if p == 0 else p2_frame_shield_labels
+		var heart_icons: Array = p1_frame_heart_icons if p == 0 else p2_frame_heart_icons
 		var frame_slots: Array[int] = p1_frame_slots if p == 0 else p2_frame_slots
 		var active_idx: int = battle.active_index[p]
 		var reserves := _get_reserve_slots(p)
 		var pcolor := Color("#3388dd") if p == 0 else Color("#dd3333")
 
 		frame_slots[0] = active_idx
-		_update_single_frame(frames[0], hp_labels[0], shield_labels[0], p, active_idx, true, pcolor)
+		_update_single_frame(frames[0], hp_labels[0], shield_labels[0], heart_icons[0], p, active_idx, true, pcolor)
 
 		for j in range(2):
 			var fi := j + 1
 			if j < reserves.size():
 				var slot: int = reserves[j]
 				frame_slots[fi] = slot
-				_update_single_frame(frames[fi], hp_labels[fi], shield_labels[fi], p, slot, false, pcolor)
+				_update_single_frame(frames[fi], hp_labels[fi], shield_labels[fi], heart_icons[fi], p, slot, false, pcolor)
 			else:
 				frame_slots[fi] = -1
 				frames[fi].visible = false
 				hp_labels[fi].visible = false
 				shield_labels[fi].visible = false
+				if heart_icons[fi] != null:
+					heart_icons[fi].visible = false
 
 
-func _update_single_frame(frame: HeroFrame, hp_label: Label, shield_label: Label, player: int, slot: int, is_active: bool, pcolor: Color) -> void:
+## 出战位(is_active)：只画头像，血量/护盾文字隐藏（看上方大心条）。
+## 待选位：头像 + 心形美术标记(heart_icon, 仅作图标) + 血量数字 + 护盾。
+func _update_single_frame(frame: HeroFrame, hp_label: Label, shield_label: Label, heart_icon, player: int, slot: int, is_active: bool, pcolor: Color) -> void:
 	if slot < 0 or slot >= battle.heroes[player].size():
 		frame.visible = false
 		hp_label.visible = false
 		shield_label.visible = false
+		if heart_icon != null:
+			heart_icon.visible = false
 		return
 
 	frame.visible = true
-	hp_label.visible = true
-	shield_label.visible = true
 
 	var h: HeroData = battle.heroes[player][slot]
 	var dead: bool = battle.hp[player][slot] <= 0
@@ -583,40 +588,59 @@ func _update_single_frame(frame: HeroFrame, hp_label: Label, shield_label: Label
 	frame.is_active = is_active
 	frame.is_dead = dead
 	frame.player_color = pcolor
-	frame.frame_size = Vector2(72, 72) if is_active else Vector2(48, 48)
+	frame.frame_size = Vector2(72, 72) if is_active else Vector2(68, 68)
+
+	# 出战位：血量/护盾文字 + 心形图标全隐藏（出战血量由上方大心条显示）。
+	if is_active:
+		hp_label.visible = false
+		shield_label.visible = false
+		if heart_icon != null:
+			heart_icon.visible = false
+		return
+
+	# 阵亡：灰头像，下方不显示 0hp / 护盾 / 心标记。
+	if dead:
+		hp_label.visible = false
+		shield_label.visible = false
+		if heart_icon != null:
+			heart_icon.visible = false
+		return
+
+	hp_label.visible = true
+	shield_label.visible = true
 
 	var hp_now := battle.hp_display(battle.hp[player][slot])
 	var hp_max := battle.hp_display(battle.max_hp[player][slot])
-	hp_label.text = "❤%s" % _fmt_hp(hp_now)
+	hp_label.text = _fmt_hp(hp_now)                 # 纯数字，心形交给 heart_icon 美术
 	var hp_ratio := clampf(hp_now / maxf(hp_max, 0.01), 0.0, 1.0)
 	hp_label.add_theme_color_override("font_color", _hp_color(hp_ratio))
-	hp_label.add_theme_font_size_override("font_size", 13 if is_active else 11)
+	hp_label.add_theme_font_size_override("font_size", 15)
+
+	if heart_icon != null:
+		heart_icon.visible = not dead              # 阵亡不显示心
+		heart_icon.set_value(1.0, 1.0)             # 永远 1 颗，仅作标记图标（保持原图红色）
 
 	var sh := battle.hp_display(battle.shield[player][slot])
 	shield_label.text = "🛡%s" % _fmt_hp(sh) if sh > 0 else ""
-	shield_label.add_theme_font_size_override("font_size", 11 if is_active else 10)
+	shield_label.add_theme_font_size_override("font_size", 11)
 
 
 func _update_energy_labels() -> void:
-	p1_energy_bar.set_energy(battle.energy[0])
-	p2_energy_bar.set_energy(battle.energy[1])
+	# 金币能量点：能量为整数，show_empty=false → 画 N 枚金币（在 .tscn 配置）。
+	p1_coin_row.set_value(float(battle.energy[0]), float(battle.energy[0]))
+	p2_coin_row.set_value(float(battle.energy[1]), float(battle.energy[1]))
 
 
 func _update_hp_labels() -> void:
 	p1_char_display.visible = true
 	p2_char_display.visible = true
 	for p in [0, 1]:
-		var lbl: Label = p1_hp_label if p == 0 else p2_hp_label
 		var hp_now := battle.hp_display(battle.current_hp(p))
+		var hp_max := battle.hp_display(battle.current_max_hp(p))
 		var sh := battle.hp_display(battle.shield[p][battle.active_index[p]])
-		lbl.text = "❤%s  🛡%s" % [_fmt_hp(hp_now), _fmt_hp(sh)] if sh > 0 else "❤%s" % _fmt_hp(hp_now)
-		var ratio := clampf(hp_now / maxf(battle.hp_display(battle.current_max_hp(p)), 0.01), 0.0, 1.0)
-		lbl.add_theme_color_override("font_color", _hp_color(ratio))
-
-
-func _update_hero_names() -> void:
-	p1_name_label.text = battle.active_hero(0).hero_name
-	p2_name_label.text = battle.active_hero(1).hero_name
+		# 心形血珠：满+半+暗色空心到 max；护盾作青色额外心追加。
+		var row: IconPipRow = p1_heart_row if p == 0 else p2_heart_row
+		row.set_value(hp_now, hp_max, sh)
 
 
 func _fmt_hp(v: float) -> String:
@@ -745,22 +769,50 @@ func _process(delta: float) -> void:
 
 
 # ============================================================
-# 事件文案（v4，内联；S3 转正时考虑抽出 EventFormatter）
+# 头顶招式圆圈（揭示盲选出招，占位待美术）/ 动作名
 # ============================================================
 
-func _show_events(r: Dictionary) -> void:
-	var a0_name := _action_name(r.get("p1_action", -1))
-	var a1_name := _action_name(r.get("p2_action", -1))
-	status_label.text = "你：%s    vs    对手：%s" % [a0_name, a1_name]
-	status_label.visible = true
+## 双方各在角色头顶显示一个占位圆圈(招式名+按钮配色)，显示 1.2s 后消失。
+func _show_action_indicators(a0: int, a1: int) -> void:
+	status_label.visible = false
+	event_label.visible = false
+	var c0 := _spawn_action_circle(0, a0)
+	var c1 := _spawn_action_circle(1, a1)
+	await get_tree().create_timer(1.2).timeout
+	if is_instance_valid(c0):
+		c0.queue_free()
+	if is_instance_valid(c1):
+		c1.queue_free()
 
-	var lines: Array[String] = []
-	for ev in r.get("events", []):
-		var t := _event_text(ev)
-		if t != "":
-			lines.append(t)
-	event_label.text = "\n".join(lines)
-	event_label.visible = true
+
+## 在 player 角色头顶生成占位招式圆圈（之后替换美术素材）。
+func _spawn_action_circle(player: int, action: int) -> Control:
+	var cd := _cd(player)
+	var sz := 92.0
+	var circ := Panel.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color("#2a2a4a")
+	sb.border_color = Color("#7070c8")
+	sb.set_border_width_all(4)
+	sb.set_corner_radius_all(int(sz / 2.0))
+	circ.add_theme_stylebox_override("panel", sb)
+	circ.size = Vector2(sz, sz)
+	circ.position = cd.position + Vector2(cd.size.x * 0.5 - sz * 0.5, -sz - 12.0)
+	circ.z_index = 80
+	circ.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var lbl := Label.new()
+	lbl.text = _action_name(action)
+	FontManager.apply(lbl, 28)
+	lbl.add_theme_color_override("font_color", Color.WHITE)
+	lbl.add_theme_color_override("font_outline_color", Color.BLACK)
+	lbl.add_theme_constant_override("outline_size", 3)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	circ.add_child(lbl)
+	add_child(circ)
+	return circ
 
 
 func _action_name(act: int) -> String:
@@ -773,21 +825,3 @@ func _action_name(act: int) -> String:
 		A.SWITCH: return "切换"
 		ACTIVE: return "技能"
 	return "?"
-
-
-func _event_text(ev: Dictionary) -> String:
-	var p: int = ev.get("player", -1)
-	var who := "你" if p == 0 else "对手"
-	var amt := float(ev.get("amount", 0)) / 2.0
-	match ev.get("id", ""):
-		"damage_taken": return "%s 受 %s 伤害" % [who, _fmt_hp(amt)]
-		"deferred_damage": return "%s 延迟伤害 %s" % [who, _fmt_hp(amt)]
-		"big_defend_block", "defend_block": return "%s 格挡" % who
-		"shield_absorb": return "%s 护盾吸收 %s" % [who, _fmt_hp(amt)]
-		"charge_gain": return "%s 攒能量 +%d" % [who, ev.get("amount", 0)]
-		"active_used": return "%s 发动技能" % who
-		"vulnerable": return "%s 易伤" % who
-		"switch": return "%s 切换" % who
-		"hero_died": return "%s 一名英雄阵亡" % who
-		"victory", "draw": return "胜负已分"
-	return ""
