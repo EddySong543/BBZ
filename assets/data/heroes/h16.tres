@@ -8,6 +8,6 @@ hero_id = "h16"
 hero_name = "皇后"
 max_hp = 5
 skill_description = "泽被苍生"
-skill_detail = "消耗2点能量，回复全队1点hp"
+skill_detail = "消耗2点能量，回复全队1点血量"
 portrait_path = "res://assets/sprites/heroes/h16/h16_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h16/h16_idle.tres"

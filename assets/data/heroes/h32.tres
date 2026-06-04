@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="HeroData" format=3]
+[gd_resource type="Resource" script_class="HeroData" format=3 uid="uid://bhn4ykubeplti"]
 
-[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_6jbl8"]
+[ext_resource type="Script" uid="uid://ciiovppuu1rft" path="res://src/battle/hero_data.gd" id="1_6jbl8"]
 
 [resource]
 script = ExtResource("1_6jbl8")
@@ -8,6 +8,6 @@ hero_id = "h32"
 hero_name = "太阳"
 max_hp = 4
 skill_description = "赤日流金"
-skill_detail = "消耗 1 能灼烧对手出战英雄 2 回合，期间不能回血且受攻击 +1 伤，每局最多 3 次"
+skill_detail = "消耗1点能量，使对方英雄燃烧2回合（燃烧：无法回血，受到伤害增加1点）（0/3）"
 portrait_path = "res://assets/sprites/heroes/h32/h32_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h32/h32_idle.tres"

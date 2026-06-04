@@ -19,8 +19,12 @@ signal advance_requested
 const ALLY_TINT := Color(0.82, 0.9, 1.0)     # 己方·冷调羊皮
 const ENEMY_TINT := Color(1.0, 0.86, 0.72)   # 对方·暖调羊皮
 
-const INK := Color(0.2, 0.14, 0.08)               # 深褐墨字
+const INK := Color(0.2, 0.14, 0.08)               # 深褐墨字（描述正文）
 const INK_OUTLINE := Color(0.96, 0.92, 0.8, 0.45) # 浅羊皮色描边（墨字在纸纹上更清晰）
+
+## 主动 / 被动 标签配色（在米黄羊皮纸上可读、冷暖区分）：主动=赤红（进攻），被动=靛蓝（恒常）。
+const ACTIVE_COLOR := Color(0.72, 0.16, 0.1)
+const PASSIVE_COLOR := Color(0.13, 0.32, 0.56)
 
 ## 头像图片路径（res://...png）；空或不存在则隐藏头像。
 @export var portrait_path: String = "":
@@ -63,7 +67,7 @@ const INK_OUTLINE := Color(0.96, 0.92, 0.8, 0.45) # 浅羊皮色描边（墨字�
 @onready var _page: ColorRect = $Page
 @onready var _portrait: TextureRect = $PortraitCell/Portrait
 @onready var _type_label: Label = $TypeLabel
-@onready var _desc_label: Label = $DescLabel
+@onready var _desc_label: RichTextLabel = $DescLabel
 
 static var _tex_cache: Dictionary = {}
 
@@ -78,16 +82,19 @@ func _ready() -> void:
 
 ## 像素字体（assets/font 的 Ark Pixel，关 AA），经 FontManager autoload。
 ## 深褐墨字 + 浅描边，压在羊皮纸内页上可读（图鉴质感）。
+## TypeLabel(主动/被动)颜色与加粗在 _refresh_text 按类型设；DescLabel 是 RichTextLabel，
+## 字体/颜色用 normal_font/default_color 键，技能名加粗靠 BBCode 描边。
 func _apply_fonts() -> void:
 	var fm := get_node_or_null("/root/FontManager")
 	if fm == null:
 		return
 	fm.apply(_type_label, 16)
-	fm.apply(_desc_label, 16)
-	for lbl in [_type_label, _desc_label]:
-		lbl.add_theme_color_override("font_color", INK)
-		lbl.add_theme_color_override("font_outline_color", INK_OUTLINE)
-		lbl.add_theme_constant_override("outline_size", 2)
+	if _desc_label and fm.f16:
+		_desc_label.add_theme_font_override("normal_font", fm.f16)
+		_desc_label.add_theme_font_size_override("normal_font_size", 16)
+		_desc_label.add_theme_color_override("default_color", INK)
+		_desc_label.add_theme_color_override("font_outline_color", INK_OUTLINE)
+		_desc_label.add_theme_constant_override("outline_size", 2)
 
 
 ## 一次性填充（外部翻页时调用）。
@@ -125,13 +132,23 @@ func _refresh_portrait() -> void:
 func _refresh_text() -> void:
 	if not _type_label:
 		return
+	# 主动/被动：加粗（同色描边）+ 红（进攻）/蓝（恒常）区分。
 	_type_label.text = "主动技能" if is_active_skill else "被动技能"
-	# 技能名与描述同段「名：描述」，名与描述间不换行（描述未补则仅显示技能名）。
+	var tc := ACTIVE_COLOR if is_active_skill else PASSIVE_COLOR
+	_type_label.add_theme_color_override("font_color", tc)
+	_type_label.add_theme_color_override("font_outline_color", tc)
+	_type_label.add_theme_constant_override("outline_size", 2)
+
+	if not _desc_label:
+		return
+	# 技能名加粗（同墨色 BBCode 描边 → 笔画变粗）+ 与描述同段不换行；描述用普通墨字。
 	var body := skill_detail.strip_edges()
+	var ink_hex := INK.to_html(false)
+	var bold_name := "[outline_size=3][outline_color=#%s]%s[/outline_color][/outline_size]" % [ink_hex, skill_name]
 	if skill_name != "" and body != "":
-		_desc_label.text = "%s：%s" % [skill_name, body]
+		_desc_label.text = "%s：%s" % [bold_name, body]
 	elif skill_name != "":
-		_desc_label.text = skill_name
+		_desc_label.text = bold_name
 	else:
 		_desc_label.text = body
 

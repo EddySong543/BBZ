@@ -8,6 +8,6 @@ hero_id = "h15"
 hero_name = "女祭司"
 max_hp = 4
 skill_description = "三缄其口"
-skill_detail = "消耗1点能量，抹去对手当前英雄的增益，锁定被动技能1回合（0/3）"
+skill_detail = "消耗1点能量，锁定对手当前英雄技能2回合（0/3）"
 portrait_path = "res://assets/sprites/heroes/h15/h15_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h15/h15_idle.tres"

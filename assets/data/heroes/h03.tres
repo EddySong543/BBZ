@@ -8,6 +8,6 @@ hero_id = "h03"
 hero_name = "寅虎"
 max_hp = 5
 skill_description = "渴血"
-skill_detail = "当寅虎击杀一个英雄后，该英雄伤害永久增加1点伤害"
+skill_detail = "寅虎击杀一个英雄后，该英雄伤害永久增加1点伤害"
 portrait_path = "res://assets/sprites/heroes/h03/h03_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h03/h03_idle.tres"

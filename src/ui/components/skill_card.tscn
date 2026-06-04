@@ -13,7 +13,7 @@ shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 40.0
 shader_parameter/corner = 0.08
 shader_parameter/edge_px = 2.0
-shader_parameter/aspect = 3.4375
+shader_parameter/aspect = 2.890625
 shader_parameter/noise_amt = 0.05
 shader_parameter/wear = 0.16
 
@@ -27,7 +27,7 @@ shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 44.0
 shader_parameter/corner = 0.05
 shader_parameter/edge_px = 2.0
-shader_parameter/aspect = 3.94
+shader_parameter/aspect = 3.283
 shader_parameter/noise_amt = 0.06
 shader_parameter/wear = 0.1
 
@@ -48,7 +48,7 @@ shader_parameter/wear = 0.16
 [node name="SkillCard" type="Control"]
 layout_mode = 3
 anchors_preset = 0
-offset_right = 440.0
+offset_right = 370.0
 offset_bottom = 128.0
 script = ExtResource("1_card")
 
@@ -128,7 +128,7 @@ grow_horizontal = 2
 mouse_filter = 2
 text = "被动技能"
 
-[node name="DescLabel" type="Label" parent="."]
+[node name="DescLabel" type="RichTextLabel" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -140,4 +140,7 @@ offset_bottom = -16.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+bbcode_enabled = true
+fit_content = false
+scroll_active = false
 autowrap_mode = 3

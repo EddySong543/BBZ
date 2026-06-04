@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="HeroData" format=3]
+[gd_resource type="Resource" script_class="HeroData" format=3 uid="uid://cf018d32ru3k5"]
 
-[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_mxkj2"]
+[ext_resource type="Script" uid="uid://ciiovppuu1rft" path="res://src/battle/hero_data.gd" id="1_mxkj2"]
 
 [resource]
 script = ExtResource("1_mxkj2")
@@ -8,6 +8,6 @@ hero_id = "h27"
 hero_name = "节制"
 max_hp = 4
 skill_description = "以柔克刚"
-skill_detail = "受到超过 1 点伤害时，溢出部分延迟到下回合结算"
+skill_detail = "当节制受到超过1点的伤害时，溢出的伤害延迟到下回合结算"
 portrait_path = "res://assets/sprites/heroes/h27/h27_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h27/h27_idle.tres"

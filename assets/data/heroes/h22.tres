@@ -8,6 +8,6 @@ hero_id = "h22"
 hero_name = "隐者"
 max_hp = 5
 skill_description = "遗世独立"
-skill_detail = "每有1名队友死亡，隐者获得加1点攻击或加1点防御"
+skill_detail = "每有1名队友死亡，隐者永久增加1点伤害或减少0.5点受到伤害"
 portrait_path = "res://assets/sprites/heroes/h22/h22_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h22/h22_idle.tres"

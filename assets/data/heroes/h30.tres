@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="HeroData" format=3]
+[gd_resource type="Resource" script_class="HeroData" format=3 uid="uid://cgua4w6x5ekmo"]
 
-[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_jwi2s"]
+[ext_resource type="Script" uid="uid://ciiovppuu1rft" path="res://src/battle/hero_data.gd" id="1_jwi2s"]
 
 [resource]
 script = ExtResource("1_jwi2s")
@@ -8,6 +8,6 @@ hero_id = "h30"
 hero_name = "星星"
 max_hp = 6
 skill_description = "北辰守望"
-skill_detail = "在替补席存活时，出战队友每次受伤由星星替其分担一半"
+skill_detail = "星星在替补席存活时，出战队友每次受到伤害，星星替其分担一半"
 portrait_path = "res://assets/sprites/heroes/h30/h30_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h30/h30_idle.tres"

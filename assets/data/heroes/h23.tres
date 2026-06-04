@@ -8,6 +8,6 @@ hero_id = "h23"
 hero_name = "命运之轮"
 max_hp = 5
 skill_description = "周而复始"
-skill_detail = "每次登场时，随机获得一项命运的馈赠（1点攻击增幅，1点护甲，1点能量）"
+skill_detail = "每次登场时，随机获得一项命运的馈赠（增加1点攻击，获得1点护甲，获得1点能量）"
 portrait_path = "res://assets/sprites/heroes/h23/h23_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h23/h23_idle.tres"

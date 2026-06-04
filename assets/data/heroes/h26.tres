@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="HeroData" format=3]
+[gd_resource type="Resource" script_class="HeroData" format=3 uid="uid://by1eta0klcl6"]
 
-[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_r1mrc"]
+[ext_resource type="Script" uid="uid://ciiovppuu1rft" path="res://src/battle/hero_data.gd" id="1_r1mrc"]
 
 [resource]
 script = ExtResource("1_r1mrc")
@@ -8,6 +8,6 @@ hero_id = "h26"
 hero_name = "死神"
 max_hp = 4
 skill_description = "向死而生"
-skill_detail = "消耗 4 能永久变身收割形态，此后所有伤害 +1 且击杀回 2 HP，每局 1 次"
+skill_detail = "消耗4点能量，化身死神（所有伤害增加1点，击杀英雄后回复2点血量）"
 portrait_path = "res://assets/sprites/heroes/h26/h26_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h26/h26_idle.tres"

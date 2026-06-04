@@ -47,13 +47,8 @@ extends Panel
 		if is_node_ready() and _portrait:
 			(_portrait as TextureRect).flip_h = v
 
-## 头像框阵营染色（乘到中性深蓝灰底 → P1 冷蓝 / P2 暖红，一眼分敌我）。
-const ALLY_FRAME_TINT := Color(0.74, 0.9, 1.22)    # 己方·冷蓝（player_color 偏蓝时）
-const ENEMY_FRAME_TINT := Color(1.22, 0.82, 0.78)  # 对方·暖红（player_color 偏红时）
-
 var _portrait: TextureRect
 var _name_label: Label
-var _bg: ColorRect                # 边框果冻底（阵营色染到它上，不影响 modulate 出战/阵亡）
 var _base_stylebox: StyleBoxFlat  # P1-NEW2: 从 .tscn 取 default，state 切换基于此 duplicate
 static var _cache: Dictionary = {}
 
@@ -67,7 +62,6 @@ func _ready() -> void:
 
 
 func _setup_children() -> void:
-	_bg = get_node_or_null("Bg") as ColorRect
 	_portrait = _find_or_create_texture_rect("Portrait")
 	_name_label = _find_or_create_label("NameLabel")
 	(_name_label as Label).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -123,24 +117,17 @@ func _refresh_portrait() -> void:
 
 
 func _refresh_style() -> void:
-	# 像素徽章边框由子节点 Bg(中性深蓝灰 jelly) 绘制；阵营色染到 Bg、出战/阵亡用整框 modulate。
-	var faction := ALLY_FRAME_TINT if player_color.b >= player_color.r else ENEMY_FRAME_TINT
+	# 像素徽章边框由子节点 Bg(深墨蓝 jelly) 绘制；出战/阵亡用整框 modulate（不再乘阵营色，避免浑浊）。
 	if is_dead:
-		modulate = Color(0.5, 0.5, 0.55)
-		if _bg:
-			_bg.modulate = Color(0.62, 0.62, 0.68)   # 阵亡：去阵营色、压暗
+		modulate = Color(0.52, 0.53, 0.58)            # 阵亡：压暗去活力
 		if _portrait:
-			(_portrait as TextureRect).modulate = Color(0.4, 0.4, 0.4)
+			(_portrait as TextureRect).modulate = Color(0.42, 0.42, 0.46)
 	elif is_active:
-		modulate = Color(1.16, 1.22, 1.32)           # 出战高亮：中性冷亮（不撞金/铜）
-		if _bg:
-			_bg.modulate = faction * 1.12             # 出战边框：阵营色更亮
+		modulate = Color(1.3, 1.16, 1.05)             # 出战高亮：暖亮（配玫瑰铜框，提亮更暖）
 		if _portrait:
 			(_portrait as TextureRect).modulate = Color.WHITE
 	else:
 		modulate = Color.WHITE
-		if _bg:
-			_bg.modulate = faction                    # 待选边框：常驻阵营色
 		if _portrait:
 			(_portrait as TextureRect).modulate = Color.WHITE
 

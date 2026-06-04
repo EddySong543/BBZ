@@ -8,6 +8,6 @@ hero_id = "h02"
 hero_name = "丑牛"
 max_hp = 6
 skill_description = "怒目"
-skill_detail = "当丑牛不满血时，该英雄所有攻击增加1点伤害"
+skill_detail = "丑牛不是满血时，该英雄所有攻击增加1点伤害"
 portrait_path = "res://assets/sprites/heroes/h02/h02_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h02/h02_idle.tres"

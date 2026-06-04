@@ -5,16 +5,16 @@
 
 [sub_resource type="ShaderMaterial" id="FrameJelly"]
 shader = ExtResource("2_jelly")
-shader_parameter/fill_top = Color(0.3, 0.34, 0.44, 1)
-shader_parameter/fill_bottom = Color(0.17, 0.2, 0.29, 1)
-shader_parameter/edge_inner = Color(0.62, 0.7, 0.86, 1)
-shader_parameter/edge_outer = Color(0.08, 0.1, 0.16, 1)
+shader_parameter/fill_top = Color(0.83, 0.55, 0.44, 1)
+shader_parameter/fill_bottom = Color(0.5, 0.28, 0.2, 1)
+shader_parameter/edge_inner = Color(1.0, 0.76, 0.62, 1)
+shader_parameter/edge_outer = Color(0.26, 0.13, 0.09, 1)
 shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 24.0
 shader_parameter/corner = 0.12
 shader_parameter/edge_px = 2.0
-shader_parameter/noise_amt = 0.04
-shader_parameter/wear = 0.14
+shader_parameter/noise_amt = 0.02
+shader_parameter/wear = 0.04
 
 [sub_resource type="StyleBoxEmpty" id="FrameEmpty"]
 

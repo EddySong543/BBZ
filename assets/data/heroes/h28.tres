@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="HeroData" format=3]
+[gd_resource type="Resource" script_class="HeroData" format=3 uid="uid://x626sllihrmd"]
 
-[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_ke7cm"]
+[ext_resource type="Script" uid="uid://ciiovppuu1rft" path="res://src/battle/hero_data.gd" id="1_ke7cm"]
 
 [resource]
 script = ExtResource("1_ke7cm")
@@ -8,6 +8,6 @@ hero_id = "h28"
 hero_name = "恶魔"
 max_hp = 6
 skill_description = "灵魂契约"
-skill_detail = "开局指定一名队友攻击 +1，其每次攻击恶魔 -1 HP，持续到一方死亡"
+skill_detail = "与一名队友缔结灵魂契约，契约期间该队友所有攻击增加1点伤害，每次攻击时，恶魔减少1点血量"
 portrait_path = "res://assets/sprites/heroes/h28/h28_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h28/h28_idle.tres"

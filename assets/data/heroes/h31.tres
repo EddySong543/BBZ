@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="HeroData" format=3]
+[gd_resource type="Resource" script_class="HeroData" format=3 uid="uid://ko0tfksy74en"]
 
-[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_80p8j"]
+[ext_resource type="Script" uid="uid://ciiovppuu1rft" path="res://src/battle/hero_data.gd" id="1_80p8j"]
 
 [resource]
 script = ExtResource("1_80p8j")
@@ -8,6 +8,6 @@ hero_id = "h31"
 hero_name = "月亮"
 max_hp = 5
 skill_description = "阴晴圆缺"
-skill_detail = "从第 1 回合起循环四相：阴攻减半 / 晴攻翻倍 / 圆受减半 / 缺受翻倍"
+skill_detail = "轮转：阴-造成伤害减半，晴-造成伤害翻倍，圆-受到伤害减半，缺-受到伤害翻倍"
 portrait_path = "res://assets/sprites/heroes/h31/h31_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h31/h31_idle.tres"
