@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="HeroData" format=3]
+[gd_resource type="Resource" script_class="HeroData" format=3 uid="uid://qlateebfs13b"]
 
-[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_hwyqb"]
+[ext_resource type="Script" uid="uid://ciiovppuu1rft" path="res://src/battle/hero_data.gd" id="1_hwyqb"]
 
 [resource]
 script = ExtResource("1_hwyqb")
@@ -8,5 +8,6 @@ hero_id = "h04"
 hero_name = "卯兔"
 max_hp = 4
 skill_description = "三窟"
+skill_detail = "每次切换下场时，自己获得一个“窟”，“窟”提供下次受伤减少1点伤害"
 portrait_path = "res://assets/sprites/heroes/h04/h04_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h04/h04_idle.tres"

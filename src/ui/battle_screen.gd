@@ -15,6 +15,11 @@ const CIRCLE_Y := 890.0
 const SCREEN_W := 1920.0
 const SCREEN_H := 1080.0
 
+## 待选爱心垂直对齐基线带高度（= 自适应 pip 的上限），不同 maxHP 的爱心在其中居中（任务6）。
+const HEART_BAND := 16.0
+## 出战血条低血红闪阈值（HP 占比 ≤ 此值）；闪烁在 IconPipRow 内部实现（任务5：红光改到剩余血量爱心上）。
+const LOW_HP_RATIO := 0.3
+
 ## 默认阵容 fallback：直接打开 battle_screen.tscn(F6) 测试用，BattleSetup 为空时启用。
 const HERO_DATA_DIR := "res://assets/data/heroes/"
 const DEFAULT_P0 := ["h01", "h05", "h13"]   # 窃运 / 天威 / 孤注（均有美术 h01-h17）
@@ -58,7 +63,12 @@ const AI := 1       # 对手 AI
 var p1_frame_slots: Array[int] = [-1, -1, -1]
 var p2_frame_slots: Array[int] = [-1, -1, -1]
 
+# ---- 技能展示格：顺序浏览 [己方0,1,2 → 对方0,1,2]，点击翻页 ----
+var _skill_entries: Array = []   # [[player, slot], ...]
+var _skill_index: int = 0
+
 @onready var buttons_ctrl: Control = $Buttons
+@onready var skill_card: SkillCard = $SkillCard
 @onready var _death_switch_overlay: DeathSwitchOverlay = $DeathSwitchOverlay
 @onready var game_timer: Timer = $GameTimer
 
@@ -82,11 +92,6 @@ var selected_action: int = -1
 var selected_switch: int = -1
 var selected_btn: Button = null
 
-var _circle_style_normal: StyleBoxFlat
-var _circle_style_selected: StyleBoxFlat
-var _confirm_style: StyleBoxFlat
-var _confirm_style_active: StyleBoxFlat
-
 # ---- juice ----
 var _shake := 0.0
 var _cd_home: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]  # 立绘原位（前冲 juice 复位用）
@@ -104,7 +109,6 @@ func _ready() -> void:
 	BattleSetup.reset()   # 消费即清空：防止下一局（未经 BP）复用本局阵容
 	battle.setup(p0, p1, randi())
 
-	_init_styles()
 	_init_buttons()
 	_connect_frame_signals()
 	game_timer.timeout.connect(_on_timer_tick)
@@ -117,6 +121,15 @@ func _ready() -> void:
 	p2_char_display.flip_h = true
 	for f in p2_frames:
 		f.flip_h = true
+
+	_build_skill_entries()
+	skill_card.advance_requested.connect(_on_skill_card_advance)
+	_refresh_skill_card()
+
+	# 低血红闪（任务5）：出战血条剩余爱心在 HP 占比低时红色呼吸（IconPipRow 内部实现）。
+	for row in [p1_heart_row, p2_heart_row]:
+		row.low_hp_flash = true
+		row.low_hp_ratio = LOW_HP_RATIO
 
 	_update_all()
 	_show_turn_intro()
@@ -140,21 +153,6 @@ func _resolve_team(setup_heroes: Array, fallback_ids: Array) -> Array:
 	return t
 
 
-func _init_styles() -> void:
-	_circle_style_normal = btn_charge.get_theme_stylebox("normal") as StyleBoxFlat
-	_confirm_style = btn_confirm.get_theme_stylebox("normal") as StyleBoxFlat
-	_confirm_style_active = btn_confirm.get_theme_stylebox("hover") as StyleBoxFlat
-
-	_circle_style_selected = StyleBoxFlat.new()
-	_circle_style_selected.bg_color = Color("#3a3a5a")
-	_circle_style_selected.border_color = Color("#ffdd44")
-	_circle_style_selected.border_width_left = 5
-	_circle_style_selected.border_width_right = 5
-	_circle_style_selected.border_width_top = 5
-	_circle_style_selected.border_width_bottom = 5
-	_circle_style_selected.set_corner_radius_all(int(CIRCLE_D / 2.0))
-
-
 func _init_buttons() -> void:
 	btn_charge.pressed.connect(_on_circle_pressed.bind(A.CHARGE, btn_charge))
 	btn_attack.pressed.connect(_on_circle_pressed.bind(A.ATTACK, btn_attack))
@@ -165,8 +163,8 @@ func _init_buttons() -> void:
 	btn_confirm.pressed.connect(_on_confirm_pressed)
 
 	# 攒/波/大波/防/大防 用 HoverIcon 美术图标（节点在 battle_screen.tscn 内，编辑器可见可调）；
-	# 技能按钮不显示文字（说明改放 tooltip，见 _layout_circles）。位置/尺寸全部由 .tscn 决定。
-	btn_special.text = ""
+	# 技能按钮显示「技能」二字（详细说明仍放 tooltip，见 _layout_circles）。位置/尺寸由 .tscn 决定。
+	btn_special.text = "技能"
 	btn_confirm.text = "结束"
 
 	for btn in [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend, btn_special]:
@@ -174,6 +172,18 @@ func _init_buttons() -> void:
 		btn.clip_text = true
 	FontManager.apply_btn(btn_confirm, 16)
 	btn_confirm.clip_text = true
+
+	# 技能按钮「技能」二字单独放大 + 描边，叠在紫色果冻底上清晰可读。
+	FontManager.apply_btn(btn_special, 30)
+	btn_special.add_theme_color_override("font_color", Color.WHITE)
+	btn_special.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
+	btn_special.add_theme_constant_override("outline_size", 4)
+
+	# 结束按钮「结束」二字同样放大 + 描边，配绿色徽章底。
+	FontManager.apply_btn(btn_confirm, 30)
+	btn_confirm.add_theme_color_override("font_color", Color.WHITE)
+	btn_confirm.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
+	btn_confirm.add_theme_constant_override("outline_size", 4)
 
 	action_btn_list = [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend, btn_special]
 
@@ -200,12 +210,47 @@ func _connect_frame_signals() -> void:
 
 
 # ============================================================
+# 技能展示格（点击翻页浏览全部英雄技能：己方 → 对方）
+# ============================================================
+
+## 构建浏览顺序：先己方 3 个（含替补），再对方 3 个，按阵容槽位顺序。
+func _build_skill_entries() -> void:
+	_skill_entries.clear()
+	for p in [PLAYER, AI]:
+		for slot in range(battle.heroes[p].size()):
+			_skill_entries.append([p, slot])
+	_skill_index = 0
+
+
+## 把当前选中的英雄填进展示格。主动/被动取自运行时技能组件（h07 当先按主动算）。
+func _refresh_skill_card() -> void:
+	if _skill_entries.is_empty():
+		return
+	var e: Array = _skill_entries[_skill_index % _skill_entries.size()]
+	var p: int = int(e[0])
+	var slot: int = int(e[1])
+	var h: HeroData = battle.heroes[p][slot]
+	var sk: HeroSkill = battle._skills[p][slot]
+	var is_active: bool = sk != null and (sk.has_active() or sk.has_free_switch())
+	# 立绘一律朝右；阵营靠底色区分（己方冷蓝 / 对方暖红）。
+	skill_card.populate(h.hero_name, h.skill_description, h.skill_detail, is_active, h.portrait_path, p == PLAYER)
+
+
+## 点击展示格 → 翻到下一个英雄，循环。
+func _on_skill_card_advance() -> void:
+	if _skill_entries.is_empty():
+		return
+	_skill_index = (_skill_index + 1) % _skill_entries.size()
+	_refresh_skill_card()
+
+
+# ============================================================
 # 回合流程（同时盲选）
 # ============================================================
 
 func _show_turn_intro() -> void:
 	state = State.TURN_INTRO
-	_set_buttons_active(false)
+	_set_buttons_active(false, false)   # 回合介绍：按钮按能量正常显示、不压暗（仅暂不可点）
 	status_label.visible = false
 	event_label.visible = false
 	timer_label.text = ""
@@ -268,8 +313,8 @@ func _on_circle_pressed(action: int, btn: Button) -> void:
 	selected_switch = -1
 	_reset_button_styles()
 	selected_btn = btn
-	btn.add_theme_stylebox_override("normal", _circle_style_selected)
-	btn_confirm.add_theme_stylebox_override("normal", _confirm_style_active)
+	_set_btn_selected(btn, true)
+	_set_confirm_active(true)
 
 
 func _on_confirm_pressed() -> void:
@@ -426,7 +471,7 @@ func _on_frame_clicked(player: int, frame_idx: int) -> void:
 	selected_switch = hero_slot
 	selected_btn = null
 	_reset_button_styles()
-	btn_confirm.add_theme_stylebox_override("normal", _confirm_style_active)
+	_set_confirm_active(true)
 	status_label.text = "切换 → %s（按结束确认）" % battle.heroes[player][hero_slot].hero_name
 
 
@@ -434,13 +479,28 @@ func _on_frame_clicked(player: int, frame_idx: int) -> void:
 # 按钮布局 / 状态
 # ============================================================
 
-func _set_buttons_active(active: bool) -> void:
+## active=true：选择阶段，按钮按真实可用性亮/暗 + 可点。
+## active=false 时按 dim_inactive 区分：
+##   true（结算 / 换人 / 游戏结束）→ 全禁用 + 整体降透明度 0.4（不消失，保留"不可操作"反馈）；
+##   false（开局 / 回合介绍）→ 仍按真实可用性显示亮/暗、不整体压暗，仅靠 state 守卫拦截点击
+##     → 开局就是"正常"的按钮，不再一上来一片半透明（任务1）。
+func _set_buttons_active(active: bool, dim_inactive: bool = true) -> void:
+	# 底部 UI 始终可见。
 	for btn in action_btn_list + [btn_confirm]:
-		btn.visible = active
-		btn.disabled = not active
-	if active:
-		_layout_circles()
-		_update_button_states()
+		btn.visible = true
+	_layout_circles()
+	var show_affordance := active or not dim_inactive
+	var alpha := 1.0 if show_affordance else 0.4
+	buttons_ctrl.modulate = Color(1, 1, 1, alpha)
+	if skill_card:
+		skill_card.visible = true
+		skill_card.modulate = Color(1, 1, 1, alpha)
+	if show_affordance:
+		_refresh_action_affordance()   # 按能量显示亮/暗（开局与选择阶段一致）
+	else:
+		for btn in action_btn_list + [btn_confirm]:
+			btn.disabled = true        # 结算/过场：全禁用
+	_refresh_skill_card()
 
 
 ## 编辑器可摆位：按钮位置/尺寸全部读 .tscn，代码只管显隐与技能 tooltip，不再覆盖坐标。
@@ -464,13 +524,38 @@ func _player_has_active() -> bool:
 
 func _reset_button_styles() -> void:
 	for btn in action_btn_list:
-		btn.add_theme_stylebox_override("normal", _circle_style_normal)
-	btn_confirm.add_theme_stylebox_override("normal", _confirm_style)
+		_set_btn_selected(btn, false)
+	_set_confirm_active(false)
+
+
+## 选中态视觉：果冻底常显，选中按钮整体提亮 + 从中心轻微放大
+## （不再用不透明 StyleBox 盖住果冻 —— 那正是"点击后变回老版"的根因）。
+func _set_btn_selected(btn: Button, on: bool) -> void:
+	# 选中高亮用「冷亮蓝白」而非暖金 —— 暖金会撞 skill_card 的金色书本/羊皮纸（任务2）。
+	# 银色按钮 × 冷亮 → 像通电发光，与金色图鉴格冷暖区分明显。
+	btn.modulate = Color(1.28, 1.42, 1.6) if on else Color.WHITE
+	btn.pivot_offset = btn.size * 0.5
+	btn.scale = Vector2.ONE * (1.08 if on else 1.0)
+	# 任务7：选中该动作按钮后，让按钮内的美术图标持续播 idle（取消选中则回静止帧）。
+	var hi := btn.get_node_or_null("HoverIcon") as HoverIcon
+	if hi != null:
+		hi.set_selected_play(on)
+
+
+## 结束按钮"可确认"高亮：选中动作/切换后整体暖亮（用 modulate，不再用已废弃的 StyleBox 覆盖）。
+func _set_confirm_active(on: bool) -> void:
+	btn_confirm.modulate = Color(1.35, 1.36, 1.18) if on else Color.WHITE
 
 
 func _update_button_states() -> void:
 	if state != State.PLAYER_SELECT:
 		return
+	_refresh_action_affordance()
+
+
+## 按真实能量/可用性刷新每个动作按钮的 disabled（= 图标亮/暗 + 能否点）。
+## 不依赖 state：开局回合介绍阶段也据此显示正确的亮/暗，能否实际操作交给 state 守卫拦截。
+func _refresh_action_affordance() -> void:
 	_layout_circles()
 	for btn in action_btn_list:
 		if not btn.visible:
@@ -597,19 +682,30 @@ func _update_single_frame(frame: HeroFrame, hp_label: Label, shield_label: Label
 			heart_icon.visible = false
 		return
 
-	hp_label.visible = true
+	hp_label.visible = false                        # 不再用 ♥+数字
 	shield_label.visible = true
 
 	var hp_now := battle.hp_display(battle.hp[player][slot])
 	var hp_max := battle.hp_display(battle.max_hp[player][slot])
-	hp_label.text = _fmt_hp(hp_now)                 # 纯数字，心形交给 heart_icon 美术
-	var hp_ratio := clampf(hp_now / maxf(hp_max, 0.01), 0.0, 1.0)
-	hp_label.add_theme_color_override("font_color", _hp_color(hp_ratio))
-	hp_label.add_theme_font_size_override("font_size", 15)
 
+	# 待选血量 = 一排缩小的爱心（心数 = maxHP，pip 自适应缩到"整排不超头像框宽"）。
 	if heart_icon != null:
-		heart_icon.visible = not dead              # 阵亡不显示心
-		heart_icon.set_value(1.0, 1.0)             # 永远 1 颗，仅作标记图标（保持原图红色）
+		heart_icon.visible = true
+		var maxn := maxi(int(ceil(hp_max - 0.0001)), 1)
+		var fw: float = frame.size.x                # 头像框宽度（待选 68）
+		var hsp := 1.0   # 爱心间距（本地 float，避免无类型 Array 元素属性的 Variant 推断失败）
+		heart_icon.spacing = hsp
+		var ps := clampf((fw - hsp * float(maxn - 1)) / float(maxn), 6.0, HEART_BAND)
+		heart_icon.pip_size = ps
+		# 对齐修复（任务6）：所有替补爱心在「框底下方一条固定 16px 高度带」内垂直居中，
+		# 整排水平也在框内居中 → 不同 maxHP（pip 大小不同）的英雄爱心 y 视觉对齐、不再参差。
+		var row_w := ps * float(maxn) + hsp * float(maxn - 1)
+		var x_off := maxf((fw - row_w) * 0.5, 0.0)
+		var y_off := frame.size.y + 2.0 + (HEART_BAND - ps) * 0.5
+		heart_icon.position = frame.position + Vector2(x_off, y_off)
+		heart_icon.show_empty = true                # 满槽=maxHP（暗色空心补齐），宽度恒定不超框
+		heart_icon.allow_half = true
+		heart_icon.set_value(hp_now, hp_max)
 
 	var sh := battle.hp_display(battle.shield[player][slot])
 	shield_label.text = "🛡%s" % _fmt_hp(sh) if sh > 0 else ""
@@ -817,6 +913,7 @@ func _btn_for_action(action: int) -> Button:
 		A.BIG_ATTACK: return btn_big_attack
 		A.DEFEND: return btn_defend
 		A.BIG_DEFEND: return btn_big_defend
+		ACTIVE: return btn_special
 	return null
 
 
@@ -832,33 +929,46 @@ func _hover_icon_for(action: int) -> HoverIcon:
 func _spawn_action_circle(player: int, action: int) -> Control:
 	var cd := _cd(player)
 	var sz := 92.0
-	var circ := Panel.new()
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color("#2a2a4a")
-	sb.border_color = Color("#7070c8")
-	sb.set_border_width_all(4)
-	sb.set_corner_radius_all(int(sz / 2.0))
-	circ.add_theme_stylebox_override("panel", sb)
+	var circ := Control.new()
 	circ.size = Vector2(sz, sz)
 	circ.position = cd.position + Vector2(cd.size.x * 0.5 - sz * 0.5, -sz - 12.0)
 	circ.pivot_offset = Vector2(sz, sz) * 0.5   # 从中心 pop
 	circ.z_index = 80
 	circ.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
+	# 果冻底：复用对应动作按钮的 jelly 材质 → 颜色/像素风格/Inspector 微调全与按钮一致。
+	var bg := ColorRect.new()
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var btn := _btn_for_action(action)
+	var btn_bg: ColorRect = null
+	if btn != null:
+		btn_bg = btn.get_node_or_null("Bg") as ColorRect
+	if btn_bg != null and btn_bg.material != null:
+		bg.material = btn_bg.material
+		bg.color = Color.WHITE              # shader 输出 × COLOR；白 = 全强度
+	else:
+		bg.color = Color("#2a2a4a")         # 无对应按钮(如切换)→ 维持深蓝底
+	circ.add_child(bg)
+
 	var hi := _hover_icon_for(action)
 	if hi != null and hi.sheet != null:
-		# 复用按钮图标的帧0 + 相同 inset/content_scale，气泡里与按钮里观感一致。
-		var inset := sz * hi.inset_ratio
-		var side := (sz - inset * 2.0) * hi.content_scale
-		var tr := TextureRect.new()
-		tr.texture = hi.make_frame_texture(0)
-		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		tr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		tr.size = Vector2(side, side)
-		tr.position = (Vector2(sz, sz) - tr.size) * 0.5
-		circ.add_child(tr)
+		# 气泡内放一个自动循环播放的 HoverIcon → 复用按钮图标的 sheet/帧/缩放，观感与按钮一致，
+		# 且持续播放 idle 动画（动态，不再是静止帧0）。填满气泡，inset/content_scale 同按钮。
+		var anim := HoverIcon.new()
+		anim.sheet = hi.sheet
+		anim.hframes = hi.hframes
+		anim.vframes = hi.vframes
+		anim.frame_count = hi.frame_count
+		anim.fps = hi.fps
+		# 比例与按钮一致：取按钮里图标的「显示占比」直接当 content_scale + inset 归零 →
+		# 气泡内图标占气泡的比例 = 图标占按钮的比例（修复气泡图标偏大/比例不一致）。
+		anim.inset_ratio = 0.0
+		anim.content_scale = hi.display_ratio()
+		anim.auto_play = true
+		anim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		anim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		circ.add_child(anim)
 	else:
 		var lbl := Label.new()
 		lbl.text = _action_name(action)

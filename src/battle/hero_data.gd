@@ -10,7 +10,8 @@ enum SkillType { PASSIVE, EXTRA_ACTION, ENHANCED_ACTION }
 @export var hero_name: String = ""
 @export var max_hp: int = 10
 @export var skill_type: int = SkillType.PASSIVE
-@export var skill_description: String = ""
+@export var skill_description: String = ""  ## 技能名（短，如「渴血」）；展示格标题用。
+@export var skill_detail: String = ""       ## 技能完整说明（展示格正文用）；为空则回退 skill_description。
 @export var extra_action_id: int = -1
 @export var passive_id: String = ""
 @export var role: String = ""

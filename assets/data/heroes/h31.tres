@@ -8,5 +8,6 @@ hero_id = "h31"
 hero_name = "月亮"
 max_hp = 5
 skill_description = "阴晴圆缺"
+skill_detail = "从第 1 回合起循环四相：阴攻减半 / 晴攻翻倍 / 圆受减半 / 缺受翻倍"
 portrait_path = "res://assets/sprites/heroes/h31/h31_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h31/h31_idle.tres"

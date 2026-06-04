@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="HeroData" format=3]
+[gd_resource type="Resource" script_class="HeroData" format=3 uid="uid://q7s7wct5fhqx"]
 
-[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_43ert"]
+[ext_resource type="Script" uid="uid://ciiovppuu1rft" path="res://src/battle/hero_data.gd" id="1_43ert"]
 
 [resource]
 script = ExtResource("1_43ert")
@@ -8,5 +8,6 @@ hero_id = "h19"
 hero_name = "恋人"
 max_hp = 6
 skill_description = "至死不渝"
+skill_detail = "开局指定一名挚爱，挚爱存在时受到伤害减少1点，挚爱死亡时立即受到3点伤害"
 portrait_path = "res://assets/sprites/heroes/h19/h19_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h19/h19_idle.tres"

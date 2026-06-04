@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="HeroData" format=3]
+[gd_resource type="Resource" script_class="HeroData" format=3 uid="uid://dc8xtx5kdy4o2"]
 
-[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_ij7u6"]
+[ext_resource type="Script" uid="uid://ciiovppuu1rft" path="res://src/battle/hero_data.gd" id="1_ij7u6"]
 
 [resource]
 script = ExtResource("1_ij7u6")
@@ -8,5 +8,6 @@ hero_id = "h24"
 hero_name = "正义"
 max_hp = 6
 skill_description = "天平归衡"
+skill_detail = "耗2点能量，将你当前hp和对手hp平衡至平均值（每回合变化！）"
 portrait_path = "res://assets/sprites/heroes/h24/h24_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h24/h24_idle.tres"

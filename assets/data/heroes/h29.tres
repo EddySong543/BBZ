@@ -8,5 +8,6 @@ hero_id = "h29"
 hero_name = "塔"
 max_hp = 5
 skill_description = "倾巢之下"
+skill_detail = "击杀对手出战英雄时，超出其剩余血量的溢出伤害波及对手剩余队友"
 portrait_path = "res://assets/sprites/heroes/h29/h29_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h29/h29_idle.tres"

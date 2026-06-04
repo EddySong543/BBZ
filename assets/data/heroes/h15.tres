@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="HeroData" format=3]
+[gd_resource type="Resource" script_class="HeroData" format=3 uid="uid://dexekp32l01pm"]
 
-[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_44614"]
+[ext_resource type="Script" uid="uid://ciiovppuu1rft" path="res://src/battle/hero_data.gd" id="1_44614"]
 
 [resource]
 script = ExtResource("1_44614")
@@ -8,5 +8,6 @@ hero_id = "h15"
 hero_name = "女祭司"
 max_hp = 4
 skill_description = "三缄其口"
+skill_detail = "消耗1点能量，抹去对手当前英雄的增益，锁定被动技能1回合（0/3）"
 portrait_path = "res://assets/sprites/heroes/h15/h15_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h15/h15_idle.tres"

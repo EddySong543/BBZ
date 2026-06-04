@@ -17,6 +17,8 @@
 [ext_resource type="Texture2D" uid="uid://bi2d2aupxvtke" path="res://assets/ui/icons/DaBo_idle.png" id="18_dabo"]
 [ext_resource type="Texture2D" uid="uid://1wrmooe2eynb" path="res://assets/ui/icons/Fang_idle.png" id="19_fang"]
 [ext_resource type="Texture2D" uid="uid://bg6qynpwqkgmw" path="res://assets/ui/icons/DaFang_idle.png" id="20_dafang"]
+[ext_resource type="Shader" uid="uid://nr0mkp6afjoy" path="res://assets/shaders/canvas_button_jelly.gdshader" id="21_jelly"]
+[ext_resource type="PackedScene" path="res://src/ui/components/skill_card.tscn" id="22_skillcard"]
 
 [sub_resource type="Gradient" id="ShadowGradient"]
 offsets = PackedFloat32Array(0, 0.95913464, 0.99759614, 1)
@@ -59,65 +61,105 @@ shader_parameter/vignette_softness = 0.55
 shader_parameter/grain_amount = 0.018
 shader_parameter/grain_scale = 1.6
 
-[sub_resource type="StyleBoxFlat" id="CircleNormal"]
-bg_color = Color(0.164706, 0.164706, 0.290196, 1)
-border_width_left = 3
-border_width_top = 3
-border_width_right = 3
-border_width_bottom = 3
-border_color = Color(0.290196, 0.290196, 0.415686, 1)
-corner_radius_top_left = 80
-corner_radius_top_right = 80
-corner_radius_bottom_right = 80
-corner_radius_bottom_left = 80
+[sub_resource type="StyleBoxEmpty" id="BtnTransparent"]
 
-[sub_resource type="StyleBoxFlat" id="CircleHover"]
-bg_color = Color(0.239216, 0.239216, 0.4, 1)
-border_width_left = 3
-border_width_top = 3
-border_width_right = 3
-border_width_bottom = 3
-border_color = Color(0.415686, 0.415686, 0.8, 1)
-corner_radius_top_left = 80
-corner_radius_top_right = 80
-corner_radius_bottom_right = 80
-corner_radius_bottom_left = 80
+[sub_resource type="ShaderMaterial" id="JellyZan"]
+shader = ExtResource("21_jelly")
+shader_parameter/fill_top = Color(0.7, 0.72, 0.77, 1)
+shader_parameter/fill_bottom = Color(0.48, 0.5, 0.56, 1)
+shader_parameter/edge_inner = Color(0.9, 0.92, 0.97, 1)
+shader_parameter/edge_outer = Color(0.32, 0.34, 0.4, 1)
+shader_parameter/fill_alpha = 0.92
+shader_parameter/pixel_grid = 38.0
+shader_parameter/corner = 0.22
+shader_parameter/edge_px = 2.0
+shader_parameter/aspect = 1.0
+shader_parameter/noise_amt = 0.05
+shader_parameter/wear = 0.22
 
-[sub_resource type="StyleBoxFlat" id="CircleDisabled"]
-bg_color = Color(0.101961, 0.101961, 0.164706, 1)
-border_width_left = 3
-border_width_top = 3
-border_width_right = 3
-border_width_bottom = 3
-border_color = Color(0.164706, 0.164706, 0.227451, 1)
-corner_radius_top_left = 80
-corner_radius_top_right = 80
-corner_radius_bottom_right = 80
-corner_radius_bottom_left = 80
+[sub_resource type="ShaderMaterial" id="JellyBo"]
+shader = ExtResource("21_jelly")
+shader_parameter/fill_top = Color(0.7, 0.72, 0.77, 1)
+shader_parameter/fill_bottom = Color(0.48, 0.5, 0.56, 1)
+shader_parameter/edge_inner = Color(0.9, 0.92, 0.97, 1)
+shader_parameter/edge_outer = Color(0.32, 0.34, 0.4, 1)
+shader_parameter/fill_alpha = 0.92
+shader_parameter/pixel_grid = 38.0
+shader_parameter/corner = 0.22
+shader_parameter/edge_px = 2.0
+shader_parameter/aspect = 1.0
+shader_parameter/noise_amt = 0.05
+shader_parameter/wear = 0.22
 
-[sub_resource type="StyleBoxFlat" id="ConfirmNormal"]
-bg_color = Color(0.164706, 0.290196, 0.164706, 1)
-border_width_left = 3
-border_width_top = 3
-border_width_right = 3
-border_width_bottom = 3
-border_color = Color(0.266667, 0.666667, 0.266667, 1)
-corner_radius_top_left = 80
-corner_radius_top_right = 80
-corner_radius_bottom_right = 80
-corner_radius_bottom_left = 80
+[sub_resource type="ShaderMaterial" id="JellyDaBo"]
+shader = ExtResource("21_jelly")
+shader_parameter/fill_top = Color(0.7, 0.72, 0.77, 1)
+shader_parameter/fill_bottom = Color(0.48, 0.5, 0.56, 1)
+shader_parameter/edge_inner = Color(0.9, 0.92, 0.97, 1)
+shader_parameter/edge_outer = Color(0.32, 0.34, 0.4, 1)
+shader_parameter/fill_alpha = 0.92
+shader_parameter/pixel_grid = 38.0
+shader_parameter/corner = 0.22
+shader_parameter/edge_px = 2.0
+shader_parameter/aspect = 1.0
+shader_parameter/noise_amt = 0.05
+shader_parameter/wear = 0.22
 
-[sub_resource type="StyleBoxFlat" id="ConfirmActive"]
-bg_color = Color(0.227451, 0.415686, 0.227451, 1)
-border_width_left = 4
-border_width_top = 4
-border_width_right = 4
-border_width_bottom = 4
-border_color = Color(0.266667, 1, 0.266667, 1)
-corner_radius_top_left = 80
-corner_radius_top_right = 80
-corner_radius_bottom_right = 80
-corner_radius_bottom_left = 80
+[sub_resource type="ShaderMaterial" id="JellyFang"]
+shader = ExtResource("21_jelly")
+shader_parameter/fill_top = Color(0.7, 0.72, 0.77, 1)
+shader_parameter/fill_bottom = Color(0.48, 0.5, 0.56, 1)
+shader_parameter/edge_inner = Color(0.9, 0.92, 0.97, 1)
+shader_parameter/edge_outer = Color(0.32, 0.34, 0.4, 1)
+shader_parameter/fill_alpha = 0.92
+shader_parameter/pixel_grid = 38.0
+shader_parameter/corner = 0.22
+shader_parameter/edge_px = 2.0
+shader_parameter/aspect = 1.0
+shader_parameter/noise_amt = 0.05
+shader_parameter/wear = 0.22
+
+[sub_resource type="ShaderMaterial" id="JellyDaFang"]
+shader = ExtResource("21_jelly")
+shader_parameter/fill_top = Color(0.7, 0.72, 0.77, 1)
+shader_parameter/fill_bottom = Color(0.48, 0.5, 0.56, 1)
+shader_parameter/edge_inner = Color(0.9, 0.92, 0.97, 1)
+shader_parameter/edge_outer = Color(0.32, 0.34, 0.4, 1)
+shader_parameter/fill_alpha = 0.92
+shader_parameter/pixel_grid = 38.0
+shader_parameter/corner = 0.22
+shader_parameter/edge_px = 2.0
+shader_parameter/aspect = 1.0
+shader_parameter/noise_amt = 0.05
+shader_parameter/wear = 0.22
+
+[sub_resource type="ShaderMaterial" id="JellySpecial"]
+shader = ExtResource("21_jelly")
+shader_parameter/fill_top = Color(0.7, 0.72, 0.77, 1)
+shader_parameter/fill_bottom = Color(0.48, 0.5, 0.56, 1)
+shader_parameter/edge_inner = Color(0.9, 0.92, 0.97, 1)
+shader_parameter/edge_outer = Color(0.32, 0.34, 0.4, 1)
+shader_parameter/fill_alpha = 0.92
+shader_parameter/pixel_grid = 38.0
+shader_parameter/corner = 0.22
+shader_parameter/edge_px = 2.0
+shader_parameter/aspect = 1.0
+shader_parameter/noise_amt = 0.05
+shader_parameter/wear = 0.22
+
+[sub_resource type="ShaderMaterial" id="JellyConfirm"]
+shader = ExtResource("21_jelly")
+shader_parameter/fill_top = Color(0.42, 0.6, 0.42, 1)
+shader_parameter/fill_bottom = Color(0.24, 0.42, 0.27, 1)
+shader_parameter/edge_inner = Color(0.66, 0.88, 0.66, 1)
+shader_parameter/edge_outer = Color(0.16, 0.3, 0.19, 1)
+shader_parameter/fill_alpha = 0.92
+shader_parameter/pixel_grid = 38.0
+shader_parameter/corner = 0.22
+shader_parameter/edge_px = 2.0
+shader_parameter/aspect = 1.0
+shader_parameter/noise_amt = 0.05
+shader_parameter/wear = 0.22
 
 [node name="BattleScreen" type="Control" unique_id=1618077294]
 layout_mode = 3
@@ -238,6 +280,7 @@ hframes = 4
 idle_rest_min = 2.0
 idle_rest_max = 5.0
 wave_idle = true
+wave_speed_by_hp = true
 pip_size = 100.0
 spacing = -50.0
 extra_modulate = Color(0.6177773, 0.6495925, 0.7172231, 1)
@@ -254,6 +297,7 @@ hframes = 4
 idle_rest_min = 2.0
 idle_rest_max = 5.0
 wave_idle = true
+wave_speed_by_hp = true
 pip_size = 100.0
 spacing = -50.0
 right_to_left = true
@@ -547,21 +591,32 @@ horizontal_alignment = 1
 
 [node name="Buttons" type="Control" parent="." unique_id=1866875046]
 anchors_preset = 0
-offset_top = 810.0
+offset_top = 870.0
 offset_right = 1920.0
-offset_bottom = 1080.0
+offset_bottom = 1140.0
 mouse_filter = 2
 
 [node name="BtnCharge" type="Button" parent="Buttons" unique_id=1005743617]
 layout_mode = 0
-offset_left = 220.0
-offset_top = 80.0
-offset_right = 380.0
-offset_bottom = 240.0
-theme_override_styles/normal = SubResource("CircleNormal")
-theme_override_styles/pressed = SubResource("CircleHover")
-theme_override_styles/hover = SubResource("CircleHover")
-theme_override_styles/disabled = SubResource("CircleDisabled")
+offset_left = 885.0
+offset_top = 15.0
+offset_right = 1035.0
+offset_bottom = 165.0
+theme_override_styles/normal = SubResource("BtnTransparent")
+theme_override_styles/pressed = SubResource("BtnTransparent")
+theme_override_styles/hover = SubResource("BtnTransparent")
+theme_override_styles/disabled = SubResource("BtnTransparent")
+
+[node name="Bg" type="ColorRect" parent="Buttons/BtnCharge" unique_id=2034091034]
+show_behind_parent = true
+material = SubResource("JellyZan")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 
 [node name="HoverIcon" type="Control" parent="Buttons/BtnCharge" unique_id=1082315755]
 texture_filter = 1
@@ -569,6 +624,10 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = 15.0
+offset_top = 11.0
+offset_right = -13.0
+offset_bottom = -17.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
@@ -577,17 +636,29 @@ sheet = ExtResource("16_zan")
 hframes = 4
 vframes = 2
 frame_count = 5
+inset_ratio = 0.14
 
 [node name="BtnAttack" type="Button" parent="Buttons" unique_id=1348519698]
 layout_mode = 0
-offset_left = 440.0
-offset_top = 80.0
-offset_right = 600.0
-offset_bottom = 240.0
-theme_override_styles/normal = SubResource("CircleNormal")
-theme_override_styles/pressed = SubResource("CircleHover")
-theme_override_styles/hover = SubResource("CircleHover")
-theme_override_styles/disabled = SubResource("CircleDisabled")
+offset_left = 726.0
+offset_top = 26.0
+offset_right = 854.0
+offset_bottom = 154.0
+theme_override_styles/normal = SubResource("BtnTransparent")
+theme_override_styles/pressed = SubResource("BtnTransparent")
+theme_override_styles/hover = SubResource("BtnTransparent")
+theme_override_styles/disabled = SubResource("BtnTransparent")
+
+[node name="Bg" type="ColorRect" parent="Buttons/BtnAttack" unique_id=1237380891]
+show_behind_parent = true
+material = SubResource("JellyBo")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 
 [node name="HoverIcon" type="Control" parent="Buttons/BtnAttack" unique_id=513874469]
 texture_filter = 1
@@ -595,10 +666,10 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 4.0
-offset_top = 4.005
-offset_right = -6.0
-offset_bottom = -5.994995
+offset_left = 23.0
+offset_top = 21.56
+offset_right = -25.0
+offset_bottom = -26.440002
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
@@ -607,18 +678,30 @@ sheet = ExtResource("17_bo")
 hframes = 4
 vframes = 2
 frame_count = 5
+inset_ratio = 0.14
 content_scale = 1.08
 
 [node name="BtnBigAttack" type="Button" parent="Buttons" unique_id=1182840675]
 layout_mode = 0
-offset_left = 660.0
-offset_top = 80.0
-offset_right = 820.0
-offset_bottom = 240.0
-theme_override_styles/normal = SubResource("CircleNormal")
-theme_override_styles/pressed = SubResource("CircleHover")
-theme_override_styles/hover = SubResource("CircleHover")
-theme_override_styles/disabled = SubResource("CircleDisabled")
+offset_left = 556.0
+offset_top = 26.0
+offset_right = 684.0
+offset_bottom = 154.0
+theme_override_styles/normal = SubResource("BtnTransparent")
+theme_override_styles/pressed = SubResource("BtnTransparent")
+theme_override_styles/hover = SubResource("BtnTransparent")
+theme_override_styles/disabled = SubResource("BtnTransparent")
+
+[node name="Bg" type="ColorRect" parent="Buttons/BtnBigAttack" unique_id=1154454039]
+show_behind_parent = true
+material = SubResource("JellyDaBo")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 
 [node name="HoverIcon" type="Control" parent="Buttons/BtnBigAttack" unique_id=1492395735]
 texture_filter = 1
@@ -626,10 +709,10 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -14.0
-offset_top = -14.000008
-offset_right = 6.0
-offset_bottom = 6.0
+offset_left = 13.0
+offset_top = 10.999992
+offset_right = -15.0
+offset_bottom = -17.000008
 grow_horizontal = 2
 grow_vertical = 2
 scale = Vector2(1, 1.1)
@@ -640,18 +723,30 @@ hframes = 4
 vframes = 2
 frame_count = 7
 fps = 12.0
+inset_ratio = 0.14
 content_scale = 1.05
 
 [node name="BtnDefend" type="Button" parent="Buttons" unique_id=1455563286]
 layout_mode = 0
-offset_left = 880.0
-offset_top = 80.0
-offset_right = 1040.0
-offset_bottom = 240.0
-theme_override_styles/normal = SubResource("CircleNormal")
-theme_override_styles/pressed = SubResource("CircleHover")
-theme_override_styles/hover = SubResource("CircleHover")
-theme_override_styles/disabled = SubResource("CircleDisabled")
+offset_left = 1066.0
+offset_top = 26.0
+offset_right = 1194.0
+offset_bottom = 154.0
+theme_override_styles/normal = SubResource("BtnTransparent")
+theme_override_styles/pressed = SubResource("BtnTransparent")
+theme_override_styles/hover = SubResource("BtnTransparent")
+theme_override_styles/disabled = SubResource("BtnTransparent")
+
+[node name="Bg" type="ColorRect" parent="Buttons/BtnDefend" unique_id=104500204]
+show_behind_parent = true
+material = SubResource("JellyFang")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 
 [node name="HoverIcon" type="Control" parent="Buttons/BtnDefend" unique_id=432668711]
 texture_filter = 1
@@ -659,10 +754,10 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -33.0
-offset_top = -28.0
-offset_right = 29.0
-offset_bottom = 34.0
+offset_left = 5.0
+offset_top = 3.0
+offset_right = -3.0
+offset_bottom = -5.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
@@ -672,18 +767,30 @@ hframes = 4
 vframes = 3
 frame_count = 12
 fps = 12.0
+inset_ratio = 0.14
 content_scale = 1.15
 
 [node name="BtnBigDefend" type="Button" parent="Buttons" unique_id=772727519]
 layout_mode = 0
-offset_left = 1100.0
-offset_top = 80.0
-offset_right = 1260.0
-offset_bottom = 240.0
-theme_override_styles/normal = SubResource("CircleNormal")
-theme_override_styles/pressed = SubResource("CircleHover")
-theme_override_styles/hover = SubResource("CircleHover")
-theme_override_styles/disabled = SubResource("CircleDisabled")
+offset_left = 1236.0
+offset_top = 26.0
+offset_right = 1364.0
+offset_bottom = 154.0
+theme_override_styles/normal = SubResource("BtnTransparent")
+theme_override_styles/pressed = SubResource("BtnTransparent")
+theme_override_styles/hover = SubResource("BtnTransparent")
+theme_override_styles/disabled = SubResource("BtnTransparent")
+
+[node name="Bg" type="ColorRect" parent="Buttons/BtnBigDefend" unique_id=1885301487]
+show_behind_parent = true
+material = SubResource("JellyDaFang")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 
 [node name="HoverIcon" type="Control" parent="Buttons/BtnBigDefend" unique_id=1785205266]
 texture_filter = 1
@@ -691,10 +798,9 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -44.0
-offset_top = -28.0
-offset_right = 46.0
-offset_bottom = 34.0
+offset_left = -2.0
+offset_top = -1.0
+offset_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
@@ -704,29 +810,61 @@ hframes = 4
 vframes = 3
 frame_count = 12
 fps = 12.0
+inset_ratio = 0.14
 content_scale = 1.15
 
 [node name="BtnSpecial" type="Button" parent="Buttons" unique_id=581864479]
 layout_mode = 0
-offset_left = 1320.0
-offset_top = 80.0
-offset_right = 1480.0
-offset_bottom = 240.0
-theme_override_styles/normal = SubResource("CircleNormal")
-theme_override_styles/pressed = SubResource("CircleHover")
-theme_override_styles/hover = SubResource("CircleHover")
-theme_override_styles/disabled = SubResource("CircleDisabled")
+offset_left = 1406.0
+offset_top = 26.0
+offset_right = 1534.0
+offset_bottom = 154.0
+theme_override_styles/normal = SubResource("BtnTransparent")
+theme_override_styles/pressed = SubResource("BtnTransparent")
+theme_override_styles/hover = SubResource("BtnTransparent")
+theme_override_styles/disabled = SubResource("BtnTransparent")
+text = "技能"
+
+[node name="Bg" type="ColorRect" parent="Buttons/BtnSpecial" unique_id=279390391]
+show_behind_parent = true
+material = SubResource("JellySpecial")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 
 [node name="BtnConfirm" type="Button" parent="Buttons" unique_id=2072422273]
 layout_mode = 0
-offset_left = 1540.0
-offset_top = 80.0
-offset_right = 1700.0
-offset_bottom = 240.0
-theme_override_styles/normal = SubResource("ConfirmNormal")
-theme_override_styles/pressed = SubResource("ConfirmActive")
-theme_override_styles/hover = SubResource("ConfirmActive")
+offset_left = 1762.0
+offset_top = 26.0
+offset_right = 1890.0
+offset_bottom = 154.0
+theme_override_styles/normal = SubResource("BtnTransparent")
+theme_override_styles/pressed = SubResource("BtnTransparent")
+theme_override_styles/hover = SubResource("BtnTransparent")
+theme_override_styles/disabled = SubResource("BtnTransparent")
 text = "结束"
+
+[node name="Bg" type="ColorRect" parent="Buttons/BtnConfirm" unique_id=659847710]
+show_behind_parent = true
+material = SubResource("JellyConfirm")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="SkillCard" parent="." unique_id=712725023 instance=ExtResource("22_skillcard")]
+layout_mode = 0
+offset_left = 30.0
+offset_top = 896.0
+offset_right = 470.0
+offset_bottom = 1024.0
 
 [node name="DeathSwitchOverlay" parent="." unique_id=812501744 instance=ExtResource("6_death")]
 layout_mode = 1

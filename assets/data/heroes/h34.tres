@@ -8,5 +8,6 @@ hero_id = "h34"
 hero_name = "世界"
 max_hp = 4
 skill_description = "寰宇同寂"
+skill_detail = "消耗 2 能对除世界外全场所有角色各造成 1 伤（含双方替补，无视防御护盾）"
 portrait_path = "res://assets/sprites/heroes/h34/h34_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h34/h34_idle.tres"

@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="HeroData" format=3]
+[gd_resource type="Resource" script_class="HeroData" format=3 uid="uid://lt6bla84d3qb"]
 
-[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_f1lmo"]
+[ext_resource type="Script" uid="uid://ciiovppuu1rft" path="res://src/battle/hero_data.gd" id="1_f1lmo"]
 
 [resource]
 script = ExtResource("1_f1lmo")
@@ -8,5 +8,6 @@ hero_id = "h20"
 hero_name = "战车"
 max_hp = 5
 skill_description = "倾力一击"
+skill_detail = "消耗全部能量，造成等量伤害"
 portrait_path = "res://assets/sprites/heroes/h20/h20_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h20/h20_idle.tres"

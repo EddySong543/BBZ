@@ -47,8 +47,13 @@ extends Panel
 		if is_node_ready() and _portrait:
 			(_portrait as TextureRect).flip_h = v
 
+## 头像框阵营染色（乘到中性深蓝灰底 → P1 冷蓝 / P2 暖红，一眼分敌我）。
+const ALLY_FRAME_TINT := Color(0.74, 0.9, 1.22)    # 己方·冷蓝（player_color 偏蓝时）
+const ENEMY_FRAME_TINT := Color(1.22, 0.82, 0.78)  # 对方·暖红（player_color 偏红时）
+
 var _portrait: TextureRect
 var _name_label: Label
+var _bg: ColorRect                # 边框果冻底（阵营色染到它上，不影响 modulate 出战/阵亡）
 var _base_stylebox: StyleBoxFlat  # P1-NEW2: 从 .tscn 取 default，state 切换基于此 duplicate
 static var _cache: Dictionary = {}
 
@@ -62,6 +67,7 @@ func _ready() -> void:
 
 
 func _setup_children() -> void:
+	_bg = get_node_or_null("Bg") as ColorRect
 	_portrait = _find_or_create_texture_rect("Portrait")
 	_name_label = _find_or_create_label("NameLabel")
 	(_name_label as Label).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -72,6 +78,7 @@ func _setup_children() -> void:
 	(_name_label as Label).add_theme_color_override("font_color", Color.WHITE)
 	(_name_label as Label).add_theme_color_override("font_outline_color", Color("#000000"))
 	(_name_label as Label).add_theme_constant_override("outline_size", 2)
+	(_name_label as Label).visible = false   # 任务4：头像框不再显示英雄名（节点保留备用）
 
 
 func _find_or_create_texture_rect(cname: String) -> TextureRect:
@@ -116,31 +123,26 @@ func _refresh_portrait() -> void:
 
 
 func _refresh_style() -> void:
-	# P1-NEW2: base stylebox 来自 .tscn theme_override_styles/panel (FrameBase SubResource)
-	# 美术换素材 → 改 .tscn FrameBase；state 差异（颜色/宽度）由下方 code 派生
-	if _base_stylebox == null:
-		return
-	var sb := _base_stylebox.duplicate() as StyleBoxFlat
-
+	# 像素徽章边框由子节点 Bg(中性深蓝灰 jelly) 绘制；阵营色染到 Bg、出战/阵亡用整框 modulate。
+	var faction := ALLY_FRAME_TINT if player_color.b >= player_color.r else ENEMY_FRAME_TINT
 	if is_dead:
-		sb.bg_color = Color("#1a1a1a")
-		sb.border_color = Color("#444444")
+		modulate = Color(0.5, 0.5, 0.55)
+		if _bg:
+			_bg.modulate = Color(0.62, 0.62, 0.68)   # 阵亡：去阵营色、压暗
 		if _portrait:
-			(_portrait as TextureRect).modulate = Color(0.35, 0.35, 0.35)
+			(_portrait as TextureRect).modulate = Color(0.4, 0.4, 0.4)
 	elif is_active:
-		sb.border_color = Color("#ffdd44")
-		sb.border_width_left = 5
-		sb.border_width_right = 5
-		sb.border_width_top = 5
-		sb.border_width_bottom = 5
+		modulate = Color(1.16, 1.22, 1.32)           # 出战高亮：中性冷亮（不撞金/铜）
+		if _bg:
+			_bg.modulate = faction * 1.12             # 出战边框：阵营色更亮
 		if _portrait:
 			(_portrait as TextureRect).modulate = Color.WHITE
 	else:
-		sb.border_color = player_color
+		modulate = Color.WHITE
+		if _bg:
+			_bg.modulate = faction                    # 待选边框：常驻阵营色
 		if _portrait:
 			(_portrait as TextureRect).modulate = Color.WHITE
-
-	add_theme_stylebox_override("panel", sb)
 
 	if _name_label:
 		(_name_label as Label).text = hero_name.substr(0, 2) if hero_name != "" else ""

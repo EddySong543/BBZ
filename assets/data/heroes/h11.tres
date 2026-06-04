@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="HeroData" format=3]
+[gd_resource type="Resource" script_class="HeroData" format=3 uid="uid://33qvljhe3ny3"]
 
-[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_k8wpg"]
+[ext_resource type="Script" uid="uid://ciiovppuu1rft" path="res://src/battle/hero_data.gd" id="1_k8wpg"]
 
 [resource]
 script = ExtResource("1_k8wpg")
@@ -8,5 +8,6 @@ hero_id = "h11"
 hero_name = "戌狗"
 max_hp = 5
 skill_description = "穷追"
+skill_detail = "戌狗在场时，当对手切换英雄，下场英雄受到1点伤害"
 portrait_path = "res://assets/sprites/heroes/h11/h11_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h11/h11_idle.tres"

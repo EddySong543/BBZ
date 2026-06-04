@@ -1,12 +1,13 @@
-[gd_resource type="Resource" script_class="HeroData" format=3]
+[gd_resource type="Resource" script_class="HeroData" format=3 uid="uid://dfg81yt8jnf6w"]
 
-[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_1h35p"]
+[ext_resource type="Script" uid="uid://ciiovppuu1rft" path="res://src/battle/hero_data.gd" id="1_1h35p"]
 
 [resource]
 script = ExtResource("1_1h35p")
 hero_id = "h01"
 hero_name = "子鼠"
 max_hp = 4
-skill_description = "窃运"
+skill_description = "盗天机"
+skill_detail = "消耗0点能量，偷取对手1点能量（0/3）"
 portrait_path = "res://assets/sprites/heroes/h01/h01_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h01/h01_idle.tres"

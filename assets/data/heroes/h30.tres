@@ -8,5 +8,6 @@ hero_id = "h30"
 hero_name = "星星"
 max_hp = 6
 skill_description = "北辰守望"
+skill_detail = "在替补席存活时，出战队友每次受伤由星星替其分担一半"
 portrait_path = "res://assets/sprites/heroes/h30/h30_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h30/h30_idle.tres"

@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="HeroData" format=3]
+[gd_resource type="Resource" script_class="HeroData" format=3 uid="uid://clb6dhrde20fn"]
 
-[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_si0qt"]
+[ext_resource type="Script" uid="uid://ciiovppuu1rft" path="res://src/battle/hero_data.gd" id="1_si0qt"]
 
 [resource]
 script = ExtResource("1_si0qt")
@@ -8,5 +8,6 @@ hero_id = "h13"
 hero_name = "愚者"
 max_hp = 5
 skill_description = "孤注一掷"
+skill_detail = "消耗2点能量，本回合你的攻击有66%概率伤害翻倍"
 portrait_path = "res://assets/sprites/heroes/h13/h13_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h13/h13_idle.tres"

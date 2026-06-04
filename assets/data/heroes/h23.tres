@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="HeroData" format=3]
+[gd_resource type="Resource" script_class="HeroData" format=3 uid="uid://b4tdtpd83pl82"]
 
-[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_5tdf5"]
+[ext_resource type="Script" uid="uid://ciiovppuu1rft" path="res://src/battle/hero_data.gd" id="1_5tdf5"]
 
 [resource]
 script = ExtResource("1_5tdf5")
@@ -8,5 +8,6 @@ hero_id = "h23"
 hero_name = "命运之轮"
 max_hp = 5
 skill_description = "周而复始"
+skill_detail = "每次登场时，随机获得一项命运的馈赠（1点攻击增幅，1点护甲，1点能量）"
 portrait_path = "res://assets/sprites/heroes/h23/h23_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h23/h23_idle.tres"

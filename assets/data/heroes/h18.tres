@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="HeroData" format=3]
+[gd_resource type="Resource" script_class="HeroData" format=3 uid="uid://bjtrk7ih4ikbo"]
 
-[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_eobmn"]
+[ext_resource type="Script" uid="uid://ciiovppuu1rft" path="res://src/battle/hero_data.gd" id="1_eobmn"]
 
 [resource]
 script = ExtResource("1_eobmn")
@@ -8,5 +8,6 @@ hero_id = "h18"
 hero_name = "教皇"
 max_hp = 6
 skill_description = "万民归心"
+skill_detail = "每存在1名队友，受到的伤害减少0.5点"
 portrait_path = "res://assets/sprites/heroes/h18/h18_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h18/h18_idle.tres"

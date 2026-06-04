@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="HeroData" format=3]
+[gd_resource type="Resource" script_class="HeroData" format=3 uid="uid://cjnyabu743cpc"]
 
-[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_j7qqm"]
+[ext_resource type="Script" uid="uid://ciiovppuu1rft" path="res://src/battle/hero_data.gd" id="1_j7qqm"]
 
 [resource]
 script = ExtResource("1_j7qqm")
@@ -8,5 +8,6 @@ hero_id = "h22"
 hero_name = "隐者"
 max_hp = 5
 skill_description = "遗世独立"
+skill_detail = "每有1名队友死亡，隐者获得加1点攻击或加1点防御"
 portrait_path = "res://assets/sprites/heroes/h22/h22_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h22/h22_idle.tres"

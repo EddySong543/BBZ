@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="HeroData" format=3]
+[gd_resource type="Resource" script_class="HeroData" format=3 uid="uid://pl158qtrayko"]
 
-[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_fnq8d"]
+[ext_resource type="Script" uid="uid://ciiovppuu1rft" path="res://src/battle/hero_data.gd" id="1_fnq8d"]
 
 [resource]
 script = ExtResource("1_fnq8d")
@@ -8,5 +8,6 @@ hero_id = "h08"
 hero_name = "未羊"
 max_hp = 5
 skill_description = "替罪"
+skill_detail = "消耗0点能量，扣除1点血量，获得2点能量"
 portrait_path = "res://assets/sprites/heroes/h08/h08_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h08/h08_idle.tres"

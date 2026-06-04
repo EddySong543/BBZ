@@ -44,6 +44,8 @@ extends Control
 @export var fps: float = 10.0
 ## 悬停时是否循环（false = 播一遍后停在末帧）。
 @export var loop_on_hover: bool = true
+## 自动播放：无需父按钮悬停，挂上即一直循环播放 idle（回合揭示气泡用）。
+@export var auto_play: bool = false
 ## 静止时停留的帧。
 @export var rest_frame: int = 0:
 	set(v):
@@ -54,7 +56,7 @@ extends Control
 
 @export_group("排布")
 ## 图标相对按钮的内边距比例（按短边），留出边框空间。0.14 ≈ 留 14%。
-@export_range(0.0, 0.45) var inset_ratio: float = 0.14:
+@export_range(0.0, 0.45) var inset_ratio: float = 0.22:
 	set(v):
 		inset_ratio = clampf(v, 0.0, 0.45)
 		queue_redraw()
@@ -68,6 +70,8 @@ extends Control
 @export_range(0.0, 1.0) var disabled_alpha: float = 0.35
 
 var _hovering: bool = false
+var _selected_play: bool = false   # 选中该动作按钮后常播 idle（任务7），运行时切换
+var _last_disabled: bool = false   # 上帧父按钮 disabled，变化即重绘（修按钮不自动亮）
 var _time: float = 0.0
 var _frame: int = 0
 
@@ -78,10 +82,13 @@ func _ready() -> void:
 	_frame = rest_frame
 	var par := get_parent()
 	if par is BaseButton:
+		_last_disabled = (par as BaseButton).disabled
 		if not par.mouse_entered.is_connected(_on_parent_enter):
 			par.mouse_entered.connect(_on_parent_enter)
 		if not par.mouse_exited.is_connected(_on_parent_exit):
 			par.mouse_exited.connect(_on_parent_exit)
+	if auto_play:
+		_hovering = true        # 持续循环播放，不依赖悬停
 	set_process(not Engine.is_editor_hint())
 
 
@@ -104,8 +111,40 @@ func make_frame_texture(frame: int = 0) -> AtlasTexture:
 	return at
 
 
+## 图标在按钮里的显示边长 ÷ 按钮边长。供回合气泡按「相同占比」显示同一图标 →
+## 自动跟随按钮里对 HoverIcon 的 offset 外扩 / content_scale 调整，气泡不再各算一套尺寸。
+func display_ratio() -> float:
+	var box := minf(size.x, size.y) * (1.0 - 2.0 * inset_ratio) * content_scale
+	var par := get_parent() as Control
+	var btn_side := minf(par.size.x, par.size.y) if par != null else 0.0
+	if btn_side <= 0.0:
+		return (1.0 - 2.0 * inset_ratio) * content_scale
+	return box / btn_side
+
+
+## 运行时开关「持续播放」：选中该动作按钮后让图标常播 idle（不依赖悬停）。
+func set_selected_play(on: bool) -> void:
+	if _selected_play == on:
+		return
+	_selected_play = on
+	if on:
+		_time = 0.0
+		_frame = 0
+	elif not _hovering:
+		_frame = rest_frame
+	queue_redraw()
+
+
 func _process(delta: float) -> void:
-	if not _hovering:
+	# 父按钮 disabled 变化 → 立即重绘，使图标亮/暗实时跟随「能不能用」
+	# （修复：攒够能量按钮不自动亮 / 不悬停时持续半透明）。
+	var par := get_parent()
+	if par is BaseButton:
+		var dis: bool = (par as BaseButton).disabled
+		if dis != _last_disabled:
+			_last_disabled = dis
+			queue_redraw()
+	if not (_hovering or _selected_play):
 		return
 	var total := _total_frames()
 	if total <= 1 or fps <= 0.0:

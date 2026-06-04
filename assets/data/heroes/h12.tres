@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="HeroData" format=3]
+[gd_resource type="Resource" script_class="HeroData" format=3 uid="uid://82agkpwpteoq"]
 
-[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_j0nfx"]
+[ext_resource type="Script" uid="uid://ciiovppuu1rft" path="res://src/battle/hero_data.gd" id="1_j0nfx"]
 
 [resource]
 script = ExtResource("1_j0nfx")
@@ -8,5 +8,6 @@ hero_id = "h12"
 hero_name = "亥猪"
 max_hp = 6
 skill_description = "吞噬"
+skill_detail = "消耗0点能量，当亥猪造成伤害时，回复等量的生命值（0/3）"
 portrait_path = "res://assets/sprites/heroes/h12/h12_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h12/h12_idle.tres"

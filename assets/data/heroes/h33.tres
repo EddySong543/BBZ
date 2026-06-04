@@ -8,5 +8,6 @@ hero_id = "h33"
 hero_name = "审判"
 max_hp = 5
 skill_description = "最后审判"
+skill_detail = "消耗 2 能处决 HP ≤ 2 的对手出战英雄（无视防御护盾），否则无效，每局最多 2 次"
 portrait_path = "res://assets/sprites/heroes/h33/h33_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h33/h33_idle.tres"

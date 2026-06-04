@@ -8,5 +8,6 @@ hero_id = "h27"
 hero_name = "节制"
 max_hp = 4
 skill_description = "以柔克刚"
+skill_detail = "受到超过 1 点伤害时，溢出部分延迟到下回合结算"
 portrait_path = "res://assets/sprites/heroes/h27/h27_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h27/h27_idle.tres"

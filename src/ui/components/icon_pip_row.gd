@@ -50,6 +50,10 @@ extends Control
 @export var wave_idle: bool = false
 ## 波纹相邻图标点起跳间隔(秒)，越小波传播越快。
 @export var wave_stagger: float = 0.12
+## 血量越少波越快：以「当前值/上限」插值波速 → 满血=1.0、濒死(→0)按 wave_low_speed 倍加速(心跳加快感)。
+@export var wave_speed_by_hp: bool = false
+## 濒死(值→0)时的波速倍率（满血基准=1.0）。
+@export var wave_low_speed: float = 3.0
 
 @export_group("排布")
 ## 单个图标点的绘制边长（物理像素，正方形）。
@@ -105,6 +109,18 @@ extends Control
 		extra_modulate = v
 		queue_redraw()
 
+@export_group("低血闪烁")
+## 开启=剩余血量（满心/半心）在低血时红色呼吸闪烁（血条用；金币/标记关）。
+@export var low_hp_flash: bool = false
+## 触发阈值：当前值/上限 ≤ 此值时开始闪。
+@export var low_hp_ratio: float = 0.3
+## 闪烁峰值叠加的红色（混入 full_modulate）。
+@export var low_hp_flash_color: Color = Color(1.7, 0.42, 0.38, 1.0)
+## 闪烁速度（rad/s）。
+@export var low_hp_flash_speed: float = 6.0
+## 闪烁强度（0~1，红色混入比例峰值）。
+@export_range(0.0, 1.0) var low_hp_flash_amount: float = 0.85
+
 @export_group("编辑器预览")
 ## @tool 下无数据时用这组值预览，便于可视化摆位；运行时被实际值覆盖。
 @export var preview_cur: float = 4.5:
@@ -132,6 +148,8 @@ var _playing: PackedByteArray = PackedByteArray()       # 0=静止 1=播放中
 var _pip_frame: PackedInt32Array = PackedInt32Array()   # 当前帧
 var _slot_count: int = 0                                # 当前绘制的图标点数
 var _wave_time: float = 0.0                             # 波纹律动累计时间
+var _flash_phase: float = 0.0                           # 低血闪烁相位
+var _flash_on: bool = false                             # 当前是否处于低血闪烁
 
 
 func _ready() -> void:
@@ -145,6 +163,8 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if Engine.is_editor_hint():
 		return                                  # 编辑器里静止显示第 0 帧，避免无谓重绘
+	if low_hp_flash:
+		_process_low_hp_flash(delta)            # 低血红闪独立于帧动画，始终生效
 	var total := hframes * vframes
 	if total <= 1 or fps <= 0.0 or _slot_count <= 0:
 		return
@@ -155,10 +175,29 @@ func _process(delta: float) -> void:
 		_process_random(delta, total)
 
 
+## 低血红闪：当前值/上限 ≤ low_hp_ratio 时推进相位、每帧重绘（满/半心脉动）；
+## 恢复后重绘一次复位。空心与护盾不受影响（仅剩余血量爱心闪）。
+func _process_low_hp_flash(delta: float) -> void:
+	var lowhp := _max > 0.0 and _cur > 0.0 and (_cur / _max) <= low_hp_ratio
+	if lowhp:
+		_flash_phase += delta
+		_flash_on = true
+		queue_redraw()
+	elif _flash_on:
+		_flash_on = false
+		queue_redraw()
+
+
 ## 波纹律动：一道波沿索引(0→N)依次点亮 → 停顿(idle_rest_min) → 循环。
 ## 索引顺序天然给出 左血条"左→右"、右血条(right_to_left)"右→左"。
 func _process_wave(delta: float, total: int) -> void:
-	_wave_time += delta
+	# 动态速度：血量越少波越快。speed 由「当前值/上限」插值，每帧用实时血量重算
+	# （每滴血独立反映到速度上）；满血=1.0 不变，濒死≈wave_low_speed 倍（心跳加快）。
+	var speed := 1.0
+	if wave_speed_by_hp and _max > 0.0:
+		var frac := clampf(_cur / _max, 0.0, 1.0)
+		speed = lerpf(maxf(wave_low_speed, 1.0), 1.0, frac)
+	_wave_time += delta * speed
 	var anim_dur := float(total) / fps
 	var cycle := maxf(float(_slot_count - 1) * wave_stagger + anim_dur + maxf(idle_rest_min, 0.1), 0.1)
 	var cyc := fmod(_wave_time, cycle)
@@ -251,13 +290,19 @@ func _draw() -> void:
 	_slot_count = maxi(filled + empties, extra_slots)
 	_ensure_slots(_slot_count)
 
+	# 剩余血量爱心的颜色：低血时红色呼吸脉动（仅满/半心，空心不变）。
+	var live_mod := full_modulate
+	if low_hp_flash and _flash_on:
+		var pulse := 0.5 + 0.5 * sin(_flash_phase * low_hp_flash_speed)
+		live_mod = full_modulate.lerp(low_hp_flash_color, pulse * low_hp_flash_amount)
+
 	# 第一层：血量（满 / 半 / 暗色空心）
 	var slot := 0
 	for _i in range(full_n):                 # 满
-		_draw_pip(slot, 1.0, full_modulate, true)
+		_draw_pip(slot, 1.0, live_mod, true)
 		slot += 1
 	if has_half:                             # 半
-		_draw_pip(slot, 0.5, full_modulate, true)
+		_draw_pip(slot, 0.5, live_mod, true)
 		slot += 1
 	for _i in range(empties):                # 暗色空心占位（不跳动）
 		_draw_pip(slot, 1.0, empty_modulate, false)

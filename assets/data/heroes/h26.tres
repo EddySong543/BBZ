@@ -8,5 +8,6 @@ hero_id = "h26"
 hero_name = "死神"
 max_hp = 4
 skill_description = "向死而生"
+skill_detail = "消耗 4 能永久变身收割形态，此后所有伤害 +1 且击杀回 2 HP，每局 1 次"
 portrait_path = "res://assets/sprites/heroes/h26/h26_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h26/h26_idle.tres"
