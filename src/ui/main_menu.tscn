@@ -4,9 +4,9 @@
 [ext_resource type="PackedScene" uid="uid://ddiu7ck5le8p3" path="res://src/ui/scenes/menu_background.tscn" id="2_bg"]
 [ext_resource type="PackedScene" uid="uid://ccx2qeqk5rvx5" path="res://src/ui/components/character_display.tscn" id="3_char"]
 [ext_resource type="PackedScene" uid="uid://bforedustcmp" path="res://src/ui/components/fore_dust.tscn" id="4_foredust"]
-[ext_resource type="Texture2D" uid="uid://d2elpwcm7vwqa" path="res://assets/ui/newAssets/longTab.png" id="5_long"]
-[ext_resource type="Texture2D" uid="uid://dvy2idovern52" path="res://assets/ui/newAssets/midTab.png" id="6_mid"]
-[ext_resource type="Texture2D" uid="uid://cxmfnlkqnveeu" path="res://assets/ui/newAssets/orangeButton.png" id="7_orange"]
+[ext_resource type="Texture2D" uid="uid://d2elpwcm7vwqa" path="res://assets/ui/buttons/longTab.png" id="5_long"]
+[ext_resource type="Texture2D" uid="uid://dvy2idovern52" path="res://assets/ui/buttons/midTab.png" id="6_mid"]
+[ext_resource type="Texture2D" uid="uid://cxmfnlkqnveeu" path="res://assets/ui/buttons/orangeButton.png" id="7_orange"]
 
 [sub_resource type="StyleBoxFlat" id="BtnNormal"]
 bg_color = Color(0.13, 0.14, 0.22, 0.82)

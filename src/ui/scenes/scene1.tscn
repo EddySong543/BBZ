@@ -7,10 +7,9 @@
 [ext_resource type="Texture2D" uid="uid://bnoqmmqjiq38l" path="res://assets/scenes/scene1/Scene1_moon.png" id="5_moon"]
 [ext_resource type="Shader" uid="uid://dpaogff5yo8xt" path="res://assets/shaders/canvas_env_moon_halo.gdshader" id="6_halo"]
 [ext_resource type="Shader" uid="uid://coh7sfy7jmc26" path="res://assets/shaders/canvas_env_horizon_haze.gdshader" id="10_haze"]
-[ext_resource type="Shader" uid="uid://clhfkajcds46m" path="res://assets/shaders/canvas_env_clouds.gdshader" id="11_clouds"]
-[ext_resource type="Texture2D" uid="uid://cs6rtnmt7nn3" path="res://assets/scenes/NewAssets/scene1_mountain.png" id="12_mtntex"]
-[ext_resource type="Texture2D" uid="uid://nb106ifrsave" path="res://assets/scenes/NewAssets/scene1_frontRooftop1.png" id="13_front1"]
-[ext_resource type="Texture2D" uid="uid://bgybtupsa42ml" path="res://assets/scenes/NewAssets/Scene1_frontRooftop2.png" id="14_front2"]
+[ext_resource type="Texture2D" uid="uid://cs6rtnmt7nn3" path="res://assets/scenes/scene1/scene1_mountain.png" id="12_mtntex"]
+[ext_resource type="Texture2D" uid="uid://nb106ifrsave" path="res://assets/scenes/scene1/scene1_frontRooftop1.png" id="13_front1"]
+[ext_resource type="Texture2D" uid="uid://bgybtupsa42ml" path="res://assets/scenes/scene1/Scene1_frontRooftop2.png" id="14_front2"]
 [ext_resource type="Shader" uid="uid://bxudpdq6445n7" path="res://assets/shaders/canvas_env_meteor.gdshader" id="15_meteor"]
 [ext_resource type="Shader" uid="uid://8nr5wbxavv34" path="res://assets/shaders/canvas_fx_edge_soften.gdshader" id="16_edgesoft"]
 [ext_resource type="Shader" uid="uid://u0mpca3l8lig" path="res://assets/shaders/canvas_fx_moonlight.gdshader" id="17_moonlight"]
@@ -81,18 +80,6 @@ shader_parameter/flicker_speed = 0.6
 [sub_resource type="ShaderMaterial" id="EdgeSoftenMat"]
 shader = ExtResource("16_edgesoft")
 shader_parameter/edge_blur = 1.50000007125
-
-[sub_resource type="ShaderMaterial" id="CloudsMat"]
-shader = ExtResource("11_clouds")
-shader_parameter/cloud_color = Color(0.3, 0.36, 0.5, 1)
-shader_parameter/coverage = 0.58
-shader_parameter/softness = 0.45
-shader_parameter/opacity = 0.42
-shader_parameter/cloud_scale = Vector2(2.5, 3.5)
-shader_parameter/drift_speed = 0.012
-shader_parameter/warp_amount = 0.15
-shader_parameter/top_bias = 0.55
-shader_parameter/fade_span = 0.3
 
 [sub_resource type="ShaderMaterial" id="HazeMat"]
 shader = ExtResource("10_haze")
@@ -267,18 +254,6 @@ offset_bottom = 836.6752
 mouse_filter = 2
 texture = ExtResource("12_mtntex")
 expand_mode = 1
-
-[node name="Clouds" type="ColorRect" parent="." unique_id=786085262]
-visible = false
-material = SubResource("CloudsMat")
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-color = Color(0, 0, 0, 0)
 
 [node name="HorizonHaze" type="ColorRect" parent="." unique_id=1841776131]
 material = SubResource("HazeMat")

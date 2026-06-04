@@ -31,7 +31,7 @@ const HP_UNIT := 2       # 1 HP = 2 半点
 const MIN_DAMAGE := 1    # 最小伤害 = 1 半点 = 0.5 HP
 
 const INITIAL_ENERGY := 1
-const MAX_ENERGY := 20
+const MAX_ENERGY := 10
 
 ## key = Action enum int；damage 单位为半点。
 const BASE_ACTION_DEF := {

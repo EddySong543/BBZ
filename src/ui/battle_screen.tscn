@@ -8,17 +8,15 @@
 [ext_resource type="PackedScene" uid="uid://cscn1rftp00a" path="res://src/ui/scenes/scene1.tscn" id="7_stage"]
 [ext_resource type="Shader" uid="uid://dnycv6j3wn0ot" path="res://assets/shaders/post_fx_color_grade.gdshader" id="8_postfx"]
 [ext_resource type="Shader" uid="uid://cldul26ik2rgm" path="res://assets/shaders/canvas_post_godray.gdshader" id="9_godray"]
-[ext_resource type="Texture2D" uid="uid://xcqh16w8t4ia" path="res://assets/scenes/NewAssets/scene1_leaf.png" id="10_leaf"]
-[ext_resource type="Shader" uid="uid://hol4eldshbb0" path="res://assets/shaders/canvas_fx_motion_blur.gdshader" id="11_leafblur"]
 [ext_resource type="PackedScene" uid="uid://bforedustcmp" path="res://src/ui/components/fore_dust.tscn" id="12_foredust"]
-[ext_resource type="Texture2D" uid="uid://cq7w4kpww2rkq" path="res://assets/ui/newAssets/heart_idle.png" id="13_heart"]
-[ext_resource type="Texture2D" uid="uid://dmk21cawlx7uf" path="res://assets/ui/newAssets/energy_idle.png" id="14_coin"]
+[ext_resource type="Texture2D" uid="uid://cq7w4kpww2rkq" path="res://assets/ui/icons/heart_idle.png" id="13_heart"]
+[ext_resource type="Texture2D" uid="uid://dmk21cawlx7uf" path="res://assets/ui/icons/energy_idle.png" id="14_coin"]
 [ext_resource type="Script" uid="uid://cel6yroklcse5" path="res://src/ui/components/hover_icon.gd" id="15_hovericon"]
-[ext_resource type="Texture2D" uid="uid://cbwxfqjpi8q5r" path="res://assets/ui/newAssets/Zan_idle.png" id="16_zan"]
-[ext_resource type="Texture2D" uid="uid://clwpo0nw0io3c" path="res://assets/ui/newAssets/Bo_idle.png" id="17_bo"]
-[ext_resource type="Texture2D" uid="uid://bi2d2aupxvtke" path="res://assets/ui/newAssets/DaBo_idle.png" id="18_dabo"]
-[ext_resource type="Texture2D" uid="uid://1wrmooe2eynb" path="res://assets/ui/newAssets/Fang_idle.png" id="19_fang"]
-[ext_resource type="Texture2D" uid="uid://bg6qynpwqkgmw" path="res://assets/ui/newAssets/DaFang_idle.png" id="20_dafang"]
+[ext_resource type="Texture2D" uid="uid://cbwxfqjpi8q5r" path="res://assets/ui/icons/Zan_idle.png" id="16_zan"]
+[ext_resource type="Texture2D" uid="uid://clwpo0nw0io3c" path="res://assets/ui/icons/Bo_idle.png" id="17_bo"]
+[ext_resource type="Texture2D" uid="uid://bi2d2aupxvtke" path="res://assets/ui/icons/DaBo_idle.png" id="18_dabo"]
+[ext_resource type="Texture2D" uid="uid://1wrmooe2eynb" path="res://assets/ui/icons/Fang_idle.png" id="19_fang"]
+[ext_resource type="Texture2D" uid="uid://bg6qynpwqkgmw" path="res://assets/ui/icons/DaFang_idle.png" id="20_dafang"]
 
 [sub_resource type="Gradient" id="ShadowGradient"]
 offsets = PackedFloat32Array(0, 0.95913464, 0.99759614, 1)
@@ -60,31 +58,6 @@ shader_parameter/vignette_radius = 0.91100004094343
 shader_parameter/vignette_softness = 0.55
 shader_parameter/grain_amount = 0.018
 shader_parameter/grain_scale = 1.6
-
-[sub_resource type="ShaderMaterial" id="LeafBlurMat"]
-shader = ExtResource("11_leafblur")
-shader_parameter/blur_dir = Vector2(0.87, 0.49)
-shader_parameter/blur_amount = 0.06
-
-[sub_resource type="ParticleProcessMaterial" id="LeafMat"]
-emission_shape = 3
-emission_box_extents = Vector3(250, 180, 1)
-angle_min = -180.0
-angle_max = 180.0
-direction = Vector3(0.87, 0.49, 0)
-spread = 10.0
-initial_velocity_min = 1900.0
-initial_velocity_max = 2500.0
-angular_velocity_min = -140.0
-angular_velocity_max = 140.0
-gravity = Vector3(0, 150, 0)
-scale_min = 0.25
-scale_max = 0.5
-turbulence_enabled = true
-turbulence_noise_strength = 8.0
-turbulence_noise_scale = 1.0
-turbulence_influence_min = 0.05
-turbulence_influence_max = 0.15
 
 [sub_resource type="StyleBoxFlat" id="CircleNormal"]
 bg_color = Color(0.164706, 0.164706, 0.290196, 1)
@@ -253,18 +226,6 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(0, 0, 0, 1)
 
-[node name="FallingLeaves" type="GPUParticles2D" parent="." unique_id=2039469610]
-visible = false
-material = SubResource("LeafBlurMat")
-position = Vector2(150, -80)
-amount = 2
-texture = ExtResource("10_leaf")
-lifetime = 2.5
-preprocess = 1.0
-randomness = 1.0
-visibility_rect = Rect2(-2000, -2000, 6000, 5000)
-process_material = SubResource("LeafMat")
-
 [node name="P1HeartRow" parent="." unique_id=140100001 instance=ExtResource("4_piprow")]
 texture_filter = 1
 anchors_preset = 0
@@ -279,6 +240,7 @@ idle_rest_max = 5.0
 wave_idle = true
 pip_size = 100.0
 spacing = -50.0
+extra_modulate = Color(0.6177773, 0.6495925, 0.7172231, 1)
 
 [node name="P2HeartRow" parent="." unique_id=140100002 instance=ExtResource("4_piprow")]
 texture_filter = 1
@@ -295,14 +257,15 @@ wave_idle = true
 pip_size = 100.0
 spacing = -50.0
 right_to_left = true
+extra_modulate = Color(0.8, 0.82, 0.86, 1)
 
 [node name="P1CoinRow" parent="." unique_id=1966048575 instance=ExtResource("4_piprow")]
 texture_filter = 1
 anchors_preset = 0
 offset_left = 122.985
-offset_top = 47.42
+offset_top = 48.85
 offset_right = 476.985
-offset_bottom = 89.42003
+offset_bottom = 90.85
 sheet = ExtResource("14_coin")
 hframes = 4
 vframes = 4
@@ -315,15 +278,16 @@ per_row_cap = 10
 row_spacing = -20.0
 show_empty = false
 allow_half = false
-preview_cur = 20.0
+extra_modulate = Color(0.8, 0.82, 0.86, 1)
+preview_cur = 10.865
 
 [node name="P2CoinRow" parent="." unique_id=1708577516 instance=ExtResource("4_piprow")]
 texture_filter = 1
 anchors_preset = 0
 offset_left = 1799.74
-offset_top = 47.145
+offset_top = 48.04
 offset_right = 1999.74
-offset_bottom = 89.14494
+offset_bottom = 90.04005
 sheet = ExtResource("14_coin")
 hframes = 4
 vframes = 4
@@ -337,7 +301,8 @@ per_row_cap = 10
 row_spacing = -20.0
 show_empty = false
 allow_half = false
-preview_cur = 20.0
+extra_modulate = Color(0.8, 0.82, 0.86, 1)
+preview_cur = 10.0
 
 [node name="TurnLabel" type="Label" parent="." unique_id=1408631385]
 visible = false
@@ -427,6 +392,7 @@ pip_size = 22.0
 spacing = 0.0
 show_empty = false
 allow_half = false
+extra_modulate = Color(0.8, 0.82, 0.86, 1)
 
 [node name="P1Frame1Hp" type="Label" parent="." unique_id=1952929696]
 layout_mode = 0
@@ -464,6 +430,7 @@ pip_size = 22.0
 spacing = 0.0
 show_empty = false
 allow_half = false
+extra_modulate = Color(0.8, 0.82, 0.86, 1)
 
 [node name="P1Frame2Hp" type="Label" parent="." unique_id=1859547373]
 layout_mode = 0
@@ -523,6 +490,7 @@ pip_size = 22.0
 spacing = 0.0
 show_empty = false
 allow_half = false
+extra_modulate = Color(0.8, 0.82, 0.86, 1)
 
 [node name="P2Frame1Hp" type="Label" parent="." unique_id=35987408]
 layout_mode = 0
@@ -560,6 +528,7 @@ pip_size = 22.0
 spacing = 0.0
 show_empty = false
 allow_half = false
+extra_modulate = Color(0.8, 0.82, 0.86, 1)
 
 [node name="P2Frame2Hp" type="Label" parent="." unique_id=1691399540]
 layout_mode = 0
@@ -738,7 +707,6 @@ fps = 12.0
 content_scale = 1.15
 
 [node name="BtnSpecial" type="Button" parent="Buttons" unique_id=581864479]
-visible = false
 layout_mode = 0
 offset_left = 1320.0
 offset_top = 80.0

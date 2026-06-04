@@ -81,16 +81,6 @@ extends SubViewportContainer
 		if is_node_ready() and _sprite and v != "":
 			_ensure_animation("defeat", v)
 
-## Universal defend shield spritesheet (shared across all heroes).
-## When a hero uses 防/大防, this shield overlay appears on top of the character.
-@export var shield_spritesheet_path: String = "":
-	set(v):
-		shield_spritesheet_path = v
-		if is_node_ready() and _shield_sprite and v != "":
-			_load_shield_spritesheet()
-
-## Shield overlay transparency (0 = invisible, 1 = fully opaque). Tune in Inspector.
-@export var shield_opacity: float = 0.5
 @export var frame_size: int = 256
 @export var frame_cols: int = 4
 @export var frame_rows: int = 4
@@ -138,7 +128,6 @@ extends SubViewportContainer
 		_apply_light()
 
 var _sprite: AnimatedSprite2D
-var _shield_sprite: AnimatedSprite2D
 var _return_to_idle: bool = false
 
 static var _sprite_cache: Dictionary = {}
@@ -150,10 +139,7 @@ func _ready() -> void:
 		var vp: SubViewport = get_child(0) as SubViewport
 		for c in vp.get_children():
 			if c is AnimatedSprite2D:
-				if c.name == "DefendShield":
-					_shield_sprite = c as AnimatedSprite2D
-				else:
-					_sprite = c as AnimatedSprite2D
+				_sprite = c as AnimatedSprite2D
 	if not _sprite:
 		_build_nodes()
 
@@ -175,10 +161,6 @@ func _ready() -> void:
 	if defeat_spritesheet_path != "":
 		_ensure_animation("defeat", defeat_spritesheet_path)
 
-	# Load universal defend shield spritesheet
-	if _shield_sprite and shield_spritesheet_path != "":
-		_load_shield_spritesheet()
-
 	if not _sprite.animation_finished.is_connected(_on_anim_finished):
 		_sprite.animation_finished.connect(_on_anim_finished)
 
@@ -186,8 +168,6 @@ func _ready() -> void:
 	# 像素清晰：SubViewport 内默认是 Linear 过滤会把精灵放大糊掉，强制 Nearest（容器 + 精灵）
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	if _shield_sprite:
-		_shield_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	# 角色光照 shader（背光 + 月光边缘光 rim + 受击白闪）。
 	if _sprite.material == null:
 		var fmat := ShaderMaterial.new()
@@ -210,13 +190,6 @@ func _build_nodes() -> void:
 	_sprite.position = sprite_offset
 	_sprite.scale = sprite_scale
 	vp.add_child(_sprite)
-
-	_shield_sprite = AnimatedSprite2D.new()
-	_shield_sprite.name = "DefendShield"
-	_shield_sprite.position = sprite_offset
-	_shield_sprite.scale = sprite_scale
-	_shield_sprite.visible = false
-	vp.add_child(_shield_sprite)
 
 
 func _load_spritesheet() -> void:
@@ -345,39 +318,3 @@ func _apply_light() -> void:
 	mat.set_shader_parameter("warmth_amount", warmth_amount)
 	var ldx: float = -light_dir.x if flip_h else light_dir.x
 	mat.set_shader_parameter("light_dir", Vector2(ldx, light_dir.y))
-
-
-func _load_shield_spritesheet() -> void:
-	if not _shield_sprite or shield_spritesheet_path == "":
-		return
-	if not ResourceLoader.exists(shield_spritesheet_path):
-		push_warning("CharacterDisplay: shield spritesheet not found: " + shield_spritesheet_path)
-		return
-
-	var tex: Texture2D = load(shield_spritesheet_path)
-	var frames := SpriteFrames.new()
-	frames.add_animation("appear")
-	frames.set_animation_speed("appear", anim_fps)
-	frames.set_animation_loop("appear", false)
-	for row in range(frame_rows):
-		for col in range(frame_cols):
-			var atlas := AtlasTexture.new()
-			atlas.atlas = tex
-			atlas.region = Rect2(col * frame_size, row * frame_size, frame_size, frame_size)
-			frames.add_frame("appear", atlas)
-	_shield_sprite.sprite_frames = frames
-	_shield_sprite.visible = false
-
-
-## Show or hide the universal defend shield overlay.
-## Call with true when hero uses 防/大防, false to hide.
-func show_defend_shield(on: bool) -> void:
-	if not _shield_sprite or not _shield_sprite.sprite_frames:
-		return
-	if on:
-		_shield_sprite.visible = true
-		_shield_sprite.modulate = Color(1, 1, 1, shield_opacity)
-		_shield_sprite.play("appear")
-	else:
-		_shield_sprite.visible = false
-		_shield_sprite.stop()

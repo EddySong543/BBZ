@@ -7,15 +7,10 @@
 [ext_resource type="Texture2D" uid="uid://bnoqmmqjiq38l" path="res://assets/scenes/scene1/Scene1_moon.png" id="5_moon"]
 [ext_resource type="Shader" uid="uid://dpaogff5yo8xt" path="res://assets/shaders/canvas_env_moon_halo.gdshader" id="6_halo"]
 [ext_resource type="Shader" uid="uid://coh7sfy7jmc26" path="res://assets/shaders/canvas_env_horizon_haze.gdshader" id="10_haze"]
-[ext_resource type="Shader" uid="uid://clhfkajcds46m" path="res://assets/shaders/canvas_env_clouds.gdshader" id="11_clouds"]
-[ext_resource type="Texture2D" uid="uid://cs6rtnmt7nn3" path="res://assets/scenes/NewAssets/scene1_mountain.png" id="12_mtntex"]
-[ext_resource type="Texture2D" uid="uid://nb106ifrsave" path="res://assets/scenes/NewAssets/scene1_frontRooftop1.png" id="13_front1"]
-[ext_resource type="Texture2D" uid="uid://bgybtupsa42ml" path="res://assets/scenes/NewAssets/Scene1_frontRooftop2.png" id="14_front2"]
+[ext_resource type="Texture2D" uid="uid://cs6rtnmt7nn3" path="res://assets/scenes/scene1/scene1_mountain.png" id="12_mtntex"]
 [ext_resource type="Shader" uid="uid://bxudpdq6445n7" path="res://assets/shaders/canvas_env_meteor.gdshader" id="15_meteor"]
 [ext_resource type="Shader" uid="uid://8nr5wbxavv34" path="res://assets/shaders/canvas_fx_edge_soften.gdshader" id="16_edgesoft"]
 [ext_resource type="Shader" uid="uid://u0mpca3l8lig" path="res://assets/shaders/canvas_fx_moonlight.gdshader" id="17_moonlight"]
-[ext_resource type="Texture2D" uid="uid://d1522s6a5yegg" path="res://assets/scenes/NewAssets/Scene1_tower.png" id="18_tower"]
-[ext_resource type="Shader" uid="uid://b3ng2d6n5tfti" path="res://assets/shaders/canvas_fx_window_light.gdshader" id="19_winlight"]
 
 [sub_resource type="ShaderMaterial" id="SkyMat"]
 shader = ExtResource("3_sky")
@@ -50,6 +45,7 @@ shader_parameter/flash_duration = 0.3
 shader_parameter/flash_boost = 0.7
 shader_parameter/moon_pos = Vector2(0.359, 0.55)
 shader_parameter/moon_clear = 0.4
+shader_parameter/edge_margin = 0.14
 
 [sub_resource type="ShaderMaterial" id="MeteorMat"]
 shader = ExtResource("15_meteor")
@@ -82,18 +78,6 @@ shader_parameter/flicker_speed = 0.6
 shader = ExtResource("16_edgesoft")
 shader_parameter/edge_blur = 1.50000007125
 
-[sub_resource type="ShaderMaterial" id="CloudsMat"]
-shader = ExtResource("11_clouds")
-shader_parameter/cloud_color = Color(0.3, 0.36, 0.5, 1)
-shader_parameter/coverage = 0.58
-shader_parameter/softness = 0.45
-shader_parameter/opacity = 0.42
-shader_parameter/cloud_scale = Vector2(2.5, 3.5)
-shader_parameter/drift_speed = 0.012
-shader_parameter/warp_amount = 0.15
-shader_parameter/top_bias = 0.55
-shader_parameter/fade_span = 0.3
-
 [sub_resource type="ShaderMaterial" id="HazeMat"]
 shader = ExtResource("10_haze")
 shader_parameter/haze_color = Color(0.16, 0.22, 0.34, 1)
@@ -104,27 +88,6 @@ shader_parameter/noise_scale = 3.0
 shader_parameter/noise_amount = 0.55
 shader_parameter/edge_wobble = 0.06
 shader_parameter/flow_speed = 0.02
-
-[sub_resource type="ShaderMaterial" id="TowerSoftenMat"]
-shader = ExtResource("16_edgesoft")
-shader_parameter/edge_blur = 2.0
-
-[sub_resource type="ShaderMaterial" id="WindowLightMat"]
-shader = ExtResource("19_winlight")
-shader_parameter/win1 = Vector2(0.4, 0.46)
-shader_parameter/win2 = Vector2(0.535, 0.46)
-shader_parameter/win3 = Vector2(0.26, 0.64)
-shader_parameter/win4 = Vector2(0.245, 0.82)
-shader_parameter/aspect = 1.273
-shader_parameter/light_color = Color(1, 0.58, 0.26, 1)
-shader_parameter/glow_radius = 0.03500000166249
-shader_parameter/glow_intensity = 0.8030000381425
-shader_parameter/shaft_dir = Vector2(0.05, 1)
-shader_parameter/shaft_length = 0.1600000076
-shader_parameter/shaft_width = 0.00400000018999
-shader_parameter/shaft_intensity = 0.0
-shader_parameter/flicker_amount = 0.08
-shader_parameter/flicker_speed = 2.3
 
 [sub_resource type="ShaderMaterial" id="RooftopMoonMat"]
 shader = ExtResource("17_moonlight")
@@ -274,19 +237,6 @@ mouse_filter = 2
 texture = ExtResource("12_mtntex")
 expand_mode = 1
 
-[node name="Clouds" type="ColorRect" parent="." unique_id=786085262]
-visible = false
-material = SubResource("CloudsMat")
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-color = Color(0, 0, 0, 0)
-metadata/_edit_lock_ = true
-
 [node name="HorizonHaze" type="ColorRect" parent="." unique_id=1841776131]
 material = SubResource("HazeMat")
 layout_mode = 1
@@ -297,66 +247,6 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 color = Color(0, 0, 0, 0)
-metadata/_edit_lock_ = true
-
-[node name="Tower" type="TextureRect" parent="." unique_id=299192421]
-visible = false
-self_modulate = Color(1, 0.82, 0.55, 1)
-texture_filter = 2
-material = SubResource("TowerSoftenMat")
-layout_mode = 0
-offset_left = 233.0
-offset_top = 406.0
-offset_right = 562.99976
-offset_bottom = 758.0
-mouse_filter = 2
-texture = ExtResource("18_tower")
-expand_mode = 1
-metadata/parallax_factor = 0.8
-metadata/_edit_lock_ = true
-
-[node name="TowerWindows" type="ColorRect" parent="." unique_id=1196873822]
-visible = false
-material = SubResource("WindowLightMat")
-layout_mode = 0
-offset_left = 261.75
-offset_top = 440.845
-offset_right = 591.74976
-offset_bottom = 792.845
-mouse_filter = 2
-color = Color(0, 0, 0, 0)
-metadata/parallax_factor = 0.8
-metadata/_edit_lock_ = true
-
-[node name="RooftopL" type="TextureRect" parent="." unique_id=111504973]
-visible = false
-self_modulate = Color(0.4, 0.46, 0.6, 1)
-texture_filter = 2
-layout_mode = 0
-offset_left = -302.0
-offset_top = 623.0
-offset_right = 258.0
-offset_bottom = 903.0
-mouse_filter = 2
-texture = ExtResource("14_front2")
-expand_mode = 1
-flip_h = true
-metadata/parallax_factor = 0.85
-metadata/_edit_lock_ = true
-
-[node name="RooftopR" type="TextureRect" parent="." unique_id=50263200]
-visible = false
-self_modulate = Color(0.4, 0.46, 0.6, 1)
-texture_filter = 2
-layout_mode = 0
-offset_left = 1781.0
-offset_top = 810.19
-offset_right = 1991.0
-offset_bottom = 903.19
-mouse_filter = 2
-texture = ExtResource("13_front1")
-expand_mode = 1
-metadata/parallax_factor = 0.85
 metadata/_edit_lock_ = true
 
 [node name="Rooftop" type="TextureRect" parent="." unique_id=2002299607]

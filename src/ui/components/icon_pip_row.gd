@@ -23,6 +23,7 @@ extends Control
 @export var sheet: Texture2D:
 	set(v):
 		sheet = v
+		_rebuild_gray_tex()
 		queue_redraw()
 ## 横向帧数（heart_idle=4，energy_idle=4）。
 @export var hframes: int = 1:
@@ -98,8 +99,8 @@ extends Control
 	set(v):
 		empty_modulate = v
 		queue_redraw()
-## 额外段（护盾）色调（青）。
-@export var extra_modulate: Color = Color(0.42, 0.78, 1.0, 1.0):
+## 护盾覆盖色（银灰；先把心形去色再 × 本色 → 真银灰，不受红心原色影响）。
+@export var extra_modulate: Color = Color(0.92, 0.94, 0.98, 1.0):
 	set(v):
 		extra_modulate = v
 		queue_redraw()
@@ -122,6 +123,7 @@ extends Control
 var _cur: float = 0.0
 var _max: float = 0.0
 var _extra: float = 0.0
+var _gray_tex: Texture2D = null   # 去色版心形(护盾银灰覆盖用；× extra_modulate = 真银灰)
 
 # 每个图标点独立的 idle 状态（错峰、偶发播放）。索引 = 槽位。
 var _phase: PackedFloat32Array = PackedFloat32Array()   # 当前段已过时间
@@ -135,6 +137,8 @@ var _wave_time: float = 0.0                             # 波纹律动累计时�
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if _gray_tex == null:
+		_rebuild_gray_tex()
 	set_process(true)
 
 
@@ -241,10 +245,13 @@ func _draw() -> void:
 	var extra_full := int(floor(extra + 0.0001))
 	var extra_half := allow_half and (extra - float(extra_full)) >= 0.49
 
-	# 估算总点数 → 同步 idle 状态数组（空心不跳，但仍占槽位以对齐索引）
-	_slot_count = filled + empties + extra_full + (1 if extra_half else 0)
+	# 总宽取「血量段」与「护盾段」较大者：护盾灰色覆盖叠在血量爱心上(从最左起)，
+	# 仅当护盾多于血量槽位时才向右延伸。空心不跳但仍占槽位以对齐索引。
+	var extra_slots := extra_full + (1 if extra_half else 0)
+	_slot_count = maxi(filled + empties, extra_slots)
 	_ensure_slots(_slot_count)
 
+	# 第一层：血量（满 / 半 / 暗色空心）
 	var slot := 0
 	for _i in range(full_n):                 # 满
 		_draw_pip(slot, 1.0, full_modulate, true)
@@ -255,16 +262,24 @@ func _draw() -> void:
 	for _i in range(empties):                # 暗色空心占位（不跳动）
 		_draw_pip(slot, 1.0, empty_modulate, false)
 		slot += 1
-	for _i in range(extra_full):             # 护盾满
-		_draw_pip(slot, 1.0, extra_modulate, true)
-		slot += 1
-	if extra_half:                           # 护盾半
-		_draw_pip(slot, 0.5, extra_modulate, true)
-		slot += 1
+
+	# 第二层：护盾银灰覆盖。从最左(slot 0)起叠在血量爱心之上；用去色心形 ×
+	# 银灰 extra_modulate → 真银灰(不受红心原色影响)；半格/整格同血量；不跳动。
+	var shield_tex: Texture2D = _gray_tex if _gray_tex != null else sheet
+	var sslot := 0
+	for _i in range(extra_full):             # 护盾满格
+		_draw_pip(sslot, 1.0, extra_modulate, false, shield_tex)
+		sslot += 1
+	if extra_half:                           # 护盾半格
+		_draw_pip(sslot, 0.5, extra_modulate, false, shield_tex)
+		sslot += 1
 
 
 ## 画第 index 个图标点。fill<1 = 半颗（裁靠内一侧）；animate=false 强制第 0 帧（空心用）。
-func _draw_pip(index: int, fill: float, mod: Color, animate: bool) -> void:
+func _draw_pip(index: int, fill: float, mod: Color, animate: bool, tex: Texture2D = null) -> void:
+	var t: Texture2D = tex if tex != null else sheet
+	if t == null:
+		return
 	var step := pip_size + spacing
 	var col := index
 	var row := 0
@@ -279,8 +294,8 @@ func _draw_pip(index: int, fill: float, mod: Color, animate: bool) -> void:
 	var frame := 0
 	if animate and index < _pip_frame.size():
 		frame = _pip_frame[index]
-	var fw := sheet.get_width() / hframes
-	var fh := sheet.get_height() / vframes
+	var fw := t.get_width() / hframes
+	var fh := t.get_height() / vframes
 	var fcol := frame % hframes
 	var frow := frame / hframes
 	var src := Rect2(fcol * fw, frow * fh, fw, fh)
@@ -295,4 +310,26 @@ func _draw_pip(index: int, fill: float, mod: Color, animate: bool) -> void:
 		else:
 			src.size.x *= 0.5
 			dst.size.x *= 0.5
-	draw_texture_rect_region(sheet, dst, src, mod)
+	draw_texture_rect_region(t, dst, src, mod)
+
+
+## 生成去色版心形纹理：护盾用它 × 银灰 extra_modulate 得到真银灰
+## （红心原色经乘法只会变暗红，必须先去色为灰度再上色）。sheet 变更时重建一次。
+func _rebuild_gray_tex() -> void:
+	if sheet == null:
+		_gray_tex = null
+		return
+	var img := sheet.get_image()
+	if img == null:
+		_gray_tex = null
+		return
+	img = img.duplicate()
+	if img.is_compressed():
+		img.decompress()
+	for yy in img.get_height():
+		for xx in img.get_width():
+			var c := img.get_pixel(xx, yy)
+			var l := c.r * 0.299 + c.g * 0.587 + c.b * 0.114
+			var lb := clampf(l * 1.1 + 0.5, 0.0, 1.0)   # 整体提亮到银白区，保留相对明暗
+			img.set_pixel(xx, yy, Color(lb, lb, lb, c.a))
+	_gray_tex = ImageTexture.create_from_image(img)

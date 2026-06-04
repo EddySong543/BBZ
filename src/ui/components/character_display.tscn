@@ -8,7 +8,6 @@ texture_filter = 1
 offset_right = 166.0
 offset_bottom = 260.0
 script = ExtResource("1_script")
-shield_spritesheet_path = "res://assets/sprites/vfx/defend_shield.png"
 
 [node name="SubViewport" type="SubViewport" parent="." unique_id=1325957388]
 transparent_bg = true
@@ -28,9 +27,3 @@ position = Vector2(170, 154)
 scale = Vector2(1.9, 1.9)
 sprite_frames = ExtResource("2_3v6dl")
 animation = &"idle"
-
-[node name="DefendShield" type="AnimatedSprite2D" parent="SubViewport" unique_id=-512020783]
-visible = false
-texture_filter = 1
-position = Vector2(101.00001, 154)
-scale = Vector2(1.9, 1.9)
