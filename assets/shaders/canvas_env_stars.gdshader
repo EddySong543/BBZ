@@ -1,39 +1,36 @@
 shader_type canvas_item;
 
 // =============================================================
-// canvas_env_stars.gdshader  (v4: 3×3 邻域 → 星芒跨格不裁切；随机偶发闪烁)
+// canvas_env_stars.gdshader  (v10: 粗像素十字星 + 个体不规则"眨眼"闪烁 + seed)
 // 作者: Claude (Game Studios) ｜ 用途: scene1 深夜繁星（纯程序化，全屏）
-//   每格至多一颗星，每颗都具十字星芒：平时只显"亮点"，按各自随机周期偶发"闪烁"
-//   (展开横竖星芒 + 增亮)，满天错开 → 自然随机闪烁，且和飘动浮尘明显区分。
-//   ★ v4：fragment 采样 3×3 邻格累加 → 星芒延伸出格时不再被格边界裁掉(修"半边芒")。
-//   自动避开月亮天区。
-// 目标平台: PC (Windows D3D12 / Forward+)。复杂度: 全屏 1 pass、9 格 hash 算术 → 低-中。
-// 渲染管线: Godot 4.6 Forward+（2D canvas_item，alpha 混合，TIME 驱动）。
+//   ★ v10：回到「每颗星独立随机闪烁」，但换新形式——【多频叠加的不规则眨眼】(scintillation)：
+//     三个不同频率正弦叠加 + 每星随机相位 → 亮度忽明忽暗、有快有慢、不规则，
+//     像真实星星大气闪烁，明显区别于之前"单一正弦平滑明灭"。去掉潮汐波/漂移。
+//     星形状：星核 + 常驻小十字芒(区别浮尘)；seed 每次进场景随机洗牌。
+//   目标平台: PC (Windows D3D12 / Forward+)。复杂度: 单层 3×3 邻域纯算术 → 低。
+//   渲染管线: Godot 4.6 Forward+（2D canvas_item，alpha 混合，TIME 驱动）。
 // =============================================================
 
 group_uniforms density;
-uniform vec2 grid = vec2(32.0, 18.0);
-uniform float star_amount : hint_range(0.80, 0.999) = 0.95;
+uniform vec2 grid = vec2(32.0, 18.0);                        // 星分布网格(星格数)
+uniform float star_amount : hint_range(0.80, 0.999) = 0.95; // 出星阈值(高=星更少)
+uniform float center_bias : hint_range(0.0, 0.3) = 0.04;    // 中央密度偏置(0=完全均匀)
+uniform float seed : hint_range(0.0, 1000.0) = 0.0;         // 随机种子(脚本每次进场景随机设)
 group_uniforms;
 
 group_uniforms look;
 uniform vec4 star_color : source_color = vec4(0.85, 0.92, 1.0, 1.0);
-uniform float star_size : hint_range(0.5, 4.0) = 1.6;        // 亮点核心半径(像素)
-uniform float brightness : hint_range(0.0, 2.0) = 0.9;
+uniform float brightness : hint_range(0.0, 2.0) = 1.0;
 group_uniforms;
 
-group_uniforms twinkle;  // 亮点的基础微闪(所有星，持续轻微)
-uniform float twinkle_speed : hint_range(0.0, 3.0) = 0.7;
-uniform float twinkle_depth : hint_range(0.0, 1.0) = 0.35;
+group_uniforms twinkle;  // 个体不规则眨眼(多频叠加+随机相位 → 每星各自忽明忽暗，非单一正弦)
+uniform float twinkle_speed : hint_range(0.0, 3.0) = 1.2;   // 闪烁基准速度
+uniform float twinkle_depth : hint_range(0.0, 1.0) = 0.6;   // 闪烁幅度(越大忽明忽暗越剧烈)
 group_uniforms;
 
-group_uniforms sparkle;  // 十字星芒 + 随机偶发闪烁
-uniform float spike_length : hint_range(2.0, 40.0) = 8.0;        // 星芒长度(像素，闪烁时)
-uniform float spike_width : hint_range(0.5, 4.0) = 1.2;          // 星芒粗细(像素)
-uniform float flash_min_interval : hint_range(1.0, 20.0) = 8.0;  // 每星闪烁最小间隔(秒)
-uniform float flash_max_interval : hint_range(1.0, 30.0) = 24.0; // 最大间隔(与上构成随机区间)
-uniform float flash_duration : hint_range(0.05, 0.6) = 0.30;    // 单次闪烁占周期比例(大→更舒缓)
-uniform float flash_boost : hint_range(0.0, 3.0) = 0.7;         // 闪烁时增亮倍量
+group_uniforms sparkle;  // 常驻小十字星芒(形状特征 → 区别于圆形浮尘粒子)
+uniform float spike_blocks : hint_range(0.0, 4.0) = 1.6;    // 常驻星芒长度(像素块)
+uniform float spike_strength : hint_range(0.0, 1.0) = 0.5;  // 星芒亮度(相对星核)
 group_uniforms;
 
 group_uniforms moon_avoid;
@@ -41,8 +38,12 @@ uniform vec2 moon_pos = vec2(0.745, 0.16);
 uniform float moon_clear : hint_range(0.0, 0.5) = 0.13;
 group_uniforms;
 
-group_uniforms edge;  // 画面四边留空：每边一条 edge_margin 宽的渐隐带(四角因 x、y 两因子相乘缩得更多) → 边缘无锐利亮星被战斗 PostFX 拉成长条
-uniform float edge_margin : hint_range(0.0, 0.45) = 0.14;   // 每边渐隐带宽度(UV比例)；0=星布满到边，越大留空越多
+group_uniforms edge;  // 四边渐隐留空 → 边缘无锐利亮星被战斗 PostFX 拉成长条
+uniform float edge_margin : hint_range(0.0, 0.45) = 0.14;
+group_uniforms;
+
+group_uniforms pixelate;
+uniform float pixel_grid : hint_range(20.0, 600.0) = 90.0;  // 横向像素格数(宽度计)，越大格越小越精细
 group_uniforms;
 
 float hash21(vec2 p) {
@@ -55,61 +56,60 @@ vec2 hash22(vec2 p) {
 	return fract(vec2(hash21(p + n), hash21(p + n + 1.7)));
 }
 
-// 单颗星(指定网格 cell)对当前像素(全局网格坐标 gpos)的亮度贡献
-float star_contrib(vec2 cell, vec2 gpos, vec2 cell_px) {
-	float present = step(star_amount, hash21(cell + 1.3));
-	vec2 star_uv = hash22(cell + 7.7);
-	float base_b = mix(0.35, 1.0, hash21(cell + 9.1));
-	float phase = hash21(cell + 3.3) * 6.2831;
+// 单颗星(density cell)对当前像素块(bcell)的亮度贡献(静止 + 不规则眨眼)。
+float star_contrib(vec2 cell, vec2 bcell, vec2 pg) {
+	vec2 sc = cell + seed;
+	vec2 star_in = hash22(sc + 7.7);
+	vec2 star_uv = (cell + star_in) / grid;
+	float amount = clamp(star_amount + center_bias * distance(star_uv, vec2(0.5)), 0.0, 0.999);
+	float present = step(amount, hash21(sc + 1.3));
+	vec2 star_bcell = floor(star_uv * pg);
+	float base_b = mix(0.4, 1.0, hash21(sc + 9.1));
 
-	vec2 star_gpos = cell + star_uv;                  // 星的全局网格位置
-	vec2 dp = (gpos - star_gpos) * cell_px;           // 当前像素到星的像素偏移(可跨格)
-	float dist = length(dp);
-	float core = 1.0 - smoothstep(star_size * 0.5, star_size, dist);
+	vec2 dcell = bcell - star_bcell;
+	float adx = abs(dcell.x);
+	float ady = abs(dcell.y);
+	float core = step(adx, 0.5) * step(ady, 0.5);
+	// 常驻小十字芒(固定形状)
+	float harm = step(ady, 0.5) * step(0.5, adx) * (1.0 - smoothstep(0.0, spike_blocks + 0.001, adx));
+	float varm = step(adx, 0.5) * step(0.5, ady) * (1.0 - smoothstep(0.0, spike_blocks + 0.001, ady));
+	float shape = core + (harm + varm) * spike_strength;
 
-	float tw = 1.0 - twinkle_depth * (0.5 + 0.5 * sin(TIME * twinkle_speed + phase));
-	float period = mix(flash_min_interval, flash_max_interval, hash21(cell + 5.5));
-	float pp = fract(TIME / period + hash21(cell + 8.2));
-	float flash = smoothstep(0.0, flash_duration * 0.35, pp)
-		* (1.0 - smoothstep(flash_duration * 0.35, flash_duration, pp));
+	// 个体不规则眨眼：三频叠加 + 每星随机相位/速度 → 忽明忽暗、有快有慢
+	float ph = hash21(sc + 3.3) * 100.0;
+	float spd = twinkle_speed * mix(0.6, 1.4, hash21(sc + 4.4));
+	float t = TIME * spd + ph;
+	float fl = (sin(t) + 0.7 * sin(t * 1.9 + 1.3) + 0.5 * sin(t * 4.3 + 2.7)) / 2.2;  // ~ -1..1 不规则
+	float tw = clamp(1.0 + twinkle_depth * fl, 0.0, 2.0);
 
-	float len = spike_length * max(flash, 0.001);
-	float adx = abs(dp.x);
-	float ady = abs(dp.y);
-	float sh = (1.0 - smoothstep(0.0, len, adx)) * exp(-(ady * ady) / (spike_width * spike_width));
-	float sv = (1.0 - smoothstep(0.0, len, ady)) * exp(-(adx * adx) / (spike_width * spike_width));
-	float spikes = (sh + sv) * flash;
-
-	float lum = base_b * brightness;
-	return present * (core * tw * (1.0 + flash * flash_boost) + spikes * (1.0 + flash_boost)) * lum;
+	return present * shape * base_b * brightness * tw;
 }
 
 void fragment() {
 	vec2 vp = 1.0 / SCREEN_PIXEL_SIZE;
 	float aspect = vp.x / vp.y;
-	vec2 uv = UV;
 
-	vec2 gpos = uv * grid;
-	vec2 cell0 = floor(gpos);
-	vec2 cell_px = vp / grid;
+	vec2 pg = vec2(pixel_grid, pixel_grid / aspect);
+	vec2 bcell = floor(UV * pg);
+	vec2 buv = (bcell + 0.5) / pg;
 
-	// 3×3 邻域累加 → 星芒可延伸出本格、不被格边界裁切
-	float accum = 0.0;
+	// 3×3 邻域累加 → 常驻星芒延伸出 density 格时不被格边界裁切
+	vec2 dcell0 = floor(buv * grid);
+	float lum = 0.0;
 	for (int oy = -1; oy <= 1; oy++) {
 		for (int ox = -1; ox <= 1; ox++) {
-			accum += star_contrib(cell0 + vec2(float(ox), float(oy)), gpos, cell_px);
+			lum += star_contrib(dcell0 + vec2(float(ox), float(oy)), bcell, pg);
 		}
 	}
 
 	// 远离月亮天区
-	vec2 md = uv - moon_pos;
+	vec2 md = buv - moon_pos;
 	md.x *= aspect;
 	float moon_mask = smoothstep(moon_clear * 0.5, moon_clear, length(md));
 
-	// 四边矩形遮罩：每边留 edge_margin 宽的渐隐带；四角因 x、y 两因子相乘缩得更多。
-	// 边缘无锐利亮星 → 战斗 PostFX 的边缘模糊/畸变没有亮星可拉成长条。
-	vec2 em = smoothstep(vec2(0.0), vec2(edge_margin), uv) * smoothstep(vec2(0.0), vec2(edge_margin), 1.0 - uv);
+	// 四边矩形渐隐遮罩
+	vec2 em = smoothstep(vec2(0.0), vec2(edge_margin), buv) * smoothstep(vec2(0.0), vec2(edge_margin), 1.0 - buv);
 	float edge_mask = em.x * em.y;
 
-	COLOR = vec4(star_color.rgb, clamp(accum * moon_mask * edge_mask, 0.0, 1.0));
+	COLOR = vec4(star_color.rgb, clamp(lum * moon_mask * edge_mask, 0.0, 1.0));
 }

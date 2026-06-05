@@ -1,40 +1,12 @@
-[gd_scene load_steps=5 format=3 uid="uid://bhfrm000000000001"]
+[gd_scene load_steps=2 format=3 uid="uid://bhfrm000000000001"]
 
 [ext_resource type="Script" path="res://src/ui/components/hero_frame.gd" id="1_script"]
-[ext_resource type="Shader" path="res://assets/shaders/canvas_button_jelly.gdshader" id="2_jelly"]
-
-[sub_resource type="ShaderMaterial" id="FrameJelly"]
-shader = ExtResource("2_jelly")
-shader_parameter/fill_top = Color(0.83, 0.55, 0.44, 1)
-shader_parameter/fill_bottom = Color(0.5, 0.28, 0.2, 1)
-shader_parameter/edge_inner = Color(1.0, 0.76, 0.62, 1)
-shader_parameter/edge_outer = Color(0.26, 0.13, 0.09, 1)
-shader_parameter/fill_alpha = 1.0
-shader_parameter/pixel_grid = 24.0
-shader_parameter/corner = 0.12
-shader_parameter/edge_px = 2.0
-shader_parameter/noise_amt = 0.02
-shader_parameter/wear = 0.04
-
-[sub_resource type="StyleBoxEmpty" id="FrameEmpty"]
 
 [node name="HeroFrame" type="Panel"]
 layout_mode = 0
 offset_right = 72.0
 offset_bottom = 72.0
-theme_override_styles/panel = SubResource("FrameEmpty")
 script = ExtResource("1_script")
-
-[node name="Bg" type="ColorRect" parent="."]
-show_behind_parent = true
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-material = SubResource("FrameJelly")
 
 [node name="Portrait" type="TextureRect" parent="."]
 layout_mode = 1
@@ -42,9 +14,9 @@ anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 9.0
-offset_top = 9.0
+offset_top = 14.0
 offset_right = -9.0
-offset_bottom = -9.0
+offset_bottom = -6.0
 grow_horizontal = 2
 grow_vertical = 2
 expand_mode = 1

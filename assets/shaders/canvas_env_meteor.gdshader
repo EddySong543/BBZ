@@ -30,6 +30,10 @@ uniform float spawn_top : hint_range(0.0, 1.0) = 0.05;     // 起点天区上边
 uniform float spawn_band : hint_range(0.0, 1.0) = 0.45;    // 起点天区高度
 group_uniforms;
 
+group_uniforms pixelate;  // 像素化：横向像素格数(宽度计)，越小格越粗
+uniform float pixel_grid : hint_range(20.0, 600.0) = 90.0;
+group_uniforms;
+
 float hash1(float n) { return fract(sin(n * 127.1) * 43758.5453); }
 vec2 hash2(float n) { return fract(sin(vec2(n * 127.1, n * 311.7)) * 43758.5453); }
 
@@ -37,6 +41,10 @@ void fragment() {
 	vec2 vp = 1.0 / SCREEN_PIXEL_SIZE;
 	float aspect = vp.x / vp.y;
 	vec2 dir = normalize(travel_dir);
+
+	// 像素化：UV 吸附到粗像素块(UV 方格、aspect 校正保持方形) → 拖尾变粗像素点列
+	vec2 pg = vec2(pixel_grid, pixel_grid / aspect);
+	vec2 uv = (floor(UV * pg) + 0.5) / pg;
 
 	float cycle = floor(TIME / period);            // 当前周期索引
 	float t_in = fract(TIME / period) * period;    // 周期内已过秒数
@@ -48,7 +56,7 @@ void fragment() {
 		// 起点(天空上部随机)，在 aspect 校正空间(x: 0..aspect)
 		vec2 start = vec2((0.6 + rnd.x * 0.4) * aspect, spawn_top + rnd.y * spawn_band);
 		vec2 head = start + dir * travel_len * prog;
-		vec2 P = vec2(UV.x * aspect, UV.y);
+		vec2 P = vec2(uv.x * aspect, uv.y);
 		vec2 toP = P - head;
 		float along = dot(toP, -dir);              // 沿拖尾方向(>0 = 在流星头后方)
 		float perp = length(toP + dir * along);    // 到轨迹线的垂直距离
