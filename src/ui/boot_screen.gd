@@ -228,7 +228,17 @@ func _run_combo(blue_wins: bool) -> void:
 	bt.tween_method(_set_burst, 0.0, 1.3, 0.6) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	await bt.finished
-	_set_burst(0.0)
+	# 白幕收束：决堤光最亮时用全屏白幕快速合上，盖过场景切换的硬接缝；
+	# main_menu 会从同样的全白淡出 → boot→菜单 无缝（dip-to-white 转场，去僵硬感）。
+	var fade := ColorRect.new()
+	fade.color = Color.WHITE
+	fade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fade.modulate.a = 0.0
+	add_child(fade)
+	var ft := create_tween()
+	ft.tween_property(fade, "modulate:a", 1.0, 0.22).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	await ft.finished
 	_on_swept(blue_wins)
 
 

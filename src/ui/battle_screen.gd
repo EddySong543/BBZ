@@ -22,7 +22,7 @@ const LOW_HP_RATIO := 0.3
 
 ## 默认阵容 fallback：直接打开 battle_screen.tscn(F6) 测试用，BattleSetup 为空时启用。
 const HERO_DATA_DIR := "res://assets/data/heroes/"
-const DEFAULT_P0 := ["h01", "h05", "h13"]   # 窃运 / 天威 / 孤注（均有美术 h01-h17）
+const DEFAULT_P0 := ["h01", "h05", "h13"]   # 盗天机 / 天威 / 孤注（均有美术 h01-h17）
 const DEFAULT_P1 := ["h02", "h09", "h16"]   # 怒目 / 凶兽 / 泽被苍生（均有美术）
 
 ## 各动画相位等待（秒），可在 Inspector 调。
@@ -94,6 +94,7 @@ var selected_btn: Button = null
 
 # ---- juice ----
 var _shake := 0.0
+var _confirm_pulse: Tween   # 「结束」按钮的呼吸金光（有待确认动作时召唤点击）
 var _cd_home: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]  # 立绘原位（前冲 juice 复位用）
 var _shadow_home: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]  # 阴影原位（跟随角色水平位移用）
 
@@ -170,8 +171,10 @@ func _init_buttons() -> void:
 	for btn in [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend, btn_special]:
 		FontManager.apply_btn(btn, 16)
 		btn.clip_text = true
+		_attach_button_juice(btn)
 	FontManager.apply_btn(btn_confirm, 16)
 	btn_confirm.clip_text = true
+	_attach_button_juice(btn_confirm)
 
 	# 技能按钮「技能」二字单独放大 + 描边，叠在紫色果冻底上清晰可读。
 	FontManager.apply_btn(btn_special, 30)
@@ -339,6 +342,7 @@ func _on_confirm_pressed() -> void:
 	selected_switch = -1
 	selected_btn = null
 	_reset_button_styles()
+	_set_confirm_active(false)   # 停止呼吸：已确认提交
 	await _resolve()
 
 
@@ -528,23 +532,45 @@ func _reset_button_styles() -> void:
 	_set_confirm_active(false)
 
 
-## 选中态视觉：果冻底常显，选中按钮整体提亮 + 从中心轻微放大
+## 给按钮挂 ButtonJuice 交互手感组件（幂等：已挂则跳过）。
+func _attach_button_juice(btn: BaseButton) -> void:
+	if btn.get_node_or_null("ButtonJuice") == null:
+		var bj := ButtonJuice.new()
+		bj.name = "ButtonJuice"
+		btn.add_child(bj)
+
+
+## 选中态视觉：果冻底常显，选中按钮整体提亮 + 从中心放大（缩放手感交给 ButtonJuice 弹性处理）。
 ## （不再用不透明 StyleBox 盖住果冻 —— 那正是"点击后变回老版"的根因）。
 func _set_btn_selected(btn: Button, on: bool) -> void:
 	# 选中高亮用「冷亮蓝白」而非暖金 —— 暖金会撞 skill_card 的金色书本/羊皮纸（任务2）。
 	# 银色按钮 × 冷亮 → 像通电发光，与金色图鉴格冷暖区分明显。
 	btn.modulate = Color(1.28, 1.42, 1.6) if on else Color.WHITE
-	btn.pivot_offset = btn.size * 0.5
-	btn.scale = Vector2.ONE * (1.08 if on else 1.0)
+	var juice := btn.get_node_or_null("ButtonJuice") as ButtonJuice
+	if juice != null:
+		juice.set_selected(on)   # 弹性放大/复位（带 overshoot）
+	else:
+		btn.pivot_offset = btn.size * 0.5
+		btn.scale = Vector2.ONE * (1.08 if on else 1.0)
 	# 任务7：选中该动作按钮后，让按钮内的美术图标持续播 idle（取消选中则回静止帧）。
 	var hi := btn.get_node_or_null("HoverIcon") as HoverIcon
 	if hi != null:
 		hi.set_selected_play(on)
 
 
-## 结束按钮"可确认"高亮：选中动作/切换后整体暖亮（用 modulate，不再用已废弃的 StyleBox 覆盖）。
+## 结束按钮"可确认"召唤：有待确认动作时**呼吸金光**，明确区分「已选定」与「已确认」——
+## 选了动作只是待提交，必须再点「结束」才出招，呼吸把玩家视线引到这一步（修"选完以为就完了"的错觉）。
 func _set_confirm_active(on: bool) -> void:
-	btn_confirm.modulate = Color(1.35, 1.36, 1.18) if on else Color.WHITE
+	if _confirm_pulse and _confirm_pulse.is_valid():
+		_confirm_pulse.kill()
+	if on:
+		_confirm_pulse = create_tween().set_loops()
+		_confirm_pulse.tween_property(btn_confirm, "modulate", Color(1.75, 1.6, 1.2), 0.55) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		_confirm_pulse.tween_property(btn_confirm, "modulate", Color(1.28, 1.3, 1.12), 0.55) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	else:
+		btn_confirm.modulate = Color.WHITE
 
 
 func _update_button_states() -> void:

@@ -21,6 +21,21 @@ func _ready() -> void:
 	_load_featured_hero()
 	_setup_buttons()
 	_coming_soon.modulate.a = 0.0
+	_play_intro()
+
+
+## 入场转场：承接 boot 决堤白幕 —— 全屏白幕淡出，主菜单从光中浮现（衔接 boot→menu，去硬切感）。
+func _play_intro() -> void:
+	var fade := ColorRect.new()
+	fade.color = Color.WHITE
+	fade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fade.z_index = 4096   # 盖住一切，最后淡出
+	add_child(fade)
+	var tw := create_tween()
+	tw.tween_interval(0.05)
+	tw.tween_property(fade, "modulate:a", 0.0, 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(fade.queue_free)
 
 
 ## 把 featured 英雄的 idle 立绘喂给左侧展示组件。
