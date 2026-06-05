@@ -72,6 +72,14 @@ func test_h10_wave_upgrades_every_third_turn() -> void:
 	assert_eq(b.hp[1][0], 30 - 8, "1+1+2 = 4.0（8 半点），第3回合波升级")
 
 
+func test_h10_third_wave_pierces_defend() -> void:
+	var b := _battle2([["h10", 5], ["t01", 10], ["t02", 10]], [["t10", 15], ["t11", 10], ["t12", 10]])
+	_aa(b, ATTACK, CHARGE)   # 回合1：波 1.0 (30→28)
+	_aa(b, ATTACK, CHARGE)   # 回合2：波 1.0 (28→26)
+	_aa(b, ATTACK, DEFEND)   # 回合3：波按大波判定 → 穿"防"，受 2.0 (26→22)
+	assert_eq(b.hp[1][0], 22, "第3波穿防：30 -2 -2 -4 半点")
+
+
 # ---- h16 皇后 ----
 
 func test_h16_heals_whole_team_including_reserves() -> void:

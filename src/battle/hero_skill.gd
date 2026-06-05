@@ -32,9 +32,16 @@ func on_setup(_battle: BattleCore, _player: int, _slot: int) -> void:
 
 ## 出伤计算：修改本英雄【造成】的伤害（半点）。返回修改后的值。
 ## h02 怒目 / h03 渴血 / h05 天威 / h09 凶兽 / h10 啼晓 / h13 孤注 / h22 / h25 蓄势 /
-## h26 收割形态 / h28 契约队友 / h31 月相(造成)。
+## h26 收割形态 / h28 契约队友 / h31 月相(造成) / h13 孤注(翻倍 buff)。
 func modify_outgoing_damage(dmg: int, _action: int, _battle: BattleCore, _player: int, _slot: int) -> int:
 	return dmg
+
+
+## 攻击判定类型覆盖（防御门用）：出战英雄发起基础攻击(波/大波)时调用，
+## 返回该次攻击在防御门里按哪种类型判定（ATTACK=被"防"挡 / BIG_ATTACK=穿"防"被"大防"挡）。
+## 默认按原动作判定。h10 啼晓：第 3/6/9… 回合把"波"升级为大波判定（伤害另由 modify_outgoing 给到）。
+func override_attack_kind(action: int, _battle: BattleCore, _player: int, _slot: int) -> int:
+	return action
 
 
 ## 受伤管线：修改本英雄【受到】的伤害（半点，已过防御门）。返回修改后的值（下限 0）。
@@ -148,7 +155,7 @@ func execute_active(_battle: BattleCore, _player: int, _slot: int) -> void:
 	pass
 
 
-# --- 攻击型主动技（伤害走伤害管线，§D9）。h12 吞噬 / h13 孤注 / h20 倾力 ---
+# --- 攻击型主动技（伤害走伤害管线，§D9）。h20 倾力（h12 吞噬 / h13 孤注 已改 buff 型，见各自文件）---
 
 ## 本主动技是否是一次"攻击"（造成伤害、走 _apply_damage 管线）。默认 false（即时型）。
 func active_is_attack() -> bool:
@@ -163,7 +170,7 @@ func active_attack_damage(_battle: BattleCore, _player: int, _slot: int) -> int:
 func active_attack_kind() -> int:
 	return ActionDef.Action.ATTACK
 
-## 攻击型主动技命中结算后回调（dealt = 实际落在 HP 上的半点）。吞噬 h12 用于吸血。
+## 攻击型主动技命中结算后回调（dealt = 实际落在 HP 上的半点）。预留给攻击型主动技按需追加效果。
 func on_active_attack_resolved(_battle: BattleCore, _player: int, _slot: int, _dealt: int) -> void:
 	pass
 

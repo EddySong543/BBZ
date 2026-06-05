@@ -8,6 +8,6 @@ hero_id = "h24"
 hero_name = "正义"
 max_hp = 6
 skill_description = "天平归衡"
-skill_detail = "消耗2点能量，平衡你和对手的血量（每回合变化！）"
+skill_detail = "消耗2点能量，平衡你和对手的血量（0/2，每回合变化！）"
 portrait_path = "res://assets/sprites/heroes/h24/h24_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h24/h24_idle.tres"

@@ -83,26 +83,40 @@ func test_h32_burn_expires() -> void:
 	assert_eq(int(b.get_status(1, 0, "burn", 0)), 0, "燃烧 2 回合后消失")
 
 
-# ---- h15 女祭司（沉默）----
+# ---- h15 女祭司（沉默 2 回合，冻结叠层而非抹除）----
 
-func test_h15_silences_passive_and_clears_combo() -> void:
+func test_h15_silences_passive_freezes_combo() -> void:
 	var b := _battle2([["h15", 10], ["t01", 10], ["t02", 10]], [["h09", 4], ["t11", 10], ["t12", 10]])
 	_aa(b, CHARGE, ATTACK)            # 凶兽 1.0，combo→1
 	_aa(b, CHARGE, ATTACK)            # 凶兽 2.0，combo→2
-	b.select_active(0)               # P0 三缄：沉默 + 清叠层
-	b.select_action(1, ATTACK)       # 凶兽被沉默 → 只打基础 1.0
+	b.select_active(0)               # P0 三缄：沉默对手出战 2 回合
+	b.select_action(1, ATTACK)       # 凶兽被沉默 → modify_outgoing 失效，只打基础 1.0
 	b.resolve()
-	assert_eq(int(b.get_status(1, 0, "combo", 0)), 0, "连段被清、沉默下不再累积")
+	assert_eq(int(b.get_status(1, 0, "combo", 0)), 2, "沉默下连段冻结（不清零、不累积）")
 	assert_eq(b.hp[0][0], 12, "20 -2 -4 -2：第三波因沉默只造成 1.0")
 
 
-func test_h15_clears_stack_status() -> void:
-	var b := _battle2([["h15", 10], ["t01", 10], ["t02", 10]], [["h03", 5], ["t11", 10], ["t12", 10]])
-	b.set_status(1, 0, "xuexue", 2)
-	b.select_active(0)
-	b.select_action(1, CHARGE)
+func test_h15_silence_lasts_two_turns() -> void:
+	var b := _battle2([["h15", 10], ["t01", 10], ["t02", 10]], [["h09", 4], ["t11", 10], ["t12", 10]])
+	b.set_status(1, 0, "combo", 2)   # 凶兽已有 2 层连段
+	b.select_active(0)               # 回合0：三缄沉默凶兽（silenced_until=1）
+	b.select_action(1, ATTACK)       # 沉默 → 基础 1.0
 	b.resolve()
-	assert_eq(int(b.get_status(1, 0, "xuexue", 0)), 0, "三缄抹除渴血叠层")
+	assert_true(b._is_silenced(1, 0), "回合0 沉默生效")
+	_aa(b, CHARGE, ATTACK)           # 回合1：仍在沉默期 → 基础 1.0（否则 combo 会让伤害更高）
+	assert_eq(b.hp[0][0], 16, "两回合均沉默：20 -2 -2")
+	_aa(b, CHARGE, ATTACK)           # 回合2：沉默解除 → 凶兽 combo 恢复作用
+	assert_lt(b.hp[0][0], 16, "回合2 沉默解除，凶兽被动恢复")
+
+
+func test_h15_silence_keeps_stacks() -> void:
+	var b := _battle2([["h15", 10], ["t01", 10], ["t02", 10]], [["h03", 5], ["t11", 10], ["t12", 10]])
+	b.set_status(1, 0, "xuexue", 2)   # 寅虎已有 2 层渴血
+	b.select_active(0)               # 三缄沉默寅虎（出战 slot0）
+	b.select_action(1, ATTACK)       # 寅虎出波，被沉默 → 渴血团队 buff 失效，只打基础 1.0
+	b.resolve()
+	assert_eq(int(b.get_status(1, 0, "xuexue", 0)), 2, "叠层保留（不再被抹除）")
+	assert_eq(b.hp[0][0], 18, "沉默下渴血失效：波仅 1.0 (20-2，否则应 -6)")
 
 
 # ---- h17 皇帝（禁用动作）----

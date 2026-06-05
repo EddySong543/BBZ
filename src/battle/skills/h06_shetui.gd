@@ -5,7 +5,7 @@ extends HeroSkill
 ## debuff 清单随后续英雄扩充（燃烧 h32 / 易伤 / 沉默 h15 等）。
 
 const REVIVE_HP_HALF := 2 * ActionDef.HP_UNIT   # 2.0 HP
-const DEBUFF_KEYS := ["burn", "vulnerable", "silenced"]
+const DEBUFF_KEYS := ["burn", "vulnerable", "silenced_until"]
 
 
 func on_before_death(battle: BattleCore, player: int, slot: int) -> bool:

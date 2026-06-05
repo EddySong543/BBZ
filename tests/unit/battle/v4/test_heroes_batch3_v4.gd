@@ -175,5 +175,5 @@ func test_h22_two_points_when_solo() -> void:
 func test_h22_def_variant_reduces_damage() -> void:
 	var b := _battle2([["h22", 5], ["t01", 10], ["t02", 10]], [["t10", 10], ["t11", 10], ["t12", 10]])
 	b.set_status(0, 0, "yinzhe_def", 1)    # 模拟玩家选了"防"
-	_aa(b, CHARGE, BIG)                    # 大波 2.0 - 1.0 = 1.0
-	assert_eq(b.hp[0][0], 8, "+1 防 → 实受 1.0 (10-2)")
+	_aa(b, CHARGE, BIG)                    # 大波 2.0(4半) - 0.5(1半) = 1.5
+	assert_eq(b.hp[0][0], 7, "+1 防层 → 减 0.5 → 实受 1.5 (10-3)")

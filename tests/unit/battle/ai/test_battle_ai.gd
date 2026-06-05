@@ -143,10 +143,12 @@ func test_death_switch_is_matchup_aware() -> void:
 # ---- 随机技多样本评估（T3）----
 
 func test_stochastic_multisample_reduces_variance() -> void:
-	# Arrange：h13 孤注（66% 翻倍）局面——p0 用主动技、p1 攒
+	# Arrange：h13 孤注（66% 翻倍）局面——预挂孤注 buff，p0 出波触发翻倍掷骰、p1 攒
+	# （h13 已改 buff 型：发动主动技那步是确定的挂 buff，随机性在「下一次攻击」结算时发生）
 	var b := _battle2([["h13", 5], ["t01", 10], ["t02", 10]], [["t10", 10], ["t11", 10], ["t12", 10]])
+	b.set_status(0, 0, "guzhu_buff", true)   # 孤注 buff 已挂 → 下一次攻击触发 66% 翻倍
 	var ai := BattleAI.new(123, 1)
-	var ca := {action = ActionDef.ACTIVE, target = -1}
+	var ca := {action = ATTACK, target = -1}   # p0 出波 → 命中前 guzhu_buff 掷骰
 	var cb := {action = CHARGE, target = -1}
 
 	# Act：单次 rollout vs 多样本 _value_after，各采 30 次

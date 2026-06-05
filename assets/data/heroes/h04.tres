@@ -8,6 +8,6 @@ hero_id = "h04"
 hero_name = "卯兔"
 max_hp = 4
 skill_description = "三窟"
-skill_detail = "每次切换下场时，卯兔获得一个“窟”（“窟”：下次受到的伤害减少1"
+skill_detail = "每次切换下场时，卯兔获得一个“窟”（“窟”：最多3层，下次受到的伤害减少1）"
 portrait_path = "res://assets/sprites/heroes/h04/h04_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h04/h04_idle.tres"

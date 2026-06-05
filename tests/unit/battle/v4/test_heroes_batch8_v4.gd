@@ -5,7 +5,7 @@ extends GutTest
 ##   h26 死神 —— 变身（form+1.0 伤 / 击杀回血）
 ##   h28 恶魔 —— 契约（队友 +1.0 / 恶魔付 HP）
 ##   h31 月亮 —— 四相 turn%4（造成/受到 ×0.5 / ×2）
-##   h14 梅开 —— 下一动作 ×2（攒/攻；切换不消耗）
+##   h14 梅开 —— 下一动作 ×2（所有动作，含切换连切 2 个 / 主动技发动 2 次）
 ##   h24 天平 —— HP 拉平均（扶倾）
 ##   h07 当先 —— 免费切换不占槽 + 同回合行动
 ## ============================================================================
@@ -144,15 +144,16 @@ func test_h14_doubles_charge() -> void:
 	assert_eq(b.energy[0], 6, "攒 ×2（4+2）")
 
 
-func test_h14_switch_does_not_consume() -> void:
+func test_h14_switch_also_doubles() -> void:
 	var b := _battle2([["h14", 5], ["t01", 10], ["t02", 10]], [["t10", 10], ["t11", 10], ["t12", 10]])
 	b.select_active(0)
 	b.select_action(1, CHARGE)
 	b.resolve()
-	b.select_switch(0, 1)     # 切换不消耗 meikai
+	b.select_switch(0, 1)     # 梅开下切换也 ×2：连切 0→1→2
 	b.select_action(1, CHARGE)
 	b.resolve()
-	assert_true(b.get_status(0, 0, "meikai", false), "切换不消耗，meikai 保留")
+	assert_false(b.get_status(0, 0, "meikai", false), "切换也消耗 meikai")
+	assert_eq(b.active_index[0], 2, "连切 2 个不同英雄，最终停在 slot2")
 
 
 # ---- h24 天平 ----

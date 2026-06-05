@@ -246,9 +246,10 @@ func is_action_disabled(player: int, action: int) -> bool:
 	return false
 
 
-## 出战英雄被沉默（h15）：本回合其被动 hook 失效。
+## 出战英雄被沉默（h15）：被动 hook 失效，直到 statuses["silenced_until"] 回合（含）为止。
+## 默认 -1 → turn_number(≥0) <= -1 恒 false（未沉默）。三缄设 silenced_until = 当前回合+1 → 沉默 2 回合。
 func _is_silenced(player: int, slot: int) -> bool:
-	return int(get_status(player, slot, "silenced_turn", -1)) == turn_number
+	return turn_number <= int(get_status(player, slot, "silenced_until", -1))
 
 
 ## 统一回血入口：燃烧(h32)期间禁回血。返回实际回复量（半点）。
@@ -407,14 +408,13 @@ func resolve() -> Dictionary:
 		for s in range(_killer[p].size()):
 			_killer[p][s] = -1
 
-	# h14 梅开二度：本回合动作是否执行 2 次（仅基础非切换非主动；消耗 meikai。切换/主动不消耗不复制）
+	# h14 梅开二度：本回合动作执行 2 次（所有动作，含切换/主动技；消耗 meikai）。
+	# 各动作"2 次"语义：攒→gain×2 / 攻击→打 2 下 / 切换→连切 2 个英雄 /
+	#   即时主动→效果发动 2 次 / 攻击主动→打 2 下 / 防御→无额外效果（防仍是防）。
+	# 能量成本只扣一次、cap 也只计一次（成本是代价、翻倍是收益）。
 	var dbl: Array[bool] = [false, false]
 	for p in [0, 1]:
-		var act: int = a[p]
-		var dupable: bool = act == ActionDef.Action.CHARGE or act == ActionDef.Action.ATTACK \
-			or act == ActionDef.Action.DEFEND or act == ActionDef.Action.BIG_ATTACK \
-			or act == ActionDef.Action.BIG_DEFEND
-		if dupable and get_status(p, active_index[p], "meikai", false):
+		if get_status(p, active_index[p], "meikai", false):
 			dbl[p] = true
 			set_status(p, active_index[p], "meikai", false)
 
@@ -446,7 +446,14 @@ func resolve() -> Dictionary:
 	# Phase 2.5: 切换（甲时机，先于伤害）→ 攻击将打到换上来的新英雄
 	for p in [0, 1]:
 		if a[p] == ActionDef.Action.SWITCH:
+			var from0: int = active_index[p]
 			_do_switch(p, events)
+			# 梅开二度：再切一次到另一个存活替补（避开刚下场的，连切 2 个不同英雄；无则止）
+			if dbl[p]:
+				for cand in living_reserves(p):
+					if cand != from0:
+						_perform_switch(p, active_index[p], cand, events)
+						break
 
 	# Phase 2.6: 即时型主动技执行（在切换之后 → 审判/太阳/三缄 命中对手 post-switch 出战位）
 	for p in [0, 1]:
@@ -454,22 +461,30 @@ func resolve() -> Dictionary:
 			var sk: HeroSkill = _skills[p][active_index[p]]
 			if sk != null and not sk.active_is_attack():
 				sk.execute_active(self, p, active_index[p])
+				if dbl[p]:   # 梅开二度：即时主动技效果发动 2 次
+					sk.execute_active(self, p, active_index[p])
 
-	# Phase 3: 计算双方造成伤害（快照；含攻击型主动技 h12/h13/h20）
+	# Phase 3: 计算双方造成伤害（快照；含攻击型主动技 h20 倾力）
 	var out: Array[int] = [0, 0]
 	var out_kind: Array[int] = [-1, -1]   # 防御门判定用的攻击类型
 	for p in [0, 1]:
+		var aslot: int = active_index[p]
 		if ActionDef.is_attack(a[p]):
 			out[p] = _calc_outgoing(p, a[p])
 			out_kind[p] = a[p]
+			# 攻击判定类型覆盖（h10 啼晓：第 3/6/9… 回合"波"按大波判定 → 穿"防"）
+			var ksk: HeroSkill = _skills[p][aslot]
+			if ksk != null and not _is_silenced(p, aslot):
+				out_kind[p] = ksk.override_attack_kind(a[p], self, p, aslot)
 		elif a[p] == ActionDef.ACTIVE:
-			var sk: HeroSkill = _skills[p][active_index[p]]
+			var sk: HeroSkill = _skills[p][aslot]
 			if sk != null and sk.active_is_attack():
-				out[p] = sk.active_attack_damage(self, p, active_index[p])
 				out_kind[p] = sk.active_attack_kind()
+				# 攻击型主动技伤害也过团队层出伤修正（h28 契约对象用主动技攻击也 +1）
+				out[p] = _apply_team_outgoing(sk.active_attack_damage(self, p, aslot), out_kind[p], p, aslot)
 
-	# Phase 4: 施加伤害（打到 post-switch 出战英雄）；攻击型主动技命中后回调（吞噬吸血）
-	# 梅开二度 dbl：基础攻击执行 2 次（dbl 只对基础动作为真，主动攻击不翻倍）。
+	# Phase 4: 施加伤害（打到 post-switch 出战英雄）；攻击型主动技命中后回调（预留）。
+	# 梅开二度 dbl：攻击执行 2 次（基础攻击 + 攻击型主动技同样翻倍）。
 	for p in [0, 1]:
 		if out[p] <= 0:
 			continue
@@ -575,11 +590,16 @@ func _calc_outgoing(player: int, action: int) -> int:
 	var skill: HeroSkill = _skills[player][slot]
 	if skill != null and not _is_silenced(player, slot):
 		dmg = skill.modify_outgoing_damage(dmg, action, self, player, slot)
-	# 团队层出伤修正：扫攻击方全队（含替补），让团队 buff 源生效（h03 渴血）
+	return _apply_team_outgoing(dmg, action, player, slot)
+
+
+## 团队层出伤修正：扫攻击方全队（含替补），让团队 buff 源生效（h03 渴血 / h28 契约）。
+## 基础攻击与攻击型主动技命中前都会过本管线。attacker_slot = 发起攻击的出战英雄槽。
+func _apply_team_outgoing(dmg: int, action: int, player: int, attacker_slot: int) -> int:
 	for s in range(heroes[player].size()):
 		var tsk: HeroSkill = _skills[player][s]
 		if tsk != null and not _is_silenced(player, s):
-			dmg = tsk.modify_team_outgoing_damage(dmg, action, self, player, slot, player, s)
+			dmg = tsk.modify_team_outgoing_damage(dmg, action, self, player, attacker_slot, player, s)
 	return dmg
 
 

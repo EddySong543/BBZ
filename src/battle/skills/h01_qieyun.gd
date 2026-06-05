@@ -1,6 +1,6 @@
 extends HeroSkill
 
-## h01 子鼠【窃运】主动 0 能 · 单英雄
+## h01 子鼠【盗天机】主动 0 能 · 单英雄（action_id 仍为内部 key "qieyun"，不展示）
 ## 偷对手 1 能（对手团队池 -1 / 己方池 +1），每局 cap 3。对手 0 能时无效果（仍消耗一次动作）。
 ## cap 由引擎统一计数（statuses["active_uses"]）。
 
