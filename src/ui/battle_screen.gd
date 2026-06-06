@@ -82,6 +82,7 @@ var _skill_index: int = 0
 @onready var btn_defend: Button = $Buttons/BtnDefend
 @onready var btn_big_defend: Button = $Buttons/BtnBigDefend
 @onready var btn_special: Button = $Buttons/BtnSpecial
+@onready var btn_switch: Button = $Buttons/BtnSwitch
 @onready var btn_confirm: Button = $Buttons/BtnConfirm
 
 # 新美术 HUD：心形血珠 + 金币能量点（替换旧 EnergyBar / ArcHealthBar）。
@@ -213,6 +214,16 @@ func _init_buttons() -> void:
 	btn_confirm.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
 	btn_confirm.add_theme_constant_override("outline_size", 4)
 
+	# 换人按钮（结束左侧）：主动换人入口，循环选存活替补、按结束确认。
+	btn_switch.pressed.connect(_on_switch_pressed)
+	btn_switch.text = "换人"
+	FontManager.apply_btn(btn_switch, 30)
+	btn_switch.add_theme_color_override("font_color", Color.WHITE)
+	btn_switch.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
+	btn_switch.add_theme_constant_override("outline_size", 4)
+	btn_switch.clip_text = true
+	_attach_button_juice(btn_switch)
+
 	action_btn_list = [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend, btn_special]
 
 	FontManager.apply(turn_label, 22)
@@ -221,7 +232,7 @@ func _init_buttons() -> void:
 	timer_label.add_theme_color_override("font_color", Color.WHITE)
 	FontManager.apply(status_label, 44)
 	status_label.add_theme_color_override("font_color", Color.WHITE)
-	FontManager.apply(big_turn_label, 56)   # 中间「回合开始」横幅 + 倒计时
+	FontManager.apply(big_turn_label, 72)   # 中间「回合开始」横幅 + 倒计时（72=12×6 整数倍·清晰）
 	big_turn_label.add_theme_color_override("font_color", Color.WHITE)
 	event_label.visible = false
 	for lbl in p1_frame_hp_labels + p2_frame_hp_labels:
@@ -233,8 +244,8 @@ func _init_buttons() -> void:
 
 
 func _connect_frame_signals() -> void:
-	for i in range(3):
-		p1_frames[i].gui_input.connect(_on_frame_gui_input.bind(PLAYER, i))
+	# 主动换人改由底部「换人」按钮触发；点击头像换人方案已弃用，故不再连接 frame 点击。
+	pass
 
 
 # ============================================================
@@ -463,34 +474,26 @@ func _show_death_switch_selection(player: int) -> void:
 # 英雄框交互（切换 / h07 免费切）
 # ============================================================
 
-func _on_frame_gui_input(event: InputEvent, player: int, frame_idx: int) -> void:
-	if not (event is InputEventMouseButton):
+## 「换人」按钮：在存活替补间循环选目标（高亮该头像框）；按「结束」确认换人（占动作槽）。
+func _on_switch_pressed() -> void:
+	if state != State.PLAYER_SELECT:
 		return
-	var mb := event as InputEventMouseButton
-	if not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT:
+	var living: Array[int] = battle.living_reserves(PLAYER)
+	if living.is_empty():
 		return
-	_on_frame_clicked(player, frame_idx)
+	var idx: int = living.find(selected_switch)
+	var target: int = living[(idx + 1) % living.size()]   # 循环到下一个存活替补
+	_select_switch_target(target)
 
 
-func _on_frame_clicked(player: int, frame_idx: int) -> void:
-	if state != State.PLAYER_SELECT or player != PLAYER:
-		return
-	if frame_idx == 0:
-		return  # slot 0 = 当前出战，不可切自己
-
-	var frame_slots: Array[int] = p1_frame_slots if player == 0 else p2_frame_slots
-	if frame_idx >= frame_slots.size():
-		return
-	var hero_slot: int = frame_slots[frame_idx]
-	if hero_slot < 0 or hero_slot == battle.active_index[player]:
-		return
-	if battle.hp[player][hero_slot] <= 0:
+## 选定换上的替补 slot：h07 当先则立即免费换；否则置为待确认的换人动作并高亮该头像框。
+func _select_switch_target(slot: int) -> void:
+	if slot < 0 or slot == battle.active_index[PLAYER] or battle.hp[PLAYER][slot] <= 0:
 		return
 
-	# h07 当先：可免费切 → 立即换人（不占动作，本回合继续行动）
-	if battle.can_free_switch(player):
-		if battle.free_switch(player, hero_slot):
-			status_label.text = "当先！免费换上 %s，继续行动" % battle.active_hero(player).hero_name
+	# h07 当先：免费换 → 立即换上、本回合继续行动（不占动作）。
+	if battle.can_free_switch(PLAYER):
+		if battle.free_switch(PLAYER, slot):
 			selected_action = -1
 			selected_switch = -1
 			selected_btn = null
@@ -498,13 +501,24 @@ func _on_frame_clicked(player: int, frame_idx: int) -> void:
 			_update_all()
 		return
 
-	# 普通切换 = 占动作槽，待确认
+	# 普通切换 = 占动作槽，待确认。
 	selected_action = A.SWITCH
-	selected_switch = hero_slot
+	selected_switch = slot
 	selected_btn = null
 	_reset_button_styles()
+	var fi := _frame_idx_for_slot(PLAYER, slot)
+	if fi > 0:
+		p1_frames[fi].is_selected = true   # 高亮"换上谁"
+	_set_btn_selected(btn_switch, true)
 	_set_confirm_active(true)
-	status_label.text = "切换 → %s（按结束确认）" % battle.heroes[player][hero_slot].hero_name
+
+
+func _frame_idx_for_slot(player: int, slot: int) -> int:
+	var slots: Array[int] = p1_frame_slots if player == 0 else p2_frame_slots
+	for i in range(slots.size()):
+		if slots[i] == slot:
+			return i
+	return -1
 
 
 # ============================================================
@@ -558,6 +572,10 @@ func _reset_button_styles() -> void:
 	for btn in action_btn_list:
 		_set_btn_selected(btn, false)
 	_set_confirm_active(false)
+	_set_btn_selected(btn_switch, false)
+	# 清除替补头像「换人待确认」高亮（选动作 / 取消 / 提交时都复位）
+	for f in p1_frames:
+		f.is_selected = false
 
 
 ## 给按钮挂 ButtonJuice 交互手感组件（幂等：已挂则跳过）。
@@ -620,6 +638,7 @@ func _refresh_action_affordance() -> void:
 			var act: int = _btn_action(btn)
 			btn.disabled = battle.is_action_disabled(PLAYER, act) or not battle.can_afford(PLAYER, act)
 	btn_confirm.disabled = false
+	btn_switch.disabled = battle.living_reserves(PLAYER).is_empty()   # 无存活替补 → 换人键禁用
 
 
 func _btn_action(btn: Button) -> int:

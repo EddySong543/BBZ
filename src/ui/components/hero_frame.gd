@@ -25,6 +25,15 @@ extends Panel
 		if is_node_ready():
 			_refresh_style()
 
+## 选中态：替补被点选、准备换人时高亮（提亮边框/宝石 + 轻微放大）→ 给"点击头像换人"明确反馈。
+@export var is_selected: bool = false:
+	set(v):
+		is_selected = v
+		if is_node_ready():
+			_refresh_style()
+			pivot_offset = size * 0.5
+			scale = Vector2.ONE * (1.08 if v else 1.0)
+
 @export var player_color: Color = Color("#3f86c8"):
 	set(v):
 		player_color = v
@@ -141,6 +150,12 @@ func _refresh_style() -> void:
 		corner = pc                         # 阵营宝石(蓝/红)
 		fill = Color(0.1, 0.1, 0.12)
 
+	# 选中高亮（换人待确认）：提亮边框 + 宝石。
+	if is_selected and not is_dead:
+		e_mid = e_mid.lightened(0.4)
+		e_inner = e_inner.lightened(0.3)
+		corner = corner.lightened(0.45)
+
 	if _bg and _bg.material is ShaderMaterial:
 		var m := _bg.material as ShaderMaterial
 		m.set_shader_parameter("edge_outer", e_outer)
@@ -152,6 +167,7 @@ func _refresh_style() -> void:
 
 	if _corners:
 		_corners.set("corner_color", corner)
+		_corners.set("dead", is_dead)   # 死亡→四角宝石对角连线成 X
 
 	if _portrait:
 		if is_dead:

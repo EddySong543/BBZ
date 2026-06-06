@@ -1,10 +1,10 @@
 class_name ButtonJuice
 extends Node
 
-## 挂为 [BaseButton] 的子节点，给父按钮加交互"手感"（纯物理弹性）：
-##   悬停 → 从中心轻微放大（弹性 overshoot 弹一下）；
-##   按下 → 快速缩小（物理按压感）；
-##   松开 → 回弹；
+## 挂为 [BaseButton] 的子节点，给父按钮加交互"手感"（收敛克制·去 Q弹）：
+##   悬停 → 从中心轻微放大（平滑收敛，无过冲）；
+##   按下 → 快速缩小（干脆按压感）；
+##   松开 → 平滑回位；
 ##   选中 → 放大保持（外部调 [method set_selected]）。
 ##
 ## **职责单一**：只动父按钮的 scale + pivot。颜色(modulate) 完全留给外部
@@ -18,16 +18,16 @@ extends Node
 ## button.add_child(bj)
 ## [/codeblock]
 
-## 悬停放大倍率。
-@export var hover_scale: float = 1.06
-## 按下缩小倍率（物理按压感）。
-@export var press_scale: float = 0.92
+## 悬停放大倍率。（收敛：去 Q弹，幅度更克制）
+@export var hover_scale: float = 1.035
+## 按下缩小倍率（物理按压感，轻一点）。
+@export var press_scale: float = 0.955
 ## 选中保持的放大倍率。
-@export var selected_scale: float = 1.10
-## 悬停 / 松开回弹的时长（秒）。
-@export var settle_time: float = 0.18
+@export var selected_scale: float = 1.05
+## 悬停 / 松开归位的时长（秒，短=干脆无回弹）。
+@export var settle_time: float = 0.08
 ## 按下缩小的时长（秒，要快、干脆）。
-@export var press_time: float = 0.06
+@export var press_time: float = 0.05
 
 var _btn: BaseButton
 var _hovering: bool = false
@@ -101,7 +101,7 @@ func _apply(bouncy: bool) -> void:
 	elif _pressing:
 		target = press_scale
 	elif _selected:
-		target = selected_scale * (1.03 if _hovering else 1.0)   # 选中再悬停略再大
+		target = selected_scale * (1.02 if _hovering else 1.0)   # 选中再悬停略再大
 	elif _hovering:
 		target = hover_scale
 	_btn.pivot_offset = _btn.size * 0.5
@@ -109,8 +109,9 @@ func _apply(bouncy: bool) -> void:
 		_tween.kill()
 	_tween = create_tween()
 	if bouncy:
+		# 去回弹：短促直接归位(TRANS_QUAD EASE_OUT)，不软着陆、不过冲 —— 干脆稳重。
 		_tween.tween_property(_btn, "scale", Vector2.ONE * target, settle_time)\
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	else:
 		_tween.tween_property(_btn, "scale", Vector2.ONE * target, press_time)\
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)

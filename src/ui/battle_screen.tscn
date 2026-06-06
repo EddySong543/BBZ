@@ -835,6 +835,29 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
+[node name="BtnSwitch" type="Button" parent="Buttons" unique_id=1900000001]
+layout_mode = 0
+offset_left = 1600.0
+offset_top = 26.0
+offset_right = 1728.0
+offset_bottom = 154.0
+theme_override_styles/normal = SubResource("BtnTransparent")
+theme_override_styles/pressed = SubResource("BtnTransparent")
+theme_override_styles/hover = SubResource("BtnTransparent")
+theme_override_styles/disabled = SubResource("BtnTransparent")
+text = "换人"
+
+[node name="Bg" type="ColorRect" parent="Buttons/BtnSwitch" unique_id=1900000002]
+show_behind_parent = true
+material = SubResource("JellySpecial")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
 [node name="BtnConfirm" type="Button" parent="Buttons" unique_id=2072422273]
 layout_mode = 0
 offset_left = 1762.0
