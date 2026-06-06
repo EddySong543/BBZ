@@ -148,7 +148,8 @@ var _playing: PackedByteArray = PackedByteArray()       # 0=静止 1=播放中
 var _pip_frame: PackedInt32Array = PackedInt32Array()   # 当前帧
 var _slot_count: int = 0                                # 当前绘制的图标点数
 var _wave_time: float = 0.0                             # 波纹律动累计时间
-var _flash_phase: float = 0.0                           # 低血闪烁相位
+var _wave_cycle: float = 1.0                            # 当前波纹一个循环的时长(秒)·供低血红闪同步节奏
+var _flash_phase: float = 0.0                           # 低血闪烁相位(无波纹时回退用)
 var _flash_on: bool = false                             # 当前是否处于低血闪烁
 
 
@@ -200,6 +201,7 @@ func _process_wave(delta: float, total: int) -> void:
 	_wave_time += delta * speed
 	var anim_dur := float(total) / fps
 	var cycle := maxf(float(_slot_count - 1) * wave_stagger + anim_dur + maxf(idle_rest_min, 0.1), 0.1)
+	_wave_cycle = cycle   # 供低血红闪同步同一节奏(见 _draw)
 	var cyc := fmod(_wave_time, cycle)
 	var changed := false
 	for i in range(_slot_count):
@@ -290,10 +292,17 @@ func _draw() -> void:
 	_slot_count = maxi(filled + empties, extra_slots)
 	_ensure_slots(_slot_count)
 
-	# 剩余血量爱心的颜色：低血时红色呼吸脉动（仅满/半心，空心不变）。
+	# 剩余血量爱心的颜色：低血时红色脉动（仅满/半心，空心不变）。
+	# 节奏与血条波浪一致：用同一 _wave_time 时钟·每个波循环红光脉动一次(峰值对齐波起点)；
+	# 无波纹(wave_idle=false)时回退独立正弦呼吸。
 	var live_mod := full_modulate
 	if low_hp_flash and _flash_on:
-		var pulse := 0.5 + 0.5 * sin(_flash_phase * low_hp_flash_speed)
+		var pulse: float
+		if wave_idle and _wave_cycle > 0.0:
+			var ph := fmod(_wave_time, _wave_cycle) / _wave_cycle
+			pulse = 0.5 + 0.5 * cos(ph * TAU)   # ph=0(波循环起点)→红光峰值，与波同拍
+		else:
+			pulse = 0.5 + 0.5 * sin(_flash_phase * low_hp_flash_speed)
 		live_mod = full_modulate.lerp(low_hp_flash_color, pulse * low_hp_flash_amount)
 
 	# 第一层：血量（满 / 半 / 暗色空心）

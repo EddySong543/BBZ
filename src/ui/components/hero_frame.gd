@@ -79,6 +79,10 @@ static var _cache: Dictionary = {}
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	# 入树时套用 frame_size → size。frame_size 的 setter 仅在 is_node_ready() 才应用，
+	# 若调用方在 add_child(节点未 ready·如游离 wrap) 之前设 frame_size，size 会停在默认值；
+	# 这里在 _ready 兜底套用，保证任何用法下框尺寸都正确（修被动换人浮窗头像不对齐）。
+	size = frame_size
 	_setup_children()
 	_apply_corner_radius()
 	_refresh_portrait()

@@ -19,6 +19,7 @@
 [ext_resource type="Texture2D" uid="uid://bg6qynpwqkgmw" path="res://assets/ui/icons/DaFang_idle.png" id="20_dafang"]
 [ext_resource type="Shader" uid="uid://nr0mkp6afjoy" path="res://assets/shaders/canvas_button_jelly.gdshader" id="21_jelly"]
 [ext_resource type="PackedScene" path="res://src/ui/components/skill_card.tscn" id="22_skillcard"]
+[ext_resource type="FontFile" uid="uid://crf26hvhxwgim" path="res://assets/font/ark-pixel-16px-proportional-zh_cn.ttf" id="23_pixelfont"]
 
 [sub_resource type="Gradient" id="ShadowGradient"]
 offsets = PackedFloat32Array(0, 0.95913464, 0.99759614, 1)
@@ -60,6 +61,10 @@ shader_parameter/vignette_radius = 0.91100004094343
 shader_parameter/vignette_softness = 0.55
 shader_parameter/grain_amount = 0.018
 shader_parameter/grain_scale = 1.6
+
+[sub_resource type="FontVariation" id="PixelBold16"]
+base_font = ExtResource("23_pixelfont")
+variation_embolden = 1.0
 
 [sub_resource type="StyleBoxEmpty" id="BtnTransparent"]
 
@@ -588,6 +593,63 @@ offset_right = 1218.0
 offset_bottom = 112.0
 horizontal_alignment = 1
 
+[node name="P1ActiveName" type="Label" parent="." unique_id=1930000001]
+layout_mode = 0
+offset_left = 22.0
+offset_top = 100.0
+offset_right = 110.0
+offset_bottom = 126.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.7)
+theme_override_constants/outline_size = 3
+theme_override_fonts/font = SubResource("PixelBold16")
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="P1PlayerId" type="Label" parent="." unique_id=1930000002]
+layout_mode = 0
+offset_left = 138.0
+offset_top = 100.0
+offset_right = 395.0
+offset_bottom = 126.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.7)
+theme_override_constants/outline_size = 3
+theme_override_fonts/font = SubResource("PixelBold16")
+theme_override_font_sizes/font_size = 16
+text = "玩家1"
+vertical_alignment = 1
+
+[node name="P2ActiveName" type="Label" parent="." unique_id=1930000003]
+layout_mode = 0
+offset_left = 1810.0
+offset_top = 100.0
+offset_right = 1898.0
+offset_bottom = 126.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.7)
+theme_override_constants/outline_size = 3
+theme_override_fonts/font = SubResource("PixelBold16")
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="P2PlayerId" type="Label" parent="." unique_id=1930000004]
+layout_mode = 0
+offset_left = 1527.505
+offset_top = 100.0
+offset_right = 1784.505
+offset_bottom = 126.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.7)
+theme_override_constants/outline_size = 3
+theme_override_fonts/font = SubResource("PixelBold16")
+theme_override_font_sizes/font_size = 16
+text = "玩家2"
+horizontal_alignment = 2
+vertical_alignment = 1
+
 [node name="Buttons" type="Control" parent="." unique_id=1866875046]
 anchors_preset = 0
 offset_top = 870.0
@@ -825,29 +887,6 @@ theme_override_styles/disabled = SubResource("BtnTransparent")
 text = "技能"
 
 [node name="Bg" type="ColorRect" parent="Buttons/BtnSpecial" unique_id=279390391]
-show_behind_parent = true
-material = SubResource("JellySpecial")
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-
-[node name="BtnSwitch" type="Button" parent="Buttons" unique_id=1900000001]
-layout_mode = 0
-offset_left = 1600.0
-offset_top = 26.0
-offset_right = 1728.0
-offset_bottom = 154.0
-theme_override_styles/normal = SubResource("BtnTransparent")
-theme_override_styles/pressed = SubResource("BtnTransparent")
-theme_override_styles/hover = SubResource("BtnTransparent")
-theme_override_styles/disabled = SubResource("BtnTransparent")
-text = "换人"
-
-[node name="Bg" type="ColorRect" parent="Buttons/BtnSwitch" unique_id=1900000002]
 show_behind_parent = true
 material = SubResource("JellySpecial")
 layout_mode = 1

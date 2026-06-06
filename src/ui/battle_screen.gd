@@ -18,7 +18,7 @@ const SCREEN_H := 1080.0
 ## 待选爱心垂直对齐基线带高度（= 自适应 pip 的上限），不同 maxHP 的爱心在其中居中（任务6）。
 const HEART_BAND := 16.0
 ## 出战血条低血红闪阈值（HP 占比 ≤ 此值）；闪烁在 IconPipRow 内部实现（任务5：红光改到剩余血量爱心上）。
-const LOW_HP_RATIO := 0.3
+const LOW_HP_RATIO := 0.5
 
 ## 顶部 UI 整体下移量(px)：原布局太贴屏幕顶端 → 下沉一点留呼吸。改这一个数即可整组调整。
 ## 注：当前为运行时代码统一微调(编辑器里仍是基准位)；下移量定稿后可烘焙进 .tscn 使"所见=所得"。
@@ -49,6 +49,12 @@ const AI := 1       # 对手 AI
 @onready var status_label: Label = $StatusLabel
 @onready var event_label: Label = $EventLabel
 @onready var big_turn_label: Label = $BigTurnLabel
+
+# 出战角色名(每回合随出战英雄更新) + 玩家伪 id(常驻·占位)。
+@onready var p1_active_name: Label = $P1ActiveName
+@onready var p2_active_name: Label = $P2ActiveName
+@onready var p1_player_id: Label = $P1PlayerId
+@onready var p2_player_id: Label = $P2PlayerId
 
 @onready var p1_char_display: CharacterDisplay = $P1CharDisplay
 @onready var p2_char_display: CharacterDisplay = $P2CharDisplay
@@ -82,7 +88,6 @@ var _skill_index: int = 0
 @onready var btn_defend: Button = $Buttons/BtnDefend
 @onready var btn_big_defend: Button = $Buttons/BtnBigDefend
 @onready var btn_special: Button = $Buttons/BtnSpecial
-@onready var btn_switch: Button = $Buttons/BtnSwitch
 @onready var btn_confirm: Button = $Buttons/BtnConfirm
 
 # 新美术 HUD：心形血珠 + 金币能量点（替换旧 EnergyBar / ArcHealthBar）。
@@ -96,6 +101,10 @@ var action_btn_list: Array[Button] = []
 var selected_action: int = -1
 var selected_switch: int = -1
 var selected_btn: Button = null
+
+# ---- 主动换人：点击己方替补头像 → 头像下浮现「切换」小按钮 ----
+var _switch_prompt: Button = null    # 当前浮现的「切换」按钮（运行时创建，单例）
+var _switch_prompt_frame: int = -1   # 「切换」按钮当前挂在哪个替补框索引（1 / 2），-1=无
 
 # ---- juice ----
 var _shake := 0.0
@@ -132,6 +141,7 @@ func _ready() -> void:
 
 	_build_skill_entries()
 	skill_card.advance_requested.connect(_on_skill_card_advance)
+	skill_card.back_requested.connect(_on_skill_card_back)   # 右键 → 上一个英雄
 	_refresh_skill_card()
 
 	# 低血红闪（任务5）：出战血条剩余爱心在 HP 占比低时红色呼吸（IconPipRow 内部实现）。
@@ -144,12 +154,13 @@ func _ready() -> void:
 
 
 ## 顶部 UI 整组下移 TOP_UI_DROP 像素（避免太贴屏幕顶端）。
-## 这些节点各自独立顶部锚定、无统一容器 → 运行时统一平移；替补爱心(heart_icon)由 _update_single_frame
-## 按 frame.position 重算 → 自动跟随，无需在此列入。
+## 这些节点各自独立顶部锚定、无统一容器 → 运行时统一平移；替补爱心(heart_icon)位置改由 .tscn
+## 摆放(❤+数字 格式)，故一并列入平移（数组含 null 占位，下方循环已防 null）。
 func _nudge_top_ui_down() -> void:
 	var tops: Array = [
 		turn_label, timer_label,
 		p1_heart_row, p2_heart_row, p1_coin_row, p2_coin_row,
+		p1_active_name, p2_active_name, p1_player_id, p2_player_id,
 	]
 	tops.append_array(p1_frames)
 	tops.append_array(p2_frames)
@@ -157,6 +168,8 @@ func _nudge_top_ui_down() -> void:
 	tops.append_array(p2_frame_hp_labels)
 	tops.append_array(p1_frame_shield_labels)
 	tops.append_array(p2_frame_shield_labels)
+	tops.append_array(p1_frame_heart_icons)   # ❤ 图标(含 null 占位；循环已防 null)
+	tops.append_array(p2_frame_heart_icons)
 	for n in tops:
 		if n != null:
 			(n as Control).position.y += TOP_UI_DROP
@@ -214,16 +227,6 @@ func _init_buttons() -> void:
 	btn_confirm.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
 	btn_confirm.add_theme_constant_override("outline_size", 4)
 
-	# 换人按钮（结束左侧）：主动换人入口，循环选存活替补、按结束确认。
-	btn_switch.pressed.connect(_on_switch_pressed)
-	btn_switch.text = "换人"
-	FontManager.apply_btn(btn_switch, 30)
-	btn_switch.add_theme_color_override("font_color", Color.WHITE)
-	btn_switch.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
-	btn_switch.add_theme_constant_override("outline_size", 4)
-	btn_switch.clip_text = true
-	_attach_button_juice(btn_switch)
-
 	action_btn_list = [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend, btn_special]
 
 	FontManager.apply(turn_label, 22)
@@ -242,10 +245,16 @@ func _init_buttons() -> void:
 		FontManager.apply(lbl, 11)
 		lbl.add_theme_color_override("font_color", Color("#44ccff"))
 
+	# 出战角色名 / 玩家 id 的字体·字号·颜色·描边·玩家id文本 全部在 battle_screen.tscn 设置
+	# （像素字体 ttf 直接引用·import 已关 AA → 编辑器所见即所得，可在 Inspector 手调位置/大小）。
+	# 代码只负责把角色名文本随出战英雄更新（见 _update_hero_frames）。
+
 
 func _connect_frame_signals() -> void:
-	# 主动换人改由底部「换人」按钮触发；点击头像换人方案已弃用，故不再连接 frame 点击。
-	pass
+	# 主动换人：点击己方替补头像（索引 1 / 2）→ 头像下浮现「切换」小按钮（见 _on_reserve_frame_input）。
+	# 出战位（索引 0）不可点（不能换成自己）。对手框不连接。
+	for fi in [1, 2]:
+		p1_frames[fi].gui_input.connect(_on_reserve_frame_input.bind(fi))
 
 
 # ============================================================
@@ -275,11 +284,19 @@ func _refresh_skill_card() -> void:
 	skill_card.populate(h.hero_name, h.skill_description, h.skill_detail, is_active, h.portrait_path, p == PLAYER)
 
 
-## 点击展示格 → 翻到下一个英雄，循环。
+## 左键点击展示格 → 翻到下一个英雄，循环。
 func _on_skill_card_advance() -> void:
 	if _skill_entries.is_empty():
 		return
 	_skill_index = (_skill_index + 1) % _skill_entries.size()
+	_refresh_skill_card()
+
+
+## 右键点击展示格 → 翻回上一个英雄，循环。
+func _on_skill_card_back() -> void:
+	if _skill_entries.is_empty():
+		return
+	_skill_index = (_skill_index - 1 + _skill_entries.size()) % _skill_entries.size()
 	_refresh_skill_card()
 
 
@@ -289,12 +306,12 @@ func _on_skill_card_advance() -> void:
 
 func _show_turn_intro() -> void:
 	state = State.TURN_INTRO
-	_set_buttons_active(false, false)   # 回合介绍：按钮按能量正常显示、不压暗（仅暂不可点）
+	_set_buttons_active(false, true)   # 回合介绍：动作栏整体压暗 + 禁用（灰色·防误触；进入选择阶段再亮）
 	status_label.visible = false
 	event_label.visible = false
 
-	# 顶部中间：持续显示回合数（每回合更新，整局常驻；紧凑无空格，视觉对齐底部攒按钮 x=960）
-	timer_label.text = "回合%d" % (battle.turn_number + 1)
+	# 顶部中间：持续显示回合数（每回合更新，整局常驻）。「回合」与数字间留一空格，避免拥挤。
+	timer_label.text = "回合 %d" % (battle.turn_number + 1)
 	timer_label.visible = true
 
 	# 中间：先「回合开始」横幅，随后(进入选择)在同一位置转为倒计时（无底板）
@@ -474,51 +491,173 @@ func _show_death_switch_selection(player: int) -> void:
 # 英雄框交互（切换 / h07 免费切）
 # ============================================================
 
-## 「换人」按钮：在存活替补间循环选目标（高亮该头像框）；按「结束」确认换人（占动作槽）。
-func _on_switch_pressed() -> void:
+## 点击己方替补头像：在该头像正下方浮现 / 收起「切换」小按钮（二段确认，避免误触换人）。
+func _on_reserve_frame_input(event: InputEvent, frame_idx: int) -> void:
 	if state != State.PLAYER_SELECT:
 		return
-	var living: Array[int] = battle.living_reserves(PLAYER)
-	if living.is_empty():
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
+			# 已对同一个框浮现 → 再点收起（toggle）；否则浮现到此框。
+			if _switch_prompt_frame == frame_idx:
+				_cancel_switch_selection_if_active()   # 若该「切换」已被选定，一并取消
+				_clear_switch_prompt()
+			else:
+				_show_switch_prompt(frame_idx)
+
+
+## 在替补框正下方浮现「切换」按钮（背景板=头像框同族风格：深底 + 锡灰像素边）。
+## 宽度 = 头像框宽、y 轴短；浮现期间临时隐藏该框血量爱心/护盾，按钮占其位（避免重叠）。
+func _show_switch_prompt(frame_idx: int) -> void:
+	_cancel_switch_selection_if_active()   # 换到新框前，取消旧框的选定
+	_clear_switch_prompt()
+	if frame_idx < 1 or frame_idx >= p1_frames.size():
 		return
-	var idx: int = living.find(selected_switch)
-	var target: int = living[(idx + 1) % living.size()]   # 循环到下一个存活替补
-	_select_switch_target(target)
-
-
-## 选定换上的替补 slot：h07 当先则立即免费换；否则置为待确认的换人动作并高亮该头像框。
-func _select_switch_target(slot: int) -> void:
+	var slot: int = p1_frame_slots[frame_idx]
+	# 仅存活替补可换；空位 / 阵亡 / 出战位不浮现。
 	if slot < 0 or slot == battle.active_index[PLAYER] or battle.hp[PLAYER][slot] <= 0:
 		return
 
-	# h07 当先：免费换 → 立即换上、本回合继续行动（不占动作）。
+	var frame: HeroFrame = p1_frames[frame_idx]
+	_switch_prompt_frame = frame_idx
+
+	# 浮现期间隐藏该框 ❤血量(图标+数字)/护盾，让「切换」占位（_clear_switch_prompt 时恢复）。
+	var heart = p1_frame_heart_icons[frame_idx]
+	if heart != null:
+		heart.visible = false
+	p1_frame_hp_labels[frame_idx].visible = false
+	p1_frame_shield_labels[frame_idx].visible = false
+
+	var btn := Button.new()
+	btn.name = "SwitchPrompt"
+	var w: float = frame.size.x
+	var h := 26.0
+	btn.position = frame.position + Vector2(0.0, frame.size.y + 3.0)
+	btn.size = Vector2(w, h)
+	btn.z_index = 50
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.text = "切换"
+	# 透明 theme（背景板交给下面的 StyleBox ColorRect 子节点，文字浮在其上）。
+	for st in ["normal", "hover", "pressed", "focus", "disabled"]:
+		btn.add_theme_stylebox_override(st, StyleBoxEmpty.new())
+	FontManager.apply_btn(btn, 16)
+	btn.add_theme_color_override("font_color", Color.WHITE)
+	btn.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
+	btn.add_theme_constant_override("outline_size", 3)
+	btn.clip_text = true
+
+	# 背景板：深底 + 锡灰像素描边（与头像框同族）。StyleBoxFlat 不随长条比例拉伸。
+	var plate := ColorRect.new()
+	plate.name = "Plate"
+	plate.show_behind_parent = true   # 渲染在按钮文字之下
+	plate.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	plate.color = Color(0, 0, 0, 0)   # 颜色交给下面的 Panel；ColorRect 仅占位
+	var panel := Panel.new()
+	panel.show_behind_parent = true
+	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_theme_stylebox_override("panel", _make_switch_plate_style())
+	btn.add_child(panel)
+
+	btn.pressed.connect(_on_switch_prompt_pressed.bind(slot))
+	_attach_button_juice(btn)
+	add_child(btn)
+	_switch_prompt = btn
+	_animate_prompt_pop(btn)
+
+
+## 「切换」按钮背景板样式：深板岩底 + 锡灰边 + 微圆角（呼应头像框中性像素框，但不靠 shader → 长条不变形）。
+func _make_switch_plate_style() -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.11, 0.11, 0.14)
+	sb.border_color = Color(0.65, 0.67, 0.71)   # 锡灰，与 HeroFrame edge_mid 一致
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(3)
+	sb.corner_detail = 2
+	sb.anti_aliasing = false   # 像素感：不抗锯齿
+	return sb
+
+
+## 「切换」浮现进场：轻微 pop（从扁到正 + 淡入）。
+func _animate_prompt_pop(node: Control) -> void:
+	node.pivot_offset = node.size * 0.5
+	node.scale = Vector2(0.86, 0.4)
+	node.modulate.a = 0.0
+	var tw := create_tween()
+	tw.tween_property(node, "scale", Vector2.ONE, 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	var tw2 := create_tween()
+	tw2.tween_property(node, "modulate:a", 1.0, 0.12).set_ease(Tween.EASE_OUT)
+
+
+## 收起「切换」按钮并恢复被它占位的血量爱心/护盾。
+func _clear_switch_prompt() -> void:
+	if is_instance_valid(_switch_prompt):
+		_switch_prompt.queue_free()
+	_switch_prompt = null
+	var prev := _switch_prompt_frame
+	_switch_prompt_frame = -1
+	if prev >= 0:
+		# 恢复该框 ❤血量(图标+数字)/护盾显示（仅当它仍是存活替补；否则下次 _update_hero_frames 会纠正）。
+		var heart = p1_frame_heart_icons[prev]
+		if heart != null:
+			heart.visible = true
+		if prev < p1_frame_hp_labels.size():
+			p1_frame_hp_labels[prev].visible = true
+		if prev < p1_frame_shield_labels.size():
+			p1_frame_shield_labels[prev].visible = true
+
+
+## 点击「切换」按钮：与底部动作按钮**完全相同的选中逻辑**——选中=高亮按钮本身(保持显示)，
+## 再点取消；选定后点「结束」提交换人(占动作槽)。h07 当先则免费立即换。
+func _on_switch_prompt_pressed(slot: int) -> void:
+	if state != State.PLAYER_SELECT:
+		return
+	if not is_instance_valid(_switch_prompt):
+		return
+
+	# h07 当先：免费换 → 立即换上、本回合继续行动（不占动作·无需二段确认）。
 	if battle.can_free_switch(PLAYER):
 		if battle.free_switch(PLAYER, slot):
 			selected_action = -1
 			selected_switch = -1
 			selected_btn = null
-			_reset_button_styles()
+			_reset_button_styles()   # 收起切换按钮 + 清所有高亮
 			_update_all()
 		return
 
-	# 普通切换 = 占动作槽，待确认。
+	# 再点已选中的「切换」= 取消（与底部按钮一致；按钮保留显示，仅去高亮）。
+	if selected_btn == _switch_prompt:
+		selected_action = -1
+		selected_switch = -1
+		selected_btn = null
+		_set_btn_selected(_switch_prompt, false)
+		_set_confirm_active(false)
+		_update_button_states()
+		return
+
+	# 选定换人：高亮「切换」按钮本身（不动头像框），待「结束」提交。
 	selected_action = A.SWITCH
 	selected_switch = slot
-	selected_btn = null
-	_reset_button_styles()
-	var fi := _frame_idx_for_slot(PLAYER, slot)
-	if fi > 0:
-		p1_frames[fi].is_selected = true   # 高亮"换上谁"
-	_set_btn_selected(btn_switch, true)
+	_clear_action_selection()        # 清掉可能已选的底部动作高亮（但保留切换按钮）
+	selected_btn = _switch_prompt
+	_set_btn_selected(_switch_prompt, true)
 	_set_confirm_active(true)
 
 
-func _frame_idx_for_slot(player: int, slot: int) -> int:
-	var slots: Array[int] = p1_frame_slots if player == 0 else p2_frame_slots
-	for i in range(slots.size()):
-		if slots[i] == slot:
-			return i
-	return -1
+## 清除底部动作按钮的选中高亮（不触碰「切换」按钮，供选定换人时复位其它选择）。
+func _clear_action_selection() -> void:
+	for btn in action_btn_list:
+		_set_btn_selected(btn, false)
+
+
+## 若「切换」按钮当前正被选定，取消其选定状态（按钮即将隐藏/换框前调用，避免遗留幽灵选择）。
+func _cancel_switch_selection_if_active() -> void:
+	if selected_action == A.SWITCH and selected_btn == _switch_prompt:
+		selected_action = -1
+		selected_switch = -1
+		selected_btn = null
+		_set_confirm_active(false)
 
 
 # ============================================================
@@ -531,6 +670,8 @@ func _frame_idx_for_slot(player: int, slot: int) -> int:
 ##   false（开局 / 回合介绍）→ 仍按真实可用性显示亮/暗、不整体压暗，仅靠 state 守卫拦截点击
 ##     → 开局就是"正常"的按钮，不再一上来一片半透明（任务1）。
 func _set_buttons_active(active: bool, dim_inactive: bool = true) -> void:
+	if not active:
+		_clear_switch_prompt()   # 离开选择阶段 → 收起浮现的「切换」按钮
 	# 底部 UI 始终可见。
 	for btn in action_btn_list + [btn_confirm]:
 		btn.visible = true
@@ -572,10 +713,7 @@ func _reset_button_styles() -> void:
 	for btn in action_btn_list:
 		_set_btn_selected(btn, false)
 	_set_confirm_active(false)
-	_set_btn_selected(btn_switch, false)
-	# 清除替补头像「换人待确认」高亮（选动作 / 取消 / 提交时都复位）
-	for f in p1_frames:
-		f.is_selected = false
+	_clear_switch_prompt()   # 收起浮现的「切换」按钮（换人选中态随之消失）
 
 
 ## 给按钮挂 ButtonJuice 交互手感组件（幂等：已挂则跳过）。
@@ -638,7 +776,6 @@ func _refresh_action_affordance() -> void:
 			var act: int = _btn_action(btn)
 			btn.disabled = battle.is_action_disabled(PLAYER, act) or not battle.can_afford(PLAYER, act)
 	btn_confirm.disabled = false
-	btn_switch.disabled = battle.living_reserves(PLAYER).is_empty()   # 无存活替补 → 换人键禁用
 
 
 func _btn_action(btn: Button) -> int:
@@ -695,6 +832,9 @@ func _update_hero_frames() -> void:
 		var heart_icons: Array = p1_frame_heart_icons if p == 0 else p2_frame_heart_icons
 		var frame_slots: Array[int] = p1_frame_slots if p == 0 else p2_frame_slots
 		var active_idx: int = battle.active_index[p]
+		# 出战头像框下方的角色名（随换人/回合更新）。
+		var name_lbl: Label = p1_active_name if p == 0 else p2_active_name
+		name_lbl.text = battle.heroes[p][active_idx].hero_name
 		var reserves := _get_reserve_slots(p)
 		var pcolor := Color("#3f86c8") if p == 0 else Color("#d24a44")  # 四角阵营宝石：我方蓝 / 敌方红(边框统一中性板岩)
 
@@ -717,7 +857,8 @@ func _update_hero_frames() -> void:
 
 
 ## 出战位(is_active)：只画头像，血量/护盾文字隐藏（看上方大心条）。
-## 待选位：头像 + 心形美术标记(heart_icon, 仅作图标) + 血量数字 + 护盾。
+## 待选位：头像 + ❤X（心形美术图标 heart_icon 单颗 + 血量数字 hp_label）+ 护盾。
+## ❤+数字 的位置·大小在 battle_screen.tscn 摆放（Eddy 可视化手调），代码只填值。
 func _update_single_frame(frame: HeroFrame, hp_label: Label, shield_label: Label, heart_icon, player: int, slot: int, is_active: bool, pcolor: Color) -> void:
 	if slot < 0 or slot >= battle.heroes[player].size():
 		frame.visible = false
@@ -755,31 +896,17 @@ func _update_single_frame(frame: HeroFrame, hp_label: Label, shield_label: Label
 			heart_icon.visible = false
 		return
 
-	hp_label.visible = false                        # 不再用 ♥+数字
-	shield_label.visible = true
-
+	# 待选血量 = ❤X：心形美术图标(单颗) + 红色数字（格式与换人界面一致）。
+	# 心形/数字的摆位·大小在 .tscn（heart_icon show_empty=false/allow_half=false 已配为单图标），
+	# 代码只填值：图标固定画 1 颗(set_value(1,1))、数字显示当前 HP。
 	var hp_now := battle.hp_display(battle.hp[player][slot])
-	var hp_max := battle.hp_display(battle.max_hp[player][slot])
-
-	# 待选血量 = 一排缩小的爱心（心数 = maxHP，pip 自适应缩到"整排不超头像框宽"）。
+	hp_label.visible = true
+	hp_label.text = _fmt_hp(hp_now)
 	if heart_icon != null:
 		heart_icon.visible = true
-		var maxn := maxi(int(ceil(hp_max - 0.0001)), 1)
-		var fw: float = frame.size.x                # 头像框宽度（待选 68）
-		var hsp := 1.0   # 爱心间距（本地 float，避免无类型 Array 元素属性的 Variant 推断失败）
-		heart_icon.spacing = hsp
-		var ps := clampf((fw - hsp * float(maxn - 1)) / float(maxn), 6.0, HEART_BAND)
-		heart_icon.pip_size = ps
-		# 对齐修复（任务6）：所有替补爱心在「框底下方一条固定 16px 高度带」内垂直居中，
-		# 整排水平也在框内居中 → 不同 maxHP（pip 大小不同）的英雄爱心 y 视觉对齐、不再参差。
-		var row_w := ps * float(maxn) + hsp * float(maxn - 1)
-		var x_off := maxf((fw - row_w) * 0.5, 0.0)
-		var y_off := frame.size.y + 2.0 + (HEART_BAND - ps) * 0.5
-		heart_icon.position = frame.position + Vector2(x_off, y_off)
-		heart_icon.show_empty = true                # 满槽=maxHP（暗色空心补齐），宽度恒定不超框
-		heart_icon.allow_half = true
-		heart_icon.set_value(hp_now, hp_max)
+		heart_icon.set_value(1.0, 1.0)          # 单颗心形图标(❤)；血量数字由 hp_label 显示
 
+	shield_label.visible = true
 	var sh := battle.hp_display(battle.shield[player][slot])
 	shield_label.text = "🛡%s" % _fmt_hp(sh) if sh > 0 else ""
 	shield_label.add_theme_font_size_override("font_size", 11)
