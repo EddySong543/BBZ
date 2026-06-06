@@ -20,12 +20,25 @@ group_uniforms shape;
 uniform float pixel_grid : hint_range(12.0, 48.0) = 24.0;  // 像素格数(框宽高，越大格越细)
 uniform float border_px : hint_range(1.0, 6.0) = 2.0;      // 中层边框宽(像素格)
 uniform float noise_amt : hint_range(0.0, 0.2) = 0.06;     // 像素噪点质感
+uniform float corner_radius : hint_range(0.0, 0.4) = 0.0;  // 圆角半径(UV比例,0=直角)；像素台阶圆角
 group_uniforms;
 
 float hash(vec2 p) {
 	p = fract(p * vec2(123.34, 345.45));
 	p += dot(p, p + 34.345);
 	return fract(p.x * p.y);
+}
+
+// 像素台阶圆角遮罩：角落圆弧外 → 0(切掉)。rr=UV比例半径, pg=量化格数。
+float corner_round_alpha(vec2 uv, float rr, float pg) {
+	if (rr <= 0.0) return 1.0;
+	vec2 q = (floor(uv * pg) + 0.5) / pg;     // 像素格中心
+	vec2 cc = min(q, vec2(1.0) - q);          // 到最近横/纵边距
+	vec2 corner = vec2(rr) - cc;              // 进入角落 rr 区的深度
+	if (corner.x > 0.0 && corner.y > 0.0 && length(corner) > rr) {
+		return 0.0;
+	}
+	return 1.0;
 }
 
 void fragment() {
@@ -53,5 +66,8 @@ void fragment() {
 	// 像素噪点质感(透明处 col=0 不受影响)
 	col.rgb *= 1.0 + (hash(cell) - 0.5) * noise_amt;
 
-	COLOR = col;
+	// 圆角：切掉角落像素 → 去除尖锐直角
+	col.a *= corner_round_alpha(UV, corner_radius, pg);
+
+	COLOR = col * COLOR;  // 乘 incoming COLOR(携带 modulate) → 跟随父节点变暗(需节点 color=白)
 }

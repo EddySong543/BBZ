@@ -20,6 +20,10 @@ const HEART_BAND := 16.0
 ## 出战血条低血红闪阈值（HP 占比 ≤ 此值）；闪烁在 IconPipRow 内部实现（任务5：红光改到剩余血量爱心上）。
 const LOW_HP_RATIO := 0.3
 
+## 顶部 UI 整体下移量(px)：原布局太贴屏幕顶端 → 下沉一点留呼吸。改这一个数即可整组调整。
+## 注：当前为运行时代码统一微调(编辑器里仍是基准位)；下移量定稿后可烘焙进 .tscn 使"所见=所得"。
+const TOP_UI_DROP := 0.0   # 顶部 UI 整体下移量；0=复原原位（想下移改这个数即可）
+
 ## 默认阵容 fallback：直接打开 battle_screen.tscn(F6) 测试用，BattleSetup 为空时启用。
 const HERO_DATA_DIR := "res://assets/data/heroes/"
 const DEFAULT_P0 := ["h01", "h05", "h13"]   # 盗天机 / 天威 / 孤注（均有美术 h01-h17）
@@ -123,6 +127,8 @@ func _ready() -> void:
 	for f in p2_frames:
 		f.flip_h = true
 
+	_nudge_top_ui_down()
+
 	_build_skill_entries()
 	skill_card.advance_requested.connect(_on_skill_card_advance)
 	_refresh_skill_card()
@@ -134,6 +140,25 @@ func _ready() -> void:
 
 	_update_all()
 	_show_turn_intro()
+
+
+## 顶部 UI 整组下移 TOP_UI_DROP 像素（避免太贴屏幕顶端）。
+## 这些节点各自独立顶部锚定、无统一容器 → 运行时统一平移；替补爱心(heart_icon)由 _update_single_frame
+## 按 frame.position 重算 → 自动跟随，无需在此列入。
+func _nudge_top_ui_down() -> void:
+	var tops: Array = [
+		turn_label, timer_label,
+		p1_heart_row, p2_heart_row, p1_coin_row, p2_coin_row,
+	]
+	tops.append_array(p1_frames)
+	tops.append_array(p2_frames)
+	tops.append_array(p1_frame_hp_labels)
+	tops.append_array(p2_frame_hp_labels)
+	tops.append_array(p1_frame_shield_labels)
+	tops.append_array(p2_frame_shield_labels)
+	for n in tops:
+		if n != null:
+			(n as Control).position.y += TOP_UI_DROP
 
 
 ## BattleSetup 有阵容就用，否则用默认（直接跑 battle_screen.tscn 测试）。
@@ -192,11 +217,11 @@ func _init_buttons() -> void:
 
 	FontManager.apply(turn_label, 22)
 	turn_label.add_theme_color_override("font_color", Color.WHITE)
-	FontManager.apply(timer_label, 80)
+	FontManager.apply(timer_label, 32)   # 顶部常驻回合数(原倒计时位)·紧凑
 	timer_label.add_theme_color_override("font_color", Color.WHITE)
 	FontManager.apply(status_label, 44)
 	status_label.add_theme_color_override("font_color", Color.WHITE)
-	FontManager.apply(big_turn_label, 44)
+	FontManager.apply(big_turn_label, 56)   # 中间「回合开始」横幅 + 倒计时
 	big_turn_label.add_theme_color_override("font_color", Color.WHITE)
 	event_label.visible = false
 	for lbl in p1_frame_hp_labels + p2_frame_hp_labels:
@@ -256,12 +281,15 @@ func _show_turn_intro() -> void:
 	_set_buttons_active(false, false)   # 回合介绍：按钮按能量正常显示、不压暗（仅暂不可点）
 	status_label.visible = false
 	event_label.visible = false
-	timer_label.text = ""
 
-	big_turn_label.text = "回合 %d" % (battle.turn_number + 1)
+	# 顶部中间：持续显示回合数（每回合更新，整局常驻；紧凑无空格，视觉对齐底部攒按钮 x=960）
+	timer_label.text = "回合%d" % (battle.turn_number + 1)
+	timer_label.visible = true
+
+	# 中间：先「回合开始」横幅，随后(进入选择)在同一位置转为倒计时（无底板）
+	big_turn_label.text = "回合开始"
 	big_turn_label.visible = true
 	await get_tree().create_timer(1.0).timeout
-	big_turn_label.visible = false
 	_start_player_select()
 
 
@@ -270,8 +298,7 @@ func _start_player_select() -> void:
 	selected_action = -1
 	selected_switch = -1
 	selected_btn = null
-	status_label.text = "选择你的动作"
-	status_label.visible = true
+	status_label.visible = false   # 去除「选择你的动作」提示
 	event_label.visible = false
 	_set_buttons_active(true)
 	_update_all()
@@ -280,6 +307,7 @@ func _start_player_select() -> void:
 
 func _start_timer() -> void:
 	timer_seconds = turn_time_limit
+	big_turn_label.visible = true   # 中间显示倒计时（接续「回合开始」横幅）
 	_update_timer_label()
 	game_timer.start(1.0)
 
@@ -294,7 +322,8 @@ func _on_timer_tick() -> void:
 
 
 func _update_timer_label() -> void:
-	timer_label.text = "%d" % maxi(timer_seconds, 0)
+	# 倒计时显示在中间(big_turn_label)；顶部 timer_label 常驻回合数不动。
+	big_turn_label.text = "%d" % maxi(timer_seconds, 0)
 
 
 func _on_circle_pressed(action: int, btn: Button) -> void:
@@ -362,7 +391,7 @@ func _ai_pick(side: int) -> void:
 func _resolve() -> void:
 	state = State.RESOLVING
 	_set_buttons_active(false)
-	timer_label.text = ""
+	big_turn_label.visible = false   # 收起中间倒计时（顶部回合数保留）
 	status_label.visible = false
 
 	var a0_before: int = battle.active_index[0]
@@ -418,8 +447,7 @@ func _resolve() -> void:
 func _show_death_switch_selection(player: int) -> void:
 	state = State.HERO_SELECT
 	_set_buttons_active(false)
-	status_label.text = "英雄阵亡，选择替补上场"
-	status_label.visible = true
+	status_label.visible = false   # 不在屏幕中间显示「英雄阵亡」，只保留换人界面
 
 	var reserves: Array = []
 	for slot in battle.living_reserves(player):
@@ -649,7 +677,7 @@ func _update_hero_frames() -> void:
 		var frame_slots: Array[int] = p1_frame_slots if p == 0 else p2_frame_slots
 		var active_idx: int = battle.active_index[p]
 		var reserves := _get_reserve_slots(p)
-		var pcolor := Color("#3388dd") if p == 0 else Color("#dd3333")
+		var pcolor := Color("#3f86c8") if p == 0 else Color("#d24a44")  # 四角阵营宝石：我方蓝 / 敌方红(边框统一中性板岩)
 
 		frame_slots[0] = active_idx
 		_update_single_frame(frames[0], hp_labels[0], shield_labels[0], heart_icons[0], p, active_idx, true, pcolor)

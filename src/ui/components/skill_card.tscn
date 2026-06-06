@@ -1,7 +1,12 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://src/ui/components/skill_card.gd" id="1_card"]
 [ext_resource type="Shader" uid="uid://nr0mkp6afjoy" path="res://assets/shaders/canvas_button_jelly.gdshader" id="2_jelly"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_ui_pixel_frame.gdshader" id="3_pixframe"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_ui_round_mask.gdshader" id="4_roundmask"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_ui_portrait_pixelate.gdshader" id="5_portraitpix"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_ui_inner_fx.gdshader" id="6_innerfx"]
+[ext_resource type="Script" path="res://src/ui/components/corner_overlay.gd" id="7_corner"]
 
 [sub_resource type="ShaderMaterial" id="GoldFrame"]
 shader = ExtResource("2_jelly")
@@ -31,19 +36,37 @@ shader_parameter/aspect = 3.283
 shader_parameter/noise_amt = 0.06
 shader_parameter/wear = 0.1
 
-[sub_resource type="ShaderMaterial" id="GoldCell"]
-shader = ExtResource("2_jelly")
-shader_parameter/fill_top = Color(0.72, 0.58, 0.26, 1)
-shader_parameter/fill_bottom = Color(0.46, 0.34, 0.14, 1)
-shader_parameter/edge_inner = Color(0.97, 0.85, 0.48, 1)
-shader_parameter/edge_outer = Color(0.22, 0.14, 0.05, 1)
-shader_parameter/fill_alpha = 1.0
-shader_parameter/pixel_grid = 22.0
-shader_parameter/corner = 0.16
-shader_parameter/edge_px = 2.0
-shader_parameter/aspect = 1.0
+[sub_resource type="ShaderMaterial" id="CellFillMat"]
+shader = ExtResource("4_roundmask")
+shader_parameter/corner_radius = 0.3
+shader_parameter/pixel_grid = 24.0
+
+[sub_resource type="ShaderMaterial" id="CellPortraitMat"]
+shader = ExtResource("5_portraitpix")
+shader_parameter/pixel_size = 0.0
+shader_parameter/levels = 20.0
+shader_parameter/corner_radius = 0.3
+shader_parameter/pixel_grid = 24.0
+
+[sub_resource type="ShaderMaterial" id="CellInnerFXMat"]
+shader = ExtResource("6_innerfx")
+shader_parameter/vignette_strength = 0.0
+shader_parameter/vignette_edge = 0.32
+shader_parameter/scan_strength = 0.0
+shader_parameter/scan_lines = 48.0
+shader_parameter/shade_color = Color(0.0, 0.0, 0.02, 1)
+shader_parameter/corner_radius = 0.3
+shader_parameter/pixel_grid = 24.0
+
+[sub_resource type="ShaderMaterial" id="CellFrameMat"]
+shader = ExtResource("3_pixframe")
+shader_parameter/edge_outer = Color(0.18, 0.12, 0.05, 1)
+shader_parameter/edge_mid = Color(0.74, 0.6, 0.28, 1)
+shader_parameter/edge_inner = Color(0.4, 0.3, 0.14, 1)
+shader_parameter/pixel_grid = 24.0
+shader_parameter/border_px = 2.0
 shader_parameter/noise_amt = 0.05
-shader_parameter/wear = 0.16
+shader_parameter/corner_radius = 0.3
 
 [node name="SkillCard" type="Control"]
 layout_mode = 3
@@ -87,8 +110,8 @@ offset_right = 108.0
 offset_bottom = 108.0
 mouse_filter = 2
 
-[node name="CellBg" type="ColorRect" parent="PortraitCell"]
-material = SubResource("GoldCell")
+[node name="BgFill" type="ColorRect" parent="PortraitCell"]
+material = SubResource("CellFillMat")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -96,10 +119,11 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(1, 1, 1, 1)
+color = Color(0.1, 0.1, 0.12, 1)
 
 [node name="Portrait" type="TextureRect" parent="PortraitCell"]
 texture_filter = 1
+material = SubResource("CellPortraitMat")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -110,11 +134,44 @@ offset_right = -7.0
 offset_bottom = -7.0
 grow_horizontal = 2
 grow_vertical = 2
-pivot_offset = Vector2(37, 0)
-scale = Vector2(1.3, 1.3)
 mouse_filter = 2
 expand_mode = 1
-stretch_mode = 5
+stretch_mode = 6
+
+[node name="InnerFX" type="ColorRect" parent="PortraitCell"]
+material = SubResource("CellInnerFXMat")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(1, 1, 1, 1)
+
+[node name="Frame" type="ColorRect" parent="PortraitCell"]
+material = SubResource("CellFrameMat")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(1, 1, 1, 1)
+
+[node name="Corners" type="Control" parent="PortraitCell"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("7_corner")
+corner_color = Color(0.99, 0.85, 0.5, 1)
+inset = 16.0
+radius = 4.0
 
 [node name="TypeLabel" type="Label" parent="."]
 layout_mode = 1

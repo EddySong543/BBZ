@@ -19,12 +19,13 @@ signal advance_requested
 const ALLY_TINT := Color(0.82, 0.9, 1.0)     # 己方·冷调羊皮
 const ENEMY_TINT := Color(1.0, 0.86, 0.72)   # 对方·暖调羊皮
 
-const INK := Color(0.2, 0.14, 0.08)               # 深褐墨字（描述正文）
+const INK := Color(0.14, 0.09, 0.04)              # 深褐墨字（描述正文）·加深提升可读性
 const INK_OUTLINE := Color(0.96, 0.92, 0.8, 0.45) # 浅羊皮色描边（墨字在纸纹上更清晰）
 
 ## 主动 / 被动 标签配色（在米黄羊皮纸上可读、冷暖区分）：主动=赤红（进攻），被动=靛蓝（恒常）。
-const ACTIVE_COLOR := Color(0.72, 0.16, 0.1)
-const PASSIVE_COLOR := Color(0.13, 0.32, 0.56)
+# 主动/被动标签：改用暖土色系，避免鲜红/亮蓝与金色羊皮书本背景冲突。
+const ACTIVE_COLOR := Color(0.66, 0.3, 0.12)   # 赭红橙（暖·主动=进攻）
+const PASSIVE_COLOR := Color(0.34, 0.4, 0.46)  # 黛蓝灰（去饱和·被动=恒常，远比原亮蓝柔和）
 
 ## 头像图片路径（res://...png）；空或不存在则隐藏头像。
 @export var portrait_path: String = "":
@@ -94,7 +95,7 @@ func _apply_fonts() -> void:
 		_desc_label.add_theme_font_size_override("normal_font_size", 16)
 		_desc_label.add_theme_color_override("default_color", INK)
 		_desc_label.add_theme_color_override("font_outline_color", INK_OUTLINE)
-		_desc_label.add_theme_constant_override("outline_size", 2)
+		_desc_label.add_theme_constant_override("outline_size", 1)
 
 
 ## 一次性填充（外部翻页时调用）。
@@ -132,19 +133,19 @@ func _refresh_portrait() -> void:
 func _refresh_text() -> void:
 	if not _type_label:
 		return
-	# 主动/被动：加粗（同色描边）+ 红（进攻）/蓝（恒常）区分。
+	# 主动/被动：轻描边 + 暖土色系区分（赭红=进攻 / 黛蓝灰=恒常），不与金色书本背景冲突。
 	_type_label.text = "主动技能" if is_active_skill else "被动技能"
 	var tc := ACTIVE_COLOR if is_active_skill else PASSIVE_COLOR
 	_type_label.add_theme_color_override("font_color", tc)
 	_type_label.add_theme_color_override("font_outline_color", tc)
-	_type_label.add_theme_constant_override("outline_size", 2)
+	_type_label.add_theme_constant_override("outline_size", 1)
 
 	if not _desc_label:
 		return
 	# 技能名加粗（同墨色 BBCode 描边 → 笔画变粗）+ 与描述同段不换行；描述用普通墨字。
 	var body := skill_detail.strip_edges()
 	var ink_hex := INK.to_html(false)
-	var bold_name := "[outline_size=3][outline_color=#%s]%s[/outline_color][/outline_size]" % [ink_hex, skill_name]
+	var bold_name := "[outline_size=1][outline_color=#%s]%s[/outline_color][/outline_size]" % [ink_hex, skill_name]
 	if skill_name != "" and body != "":
 		_desc_label.text = "%s：%s" % [bold_name, body]
 	elif skill_name != "":

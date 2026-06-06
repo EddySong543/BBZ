@@ -358,8 +358,8 @@ horizontal_alignment = 1
 
 [node name="TimerLabel" type="Label" parent="." unique_id=2111037196]
 layout_mode = 0
-offset_left = 760.0
-offset_right = 1160.0
+offset_left = 774.0
+offset_right = 1174.0
 offset_bottom = 92.0
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -386,9 +386,9 @@ horizontal_alignment = 1
 visible = false
 layout_mode = 0
 offset_left = 460.0
-offset_top = 318.0
+offset_top = 418.0
 offset_right = 1460.0
-offset_bottom = 402.0
+offset_bottom = 502.0
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -513,9 +513,9 @@ offset_bottom = 114.0
 horizontal_alignment = 1
 
 [node name="P2Frame1" parent="." unique_id=1621653890 instance=ExtResource("3_hero_frame")]
-offset_left = 1056.0
+offset_left = 1070.0
 offset_top = 6.0
-offset_right = 1124.0
+offset_right = 1138.0
 offset_bottom = 74.0
 
 [node name="P2Frame1Heart" parent="." unique_id=1500000003 instance=ExtResource("4_piprow")]
@@ -537,23 +537,23 @@ extra_modulate = Color(0.8, 0.82, 0.86, 1)
 
 [node name="P2Frame1Hp" type="Label" parent="." unique_id=35987408]
 layout_mode = 0
-offset_left = 1084.0
+offset_left = 1098.0
 offset_top = 76.0
-offset_right = 1122.0
+offset_right = 1136.0
 offset_bottom = 98.0
 
 [node name="P2Frame1Shield" type="Label" parent="." unique_id=1018620117]
 layout_mode = 0
-offset_left = 1056.0
+offset_left = 1070.0
 offset_top = 98.0
-offset_right = 1124.0
+offset_right = 1138.0
 offset_bottom = 112.0
 horizontal_alignment = 1
 
 [node name="P2Frame2" parent="." unique_id=1695379356 instance=ExtResource("3_hero_frame")]
-offset_left = 1136.0
+offset_left = 1150.0
 offset_top = 6.0
-offset_right = 1204.0
+offset_right = 1218.0
 offset_bottom = 74.0
 
 [node name="P2Frame2Heart" parent="." unique_id=1500000004 instance=ExtResource("4_piprow")]
@@ -575,16 +575,16 @@ extra_modulate = Color(0.8, 0.82, 0.86, 1)
 
 [node name="P2Frame2Hp" type="Label" parent="." unique_id=1691399540]
 layout_mode = 0
-offset_left = 1164.0
+offset_left = 1178.0
 offset_top = 76.0
-offset_right = 1202.0
+offset_right = 1216.0
 offset_bottom = 98.0
 
 [node name="P2Frame2Shield" type="Label" parent="." unique_id=145419997]
 layout_mode = 0
-offset_left = 1136.0
+offset_left = 1150.0
 offset_top = 98.0
-offset_right = 1204.0
+offset_right = 1218.0
 offset_bottom = 112.0
 horizontal_alignment = 1
 
