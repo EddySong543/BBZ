@@ -35,15 +35,14 @@ shader_parameter/pixel_grid = Vector2(1920, 1080)
 [sub_resource type="ShaderMaterial" id="StarsMat"]
 shader = ExtResource("4_stars")
 shader_parameter/grid = Vector2(32, 30)
-shader_parameter/star_amount = 0.95
+shader_parameter/star_amount = 0.96
 shader_parameter/center_bias = 0.04
 shader_parameter/seed = 0.0
 shader_parameter/star_color = Color(0.85, 0.92, 1, 1)
 shader_parameter/brightness = 1.0
-shader_parameter/twinkle_speed = 0.50000002375
-shader_parameter/twinkle_speed_var = 0.6
-shader_parameter/twinkle_depth = 0.35
-shader_parameter/spike_blocks = 3.0
+shader_parameter/twinkle_speed = 1.0
+shader_parameter/twinkle_depth = 0.6
+shader_parameter/spike_blocks = 1.0
 shader_parameter/spike_strength = 0.5
 shader_parameter/moon_pos = Vector2(0.774, 0.385)
 shader_parameter/moon_clear = 0.4
@@ -53,7 +52,7 @@ shader_parameter/pixel_grid = 600.0
 [sub_resource type="ShaderMaterial" id="MeteorMat"]
 shader = ExtResource("15_meteor")
 shader_parameter/period = 7.0
-shader_parameter/duration = 3.0
+shader_parameter/duration = 5.0
 shader_parameter/spawn_chance = 0.8
 shader_parameter/travel_dir = Vector2(-0.85, 0.5)
 shader_parameter/travel_len = 0.6
@@ -85,7 +84,7 @@ shader_parameter/cloud_color_lit = Color(0.32, 0.39, 0.54, 1)
 shader_parameter/coverage = 0.70000003325
 shader_parameter/core_step = 0.10000000335296999
 shader_parameter/opacity = 1.0
-shader_parameter/cloud_scale = Vector2(2, 4)
+shader_parameter/cloud_scale = Vector2(2.6, 4)
 shader_parameter/drift_speed = 0.010000000475
 shader_parameter/warp_amount = 0.50000002375
 shader_parameter/top_bias = 0.42
@@ -383,7 +382,7 @@ metadata/parallax_factor = 1.4
 
 [node name="MoonDust" type="GPUParticles2D" parent="." unique_id=171542226]
 position = Vector2(1140, 480)
-amount = 12
+amount = 8
 texture = SubResource("DustTex")
 lifetime = 9.0
 preprocess = 6.0

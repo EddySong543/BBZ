@@ -36,7 +36,7 @@ turbulence_noise_scale = 1.2
 
 [node name="ForeDust" type="GPUParticles2D"]
 position = Vector2(960, 540)
-amount = 64
+amount = 44
 texture = SubResource("DustTex")
 lifetime = 11.0
 preprocess = 8.0

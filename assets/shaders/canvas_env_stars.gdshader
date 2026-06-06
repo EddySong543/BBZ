@@ -1,12 +1,11 @@
 shader_type canvas_item;
 
 // =============================================================
-// canvas_env_stars.gdshader  (v10: 粗像素十字星 + 个体不规则"眨眼"闪烁 + seed)
+// canvas_env_stars.gdshader  (v11: 粗像素十字星 + 闪光脉冲 sparkle + seed)
 // 作者: Claude (Game Studios) ｜ 用途: scene1 深夜繁星（纯程序化，全屏）
-//   ★ v10：回到「每颗星独立随机闪烁」，但换新形式——【多频叠加的不规则眨眼】(scintillation)：
-//     三个不同频率正弦叠加 + 每星随机相位 → 亮度忽明忽暗、有快有慢、不规则，
-//     像真实星星大气闪烁，明显区别于之前"单一正弦平滑明灭"。去掉潮汐波/漂移。
-//     星形状：星核 + 常驻小十字芒(区别浮尘)；seed 每次进场景随机洗牌。
+//   ★ v11：从「平滑呼吸闪烁」改为【闪光脉冲 sparkle】——每星独立节奏，pow 尖锐化时间脉冲，
+//     多数时间柔和、偶尔骤亮，且【十字星芒随脉冲伸缩】(亮闪时伸出、平时收成微芒) →
+//     闪烁明显可见、十字芒成为"星光"的一部分而非突兀的常驻图案。seed 每次进场景随机洗牌。
 //   目标平台: PC (Windows D3D12 / Forward+)。复杂度: 单层 3×3 邻域纯算术 → 低。
 //   渲染管线: Godot 4.6 Forward+（2D canvas_item，alpha 混合，TIME 驱动）。
 // =============================================================
@@ -23,14 +22,16 @@ uniform vec4 star_color : source_color = vec4(0.85, 0.92, 1.0, 1.0);
 uniform float brightness : hint_range(0.0, 2.0) = 1.0;
 group_uniforms;
 
-group_uniforms twinkle;  // 个体不规则眨眼(多频叠加+随机相位 → 每星各自忽明忽暗，非单一正弦)
+group_uniforms twinkle;  // 闪光脉冲(每星独立尖锐时间脉冲 → 偶发骤亮，明显区别于平滑呼吸)
 uniform float twinkle_speed : hint_range(0.0, 3.0) = 1.2;   // 闪烁基准速度
-uniform float twinkle_depth : hint_range(0.0, 1.0) = 0.6;   // 闪烁幅度(越大忽明忽暗越剧烈)
+uniform float twinkle_depth : hint_range(0.0, 1.0) = 0.6;   // 闪烁幅度(平时多暗、pop 多亮)
+uniform float twinkle_sharp : hint_range(1.0, 10.0) = 4.0;  // 脉冲尖锐度(越大越像偶发"一闪"·越小越接近呼吸)
 group_uniforms;
 
-group_uniforms sparkle;  // 常驻小十字星芒(形状特征 → 区别于圆形浮尘粒子)
-uniform float spike_blocks : hint_range(0.0, 4.0) = 1.6;    // 常驻星芒长度(像素块)
-uniform float spike_strength : hint_range(0.0, 1.0) = 0.5;  // 星芒亮度(相对星核)
+group_uniforms sparkle;  // 十字星芒(长度=spike_blocks，强度随闪光脉冲伸缩)
+uniform float spike_blocks : hint_range(0.0, 4.0) = 1.6;    // 星芒长度(像素块)
+uniform float spike_strength : hint_range(0.0, 1.0) = 0.5;  // 星芒峰值亮度(pop 时·相对星核)
+uniform float spike_idle : hint_range(0.0, 1.0) = 0.25;     // 平时星芒残留(0=平时纯点·pop 才伸芒)
 group_uniforms;
 
 group_uniforms moon_avoid;
@@ -70,17 +71,18 @@ float star_contrib(vec2 cell, vec2 bcell, vec2 pg) {
 	float adx = abs(dcell.x);
 	float ady = abs(dcell.y);
 	float core = step(adx, 0.5) * step(ady, 0.5);
-	// 常驻小十字芒(固定形状)
-	float harm = step(ady, 0.5) * step(0.5, adx) * (1.0 - smoothstep(0.0, spike_blocks + 0.001, adx));
-	float varm = step(adx, 0.5) * step(0.5, ady) * (1.0 - smoothstep(0.0, spike_blocks + 0.001, ady));
-	float shape = core + (harm + varm) * spike_strength;
+	// 十字星芒臂(长度形状；强度由下方闪光脉冲调制)
+	float harm = step(ady, 0.5) * step(0.5, adx) * step(adx, spike_blocks + 0.5);  // 横臂硬边(整格满亮·无 smoothstep 半透明渐变尾)
+	float varm = step(adx, 0.5) * step(0.5, ady) * step(ady, spike_blocks + 0.5);  // 竖臂硬边
 
-	// 个体不规则眨眼：三频叠加 + 每星随机相位/速度 → 忽明忽暗、有快有慢
-	float ph = hash21(sc + 3.3) * 100.0;
-	float spd = twinkle_speed * mix(0.6, 1.4, hash21(sc + 4.4));
-	float t = TIME * spd + ph;
-	float fl = (sin(t) + 0.7 * sin(t * 1.9 + 1.3) + 0.5 * sin(t * 4.3 + 2.7)) / 2.2;  // ~ -1..1 不规则
-	float tw = clamp(1.0 + twinkle_depth * fl, 0.0, 2.0);
+	// 个体"闪光脉冲"：每星独立节奏，pow 尖锐化 → 多数时间柔和、偶尔骤亮(明显区别于平滑呼吸)
+	float ph = hash21(sc + 3.3) * 6.2831853;
+	float spd = twinkle_speed * mix(0.6, 1.5, hash21(sc + 4.4));
+	float wave = sin(TIME * spd + ph) * 0.5 + 0.5;                       // 0..1
+	float pulse = pow(wave, twinkle_sharp);                             // 尖锐化 → 窄亮峰、多数时间低
+	float tw = (1.0 - twinkle_depth) + twinkle_depth * 1.5 * pulse;     // 亮度：平时暗、pop 时骤亮
+	float spike_dyn = spike_strength * mix(spike_idle, 1.0, pulse);     // 星芒：平时收成微芒、pop 伸满
+	float shape = core + (harm + varm) * spike_dyn;
 
 	return present * shape * base_b * brightness * tw;
 }

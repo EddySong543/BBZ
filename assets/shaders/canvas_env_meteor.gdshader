@@ -12,7 +12,7 @@ shader_type canvas_item;
 
 group_uniforms timing;
 uniform float period : hint_range(2.0, 30.0) = 7.0;        // 出现间隔(秒)
-uniform float duration : hint_range(0.3, 3.0) = 1.1;       // 单颗划过时长(秒)
+uniform float duration : hint_range(0.3, 8.0) = 1.1;       // 单颗划过时长(秒)
 uniform float spawn_chance : hint_range(0.0, 1.0) = 0.8;   // 每周期出现概率(<1 → 偶尔不出现)
 group_uniforms;
 

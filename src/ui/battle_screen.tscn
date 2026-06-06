@@ -227,6 +227,7 @@ warmth_amount = 0.0
 visible = false
 
 [node name="LowerDust" parent="." unique_id=802756316 instance=ExtResource("12_foredust")]
+visible = false
 position = Vector2(960, 900)
 amount = 60
 

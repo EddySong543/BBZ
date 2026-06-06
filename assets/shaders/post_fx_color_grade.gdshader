@@ -9,7 +9,7 @@ shader_type canvas_item;
 // 渲染管线: Godot 4.6 Forward+（2D canvas_item，配合 BackBufferCopy 读 SCREEN_TEXTURE）。
 // =============================================================
 
-uniform sampler2D screen_tex : hint_screen_texture, filter_linear, repeat_disable;  // linear：边缘模糊；repeat_disable：鱼眼外推/shake 时夹到边缘，不露灰块
+uniform sampler2D screen_tex : hint_screen_texture, filter_nearest, repeat_disable;  // nearest：像素硬边不被重采样糊(像素风·桶形畸变/边缘模糊仍靠多 tap 采样实现)；repeat_disable：鱼眼外推/shake 时夹到边缘，不露灰块
 
 group_uniforms lens;  // 光学畸变 + 边缘模糊（聚焦中心）
 uniform float barrel_amount : hint_range(-0.3, 0.3) = 0.06;     // 桶形畸变(正=中央外凸鱼眼，负=内凹)
