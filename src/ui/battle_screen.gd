@@ -115,6 +115,8 @@ var _shake := 0.0
 var _confirm_pulse: Tween   # 「结束」按钮的呼吸金光（有待确认动作时召唤点击）
 var _cd_home: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]  # 立绘原位（前冲 juice 复位用）
 var _shadow_home: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]  # 阴影原位（跟随角色水平位移用）
+var _prev_hp_disp: Array[float] = [-1.0, -1.0]   # 上次显示的出战 HP（检测变化 → 心条 flinch 脉冲）
+var _hitstop_token: int = 0   # hitstop(c) 防重叠：仅最后一次定格负责恢复 Engine.time_scale
 
 
 # ============================================================
@@ -156,6 +158,11 @@ func _ready() -> void:
 
 	_update_all()
 	_show_turn_intro()
+
+
+## 离场恢复 time_scale=1：hitstop(c) 用全局 Engine.time_scale，若在定格瞬间切场景须复位，防下个场景慢动作。
+func _exit_tree() -> void:
+	Engine.time_scale = 1.0
 
 
 ## 顶部 UI 整组下移 TOP_UI_DROP 像素（避免太贴屏幕顶端）。
@@ -938,6 +945,10 @@ func _update_hp_labels() -> void:
 		# 心形血珠：满+半+暗色空心到 max；护盾作青色额外心追加。
 		var row: IconPipRow = p1_heart_row if p == 0 else p2_heart_row
 		row.set_value(hp_now, hp_max, sh)
+		# 数字重量(b)：HP 变化时心条 flinch 脉冲（掉血偏红 / 回血偏绿）。
+		if _prev_hp_disp[p] >= 0.0 and not is_equal_approx(hp_now, _prev_hp_disp[p]):
+			_flinch_heart_row(row, hp_now < _prev_hp_disp[p])
+		_prev_hp_disp[p] = hp_now
 
 
 func _fmt_hp(v: float) -> String:
@@ -1011,10 +1022,13 @@ func _dbg_damage_self() -> void:
 
 
 ## 给 player 的出战英雄扣 amount HP（debug，不走结算/不触发死亡换人）。
+## 一并触发命中 juice（飘字+斩击+白闪+心条 flinch+震屏）→ 方便 F6 测试质感。
 func _dbg_damage_active(player: int, amount: int) -> void:
 	var s: int = battle.active_index[player]
 	battle.hp[player][s] = maxi(battle.hp[player][s] - amount * BattleCore.HP_UNIT, 0)
-	_update_all()
+	_update_all()                              # 含心条 flinch（HP 变化检测）
+	_impact(player, amount * BattleCore.HP_UNIT)   # 飘字 + 斩击 + 白闪
+	_shake = 8.0
 
 
 func _dbg_shield_enemy() -> void:
@@ -1089,12 +1103,15 @@ func _act_juice(player: int, action: int) -> void:
 ## 命中表现：白闪 + 斩击弧光 + 伤害数字。
 func _impact(target_player: int, dmg_half: int) -> void:
 	var cd := _cd(target_player)
+	var big := dmg_half >= 4   # ≥2HP=重击：更强退弹/火花/定格
 	cd.flash_white(0.18)
 	cd.pulse_rim(0.7, 0.22)   # A3：被弧光照亮
-	_char_pop(target_player, 0.08)   # A3：受击退弹（scale 弹一下）
+	_char_pop(target_player, 0.12 if big else 0.08)   # 受击退弹（scale 弹一下）
 	_spawn_slash(target_player)
+	_spawn_spark(target_player, big)                  # c：命中火花
 	if dmg_half > 0:
 		_pop_damage(target_player, float(dmg_half) / 2.0)
+	_hitstop(0.075 if big else 0.045)                 # c：命中定格（不 await，自管恢复）
 
 
 ## A3：受击 scale-pop（绕立绘中心快速放大再回弹）。pivot 每次按当前尺寸取中心，稳健。
@@ -1104,6 +1121,41 @@ func _char_pop(player: int, amount: float) -> void:
 	var tw := create_tween()
 	tw.tween_property(cd, "scale", Vector2(1.0 + amount, 1.0 + amount), 0.06).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	tw.tween_property(cd, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## 命中定格 hitstop(c)：极短时间把 Engine.time_scale 压到极低 → 整个画面"顿"一下，
+## 把出招/受击张力咬住几帧再放开，是打击脆度的核心。token 防多发重叠误恢复；
+## 计时器用 ignore_time_scale 按真实时长恢复；_exit_tree 兜底复位。
+func _hitstop(real_dur: float, ts: float = 0.04) -> void:
+	_hitstop_token += 1
+	var my := _hitstop_token
+	Engine.time_scale = ts
+	await get_tree().create_timer(real_dur, true, false, true).timeout
+	if my == _hitstop_token:
+		Engine.time_scale = 1.0
+
+
+## 命中火花(c)：受击点爆一簇短命粒子（径向飞溅 + 重力下坠），重击更多更快。
+## 一次性 explosive 爆发 → "一帧火花"的脆感。无贴图=小方块火星，足够。
+func _spawn_spark(target_player: int, big: bool) -> void:
+	var cd := _cd(target_player)
+	var p := CPUParticles2D.new()
+	p.global_position = cd.global_position + cd.size * Vector2(0.5, 0.42)
+	p.z_index = 95
+	p.one_shot = true
+	p.explosiveness = 1.0
+	p.amount = 16 if big else 10
+	p.lifetime = 0.38
+	p.spread = 180.0                       # 径向全向飞溅
+	p.initial_velocity_min = 160.0
+	p.initial_velocity_max = 460.0 if big else 300.0
+	p.gravity = Vector2(0, 700)
+	p.scale_amount_min = 2.0
+	p.scale_amount_max = 4.5 if big else 3.0
+	p.color = Color(1.0, 0.92, 0.62)       # 暖白火星
+	add_child(p)
+	p.emitting = true
+	get_tree().create_timer(0.9).timeout.connect(p.queue_free)
 
 
 func _spawn_slash(target_player: int) -> void:
@@ -1117,29 +1169,58 @@ func _spawn_slash(target_player: int) -> void:
 	slash.play()
 
 
+## 伤害飘字（数字重量 b）：受击处弹 -N，按伤害量缩放大小/配色 → punch-in 过冲 → 抛物上浮淡出。
+## 大伤(≥2HP)更大更炽、描边更粗；起点偏击退方向 + 小随机，防多发叠死。
 func _pop_damage(player: int, amount: float) -> void:
 	var cd: CharacterDisplay = p1_char_display if player == 0 else p2_char_display
+	var big := amount >= 2.0
 	var lbl := Label.new()
 	lbl.text = "-%s" % _fmt_hp(amount)
-	FontManager.apply(lbl, 44)
-	lbl.add_theme_color_override("font_color", Color(1, 0.5, 0.4))
-	lbl.add_theme_color_override("font_outline_color", Color.BLACK)
-	lbl.add_theme_constant_override("outline_size", 6)
-	lbl.global_position = cd.global_position + Vector2(20, -40)
+	FontManager.apply(lbl, 60 if big else 44)
+	# 重击=炽黄白更醒目 / 轻击=橙红；粗黑描边 = 投影/重量。
+	lbl.add_theme_color_override("font_color", Color(1.0, 0.82, 0.5) if big else Color(1.0, 0.55, 0.42))
+	lbl.add_theme_color_override("font_outline_color", Color(0.12, 0.02, 0.02, 0.95))
+	lbl.add_theme_constant_override("outline_size", 9 if big else 6)
 	lbl.z_index = 100
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(lbl)
+	lbl.reset_size()
+	lbl.pivot_offset = lbl.size * 0.5   # 绕中心缩放
+	var dir := 1.0 if player == 0 else -1.0   # 击退方向（P0 打右侧敌→数字往右）
+	var start: Vector2 = cd.global_position + cd.size * Vector2(0.5, 0.30) - lbl.size * 0.5 \
+		+ Vector2(dir * 16.0 + randf_range(-10.0, 10.0), randf_range(-6.0, 6.0))
+	lbl.global_position = start
+	# punch-in：0.45 → 过冲 → 落定
+	var peak := 1.28 if big else 1.12
+	lbl.scale = Vector2(0.45, 0.45)
+	var st := create_tween()
+	st.tween_property(lbl, "scale", Vector2(peak, peak), 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	st.tween_property(lbl, "scale", Vector2(peak, peak) * 0.86, 0.10).set_trans(Tween.TRANS_SINE)
+	# 抛物上浮（横向带一点击退漂移）+ 末段淡出
+	var rise := 104.0 if big else 78.0
 	var tw := create_tween()
 	tw.set_parallel(true)
-	tw.tween_property(lbl, "global_position", lbl.global_position + Vector2(0, -80), 0.6).set_ease(Tween.EASE_OUT)
-	tw.tween_property(lbl, "modulate:a", 0.0, 0.6).set_delay(0.2)
-	get_tree().create_timer(0.85).timeout.connect(lbl.queue_free)
+	tw.tween_property(lbl, "global_position", start + Vector2(dir * 26.0, -rise), 0.66).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(lbl, "modulate:a", 0.0, 0.40).set_delay(0.52)
+	get_tree().create_timer(1.05).timeout.connect(lbl.queue_free)
+
+
+## 数字重量(b)：HP 变化时给出战心条一个 modulate flinch（掉血偏红 / 回血偏绿），
+## 用 modulate 而非 scale → 不受 RTL 心条(右起左排)的布局影响、稳健。
+func _flinch_heart_row(row: IconPipRow, is_loss: bool) -> void:
+	var peak := Color(1.7, 1.35, 1.35) if is_loss else Color(1.35, 1.7, 1.4)
+	var tw := create_tween()
+	tw.tween_property(row, "modulate", peak, 0.06).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(row, "modulate", Color.WHITE, 0.30).set_trans(Tween.TRANS_SINE)
 
 
 func _process(delta: float) -> void:
 	if _shake > 0.0:
 		position = Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake))
-		_shake = maxf(0.0, _shake - 40.0 * delta)
-		if _shake <= 0.0:
+		# 屏震衰减曲线(c)：指数衰减 → 起手猛、迅速收尾，比线性更"脆"。
+		_shake = lerpf(_shake, 0.0, 1.0 - exp(-13.0 * delta))
+		if _shake < 0.35:
+			_shake = 0.0
 			position = Vector2.ZERO
 	# 阴影对角色动作反应：水平位移跟随 + 离地缩小淡出 + 冲刺拉长（接地/重量感）。
 	_update_shadow(0)
