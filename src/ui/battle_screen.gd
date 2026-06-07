@@ -55,25 +55,29 @@ const AI := 1       # 对手 AI
 @onready var big_turn_label: Label = $BigTurnLabel
 
 # 出战角色名(每回合随出战英雄更新) + 玩家伪 id(常驻·占位)。
-@onready var p1_active_name: Label = $P1ActiveName
-@onready var p2_active_name: Label = $P2ActiveName
-@onready var p1_player_id: Label = $P1PlayerId
-@onready var p2_player_id: Label = $P2PlayerId
+@onready var p1_active_name: Label = $P1Hud/P1ActiveName
+@onready var p2_active_name: Label = $P2Hud/P2ActiveName
+@onready var p1_player_id: Label = $P1Hud/P1PlayerId
+@onready var p2_player_id: Label = $P2Hud/P2PlayerId
 
 @onready var p1_char_display: CharacterDisplay = $P1CharDisplay
 @onready var p2_char_display: CharacterDisplay = $P2CharDisplay
 @onready var p1_shadow: TextureRect = $P1Shadow
 @onready var p2_shadow: TextureRect = $P2Shadow
 
-@onready var p1_frames: Array[HeroFrame] = [$P1Frame0, $P1Frame1, $P1Frame2]
-@onready var p2_frames: Array[HeroFrame] = [$P2Frame0, $P2Frame1, $P2Frame2]
-@onready var p1_frame_hp_labels: Array[Label] = [$P1Frame0Hp, $P1Frame1Hp, $P1Frame2Hp]
-@onready var p2_frame_hp_labels: Array[Label] = [$P2Frame0Hp, $P2Frame1Hp, $P2Frame2Hp]
-@onready var p1_frame_shield_labels: Array[Label] = [$P1Frame0Shield, $P1Frame1Shield, $P1Frame2Shield]
-@onready var p2_frame_shield_labels: Array[Label] = [$P2Frame0Shield, $P2Frame1Shield, $P2Frame2Shield]
+# d 排版收纳：每个玩家 HUD(框+❤+名+id+主血条/能量)收进一个 Control 容器 → 整组一处定位。
+@onready var p1_hud: Control = $P1Hud
+@onready var p2_hud: Control = $P2Hud
+
+@onready var p1_frames: Array[HeroFrame] = [$P1Hud/P1Frame0, $P1Hud/P1Frame1, $P1Hud/P1Frame2]
+@onready var p2_frames: Array[HeroFrame] = [$P2Hud/P2Frame0, $P2Hud/P2Frame1, $P2Hud/P2Frame2]
+@onready var p1_frame_hp_labels: Array[Label] = [$P1Hud/P1Frame0Hp, $P1Hud/P1Frame1Hp, $P1Hud/P1Frame2Hp]
+@onready var p2_frame_hp_labels: Array[Label] = [$P2Hud/P2Frame0Hp, $P2Hud/P2Frame1Hp, $P2Hud/P2Frame2Hp]
+@onready var p1_frame_shield_labels: Array[Label] = [$P1Hud/P1Frame0Shield, $P1Hud/P1Frame1Shield, $P1Hud/P1Frame2Shield]
+@onready var p2_frame_shield_labels: Array[Label] = [$P2Hud/P2Frame0Shield, $P2Hud/P2Frame1Shield, $P2Hud/P2Frame2Shield]
 # 待选英雄头像下的心形标记（美术资产，替代旧 ❤ 文字）。index 0 = 出战位 → null（出战血量看大心条）。
-@onready var p1_frame_heart_icons: Array = [null, $P1Frame1Heart, $P1Frame2Heart]
-@onready var p2_frame_heart_icons: Array = [null, $P2Frame1Heart, $P2Frame2Heart]
+@onready var p1_frame_heart_icons: Array = [null, $P1Hud/P1Frame1Heart, $P1Hud/P1Frame2Heart]
+@onready var p2_frame_heart_icons: Array = [null, $P2Hud/P2Frame1Heart, $P2Hud/P2Frame2Heart]
 var p1_frame_slots: Array[int] = [-1, -1, -1]
 var p2_frame_slots: Array[int] = [-1, -1, -1]
 
@@ -95,10 +99,10 @@ var _skill_index: int = 0
 @onready var btn_confirm: Button = $Buttons/BtnConfirm
 
 # 新美术 HUD：心形血珠 + 金币能量点（替换旧 EnergyBar / ArcHealthBar）。
-@onready var p1_heart_row: IconPipRow = $P1HeartRow
-@onready var p2_heart_row: IconPipRow = $P2HeartRow
-@onready var p1_coin_row: IconPipRow = $P1CoinRow
-@onready var p2_coin_row: IconPipRow = $P2CoinRow
+@onready var p1_heart_row: IconPipRow = $P1Hud/P1HeartRow
+@onready var p2_heart_row: IconPipRow = $P2Hud/P2HeartRow
+@onready var p1_coin_row: IconPipRow = $P1Hud/P1CoinRow
+@onready var p2_coin_row: IconPipRow = $P2Hud/P2CoinRow
 
 # ---- 选择 / 样式 ----
 var action_btn_list: Array[Button] = []
@@ -166,23 +170,10 @@ func _exit_tree() -> void:
 
 
 ## 顶部 UI 整组下移 TOP_UI_DROP 像素（避免太贴屏幕顶端）。
-## 这些节点各自独立顶部锚定、无统一容器 → 运行时统一平移；替补爱心(heart_icon)位置改由 .tscn
-## 摆放(❤+数字 格式)，故一并列入平移（数组含 null 占位，下方循环已防 null）。
+## d 收纳后：每个玩家 HUD 已收进 P1Hud/P2Hud 容器 → 只移动这两个父节点 + 两个中央标签即可，
+## 不再逐节点平移（消除"各自独立锚定 → 零星错位"）。
 func _nudge_top_ui_down() -> void:
-	var tops: Array = [
-		turn_label, timer_label,
-		p1_heart_row, p2_heart_row, p1_coin_row, p2_coin_row,
-		p1_active_name, p2_active_name, p1_player_id, p2_player_id,
-	]
-	tops.append_array(p1_frames)
-	tops.append_array(p2_frames)
-	tops.append_array(p1_frame_hp_labels)
-	tops.append_array(p2_frame_hp_labels)
-	tops.append_array(p1_frame_shield_labels)
-	tops.append_array(p2_frame_shield_labels)
-	tops.append_array(p1_frame_heart_icons)   # ❤ 图标(含 null 占位；循环已防 null)
-	tops.append_array(p2_frame_heart_icons)
-	for n in tops:
+	for n in [p1_hud, p2_hud, turn_label, timer_label]:
 		if n != null:
 			(n as Control).position.y += TOP_UI_DROP
 

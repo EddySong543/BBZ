@@ -74,7 +74,7 @@ shader_parameter/fill_top = Color(0.7, 0.72, 0.77, 1)
 shader_parameter/fill_bottom = Color(0.48, 0.5, 0.56, 1)
 shader_parameter/edge_inner = Color(0.9, 0.92, 0.97, 1)
 shader_parameter/edge_outer = Color(0.32, 0.34, 0.4, 1)
-shader_parameter/fill_alpha = 0.92
+shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 38.0
 shader_parameter/corner = 0.22
 shader_parameter/edge_px = 2.0
@@ -88,7 +88,7 @@ shader_parameter/fill_top = Color(0.7, 0.72, 0.77, 1)
 shader_parameter/fill_bottom = Color(0.48, 0.5, 0.56, 1)
 shader_parameter/edge_inner = Color(0.9, 0.92, 0.97, 1)
 shader_parameter/edge_outer = Color(0.32, 0.34, 0.4, 1)
-shader_parameter/fill_alpha = 0.92
+shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 38.0
 shader_parameter/corner = 0.22
 shader_parameter/edge_px = 2.0
@@ -102,7 +102,7 @@ shader_parameter/fill_top = Color(0.7, 0.72, 0.77, 1)
 shader_parameter/fill_bottom = Color(0.48, 0.5, 0.56, 1)
 shader_parameter/edge_inner = Color(0.9, 0.92, 0.97, 1)
 shader_parameter/edge_outer = Color(0.32, 0.34, 0.4, 1)
-shader_parameter/fill_alpha = 0.92
+shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 38.0
 shader_parameter/corner = 0.22
 shader_parameter/edge_px = 2.0
@@ -116,7 +116,7 @@ shader_parameter/fill_top = Color(0.7, 0.72, 0.77, 1)
 shader_parameter/fill_bottom = Color(0.48, 0.5, 0.56, 1)
 shader_parameter/edge_inner = Color(0.9, 0.92, 0.97, 1)
 shader_parameter/edge_outer = Color(0.32, 0.34, 0.4, 1)
-shader_parameter/fill_alpha = 0.92
+shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 38.0
 shader_parameter/corner = 0.22
 shader_parameter/edge_px = 2.0
@@ -130,7 +130,7 @@ shader_parameter/fill_top = Color(0.7, 0.72, 0.77, 1)
 shader_parameter/fill_bottom = Color(0.48, 0.5, 0.56, 1)
 shader_parameter/edge_inner = Color(0.9, 0.92, 0.97, 1)
 shader_parameter/edge_outer = Color(0.32, 0.34, 0.4, 1)
-shader_parameter/fill_alpha = 0.92
+shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 38.0
 shader_parameter/corner = 0.22
 shader_parameter/edge_px = 2.0
@@ -144,7 +144,7 @@ shader_parameter/fill_top = Color(0.7, 0.72, 0.77, 1)
 shader_parameter/fill_bottom = Color(0.48, 0.5, 0.56, 1)
 shader_parameter/edge_inner = Color(0.9, 0.92, 0.97, 1)
 shader_parameter/edge_outer = Color(0.32, 0.34, 0.4, 1)
-shader_parameter/fill_alpha = 0.92
+shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 38.0
 shader_parameter/corner = 0.22
 shader_parameter/edge_px = 2.0
@@ -158,7 +158,7 @@ shader_parameter/fill_top = Color(0.42, 0.6, 0.42, 1)
 shader_parameter/fill_bottom = Color(0.24, 0.42, 0.27, 1)
 shader_parameter/edge_inner = Color(0.66, 0.88, 0.66, 1)
 shader_parameter/edge_outer = Color(0.16, 0.3, 0.19, 1)
-shader_parameter/fill_alpha = 0.92
+shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 38.0
 shader_parameter/corner = 0.22
 shader_parameter/edge_px = 2.0
@@ -272,7 +272,21 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(0, 0, 0, 1)
 
-[node name="P1HeartRow" parent="." unique_id=140100001 instance=ExtResource("4_piprow")]
+[node name="P1Hud" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="P2Hud" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="P1HeartRow" parent="P1Hud" unique_id=140100001 instance=ExtResource("4_piprow")]
 texture_filter = 1
 anchors_preset = 0
 offset_left = 95.2
@@ -289,7 +303,7 @@ pip_size = 100.0
 spacing = -50.0
 extra_modulate = Color(0.6177773, 0.6495925, 0.7172231, 1)
 
-[node name="P2HeartRow" parent="." unique_id=140100002 instance=ExtResource("4_piprow")]
+[node name="P2HeartRow" parent="P2Hud" unique_id=140100002 instance=ExtResource("4_piprow")]
 texture_filter = 1
 anchors_preset = 0
 offset_left = 1827.005
@@ -307,7 +321,7 @@ spacing = -50.0
 right_to_left = true
 extra_modulate = Color(0.8, 0.82, 0.86, 1)
 
-[node name="P1CoinRow" parent="." unique_id=1966048575 instance=ExtResource("4_piprow")]
+[node name="P1CoinRow" parent="P1Hud" unique_id=1966048575 instance=ExtResource("4_piprow")]
 texture_filter = 1
 anchors_preset = 0
 offset_left = 122.985
@@ -329,7 +343,7 @@ allow_half = false
 extra_modulate = Color(0.8, 0.82, 0.86, 1)
 preview_cur = 10.865
 
-[node name="P2CoinRow" parent="." unique_id=1708577516 instance=ExtResource("4_piprow")]
+[node name="P2CoinRow" parent="P2Hud" unique_id=1708577516 instance=ExtResource("4_piprow")]
 texture_filter = 1
 anchors_preset = 0
 offset_left = 1799.74
@@ -397,13 +411,13 @@ offset_bottom = 502.0
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="P1Frame0" parent="." unique_id=2129820687 instance=ExtResource("3_hero_frame")]
+[node name="P1Frame0" parent="P1Hud" unique_id=2129820687 instance=ExtResource("3_hero_frame")]
 offset_left = 30.0
 offset_top = 8.0
 offset_right = 102.0
 offset_bottom = 80.0
 
-[node name="P1Frame0Hp" type="Label" parent="." unique_id=1715166685]
+[node name="P1Frame0Hp" type="Label" parent="P1Hud" unique_id=1715166685]
 layout_mode = 0
 offset_left = 30.0
 offset_top = 82.0
@@ -411,7 +425,7 @@ offset_right = 102.0
 offset_bottom = 98.0
 horizontal_alignment = 1
 
-[node name="P1Frame0Shield" type="Label" parent="." unique_id=934402041]
+[node name="P1Frame0Shield" type="Label" parent="P1Hud" unique_id=934402041]
 layout_mode = 0
 offset_left = 30.0
 offset_top = 100.0
@@ -419,13 +433,13 @@ offset_right = 102.0
 offset_bottom = 114.0
 horizontal_alignment = 1
 
-[node name="P1Frame1" parent="." unique_id=1566007647 instance=ExtResource("3_hero_frame")]
+[node name="P1Frame1" parent="P1Hud" unique_id=1566007647 instance=ExtResource("3_hero_frame")]
 offset_left = 796.0
 offset_top = 6.0
 offset_right = 864.0
 offset_bottom = 74.0
 
-[node name="P1Frame1Heart" parent="." unique_id=1500000001 instance=ExtResource("4_piprow")]
+[node name="P1Frame1Heart" parent="P1Hud" unique_id=1500000001 instance=ExtResource("4_piprow")]
 texture_filter = 1
 anchors_preset = 0
 offset_left = 808.0
@@ -442,7 +456,7 @@ show_empty = false
 allow_half = false
 extra_modulate = Color(0.8, 0.82, 0.86, 1)
 
-[node name="P1Frame1Hp" type="Label" parent="." unique_id=1952929696]
+[node name="P1Frame1Hp" type="Label" parent="P1Hud" unique_id=1952929696]
 layout_mode = 0
 offset_left = 836.0
 offset_top = 76.0
@@ -450,7 +464,7 @@ offset_right = 860.0
 offset_bottom = 98.0
 vertical_alignment = 1
 
-[node name="P1Frame1Shield" type="Label" parent="." unique_id=1568155607]
+[node name="P1Frame1Shield" type="Label" parent="P1Hud" unique_id=1568155607]
 layout_mode = 0
 offset_left = 796.0
 offset_top = 98.0
@@ -458,13 +472,13 @@ offset_right = 864.0
 offset_bottom = 112.0
 horizontal_alignment = 1
 
-[node name="P1Frame2" parent="." unique_id=1208252427 instance=ExtResource("3_hero_frame")]
+[node name="P1Frame2" parent="P1Hud" unique_id=1208252427 instance=ExtResource("3_hero_frame")]
 offset_left = 716.0
 offset_top = 6.0
 offset_right = 784.0
 offset_bottom = 74.0
 
-[node name="P1Frame2Heart" parent="." unique_id=1500000002 instance=ExtResource("4_piprow")]
+[node name="P1Frame2Heart" parent="P1Hud" unique_id=1500000002 instance=ExtResource("4_piprow")]
 texture_filter = 1
 anchors_preset = 0
 offset_left = 728.0
@@ -481,7 +495,7 @@ show_empty = false
 allow_half = false
 extra_modulate = Color(0.8, 0.82, 0.86, 1)
 
-[node name="P1Frame2Hp" type="Label" parent="." unique_id=1859547373]
+[node name="P1Frame2Hp" type="Label" parent="P1Hud" unique_id=1859547373]
 layout_mode = 0
 offset_left = 756.0
 offset_top = 76.0
@@ -489,7 +503,7 @@ offset_right = 780.0
 offset_bottom = 98.0
 vertical_alignment = 1
 
-[node name="P1Frame2Shield" type="Label" parent="." unique_id=87371090]
+[node name="P1Frame2Shield" type="Label" parent="P1Hud" unique_id=87371090]
 layout_mode = 0
 offset_left = 716.0
 offset_top = 98.0
@@ -497,13 +511,13 @@ offset_right = 784.0
 offset_bottom = 112.0
 horizontal_alignment = 1
 
-[node name="P2Frame0" parent="." unique_id=1770616061 instance=ExtResource("3_hero_frame")]
+[node name="P2Frame0" parent="P2Hud" unique_id=1770616061 instance=ExtResource("3_hero_frame")]
 offset_left = 1818.0
 offset_top = 8.0
 offset_right = 1890.0
 offset_bottom = 80.0
 
-[node name="P2Frame0Hp" type="Label" parent="." unique_id=641229813]
+[node name="P2Frame0Hp" type="Label" parent="P2Hud" unique_id=641229813]
 layout_mode = 0
 offset_left = 1818.0
 offset_top = 82.0
@@ -511,7 +525,7 @@ offset_right = 1890.0
 offset_bottom = 98.0
 horizontal_alignment = 1
 
-[node name="P2Frame0Shield" type="Label" parent="." unique_id=1837203129]
+[node name="P2Frame0Shield" type="Label" parent="P2Hud" unique_id=1837203129]
 layout_mode = 0
 offset_left = 1818.0
 offset_top = 100.0
@@ -519,13 +533,13 @@ offset_right = 1890.0
 offset_bottom = 114.0
 horizontal_alignment = 1
 
-[node name="P2Frame1" parent="." unique_id=1621653890 instance=ExtResource("3_hero_frame")]
+[node name="P2Frame1" parent="P2Hud" unique_id=1621653890 instance=ExtResource("3_hero_frame")]
 offset_left = 1070.0
 offset_top = 6.0
 offset_right = 1138.0
 offset_bottom = 74.0
 
-[node name="P2Frame1Heart" parent="." unique_id=1500000003 instance=ExtResource("4_piprow")]
+[node name="P2Frame1Heart" parent="P2Hud" unique_id=1500000003 instance=ExtResource("4_piprow")]
 texture_filter = 1
 anchors_preset = 0
 offset_left = 1082.0
@@ -542,7 +556,7 @@ show_empty = false
 allow_half = false
 extra_modulate = Color(0.8, 0.82, 0.86, 1)
 
-[node name="P2Frame1Hp" type="Label" parent="." unique_id=35987408]
+[node name="P2Frame1Hp" type="Label" parent="P2Hud" unique_id=35987408]
 layout_mode = 0
 offset_left = 1110.0
 offset_top = 76.0
@@ -550,7 +564,7 @@ offset_right = 1134.0
 offset_bottom = 98.0
 vertical_alignment = 1
 
-[node name="P2Frame1Shield" type="Label" parent="." unique_id=1018620117]
+[node name="P2Frame1Shield" type="Label" parent="P2Hud" unique_id=1018620117]
 layout_mode = 0
 offset_left = 1070.0
 offset_top = 98.0
@@ -558,13 +572,13 @@ offset_right = 1138.0
 offset_bottom = 112.0
 horizontal_alignment = 1
 
-[node name="P2Frame2" parent="." unique_id=1695379356 instance=ExtResource("3_hero_frame")]
+[node name="P2Frame2" parent="P2Hud" unique_id=1695379356 instance=ExtResource("3_hero_frame")]
 offset_left = 1150.0
 offset_top = 6.0
 offset_right = 1218.0
 offset_bottom = 74.0
 
-[node name="P2Frame2Heart" parent="." unique_id=1500000004 instance=ExtResource("4_piprow")]
+[node name="P2Frame2Heart" parent="P2Hud" unique_id=1500000004 instance=ExtResource("4_piprow")]
 texture_filter = 1
 anchors_preset = 0
 offset_left = 1162.0
@@ -581,7 +595,7 @@ show_empty = false
 allow_half = false
 extra_modulate = Color(0.8, 0.82, 0.86, 1)
 
-[node name="P2Frame2Hp" type="Label" parent="." unique_id=1691399540]
+[node name="P2Frame2Hp" type="Label" parent="P2Hud" unique_id=1691399540]
 layout_mode = 0
 offset_left = 1190.0
 offset_top = 76.0
@@ -589,7 +603,7 @@ offset_right = 1214.0
 offset_bottom = 98.0
 vertical_alignment = 1
 
-[node name="P2Frame2Shield" type="Label" parent="." unique_id=145419997]
+[node name="P2Frame2Shield" type="Label" parent="P2Hud" unique_id=145419997]
 layout_mode = 0
 offset_left = 1150.0
 offset_top = 98.0
@@ -597,7 +611,7 @@ offset_right = 1218.0
 offset_bottom = 112.0
 horizontal_alignment = 1
 
-[node name="P1ActiveName" type="Label" parent="." unique_id=1930000001]
+[node name="P1ActiveName" type="Label" parent="P1Hud" unique_id=1930000001]
 layout_mode = 0
 offset_left = 22.0
 offset_top = 100.0
@@ -611,7 +625,7 @@ theme_override_font_sizes/font_size = 16
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="P1PlayerId" type="Label" parent="." unique_id=1930000002]
+[node name="P1PlayerId" type="Label" parent="P1Hud" unique_id=1930000002]
 layout_mode = 0
 offset_left = 138.0
 offset_top = 100.0
@@ -625,7 +639,7 @@ theme_override_font_sizes/font_size = 16
 text = "玩家1"
 vertical_alignment = 1
 
-[node name="P2ActiveName" type="Label" parent="." unique_id=1930000003]
+[node name="P2ActiveName" type="Label" parent="P2Hud" unique_id=1930000003]
 layout_mode = 0
 offset_left = 1810.0
 offset_top = 100.0
@@ -639,7 +653,7 @@ theme_override_font_sizes/font_size = 16
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="P2PlayerId" type="Label" parent="." unique_id=1930000004]
+[node name="P2PlayerId" type="Label" parent="P2Hud" unique_id=1930000004]
 layout_mode = 0
 offset_left = 1527.505
 offset_top = 100.0
