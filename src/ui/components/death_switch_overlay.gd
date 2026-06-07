@@ -78,7 +78,7 @@ func _update_countdown_label() -> void:
 ## 单个替补 = 居中竖排(固定 FRAME_SIZE 宽对齐)：头像框(HeroFrame 同款) + 名字 + ❤X 血量。
 func _create_frame_entry(h: HeroData, hp: float, slot: int, pcolor: Color) -> Control:
 	var wrap := Control.new()
-	wrap.custom_minimum_size = Vector2(FRAME_SIZE, FRAME_SIZE + 56.0)
+	wrap.custom_minimum_size = Vector2(FRAME_SIZE, FRAME_SIZE + 72.0)
 	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	var frame := HeroFrameScene.instantiate() as HeroFrame
@@ -106,28 +106,34 @@ func _create_frame_entry(h: HeroData, hp: float, slot: int, pcolor: Color) -> Co
 
 	# 血量 = ❤X：心形美术图标(单颗 heart_idle.png) + 数字，水平居中成一组（❤ 用美术资产，非文本字符）。
 	var hp_box := HBoxContainer.new()
-	hp_box.position = Vector2(0, FRAME_SIZE + 28.0)
-	hp_box.size = Vector2(FRAME_SIZE, 24.0)
+	# x=-5 补偿心形美术左侧透明留白(约11px)——否则 HBox 几何居中会让可见内容整体右移 ~5px，
+	# 与上方头像框/角色名(均居中于 0..FRAME_SIZE)不齐。偏移量与数字位数无关(已推导抵消)。
+	hp_box.position = Vector2(-5.0, FRAME_SIZE + 28.0)
+	hp_box.size = Vector2(FRAME_SIZE, 40.0)
 	hp_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	hp_box.add_theme_constant_override("separation", 2)
+	hp_box.add_theme_constant_override("separation", -8)   # 负间距补偿心形美术四周透明留白(61%)，让数字贴近心形
 	hp_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	var heart := IconPipRow.new()
 	heart.sheet = HEART_SHEET
 	heart.hframes = 4
 	heart.spacing = 0.0
-	heart.pip_size = 20.0
+	heart.pip_size = 36.0
 	heart.show_empty = false
 	heart.allow_half = false
-	heart.custom_minimum_size = Vector2(20.0, 20.0)
+	heart.custom_minimum_size = Vector2(36.0, 36.0)
 	heart.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	heart.set_value(1.0, 1.0)               # 固定画 1 颗心形图标(❤)
 	hp_box.add_child(heart)
 
 	var hp_lbl := Label.new()
 	hp_lbl.text = _fmt_hp(hp)
-	FontManager.apply(hp_lbl, 16)
-	hp_lbl.add_theme_color_override("font_color", Color("#ff6666"))
+	var hp_bold := FontVariation.new()
+	hp_bold.base_font = FontManager.f16
+	hp_bold.variation_embolden = 0.7
+	hp_lbl.add_theme_font_override("font", hp_bold)
+	hp_lbl.add_theme_font_size_override("font_size", 16)
+	hp_lbl.add_theme_color_override("font_color", Color("#d7342e"))   # = 爱心红(与战斗内备选一致)
 	hp_lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	hp_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	hp_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE

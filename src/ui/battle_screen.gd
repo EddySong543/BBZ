@@ -29,6 +29,10 @@ const HERO_DATA_DIR := "res://assets/data/heroes/"
 const DEFAULT_P0 := ["h01", "h05", "h13"]   # 盗天机 / 天威 / 孤注（均有美术 h01-h17）
 const DEFAULT_P1 := ["h02", "h09", "h16"]   # 怒目 / 凶兽 / 泽被苍生（均有美术）
 
+## 左侧调试测试按钮（满能量/满血/造伤/加盾）。发布或联机前设 false（或删整块）。
+## 仅本地调试：直接改 BattleCore 状态后刷新，不走战斗结算管线。
+const DEBUG_BUTTONS := true
+
 ## 各动画相位等待（秒），可在 Inspector 调。
 @export var anim_phase_duration: float = 1.0
 @export var action_phase_duration: float = 0.6
@@ -138,6 +142,7 @@ func _ready() -> void:
 		f.flip_h = true
 
 	_nudge_top_ui_down()
+	_build_debug_buttons()
 
 	_build_skill_entries()
 	skill_card.advance_requested.connect(_on_skill_card_advance)
@@ -238,9 +243,14 @@ func _init_buttons() -> void:
 	FontManager.apply(big_turn_label, 72)   # 中间「回合开始」横幅 + 倒计时（72=12×6 整数倍·清晰）
 	big_turn_label.add_theme_color_override("font_color", Color.WHITE)
 	event_label.visible = false
+	# 备选血量数字：embolden 加粗 → 小红字更醒目（Eddy 2026-06-07）。想再粗/再细改 variation_embolden。
+	var _hp_bold := FontVariation.new()
+	_hp_bold.base_font = FontManager.f12
+	_hp_bold.variation_embolden = 0.7
 	for lbl in p1_frame_hp_labels + p2_frame_hp_labels:
-		FontManager.apply(lbl, 13)
-		lbl.add_theme_color_override("font_color", Color("#ff6666"))
+		lbl.add_theme_font_override("font", _hp_bold)
+		lbl.add_theme_font_size_override("font_size", 13)
+		lbl.add_theme_color_override("font_color", Color("#d7342e"))   # = 爱心红(heart_idle.png 采样)
 	for lbl in p1_frame_shield_labels + p2_frame_shield_labels:
 		FontManager.apply(lbl, 11)
 		lbl.add_theme_color_override("font_color", Color("#44ccff"))
@@ -943,6 +953,74 @@ func _hp_color(ratio: float) -> Color:
 	elif ratio > 0.3:
 		return Color("#ffaa00")
 	return Color("#ff4444")
+
+
+# ============================================================
+# 调试测试按钮（左侧）—— DEBUG_BUTTONS 开关
+# ============================================================
+
+## 左侧竖排测试按钮：满能量 / 满血 / 敌我造伤 / 加盾。直接改 battle 状态 → _update_all() 刷新。
+## ⚠ 不走正常结算管线：debug 致死不会触发强制换人浮窗（要测死亡流程请打真实战斗）。
+func _build_debug_buttons() -> void:
+	if not DEBUG_BUTTONS:
+		return
+	var vb := VBoxContainer.new()
+	vb.name = "DebugButtons"
+	vb.position = Vector2(12.0, 300.0)
+	vb.add_theme_constant_override("separation", 6)
+	add_child(vb)
+
+	var defs: Array = [
+		["满能量", _dbg_full_energy],
+		["满血", _dbg_full_hp],
+		["敌 -10", _dbg_damage_enemy],
+		["我 -10", _dbg_damage_self],
+		["敌 +盾2", _dbg_shield_enemy],
+	]
+	for d in defs:
+		var b := Button.new()
+		b.text = d[0] as String
+		b.custom_minimum_size = Vector2(92.0, 30.0)
+		b.focus_mode = Control.FOCUS_NONE
+		b.modulate = Color(1, 1, 1, 0.82)
+		FontManager.apply_btn(b, 14)
+		b.pressed.connect(d[1] as Callable)
+		vb.add_child(b)
+
+
+func _dbg_full_energy() -> void:
+	battle.energy[PLAYER] = ActionDef.MAX_ENERGY
+	battle.energy[AI] = ActionDef.MAX_ENERGY
+	_update_all()
+
+
+func _dbg_full_hp() -> void:
+	for p in [0, 1]:
+		for s in range(battle.hp[p].size()):
+			battle.hp[p][s] = battle.max_hp[p][s]
+			battle.shield[p][s] = 0
+	_update_all()
+
+
+func _dbg_damage_enemy() -> void:
+	_dbg_damage_active(AI, 10)
+
+
+func _dbg_damage_self() -> void:
+	_dbg_damage_active(PLAYER, 10)
+
+
+## 给 player 的出战英雄扣 amount HP（debug，不走结算/不触发死亡换人）。
+func _dbg_damage_active(player: int, amount: int) -> void:
+	var s: int = battle.active_index[player]
+	battle.hp[player][s] = maxi(battle.hp[player][s] - amount * BattleCore.HP_UNIT, 0)
+	_update_all()
+
+
+func _dbg_shield_enemy() -> void:
+	var s: int = battle.active_index[AI]
+	battle.shield[AI][s] += 2 * BattleCore.HP_UNIT
+	_update_all()
 
 
 # ============================================================

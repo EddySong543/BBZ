@@ -49,12 +49,12 @@ shader_parameter/edge_blur_amount = 2.5550001213625
 shader_parameter/edge_blur_start = 0.3330000158175
 shader_parameter/brightness = 1.16000003135
 shader_parameter/contrast = 1.00000002375
-shader_parameter/saturation = 1.3770000654075
+shader_parameter/saturation = 1.0000000475
 shader_parameter/tint_color = Color(0.8, 0.9, 1.14, 1)
 shader_parameter/tint_strength = 0.45
 shader_parameter/shadow_tint = Color(0.88, 0.94, 1.08, 1)
-shader_parameter/highlight_tint = Color(1.06, 1, 0.9, 1)
-shader_parameter/split_strength = 0.2
+shader_parameter/highlight_tint = Color(0.93, 0.99, 1.12, 1)
+shader_parameter/split_strength = 0.400000019
 shader_parameter/vignette_color = Color(0.012, 0.02, 0.047, 1)
 shader_parameter/vignette_strength = 0.1330000063175
 shader_parameter/vignette_radius = 0.91100004094343
@@ -428,15 +428,15 @@ offset_bottom = 74.0
 [node name="P1Frame1Heart" parent="." unique_id=1500000001 instance=ExtResource("4_piprow")]
 texture_filter = 1
 anchors_preset = 0
-offset_left = 800.0
-offset_top = 76.0
-offset_right = 822.0
-offset_bottom = 98.0
+offset_left = 808.0
+offset_top = 68.0
+offset_right = 844.0
+offset_bottom = 104.0
 sheet = ExtResource("13_heart")
 hframes = 4
 idle_rest_min = 3.0
 idle_rest_max = 7.0
-pip_size = 22.0
+pip_size = 36.0
 spacing = 0.0
 show_empty = false
 allow_half = false
@@ -444,10 +444,11 @@ extra_modulate = Color(0.8, 0.82, 0.86, 1)
 
 [node name="P1Frame1Hp" type="Label" parent="." unique_id=1952929696]
 layout_mode = 0
-offset_left = 824.0
+offset_left = 836.0
 offset_top = 76.0
-offset_right = 862.0
+offset_right = 860.0
 offset_bottom = 98.0
+vertical_alignment = 1
 
 [node name="P1Frame1Shield" type="Label" parent="." unique_id=1568155607]
 layout_mode = 0
@@ -466,15 +467,15 @@ offset_bottom = 74.0
 [node name="P1Frame2Heart" parent="." unique_id=1500000002 instance=ExtResource("4_piprow")]
 texture_filter = 1
 anchors_preset = 0
-offset_left = 720.0
-offset_top = 76.0
-offset_right = 742.0
-offset_bottom = 98.0
+offset_left = 728.0
+offset_top = 68.0
+offset_right = 764.0
+offset_bottom = 104.0
 sheet = ExtResource("13_heart")
 hframes = 4
 idle_rest_min = 3.0
 idle_rest_max = 7.0
-pip_size = 22.0
+pip_size = 36.0
 spacing = 0.0
 show_empty = false
 allow_half = false
@@ -482,10 +483,11 @@ extra_modulate = Color(0.8, 0.82, 0.86, 1)
 
 [node name="P1Frame2Hp" type="Label" parent="." unique_id=1859547373]
 layout_mode = 0
-offset_left = 744.0
+offset_left = 756.0
 offset_top = 76.0
-offset_right = 782.0
+offset_right = 780.0
 offset_bottom = 98.0
+vertical_alignment = 1
 
 [node name="P1Frame2Shield" type="Label" parent="." unique_id=87371090]
 layout_mode = 0
@@ -526,15 +528,15 @@ offset_bottom = 74.0
 [node name="P2Frame1Heart" parent="." unique_id=1500000003 instance=ExtResource("4_piprow")]
 texture_filter = 1
 anchors_preset = 0
-offset_left = 1060.0
-offset_top = 76.0
-offset_right = 1082.0
-offset_bottom = 98.0
+offset_left = 1082.0
+offset_top = 68.0
+offset_right = 1118.0
+offset_bottom = 104.0
 sheet = ExtResource("13_heart")
 hframes = 4
 idle_rest_min = 3.0
 idle_rest_max = 7.0
-pip_size = 22.0
+pip_size = 36.0
 spacing = 0.0
 show_empty = false
 allow_half = false
@@ -542,10 +544,11 @@ extra_modulate = Color(0.8, 0.82, 0.86, 1)
 
 [node name="P2Frame1Hp" type="Label" parent="." unique_id=35987408]
 layout_mode = 0
-offset_left = 1098.0
+offset_left = 1110.0
 offset_top = 76.0
-offset_right = 1136.0
+offset_right = 1134.0
 offset_bottom = 98.0
+vertical_alignment = 1
 
 [node name="P2Frame1Shield" type="Label" parent="." unique_id=1018620117]
 layout_mode = 0
@@ -564,15 +567,15 @@ offset_bottom = 74.0
 [node name="P2Frame2Heart" parent="." unique_id=1500000004 instance=ExtResource("4_piprow")]
 texture_filter = 1
 anchors_preset = 0
-offset_left = 1140.0
-offset_top = 76.0
-offset_right = 1162.0
-offset_bottom = 98.0
+offset_left = 1162.0
+offset_top = 68.0
+offset_right = 1198.0
+offset_bottom = 104.0
 sheet = ExtResource("13_heart")
 hframes = 4
 idle_rest_min = 3.0
 idle_rest_max = 7.0
-pip_size = 22.0
+pip_size = 36.0
 spacing = 0.0
 show_empty = false
 allow_half = false
@@ -580,10 +583,11 @@ extra_modulate = Color(0.8, 0.82, 0.86, 1)
 
 [node name="P2Frame2Hp" type="Label" parent="." unique_id=1691399540]
 layout_mode = 0
-offset_left = 1178.0
+offset_left = 1190.0
 offset_top = 76.0
-offset_right = 1216.0
+offset_right = 1214.0
 offset_bottom = 98.0
+vertical_alignment = 1
 
 [node name="P2Frame2Shield" type="Label" parent="." unique_id=145419997]
 layout_mode = 0
