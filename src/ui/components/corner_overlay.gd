@@ -7,6 +7,15 @@ extends Control
 @export var inset: float = 13.0
 @export var radius: float = 4.0
 
+## 款式基准尺寸：>0 时，inset/radius 视为"该尺寸框下的目标值"，实际绘制按当前框尺寸等比缩放 →
+## 不同尺寸的框呈现一致的宝石比例（让 HUD 小框对齐被迫切换 120px 浮窗的精致款式）。
+## =0（默认）时沿用绝对像素、不缩放（skill_card 图鉴卡等保持原样）。
+@export var ref_size: float = 0.0:
+	set(v):
+		ref_size = v
+		if is_node_ready():
+			queue_redraw()
+
 @export var corner_color: Color = Color(0.5, 0.7, 1.0):
 	set(v):
 		corner_color = v
@@ -27,20 +36,25 @@ func _ready() -> void:
 
 func _draw() -> void:
 	var sz := size
+	# ref_size>0：按当前框尺寸相对基准等比缩放 inset/radius，让不同尺寸的框宝石比例一致
+	# （HUD 72/68px 小框对齐被迫切换 120px 浮窗款式）。=0 时 s=1，沿用绝对像素。
+	var s: float = (sz.x / ref_size) if ref_size > 0.0 else 1.0
+	var ins: float = inset * s
+	var rad: float = radius * s
 	var cs := [
-		Vector2(inset, inset),
-		Vector2(sz.x - inset, inset),
-		Vector2(inset, sz.y - inset),
-		Vector2(sz.x - inset, sz.y - inset),
+		Vector2(ins, ins),
+		Vector2(sz.x - ins, ins),
+		Vector2(ins, sz.y - ins),
+		Vector2(sz.x - ins, sz.y - ins),
 	]
 	# 死亡：四角宝石对角连线成 X（逐格行走的干净像素台阶，与像素边框同格）；宝石再叠其上。
 	if dead:
 		_pixel_line(cs[0], cs[3], corner_color)   # ↘
 		_pixel_line(cs[1], cs[2], corner_color)   # ↙
 	for c in cs:
-		_diamond(c, radius + 1.2, Color(0.03, 0.03, 0.05, 0.85))  # 暗边(衬底)
-		_diamond(c, radius, corner_color)                          # 阵营主体
-		_diamond(c, radius * 0.42, corner_color.lightened(0.55))   # 高光核
+		_diamond(c, rad + 1.2 * s, Color(0.03, 0.03, 0.05, 0.85))  # 暗边(衬底)
+		_diamond(c, rad, corner_color)                              # 阵营主体
+		_diamond(c, rad * 0.42, corner_color.lightened(0.55))      # 高光核
 
 
 func _diamond(c: Vector2, r: float, col: Color) -> void:

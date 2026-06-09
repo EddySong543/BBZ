@@ -9,6 +9,11 @@ extends Control
 const A := ActionDef.Action
 const ACTIVE := ActionDef.ACTIVE
 
+## 动作按钮底部"能量消耗"金币（复用 HUD 同款 energy_idle 金币图标；消耗 0 不显示）。
+const COIN_SHEET := preload("res://assets/ui/icons/energy_idle.png")
+const COST_PIP_SIZE := 26.0
+const COST_PIP_SPACING := 2.0
+
 const CIRCLE_D := 160.0
 const CIRCLE_GAP := 60.0
 const CIRCLE_Y := 890.0
@@ -231,6 +236,11 @@ func _init_buttons() -> void:
 	btn_confirm.add_theme_constant_override("outline_size", 4)
 
 	action_btn_list = [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend, btn_special]
+
+	# 动作按钮底部能量消耗金币（基础动作 cost 固定；攒/防=0 不显示）。技能键 cost 动态，随刷新更新。
+	_attach_cost_pips(btn_attack, ActionDef.BASE_ACTION_DEF[A.ATTACK]["cost"])
+	_attach_cost_pips(btn_big_attack, ActionDef.BASE_ACTION_DEF[A.BIG_ATTACK]["cost"])
+	_attach_cost_pips(btn_big_defend, ActionDef.BASE_ACTION_DEF[A.BIG_DEFEND]["cost"])
 
 	FontManager.apply(turn_label, 22)
 	turn_label.add_theme_color_override("font_color", Color.WHITE)
@@ -783,6 +793,8 @@ func _refresh_action_affordance() -> void:
 		else:
 			var act: int = _btn_action(btn)
 			btn.disabled = battle.is_action_disabled(PLAYER, act) or not battle.can_afford(PLAYER, act)
+	# 技能键能量消耗随出战英雄主动技动态变化（0 不显示）。
+	_attach_cost_pips(btn_special, battle._get_cost(PLAYER, ACTIVE))
 	btn_confirm.disabled = false
 
 
@@ -793,6 +805,36 @@ func _btn_action(btn: Button) -> int:
 	if btn == btn_defend: return A.DEFEND
 	if btn == btn_big_defend: return A.BIG_DEFEND
 	return -1
+
+
+## 在动作按钮底部居中显示该动作的"能量消耗"金币（cost≤0 不显示）。
+## 复用 HUD 同款金币图标(IconPipRow + energy_idle sheet)；静止(fps=0)只作消耗标识不转圈。
+func _attach_cost_pips(btn: Button, cost: int) -> void:
+	var row := btn.get_node_or_null("CostPips") as IconPipRow
+	if cost <= 0:
+		if row != null:
+			row.visible = false
+		return
+	if row == null:
+		row = IconPipRow.new()
+		row.name = "CostPips"
+		row.sheet = COIN_SHEET
+		row.hframes = 4
+		row.vframes = 4
+		row.fps = 0.0                  # 静止：仅作消耗标识，不偶发转圈
+		row.pip_size = COST_PIP_SIZE
+		row.spacing = COST_PIP_SPACING
+		row.show_empty = false
+		row.allow_half = false
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		btn.add_child(row)
+	row.visible = true
+	row.set_value(float(cost), float(cost))
+	# 底部居中摆放（按钮为 layout_mode=0，宽高取 offset 差）。
+	var bw := btn.offset_right - btn.offset_left
+	var bh := btn.offset_bottom - btn.offset_top
+	var total_w := float(cost) * COST_PIP_SIZE + float(maxi(cost - 1, 0)) * COST_PIP_SPACING
+	row.position = Vector2((bw - total_w) * 0.5, bh - COST_PIP_SIZE - 6.0)
 
 
 # ============================================================
@@ -842,7 +884,7 @@ func _update_hero_frames() -> void:
 		var active_idx: int = battle.active_index[p]
 		# 出战头像框下方的角色名（随换人/回合更新）。
 		var name_lbl: Label = p1_active_name if p == 0 else p2_active_name
-		name_lbl.text = battle.heroes[p][active_idx].hero_name
+		name_lbl.text = "【%s】" % battle.heroes[p][active_idx].hero_name
 		var reserves := _get_reserve_slots(p)
 		var pcolor := Color("#3f86c8") if p == 0 else Color("#d24a44")  # 四角阵营宝石：我方蓝 / 敌方红(边框统一中性板岩)
 

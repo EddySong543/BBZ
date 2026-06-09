@@ -1,108 +1,98 @@
 class_name HeroCard
 extends Button
 
-## Self-contained hero card for the Ban/Pick screen.
-## Drop into any scene, set hero data via exports, see layout in editor.
+## Ban/Pick 英雄卡 —— 像素框风格（复用战斗/图鉴的边框 shader + 四角阵营宝石 corner_overlay）。
+## 结构（hero_card.tscn）：PortraitCell( BgFill 暗底 + Portrait 头像 posterize + InnerFX 内阴影
+##   + Frame 像素边框 + Corners 四角宝石 + HPBadge ) + NameLabel。
+## 5 态视觉由代码设 Frame 的 edge_* uniform + Corners.corner_color/dead 实现：
+##   NORMAL 锡灰 / SELECTED 描金+宝石 / PICKED_P1 蓝 / PICKED_P2 红 / BANNED 灰暗+对角X+头像灰。
+## 选中态额外走 ButtonJuice 放大；禁用态走 corner_overlay 的 dead（四角宝石连成 X，呼应"禁用"）。
+
+enum CardState { NORMAL, SELECTED, PICKED_P1, PICKED_P2, BANNED }
 
 @export var hero_id: String = ""
 @export var hero_name: String = "":
 	set(v):
 		hero_name = v
-		if is_node_ready() and _name_label:
-			(_name_label as Label).text = v
+		if is_node_ready():
+			_refresh_text()
 @export var max_hp: int = 10:
 	set(v):
 		max_hp = v
-		if is_node_ready() and _hp_label:
-			(_hp_label as Label).text = "❤ %d" % v
-@export var role_text: String = "":
-	set(v):
-		role_text = v
-		if is_node_ready() and _role_label:
-			(_role_label as Label).text = v
-			(_role_label as Label).add_theme_color_override("font_color", _role_color(v))
-@export var position_text: String = "":
-	set(v):
-		position_text = v
-		if is_node_ready() and _pos_label:
-			(_pos_label as Label).text = v
+		if is_node_ready():
+			_refresh_text()
+@export var role_text: String = ""        # 保留字段（调用方设置）；当前卡面暂不展示职业
+@export var position_text: String = ""     # 同上
 @export var portrait_path: String = "":
 	set(v):
 		portrait_path = v
 		if is_node_ready():
 			_load_portrait()
-
 @export var card_state: int = 0:
 	set(v):
 		card_state = v
 		if is_node_ready():
 			_refresh_style()
 
-enum CardState { NORMAL, SELECTED, PICKED_P1, PICKED_P2, BANNED }
-
 var _portrait: TextureRect
+var _frame: ColorRect
+var _corners: Control
 var _name_label: Label
 var _hp_label: Label
-var _role_label: Label
-var _pos_label: Label
-var _base_stylebox: StyleBoxFlat  # P1-NEW2: 从 .tscn 取 default，state 切换基于此 duplicate
+var _juice: ButtonJuice
 static var _portrait_cache: Dictionary = {}
 
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(130, 130)
-	_setup_children()
-	_base_stylebox = get_theme_stylebox("normal", "Button") as StyleBoxFlat
+	custom_minimum_size = Vector2(130, 158)
+	# 去掉默认按钮外观（像素框 shader 当外观），各态统一空 stylebox。
+	for s in ["normal", "hover", "pressed", "focus", "disabled"]:
+		add_theme_stylebox_override(s, StyleBoxEmpty.new())
+
+	_portrait = $PortraitCell/Portrait
+	_frame = $PortraitCell/Frame
+	_corners = $PortraitCell/Corners
+	_name_label = $NameLabel
+	_hp_label = $PortraitCell/HPBadge
+
+	FontManager.apply(_name_label, 16)
+	_style_text(_name_label, Color.WHITE)
+	FontManager.apply(_hp_label, 22)
+	_style_text(_hp_label, Color("#ff6b6b"))
+
+	_juice = ButtonJuice.new()
+	_juice.name = "ButtonJuice"
+	add_child(_juice)
+
 	_load_portrait()
+	_refresh_text()
 	_refresh_style()
 
 
-func _setup_children() -> void:
-	_portrait = _find_or_create_texture_rect("PortraitThumb", Vector2(4, 4), Vector2(40, 40))
-	_name_label = _create_label("NameLabel", hero_name, 16, Color.WHITE, Vector2(0, 8), Vector2(130, 22))
-	_hp_label = _create_label("HPLabel", "❤ %d" % max_hp, 12, Color("#ff6666"), Vector2(0, 32), Vector2(130, 18))
-	_role_label = _create_label("RoleLabel", role_text, 12, _role_color(role_text), Vector2(0, 52), Vector2(130, 18))
-	_pos_label = _create_label("PosLabel", position_text, 12, Color("#777799"), Vector2(0, 70), Vector2(130, 16))
+## 文字描黑边 + 投影 → 在头像/夜空上清晰可读。
+func _style_text(lbl: Label, col: Color) -> void:
+	if lbl == null:
+		return
+	lbl.add_theme_color_override("font_color", col)
+	lbl.add_theme_constant_override("outline_size", 4)
+	lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 0.95))
+	lbl.add_theme_constant_override("shadow_offset_x", 0)
+	lbl.add_theme_constant_override("shadow_offset_y", 2)
+	lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
 
 
-func _find_or_create_texture_rect(cname: String, pos: Vector2, sz: Vector2) -> TextureRect:
-	for c in get_children():
-		if c is TextureRect and c.name == cname:
-			return c as TextureRect
-	var tr := TextureRect.new()
-	tr.name = cname
-	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	tr.position = pos
-	tr.size = sz
-	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(tr)
-	return tr
-
-
-func _create_label(cname: String, text: String, size_px: int, color: Color, pos: Vector2, sz: Vector2) -> Label:
-	var lbl := Label.new()
-	lbl.name = cname
-	lbl.text = text
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.position = pos
-	lbl.size = sz
-	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	FontManager.apply(lbl, size_px)
-	lbl.add_theme_font_size_override("font_size", size_px)
-	lbl.add_theme_color_override("font_color", color)
-	add_child(lbl)
-	return lbl
+func _refresh_text() -> void:
+	if _name_label:
+		_name_label.text = hero_name
+	if _hp_label:
+		_hp_label.text = "❤%d" % max_hp
 
 
 func _load_portrait() -> void:
 	if not _portrait:
 		return
 	if portrait_path == "" or not ResourceLoader.exists(portrait_path):
-		(_portrait as TextureRect).visible = false
-		(_portrait as TextureRect).position = Vector2(4, 4)
-		(_portrait as TextureRect).size = Vector2(40, 40)
-		_set_labels_visible(true)
+		_portrait.visible = false
 		return
 	var tex: Texture2D
 	if _portrait_cache.has(portrait_path):
@@ -110,70 +100,62 @@ func _load_portrait() -> void:
 	else:
 		tex = load(portrait_path)
 		_portrait_cache[portrait_path] = tex
-	(_portrait as TextureRect).texture = tex
-	(_portrait as TextureRect).visible = true
-	(_portrait as TextureRect).position = Vector2(8, 8)
-	(_portrait as TextureRect).size = Vector2(114, 114)
-	_set_labels_visible(false)
-
-
-func _set_labels_visible(vis: bool) -> void:
-	if _name_label:
-		(_name_label as Label).visible = vis
-	if _hp_label:
-		(_hp_label as Label).visible = vis
-	if _role_label:
-		(_role_label as Label).visible = vis
-	if _pos_label:
-		(_pos_label as Label).visible = vis
+	_portrait.texture = tex
+	_portrait.visible = true
 
 
 func _refresh_style() -> void:
-	# P1-NEW2: base stylebox 来自 .tscn theme_override_styles/normal (CardBase SubResource)
-	# 美术换素材 → 改 .tscn CardBase；state 差异（边框颜色/宽度）由下方 code 派生
-	if _base_stylebox == null:
-		return
-	var sb := _base_stylebox.duplicate() as StyleBoxFlat
+	# 边框三层色 + 四角宝石色 + 头像变灰 + 选中放大，按 card_state 切换。
+	var e_outer := Color(0.05, 0.05, 0.06)
+	var e_mid := Color(0.65, 0.67, 0.71)   # 锡灰（中性）
+	var e_inner := Color(0.34, 0.36, 0.39)
+	var gem := Color(0.55, 0.58, 0.64)     # 中性淡宝石
+	var dead := false
+	var port_mod := Color.WHITE
+	var name_col := Color.WHITE
+
 	match card_state:
 		CardState.SELECTED:
-			sb.border_color = Color("#ffdd44")
-			sb.border_width_left = 4
-			sb.border_width_right = 4
-			sb.border_width_top = 4
-			sb.border_width_bottom = 4
+			e_mid = Color(0.99, 0.85, 0.5)     # 描金
+			e_inner = Color(0.6, 0.46, 0.16)
+			gem = Color(0.99, 0.85, 0.5)
+			name_col = Color(1.0, 0.92, 0.66)
 		CardState.PICKED_P1:
-			sb.border_color = Color("#4488ff")
-			sb.border_width_left = 3
-			sb.border_width_right = 3
-			sb.border_width_top = 3
-			sb.border_width_bottom = 3
+			e_mid = Color(0.36, 0.6, 0.9)      # 我方蓝
+			e_inner = Color(0.16, 0.28, 0.48)
+			gem = Color(0.4, 0.66, 1.0)
+			name_col = Color(0.74, 0.86, 1.0)
 		CardState.PICKED_P2:
-			sb.border_color = Color("#ff4444")
-			sb.border_width_left = 3
-			sb.border_width_right = 3
-			sb.border_width_top = 3
-			sb.border_width_bottom = 3
+			e_mid = Color(0.85, 0.36, 0.32)    # 敌方红
+			e_inner = Color(0.46, 0.16, 0.15)
+			gem = Color(0.95, 0.42, 0.38)
+			name_col = Color(1.0, 0.78, 0.74)
 		CardState.BANNED:
-			sb.bg_color = Color("#1a1a1a")
-			sb.border_color = Color("#442222")
+			e_outer = Color(0.03, 0.03, 0.04)
+			e_mid = Color(0.3, 0.3, 0.33)
+			e_inner = Color(0.15, 0.15, 0.17)
+			gem = Color(0.62, 0.63, 0.7)       # 禁用灰（四角宝石 + 对角 X 共用此色）
+			dead = true                         # 四角宝石对角连成 X（=禁用）
+			port_mod = Color(0.38, 0.38, 0.43) # 头像压暗转灰
+			name_col = Color(0.5, 0.5, 0.56)
 
-	add_theme_stylebox_override("normal", sb)
+	if _frame and _frame.material is ShaderMaterial:
+		var m := _frame.material as ShaderMaterial
+		m.set_shader_parameter("edge_outer", e_outer)
+		m.set_shader_parameter("edge_mid", e_mid)
+		m.set_shader_parameter("edge_inner", e_inner)
 
-	var sb_hover := _base_stylebox.duplicate() as StyleBoxFlat
-	sb_hover.bg_color = Color("#303055")
-	sb_hover.border_color = Color("#5a5a8a")
-	add_theme_stylebox_override("hover", sb_hover)
+	if _corners:
+		_corners.set("corner_color", gem)
+		_corners.set("dead", dead)
 
+	if _portrait:
+		_portrait.modulate = port_mod
 
-func _role_color(role: String) -> Color:
-	match role:
-		"进攻型": return Color("#dd4444")
-		"防御型": return Color("#4488dd")
-		"反制型": return Color("#dd8833")
-		"经济型": return Color("#33aa33")
-		"骗招型": return Color("#aa44aa")
-		"爆发型": return Color("#dd3333")
-		"赌博型": return Color("#ddaa33")
-		"切换型": return Color("#33aaaa")
-		"蓄势型": return Color("#8888cc")
-	return Color("#888899")
+	if _name_label:
+		_name_label.add_theme_color_override("font_color", name_col)
+	if _hp_label:
+		_hp_label.modulate = Color(0.5, 0.5, 0.56) if card_state == CardState.BANNED else Color.WHITE
+
+	if _juice:
+		_juice.set_selected(card_state == CardState.SELECTED)

@@ -10,9 +10,10 @@ enum Step { BAN, PICK, REVEAL }
 
 const HERO_DATA_DIR := "res://assets/data/heroes/"
 const CARD_W := 130
-const CARD_H := 130
+const CARD_H := 158
 const COLS := 8
-const GAP := 10
+const GAP_X := 18
+const GAP_Y := 16
 const STEP_TIME := 30        # 每步思考时限（秒），超时自动随机补满
 const BAN_COUNT := 3
 const PICK_COUNT := 3
@@ -38,6 +39,7 @@ var ai_picks: Array[int] = []
 
 var card_cards: Array[HeroCard] = []
 var timer_seconds: int = STEP_TIME
+var _glow_tween: Tween   # 确认按钮"可确认"时的呼吸金光循环
 
 
 func _ready() -> void:
@@ -56,6 +58,9 @@ func _setup_ui() -> void:
 	FontManager.apply_btn(confirm_btn, 24)
 
 	confirm_btn.pressed.connect(_on_confirm)
+	var bj := ButtonJuice.new()
+	bj.name = "ButtonJuice"
+	confirm_btn.add_child(bj)
 	bp_timer.one_shot = false
 	bp_timer.timeout.connect(_on_timer_tick)
 
@@ -65,13 +70,19 @@ func _setup_ui() -> void:
 func _build_hero_cards() -> void:
 	var count := all_heroes.size()
 	var rows := ceili(float(count) / COLS)
-	card_area.custom_minimum_size = Vector2(0, rows * (CARD_H + GAP))
+	var content_w := COLS * CARD_W + (COLS - 1) * GAP_X
+	var content_h := rows * CARD_H + (rows - 1) * GAP_Y
+	# 卡池在 ScrollContainer 视口内水平居中（start_x），高度=内容（驱动垂直滚动）。
+	var scroll := card_area.get_parent() as Control
+	var view_w: float = scroll.size.x if scroll and scroll.size.x > 0.0 else float(content_w)
+	var start_x: float = maxf((view_w - float(content_w)) * 0.5, 0.0)
+	card_area.custom_minimum_size = Vector2(maxf(view_w, float(content_w)), content_h)
 
 	for i in range(count):
 		var row := i / COLS
 		var col := i % COLS
-		var x := 150 + col * (CARD_W + GAP)
-		var y := row * (CARD_H + GAP)
+		var x := start_x + col * (CARD_W + GAP_X)
+		var y := row * (CARD_H + GAP_Y)
 		var h := all_heroes[i]
 		var card := HERO_CARD_SCENE.instantiate() as HeroCard
 		card.hero_id = h.hero_id
@@ -102,7 +113,7 @@ func _on_card_clicked(idx: int) -> void:
 		my_sel.append(idx)
 	_update_all_cards()
 	_update_info()
-	confirm_btn.disabled = my_sel.size() != _need()
+	_set_confirm_enabled(my_sel.size() == _need())
 
 
 func _update_all_cards() -> void:
@@ -137,7 +148,7 @@ func _enter_step(s: int) -> void:
 	match s:
 		Step.BAN, Step.PICK:
 			confirm_btn.visible = true
-			confirm_btn.disabled = true
+			_set_confirm_enabled(false)
 			confirm_btn.text = "确认禁用" if s == Step.BAN else "确认出战"
 			timer_label.visible = true
 			timer_seconds = STEP_TIME
@@ -145,7 +156,7 @@ func _enter_step(s: int) -> void:
 			bp_timer.start(1.0)
 		Step.REVEAL:
 			confirm_btn.visible = true
-			confirm_btn.disabled = false
+			_set_confirm_enabled(true)
 			confirm_btn.text = "开始战斗"
 			timer_label.visible = false
 
@@ -237,6 +248,20 @@ func _auto_fill() -> void:
 	_update_all_cards()
 	if my_sel.size() == _need():
 		_on_confirm()
+
+
+## 确认按钮可用态 + 呼吸金光：可确认时循环脉冲 modulate，提示玩家"可以提交了"。
+func _set_confirm_enabled(on: bool) -> void:
+	confirm_btn.disabled = not on
+	if _glow_tween and _glow_tween.is_valid():
+		_glow_tween.kill()
+	confirm_btn.modulate = Color.WHITE
+	if on:
+		_glow_tween = create_tween().set_loops()
+		_glow_tween.tween_property(confirm_btn, "modulate", Color(1.32, 1.2, 0.82), 0.6)\
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		_glow_tween.tween_property(confirm_btn, "modulate", Color.WHITE, 0.6)\
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
 func _update_timer_label() -> void:

@@ -41,7 +41,6 @@ var _speed_l := BASE_PHASE_SPEED
 var _speed_r := BASE_PHASE_SPEED
 var _shake_amt := 0.0          # 当前 shake 幅度（_process 每帧衰减）
 var _phase := "advance"
-var _title: Label
 var _prompt: Label
 
 
@@ -75,19 +74,7 @@ func _update_aspect() -> void:
 
 
 func _build_labels() -> void:
-	_title = Label.new()
-	_title.text = "波波攒之王"
-	FontManager.apply(_title, 96)
-	_title.add_theme_color_override("font_color", Color("#fdf3d0"))
-	_title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
-	_title.add_theme_constant_override("outline_size", 6)
-	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_title.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	_title.offset_top = 80.0
-	_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_title.modulate.a = 0.0
-	add_child(_title)
-
+	# 标题文字（「波波攒之王」）已移除——后续做专门的标题文字动画。这里仅建"点击提示"。
 	_prompt = Label.new()
 	_prompt.text = ""
 	FontManager.apply(_prompt, 36)
@@ -124,7 +111,6 @@ func _run_intro() -> void:
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tw_i.tween_method(_set_wave_amp, WAVE_AMP_INTRO, WAVE_AMP_TARGET, IMPACT_TIME) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw_i.tween_property(_title, "modulate:a", 1.0, IMPACT_TIME)
 	await tw_i.finished
 
 	# ── 3) 僵持：_process 接管 ─────
@@ -181,6 +167,7 @@ func _input(event: InputEvent) -> void:
 func _trigger_sweep() -> void:
 	_phase = "sweeping"
 	var blue_wins := randf() < 0.5
+	BootResult.set_winner(blue_wins)  # 记下胜方色 → main_menu / bp_screen 单色波流背景继承
 	# 胜方加速冲锋，败方被压制（波变疏弱）
 	if blue_wins:
 		_speed_l = CHARGE_PHASE_SPEED
@@ -198,7 +185,7 @@ func _run_combo(blue_wins: bool) -> void:
 	# 4 击蓄力：中线 clash_pos 围绕中央(0.5)做阻尼震颤（被撞后来回摆动、幅度衰减，丝滑），
 	# 配合胜方波加速冲锋 + 每击 hit_flash 局部闪 + 轻微 shake 体现"一道道猛攻"；
 	# 张力累积到第 5 下才崩溃决堤。
-	var strikes := 4
+	var strikes := 3
 	var dir := 1.0 if blue_wins else -1.0
 	for i in strikes:
 		var dur := 0.13 - i * 0.018   # 每击的持续（越往后越快）
@@ -221,17 +208,17 @@ func _run_combo(blue_wins: bool) -> void:
 	_set_hit(1.0)
 	_shake_amt = SHAKE_BURST          # 崩溃强 shake（随 _process 自然衰减）
 	var bt := create_tween().set_parallel(true)
-	bt.tween_method(_set_clash, cur2, target, 0.42) \
+	bt.tween_method(_set_clash, cur2, target, 0.34) \
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	bt.tween_method(_set_hit, 1.0, 0.0, 0.18)
+	bt.tween_method(_set_hit, 1.0, 0.0, 0.16)
 	# 全屏光爆发：burst 0→1.3 驱动中央光晕扩展到全屏再自然衰落（shader 内 glow，取代旧白闪）
-	bt.tween_method(_set_burst, 0.0, 1.3, 0.6) \
+	bt.tween_method(_set_burst, 0.0, 1.3, 0.5) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	await bt.finished
-	# 白幕收束：决堤光最亮时用全屏白幕快速合上，盖过场景切换的硬接缝；
-	# main_menu 会从同样的全白淡出 → boot→菜单 无缝（dip-to-white 转场，去僵硬感）。
+	# 色幕收束：决堤光最亮时用全屏「胜方色幕」快速合上，盖过场景切换的硬接缝；
+	# main_menu 会从同一胜方色淡出露出同色波流 → boot→菜单 色相连贯无缝（dip-to-color 转场）。
 	var fade := ColorRect.new()
-	fade.color = Color.WHITE
+	fade.color = BootResult.dip_color()
 	fade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	fade.modulate.a = 0.0
