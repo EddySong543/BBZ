@@ -38,7 +38,7 @@ var _portrait: TextureRect
 var _frame: ColorRect
 var _corners: Control
 var _name_label: Label
-var _hp_label: Label
+var _hp_badge: IconBadge          # 爱心内嵌血量数字（骑在框外左上角·任务1）
 var _juice: ButtonJuice
 static var _portrait_cache: Dictionary = {}
 
@@ -53,12 +53,10 @@ func _ready() -> void:
 	_frame = $PortraitCell/Frame
 	_corners = $PortraitCell/Corners
 	_name_label = $NameLabel
-	_hp_label = $PortraitCell/HPBadge
+	_hp_badge = $HPBadge
 
 	FontManager.apply(_name_label, 16)
 	_style_text(_name_label, Color.WHITE)
-	FontManager.apply(_hp_label, 22)
-	_style_text(_hp_label, Color("#ff6b6b"))
 
 	_juice = ButtonJuice.new()
 	_juice.name = "ButtonJuice"
@@ -84,8 +82,8 @@ func _style_text(lbl: Label, col: Color) -> void:
 func _refresh_text() -> void:
 	if _name_label:
 		_name_label.text = hero_name
-	if _hp_label:
-		_hp_label.text = "❤%d" % max_hp
+	if _hp_badge:
+		_hp_badge.set_number(max_hp)
 
 
 func _load_portrait() -> void:
@@ -154,8 +152,8 @@ func _refresh_style() -> void:
 
 	if _name_label:
 		_name_label.add_theme_color_override("font_color", name_col)
-	if _hp_label:
-		_hp_label.modulate = Color(0.5, 0.5, 0.56) if card_state == CardState.BANNED else Color.WHITE
+	if _hp_badge:
+		_hp_badge.modulate = Color(0.5, 0.5, 0.56) if card_state == CardState.BANNED else Color.WHITE
 
 	if _juice:
 		_juice.set_selected(card_state == CardState.SELECTED)

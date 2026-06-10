@@ -20,11 +20,25 @@ var _slots: Array[BPHeroSlot] = []
 
 func _ready() -> void:
 	_slots = [_slot0, _slot1, _slot2]
-	FontManager.apply(_title_label, 16)
+	_style_title()
 	_apply_player_style()
 	for s in _slots:
 		if s:
 			s.clear()
+
+
+## 标题：像素字体放大·加粗·描边 → 在波动背景上醒目清晰（修"太细/看不清"·任务2）。
+func _style_title() -> void:
+	FontManager.apply(_title_label, 20)
+	var bold := FontVariation.new()
+	bold.base_font = FontManager.f16
+	bold.variation_embolden = 0.9
+	_title_label.add_theme_font_override("font", bold)
+	_title_label.add_theme_font_size_override("font_size", 20)
+	_title_label.add_theme_constant_override("outline_size", 5)
+	_title_label.add_theme_color_override("font_outline_color", Color(0.03, 0.03, 0.05, 0.95))
+	_title_label.add_theme_constant_override("shadow_offset_y", 2)
+	_title_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.55))
 
 
 ## 用 picks（英雄索引数组）+ all_heroes 填充槽位。

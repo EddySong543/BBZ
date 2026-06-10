@@ -39,20 +39,35 @@ float noise(vec2 p) {
 	float d = hash(i + vec2(1.0, 1.0));
 	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
+// 每 octave 旋转 ~37° → 打破 value-noise 的轴对齐方块（消除规则的横向"长方形"带）。
+const mat2 ROT = mat2(vec2(0.80, 0.60), vec2(-0.60, 0.80));
 float fbm(vec2 p) {
-	return noise(p) * 0.65 + noise(p * 2.1 + 7.3) * 0.35;
+	float v = 0.0;
+	float amp = 0.6;
+	for (int i = 0; i < 3; i++) {
+		v += amp * noise(p);
+		p = ROT * p * 2.03 + vec2(7.3, 11.7);
+		amp *= 0.5;
+	}
+	return v;
 }
 
 void fragment() {
 	float y = UV.y;
-	// 流动噪声场
-	vec2 np = vec2(UV.x * noise_scale + TIME * flow_speed, UV.y * noise_scale * 0.5);
-	float n = fbm(np);
-	// 噪声扰动上边界 → 雾顶起伏不规则（不是死板直线）
-	float top = haze_top + (n - 0.5) * 2.0 * edge_wobble;
-	// 从上(透明)到下(浓)的渐变
+	// ★ 修复"隐形长方形从右往左扫过"(任务6 · 2026-06-09)：
+	//   原密度用粗格(scale 3)、轴对齐 value-noise，且整张噪声随 TIME 横向平移
+	//   (np.x = UV.x*scale + TIME*flow) → 一道淡 alpha 竖带在雾带内从右往左扫，
+	//   alpha 太淡平时看不见，被 battle_screen 的 PostFX(对比/染色)放大成可见长方形。
+	//   修复 = 密度噪声【静态·不随 TIME 平移】+ 旋转 fbm 打散方块 → 雾带内无横扫结构；
+	//   仅让"雾顶边界"随极缓 flow 轻微起伏(仅一条边、非整块) → 保留雾的生气、消除长方形。
+	vec2 dp = vec2(UV.x * noise_scale, UV.y * noise_scale * 0.5);
+	float n = fbm(dp);                                         // 静态密度（不平移 → 不横扫）
+	float ne = fbm(dp * 0.7 + vec2(TIME * flow_speed, 17.0));  // 仅雾顶边界用，缓慢起伏
+	// 噪声扰动上边界 → 雾顶起伏不规则（缓慢漂移·仅边界一条线）
+	float top = haze_top + (ne - 0.5) * 2.0 * edge_wobble;
+	// 从上(透明)到下(浓)的平滑渐变
 	float band = smoothstep(top, haze_bottom, y);
-	// 噪声调制浓度（让雾团块状、不均匀）
+	// 密度：平滑渐变为主 + 低幅静态颗粒（团块感但不横扫）
 	float fog = band * mix(1.0 - noise_amount, 1.0, n) * haze_intensity;
 	COLOR = vec4(haze_color.rgb, clamp(fog, 0.0, 1.0));
 }

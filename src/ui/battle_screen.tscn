@@ -20,6 +20,8 @@
 [ext_resource type="Shader" uid="uid://nr0mkp6afjoy" path="res://assets/shaders/canvas_button_jelly.gdshader" id="21_jelly"]
 [ext_resource type="PackedScene" path="res://src/ui/components/skill_card.tscn" id="22_skillcard"]
 [ext_resource type="FontFile" uid="uid://crf26hvhxwgim" path="res://assets/font/ark-pixel-16px-proportional-zh_cn.ttf" id="23_pixelfont"]
+[ext_resource type="Script" path="res://src/ui/components/reserve_hp_row.gd" id="24_reservehp"]
+[ext_resource type="Script" path="res://src/ui/components/icon_badge.gd" id="25_iconbadge"]
 
 [sub_resource type="Gradient" id="ShadowGradient"]
 offsets = PackedFloat32Array(0, 0.95913464, 0.99759614, 1)
@@ -439,38 +441,18 @@ offset_top = 6.0
 offset_right = 864.0
 offset_bottom = 74.0
 
-[node name="P1Frame1Heart" parent="P1Hud" unique_id=1500000001 instance=ExtResource("4_piprow")]
-texture_filter = 1
-anchors_preset = 0
-offset_left = 808.0
-offset_top = 68.0
-offset_right = 844.0
-offset_bottom = 104.0
-sheet = ExtResource("13_heart")
-hframes = 4
-idle_rest_min = 3.0
-idle_rest_max = 7.0
-pip_size = 36.0
-spacing = 0.0
-show_empty = false
-allow_half = false
-extra_modulate = Color(0.8, 0.82, 0.86, 1)
-
-[node name="P1Frame1Hp" type="Label" parent="P1Hud" unique_id=1952929696]
+[node name="P1Frame1HpRow" type="Control" parent="P1Hud"]
 layout_mode = 0
-offset_left = 836.0
+offset_left = 786.0
 offset_top = 76.0
-offset_right = 860.0
-offset_bottom = 98.0
-vertical_alignment = 1
-
-[node name="P1Frame1Shield" type="Label" parent="P1Hud" unique_id=1568155607]
-layout_mode = 0
-offset_left = 796.0
-offset_top = 98.0
-offset_right = 864.0
-offset_bottom = 112.0
-horizontal_alignment = 1
+offset_right = 874.0
+offset_bottom = 106.0
+mouse_filter = 2
+script = ExtResource("24_reservehp")
+heart_sheet = ExtResource("13_heart")
+heart_px = 24.0
+preview_hp = 4.5
+preview_shield = 2.0
 
 [node name="P1Frame2" parent="P1Hud" unique_id=1208252427 instance=ExtResource("3_hero_frame")]
 offset_left = 716.0
@@ -478,38 +460,18 @@ offset_top = 6.0
 offset_right = 784.0
 offset_bottom = 74.0
 
-[node name="P1Frame2Heart" parent="P1Hud" unique_id=1500000002 instance=ExtResource("4_piprow")]
-texture_filter = 1
-anchors_preset = 0
-offset_left = 728.0
-offset_top = 68.0
-offset_right = 764.0
-offset_bottom = 104.0
-sheet = ExtResource("13_heart")
-hframes = 4
-idle_rest_min = 3.0
-idle_rest_max = 7.0
-pip_size = 36.0
-spacing = 0.0
-show_empty = false
-allow_half = false
-extra_modulate = Color(0.8, 0.82, 0.86, 1)
-
-[node name="P1Frame2Hp" type="Label" parent="P1Hud" unique_id=1859547373]
+[node name="P1Frame2HpRow" type="Control" parent="P1Hud"]
 layout_mode = 0
-offset_left = 756.0
+offset_left = 706.0
 offset_top = 76.0
-offset_right = 780.0
-offset_bottom = 98.0
-vertical_alignment = 1
-
-[node name="P1Frame2Shield" type="Label" parent="P1Hud" unique_id=87371090]
-layout_mode = 0
-offset_left = 716.0
-offset_top = 98.0
-offset_right = 784.0
-offset_bottom = 112.0
-horizontal_alignment = 1
+offset_right = 794.0
+offset_bottom = 106.0
+mouse_filter = 2
+script = ExtResource("24_reservehp")
+heart_sheet = ExtResource("13_heart")
+heart_px = 24.0
+preview_hp = 4.5
+preview_shield = 0.0
 
 [node name="P2Frame0" parent="P2Hud" unique_id=1770616061 instance=ExtResource("3_hero_frame")]
 offset_left = 1818.0
@@ -539,38 +501,18 @@ offset_top = 6.0
 offset_right = 1138.0
 offset_bottom = 74.0
 
-[node name="P2Frame1Heart" parent="P2Hud" unique_id=1500000003 instance=ExtResource("4_piprow")]
-texture_filter = 1
-anchors_preset = 0
-offset_left = 1082.0
-offset_top = 68.0
-offset_right = 1118.0
-offset_bottom = 104.0
-sheet = ExtResource("13_heart")
-hframes = 4
-idle_rest_min = 3.0
-idle_rest_max = 7.0
-pip_size = 36.0
-spacing = 0.0
-show_empty = false
-allow_half = false
-extra_modulate = Color(0.8, 0.82, 0.86, 1)
-
-[node name="P2Frame1Hp" type="Label" parent="P2Hud" unique_id=35987408]
+[node name="P2Frame1HpRow" type="Control" parent="P2Hud"]
 layout_mode = 0
-offset_left = 1110.0
+offset_left = 1060.0
 offset_top = 76.0
-offset_right = 1134.0
-offset_bottom = 98.0
-vertical_alignment = 1
-
-[node name="P2Frame1Shield" type="Label" parent="P2Hud" unique_id=1018620117]
-layout_mode = 0
-offset_left = 1070.0
-offset_top = 98.0
-offset_right = 1138.0
-offset_bottom = 112.0
-horizontal_alignment = 1
+offset_right = 1148.0
+offset_bottom = 106.0
+mouse_filter = 2
+script = ExtResource("24_reservehp")
+heart_sheet = ExtResource("13_heart")
+heart_px = 24.0
+preview_hp = 4.5
+preview_shield = 0.0
 
 [node name="P2Frame2" parent="P2Hud" unique_id=1695379356 instance=ExtResource("3_hero_frame")]
 offset_left = 1150.0
@@ -578,38 +520,18 @@ offset_top = 6.0
 offset_right = 1218.0
 offset_bottom = 74.0
 
-[node name="P2Frame2Heart" parent="P2Hud" unique_id=1500000004 instance=ExtResource("4_piprow")]
-texture_filter = 1
-anchors_preset = 0
-offset_left = 1162.0
-offset_top = 68.0
-offset_right = 1198.0
-offset_bottom = 104.0
-sheet = ExtResource("13_heart")
-hframes = 4
-idle_rest_min = 3.0
-idle_rest_max = 7.0
-pip_size = 36.0
-spacing = 0.0
-show_empty = false
-allow_half = false
-extra_modulate = Color(0.8, 0.82, 0.86, 1)
-
-[node name="P2Frame2Hp" type="Label" parent="P2Hud" unique_id=1691399540]
+[node name="P2Frame2HpRow" type="Control" parent="P2Hud"]
 layout_mode = 0
-offset_left = 1190.0
+offset_left = 1140.0
 offset_top = 76.0
-offset_right = 1214.0
-offset_bottom = 98.0
-vertical_alignment = 1
-
-[node name="P2Frame2Shield" type="Label" parent="P2Hud" unique_id=145419997]
-layout_mode = 0
-offset_left = 1150.0
-offset_top = 98.0
-offset_right = 1218.0
-offset_bottom = 112.0
-horizontal_alignment = 1
+offset_right = 1228.0
+offset_bottom = 106.0
+mouse_filter = 2
+script = ExtResource("24_reservehp")
+heart_sheet = ExtResource("13_heart")
+heart_px = 24.0
+preview_hp = 4.5
+preview_shield = 0.0
 
 [node name="P1ActiveName" type="Label" parent="P1Hud" unique_id=1930000001]
 layout_mode = 0
@@ -760,6 +682,22 @@ frame_count = 5
 inset_ratio = 0.14
 content_scale = 1.08
 
+[node name="CostPips" type="Control" parent="Buttons/BtnAttack"]
+texture_filter = 1
+offset_left = 6.0
+offset_top = 4.0
+offset_right = 40.0
+offset_bottom = 38.0
+mouse_filter = 2
+script = ExtResource("25_iconbadge")
+sheet = ExtResource("14_coin")
+hframes = 4
+vframes = 4
+frame = 0
+number = 1
+number_color = Color(1, 1, 1, 1)
+font_size = 16
+
 [node name="BtnBigAttack" type="Button" parent="Buttons" unique_id=1182840675]
 layout_mode = 0
 offset_left = 556.0
@@ -804,6 +742,22 @@ frame_count = 7
 fps = 12.0
 inset_ratio = 0.14
 content_scale = 1.05
+
+[node name="CostPips" type="Control" parent="Buttons/BtnBigAttack"]
+texture_filter = 1
+offset_left = 6.0
+offset_top = 4.0
+offset_right = 40.0
+offset_bottom = 38.0
+mouse_filter = 2
+script = ExtResource("25_iconbadge")
+sheet = ExtResource("14_coin")
+hframes = 4
+vframes = 4
+frame = 0
+number = 2
+number_color = Color(1, 1, 1, 1)
+font_size = 16
 
 [node name="BtnDefend" type="Button" parent="Buttons" unique_id=1455563286]
 layout_mode = 0
@@ -892,6 +846,22 @@ fps = 12.0
 inset_ratio = 0.14
 content_scale = 1.15
 
+[node name="CostPips" type="Control" parent="Buttons/BtnBigDefend"]
+texture_filter = 1
+offset_left = 6.0
+offset_top = 4.0
+offset_right = 40.0
+offset_bottom = 38.0
+mouse_filter = 2
+script = ExtResource("25_iconbadge")
+sheet = ExtResource("14_coin")
+hframes = 4
+vframes = 4
+frame = 0
+number = 2
+number_color = Color(1, 1, 1, 1)
+font_size = 16
+
 [node name="BtnSpecial" type="Button" parent="Buttons" unique_id=581864479]
 layout_mode = 0
 offset_left = 1406.0
@@ -914,6 +884,22 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+
+[node name="CostPips" type="Control" parent="Buttons/BtnSpecial"]
+texture_filter = 1
+offset_left = 6.0
+offset_top = 4.0
+offset_right = 40.0
+offset_bottom = 38.0
+mouse_filter = 2
+script = ExtResource("25_iconbadge")
+sheet = ExtResource("14_coin")
+hframes = 4
+vframes = 4
+frame = 0
+number = 2
+number_color = Color(1, 1, 1, 1)
+font_size = 16
 
 [node name="BtnConfirm" type="Button" parent="Buttons" unique_id=2072422273]
 layout_mode = 0

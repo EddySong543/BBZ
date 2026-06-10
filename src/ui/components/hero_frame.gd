@@ -7,6 +7,9 @@ extends Panel
 ## 边框统一「浅锡灰」(简约像素感·中性不偏阵营·出战/替补/敌我同款)；敌我=Corners 四角阵营宝石(我方蓝 / 敌方红)。
 ## 内部FX：Portrait 走 PortraitMat(pixelate/posterize) 统一像素颗粒；InnerFX 走 InnerFXMat(暗角 vignette + 极淡扫描线)。阵亡=灰边/灰宝石+头像灰。
 
+## 选中补色（冷亮蓝白）：与战斗底部动作按钮 _set_btn_selected 的高亮一致。
+const SELECTED_TINT := Color(1.28, 1.42, 1.6)
+
 @export var portrait_path: String = "":
 	set(v):
 		portrait_path = v
@@ -25,14 +28,14 @@ extends Panel
 		if is_node_ready():
 			_refresh_style()
 
-## 选中态：替补被点选、准备换人时高亮（提亮边框/宝石 + 轻微放大）→ 给"点击头像换人"明确反馈。
+## 选中态：替补被点选、准备换人时高亮（冷亮蓝白补色 + 弹跳放大）→ 选择动画，与底部动作按钮一致。
 @export var is_selected: bool = false:
 	set(v):
 		is_selected = v
 		if is_node_ready():
 			_refresh_style()
-			pivot_offset = size * 0.5
-			scale = Vector2.ONE * (1.08 if v else 1.0)
+			modulate = SELECTED_TINT if v else Color.WHITE   # 补色：与底部按钮选中同款冷亮蓝白
+			_play_select_pop(v)
 
 @export var player_color: Color = Color("#3f86c8"):
 	set(v):
@@ -73,6 +76,8 @@ var _bg: ColorRect
 var _bg_fill: ColorRect
 var _inner_fx: ColorRect
 var _corners: Control
+var _switch_label: Label   # 主动换人：armed 时盖在立绘上显示「切换」二字（任务5）
+var _sel_tween: Tween      # 选中弹跳动画（选择动作时的 pop）
 static var _cache: Dictionary = {}
 
 
@@ -185,3 +190,45 @@ func _refresh_style() -> void:
 
 func set_hp(_hp: int, _max_hp: int) -> void:
 	pass
+
+
+## 主动换人 armed 态（任务5）：on=立绘隐藏、框内居中显示「切换」二字 + 边框高亮放大；
+## off=恢复立绘、去高亮。点替补框进入此态，再次点击=确认换人。
+func set_switch_prompt(on: bool) -> void:
+	if _switch_label == null:
+		_switch_label = Label.new()
+		_switch_label.name = "SwitchPrompt"
+		_switch_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		_switch_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_switch_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_switch_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_switch_label.text = "切换"
+		var fm := get_node_or_null("/root/FontManager")
+		if fm != null:
+			fm.apply(_switch_label, 16)
+		_switch_label.add_theme_color_override("font_color", Color.WHITE)
+		_switch_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+		_switch_label.add_theme_constant_override("outline_size", 4)
+		add_child(_switch_label)   # 加在最后 → 渲染在边框/立绘之上
+	_switch_label.visible = on
+	if _portrait:
+		if on:
+			_portrait.visible = false
+		else:
+			_refresh_portrait()
+	# armed ≠ selected（任务5修订）：仅显示「切换」二字 + 隐立绘，不自动高亮；
+	# 选中高亮/选择动画由调用方再点一次时通过 is_selected 触发。
+
+
+## 选择弹跳动画：选中=带 overshoot 放大(像底部按钮 ButtonJuice)；取消=回弹归位。
+func _play_select_pop(on: bool) -> void:
+	pivot_offset = size * 0.5
+	if _sel_tween and _sel_tween.is_valid():
+		_sel_tween.kill()
+	_sel_tween = create_tween()
+	if on:
+		_sel_tween.tween_property(self, "scale", Vector2.ONE * 1.12, 0.16) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	else:
+		_sel_tween.tween_property(self, "scale", Vector2.ONE, 0.1) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
