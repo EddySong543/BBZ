@@ -8,7 +8,8 @@ extends Control
 ## 时间轴（一条线，绝无 sleep/wait/hold 死帧；连击"蓄力顿挫"期 _process 仍在涌波）：
 ##   推进 0.85s → 撞击 0.20s → 僵持(_process 接管，等待点击) → 连击盖过(C 型) → 切场景。
 ## 连击盖过：胜方波加速冲锋 → 4 击猛攻（中线阻尼震颤 + hit_flash 局部闪 + 轻 shake）
-##   → 第 5 下崩溃决堤（clash 冲到 0/1 + burst 全屏光爆发 + 强 shake）→ 进入 title_screen。
+##   → 第 5 下崩溃决堤（clash 冲到 0/1 + burst 全屏光爆发 + 强 shake）
+##   → 交棒全局波幕（TransitionManager.reveal_into）：胜方波同色同向接管 → 切菜单 → 排走揭幕。
 ##
 ## 像素机制：shader 64 列大格、每格纯色；亮度量化 40 档 + Bayer 抖动 → 复古像素渐变。
 ## 波形：非对称浪头（陡前缘 + 长拖尾）；颗粒：2D 格点 hash（非水平长条）。
@@ -215,30 +216,16 @@ func _run_combo(blue_wins: bool) -> void:
 	bt.tween_method(_set_burst, 0.0, 1.3, 0.5) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	await bt.finished
-	# 色幕收束：决堤光最亮时用全屏「胜方色幕」快速合上，盖过场景切换的硬接缝；
-	# main_menu 会从同一胜方色淡出露出同色波流 → boot→菜单 色相连贯无缝（dip-to-color 转场）。
-	var fade := ColorRect.new()
-	fade.color = BootResult.dip_color()
-	fade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	fade.modulate.a = 0.0
-	add_child(fade)
-	var ft := create_tween()
-	ft.tween_property(fade, "modulate:a", 1.0, 0.22).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	await ft.finished
-	_on_swept(blue_wins)
+	# 决堤已把整屏洗成胜方色波 → 交棒全局波幕（同色同向瞬时全盖，burst 余晖掩住接缝）
+	# → 切菜单 → 胜方波朝自己的推进方向整体排走，亲手揭开菜单（与 menu→bp→battle 同一套转场语言）。
+	_phase = "done"
+	TransitionManager.reveal_into(NEXT_SCENE, 0.6)
 
 
 ## 受击震颤：u(0→1) 驱动阻尼正弦，中线围绕中央 0.5 来回摆动并衰减（丝滑）。
 func _apply_kick(u: float, dir: float, amp: float) -> void:
 	var osc := sin(u * PI * 2.6) * exp(-u * 3.0)
 	_set_clash(0.5 + dir * amp * osc)
-
-
-## 盖过完成 → 切换到标题屏（启动过场结束）。
-func _on_swept(_blue_wins: bool) -> void:
-	_phase = "done"
-	get_tree().change_scene_to_file(NEXT_SCENE)
 
 
 # ── shader 参数 setter ────────────────────────────────────────

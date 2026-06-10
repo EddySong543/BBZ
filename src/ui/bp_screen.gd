@@ -3,8 +3,11 @@ extends Control
 ## BP 选人屏 —— 联机正式形态（同时盲选，2 步），单机由 AI 扮演对手（决策 Q1=b/Q2=b/Q3=b）。
 ## 3 态：BAN（双方盲选 3 禁用 → 取并集，撞车合并）→ PICK（双方盲选 3 出战，允许双方重复=镜像）
 ##        → REVEAL（亮出双方阵容，点「开始战斗」进 battle_screen）。
-## 池 = assets/data/heroes 全 34（h18-h34 暂名字占位）。保留 bp_screen.tscn 布局。
+## 池 = assets/data/heroes 全 34（h18-h34 暂名字占位）。
 ## 最新方案出处：design/heroes-schools.md §8.3。
+##
+## 对峙重构（2026-06-10·决议 1A/2A/3B）：左右缘对峙阵容柱（BPLineupColumn·我方实时勾选/
+## 对手盖牌呼吸）+ 选卡飞入 + REVEAL 逐槽翻面亮相 + 撞波闪 + 全局波幕转场（TransitionManager）。
 
 enum Step { BAN, PICK, REVEAL }
 
@@ -32,8 +35,8 @@ var ai_picks: Array[int] = []
 @onready var phase_label: Label = $PhaseLabel
 @onready var info_label: Label = $InfoLabel
 @onready var timer_label: Label = $TimerLabel
-@onready var p1_preview: BPPreviewPanel = $P1PreviewPanel
-@onready var p2_preview: BPPreviewPanel = $P2PreviewPanel
+@onready var p1_column: BPLineupColumn = $P1Column
+@onready var p2_column: BPLineupColumn = $P2Column
 @onready var card_area: Control = $CardScrollContainer/CardArea
 @onready var confirm_btn: Button = $ConfirmButton
 @onready var bp_timer: Timer = $BPTimer
@@ -47,6 +50,7 @@ func _ready() -> void:
 	all_heroes = HeroData.create_pool_heroes(HERO_DATA_DIR)
 	_setup_ui()
 	_enter_step(Step.BAN)
+	_play_intro()
 
 
 func _setup_ui() -> void:
@@ -112,7 +116,10 @@ func _on_card_clicked(idx: int) -> void:
 		my_sel.erase(idx)
 	elif my_sel.size() < _need():
 		my_sel.append(idx)
+		if step == Step.PICK:
+			_fly_to_slot(card_cards[idx], my_sel.size() - 1)
 	_update_all_cards()
+	_update_columns()
 	_update_info()
 	_set_confirm_enabled(my_sel.size() == _need())
 
@@ -132,9 +139,13 @@ func _update_all_cards() -> void:
 			card.card_state = HeroCard.CardState.NORMAL
 
 
-func _update_previews() -> void:
-	p1_preview.set_picks(my_picks, all_heroes)
-	p2_preview.set_picks(ai_picks, all_heroes)
+## 阵容柱刷新：我方 = PICK 期实时显示勾选 / 其余阶段显示已确认；对手 = REVEAL 前一律盖牌
+## （对手同时盲选中·呼吸提示）。REVEAL 的翻面亮相由 _play_reveal 驱动，不在此重置。
+func _update_columns() -> void:
+	var mine: Array[int] = my_sel if step == Step.PICK else my_picks
+	p1_column.set_picks(mine, all_heroes)
+	if step != Step.REVEAL:
+		p2_column.set_facedown_all()
 
 
 func _enter_step(s: int) -> void:
@@ -142,7 +153,7 @@ func _enter_step(s: int) -> void:
 	step = s
 	my_sel.clear()
 	_update_all_cards()
-	_update_previews()
+	_update_columns()
 	_update_phase_label()
 	_update_info()
 
@@ -160,6 +171,7 @@ func _enter_step(s: int) -> void:
 			_set_confirm_enabled(true)
 			confirm_btn.text = "开始战斗"
 			timer_label.visible = false
+			_play_reveal()
 
 
 func _update_phase_label() -> void:
@@ -270,6 +282,86 @@ func _update_timer_label() -> void:
 	timer_label.add_theme_color_override("font_color", Color("#ff4444") if timer_seconds <= 5 else Color("#ffaa00"))
 
 
+## 入场演出：对峙柱从左右缘滑入 + 卡池按行错落浮现（与主菜单按钮同一套入场语言）。
+func _play_intro() -> void:
+	_slide_in(p1_column, -300.0)
+	_slide_in(p2_column, 300.0)
+	for i in range(card_cards.size()):
+		var card := card_cards[i]
+		var home := card.position
+		card.position.y += 26.0
+		card.modulate.a = 0.0
+		var delay := 0.08 + (i / COLS) * 0.06 + (i % COLS) * 0.015
+		var ta := create_tween()
+		ta.tween_interval(delay)
+		ta.tween_property(card, "modulate:a", 1.0, 0.25)\
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		var tp := create_tween()
+		tp.tween_interval(delay)
+		tp.tween_property(card, "position", home, 0.35)\
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
+## 阵容柱滑入（dx = 起始偏移：负从左缘、正从右缘）。
+func _slide_in(col: Control, dx: float) -> void:
+	var home := col.position
+	col.position.x += dx
+	col.modulate.a = 0.0
+	var tw := create_tween().set_parallel(true)
+	tw.tween_property(col, "position", home, 0.5)\
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_property(col, "modulate:a", 1.0, 0.35)
+
+
+## 选中演出：从卡片飞一个头像残影到我方柱第 slot_idx 槽（落点 = 槽头像框）。
+func _fly_to_slot(card: HeroCard, slot_idx: int) -> void:
+	var path := card.portrait_path
+	if path.is_empty() or not ResourceLoader.exists(path):
+		return
+	var ghost := TextureRect.new()
+	ghost.texture = load(path)
+	ghost.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	ghost.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	ghost.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	ghost.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ghost.z_index = 50
+	add_child(ghost)
+	var from := card.get_global_rect()
+	var to := p1_column.get_slot_frame_rect(slot_idx)
+	ghost.global_position = from.position
+	ghost.size = from.size
+	var tw := create_tween().set_parallel(true)
+	tw.tween_property(ghost, "global_position", to.position, 0.28)\
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(ghost, "size", to.size, 0.28)\
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	tw.chain().tween_callback(ghost.queue_free)
+
+
+## 盲选揭幕：对手柱逐槽翻面亮相 → 中央撞波白闪（同时盲选机制的小高潮）。
+func _play_reveal() -> void:
+	p2_column.reveal_picks(ai_picks, all_heroes)
+	await get_tree().create_timer(0.55).timeout
+	_clash_flash()
+
+
+## 揭幕撞波闪：全屏白色快闪（0.08 起 / 0.3 落）。
+func _clash_flash() -> void:
+	var f := ColorRect.new()
+	f.color = Color.WHITE
+	f.modulate.a = 0.0
+	f.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	f.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	f.z_index = 90
+	add_child(f)
+	var tw := create_tween()
+	tw.tween_property(f, "modulate:a", 0.45, 0.08)\
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(f, "modulate:a", 0.0, 0.3)\
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(f.queue_free)
+
+
 func _start_battle() -> void:
 	var p1_lineup: Array[HeroData] = []
 	for idx in my_picks:
@@ -280,4 +372,5 @@ func _start_battle() -> void:
 	# 必须先 set BattleSetup 再切场，否则 battle_screen._ready() 拿到空 lineup
 	BattleSetup.p1_heroes = p1_lineup
 	BattleSetup.p2_heroes = p2_lineup
-	get_tree().change_scene_to_file("res://src/ui/battle_screen.tscn")
+	# 波幕转场（2A）：胜方色波卷入 → 切 battle → 波退去揭幕（battle 多风格 scene 通用）
+	TransitionManager.transition_to("res://src/ui/battle_screen.tscn")

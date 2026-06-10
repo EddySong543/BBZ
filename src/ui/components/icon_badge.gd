@@ -62,6 +62,11 @@ extends Control
 	set(v):
 		font_size = v
 		_style_number()
+## 数字加粗量（FontVariation embolden·0 = 不加粗·血量数字建议 0.7 与替补血量一致）。
+@export var embolden: float = 0.0:
+	set(v):
+		embolden = v
+		_style_number()
 ## 数字相对图标的微调位移（心形顶部有凹口 → 略下移看起来才居中）。
 @export var number_offset: Vector2 = Vector2(0, 1):
 	set(v):
@@ -127,6 +132,12 @@ func _style_number() -> void:
 		fm.apply(_num, font_size)
 	else:
 		_num.add_theme_font_size_override("font_size", font_size)
+	if embolden > 0.0:
+		# 包一层 FontVariation 加粗（基底取 fm.apply 刚设置的字体，不会嵌套叠加）。
+		var fv := FontVariation.new()
+		fv.base_font = _num.get_theme_font("font") if fm != null else ThemeDB.fallback_font
+		fv.variation_embolden = embolden
+		_num.add_theme_font_override("font", fv)
 	_num.add_theme_color_override("font_color", number_color)
 	_num.add_theme_color_override("font_outline_color", number_outline)
 	_num.add_theme_constant_override("outline_size", outline_size)

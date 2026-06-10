@@ -1,7 +1,7 @@
 [gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://src/ui/bp_screen.gd" id="1_bp_gd"]
-[ext_resource type="PackedScene" path="res://src/ui/components/bp_preview_panel.tscn" id="2_preview"]
+[ext_resource type="PackedScene" path="res://src/ui/components/bp_lineup_column.tscn" id="2_column"]
 [ext_resource type="PackedScene" uid="uid://ddiu7ck5le8p3" path="res://src/ui/scenes/menu_background.tscn" id="3_bg"]
 
 [sub_resource type="StyleBoxFlat" id="ConfirmNormal"]
@@ -83,20 +83,20 @@ horizontal_alignment = 1
 vertical_alignment = 1
 mouse_filter = 2
 
-[node name="P1PreviewPanel" parent="." instance=ExtResource("2_preview")]
+[node name="P1Column" parent="." instance=ExtResource("2_column")]
 layout_mode = 0
-offset_left = 40.0
-offset_top = 300.0
-offset_right = 220.0
-offset_bottom = 520.0
+offset_left = 26.0
+offset_top = 250.0
+offset_right = 266.0
+offset_bottom = 812.0
 player = 0
 
-[node name="P2PreviewPanel" parent="." instance=ExtResource("2_preview")]
+[node name="P2Column" parent="." instance=ExtResource("2_column")]
 layout_mode = 0
-offset_left = 1700.0
-offset_top = 300.0
-offset_right = 1880.0
-offset_bottom = 520.0
+offset_left = 1654.0
+offset_top = 250.0
+offset_right = 1894.0
+offset_bottom = 812.0
 player = 1
 
 [node name="CardScrollContainer" type="ScrollContainer" parent="."]

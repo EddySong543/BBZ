@@ -143,4 +143,5 @@ vframes = 1
 frame = 0
 number_color = Color(1, 1, 1, 1)
 font_size = 16
+embolden = 0.7
 number_offset = Vector2(0, 0)

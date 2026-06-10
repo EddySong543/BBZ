@@ -20,6 +20,7 @@ run/max_fps=60
 
 BattleSetup="*res://src/battle/battle_setup.gd"
 FontManager="*res://src/core/font_manager.gd"
+TransitionManager="*res://src/core/transition_manager.gd"
 
 [display]
 

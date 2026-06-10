@@ -35,19 +35,35 @@ func _ready() -> void:
 	_start_match_glow()
 
 
-## 入场转场：承接 boot 决堤色幕 —— 全屏胜方色幕淡出，波流背景从同色光中浮现。
-## boot 末尾决堤洗成胜方色 → 菜单从同一胜方色淡出露出同色波流，色相连贯、无白闪硬切。
+## 入场：boot 决堤由全局波幕接力揭幕（TransitionManager.reveal_into·胜方波亲手掀开菜单），
+## 本场只做"水面落定"：① 整屏缩放沉降 ② 波流从激荡平息 ③ 按钮错落浮入。
 func _play_intro() -> void:
-	var fade := ColorRect.new()
-	fade.color = BootResult.dip_color()
-	fade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	fade.z_index = 4096   # 盖住一切，最后淡出
-	add_child(fade)
-	var tw := create_tween()
-	tw.tween_interval(0.05)
-	tw.tween_property(fade, "modulate:a", 0.0, 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tw.tween_callback(fade.queue_free)
+	# ① 余势缩放沉降（整屏含波流背景一起落定）
+	pivot_offset = size * 0.5
+	scale = Vector2(1.045, 1.045)
+	var tz := create_tween()
+	tz.tween_property(self, "scale", Vector2.ONE, 0.9).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+	# ② 波流平息：决堤的能量延续进菜单背景，流速/亮度缓落常态
+	var wave := get_node_or_null("Background/WaveFlow")
+	if wave != null:
+		var calm_drift: float = wave.drift_speed
+		var calm_y: float = wave.y_drift_speed
+		wave.drift_speed = calm_drift * 8.0
+		wave.y_drift_speed = calm_y * 3.0
+		var ts := create_tween().set_parallel(true)
+		ts.tween_property(wave, "drift_speed", calm_drift, 1.4)\
+			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		ts.tween_property(wave, "y_drift_speed", calm_y, 1.4)\
+			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		var mat := wave.material as ShaderMaterial
+		if mat != null:
+			var calm_i: float = mat.get_shader_parameter("intensity")
+			var ti := create_tween()
+			ti.tween_method(
+				func(v: float) -> void: mat.set_shader_parameter("intensity", v),
+				calm_i * 1.3, calm_i, 1.2
+			).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 	_animate_buttons_in()
 
@@ -158,7 +174,8 @@ func _attach_juice(btn: Button) -> void:
 
 
 func _on_match_pressed() -> void:
-	get_tree().change_scene_to_file(BP_SCENE)
+	# 波幕转场（BP 重做 2A）：胜方色波卷入 → 切 BP → 波退去揭幕
+	TransitionManager.transition_to(BP_SCENE)
 
 
 ## 占位功能提示：淡入 → 停留 → 淡出。

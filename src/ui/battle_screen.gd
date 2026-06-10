@@ -51,7 +51,6 @@ const PLAYER := 0   # 本地玩家固定 P0
 const AI := 1       # 对手 AI
 
 # ---- @onready: battle_screen.tscn 内预置节点（布局保留，路径勿改）----
-@onready var turn_label: Label = $TurnLabel
 @onready var timer_label: Label = $TimerLabel
 @onready var status_label: Label = $StatusLabel
 @onready var event_label: Label = $EventLabel
@@ -172,7 +171,7 @@ func _exit_tree() -> void:
 ## d 收纳后：每个玩家 HUD 已收进 P1Hud/P2Hud 容器 → 只移动这两个父节点 + 两个中央标签即可，
 ## 不再逐节点平移（消除"各自独立锚定 → 零星错位"）。
 func _nudge_top_ui_down() -> void:
-	for n in [p1_hud, p2_hud, turn_label, timer_label]:
+	for n in [p1_hud, p2_hud, timer_label]:
 		if n != null:
 			(n as Control).position.y += TOP_UI_DROP
 
@@ -236,8 +235,6 @@ func _init_buttons() -> void:
 	_set_cost_pips(btn_big_attack, ActionDef.BASE_ACTION_DEF[A.BIG_ATTACK]["cost"])
 	_set_cost_pips(btn_big_defend, ActionDef.BASE_ACTION_DEF[A.BIG_DEFEND]["cost"])
 
-	FontManager.apply(turn_label, 22)
-	turn_label.add_theme_color_override("font_color", Color.WHITE)
 	FontManager.apply(timer_label, 32)   # 顶部常驻回合数(原倒计时位)·紧凑
 	timer_label.add_theme_color_override("font_color", Color.WHITE)
 	FontManager.apply(status_label, 44)

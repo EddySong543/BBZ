@@ -11,21 +11,23 @@ extends Control
 @export var heart_sheet: Texture2D:
 	set(v):
 		heart_sheet = v
+		_measure_visible()
 		_rebuild_gray()
 		queue_redraw()
 ## 心形精灵图横/纵帧数（heart_idle = 4×1，取第 0 帧）。
 @export var hframes: int = 4
 @export var vframes: int = 1
 ## 单颗心绘制边长。
-@export var heart_px: float = 24.0:
+@export var heart_px: float = 34.0:
 	set(v):
 		heart_px = v
 		queue_redraw()
-## 心与其数字之间的间距。
-@export var gap_icon_num: float = 1.0
+## 心与其数字之间的间距（按心形**可见边缘**起算，帧内透明留白已被 _measure_visible 移出布局）。
+@export var gap_icon_num: float = 5.0
 ## 血量段与护甲段之间的间距。
 @export var gap_segments: float = 8.0
-@export var font_size: int = 14
+## 16 = f16 原生字号（整数倍·像素干净）·与 bp 血量徽章同字号。
+@export var font_size: int = 16
 ## 数字加粗量（沿用 06-07 版本 embolden 0.7）。
 @export var embolden: float = 0.7
 ## HP 数字颜色（= 爱心红·06-07 版本 #d7342e）。
@@ -51,13 +53,49 @@ var _hp: float = 0.0
 var _shield: float = 0.0
 var _gray_tex: Texture2D
 var _font: Font
+var _vis_u0: float = 0.0   # 心形帧内可见像素左边界（0-1 帧宽比例）
+var _vis_u1: float = 1.0   # 可见右边界
 
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_measure_visible()
 	if _gray_tex == null:
 		_rebuild_gray()
+
+
+## 扫描第 0 帧的不透明横向边界：心形美术在帧内有透明留白，按整帧宽布局会产生
+## "心与数字假间距" + 整体偏移不居中。量出可见边界后布局/居中全按可见宽度算（换美术自适应）。
+func _measure_visible() -> void:
+	_vis_u0 = 0.0
+	_vis_u1 = 1.0
+	if heart_sheet == null:
+		return
+	var img := heart_sheet.get_image()
+	if img == null:
+		return
+	img = img.duplicate()
+	if img.is_compressed():
+		img.decompress()
+	var fw := img.get_width() / hframes
+	var fh := img.get_height() / vframes
+	var lo := fw
+	var hi := -1
+	for xx in fw:
+		for yy in fh:
+			if img.get_pixel(xx, yy).a > 0.05:
+				lo = mini(lo, xx)
+				hi = maxi(hi, xx)
+				break
+	if hi >= lo:
+		_vis_u0 = float(lo) / float(fw)
+		_vis_u1 = float(hi + 1) / float(fw)
+
+
+## 心形可见绘制宽度（heart_px 乘可见比例）。
+func _vis_w() -> float:
+	return (_vis_u1 - _vis_u0) * heart_px
 
 
 func set_values(hp: float, shield: float = 0.0) -> void:
@@ -66,10 +104,10 @@ func set_values(hp: float, shield: float = 0.0) -> void:
 	queue_redraw()
 
 
-## 加粗像素字体（embolden 沿用 06-07）。
+## 加粗像素字体（embolden 沿用 06-07·基底 f16 与 font_size=16 整数倍匹配）。
 func _resolve_font() -> Font:
 	var fm := get_node_or_null("/root/FontManager")
-	var base: Font = fm.f12 if (fm != null and fm.f12 != null) else ThemeDB.fallback_font
+	var base: Font = fm.f16 if (fm != null and fm.f16 != null) else ThemeDB.fallback_font
 	var fv := FontVariation.new()
 	fv.base_font = base
 	fv.variation_embolden = embolden
@@ -83,10 +121,10 @@ func _fmt(v: float) -> String:
 	return "%.1f" % v
 
 
-## 单段宽度 = 心 + 间距 + 数字文本宽。
+## 单段宽度 = 心可见宽 + 间距 + 数字文本宽。
 func _seg_width(text: String) -> float:
 	var tw := _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
-	return heart_px + gap_icon_num + tw
+	return _vis_w() + gap_icon_num + tw
 
 
 func _draw() -> void:
@@ -122,10 +160,11 @@ func _draw() -> void:
 
 
 ## 画一段（心 + 数字），返回下一段起点 x。数字按字体升降部垂直居中（与心对齐）。
+## 心按**可见左缘**对齐光标 x（整帧绘制位置向左补回帧内留白）。
 func _draw_segment(tex: Texture2D, icon_mod: Color, text: String, txt_col: Color, x: float, cy: float, src: Rect2) -> float:
-	var dst := Rect2(x, cy - heart_px * 0.5, heart_px, heart_px)
+	var dst := Rect2(x - _vis_u0 * heart_px, cy - heart_px * 0.5, heart_px, heart_px)
 	draw_texture_rect_region(tex, dst, src, icon_mod)
-	var nx := x + heart_px + gap_icon_num
+	var nx := x + _vis_w() + gap_icon_num
 	# 基线 = cy + (ascent - descent)/2 → 文本垂直居中于 cy（与心同高）。
 	var baseline := cy + (_font.get_ascent(font_size) - _font.get_descent(font_size)) * 0.5
 	if outline_size > 0:
