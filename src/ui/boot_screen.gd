@@ -42,7 +42,7 @@ var _speed_l := BASE_PHASE_SPEED
 var _speed_r := BASE_PHASE_SPEED
 var _shake_amt := 0.0          # 当前 shake 幅度（_process 每帧衰减）
 var _phase := "advance"
-var _prompt: Label
+var _title: TitleLogo
 
 
 func _ready() -> void:
@@ -75,20 +75,11 @@ func _update_aspect() -> void:
 
 
 func _build_labels() -> void:
-	# 标题文字（「波波攒之王」）已移除——后续做专门的标题文字动画。这里仅建"点击提示"。
-	_prompt = Label.new()
-	_prompt.text = ""
-	FontManager.apply(_prompt, 36)
-	_prompt.add_theme_color_override("font_color", Color("#e8eef7"))
-	_prompt.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
-	_prompt.add_theme_constant_override("outline_size", 4)
-	_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_prompt.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_prompt.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	_prompt.offset_top = -150.0
-	_prompt.offset_bottom = -90.0
-	_prompt.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_prompt)
+	# 标题 logo「波波攒之王」+ 副标题「点击进入游戏」：撞击瞬间逐字入场（演出见 title_logo.gd）。
+	# 旧底部"点击屏幕进入游戏"提示已并入标题组件作副标题（2026-06-10）。
+	_title = TitleLogo.new()
+	_title.impact_shake.connect(_on_title_shake)
+	add_child(_title)
 
 
 ## 单一时间轴：推进 → 撞击 → 僵持，全程 tween 连贯，无任何 timer/hold。
@@ -106,6 +97,7 @@ func _run_intro() -> void:
 	#   （涟漪 + intensity 轻闪均暂去除——对比观感中；机制保留，可随时加回。）
 	_phase = "impact"
 	_shake_amt = SHAKE_IMPACT       # 初次对撞 shake（_process 内自然衰减）
+	_title.play_entrance()          # 撞击瞬间 → 标题逐字入场
 	var tw_i := create_tween().set_parallel(true)
 	tw_i.tween_method(_set_pulse_amp, 1.0, 0.0, IMPACT_TIME)
 	tw_i.tween_method(_set_center, 0.0, 1.0, IMPACT_TIME) \
@@ -116,7 +108,6 @@ func _run_intro() -> void:
 
 	# ── 3) 僵持：_process 接管 ─────
 	_phase = "ready"
-	_prompt.text = "点击屏幕进入游戏"
 
 
 func _process(delta: float) -> void:
@@ -141,7 +132,6 @@ func _process(delta: float) -> void:
 		# 中央白柱微脉动 1.0-1.20 → 中心微上调一档；clamp 后不爆白
 		var c := 1.10 + sin(_t * 3.2) * 0.10
 		_mat.set_shader_parameter("center_amp", c)
-		_prompt.modulate.a = 0.55 + 0.45 * sin(_t * 3.0)
 
 
 ## 僵持期：边界小幅游走（双频率，互不相让的"角力"感）。
@@ -151,16 +141,12 @@ func _struggle() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if _phase != "ready":
+	# 标题完全落定（副标题就位）后才接受点击——避免"能点但提示还没浮出来"的窗口
+	if _phase != "ready" or not _title.is_settled():
 		return
-	var go := false
-	if event is InputEventMouseButton:
-		go = event.pressed
-	elif event is InputEventScreenTouch:
-		go = event.pressed
-	elif event is InputEventKey:
-		go = event.pressed and not event.echo
-	if go:
+	# 仅鼠标左键触发（键盘/触摸/其余键一律不响应）
+	if event is InputEventMouseButton and event.pressed \
+			and event.button_index == MOUSE_BUTTON_LEFT:
 		_trigger_sweep()
 
 
@@ -176,8 +162,7 @@ func _trigger_sweep() -> void:
 	else:
 		_speed_r = CHARGE_PHASE_SPEED
 		_speed_l = LOSER_PHASE_SPEED
-	var pt := create_tween()
-	pt.tween_property(_prompt, "modulate:a", 0.0, 0.18)
+	# 标题退场延后到决堤瞬间（_run_combo 内）——连击期间标题留场随每击被震推
 	_run_combo(blue_wins)
 
 
@@ -193,6 +178,7 @@ func _run_combo(blue_wins: bool) -> void:
 		var kick := 0.024 + i * 0.005  # 震幅随击数略增（越撞越猛）
 		_set_hit(1.0)
 		_shake_amt = SHAKE_HIT         # 每击轻微 shake
+		_title.combo_hit(dir)          # 标题随每击被朝胜方方向震推
 		var tw := create_tween()
 		tw.tween_method(_set_hit, 1.0, 0.0, dur + 0.06)
 		# 中线受击震颤：阻尼正弦来回摆动并衰减（丝滑，无急停转折）
@@ -204,6 +190,7 @@ func _run_combo(blue_wins: bool) -> void:
 		await get_tree().create_timer(pause).timeout
 
 	# ── 第 5 下：崩溃决堤——中线从中央一鼓作气冲到底盖过 ─────
+	_title.play_exit(blue_wins)   # 决堤瞬间标题才被波冲走（与盖屏同步，0.34s 内可见）
 	var target := 1.0 if blue_wins else 0.0
 	var cur2 := _mat.get_shader_parameter("clash_pos") as float
 	_set_hit(1.0)
@@ -215,11 +202,19 @@ func _run_combo(blue_wins: bool) -> void:
 	# 全屏光爆发：burst 0→1.3 驱动中央光晕扩展到全屏再自然衰落（shader 内 glow，取代旧白闪）
 	bt.tween_method(_set_burst, 0.0, 1.3, 0.5) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	await bt.finished
-	# 决堤已把整屏洗成胜方色波 → 交棒全局波幕（同色同向瞬时全盖，burst 余晖掩住接缝）
-	# → 切菜单 → 胜方波朝自己的推进方向整体排走，亲手揭开菜单（与 menu→bp→battle 同一套转场语言）。
+	# 盖屏即交棒：clash 冲到底的瞬间（0.34s）立刻让全局波幕接管，不等 burst 收尾
+	# （旧版 await bt.finished 多卡 0.16s 死等才切场景——Eddy 反馈间隔过长）。
+	# burst 余晖与波幕同色同向无缝衔接；boot 释放时残余 tween 随节点一并销毁。
+	await get_tree().create_timer(0.34).timeout
+	# 决堤已把整屏洗成胜方色波 → 切菜单 → 胜方波朝自己的推进方向整体排走，
+	# 亲手揭开菜单（与 menu→bp→battle 同一套转场语言）。
 	_phase = "done"
-	TransitionManager.reveal_into(NEXT_SCENE, 0.6)
+	TransitionManager.reveal_into(NEXT_SCENE, 0.5)
+
+
+## 标题动画请求屏幕 shake（王落地等）→ 并入现有 shake 衰减循环。
+func _on_title_shake(strength: float) -> void:
+	_shake_amt = maxf(_shake_amt, strength)
 
 
 ## 受击震颤：u(0→1) 驱动阻尼正弦，中线围绕中央 0.5 来回摆动并衰减（丝滑）。

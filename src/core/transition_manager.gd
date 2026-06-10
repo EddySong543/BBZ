@@ -102,9 +102,10 @@ func reveal_into(scene_path: String, reveal_time: float = REVEAL_TIME) -> void:
 
 
 ## 胜方色 + 推进方向继承 boot 对波（蓝胜→蓝波向右涌；红胜→红波向左涌）。
-## deep 取 crest 压暗 55%（配合 shader body_min 防中段过暗成"黑板"）。
+## deep 取 crest 压暗 35%（2026-06-10 55%→35%：配合 shader body_min 提高，
+## 波幕整体反转为亮色调——Eddy 反馈旧版中段过暗）。
 func _apply_winner_style() -> void:
 	_mat.set_shader_parameter("dir", 1.0 if BootResult.last_blue_wins else -1.0)
 	var crest := BootResult.dip_color()
 	_mat.set_shader_parameter("crest_color", crest)
-	_mat.set_shader_parameter("deep_color", crest.darkened(0.55))
+	_mat.set_shader_parameter("deep_color", crest.darkened(0.35))

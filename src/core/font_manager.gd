@@ -28,6 +28,8 @@ func apply_btn(btn: Button, px_size: int) -> void:
 
 
 func _best_font(px_size: int) -> FontFile:
+	# 12 整倍数→f12，16 整倍数→f16，其余退回 f12。
+	# （2026-06-10 试过全 f12 与字号全归整，Eddy 均否——非整倍数的轻微缩放可接受。）
 	if px_size % 12 == 0:
 		return f12
 	if px_size % 16 == 0:

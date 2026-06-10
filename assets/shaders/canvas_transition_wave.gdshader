@@ -14,8 +14,8 @@ uniform float wave_time = 0.0;       // 动画相位（gd 每帧推进）
 uniform vec3 deep_color : source_color = vec3(0.10, 0.22, 0.48);  // 波体暗档
 uniform vec3 crest_color : source_color = vec3(0.36, 0.64, 1.0);  // 浪头亮档（= BootResult.dip_color）
 uniform float levels = 7.0;          // 亮度量化档数（像素 ramp 感）
-uniform float body_min = 0.30;       // 波体纹理亮度下限（防中段过暗）
-uniform float body_max = 0.78;       // 波体纹理亮度上限
+uniform float body_min = 0.55;       // 波体纹理亮度下限（2026-06-10 0.30→0.55：中段过暗反转为亮幕）
+uniform float body_max = 0.95;       // 波体纹理亮度上限（0.78→0.95 同上）
 
 float edge_wave(float y, float t, float seed) {
 	return sin(y * 16.0 + t * 3.1 + seed) * 0.55
