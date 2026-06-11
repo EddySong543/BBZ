@@ -11,6 +11,21 @@ extends Control
 
 const BP_SCENE := "res://src/ui/bp_screen.tscn"
 
+# ---- 匹配状态机（盖牌等对手·2026-06-11 Eddy 批：正计时+轻震屏）----
+# IDLE 点牌=开始匹配；SEARCHING 再点牌/ESC=取消；FOUND 锁输入等转场。
+# 本地用 mock_match_seconds 定时模拟匹配成功；联机时把定时器换成真匹配回调，状态机原样复用。
+enum MatchState { IDLE, SEARCHING, FOUND }
+
+## 本地测试模拟匹配时长（秒）。联机接入后弃用。
+@export var mock_match_seconds: float = 3.0
+
+const MATCH_TITLE := "匹配对战"
+const MATCH_SUB := "1v1 同时盲选对决"
+
+var _match_state: int = MatchState.IDLE
+var _search_elapsed: float = 0.0
+var _flipping: bool = false   # 翻面动画进行中=忽略点击（防连点打断）
+
 ## 小件像素底板（设置/段位徽章用，钢蓝档；牌面金色只出现在悬停态）。
 const JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")
 const STEEL := {
@@ -24,6 +39,7 @@ const DOCK_FILL := Color(0.10, 0.115, 0.145, 0.92)
 const DOCK_TEXT := Color("#c9d2dc")
 
 @onready var _coming_soon: Label = $UI/ComingSoon
+@onready var _match_card: ModeCard = $UI/ModeMatch
 
 var _toast_tween: Tween
 
@@ -181,8 +197,93 @@ func _animate_in() -> void:
 
 
 func _on_match_pressed() -> void:
+	if _flipping:
+		return
+	match _match_state:
+		MatchState.IDLE:
+			_start_search()
+		MatchState.SEARCHING:
+			_cancel_search()
+		MatchState.FOUND:
+			pass   # 成功一拍期间锁输入，等波幕转场接管
+
+
+## ESC 取消匹配（与再点牌等价）。
+func _unhandled_input(event: InputEvent) -> void:
+	if _match_state == MatchState.SEARCHING and not _flipping \
+			and event.is_action_pressed("ui_cancel"):
+		_cancel_search()
+
+
+# ============================================================
+# 匹配状态机：盖牌(翻背) → 呼吸等待+正计时 → 成功一拍 → 波幕转场
+# ============================================================
+
+func _start_search() -> void:
+	_match_state = MatchState.SEARCHING
+	_search_elapsed = 0.0
+	_set_side_cards_enabled(false)
+	_flipping = true
+	await _match_card.flip_face(true)
+	_flipping = false
+	_match_card.card_title = "匹配中"
+	_match_card.card_subtitle = "0:00　✕ 点击取消"
+
+
+func _cancel_search() -> void:
+	_match_state = MatchState.IDLE
+	_flipping = true
+	await _match_card.flip_face(false)
+	_flipping = false
+	_match_card.card_title = MATCH_TITLE
+	_match_card.card_subtitle = MATCH_SUB
+	_set_side_cards_enabled(true)
+
+
+## 匹配中每帧：标题省略号逐点（0.5s/点）+ 副标正计时每秒跳；到时触发成功。
+func _process(delta: float) -> void:
+	if _match_state != MatchState.SEARCHING or _flipping:
+		return
+	_search_elapsed += delta
+	var dots := int(_search_elapsed * 2.0) % 4
+	_match_card.card_title = "匹配中" + ".".repeat(dots)
+	var secs := int(_search_elapsed)
+	_match_card.card_subtitle = "%d:%02d　✕ 点击取消" % [floori(secs / 60.0), secs % 60]
+	if _search_elapsed >= mock_match_seconds:
+		_on_match_found()
+
+
+## 成功一拍（~0.45s）：牌弹震+王冠闪金（ModeCard）+ 屏幕轻震 → 波幕转场进 BP。
+func _on_match_found() -> void:
+	_match_state = MatchState.FOUND
+	_match_card.card_title = "对手已找到！"
+	_match_card.card_subtitle = ""
+	_match_card.found_flash()
+	_shake_screen()
+	await get_tree().create_timer(0.45).timeout
 	# 波幕转场（BP 重做 2A）：胜方色波卷入 → 切 BP → 波退去揭幕
 	TransitionManager.transition_to(BP_SCENE)
+
+
+## 匹配中两翼牌压暗禁点（防误触离队）；坞条/设置保持可用（占位 toast 无副作用）。
+func _set_side_cards_enabled(on: bool) -> void:
+	for n in [$UI/ModeStory, $UI/ModeTower]:
+		var card := n as Button
+		card.disabled = not on
+		var tw := create_tween()
+		tw.tween_property(card, "modulate",
+			Color.WHITE if on else Color(0.55, 0.55, 0.55), 0.25)\
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+
+## 匹配成功轻震屏：±6px 衰减抖 5 下回位（菜单唯一震屏点，幅度克制）。
+func _shake_screen() -> void:
+	var tw := create_tween()
+	for i in 5:
+		var amp := 6.0 * (1.0 - i / 5.0)
+		tw.tween_property(self, "position",
+			Vector2(randf_range(-amp, amp), randf_range(-amp, amp)), 0.04)
+	tw.tween_property(self, "position", Vector2.ZERO, 0.05)
 
 
 ## 占位功能提示：淡入 → 停留 → 淡出。

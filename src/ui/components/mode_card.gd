@@ -71,6 +71,15 @@ var _crown: TextureRect
 var _hot: bool = false
 var _tw: Tween
 
+# ---- 牌背模式（匹配中=盖牌等对手·主菜单匹配动画用）----
+var _face_down: bool = false
+var _gold_locked: bool = false       # 牌背期间金框常驻（不随鼠标进出变化）
+var _crown_scale: float = 6.0        # 王冠纹章倍率：正面 ×6 / 牌背 ×4
+var _flip_tw: Tween
+var _breath_tw: Tween                # 牌背王冠呼吸
+var _float_tw: Tween                 # 牌背轻浮动
+var _float_home_y: float = 0.0
+
 
 func _ready() -> void:
 	# 清掉 Button 默认皮肤 → 牌面全自绘
@@ -196,19 +205,20 @@ func _layout() -> void:
 	_emblem.position = Vector2(0, art_h * 0.5 - 70)
 	_emblem.size = Vector2(size.x, 140)
 	if _crown:
-		_crown.size = Vector2(_crown.texture.get_size()) * 6.0
+		_crown.size = Vector2(_crown.texture.get_size()) * _crown_scale
 		_crown.position = Vector2((size.x - _crown.size.x) * 0.5, (art_h - _crown.size.y) * 0.5)
 
 
-## 银/金两套牌面（金=悬停/焦点专属）。
+## 银/金两套牌面（金=悬停/焦点专属；牌背模式金框常驻）。
 func _apply_palette() -> void:
-	var mid := GOLD_MID if _hot else SILVER_MID
+	var hot := _hot or _gold_locked
+	var mid := GOLD_MID if hot else SILVER_MID
 	_frame_mat.set_shader_parameter("edge_outer", EDGE_OUTER)
 	_frame_mat.set_shader_parameter("edge_mid", mid)
-	_frame_mat.set_shader_parameter("edge_inner", GOLD_INNER if _hot else SILVER_INNER)
-	_fill.color = FILL_WARM if _hot else FILL_COLD
+	_frame_mat.set_shader_parameter("edge_inner", GOLD_INNER if hot else SILVER_INNER)
+	_fill.color = FILL_WARM if hot else FILL_COLD
 	_sep.color = Color(mid, 0.5)
-	_title.add_theme_color_override("font_color", GOLD_TEXT if _hot else TITLE_COLD)
+	_title.add_theme_color_override("font_color", GOLD_TEXT if hot else TITLE_COLD)
 	for ln in _inner_lines:
 		ln.color = Color(mid, 0.30)
 	for cb in _corner_bars:
@@ -216,6 +226,8 @@ func _apply_palette() -> void:
 
 
 func _set_hot(hot: bool) -> void:
+	if disabled or _face_down:
+		return
 	if _hot == hot:
 		return
 	_hot = hot
@@ -246,6 +258,87 @@ func _set_pressed_rebound() -> void:
 	_tw = create_tween()
 	_tw.tween_property(self, "scale", Vector2.ONE * (hover_grow if _hot else 1.0), 0.14)\
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+# ── 牌背模式（匹配中=盖牌等对手）──
+
+## 翻面（横向压缩→中点换面→回弹展开·BP REVEAL 同语言）。await 可等动画完成。
+## down=true 进牌背：隐藏正面信息（小注/字印），王冠缩小+呼吸+牌体轻浮动，金框常驻；
+## down=false 翻回正面恢复一切。牌名/副标文字由调用方（main_menu）通过 card_title/card_subtitle 改。
+func flip_face(down: bool) -> void:
+	if _face_down == down:
+		return
+	if _tw and _tw.is_valid():
+		_tw.kill()
+	if _flip_tw and _flip_tw.is_valid():
+		_flip_tw.kill()
+	if not down:
+		_stop_back_anims()
+	# 压缩（顺带把 hover 缩放归一，防止翻完后 x/y 不一致）
+	_flip_tw = create_tween().set_parallel(true)
+	_flip_tw.tween_property(self, "scale:x", 0.0, 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	_flip_tw.tween_property(self, "scale:y", 1.0, 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	await _flip_tw.finished
+	_face_down = down
+	_gold_locked = down
+	_apply_face()
+	_apply_palette()
+	_flip_tw = create_tween()
+	_flip_tw.tween_property(self, "scale:x", 1.0, 0.14).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	await _flip_tw.finished
+	if down:
+		_start_back_anims()
+
+
+## 匹配成功一拍：王冠闪金 + 牌体弹震（屏幕轻震由 main_menu 负责）。
+func found_flash() -> void:
+	_stop_back_anims()
+	if _crown:
+		_crown.modulate = Color(2.2, 2.2, 1.5)
+		var tc := create_tween()
+		tc.tween_property(_crown, "modulate", Color.WHITE, 0.35)\
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	if _tw and _tw.is_valid():
+		_tw.kill()
+	_tw = create_tween()
+	_tw.tween_property(self, "scale", Vector2(1.08, 1.08), 0.08)\
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_tw.tween_property(self, "scale", Vector2.ONE, 0.25)\
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## 牌背内容切换：正面信息收起 / 王冠倍率切换（_layout 复用 _crown_scale）。
+func _apply_face() -> void:
+	_cap.visible = not _face_down and card_caption != ""
+	_emblem.visible = not _face_down and emblem_char != ""
+	_crown_scale = 4.0 if _face_down else 6.0
+	_layout()
+
+
+## 牌背待机：王冠呼吸（明暗 1.5s 周期）+ 牌体轻浮动（±3px 正弦）——"盖着的牌在等待中活着"。
+func _start_back_anims() -> void:
+	if _crown:
+		_breath_tw = create_tween().set_loops()
+		_breath_tw.tween_property(_crown, "modulate:a", 0.55, 0.75)\
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		_breath_tw.tween_property(_crown, "modulate:a", 1.0, 0.75)\
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_float_home_y = position.y
+	_float_tw = create_tween().set_loops()
+	_float_tw.tween_property(self, "position:y", _float_home_y - 3.0, 0.9)\
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_float_tw.tween_property(self, "position:y", _float_home_y + 3.0, 0.9)\
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+
+func _stop_back_anims() -> void:
+	if _breath_tw and _breath_tw.is_valid():
+		_breath_tw.kill()
+	if _float_tw and _float_tw.is_valid():
+		_float_tw.kill()
+		position.y = _float_home_y
+	if _crown:
+		_crown.modulate.a = 1.0
 
 
 # ── 节点工厂 ──
