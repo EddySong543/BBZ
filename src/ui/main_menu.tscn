@@ -71,6 +71,24 @@ offset_right = 1872.0
 offset_bottom = 90.0
 text = "设置"
 
+[node name="QuitButton" type="Button" parent="UI"]
+layout_mode = 0
+offset_left = 1592.0
+offset_top = 36.0
+offset_right = 1712.0
+offset_bottom = 90.0
+text = "退出"
+
+[node name="VersionLabel" type="Label" parent="UI"]
+layout_mode = 0
+offset_left = 1700.0
+offset_top = 1044.0
+offset_right = 1872.0
+offset_bottom = 1068.0
+text = "v0.6"
+horizontal_alignment = 2
+mouse_filter = 2
+
 [node name="ModeStory" type="Button" parent="UI"]
 layout_mode = 0
 offset_left = 220.0

@@ -17,10 +17,18 @@ uniform vec4 edge_inner : source_color = vec4(0.15, 0.25, 0.45, 1.0);  // 内深
 group_uniforms;
 
 group_uniforms shape;
-uniform float pixel_grid : hint_range(12.0, 48.0) = 24.0;  // 像素格数(框宽高，越大格越细)
+uniform float pixel_grid : hint_range(12.0, 200.0) = 24.0; // 像素格数(框宽高，越大格越细)
 uniform float border_px : hint_range(1.0, 6.0) = 2.0;      // 中层边框宽(像素格)
 uniform float noise_amt : hint_range(0.0, 0.2) = 0.06;     // 像素噪点质感
 uniform float corner_radius : hint_range(0.0, 0.4) = 0.0;  // 圆角半径(UV比例,0=直角)；像素台阶圆角
+group_uniforms;
+
+// 大框增质三件套（2026-06-11 反"毛坯房"·默认全关=旧效果逐位一致，battle 小头像框不受影响）
+group_uniforms enrich;
+uniform float accent_strength : hint_range(0.0, 1.0) = 0.0;  // O1 内缘镀线强度(0=关)
+uniform vec4 accent_color : source_color = vec4(0.30, 0.55, 0.85, 1.0);  // 月光青(hover 时调金)
+uniform float light_amount : hint_range(0.0, 0.5) = 0.0;     // O2 方向光：上/左提亮、下/右压暗(0=关)
+uniform float node_count : hint_range(0.0, 3.0) = 0.0;       // O3 每边竹节数(0=关)
 group_uniforms;
 
 float hash(vec2 p) {
@@ -54,13 +62,43 @@ void fragment() {
 
 	vec4 col = vec4(0.0);  // 中心透明 → 头像/底色透出
 
-	// 多层边框：外 1 格暗轮廓 → 中 border_px 格阵营色 → 内 1 格深阵营
+	// 多层边框：外 1 格暗轮廓 → 中 border_px 格阵营色 → 内 1 格深阵营(可镀 accent 线)
 	if (edge_dist < 1.0) {
 		col = edge_outer;
 	} else if (edge_dist < border_px) {
 		col = edge_mid;
 	} else if (edge_dist < border_px + 1.0) {
-		col = edge_inner;
+		// O1 内缘镀线：深内线 → 月光青/亮金细线（毛坯房→镶边）
+		col = mix(edge_inner, accent_color, accent_strength);
+	}
+
+	// O2 方向光：上缘最亮、左缘次亮、下/右压暗 → 边框有体积不再平涂
+	if (light_amount > 0.0 && col.a > 0.0 && edge_dist < border_px + 1.0) {
+		float lf = 0.0;
+		if (dt <= min(min(dl, dr), db)) {
+			lf = 1.0;
+		} else if (db <= min(dl, dr)) {
+			lf = -1.0;
+		} else if (dl < dr) {
+			lf = 0.5;
+		} else {
+			lf = -0.5;
+		}
+		col.rgb *= 1.0 + lf * light_amount;
+	}
+
+	// O3 竹节：每边 node_count 个节块（节侧深刻痕 + 节心亮线），长边不再光秃
+	if (node_count > 0.5 && col.a > 0.0 && edge_dist < border_px + 1.0) {
+		bool on_h = min(dt, db) <= min(dl, dr);
+		float t = (on_h ? cell.x : cell.y) / max(pg - 1.0, 1.0);
+		float n = max(node_count, 1.0);
+		float tn = (floor(t * n) + 0.5) / n;       // 最近节心（每边 n 等分段中点）
+		float dc = abs(t - tn) * (pg - 1.0);
+		if (dc < 0.7) {
+			col.rgb *= 1.35;                        // 节心亮线
+		} else if (dc < 2.0) {
+			col.rgb = edge_outer.rgb;               // 节侧深刻痕
+		}
 	}
 
 	// 像素噪点质感(透明处 col=0 不受影响)

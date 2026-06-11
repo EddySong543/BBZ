@@ -105,6 +105,10 @@ func _build() -> void:
 	_frame_mat.shader = FRAME_SHADER
 	_frame_mat.set_shader_parameter("border_px", 1.5)
 	_frame_mat.set_shader_parameter("noise_amt", 0.06)
+	# 大框增质三件套（反"毛坯房"）：方向光体积 + 每边 2 竹节；镀线颜色在 _apply_palette 随银/金切换
+	_frame_mat.set_shader_parameter("light_amount", 0.13)
+	_frame_mat.set_shader_parameter("node_count", 2.0)
+	_frame_mat.set_shader_parameter("accent_strength", 0.6)
 	_frame.material = _frame_mat
 
 	for i in 4:
@@ -216,6 +220,9 @@ func _apply_palette() -> void:
 	_frame_mat.set_shader_parameter("edge_outer", EDGE_OUTER)
 	_frame_mat.set_shader_parameter("edge_mid", mid)
 	_frame_mat.set_shader_parameter("edge_inner", GOLD_INNER if hot else SILVER_INNER)
+	# 内缘镀线：常态=月光青冷镀（夜色金属），悬停=亮金（与金框同族）
+	_frame_mat.set_shader_parameter("accent_color",
+		Color(1.0, 0.878, 0.541) if hot else Color(0.30, 0.55, 0.85))
 	_fill.color = FILL_WARM if hot else FILL_COLD
 	_sep.color = Color(mid, 0.5)
 	_title.add_theme_color_override("font_color", GOLD_TEXT if hot else TITLE_COLD)

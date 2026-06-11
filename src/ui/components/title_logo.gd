@@ -155,9 +155,10 @@ func _make_glyph_label(ch: String, font: FontFile, px: int,
 	lb.text = ch
 	lb.add_theme_font_override("font", font)
 	lb.add_theme_font_size_override("font_size", px)
-	# 字身纯白 → 渐变 shader 相乘后显出金渐变；描边/投影保持深色
+	# 字身纯白 → 色阶 shader 相乘后显出金；描边/投影保持深色
 	lb.add_theme_color_override("font_color", Color.WHITE)
-	lb.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	# 描边深褐而非纯黑：金属字轮廓带暖意，纯黑=贴纸感（2026-06-11 反 PPT 艺术字 A）
+	lb.add_theme_color_override("font_outline_color", Color("#2a1606", 0.95))
 	lb.add_theme_constant_override("outline_size", outline)
 	lb.add_theme_color_override("font_shadow_color", SHADOW_COLOR)
 	lb.add_theme_constant_override("shadow_offset_x", 0)
@@ -165,6 +166,7 @@ func _make_glyph_label(ch: String, font: FontFile, px: int,
 	var mat := ShaderMaterial.new()
 	mat.shader = GLYPH_SHADER
 	mat.set_shader_parameter("glyph_height", font.get_height(px))
+	mat.set_shader_parameter("px_size", float(px) / 12.0)   # 1 字体像素的屏幕尺寸（抖动/棱线粒度）
 	lb.material = mat
 	lb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lb.modulate.a = 0.0

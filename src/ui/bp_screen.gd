@@ -851,6 +851,11 @@ func _make_card_back(parent: Control, r: Rect2) -> Control:
 	m.set_shader_parameter("pixel_grid", 23.0)
 	m.set_shader_parameter("border_px", 1.5)
 	m.set_shader_parameter("noise_amt", 0.06)
+	# 大框增质三件套（与 ModeCard 同语言）：月光青镀线 + 方向光 + 单竹节
+	m.set_shader_parameter("accent_strength", 0.6)
+	m.set_shader_parameter("accent_color", Color(0.30, 0.55, 0.85))
+	m.set_shader_parameter("light_amount", 0.13)
+	m.set_shader_parameter("node_count", 1.0)
 	f.material = m
 	f.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.add_child(f)

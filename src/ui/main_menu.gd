@@ -70,6 +70,17 @@ func _setup_identity() -> void:
 	FontManager.apply(rank_lbl, 16)
 	rank_lbl.add_theme_color_override("font_color", Color("#aab4c4"))
 	_add_plate_bg(rank_lbl)
+	# 段位盾徽（icon 排查清单·先程序绘制占位）
+	var shield := TextureRect.new()
+	shield.name = "RankIcon"
+	shield.texture = PixelGlyphs.icon_texture("shield")
+	shield.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	shield.stretch_mode = TextureRect.STRETCH_SCALE
+	shield.position = Vector2(6, 9)
+	shield.size = Vector2(16, 16)
+	shield.modulate = Color("#aab4c4")
+	shield.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rank_lbl.add_child(shield)
 	btn.pressed.connect(_on_placeholder_pressed.bind("个人资料"))
 
 
@@ -77,10 +88,24 @@ func _setup_settings() -> void:
 	var btn: Button = $UI/SettingsButton
 	FontManager.apply_btn(btn, 22)
 	_apply_plate(btn)
-	_set_btn_left_margin(btn, 36.0)   # 文字让出左侧 icon 锚位
-	_add_icon_slot(btn, Rect2(16, 13, 28, 28))
+	_set_btn_left_margin(btn, 36.0)   # 文字让出左侧 icon
+	_add_icon(btn, Rect2(14, 11, 32, 32), "gear")
 	btn.pressed.connect(_on_placeholder_pressed.bind("设置"))
 	_attach_juice(btn)
+
+	# 退出游戏（PC 必备·2026-06-11 icon 排查补缺）
+	var quit_btn: Button = $UI/QuitButton
+	FontManager.apply_btn(quit_btn, 22)
+	_apply_plate(quit_btn)
+	_set_btn_left_margin(quit_btn, 32.0)
+	_add_icon(quit_btn, Rect2(10, 11, 32, 32), "exit")
+	quit_btn.pressed.connect(func() -> void: get_tree().quit())
+	_attach_juice(quit_btn)
+
+	# 版本号（角落惯例·报 bug 定位用）
+	var ver: Label = $UI/VersionLabel
+	FontManager.apply(ver, 14)
+	ver.add_theme_color_override("font_color", Color(0.55, 0.60, 0.68, 0.6))
 
 
 ## 三牌阵：匹配对战接真实流程，故事/爬塔占位。悬停金框+放大在 ModeCard 内。
@@ -93,8 +118,8 @@ func _setup_modes() -> void:
 ## 底坞：四个入口连排成一根坞条（深色底+icon 锚位+字+段间分隔线）。
 func _setup_dock() -> void:
 	var navs: Array = [
-		[$UI/NavHeroes, "英雄"], [$UI/NavSquad, "小队"],
-		[$UI/NavItems, "道具"], [$UI/NavShop, "商店"],
+		[$UI/NavHeroes, "英雄", "hero"], [$UI/NavSquad, "小队", "flag"],
+		[$UI/NavItems, "道具", "potion"], [$UI/NavShop, "商店", "coin"],
 	]
 	for i in navs.size():
 		var btn: Button = navs[i][0]
@@ -129,7 +154,7 @@ func _setup_dock() -> void:
 			sp.size = Vector2(2, 38)
 			sp.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			btn.add_child(sp)
-		_add_icon_slot(btn, Rect2(34, 21, 28, 28))
+		_add_icon(btn, Rect2(30, 19, 32, 32), navs[i][2])
 		btn.pressed.connect(_on_placeholder_pressed.bind(navs[i][1]))
 		_attach_juice(btn)
 
@@ -175,7 +200,7 @@ func _play_intro() -> void:
 func _animate_in() -> void:
 	var order: Array = [
 		$UI/ModeMatch, $UI/ModeStory, $UI/ModeTower,
-		$UI/IdentityButton, $UI/SettingsButton,
+		$UI/IdentityButton, $UI/QuitButton, $UI/SettingsButton,
 		$UI/NavHeroes, $UI/NavSquad, $UI/NavItems, $UI/NavShop,
 	]
 	var step := 0.0
@@ -351,22 +376,19 @@ func _set_btn_left_margin(btn: Button, left: float) -> void:
 		btn.add_theme_stylebox_override(s, sb)
 
 
-## icon 锚位占位：28px 像素空格（UI icon 素材到位后原位替换为 TextureRect）。
-func _add_icon_slot(host: Control, r: Rect2) -> void:
-	var backing := ColorRect.new()
-	backing.name = "IconSlot"
-	backing.color = Color(0.05, 0.05, 0.06, 0.8)
-	backing.position = r.position
-	backing.size = r.size
-	backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	host.add_child(backing)
-	var inner := ColorRect.new()
-	inner.name = "IconSlotInner"
-	inner.color = Color(0.22, 0.25, 0.30, 0.9)
-	inner.position = r.position + Vector2(2, 2)
-	inner.size = r.size - Vector2(4, 4)
-	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	host.add_child(inner)
+## 程序绘制像素 icon（PixelGlyphs 12×12 白剪影+黑描边·原生 16 含留白 → ×2 显示=32px）。
+## 美术期换素材：替换 Icon 节点的 texture 即可，位置不动。
+func _add_icon(host: Control, r: Rect2, icon_name: String) -> void:
+	var icon := TextureRect.new()
+	icon.name = "Icon"
+	icon.texture = PixelGlyphs.icon_texture(icon_name)
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	icon.stretch_mode = TextureRect.STRETCH_SCALE
+	icon.position = r.position
+	icon.size = r.size
+	icon.modulate = Color("#c9d2dc")
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	host.add_child(icon)
 
 
 ## 给按钮挂 ButtonJuice（hover 缩放 / 按下反馈）→ 手感与战斗/选人界面统一。
