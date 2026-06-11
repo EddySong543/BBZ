@@ -6,8 +6,9 @@ extends Control
 ## 字体：Ark Pixel 12px ×10 整数倍 = 120px/字，描边 10px=1 字体像素（2026-06-10 Eddy 选定全 UI 统一 12px）。
 ## （手工方格字形保留在 pixel_glyphs.gd —— 王冠仍用其像素稿；Fusion 10px 也在 assets/font/ 可随时换回对比。）
 ##
-## 配色（2026-06-10 Eddy 决议·弃逐字多彩）：5 字统一金色系——字身纵向渐变（亮金→深琥珀，
-## canvas_ui_title_glyph shader）+ 1 字体像素黑描边 + 下落投影；王冠金底红宝石。
+## 配色（2026-06-11 1A「与王冠同金」·替代纵向渐变/色带方案）：5 字统一王冠同源金——
+## 字身平涂主金 + 笔画上/下缘结构棱线（canvas_ui_title_glyph shader，取色=王冠像素稿
+## L/#/+ 三档）+ 1 字体像素纯黑描边（王冠描边同款）+ 下落投影；王冠金底三宝石。
 ##
 ## 入场（撞击瞬间，前 3 字同时开演）：
 ##   波₁：从左冲入带回弹 —— 对撞的左侧波本体
@@ -157,8 +158,8 @@ func _make_glyph_label(ch: String, font: FontFile, px: int,
 	lb.add_theme_font_size_override("font_size", px)
 	# 字身纯白 → 色阶 shader 相乘后显出金；描边/投影保持深色
 	lb.add_theme_color_override("font_color", Color.WHITE)
-	# 描边深褐而非纯黑：金属字轮廓带暖意，纯黑=贴纸感（2026-06-11 反 PPT 艺术字 A）
-	lb.add_theme_color_override("font_outline_color", Color("#2a1606", 0.95))
+	# 描边纯黑 = 王冠像素稿描边同款（2026-06-11 1A：标题与王冠是同一块金子，描边也同源）
+	lb.add_theme_color_override("font_outline_color", Color.BLACK)
 	lb.add_theme_constant_override("outline_size", outline)
 	lb.add_theme_color_override("font_shadow_color", SHADOW_COLOR)
 	lb.add_theme_constant_override("shadow_offset_x", 0)
@@ -166,7 +167,7 @@ func _make_glyph_label(ch: String, font: FontFile, px: int,
 	var mat := ShaderMaterial.new()
 	mat.shader = GLYPH_SHADER
 	mat.set_shader_parameter("glyph_height", font.get_height(px))
-	mat.set_shader_parameter("px_size", float(px) / 12.0)   # 1 字体像素的屏幕尺寸（抖动/棱线粒度）
+	mat.set_shader_parameter("px_size", float(px) / 12.0)   # 1 字体像素的屏幕尺寸（棱线粒度）
 	lb.material = mat
 	lb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lb.modulate.a = 0.0

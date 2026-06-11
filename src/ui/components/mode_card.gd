@@ -59,7 +59,8 @@ var _fill: ColorRect
 var _frame: ColorRect
 var _frame_mat: ShaderMaterial
 var _inner_lines: Array[ColorRect] = []
-var _corner_bars: Array[ColorRect] = []
+var _corner_bars: Array[ColorRect] = []      # 包角受光面（亮）
+var _corner_shadows: Array[ColorRect] = []   # 包角厚度衬底（暗·偏移 2px 下右）
 var _band: ColorRect
 var _sep: ColorRect
 var _title: Label
@@ -105,14 +106,17 @@ func _build() -> void:
 	_frame_mat.shader = FRAME_SHADER
 	_frame_mat.set_shader_parameter("border_px", 1.5)
 	_frame_mat.set_shader_parameter("noise_amt", 0.06)
-	# 大框增质三件套（反"毛坯房"）：方向光体积 + 每边 2 竹节；镀线颜色在 _apply_palette 随银/金切换
+	# 2026-06-11 2A 去科幻感：撤常态青镀线（冷色 emissive 细线=全息/科技 UI 公式）、撤竹节
+	# （细框上等距分段读成铆钉/能量管节）。保留方向光（中性体积感）；金镀线改为 hover 专属
+	# （_apply_palette 随 hot 开关）。质感重心移到四角双色金属包角。
 	_frame_mat.set_shader_parameter("light_amount", 0.13)
-	_frame_mat.set_shader_parameter("node_count", 2.0)
-	_frame_mat.set_shader_parameter("accent_strength", 0.6)
 	_frame.material = _frame_mat
 
 	for i in 4:
 		_inner_lines.append(_rect(Color.WHITE))
+	# 四角金属包角 = 暗色厚度衬底（先建=画在下层）+ 亮色受光面（后建=画在上层）
+	for i in 8:
+		_corner_shadows.append(_rect(Color.WHITE))
 	for i in 8:
 		_corner_bars.append(_rect(Color.WHITE))
 
@@ -168,9 +172,10 @@ func _layout() -> void:
 		_inner_lines[i].position = lines[i].position
 		_inner_lines[i].size = lines[i].size
 
-	# 四饰角（L 形角花 = 每角横竖两条）
-	var arm := 16.0
-	var th := 3.0
+	# 四角金属包角（2A：L 形角花升级双色——亮受光面 + 暗厚度衬底偏移 2px 下右，
+	# 顶光方向与边框方向光/标题投影一致；角落承重=手工感，替代被撤的边中段细节）
+	var arm := 20.0
+	var th := 4.0
 	var pad := inset + 6.0
 	var origins: Array = [
 		[Vector2(pad, pad), Vector2(1, 1)],
@@ -178,6 +183,7 @@ func _layout() -> void:
 		[Vector2(pad, size.y - pad), Vector2(1, -1)],
 		[Vector2(size.x - pad, size.y - pad), Vector2(-1, -1)],
 	]
+	var shadow_off := Vector2(2, 2)
 	for i in 4:
 		var origin: Vector2 = origins[i][0]
 		var dir: Vector2 = origins[i][1]
@@ -189,6 +195,11 @@ func _layout() -> void:
 		vbar.position = Vector2(origin.x if dir.x > 0 else origin.x - th,
 			origin.y if dir.y > 0 else origin.y - arm)
 		vbar.size = Vector2(th, arm)
+		for k in 2:
+			var bright := _corner_bars[i * 2 + k]
+			var shadow := _corner_shadows[i * 2 + k]
+			shadow.position = bright.position + shadow_off
+			shadow.size = bright.size
 
 	# 名牌横带
 	var band_y := size.y - band_h
@@ -217,19 +228,24 @@ func _layout() -> void:
 func _apply_palette() -> void:
 	var hot := _hot or _gold_locked
 	var mid := GOLD_MID if hot else SILVER_MID
+	var inner := GOLD_INNER if hot else SILVER_INNER
 	_frame_mat.set_shader_parameter("edge_outer", EDGE_OUTER)
 	_frame_mat.set_shader_parameter("edge_mid", mid)
-	_frame_mat.set_shader_parameter("edge_inner", GOLD_INNER if hot else SILVER_INNER)
-	# 内缘镀线：常态=月光青冷镀（夜色金属），悬停=亮金（与金框同族）
-	_frame_mat.set_shader_parameter("accent_color",
-		Color(1.0, 0.878, 0.541) if hot else Color(0.30, 0.55, 0.85))
+	_frame_mat.set_shader_parameter("edge_inner", inner)
+	# 内缘镀线 = hover/焦点专属亮金（加冕语义）；常态无镀线——状态编码靠"平时没有金"
+	# （2A：常态月光青已撤，冷色 emissive 线=科幻 UI 公式，与本作题材不符）
+	_frame_mat.set_shader_parameter("accent_strength", 0.6 if hot else 0.0)
+	_frame_mat.set_shader_parameter("accent_color", Color(1.0, 0.878, 0.541))
 	_fill.color = FILL_WARM if hot else FILL_COLD
 	_sep.color = Color(mid, 0.5)
 	_title.add_theme_color_override("font_color", GOLD_TEXT if hot else TITLE_COLD)
 	for ln in _inner_lines:
 		ln.color = Color(mid, 0.30)
+	# 金属包角：受光面实色 + 厚度衬底用边框内层深色（银/金随态）
 	for cb in _corner_bars:
-		cb.color = Color(mid, 0.65)
+		cb.color = Color(mid, 0.95)
+	for cs in _corner_shadows:
+		cs.color = Color(inner, 0.90)
 
 
 func _set_hot(hot: bool) -> void:

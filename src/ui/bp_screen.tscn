@@ -49,9 +49,9 @@ mouse_filter = 2
 color = Color(0.3, 0.55, 0.85, 0.3)
 
 [node name="OppAvatar" parent="OppBand" instance=ExtResource("4_heroframe")]
-offset_left = 600.0
+offset_left = 240.0
 offset_top = 36.0
-offset_right = 676.0
+offset_right = 316.0
 offset_bottom = 112.0
 mouse_filter = 2
 portrait_path = "res://assets/sprites/heroes/h09/h09_portrait.png"
@@ -60,52 +60,38 @@ player_color = Color(0.823529, 0.290196, 0.266667, 1)
 
 [node name="OppName" type="Label" parent="OppBand"]
 layout_mode = 0
-offset_left = 694.0
+offset_left = 334.0
 offset_top = 44.0
-offset_right = 900.0
+offset_right = 540.0
 offset_bottom = 76.0
 text = "对手"
 mouse_filter = 2
 
 [node name="OppRank" type="Label" parent="OppBand"]
 layout_mode = 0
-offset_left = 694.0
+offset_left = 334.0
 offset_top = 82.0
-offset_right = 900.0
+offset_right = 540.0
 offset_bottom = 106.0
 text = "段位 · 未定级"
 mouse_filter = 2
 
 [node name="OppProgress" type="Label" parent="OppBand"]
 layout_mode = 0
-offset_left = 1380.0
-offset_top = 58.0
-offset_right = 1620.0
-offset_bottom = 88.0
+offset_left = 1460.0
+offset_top = 36.0
+offset_right = 1820.0
+offset_bottom = 66.0
+horizontal_alignment = 1
 mouse_filter = 2
 
-[node name="PhaseStrip" type="Control" parent="."]
+[node name="TimerLabel" type="Label" parent="OppBand"]
 layout_mode = 0
-offset_top = 160.0
-offset_right = 1920.0
-offset_bottom = 220.0
-mouse_filter = 2
-
-[node name="PhaseLabel" type="Label" parent="PhaseStrip"]
-layout_mode = 0
-offset_left = 256.0
-offset_top = 10.0
-offset_right = 900.0
-offset_bottom = 48.0
-mouse_filter = 2
-
-[node name="TimerLabel" type="Label" parent="PhaseStrip"]
-layout_mode = 0
-offset_left = 1470.0
-offset_top = 12.0
-offset_right = 1710.0
-offset_bottom = 46.0
-horizontal_alignment = 2
+offset_left = 1460.0
+offset_top = 76.0
+offset_right = 1820.0
+offset_bottom = 106.0
+horizontal_alignment = 1
 mouse_filter = 2
 
 [node name="MyBand" type="Control" parent="."]

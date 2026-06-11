@@ -11,7 +11,9 @@ func _ready() -> void:
 	await get_tree().process_frame
 	var bp := (load("res://src/ui/bp_screen.tscn") as PackedScene).instantiate()
 	add_child(bp)
-	await get_tree().create_timer(2.6).timeout      # 开桌入场（含 C1 翻牌扫过）
+	await get_tree().create_timer(0.7).timeout      # 阶段宣告中段（带+大字+副注全亮）
+	await _shot("D:/Game/BoBoZan/bp_real_announce.png")
+	await get_tree().create_timer(1.9).timeout      # 开桌入场（含 C1 翻牌扫过）
 	await _shot("D:/Game/BoBoZan/bp_real_ban_empty.png")
 
 	bp._on_card_clicked(5)

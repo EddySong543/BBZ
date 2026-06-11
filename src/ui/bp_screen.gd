@@ -1,12 +1,16 @@
 extends Control
 
-## BP 选人屏 = 「双席牌局」（第二轮重构 2026-06-11·Eddy 批）。
+## BP 选人屏 = 「双席牌局」（第二轮重构 2026-06-11·Eddy 批；同日优化批：席位上下对齐/
+## 牌库均匀网格去系徽/阶段条撤掉改屏幕中央宣告/去全屏白闪）。
 ## BP 的本质是双方同时盲选 = 这局牌的第一手 → 界面从"商店货架"改为第一人称对坐牌桌。
 ## 纵深三层：对手席(顶带·你选择期间对手随机时刻盖下牌背=实时压力，本地 AI 演出/联机真信号)
-##           牌库摊开(中·46 卡按 生肖12|塔罗11+11|星座12 四行三牌系分区·全池一屏无滚动)
+##           牌库摊开(中·46 卡四行均匀网格 12/12/12/10·全池一屏无滚动)
 ##           我的手牌(底带·点池卡飞入 3 大牌位·再点退回·确认盖牌金钮)。
-## 两次翻牌仪式：禁用揭晓=双方 3 张推中央同时翻开+撞车对白闪合并（并集规则的戏剧呈现）；
-##              出战亮相=3v3 对扣翻开对峙+王冠+开始战斗。
+## 上下席对齐：头像/名字列同 x（240/334），对手槽位与手牌槽位中心对齐，
+##             右列=信息/行动列（对手进度+倒计时 ↔ 确认钮，同 1460-1820）。
+## 阶段提示 = 进入 BAN/PICK 时屏幕中央宣告横带（大字+副注，1.4s 自动退场），无常驻阶段条。
+## 两次翻牌仪式：禁用揭晓=双方 3 张推中央同时翻开+撞车对合拢合并（并集规则的戏剧呈现）；
+##              出战亮相=3v3 对扣翻开对峙+王冠砸落+开始战斗（⛔全屏白闪，Eddy 否决）。
 ## 流程保留：BAN → PICK → REVEAL（3B 本地留 Ban），超时自动补满，BattleSetup 交接，波幕转场。
 ## ⚠️ 仪式压暗用独立暗幕 ColorRect，禁用 modulate（会压黑霜玻璃衬底反而让亮波透出）。
 
@@ -21,18 +25,20 @@ const STEP_TIME := 30
 const BAN_COUNT := 3
 const PICK_COUNT := 3
 
-# ── 牌库网格（46 全池一屏：生肖12 / 塔罗11+11 / 星座12）──
-const POOL := Rect2(200, 222, 1520, 612)
+# ── 牌库网格（46 全池一屏·均匀四行 12/12/12/10·阶段条撤掉后上移加高）──
+# 边距核算：行内容宽 1441（12 卡）→ 左右余 40；血量爱心探出卡左上 ≈(-19,-20)
+# → 首行 y216 时心顶 196，距池顶 170 余 26px——任何边框不触池框。
+const POOL := Rect2(200, 170, 1520, 664)
 const CARD_SCALE := 0.846          # 130×158 → 110×134
 const HAND_SCALE := 150.0 / 130.0  # 手牌大卡
 const STEP_X := 121.0
 const ROW_H := 146.0
-const ROW_Y0 := 240.0
-# [起始索引, 张数, 行起点x]；末值=该行左缘（12 张行 / 11 张行居中）
-const ROWS: Array = [[0, 12, 270.0], [12, 11, 330.0], [23, 11, 330.0], [34, 12, 270.0]]
+const ROW_Y0 := 216.0
+# [起始索引, 张数, 行起点x]；末值=该行左缘（每行池内居中）
+const ROWS: Array = [[0, 12, 240.0], [12, 12, 240.0], [24, 12, 240.0], [36, 10, 360.5]]
 
-# ── 席位槽（OppBand / MyBand 内相对坐标）──
-const OPP_SLOTS: Array = [Vector2(980, 16), Vector2(1100, 16), Vector2(1220, 16)]
+# ── 席位槽（OppBand / MyBand 内相对坐标·对手槽与手牌槽中心上下对齐）──
+const OPP_SLOTS: Array = [Vector2(789, 16), Vector2(969, 16), Vector2(1149, 16)]
 const OPP_SLOT_SIZE := Vector2(92, 116)
 const HAND_SLOTS: Array = [Vector2(760, 16), Vector2(940, 16), Vector2(1120, 16)]
 const HAND_SLOT_SIZE := Vector2(150, 182)
@@ -67,9 +73,7 @@ var ai_picks: Array[int] = []
 @onready var pool_area: Control = $PoolArea
 @onready var opp_band: Control = $OppBand
 @onready var opp_progress: Label = $OppBand/OppProgress
-@onready var phase_strip: Control = $PhaseStrip
-@onready var phase_label: Label = $PhaseStrip/PhaseLabel
-@onready var timer_label: Label = $PhaseStrip/TimerLabel
+@onready var timer_label: Label = $OppBand/TimerLabel
 @onready var my_band: Control = $MyBand
 @onready var confirm_btn: Button = $MyBand/ConfirmButton
 @onready var bp_timer: Timer = $BPTimer
@@ -87,8 +91,6 @@ var _opp_backs: Array[Control] = []
 var _ceremony: bool = false              # 仪式进行中=锁输入
 var _pool_dim: ColorRect = null
 var _glow_tween: Tween
-var _dots: Array[ColorRect] = []
-var _dot_color: Color = BAN_RED
 
 
 func _ready() -> void:
@@ -104,8 +106,6 @@ func _ready() -> void:
 # ============================================================
 
 func _setup_ui() -> void:
-	FontManager.apply(phase_label, 24)
-	phase_label.add_theme_color_override("font_color", Color("#e8edf4"))
 	FontManager.apply(timer_label, 22)
 	timer_label.add_theme_color_override("font_color", GOLD_TEXT)
 
@@ -157,20 +157,9 @@ func _setup_ui() -> void:
 	bp_timer.timeout.connect(_on_timer_tick)
 
 
-## 牌库摊开：霜玻璃桌面 + 三牌系分区（竖排系徽）+ 46 卡四行。
+## 牌库摊开：霜玻璃桌面 + 46 卡均匀四行（系徽/分隔线已撤——正常排列，2026-06-11 Eddy）。
 func _build_pool() -> void:
 	_make_frosted(pool_area, POOL)
-	_make_section_tag(pool_area, "生肖", Vector2(214, ROW_Y0 + 30))
-	_make_section_tag(pool_area, "塔罗", Vector2(214, ROW_Y0 + ROW_H * 1.5 + 10))
-	_make_section_tag(pool_area, "星座", Vector2(214, ROW_Y0 + ROW_H * 3.0 + 30))
-	for ln_y in [ROW_Y0 + ROW_H - 8.0, ROW_Y0 + ROW_H * 3.0 - 8.0]:
-		var ln := ColorRect.new()
-		ln.color = Color(0.30, 0.55, 0.85, 0.18)
-		ln.position = Vector2(214, ln_y)
-		ln.size = Vector2(1492, 1)
-		ln.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		pool_area.add_child(ln)
-
 	for r in ROWS.size():
 		var start: int = ROWS[r][0]
 		var count: int = ROWS[r][1]
@@ -210,7 +199,6 @@ func _enter_step(s: int) -> void:
 		hc.queue_free()
 	hand_cards.clear()
 	_update_all_cards()
-	_build_phase_deco(false)
 	confirm_btn.visible = true
 	timer_label.visible = true
 	timer_seconds = STEP_TIME
@@ -229,43 +217,87 @@ func _enter_step(s: int) -> void:
 	_opp_cover_times.sort()
 	_update_opp_progress()
 	_sync_step_ui()
+	_play_phase_announce()
 
 
-## 阶段条装饰：方印图记 + 标题 + 进度方点（仪式时只换文案）。
-func _build_phase_deco(ceremony_mode: bool) -> void:
-	var old := phase_strip.get_node_or_null("PhaseDeco")
-	if old:
-		old.free()
-	var deco := Control.new()
-	deco.name = "PhaseDeco"
-	deco.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	phase_strip.add_child(deco)
-	_dots.clear()
+## 阶段宣告（替代常驻阶段条，2026-06-11 Eddy）：进入 BAN/PICK 时屏幕中央
+## 暗带展开 + 大字弹入 + 副注浮现，停留约 1s 自动退场。不锁输入（纯演出层）。
+func _play_phase_announce() -> void:
+	var is_ban := step == Step.BAN
+	var theme_col := BAN_RED if is_ban else GOLD_TEXT
+	var layer := Control.new()
+	layer.name = "PhaseAnnounce"
+	layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.z_index = 80
+	add_child(layer)
 
-	if step == Step.BAN:
-		_dot_color = BAN_RED
-		_make_seal(deco, Rect2(204, 8, 38, 38), "禁", BAN_RED)
-		phase_label.text = "禁用揭晓 · 双方同时翻开" if ceremony_mode else "禁用阶段 · 盲选 3 名"
-	elif step == Step.PICK:
-		_dot_color = GOLD_TEXT
-		_make_seal(deco, Rect2(204, 8, 38, 38), "选", GOLD_TEXT)
-		phase_label.text = "阵容亮相" if ceremony_mode else "出战阶段 · 盲选 3 名 · 允许镜像"
-	else:
-		phase_label.text = "阵容已定 · 准备开战"
+	# 中央暗带（全宽·从中线纵向展开）：busy 牌库上抬起一条安静的台面给大字
+	var band := ColorRect.new()
+	band.color = Color(0.012, 0.022, 0.045, 0.66)
+	band.position = Vector2(0, 462)
+	band.size = Vector2(1920, 156)
+	band.pivot_offset = band.size * 0.5
+	band.scale = Vector2(1.0, 0.0)
+	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(band)
+	var edge_top := ColorRect.new()
+	edge_top.color = Color(theme_col, 0.55)
+	edge_top.position = Vector2(0, 462)
+	edge_top.size = Vector2(1920, 2)
+	layer.add_child(edge_top)
+	var edge_bot := ColorRect.new()
+	edge_bot.color = Color(theme_col, 0.55)
+	edge_bot.position = Vector2(0, 616)
+	edge_bot.size = Vector2(1920, 2)
+	layer.add_child(edge_bot)
 
-	if not ceremony_mode and step != Step.REVEAL:
-		for i in 3:
-			var backing := ColorRect.new()
-			backing.color = EDGE_OUTER
-			backing.position = Vector2(700 + i * 28.0, 20)
-			backing.size = Vector2(16, 16)
-			deco.add_child(backing)
-			var dot := ColorRect.new()
-			dot.color = Color(0.22, 0.25, 0.30)
-			dot.position = backing.position + Vector2(2, 2)
-			dot.size = Vector2(12, 12)
-			deco.add_child(dot)
-			_dots.append(dot)
+	var title := Label.new()
+	title.text = "禁 用 阶 段" if is_ban else "出 战 阶 段"
+	FontManager.apply(title, 52)
+	title.add_theme_color_override("font_color", theme_col)
+	title.add_theme_constant_override("outline_size", 8)
+	title.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 0.95))
+	title.position = Vector2(0, 478)
+	title.size = Vector2(1920, 64)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.pivot_offset = Vector2(960, 32)
+	layer.add_child(title)
+
+	var sub := Label.new()
+	sub.text = "盲选禁用 3 名 · 双方同时翻开" if is_ban else "盲选出战 3 名 · 允许镜像"
+	FontManager.apply(sub, 20)
+	sub.add_theme_color_override("font_color", Color(TIN_DIM, 0.9))
+	sub.add_theme_constant_override("outline_size", 4)
+	sub.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 0.9))
+	sub.position = Vector2(0, 552)
+	sub.size = Vector2(1920, 30)
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	layer.add_child(sub)
+
+	# 入场：带展开 → 大字砸落弹定（boot 之王同语言）→ 副注浮现
+	for c: Control in [edge_top, edge_bot, title, sub]:
+		c.modulate.a = 0.0
+	var tb := create_tween()
+	tb.tween_property(band, "scale:y", 1.0, 0.14)\
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tb.parallel().tween_property(edge_top, "modulate:a", 1.0, 0.14)
+	tb.parallel().tween_property(edge_bot, "modulate:a", 1.0, 0.14)
+	title.scale = Vector2(1.6, 1.6)
+	var tt := create_tween()
+	tt.tween_interval(0.10)
+	tt.tween_callback(func() -> void: title.modulate.a = 1.0)
+	tt.tween_property(title, "scale", Vector2.ONE, 0.16)\
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	var ts := create_tween()
+	ts.tween_interval(0.26)
+	ts.tween_property(sub, "modulate:a", 1.0, 0.15)
+	# 停留后整层淡出 + 带收拢
+	var out := create_tween()
+	out.tween_interval(1.35)
+	out.tween_property(layer, "modulate:a", 0.0, 0.22)
+	out.parallel().tween_property(band, "scale:y", 0.0, 0.22)\
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	out.tween_callback(layer.queue_free)
 
 
 # ============================================================
@@ -372,8 +404,6 @@ func _update_all_cards() -> void:
 
 
 func _sync_step_ui() -> void:
-	for i in _dots.size():
-		_dots[i].color = _dot_color if i < my_sel.size() else Color(0.22, 0.25, 0.30)
 	var verb := "确认盖牌" if step == Step.BAN else "确认出战"
 	confirm_btn.text = "%s  %d/3" % [verb, my_sel.size()]
 	_set_confirm_enabled(my_sel.size() == 3)
@@ -496,7 +526,6 @@ func _run_ceremony(is_ban: bool) -> void:
 	bp_timer.stop()
 	timer_label.visible = false
 	confirm_btn.visible = false
-	_build_phase_deco(true)
 
 	# 对手剩余的牌快速补盖（演出收口）
 	while _opp_covered < 3:
@@ -572,19 +601,26 @@ func _run_ceremony(is_ban: bool) -> void:
 		_ceremony = false
 		_enter_step(Step.PICK)
 	else:
-		# 阵容亮相：王冠 + 撞波闪 + 开始战斗（仪式卡与暗幕保留=对峙画面）
+		# 阵容亮相：王冠砸落弹定 + 开始战斗（仪式卡与暗幕保留=对峙画面）。
+		# ⛔全屏白闪已删（Eddy 2026-06-11：确认后的瞬间白闪不适）——加冕的份量交给砸落动作。
 		var crown := TextureRect.new()
 		crown.texture = PixelGlyphs.crown_texture()
 		crown.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		crown.stretch_mode = TextureRect.STRETCH_SCALE
 		crown.size = Vector2(crown.texture.get_size()) * 3.0
-		crown.position = Vector2(960 - crown.size.x * 0.5, 505)
+		var crown_home := Vector2(960 - crown.size.x * 0.5, 505)
+		crown.position = crown_home + Vector2(0, -56)
 		crown.modulate.a = 0.0
 		cer.add_child(crown)
-		create_tween().tween_property(crown, "modulate:a", 1.0, 0.3)
-		_clash_flash()
+		var ct := create_tween()
+		ct.tween_property(crown, "modulate:a", 1.0, 0.10)
+		ct.parallel().tween_property(crown, "position", crown_home, 0.18)\
+			.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_IN)
+		ct.tween_property(crown, "position", crown_home + Vector2(0, 8), 0.06)\
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		ct.tween_property(crown, "position", crown_home, 0.10)\
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		step = Step.REVEAL
-		_build_phase_deco(false)
 		confirm_btn.text = "开始战斗"
 		confirm_btn.visible = true
 		_set_confirm_enabled(true)
@@ -611,9 +647,9 @@ func _play_collisions(cer: Control, my_cer: Array[HeroCard], opp_cer: Array) -> 
 			tw.tween_property(oc, "position", meet, 0.3)\
 				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 		await tw.finished
-		# 白闪
+		# 撞车暖光（局部低强度·全屏白闪同批调柔，2026-06-11 Eddy）
 		var flash := ColorRect.new()
-		flash.color = Color(1, 0.95, 0.75, 0.45)
+		flash.color = Color(1, 0.9, 0.62, 0.28)
 		flash.position = meet - Vector2(40, 40)
 		flash.size = Vector2(220, 240)
 		flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -666,23 +702,6 @@ func _spawn_cer_card(cer: Control, h: HeroData, state: int) -> HeroCard:
 	return c
 
 
-## 揭幕撞波闪：全屏白色快闪。
-func _clash_flash() -> void:
-	var f := ColorRect.new()
-	f.color = Color.WHITE
-	f.modulate.a = 0.0
-	f.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	f.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	f.z_index = 90
-	add_child(f)
-	var tw := create_tween()
-	tw.tween_property(f, "modulate:a", 0.45, 0.08)\
-		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_property(f, "modulate:a", 0.0, 0.3)\
-		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_callback(f.queue_free)
-
-
 func _start_battle() -> void:
 	var p1_lineup: Array[HeroData] = []
 	for idx in my_picks:
@@ -711,8 +730,6 @@ func _play_intro() -> void:
 	my_band.position.y += 230.0
 	create_tween().tween_property(my_band, "position", my_home, 0.45)\
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	phase_strip.modulate.a = 0.0
-	create_tween().tween_property(phase_strip, "modulate:a", 1.0, 0.5)
 
 	for i in card_cards.size():
 		var card := card_cards[i]
@@ -747,48 +764,6 @@ func _make_frosted(parent: Control, r: Rect2) -> void:
 	fill.size = r.size - Vector2(4, 4)
 	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(fill)
-
-
-## 三牌系竖排系徽（生/肖 两字竖排）。
-func _make_section_tag(parent: Control, txt: String, pos: Vector2) -> void:
-	var lbl := Label.new()
-	lbl.text = txt.substr(0, 1) + "\n" + txt.substr(1, 1)
-	FontManager.apply(lbl, 20)
-	lbl.add_theme_color_override("font_color", Color(0.55, 0.70, 0.88, 0.85))
-	lbl.add_theme_constant_override("outline_size", 3)
-	lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 0.9))
-	lbl.position = pos
-	lbl.size = Vector2(40, 80)
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	parent.add_child(lbl)
-
-
-## 阶段方印（禁=红 / 选=金）。
-func _make_seal(parent: Control, r: Rect2, ch: String, col: Color) -> void:
-	var backing := ColorRect.new()
-	backing.color = Color(col, 0.18)
-	backing.position = r.position
-	backing.size = r.size
-	parent.add_child(backing)
-	for line_r: Rect2 in [
-			Rect2(r.position, Vector2(r.size.x, 2)),
-			Rect2(r.position + Vector2(0, r.size.y - 2), Vector2(r.size.x, 2)),
-			Rect2(r.position, Vector2(2, r.size.y)),
-			Rect2(r.position + Vector2(r.size.x - 2, 0), Vector2(2, r.size.y))]:
-		var ln := ColorRect.new()
-		ln.color = Color(col, 0.8)
-		ln.position = line_r.position
-		ln.size = line_r.size
-		parent.add_child(ln)
-	var lbl := Label.new()
-	lbl.text = ch
-	FontManager.apply(lbl, 24)
-	lbl.add_theme_color_override("font_color", col)
-	lbl.position = r.position + Vector2(0, 7)
-	lbl.size = Vector2(r.size.x, 28)
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	parent.add_child(lbl)
 
 
 ## 席位暗井槽。
@@ -851,11 +826,8 @@ func _make_card_back(parent: Control, r: Rect2) -> Control:
 	m.set_shader_parameter("pixel_grid", 23.0)
 	m.set_shader_parameter("border_px", 1.5)
 	m.set_shader_parameter("noise_amt", 0.06)
-	# 大框增质三件套（与 ModeCard 同语言）：月光青镀线 + 方向光 + 单竹节
-	m.set_shader_parameter("accent_strength", 0.6)
-	m.set_shader_parameter("accent_color", Color(0.30, 0.55, 0.85))
+	# 2026-06-11 2A 去科幻感（与 ModeCard 同步）：撤月光青镀线+竹节，仅留方向光体积感
 	m.set_shader_parameter("light_amount", 0.13)
-	m.set_shader_parameter("node_count", 1.0)
 	f.material = m
 	f.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.add_child(f)
