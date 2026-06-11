@@ -28,6 +28,8 @@ extends Node
 @export var settle_time: float = 0.08
 ## 按下缩小的时长（秒，要快、干脆）。
 @export var press_time: float = 0.05
+## 基准缩放：父按钮常驻缩放 ≠ 1 时设置（如 BP 牌库卡 0.846），所有反馈倍率在其上相乘。
+@export var base_scale: float = 1.0
 
 var _btn: BaseButton
 var _hovering: bool = false
@@ -110,8 +112,8 @@ func _apply(bouncy: bool) -> void:
 	_tween = create_tween()
 	if bouncy:
 		# 去回弹：短促直接归位(TRANS_QUAD EASE_OUT)，不软着陆、不过冲 —— 干脆稳重。
-		_tween.tween_property(_btn, "scale", Vector2.ONE * target, settle_time)\
+		_tween.tween_property(_btn, "scale", Vector2.ONE * (base_scale * target), settle_time)\
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	else:
-		_tween.tween_property(_btn, "scale", Vector2.ONE * target, press_time)\
+		_tween.tween_property(_btn, "scale", Vector2.ONE * (base_scale * target), press_time)\
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)

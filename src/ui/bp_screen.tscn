@@ -1,44 +1,8 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://src/ui/bp_screen.gd" id="1_bp_gd"]
-[ext_resource type="PackedScene" path="res://src/ui/components/bp_lineup_column.tscn" id="2_column"]
 [ext_resource type="PackedScene" uid="uid://ddiu7ck5le8p3" path="res://src/ui/scenes/menu_background.tscn" id="3_bg"]
-
-[sub_resource type="StyleBoxFlat" id="ConfirmNormal"]
-bg_color = Color(0.12, 0.11, 0.15, 0.92)
-border_width_left = 3
-border_width_top = 3
-border_width_right = 3
-border_width_bottom = 3
-border_color = Color(0.72, 0.58, 0.26, 1)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
-
-[sub_resource type="StyleBoxFlat" id="ConfirmHover"]
-bg_color = Color(0.2, 0.17, 0.1, 0.95)
-border_width_left = 3
-border_width_top = 3
-border_width_right = 3
-border_width_bottom = 3
-border_color = Color(0.97, 0.8, 0.4, 1)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
-
-[sub_resource type="StyleBoxFlat" id="ConfirmDisabled"]
-bg_color = Color(0.1, 0.1, 0.12, 0.7)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.3, 0.3, 0.35, 0.8)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
+[ext_resource type="PackedScene" uid="uid://bhfrm000000000001" path="res://src/ui/components/hero_frame.tscn" id="4_heroframe"]
 
 [node name="BPScreen" type="Control"]
 layout_mode = 3
@@ -52,75 +16,152 @@ script = ExtResource("1_bp_gd")
 [node name="Background" parent="." instance=ExtResource("3_bg")]
 layout_mode = 1
 mouse_filter = 2
+metadata/_edit_lock_ = true
 
-[node name="PhaseLabel" type="Label" parent="."]
+[node name="PoolArea" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="OppBand" type="Control" parent="."]
 layout_mode = 0
-offset_left = 460.0
-offset_top = 28.0
-offset_right = 1460.0
+offset_right = 1920.0
+offset_bottom = 150.0
+mouse_filter = 2
+
+[node name="BandFill" type="ColorRect" parent="OppBand"]
+layout_mode = 0
+offset_right = 1920.0
+offset_bottom = 150.0
+mouse_filter = 2
+color = Color(0.01, 0.02, 0.05, 0.55)
+
+[node name="BandEdge" type="ColorRect" parent="OppBand"]
+layout_mode = 0
+offset_top = 148.0
+offset_right = 1920.0
+offset_bottom = 150.0
+mouse_filter = 2
+color = Color(0.3, 0.55, 0.85, 0.3)
+
+[node name="OppAvatar" parent="OppBand" instance=ExtResource("4_heroframe")]
+offset_left = 600.0
+offset_top = 36.0
+offset_right = 676.0
+offset_bottom = 112.0
+mouse_filter = 2
+portrait_path = "res://assets/sprites/heroes/h09/h09_portrait.png"
+frame_size = Vector2(76, 76)
+player_color = Color(0.823529, 0.290196, 0.266667, 1)
+
+[node name="OppName" type="Label" parent="OppBand"]
+layout_mode = 0
+offset_left = 694.0
+offset_top = 44.0
+offset_right = 900.0
 offset_bottom = 76.0
-horizontal_alignment = 1
-vertical_alignment = 1
+text = "对手"
 mouse_filter = 2
 
-[node name="TimerLabel" type="Label" parent="."]
+[node name="OppRank" type="Label" parent="OppBand"]
 layout_mode = 0
-offset_left = 810.0
+offset_left = 694.0
+offset_top = 82.0
+offset_right = 900.0
+offset_bottom = 106.0
+text = "段位 · 未定级"
+mouse_filter = 2
+
+[node name="OppProgress" type="Label" parent="OppBand"]
+layout_mode = 0
+offset_left = 1380.0
+offset_top = 58.0
+offset_right = 1620.0
+offset_bottom = 88.0
+mouse_filter = 2
+
+[node name="PhaseStrip" type="Control" parent="."]
+layout_mode = 0
+offset_top = 160.0
+offset_right = 1920.0
+offset_bottom = 220.0
+mouse_filter = 2
+
+[node name="PhaseLabel" type="Label" parent="PhaseStrip"]
+layout_mode = 0
+offset_left = 256.0
+offset_top = 10.0
+offset_right = 900.0
+offset_bottom = 48.0
+mouse_filter = 2
+
+[node name="TimerLabel" type="Label" parent="PhaseStrip"]
+layout_mode = 0
+offset_left = 1470.0
+offset_top = 12.0
+offset_right = 1710.0
+offset_bottom = 46.0
+horizontal_alignment = 2
+mouse_filter = 2
+
+[node name="MyBand" type="Control" parent="."]
+layout_mode = 0
+offset_top = 850.0
+offset_right = 1920.0
+offset_bottom = 1080.0
+mouse_filter = 2
+
+[node name="BandFill" type="ColorRect" parent="MyBand"]
+layout_mode = 0
+offset_right = 1920.0
+offset_bottom = 230.0
+mouse_filter = 2
+color = Color(0.01, 0.02, 0.05, 0.55)
+
+[node name="BandEdge" type="ColorRect" parent="MyBand"]
+layout_mode = 0
+offset_right = 1920.0
+offset_bottom = 2.0
+mouse_filter = 2
+color = Color(0.3, 0.55, 0.85, 0.3)
+
+[node name="MyAvatar" parent="MyBand" instance=ExtResource("4_heroframe")]
+offset_left = 240.0
+offset_top = 34.0
+offset_right = 316.0
+offset_bottom = 110.0
+mouse_filter = 2
+portrait_path = "res://assets/sprites/heroes/h01/h01_portrait.png"
+frame_size = Vector2(76, 76)
+
+[node name="MyName" type="Label" parent="MyBand"]
+layout_mode = 0
+offset_left = 334.0
+offset_top = 42.0
+offset_right = 540.0
+offset_bottom = 74.0
+text = "Eddy"
+mouse_filter = 2
+
+[node name="MyHint" type="Label" parent="MyBand"]
+layout_mode = 0
+offset_left = 334.0
 offset_top = 80.0
-offset_right = 1110.0
-offset_bottom = 128.0
-horizontal_alignment = 1
-vertical_alignment = 1
+offset_right = 540.0
+offset_bottom = 104.0
+text = "我的手牌"
 mouse_filter = 2
 
-[node name="InfoLabel" type="Label" parent="."]
+[node name="ConfirmButton" type="Button" parent="MyBand"]
 layout_mode = 0
-offset_left = 460.0
-offset_top = 132.0
-offset_right = 1460.0
-offset_bottom = 158.0
-horizontal_alignment = 1
-vertical_alignment = 1
-mouse_filter = 2
-
-[node name="P1Column" parent="." instance=ExtResource("2_column")]
-layout_mode = 0
-offset_left = 26.0
-offset_top = 250.0
-offset_right = 266.0
-offset_bottom = 812.0
-player = 0
-
-[node name="P2Column" parent="." instance=ExtResource("2_column")]
-layout_mode = 0
-offset_left = 1654.0
-offset_top = 250.0
-offset_right = 1894.0
-offset_bottom = 812.0
-player = 1
-
-[node name="CardScrollContainer" type="ScrollContainer" parent="."]
-layout_mode = 0
-offset_left = 290.0
-offset_top = 180.0
-offset_right = 1630.0
-offset_bottom = 920.0
-horizontal_scroll_mode = 0
-
-[node name="CardArea" type="Control" parent="CardScrollContainer"]
-layout_mode = 2
-
-[node name="ConfirmButton" type="Button" parent="."]
-layout_mode = 0
-offset_left = 785.0
-offset_top = 956.0
-offset_right = 1135.0
-offset_bottom = 1028.0
-theme_override_styles/normal = SubResource("ConfirmNormal")
-theme_override_styles/hover = SubResource("ConfirmHover")
-theme_override_styles/pressed = SubResource("ConfirmHover")
-theme_override_styles/focus = SubResource("ConfirmNormal")
-theme_override_styles/disabled = SubResource("ConfirmDisabled")
-text = "确认选择"
+offset_left = 1460.0
+offset_top = 50.0
+offset_right = 1820.0
+offset_bottom = 134.0
+text = "确认盖牌"
 
 [node name="BPTimer" type="Timer" parent="."]
