@@ -901,6 +901,8 @@ func _build_debug_buttons() -> void:
 		["敌 -10", _dbg_damage_enemy],
 		["我 -10", _dbg_damage_self],
 		["敌 +盾2", _dbg_shield_enemy],
+		["我 下个英雄", _dbg_next_hero_self],
+		["敌 下个英雄", _dbg_next_hero_enemy],
 	]
 	for d in defs:
 		var b := Button.new()
@@ -949,6 +951,52 @@ func _dbg_shield_enemy() -> void:
 	var s: int = battle.active_index[AI]
 	battle.shield[AI][s] += 2 * BattleCore.HP_UNIT
 	_update_all()
+
+
+func _dbg_next_hero_self() -> void:
+	_dbg_next_hero(PLAYER)
+
+
+func _dbg_next_hero_enemy() -> void:
+	_dbg_next_hero(AI)
+
+
+## 美术资产巡检池：全英雄池中有 idle 动画资产的（不限本局阵容）。首次点击时构建。
+var _dbg_art_pool: Array[HeroData] = []
+
+
+## 把 player 的出战英雄换成英雄池里的下一个（h01→h02→...→h46→h01，跳过无美术的）。
+## 仅替换 HeroData + 重置该槽位 HP/护盾为新英雄满血 → 立绘/头像/名字/技能卡/爱心数全套联动刷新。
+## ⚠ 纯美术巡检用：不走结算管线，被动/技能状态不迁移。
+func _dbg_next_hero(player: int) -> void:
+	if _dbg_art_pool.is_empty():
+		for h in HeroData.create_pool_heroes():
+			var has_art: bool = h.sprite_frames_path != "" and ResourceLoader.exists(h.sprite_frames_path)
+			if not has_art:
+				has_art = h.spritesheet_path != "" and ResourceLoader.exists(h.spritesheet_path)
+			if has_art:
+				_dbg_art_pool.append(h)
+		if _dbg_art_pool.is_empty():
+			push_warning("debug: 英雄池中没有任何带美术资产的英雄")
+			return
+
+	var slot: int = battle.active_index[player]
+	var cur_id: String = battle.heroes[player][slot].hero_id
+	var idx: int = -1
+	for i in range(_dbg_art_pool.size()):
+		if _dbg_art_pool[i].hero_id == cur_id:
+			idx = i
+			break
+	var next_hero: HeroData = _dbg_art_pool[(idx + 1) % _dbg_art_pool.size()]
+
+	battle.heroes[player][slot] = next_hero
+	battle.max_hp[player][slot] = int(next_hero.max_hp) * BattleCore.HP_UNIT
+	battle.hp[player][slot] = battle.max_hp[player][slot]
+	battle.shield[player][slot] = 0
+
+	_update_all()
+	_refresh_skill_card()
+	print("debug: P%d 出战英雄 → %s (%s)" % [player + 1, next_hero.hero_id, next_hero.hero_name])
 
 
 # ============================================================

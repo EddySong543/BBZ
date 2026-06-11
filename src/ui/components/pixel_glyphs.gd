@@ -86,8 +86,9 @@ const GLYPHS: Dictionary = {
 }
 
 ## 王冠像素稿（26×15·2026-06-10 重绘增质感）：三峰带珍珠尖 + 峰身高光/内侧阴影 +
-## 高光带 + 宝石饰带（三红宝石带闪点）+ 双层基座（暗金 + 深影收底）。
-## 'L'=亮金高光 '#'=金 '+'=暗金阴影 'x'=深影 'r'=红宝石 'w'=宝石闪点
+## 高光带 + 宝石饰带 + 双层基座（暗金 + 深影收底）。
+## 宝石配色（Eddy 决议）：左蓝=波蓝 / 中白=钻石（双波相争的中立王座）/ 右红=波红。
+## 'L'=亮金高光 '#'=金 '+'=暗金阴影 'x'=深影 'r'=宝石主体 'w'=宝石闪点（实际色按列归属取 GEM_COLORS）
 const CROWN_ROWS: Array[String] = [
 	"............LL............",
 	"...........L##L...........",
@@ -110,9 +111,16 @@ const CROWN_COLORS: Dictionary = {
 	"#": Color("#f4c84b"),
 	"+": Color("#b8862f"),
 	"x": Color("#7a5518"),
-	"r": Color("#d7342e"),
+	"r": Color("#d7342e"),   # 占位——宝石实际色按列归属取 GEM_COLORS
 	"w": Color("#ff9d94"),
 }
+## 三宝石主体/闪点色：左蓝（wave_clash 蓝波亮档）/ 中白钻 / 右红（红波亮档）
+const GEM_COLORS: Array[Color] = [
+	Color(0.30, 0.60, 1.00), Color("#e8eef7"), Color(0.95, 0.32, 0.22),
+]
+const GEM_GLINTS: Array[Color] = [
+	Color("#b3e0ff"), Color("#ffffff"), Color("#ffa673"),
+]
 const GEM_SPARKLE := Color("#fff1ef")   # 宝石闪烁帧的高亮色
 
 static var _cache: Dictionary = {}
@@ -144,8 +152,10 @@ static func crown_texture(sparkle_gem: int = -1) -> ImageTexture:
 			if not CROWN_COLORS.has(c):
 				continue
 			var col: Color = CROWN_COLORS[c]
-			if (c == "r" or c == "w") and sparkle_gem == _gem_cluster(rx):
-				col = GEM_SPARKLE
+			if c == "r" or c == "w":
+				var gem := _gem_cluster(rx)
+				col = GEM_SPARKLE if sparkle_gem == gem \
+					else (GEM_GLINTS[gem] if c == "w" else GEM_COLORS[gem])
 			img.set_pixel(rx + PAD, ry + PAD, col)
 	_apply_outline(img)
 	var tex := ImageTexture.create_from_image(img)

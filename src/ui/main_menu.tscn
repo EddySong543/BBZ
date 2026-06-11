@@ -1,9 +1,11 @@
-[gd_scene format=3 uid="uid://c30gewh5owlck"]
+[gd_scene load_steps=5 format=3 uid="uid://c30gewh5owlck"]
 
 [ext_resource type="Script" uid="uid://hq4i5dkrj42d" path="res://src/ui/main_menu.gd" id="1_menu"]
 [ext_resource type="PackedScene" uid="uid://ddiu7ck5le8p3" path="res://src/ui/scenes/menu_background.tscn" id="2_bg"]
+[ext_resource type="Script" path="res://src/ui/components/mode_card.gd" id="3_modecard"]
+[ext_resource type="PackedScene" uid="uid://bhfrm000000000001" path="res://src/ui/components/hero_frame.tscn" id="4_heroframe"]
 
-[node name="MainMenu" type="Control" unique_id=1380324739]
+[node name="MainMenu" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -12,12 +14,12 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_menu")
 
-[node name="Background" parent="." unique_id=1648253891 instance=ExtResource("2_bg")]
+[node name="Background" parent="." instance=ExtResource("2_bg")]
 layout_mode = 1
 mouse_filter = 2
 metadata/_edit_lock_ = true
 
-[node name="UI" type="Control" parent="." unique_id=980088302]
+[node name="UI" type="Control" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -26,83 +28,123 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="ProfileButton" type="Button" parent="UI" unique_id=1412246042]
+[node name="IdentityButton" type="Button" parent="UI"]
 layout_mode = 0
-offset_left = 40.0
-offset_top = 40.0
-offset_right = 400.0
-offset_bottom = 140.0
-text = "个人资料"
+offset_left = 48.0
+offset_top = 32.0
+offset_right = 340.0
+offset_bottom = 124.0
+flat = true
 
-[node name="SettingsButton" type="Button" parent="UI" unique_id=1134874206]
+[node name="AvatarFrame" parent="UI/IdentityButton" instance=ExtResource("4_heroframe")]
+offset_right = 84.0
+offset_bottom = 84.0
+mouse_filter = 2
+portrait_path = "res://assets/sprites/heroes/h01/h01_portrait.png"
+frame_size = Vector2(84, 84)
+
+[node name="NameLabel" type="Label" parent="UI/IdentityButton"]
 layout_mode = 0
-offset_left = 1760.0
-offset_top = 40.0
-offset_right = 1880.0
-offset_bottom = 140.0
+offset_left = 102.0
+offset_top = 10.0
+offset_right = 292.0
+offset_bottom = 46.0
+text = "Eddy"
+mouse_filter = 2
+
+[node name="RankLabel" type="Label" parent="UI/IdentityButton"]
+layout_mode = 0
+offset_left = 102.0
+offset_top = 50.0
+offset_right = 270.0
+offset_bottom = 82.0
+text = "段位 · 未定级"
+horizontal_alignment = 1
+vertical_alignment = 1
+mouse_filter = 2
+
+[node name="SettingsButton" type="Button" parent="UI"]
+layout_mode = 0
+offset_left = 1732.0
+offset_top = 36.0
+offset_right = 1872.0
+offset_bottom = 90.0
 text = "设置"
 
-[node name="TowerButton" type="Button" parent="UI" unique_id=259911884]
+[node name="ModeStory" type="Button" parent="UI"]
 layout_mode = 0
-offset_left = 1360.0
-offset_top = 470.0
-offset_right = 1840.0
-offset_bottom = 590.0
-text = "爬塔模式"
+offset_left = 220.0
+offset_top = 180.0
+offset_right = 660.0
+offset_bottom = 830.0
+script = ExtResource("3_modecard")
+card_title = "故事模式"
+card_subtitle = "英雄列传"
+card_caption = "过去"
+emblem_char = "卷"
 
-[node name="StoryButton" type="Button" parent="UI" unique_id=1942689673]
+[node name="ModeMatch" type="Button" parent="UI"]
 layout_mode = 0
-offset_left = 1360.0
-offset_top = 610.0
-offset_right = 1840.0
-offset_bottom = 730.0
-text = "故事模式"
+offset_left = 720.0
+offset_top = 160.0
+offset_right = 1200.0
+offset_bottom = 850.0
+script = ExtResource("3_modecard")
+card_title = "匹配对战"
+card_subtitle = "1v1 同时盲选对决"
+card_caption = "现在"
+use_crown = true
+title_font_size = 40
 
-[node name="MatchButton" type="Button" parent="UI" unique_id=27347961]
+[node name="ModeTower" type="Button" parent="UI"]
 layout_mode = 0
-offset_left = 1320.0
-offset_top = 790.0
-offset_right = 1840.0
-offset_bottom = 940.0
-text = "匹配对战"
+offset_left = 1260.0
+offset_top = 180.0
+offset_right = 1700.0
+offset_bottom = 830.0
+script = ExtResource("3_modecard")
+card_title = "爬塔模式"
+card_subtitle = "单人连胜挑战"
+card_caption = "未来"
+emblem_char = "塔"
 
-[node name="NavHeroes" type="Button" parent="UI" unique_id=269698226]
+[node name="NavHeroes" type="Button" parent="UI"]
 layout_mode = 0
-offset_left = 50.0
-offset_top = 890.0
-offset_right = 200.0
+offset_left = 64.0
+offset_top = 970.0
+offset_right = 224.0
 offset_bottom = 1040.0
 text = "英雄"
 
-[node name="NavSquad" type="Button" parent="UI" unique_id=277022598]
+[node name="NavSquad" type="Button" parent="UI"]
 layout_mode = 0
-offset_left = 220.0
-offset_top = 890.0
-offset_right = 370.0
+offset_left = 224.0
+offset_top = 970.0
+offset_right = 384.0
 offset_bottom = 1040.0
 text = "小队"
 
-[node name="NavItems" type="Button" parent="UI" unique_id=1172473453]
+[node name="NavItems" type="Button" parent="UI"]
 layout_mode = 0
-offset_left = 390.0
-offset_top = 890.0
-offset_right = 540.0
+offset_left = 384.0
+offset_top = 970.0
+offset_right = 544.0
 offset_bottom = 1040.0
 text = "道具"
 
-[node name="NavShop" type="Button" parent="UI" unique_id=1969062780]
+[node name="NavShop" type="Button" parent="UI"]
 layout_mode = 0
-offset_left = 560.0
-offset_top = 890.0
-offset_right = 710.0
+offset_left = 544.0
+offset_top = 970.0
+offset_right = 704.0
 offset_bottom = 1040.0
 text = "商店"
 
-[node name="ComingSoon" type="Label" parent="UI" unique_id=1322435827]
+[node name="ComingSoon" type="Label" parent="UI"]
 layout_mode = 0
 offset_left = 560.0
-offset_top = 440.0
+offset_top = 110.0
 offset_right = 1360.0
-offset_bottom = 530.0
+offset_bottom = 170.0
 horizontal_alignment = 1
 vertical_alignment = 1
