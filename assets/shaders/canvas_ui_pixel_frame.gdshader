@@ -20,7 +20,8 @@ group_uniforms shape;
 uniform float pixel_grid : hint_range(12.0, 200.0) = 24.0; // 像素格数(框宽高，越大格越细)
 uniform float border_px : hint_range(1.0, 6.0) = 2.0;      // 中层边框宽(像素格)
 uniform float noise_amt : hint_range(0.0, 0.2) = 0.06;     // 像素噪点质感
-uniform float corner_radius : hint_range(0.0, 0.4) = 0.0;  // 圆角半径(UV比例,0=直角)；像素台阶圆角
+uniform float corner_radius : hint_range(0.0, 0.4) = 0.0;  // 圆角半径(高度UV比例,0=直角)；像素台阶圆角
+uniform float aspect : hint_range(0.1, 10.0) = 1.0;        // 宽/高比：非方形节点圆角等圆修正(1=方形,旧调用不受影响)
 group_uniforms;
 
 // 大框增质三件套（2026-06-11 反"毛坯房"·默认全关=旧效果逐位一致，battle 小头像框不受影响）
@@ -37,18 +38,6 @@ float hash(vec2 p) {
 	return fract(p.x * p.y);
 }
 
-// 像素台阶圆角遮罩：角落圆弧外 → 0(切掉)。rr=UV比例半径, pg=量化格数。
-float corner_round_alpha(vec2 uv, float rr, float pg) {
-	if (rr <= 0.0) return 1.0;
-	vec2 q = (floor(uv * pg) + 0.5) / pg;     // 像素格中心
-	vec2 cc = min(q, vec2(1.0) - q);          // 到最近横/纵边距
-	vec2 corner = vec2(rr) - cc;              // 进入角落 rr 区的深度
-	if (corner.x > 0.0 && corner.y > 0.0 && length(corner) > rr) {
-		return 0.0;
-	}
-	return 1.0;
-}
-
 void fragment() {
 	float pg = pixel_grid;
 	vec2 cell = floor(UV * pg);
@@ -59,6 +48,21 @@ void fragment() {
 	float dt = cell.y;
 	float db = pg - 1.0 - cell.y;
 	float edge_dist = min(min(dl, dr), min(dt, db));
+
+	// 圆角(像素台阶)：角落 rr 区内边距改用圆弧径向距离 → 边框三层沿圆弧转过去
+	// （只切 mask 会露出"被啃掉的黑角"，边框线必须包弧）。圆弧外 → 整体切掉。
+	// 非方形修正：x 距离乘 aspect 换算到以高度为基准的等比空间，防竖牌椭圆角。
+	float corner_cut = 1.0;
+	if (corner_radius > 0.0) {
+		vec2 q = (cell + vec2(0.5)) / pg;     // 像素格中心
+		vec2 cc = vec2(min(q.x, 1.0 - q.x) * aspect, min(q.y, 1.0 - q.y));
+		vec2 cv = vec2(corner_radius) - cc;   // 进入角落 rr 区的深度
+		if (cv.x > 0.0 && cv.y > 0.0) {
+			float rd = (corner_radius - length(cv)) * pg;  // 圆弧内侧径向边距(折算成格)
+			corner_cut = step(0.0, rd);
+			edge_dist = rd;
+		}
+	}
 
 	vec4 col = vec4(0.0);  // 中心透明 → 头像/底色透出
 
@@ -104,8 +108,8 @@ void fragment() {
 	// 像素噪点质感(透明处 col=0 不受影响)
 	col.rgb *= 1.0 + (hash(cell) - 0.5) * noise_amt;
 
-	// 圆角：切掉角落像素 → 去除尖锐直角
-	col.a *= corner_round_alpha(UV, corner_radius, pg);
+	// 圆角：圆弧外整体切掉（边框分层已在上方沿弧重算）
+	col.a *= corner_cut;
 
 	COLOR = col * COLOR;  // 乘 incoming COLOR(携带 modulate) → 跟随父节点变暗(需节点 color=白)
 }

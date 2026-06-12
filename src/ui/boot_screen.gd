@@ -46,6 +46,7 @@ var _title: TitleLogo
 
 
 func _ready() -> void:
+	PixelGlyphs.preheat()   # icon/王冠预热：缓存全量生成 + 字形可渲染冒烟检查
 	_mat = _wave.material as ShaderMaterial
 	_update_aspect()
 	get_viewport().size_changed.connect(_update_aspect)

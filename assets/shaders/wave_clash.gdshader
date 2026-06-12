@@ -43,6 +43,11 @@ uniform float burst : hint_range(0.0, 1.5) = 0.0;
 uniform float ripple : hint_range(0.0, 1.0) = 0.0;  // 初撞涟漪：两道竖直亮带自 clash_pos 向左右荡开
 uniform vec2 shake = vec2(0.0);
 
+// 像素台阶圆角遮罩（ModeCard 卡面用·默认 0=关，boot 全屏不受影响 2026-06-12）。
+// ⚠ Godot clip_children 不执行父节点自定义 shader → 圆角必须由本层自切。
+uniform float corner_radius : hint_range(0.0, 0.4) = 0.0;  // 半径(高度UV比例)
+uniform float corner_grid : hint_range(12.0, 200.0) = 88.0; // 台阶量化格数(与框 shader 对齐)
+
 // Bayer 4x4 有序抖动矩阵（值 0..15，用于档位边界棋盘交错）
 const float BAYER[16] = float[16](
 	 0.0,  8.0,  2.0, 10.0,
@@ -176,5 +181,15 @@ void fragment() {
 	float side = step(cuv.x - clash_pos, 0.0);
 	vec3 col = mix(red_color_at(L), blue_color_at(L), side);
 
-	COLOR = vec4(col, 1.0);
+	float a = 1.0;
+	if (corner_radius > 0.0) {
+		// 像素台阶圆角：x 距离乘 aspect 折算到高度等比空间（防椭圆角），圆弧外切掉
+		vec2 q = (floor(UV * corner_grid) + vec2(0.5)) / corner_grid;
+		vec2 cc = vec2(min(q.x, 1.0 - q.x) * aspect, min(q.y, 1.0 - q.y));
+		vec2 cv = vec2(corner_radius) - cc;
+		if (cv.x > 0.0 && cv.y > 0.0 && length(cv) > corner_radius) {
+			a = 0.0;
+		}
+	}
+	COLOR = vec4(col, a);
 }

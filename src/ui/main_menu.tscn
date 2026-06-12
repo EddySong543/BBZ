@@ -112,6 +112,7 @@ card_title = "匹配对战"
 card_subtitle = "1v1 同时盲选对决"
 card_caption = "现在"
 use_crown = true
+art_wave_clash = true
 title_font_size = 40
 
 [node name="ModeTower" type="Button" parent="UI"]
@@ -121,10 +122,10 @@ offset_top = 180.0
 offset_right = 1700.0
 offset_bottom = 830.0
 script = ExtResource("3_modecard")
-card_title = "爬塔模式"
-card_subtitle = "单人连胜挑战"
+card_title = "远征"
+card_subtitle = "单人闯关挑战"
 card_caption = "未来"
-emblem_char = "塔"
+emblem_char = "征"
 
 [node name="NavHeroes" type="Button" parent="UI"]
 layout_mode = 0
@@ -134,27 +135,19 @@ offset_right = 224.0
 offset_bottom = 1040.0
 text = "英雄"
 
-[node name="NavSquad" type="Button" parent="UI"]
+[node name="NavItems" type="Button" parent="UI"]
 layout_mode = 0
 offset_left = 224.0
 offset_top = 970.0
 offset_right = 384.0
 offset_bottom = 1040.0
-text = "小队"
-
-[node name="NavItems" type="Button" parent="UI"]
-layout_mode = 0
-offset_left = 384.0
-offset_top = 970.0
-offset_right = 544.0
-offset_bottom = 1040.0
 text = "道具"
 
 [node name="NavShop" type="Button" parent="UI"]
 layout_mode = 0
-offset_left = 544.0
+offset_left = 384.0
 offset_top = 970.0
-offset_right = 704.0
+offset_right = 544.0
 offset_bottom = 1040.0
 text = "商店"
 

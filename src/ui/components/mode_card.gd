@@ -11,6 +11,13 @@ extends Button
 ## 用法：Button 节点挂本脚本，设置 card_title/card_subtitle/card_caption + emblem_char 或 use_crown。
 
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")
+const WAVE_CLASH_SHADER := preload("res://assets/shaders/wave_clash.gdshader")
+const ROUNDED_FILL_SHADER := preload("res://assets/shaders/canvas_ui_rounded_fill.gdshader")
+
+## 圆角半径（高度 UV 比例·≈29px@650 高牌=纵向 4 台阶·像素台阶圆角，2026-06-12 Eddy 批）。
+## 框 shader 与衬底遮罩共用此值+同 pixel_grid/aspect → 台阶逐格对齐。
+## 0.03 实测台阶只有 2-3 级，读成"缺角"而非圆角 → 0.045。
+const CORNER_RADIUS := 0.045
 
 # battle screen 框语言（hero_frame 同源）
 const EDGE_OUTER := Color(0.05, 0.05, 0.06)
@@ -48,6 +55,9 @@ const EMBLEM_COL := Color(0.667, 0.706, 0.769, 0.85)
 		if _emblem:
 			_emblem.text = v
 @export var use_crown: bool = false
+## 牌面美术 = 活的蓝红对波（boot wave_clash 同 shader 低速常燃·匹配对战卡专属）。
+## 与静态贴图美术互斥；故事/爬塔卡走贴图槽（美术就绪后替换纹章）。
+@export var art_wave_clash: bool = false
 @export var title_font_size: int = 32
 ## 悬停/焦点放大倍率（高亮+放大=悬停专属效果）。
 @export_range(1.0, 1.2) var hover_grow: float = 1.05
@@ -55,7 +65,16 @@ const EMBLEM_COL := Color(0.667, 0.706, 0.769, 0.85)
 @export_range(0.1, 0.3) var band_ratio: float = 0.19
 
 var _backing: ColorRect
+var _backing_mat: ShaderMaterial     # 圆角遮罩（外层·full rect）
 var _fill: ColorRect
+var _fill_mat: ShaderMaterial        # 圆角遮罩（内层·inset 4px 同心弧）
+var _art: ColorRect = null           # 对波美术层（_fill 之上 / 框线之下）
+var _art_mat: ShaderMaterial = null
+var _art_phase_l: float = 0.0
+var _art_phase_r: float = 0.37       # 错相起步：左右波不同步更像两军各自涌
+var _art_time: float = 0.0
+var _art_speed: float = 1.0          # 对波速率倍率（匹配中"临战升温"渐升至 READY 档）
+var _ready_tw: Tween                 # 升温/回落渐变
 var _frame: ColorRect
 var _frame_mat: ShaderMaterial
 var _inner_lines: Array[ColorRect] = []
@@ -72,7 +91,9 @@ var _crown: TextureRect
 var _hot: bool = false
 var _tw: Tween
 
-# ---- 牌背模式（匹配中=盖牌等对手·主菜单匹配动画用）----
+# ---- 牌背模式（盖牌+王冠呼吸）----
+# ⚠ 2026-06-12 起主菜单匹配不再翻面（改 set_battle_ready 临战升温——对波卡面
+# 翻成静态王冠=出戏）。API 保留给未来联机场景（断线重连/观战盖牌等）。
 var _face_down: bool = false
 var _gold_locked: bool = false       # 牌背期间金框常驻（不随鼠标进出变化）
 var _crown_scale: float = 6.0        # 王冠纹章倍率：正面 ×6 / 牌背 ×4
@@ -99,8 +120,32 @@ func _ready() -> void:
 
 
 func _build() -> void:
+	# 圆角=三层各自按像素台阶自切（backing/fill 用 rounded_fill、art 用 wave_clash
+	# 内置遮罩、框线在 frame shader 内沿弧重算）。⚠ 不能用 clip_children 统一裁：
+	# Godot 的 clip mask 不执行父节点自定义 shader → 子层直角会从弧外露出（实测踩坑）。
 	_backing = _rect(EDGE_OUTER)
+	_backing_mat = ShaderMaterial.new()
+	_backing_mat.shader = ROUNDED_FILL_SHADER
+	_backing.material = _backing_mat
 	_fill = _rect(FILL_COLD)
+	_fill_mat = ShaderMaterial.new()
+	_fill_mat.shader = ROUNDED_FILL_SHADER
+	_fill.material = _fill_mat
+	# 对波美术层：boot wave_clash 同 shader，低速"常燃"参数（无大波推进/无爆发，
+	# 仅双侧小波涌入 + 中央僵持微光柱）——主菜单里的一张活的对局预告。
+	if art_wave_clash and not Engine.is_editor_hint():
+		_art = _rect(Color.WHITE)
+		_art_mat = ShaderMaterial.new()
+		_art_mat.shader = WAVE_CLASH_SHADER
+		_art_mat.set_shader_parameter("clash_pos", 0.5)
+		_art_mat.set_shader_parameter("cells_x", 48.0)
+		_art_mat.set_shader_parameter("intensity", 0.85)
+		_art_mat.set_shader_parameter("pulse_amp", 0.0)
+		_art_mat.set_shader_parameter("center_amp", 0.30)
+		_art_mat.set_shader_parameter("wave_amp", 0.42)
+		_art_mat.set_shader_parameter("levels", 40)
+		_art_mat.set_shader_parameter("dither_amt", 1.0)
+		_art.material = _art_mat
 	_frame = _rect(Color.WHITE)
 	_frame_mat = ShaderMaterial.new()
 	_frame_mat.shader = FRAME_SHADER
@@ -138,6 +183,9 @@ func _build() -> void:
 		_crown.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		_crown.stretch_mode = TextureRect.STRETCH_SCALE
 		_crown.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# 正面不放王冠（2026-06-12 Eddy：对波卡面自明，王冠多余）——
+		# 王冠只在牌背出现（盖牌图记+匹配中呼吸+found_flash 闪金）。
+		_crown.visible = false
 		add_child(_crown)
 
 	if not Engine.is_editor_hint():
@@ -145,6 +193,13 @@ func _build() -> void:
 		FontManager.apply(_title, title_font_size)
 		FontManager.apply(_sub, 16)
 		FontManager.apply(_emblem, 96)
+	# 对波美术上的文字需描边压亮浪；名牌带加深保住标题可读
+	if _art:
+		for lbl: Label in [_cap, _title, _sub]:
+			lbl.add_theme_constant_override("outline_size", 2)
+			lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 0.9))
+		_band.color = Color(0.0, 0.0, 0.0, 0.55)
+	set_process(_art != null)
 
 
 ## 牌面布局：全部按当前 size 计算（.tscn 改 offsets 即所见即所得）。
@@ -156,9 +211,32 @@ func _layout() -> void:
 	_backing.size = size
 	_fill.position = Vector2(4, 4)
 	_fill.size = size - Vector2(8, 8)
+	if _art:
+		_art.position = _fill.position
+		_art.size = _fill.size
+		_art_mat.set_shader_parameter("aspect", _art.size.x / maxf(_art.size.y, 1.0))
 	_frame.position = Vector2.ZERO
 	_frame.size = size
-	_frame_mat.set_shader_parameter("pixel_grid", size.x / 5.0)
+	# 圆角参数：外层（框/衬底）共用同值同格 → 台阶逐格对齐；内层（fill/art·inset 4px）
+	# 用同心弧换算半径（外弧半径 - 4px），被框 outer 暗层盖住台阶差
+	var card_aspect := size.x / maxf(size.y, 1.0)
+	var grid := size.x / 5.0
+	_frame_mat.set_shader_parameter("pixel_grid", grid)
+	_frame_mat.set_shader_parameter("corner_radius", CORNER_RADIUS)
+	_frame_mat.set_shader_parameter("aspect", card_aspect)
+	_backing_mat.set_shader_parameter("pixel_grid", grid)
+	_backing_mat.set_shader_parameter("corner_radius", CORNER_RADIUS)
+	_backing_mat.set_shader_parameter("aspect", card_aspect)
+	var inner_h := maxf(size.y - 8.0, 1.0)
+	var inner_rr := (CORNER_RADIUS * size.y - 4.0) / inner_h
+	var inner_asp := (size.x - 8.0) / inner_h
+	var inner_grid := (size.x - 8.0) / 5.0
+	_fill_mat.set_shader_parameter("pixel_grid", inner_grid)
+	_fill_mat.set_shader_parameter("corner_radius", inner_rr)
+	_fill_mat.set_shader_parameter("aspect", inner_asp)
+	if _art_mat:
+		_art_mat.set_shader_parameter("corner_radius", inner_rr)
+		_art_mat.set_shader_parameter("corner_grid", inner_grid)
 
 	# 内细线框
 	var inset := 18.0
@@ -248,8 +326,56 @@ func _apply_palette() -> void:
 		cs.color = Color(inner, 0.90)
 
 
+## 对波美术驱动：双侧小波各自累积相位（速率微差→不同步）+ 纵向漂浮。
+## 仅 art_wave_clash 卡开 process；牌背期间美术隐藏但相位继续走（翻回不跳变）。
+## _art_speed=临战升温倍率（set_battle_ready 渐变驱动，常态 1.0）。
+func _process(delta: float) -> void:
+	if _art_mat == null:
+		return
+	_art_phase_l += delta * 0.085 * _art_speed
+	_art_phase_r += delta * 0.097 * _art_speed
+	_art_time += delta * 1.2 * _art_speed
+	_art_mat.set_shader_parameter("phase_l", _art_phase_l)
+	_art_mat.set_shader_parameter("phase_r", _art_phase_r)
+	_art_mat.set_shader_parameter("wave_time", _art_time)
+
+
+## 临战升温（匹配中状态·2026-06-12 取代翻面盖牌——把全场最活的卡翻成静态王冠=出戏）：
+## on=波速渐升 ×3 + 中央僵持光柱上探 + 整卡亮度微升 + 金框常驻 ——"两军开始集结"；
+## off=各参数缓落回常燃档。文案切换由调用方（main_menu）负责。
+func set_battle_ready(on: bool) -> void:
+	if _art_mat == null:
+		return
+	_gold_locked = on
+	# 升温期间抑制悬停缩放（金框已常驻·放大会盖住下方取消钮）：归位并复位 hot 态
+	if on:
+		_hot = false
+		z_index = 0
+		if _tw and _tw.is_valid():
+			_tw.kill()
+		_tw = create_tween()
+		_tw.tween_property(self, "scale", Vector2.ONE, 0.18)\
+			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_apply_palette()
+	if _ready_tw and _ready_tw.is_valid():
+		_ready_tw.kill()
+	_ready_tw = create_tween().set_parallel(true)
+	_ready_tw.tween_property(self, "_art_speed", 3.0 if on else 1.0, 1.2)\
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_tween_art_param("center_amp", 0.55 if on else 0.30, 1.2)
+	_tween_art_param("intensity", 1.0 if on else 0.85, 1.2)
+	_tween_art_param("wave_amp", 0.50 if on else 0.42, 1.2)
+
+
+func _tween_art_param(param: String, to: float, dur: float) -> void:
+	var from: float = _art_mat.get_shader_parameter(param)
+	_ready_tw.tween_method(
+		func(v: float) -> void: _art_mat.set_shader_parameter(param, v),
+		from, to, dur).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+
 func _set_hot(hot: bool) -> void:
-	if disabled or _face_down:
+	if disabled or _face_down or _gold_locked:
 		return
 	if _hot == hot:
 		return
@@ -313,9 +439,25 @@ func flip_face(down: bool) -> void:
 		_start_back_anims()
 
 
-## 匹配成功一拍：王冠闪金 + 牌体弹震（屏幕轻震由 main_menu 负责）。
+## 匹配成功一拍：对波真撞一次（撞闪 + 竖直涟漪荡开 + 波速尖峰）+ 牌体弹震
+## （屏幕轻震由 main_menu 负责）。卡里的战争打响 → 波幕转场进 BP 叙事连贯。
 func found_flash() -> void:
 	_stop_back_anims()
+	if _ready_tw and _ready_tw.is_valid():
+		_ready_tw.kill()
+	if _art_mat:
+		var t := create_tween().set_parallel(true)
+		t.tween_method(
+			func(v: float) -> void: _art_mat.set_shader_parameter("hit_flash", v),
+			1.0, 0.0, 0.4)
+		# 初撞涟漪：两道竖直亮带自中央荡开（boot 同语言）
+		t.tween_method(
+			func(v: float) -> void: _art_mat.set_shader_parameter("ripple", v),
+			0.0, 1.0, 0.5)
+		# 波速尖峰后缓落（撞击的余势）
+		_art_speed = 5.0
+		t.tween_property(self, "_art_speed", 1.0, 0.8)\
+			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	if _crown:
 		_crown.modulate = Color(2.2, 2.2, 1.5)
 		var tc := create_tween()
@@ -334,6 +476,10 @@ func found_flash() -> void:
 func _apply_face() -> void:
 	_cap.visible = not _face_down and card_caption != ""
 	_emblem.visible = not _face_down and emblem_char != ""
+	if _art:
+		_art.visible = not _face_down   # 牌背=安静深色面（呼吸王冠是主角）
+	if _crown:
+		_crown.visible = _face_down     # 王冠=牌背专属（正面已撤 2026-06-12）
 	_crown_scale = 4.0 if _face_down else 6.0
 	_layout()
 
@@ -366,11 +512,11 @@ func _stop_back_anims() -> void:
 
 # ── 节点工厂 ──
 
-func _rect(col: Color) -> ColorRect:
+func _rect(col: Color, parent: Control = null) -> ColorRect:
 	var r := ColorRect.new()
 	r.color = col
 	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(r)
+	(parent if parent != null else self).add_child(r)
 	return r
 
 

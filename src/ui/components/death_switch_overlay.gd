@@ -95,7 +95,7 @@ func _create_frame_entry(h: HeroData, hp: float, slot: int, pcolor: Color) -> Co
 	frame.gui_input.connect(_on_frame_input.bind(slot))
 
 	var name_lbl := Label.new()
-	name_lbl.text = "【%s】" % h.hero_name
+	name_lbl.text = h.hero_name
 	name_lbl.position = Vector2(0, FRAME_SIZE + 6.0)
 	name_lbl.size = Vector2(FRAME_SIZE, 22)
 	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

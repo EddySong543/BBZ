@@ -5,14 +5,15 @@ extends Control
 ## 中央 = 三张命运牌（ModeCard）：故事(过去) / 匹配对战(现在·稍大) / 爬塔(未来)。
 ##   高亮(金框)+放大 = 悬停/焦点专属效果（ModeCard 内实现），不属于某张固定的牌。
 ## 边缘件：顶左身份带(头像框+名字+段位占位=资料入口) / 顶右设置(icon锚位) /
-##   底坞 英雄|小队|道具|商店(icon锚位+字·未来收集层入口)。
+##   底坞 英雄(图鉴·已实装)|道具|商店(icon锚位+字·未来收集层入口；小队已删 2026-06-12)。
 ## 现仅「匹配对战」接入实际流程（→ bp_screen → 战斗），其余占位（点击弹"敬请期待"）。
 ## ⚠️ 历史否决（勿再走）：海面化 / 星空压暗 / 中央大物或留白 / 公告卡 / 今日一抽（第七轮裁掉）。
 
 const BP_SCENE := "res://src/ui/bp_screen.tscn"
 
-# ---- 匹配状态机（盖牌等对手·2026-06-11 Eddy 批：正计时+轻震屏）----
-# IDLE 点牌=开始匹配；SEARCHING 再点牌/ESC=取消；FOUND 锁输入等转场。
+# ---- 匹配状态机（临战升温·2026-06-12 改版：翻面盖牌废弃——对波卡面是全场最活的
+# 东西，翻成静态王冠=出戏。匹配中改为卡面对波升温备战，取消把手独立成钮）----
+# IDLE 点牌=开始匹配；SEARCHING 再点牌/ESC/取消钮=取消；FOUND 锁输入等转场。
 # 本地用 mock_match_seconds 定时模拟匹配成功；联机时把定时器换成真匹配回调，状态机原样复用。
 enum MatchState { IDLE, SEARCHING, FOUND }
 
@@ -24,7 +25,7 @@ const MATCH_SUB := "1v1 同时盲选对决"
 
 var _match_state: int = MatchState.IDLE
 var _search_elapsed: float = 0.0
-var _flipping: bool = false   # 翻面动画进行中=忽略点击（防连点打断）
+var _cancel_btn: Button   # 匹配中才出现的「✕ 取消匹配」（_setup_modes 建·常态隐藏）
 
 ## 小件像素底板（设置/段位徽章用，钢蓝档；牌面金色只出现在悬停态）。
 const JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")
@@ -112,13 +113,76 @@ func _setup_settings() -> void:
 func _setup_modes() -> void:
 	($UI/ModeMatch as Button).pressed.connect(_on_match_pressed)
 	($UI/ModeStory as Button).pressed.connect(_on_placeholder_pressed.bind("故事模式"))
-	($UI/ModeTower as Button).pressed.connect(_on_placeholder_pressed.bind("爬塔模式"))
+	($UI/ModeTower as Button).pressed.connect(_on_placeholder_pressed.bind("远征"))   # 原爬塔模式·2026-06-12 改名
+	_build_cancel_button()
 
 
-## 底坞：四个入口连排成一根坞条（深色底+icon 锚位+字+段间分隔线）。
+## 「✕ 取消匹配」独立小钮（匹配中才出现·中牌正下方居中）——取消把手必须可见可点，
+## 不再挤在副标小字里（2026-06-12 Eddy："取消匹配感觉不明显"根修）。
+func _build_cancel_button() -> void:
+	var card := $UI/ModeMatch as Control
+	_cancel_btn = Button.new()
+	_cancel_btn.name = "CancelMatchButton"
+	_cancel_btn.text = "✕ 取消匹配"
+	var btn_size := Vector2(220, 52)
+	_cancel_btn.position = Vector2(
+		card.position.x + (card.size.x - btn_size.x) * 0.5,
+		card.position.y + card.size.y + 16.0)
+	_cancel_btn.size = btn_size
+	for s in ["normal", "hover", "pressed", "focus", "disabled"]:
+		_cancel_btn.add_theme_stylebox_override(s, StyleBoxEmpty.new())
+	FontManager.apply_btn(_cancel_btn, 22)
+	_cancel_btn.add_theme_color_override("font_color", Color("#e86060"))
+	_cancel_btn.add_theme_color_override("font_hover_color", Color("#ff8a7a"))
+	# 红描边 + 深底（图鉴返回钮同范式·装饰必须 IGNORE 防吞点击）
+	var edge := ColorRect.new()
+	edge.color = Color(0.83, 0.30, 0.27, 0.65)
+	edge.show_behind_parent = true
+	edge.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	edge.offset_left = -2
+	edge.offset_top = -2
+	edge.offset_right = 2
+	edge.offset_bottom = 2
+	edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cancel_btn.add_child(edge)
+	var backing := ColorRect.new()
+	backing.color = Color(0.08, 0.05, 0.06, 0.94)
+	backing.show_behind_parent = true
+	backing.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cancel_btn.add_child(backing)
+	_cancel_btn.visible = false
+	_cancel_btn.pressed.connect(_on_cancel_btn_pressed)
+	_attach_juice(_cancel_btn)
+	$UI.add_child(_cancel_btn)
+
+
+func _on_cancel_btn_pressed() -> void:
+	if _match_state == MatchState.SEARCHING:
+		_cancel_search()
+
+
+## 取消钮显隐：出现=淡入上浮；收起=即时隐藏（取消瞬间不该有残影挡点击）。
+func _show_cancel_button(on: bool) -> void:
+	var home_y: float = ($UI/ModeMatch as Control).position.y + ($UI/ModeMatch as Control).size.y + 16.0
+	if not on:
+		_cancel_btn.visible = false
+		_cancel_btn.position.y = home_y
+		return
+	_cancel_btn.visible = true
+	_cancel_btn.modulate.a = 0.0
+	_cancel_btn.position.y = home_y + 14.0
+	var tw := create_tween().set_parallel(true)
+	tw.tween_property(_cancel_btn, "modulate:a", 1.0, 0.25)
+	tw.tween_property(_cancel_btn, "position:y", home_y, 0.3)\
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+
+## 底坞：三个入口连排成一根坞条（深色底+icon 锚位+字+段间分隔线）。
+## 「小队」已删（2026-06-12 Eddy）；「英雄」接英雄图鉴，道具/商店仍占位。
 func _setup_dock() -> void:
 	var navs: Array = [
-		[$UI/NavHeroes, "英雄", "hero"], [$UI/NavSquad, "小队", "flag"],
+		[$UI/NavHeroes, "英雄", "hero"],
 		[$UI/NavItems, "道具", "potion"], [$UI/NavShop, "商店", "coin"],
 	]
 	for i in navs.size():
@@ -155,8 +219,18 @@ func _setup_dock() -> void:
 			sp.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			btn.add_child(sp)
 		_add_icon(btn, Rect2(30, 19, 32, 32), navs[i][2])
-		btn.pressed.connect(_on_placeholder_pressed.bind(navs[i][1]))
+		if btn == $UI/NavHeroes:
+			btn.pressed.connect(_on_heroes_pressed)   # 英雄图鉴（2026-06-12 实装）
+		else:
+			btn.pressed.connect(_on_placeholder_pressed.bind(navs[i][1]))
 		_attach_juice(btn)
+
+
+## 英雄图鉴入口：波幕转场（menu↔bp 同语言）。匹配中不离队。
+func _on_heroes_pressed() -> void:
+	if _match_state != MatchState.IDLE:
+		return
+	TransitionManager.transition_to("res://src/ui/hero_gallery_screen.tscn")
 
 
 # ============================================================
@@ -201,7 +275,7 @@ func _animate_in() -> void:
 	var order: Array = [
 		$UI/ModeMatch, $UI/ModeStory, $UI/ModeTower,
 		$UI/IdentityButton, $UI/QuitButton, $UI/SettingsButton,
-		$UI/NavHeroes, $UI/NavSquad, $UI/NavItems, $UI/NavShop,
+		$UI/NavHeroes, $UI/NavItems, $UI/NavShop,
 	]
 	var step := 0.0
 	for n in order:
@@ -222,67 +296,64 @@ func _animate_in() -> void:
 
 
 func _on_match_pressed() -> void:
-	if _flipping:
-		return
 	match _match_state:
 		MatchState.IDLE:
 			_start_search()
 		MatchState.SEARCHING:
-			_cancel_search()
+			_cancel_search()   # 点卡仍可取消（取消钮是主把手，这是顺手路径）
 		MatchState.FOUND:
 			pass   # 成功一拍期间锁输入，等波幕转场接管
 
 
-## ESC 取消匹配（与再点牌等价）。
+## ESC 取消匹配（与取消钮/再点牌等价）。
 func _unhandled_input(event: InputEvent) -> void:
-	if _match_state == MatchState.SEARCHING and not _flipping \
-			and event.is_action_pressed("ui_cancel"):
+	if _match_state == MatchState.SEARCHING and event.is_action_pressed("ui_cancel"):
 		_cancel_search()
 
 
 # ============================================================
-# 匹配状态机：盖牌(翻背) → 呼吸等待+正计时 → 成功一拍 → 波幕转场
+# 匹配状态机：临战升温（对波加速备战）+正计时 → 对撞一拍 → 波幕转场
 # ============================================================
 
 func _start_search() -> void:
 	_match_state = MatchState.SEARCHING
 	_search_elapsed = 0.0
 	_set_side_cards_enabled(false)
-	_flipping = true
-	await _match_card.flip_face(true)
-	_flipping = false
+	_match_card.set_battle_ready(true)
 	_match_card.card_title = "匹配中"
-	_match_card.card_subtitle = "0:00　✕ 点击取消"
+	_match_card.card_subtitle = "0:00"
+	_show_cancel_button(true)
 
 
 func _cancel_search() -> void:
 	_match_state = MatchState.IDLE
-	_flipping = true
-	await _match_card.flip_face(false)
-	_flipping = false
+	_match_card.set_battle_ready(false)
 	_match_card.card_title = MATCH_TITLE
 	_match_card.card_subtitle = MATCH_SUB
+	_show_cancel_button(false)
 	_set_side_cards_enabled(true)
 
 
 ## 匹配中每帧：标题省略号逐点（0.5s/点）+ 副标正计时每秒跳；到时触发成功。
 func _process(delta: float) -> void:
-	if _match_state != MatchState.SEARCHING or _flipping:
+	if _match_state != MatchState.SEARCHING:
 		return
 	_search_elapsed += delta
 	var dots := int(_search_elapsed * 2.0) % 4
 	_match_card.card_title = "匹配中" + ".".repeat(dots)
 	var secs := int(_search_elapsed)
-	_match_card.card_subtitle = "%d:%02d　✕ 点击取消" % [floori(secs / 60.0), secs % 60]
+	_match_card.card_subtitle = "%d:%02d" % [floori(secs / 60.0), secs % 60]
 	if _search_elapsed >= mock_match_seconds:
 		_on_match_found()
 
 
-## 成功一拍（~0.45s）：牌弹震+王冠闪金（ModeCard）+ 屏幕轻震 → 波幕转场进 BP。
+## 成功一拍（~0.45s）：对波真撞一次（ModeCard.found_flash：撞闪+涟漪+波速尖峰）
+## + 屏幕轻震 → 波幕转场进 BP——卡里的战争打响，与进 BP 叙事连贯。
 func _on_match_found() -> void:
 	_match_state = MatchState.FOUND
 	_match_card.card_title = "对手已找到！"
 	_match_card.card_subtitle = ""
+	_show_cancel_button(false)
 	_match_card.found_flash()
 	_shake_screen()
 	await get_tree().create_timer(0.45).timeout

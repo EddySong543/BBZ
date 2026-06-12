@@ -1,0 +1,649 @@
+extends Control
+
+## 英雄图鉴 v2（2026-06-12 Eddy 改版：列表左 / 详情右常驻，弃中央浮窗）。
+## 左 = 46 卡八列网格（BP 牌库同缩放 0.846·同语言霜玻璃）；点卡=选中（金框）。
+## 右 = 常驻详情板（像素框）：**idle 动画实时播放**（sprite_frames 同战斗资源）+
+##      名字 / 主题归属 / ❤生命 + 主(红)/被(蓝)标签 + 技能名 + 技能详述。
+## ←/→ 环绕换人（↑/↓ = ±一行），ESC / 返回钮 → 波幕转场回主菜单。
+## ⚠ 返回钮的装饰 ColorRect 必须 mouse_filter=IGNORE——v1 的描边矩形默认 STOP
+##   吞掉了点击导致"返回失效"（2026-06-12 修）。
+
+const HERO_CARD_SCENE := preload("res://src/ui/components/hero_card.tscn")
+const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")
+const HEART_SHEET := preload("res://assets/ui/icons/heart_idle.png")
+
+const HERO_DATA_DIR := "res://assets/data/heroes/"
+const MENU_SCENE := "res://src/ui/main_menu.tscn"
+
+# ── 左侧牌库网格（46 卡 0.846 缩放=110×134·八列六行）──
+const CARD_SCALE := 0.846
+const POOL := Rect2(60, 140, 1032, 900)
+const COLS := 8
+const STEP_X := 121.0
+const ROW_H := 142.0
+const X0 := 97.0
+const ROW_Y0 := 186.0
+
+# ── 右侧详情板 ──
+const PANEL := Rect2(1132, 140, 728, 900)
+
+# 配色（battle 框语言·bp 同源）
+const EDGE_OUTER := Color(0.05, 0.05, 0.06)
+const EDGE_MID := Color(0.65, 0.67, 0.71)
+const EDGE_INNER := Color(0.34, 0.36, 0.39)
+const GOLD_TEXT := Color("#f4c84b")
+const TIN_DIM := Color("#aab4c4")
+const ACTIVE_TAG := Color("#d24a44")    # 主动=赤红（进攻）
+const PASSIVE_TAG := Color("#5a7fa8")   # 被动=黛蓝（恒常）
+
+# 三牌系主题色（图例带/卡顶线/详情衬光共用·2026-06-12 去毛坯批）
+const THEME_TEAL := Color(0.36, 0.72, 0.62)     # 十二生肖
+const THEME_GOLD := Color(0.957, 0.784, 0.294)  # 大阿卡那（=GOLD_TEXT）
+const THEME_PURPLE := Color(0.64, 0.52, 0.86)   # 十二星座
+
+# 顶带「典籍牌匾」落位
+const PLAQUE := Rect2(800, 26, 320, 64)
+
+var all_heroes: Array[HeroData] = []
+var card_cards: Array[HeroCard] = []
+var _sel_idx: int = -1
+
+# 详情板部件（_build_detail_panel 一次建好）
+var _d_anim: AnimatedSprite2D
+var _d_fallback: TextureRect      # 无 idle 资源时的静态头像兜底
+var _d_name: Label
+var _d_theme: Label
+var _d_hp_num: Label
+var _d_tag: Label
+var _d_tag_bg: ColorRect
+var _d_skill_name: Label
+var _d_detail: Label
+var _d_watermark: Label           # 舞台大编号水印（格斗选人语言·极淡）
+var _d_glow: TextureRect          # 立绘背后主题色径向衬光（modulate=三系色）
+var _d_chip1_edge: ColorRect      # 编号章（No.XX）
+var _d_chip1_fill: ColorRect
+var _d_chip1_lbl: Label
+var _d_chip2_edge: ColorRect      # 生命章（❤+数字）
+var _d_chip2_fill: ColorRect
+var _d_hp_heart: TextureRect
+var _row_glow: ColorRect          # 左网格选中行微亮条（键盘导航定位）
+
+@onready var pool_area: Control = $PoolArea
+@onready var detail_area: Control = $DetailArea
+@onready var back_btn: Button = $TopBand/BackButton
+@onready var title_lbl: Label = $TopBand/Title
+
+
+func _ready() -> void:
+	all_heroes = HeroData.create_pool_heroes(HERO_DATA_DIR)
+	_setup_top()
+	_build_pool()
+	_build_detail_panel()
+	_select(0)
+	_play_intro()
+
+
+func _setup_top() -> void:
+	_build_plaque()
+	_build_collect_badge()
+
+	FontManager.apply_btn(back_btn, 24)
+	back_btn.add_theme_color_override("font_color", Color("#c9d2dc"))
+	for s in ["normal", "hover", "pressed", "focus", "disabled"]:
+		back_btn.add_theme_stylebox_override(s, StyleBoxEmpty.new())
+	var edge := ColorRect.new()
+	edge.color = Color(EDGE_INNER, 0.6)
+	edge.show_behind_parent = true
+	edge.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	edge.offset_left = -2
+	edge.offset_top = -2
+	edge.offset_right = 2
+	edge.offset_bottom = 2
+	edge.mouse_filter = Control.MOUSE_FILTER_IGNORE   # ⚠ 缺这行=吞点击（返回失效 bug）
+	back_btn.add_child(edge)
+	var backing := ColorRect.new()
+	backing.color = Color(0.10, 0.115, 0.145, 0.92)
+	backing.show_behind_parent = true
+	backing.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	back_btn.add_child(backing)
+	back_btn.pressed.connect(_back_to_menu)
+	var bj := ButtonJuice.new()
+	bj.name = "ButtonJuice"
+	back_btn.add_child(bj)
+
+
+## 顶带「典籍牌匾」：标题装进横幅像素框（mode_card 名牌带同语言）+ 左右卷轴端头
+## 饰线 + 匾顶小王冠图记——图鉴的"书脊标签"（书感取其形不取其皮，材质仍走牌桌语言）。
+func _build_plaque() -> void:
+	var band := $TopBand as Control
+	# 牌匾三层：黑衬底 → 深色填充 → 像素框
+	var backing := _band_rect(band, PLAQUE, EDGE_OUTER)
+	backing.name = "PlaqueBacking"
+	var fill := _band_rect(band,
+		Rect2(PLAQUE.position + Vector2(3, 3), PLAQUE.size - Vector2(6, 6)),
+		Color(0.065, 0.075, 0.10, 0.97))
+	fill.name = "PlaqueFill"
+	var frame := _band_rect(band, PLAQUE, Color.WHITE)
+	frame.name = "PlaqueFrame"
+	var m := ShaderMaterial.new()
+	m.shader = FRAME_SHADER
+	m.set_shader_parameter("edge_outer", EDGE_OUTER)
+	m.set_shader_parameter("edge_mid", EDGE_MID)
+	m.set_shader_parameter("edge_inner", EDGE_INNER)
+	m.set_shader_parameter("pixel_grid", PLAQUE.size.x / 6.0)   # 大板折算 ≈6px/格
+	m.set_shader_parameter("border_px", 1.5)
+	m.set_shader_parameter("noise_amt", 0.06)
+	m.set_shader_parameter("light_amount", 0.13)
+	m.set_shader_parameter("aspect", PLAQUE.size.x / PLAQUE.size.y)
+	frame.material = m
+	# 标题挪进匾内（tscn 落位被代码接管·牌匾整体随顶带滑入）。
+	# y-4：Ark 像素汉字无下伸部但 Label 居中按全字体度量 → 视觉偏下，上提补正（实测定值）。
+	title_lbl.position = PLAQUE.position + Vector2(0, -4)
+	title_lbl.size = PLAQUE.size
+	title_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title_lbl.z_index = 1   # 压住后建的牌匾层
+	FontManager.apply(title_lbl, 36)
+	title_lbl.add_theme_color_override("font_color", GOLD_TEXT)
+	title_lbl.add_theme_constant_override("outline_size", 2)
+	title_lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 0.95))
+	# 匾顶小王冠（骑匾顶边沿·boot/牌背同源纹理）
+	var crown := TextureRect.new()
+	crown.name = "PlaqueCrown"
+	crown.texture = PixelGlyphs.crown_texture()
+	crown.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	crown.stretch_mode = TextureRect.STRETCH_SCALE
+	crown.size = Vector2(crown.texture.get_size()) * 2.0
+	crown.position = Vector2(960.0 - crown.size.x * 0.5, PLAQUE.position.y - crown.size.y * 0.55)
+	crown.z_index = 2
+	crown.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	band.add_child(crown)
+	# 左右卷轴端头饰线（端头方块 + 细线·与匾垂直居中对齐）
+	var line_y := PLAQUE.position.y + PLAQUE.size.y * 0.5 - 1.0
+	for side: Array in [
+			[Rect2(612, line_y, 168, 2), Rect2(604, line_y - 3, 8, 8)],
+			[Rect2(PLAQUE.end.x + 20, line_y, 168, 2), Rect2(PLAQUE.end.x + 188, line_y - 3, 8, 8)]]:
+		_band_rect(band, side[0], Color(EDGE_MID, 0.45))
+		_band_rect(band, side[1], Color(EDGE_MID, 0.7))
+
+
+## 右上「收集度徽章」：英雄 icon + N / N + 细进度条——为后期图鉴解锁/收集留语义
+## （现在全解锁=满条），替代裸文本"共 46 名英雄"。
+func _build_collect_badge() -> void:
+	var band := $TopBand as Control
+	var plate := Rect2(1620, 30, 240, 50)
+	var edge := _band_rect(band, plate, Color(EDGE_INNER, 0.6))
+	edge.name = "BadgeEdge"
+	var fill := _band_rect(band,
+		Rect2(plate.position + Vector2(2, 2), plate.size - Vector2(4, 4)),
+		Color(0.065, 0.075, 0.10, 0.94))
+	fill.name = "BadgeFill"
+	var icon := TextureRect.new()
+	icon.name = "BadgeIcon"
+	icon.texture = PixelGlyphs.icon_texture("hero")
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	icon.stretch_mode = TextureRect.STRETCH_SCALE
+	icon.position = Vector2(1634, 39)
+	icon.size = Vector2(32, 32)
+	icon.modulate = Color("#c9d2dc")
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	band.add_child(icon)
+	# 计数标签（tscn 节点挪进徽章内）
+	var count := $TopBand/CountLabel as Label
+	count.position = Vector2(1676, 35)
+	count.size = Vector2(164, 24)
+	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	count.z_index = 1
+	FontManager.apply(count, 20)
+	count.add_theme_color_override("font_color", Color(TIN_DIM, 0.95))
+	count.text = "%d / %d" % [all_heroes.size(), all_heroes.size()]
+	# 收集进度条（现=满）
+	var ratio := 1.0
+	_band_rect(band, Rect2(1676, 63, 164, 6), Color(1, 1, 1, 0.10))
+	_band_rect(band, Rect2(1676, 63, 164.0 * ratio, 6), Color(GOLD_TEXT, 0.8))
+
+
+func _band_rect(parent: Control, r: Rect2, col: Color) -> ColorRect:
+	var rect := ColorRect.new()
+	rect.color = col
+	rect.position = r.position
+	rect.size = r.size
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(rect)
+	return rect
+
+
+## 左侧牌库（bp 同源霜玻璃 + 0.846 网格八列）。
+## 去毛坯批新增：①顶部三牌系图例带 ②每卡顶沿主题色细线（骑边框·与图例对色）
+## ③选中行微亮条（键盘导航行定位）。8 列网格三系混行 → 行间分组标放不下，
+## 分组可读性改走"图例+卡顶色线"双件套。
+func _build_pool() -> void:
+	_make_frosted(pool_area, POOL)
+	_build_pool_legend()
+	# 行亮条（先建=画在卡下层）
+	_row_glow = ColorRect.new()
+	_row_glow.color = Color(1, 1, 1, 0.045)
+	_row_glow.position = Vector2(85, ROW_Y0 - 3)
+	_row_glow.size = Vector2(982, 140)
+	_row_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pool_area.add_child(_row_glow)
+	for i in all_heroes.size():
+		var h := all_heroes[i]
+		var card := HERO_CARD_SCENE.instantiate() as HeroCard
+		card.hero_id = h.hero_id
+		card.hero_name = h.hero_name
+		card.max_hp = h.max_hp
+		card.portrait_path = h.portrait_path
+		card.scale = Vector2(CARD_SCALE, CARD_SCALE)
+		card.position = Vector2(X0 + (i % COLS) * STEP_X, ROW_Y0 + floorf(i / float(COLS)) * ROW_H)
+		card.pressed.connect(_select.bind(i))
+		pool_area.add_child(card)
+		card.compensate_name_scale(CARD_SCALE)   # 名字整数像素渲染（防糊）
+		# 主题色顶线：骑卡顶边框沿（HP 爱心骑角同语言）·随卡一起缩放/入场动画
+		var strip := ColorRect.new()
+		strip.color = Color(_theme_color_of(i), 0.9)
+		strip.position = Vector2(8, 0)
+		strip.size = Vector2(114, 3)
+		strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.add_child(strip)
+		var bj := card.get_node_or_null("ButtonJuice") as ButtonJuice
+		if bj:
+			bj.base_scale = CARD_SCALE
+		card_cards.append(card)
+	pool_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+
+## 网格顶图例带：三牌系 色点+系名，整组在池内水平居中。
+func _build_pool_legend() -> void:
+	var entries: Array = [
+		["十二生肖", THEME_TEAL], ["大阿卡那", THEME_GOLD], ["十二星座", THEME_PURPLE],
+	]
+	var item_w := 72.0    # 点10 + 间6 + 字56
+	var gap := 48.0
+	var total := item_w * entries.size() + gap * (entries.size() - 1)
+	var x := POOL.position.x + (POOL.size.x - total) * 0.5
+	for e: Array in entries:
+		var dot := ColorRect.new()
+		dot.color = e[1]
+		dot.position = Vector2(x, 156)
+		dot.size = Vector2(10, 10)
+		dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pool_area.add_child(dot)
+		var lbl := Label.new()
+		lbl.text = e[0]
+		lbl.position = Vector2(x + 16, 150)
+		lbl.size = Vector2(60, 22)
+		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		FontManager.apply(lbl, 14)
+		lbl.add_theme_color_override("font_color", Color(TIN_DIM, 0.8))
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pool_area.add_child(lbl)
+		x += item_w + gap
+
+
+## 右侧常驻详情板（像素框）：上=idle 动画舞台，下=文字属性。
+func _build_detail_panel() -> void:
+	var backing := ColorRect.new()
+	backing.color = EDGE_OUTER
+	backing.position = PANEL.position
+	backing.size = PANEL.size
+	backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail_area.add_child(backing)
+	var fill := ColorRect.new()
+	fill.color = Color(0.065, 0.075, 0.10, 0.97)
+	fill.position = PANEL.position + Vector2(3, 3)
+	fill.size = PANEL.size - Vector2(6, 6)
+	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail_area.add_child(fill)
+	var frame := ColorRect.new()
+	var m := ShaderMaterial.new()
+	m.shader = FRAME_SHADER
+	m.set_shader_parameter("edge_outer", EDGE_OUTER)
+	m.set_shader_parameter("edge_mid", EDGE_MID)
+	m.set_shader_parameter("edge_inner", EDGE_INNER)
+	# pixel_grid=横向格数：大板必须按尺寸折算（≈6px/格·mode_card 同法），
+	# 直接抄卡片的 23 会把格子放大到 32px → 边框糊成厚条
+	m.set_shader_parameter("pixel_grid", PANEL.size.x / 6.0)
+	m.set_shader_parameter("border_px", 1.5)
+	m.set_shader_parameter("noise_amt", 0.06)
+	m.set_shader_parameter("light_amount", 0.13)
+	frame.material = m
+	frame.position = PANEL.position
+	frame.size = PANEL.size
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail_area.add_child(frame)
+
+	# ── ① 舞台段：暗井衬底 + 大编号水印 + 主题色衬光 + 台座投影 + idle 动画 ──
+	var stage := ColorRect.new()
+	stage.color = Color(0.03, 0.04, 0.06, 0.85)
+	stage.position = PANEL.position + Vector2(144, 60)
+	stage.size = Vector2(440, 440)
+	stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail_area.add_child(stage)
+	for line_r: Rect2 in [
+			Rect2(stage.position, Vector2(stage.size.x, 2)),
+			Rect2(stage.position + Vector2(0, stage.size.y - 2), Vector2(stage.size.x, 2)),
+			Rect2(stage.position, Vector2(2, stage.size.y)),
+			Rect2(stage.position + Vector2(stage.size.x - 2, 0), Vector2(2, stage.size.y))]:
+		var ln := ColorRect.new()
+		ln.color = Color(EDGE_INNER, 0.6)
+		ln.position = line_r.position
+		ln.size = line_r.size
+		ln.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		detail_area.add_child(ln)
+
+	# 大编号水印（格斗选人语言·α 极淡压在暗井上）。192=16 基底 ×12 整数倍（防糊）
+	_d_watermark = _make_label(stage.position, stage.size, 192, Color(1, 1, 1, 0.05))
+	_d_watermark.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_d_watermark.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+	# 主题色径向衬光（白→透明纹理 + modulate 上三系色·立绘背后一圈柔光）
+	_d_glow = TextureRect.new()
+	var grad := Gradient.new()
+	grad.set_color(0, Color(1, 1, 1, 0.16))
+	grad.set_color(1, Color(1, 1, 1, 0.0))
+	var gtex := GradientTexture2D.new()
+	gtex.gradient = grad
+	gtex.fill = GradientTexture2D.FILL_RADIAL
+	gtex.fill_from = Vector2(0.5, 0.5)
+	gtex.fill_to = Vector2(0.5, 0.0)
+	gtex.width = 256
+	gtex.height = 256
+	_d_glow.texture = gtex
+	_d_glow.position = stage.position + Vector2(30, 50)   # 中心≈立绘中心
+	_d_glow.size = Vector2(380, 380)
+	_d_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail_area.add_child(_d_glow)
+
+	# 台座投影（黑→透明径向椭圆·立绘脚下）
+	var shadow := TextureRect.new()
+	var sgrad := Gradient.new()
+	sgrad.set_color(0, Color(0, 0, 0, 0.40))
+	sgrad.set_color(1, Color(0, 0, 0, 0.0))
+	var stex := GradientTexture2D.new()
+	stex.gradient = sgrad
+	stex.fill = GradientTexture2D.FILL_RADIAL
+	stex.fill_from = Vector2(0.5, 0.5)
+	stex.fill_to = Vector2(0.5, 0.0)
+	stex.width = 256
+	stex.height = 64
+	shadow.texture = stex
+	shadow.position = stage.position + Vector2(80, 414)   # 脚位 y≈436（中心 y436）
+	shadow.size = Vector2(280, 44)
+	shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail_area.add_child(shadow)
+
+	_d_anim = AnimatedSprite2D.new()
+	_d_anim.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_d_anim.position = stage.position + stage.size * 0.5 + Vector2(0, 24)
+	_d_anim.scale = Vector2(1.5, 1.5)   # 256px 帧 → 384px
+	detail_area.add_child(_d_anim)
+	_d_fallback = TextureRect.new()
+	_d_fallback.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_d_fallback.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_d_fallback.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_d_fallback.position = stage.position + Vector2(70, 70)
+	_d_fallback.size = stage.size - Vector2(140, 140)
+	_d_fallback.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_d_fallback.visible = false
+	detail_area.add_child(_d_fallback)
+
+	var px := PANEL.position.x
+	var py := PANEL.position.y
+
+	# 名牌横带：紧贴舞台底沿（台座名牌·mode_card 名牌带同语言）——名字"长"在舞台上
+	var band_r := Rect2(stage.position.x, stage.position.y + stage.size.y, stage.size.x, 64)
+	var band_fill := ColorRect.new()
+	band_fill.color = Color(0, 0, 0, 0.45)
+	band_fill.position = band_r.position
+	band_fill.size = band_r.size
+	band_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail_area.add_child(band_fill)
+	var band_sep := ColorRect.new()
+	band_sep.color = Color(EDGE_MID, 0.5)
+	band_sep.position = band_r.position
+	band_sep.size = Vector2(band_r.size.x, 2)
+	band_sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail_area.add_child(band_sep)
+	_d_name = _make_label(band_r.position + Vector2(0, 4), Vector2(band_r.size.x, 36), 34, GOLD_TEXT)
+	_d_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_d_name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_d_name.add_theme_constant_override("outline_size", 2)
+	_d_name.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 0.95))
+	_d_theme = _make_label(band_r.position + Vector2(0, 40), Vector2(band_r.size.x, 20), 14, Color(TIN_DIM, 0.85))
+	_d_theme.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_d_theme.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+	# ── ② 数据段：编号章 + 生命章（两枚药丸章成组居中·_layout_data_chips 按内容重排）──
+	_d_chip1_edge = _chip_rect(Color(EDGE_INNER, 0.55))
+	_d_chip1_fill = _chip_rect(Color(0, 0, 0, 0.35))
+	_d_chip1_lbl = _make_label(Vector2.ZERO, Vector2(120, 34), 16, Color("#c9d2dc"))
+	_d_chip1_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_d_chip1_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_d_chip2_edge = _chip_rect(Color(EDGE_INNER, 0.55))
+	_d_chip2_fill = _chip_rect(Color(0, 0, 0, 0.35))
+	_d_hp_heart = TextureRect.new()
+	var atlas := AtlasTexture.new()
+	atlas.atlas = HEART_SHEET
+	atlas.region = Rect2(0, 0, HEART_SHEET.get_width() / 4.0, HEART_SHEET.get_height())
+	_d_hp_heart.texture = atlas
+	_d_hp_heart.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_d_hp_heart.expand_mode = TextureRect.EXPAND_IGNORE_SIZE   # ⚠ 缺这行=被帧原尺寸顶大掉出章外
+	_d_hp_heart.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_d_hp_heart.size = Vector2(26, 26)
+	_d_hp_heart.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail_area.add_child(_d_hp_heart)
+	_d_hp_num = _make_label(Vector2.ZERO, Vector2(60, 34), 20, Color("#e86060"))
+	_d_hp_num.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+	# 段间分隔线
+	var sep := ColorRect.new()
+	sep.color = Color(EDGE_MID, 0.22)
+	sep.position = Vector2(px + 120, py + 634)
+	sep.size = Vector2(PANEL.size.x - 240, 1)
+	sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail_area.add_child(sep)
+
+	# ── ③ 技能段：标签印 + 技能名（一行居中组）+ 霜玻璃详述盒 ──
+	_d_tag_bg = ColorRect.new()
+	_d_tag_bg.size = Vector2(64, 30)
+	_d_tag_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail_area.add_child(_d_tag_bg)
+	_d_tag = _make_label(Vector2.ZERO, Vector2(64, 24), 16, Color.WHITE)
+	_d_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_d_skill_name = _make_label(Vector2.ZERO, Vector2(300, 30), 24, Color("#e4eaf2"))
+	_make_frosted(detail_area, Rect2(px + 70, py + 696, PANEL.size.x - 140, 130))
+	_d_detail = _make_label(Vector2(px + 86, py + 710), Vector2(PANEL.size.x - 172, 104), 16, Color(0.78, 0.81, 0.86))
+	_d_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_d_detail.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	_d_detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	var hint := _make_label(Vector2(px, py + PANEL.size.y - 40), Vector2(PANEL.size.x, 24), 14, Color(TIN_DIM, 0.55))
+	hint.text = "← → 切换英雄 · ESC 返回"
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+
+func _chip_rect(col: Color) -> ColorRect:
+	var r := ColorRect.new()
+	r.color = col
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail_area.add_child(r)
+	return r
+
+
+## 选中英雄：左侧卡换金框 + 右板填充（idle 动画 / 无资源退头像）。
+func _select(idx: int) -> void:
+	if idx == _sel_idx:
+		return
+	if _sel_idx >= 0:
+		card_cards[_sel_idx].card_state = HeroCard.CardState.NORMAL
+	_sel_idx = idx
+	card_cards[idx].card_state = HeroCard.CardState.SELECTED
+
+	var h := all_heroes[idx]
+	if h.sprite_frames_path != "" and ResourceLoader.exists(h.sprite_frames_path):
+		_d_anim.sprite_frames = load(h.sprite_frames_path)
+		_d_anim.play("idle")
+		_d_anim.visible = true
+		_d_fallback.visible = false
+	else:
+		_d_anim.visible = false
+		_d_fallback.texture = load(h.portrait_path) if ResourceLoader.exists(h.portrait_path) else null
+		_d_fallback.visible = true
+	_d_name.text = h.hero_name
+	_d_theme.text = "%s · %s" % [_theme_of(idx), h.hero_id]
+	_d_watermark.text = "%02d" % (idx + 1)
+	_d_glow.modulate = _theme_color_of(idx)
+	_d_chip1_lbl.text = "No.%02d" % (idx + 1)
+	_d_hp_num.text = "%d" % h.max_hp
+	var is_passive := h.skill_type == HeroData.SkillType.PASSIVE
+	_d_tag.text = "被动" if is_passive else "主动"
+	_d_tag_bg.color = PASSIVE_TAG if is_passive else ACTIVE_TAG
+	_d_skill_name.text = h.skill_description
+	_d_detail.text = h.skill_detail if h.skill_detail != "" else h.skill_description
+	_layout_data_chips()
+	_layout_skill_row()
+	# 选中行亮条滑到所在行
+	var row_y := ROW_Y0 - 3 + floorf(idx / float(COLS)) * ROW_H
+	create_tween().tween_property(_row_glow, "position:y", row_y, 0.18)\
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+
+## 编号章+生命章作为一组在板内水平居中（编号/血量宽度可变 → 每次按内容重排）。
+func _layout_data_chips() -> void:
+	var y0: float = PANEL.position.y + 584
+	var f: Font = _d_chip1_lbl.get_theme_font("font")
+	var w1: float = f.get_string_size(_d_chip1_lbl.text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, _d_chip1_lbl.get_theme_font_size("font_size")).x + 28.0
+	var num_w: float = f.get_string_size(_d_hp_num.text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, _d_hp_num.get_theme_font_size("font_size")).x
+	var w2: float = 12.0 + 26.0 + 8.0 + num_w + 14.0
+	var total: float = w1 + 16.0 + w2
+	var x0: float = PANEL.position.x + (PANEL.size.x - total) * 0.5
+	_d_chip1_edge.position = Vector2(x0, y0)
+	_d_chip1_edge.size = Vector2(w1, 34)
+	_d_chip1_fill.position = Vector2(x0 + 1, y0 + 1)
+	_d_chip1_fill.size = Vector2(w1 - 2, 32)
+	_d_chip1_lbl.position = Vector2(x0, y0)
+	_d_chip1_lbl.size = Vector2(w1, 34)
+	var x2: float = x0 + w1 + 16.0
+	_d_chip2_edge.position = Vector2(x2, y0)
+	_d_chip2_edge.size = Vector2(w2, 34)
+	_d_chip2_fill.position = Vector2(x2 + 1, y0 + 1)
+	_d_chip2_fill.size = Vector2(w2 - 2, 32)
+	_d_hp_heart.position = Vector2(x2 + 12.0, y0 + 4.0)
+	_d_hp_num.position = Vector2(x2 + 12.0 + 26.0 + 8.0, y0)
+	_d_hp_num.size = Vector2(num_w + 4.0, 34)
+
+
+## 标签+技能名作为一组在板内水平居中（技能名长短不一 → 每次按内容重排）。
+func _layout_skill_row() -> void:
+	var f: Font = _d_skill_name.get_theme_font("font")
+	var fs: int = _d_skill_name.get_theme_font_size("font_size")
+	var name_w: float = f.get_string_size(_d_skill_name.text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var total: float = 64.0 + 12.0 + name_w
+	var x0: float = PANEL.position.x + (PANEL.size.x - total) * 0.5
+	var y0: float = PANEL.position.y + 652
+	_d_tag_bg.position = Vector2(x0, y0)
+	_d_tag.position = Vector2(x0, y0 + 3)
+	_d_skill_name.position = Vector2(x0 + 76, y0)
+	_d_skill_name.size = Vector2(name_w + 8, 30)
+
+
+## ←/→ 环绕换人，↑/↓ ±一行；ESC 回主菜单。
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel"):
+		_back_to_menu()
+		get_viewport().set_input_as_handled()
+		return
+	var step := 0
+	if event.is_action_pressed("ui_left"):
+		step = -1
+	elif event.is_action_pressed("ui_right"):
+		step = 1
+	elif event.is_action_pressed("ui_up"):
+		step = -COLS
+	elif event.is_action_pressed("ui_down"):
+		step = COLS
+	if step != 0 and _sel_idx >= 0:
+		_select(wrapi(_sel_idx + step, 0, all_heroes.size()))
+		get_viewport().set_input_as_handled()
+
+
+func _back_to_menu() -> void:
+	TransitionManager.transition_to(MENU_SCENE)
+
+
+## 主题归属（池顺序固定：h01-12 生肖 / h13-34 大阿卡那 / h35-46 星座）。
+func _theme_of(idx: int) -> String:
+	if idx < 12:
+		return "十二生肖"
+	if idx < 34:
+		return "大阿卡那"
+	return "十二星座"
+
+
+func _theme_color_of(idx: int) -> Color:
+	if idx < 12:
+		return THEME_TEAL
+	if idx < 34:
+		return THEME_GOLD
+	return THEME_PURPLE
+
+
+## 入场：顶带滑入 + 左侧牌按行翻开扫过（bp C1 同语言）+ 右板淡入。
+func _play_intro() -> void:
+	var band := $TopBand as Control
+	var band_home := band.position
+	band.position.y -= 130.0
+	create_tween().tween_property(band, "position", band_home, 0.4)\
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	for i in card_cards.size():
+		var card := card_cards[i]
+		card.pivot_offset = card.size * 0.5
+		card.scale = Vector2(0.001, CARD_SCALE)
+		card.modulate.a = 0.0
+		var delay := 0.1 + floorf(i / float(COLS)) * 0.1 + (i % COLS) * 0.03
+		var ta := create_tween()
+		ta.tween_interval(delay)
+		ta.tween_property(card, "modulate:a", 1.0, 0.1)
+		var tp := create_tween()
+		tp.tween_interval(delay)
+		tp.tween_property(card, "scale:x", CARD_SCALE, 0.2)\
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	detail_area.modulate.a = 0.0
+	var td := create_tween()
+	td.tween_interval(0.25)
+	td.tween_property(detail_area, "modulate:a", 1.0, 0.35)
+
+
+# ============================================================
+# 自绘部件（bp 同源）
+# ============================================================
+
+func _make_label(pos: Vector2, sz: Vector2, font_px: int, col: Color) -> Label:
+	var lbl := Label.new()
+	lbl.position = pos
+	lbl.size = sz
+	FontManager.apply(lbl, font_px)
+	lbl.add_theme_color_override("font_color", col)
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail_area.add_child(lbl)
+	return lbl
+
+
+## 霜玻璃桌面（bp B2 同款）：月光青细边 + 极浅暗底。
+func _make_frosted(parent: Control, r: Rect2) -> void:
+	var border := ColorRect.new()
+	border.color = Color(0.30, 0.55, 0.85, 0.35)
+	border.position = r.position
+	border.size = r.size
+	border.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(border)
+	var fill := ColorRect.new()
+	fill.color = Color(0.01, 0.02, 0.05, 0.45)
+	fill.position = r.position + Vector2(2, 2)
+	fill.size = r.size - Vector2(4, 4)
+	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(fill)

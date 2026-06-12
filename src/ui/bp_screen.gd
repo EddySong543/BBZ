@@ -6,11 +6,14 @@ extends Control
 ## 纵深三层：对手席(顶带·你选择期间对手随机时刻盖下牌背=实时压力，本地 AI 演出/联机真信号)
 ##           牌库摊开(中·46 卡四行均匀网格 12/12/12/10·全池一屏无滚动)
 ##           我的手牌(底带·点池卡飞入 3 大牌位·再点退回·确认盖牌金钮)。
-## 上下席对齐：头像/名字列同 x（240/334），对手槽位与手牌槽位中心对齐，
-##             右列=信息/行动列（对手进度+倒计时 ↔ 确认钮，同 1460-1820）。
+## 上下席对齐（2026-06-12 Eddy 反馈返工）：两条席位带同高 190、内容以带中心垂直居中镜像；
+##             对手槽与手牌槽**同规格同坐标**（130×158 @ x 770/950/1130·卡原生尺寸不缩放——
+##             缩放+ButtonJuice 中心 pivot 会让卡整体偏左上错位，已废）；
+##             头像/名字列同 x（240/334），右列=信息/行动列（同 1460-1820）。
 ## 阶段提示 = 进入 BAN/PICK 时屏幕中央宣告横带（大字+副注，1.4s 自动退场），无常驻阶段条。
-## 两次翻牌仪式：禁用揭晓=双方 3 张推中央同时翻开+撞车对合拢合并（并集规则的戏剧呈现）；
-##              出战亮相=3v3 对扣翻开对峙+王冠砸落+开始战斗（⛔全屏白闪，Eddy 否决）。
+## 两次翻牌仪式：禁用揭晓=双方 3 张推中央同时翻开+撞车对原地标红✕（⛔合拢合并动画）；
+##              出战亮相=3v3 对扣翻开对峙+开始战斗（⛔全屏白闪/⛔中央王冠均被 Eddy 否决，
+##              中央空位预留联机加载动画）。
 ## 流程保留：BAN → PICK → REVEAL（3B 本地留 Ban），超时自动补满，BattleSetup 交接，波幕转场。
 ## ⚠️ 仪式压暗用独立暗幕 ColorRect，禁用 modulate（会压黑霜玻璃衬底反而让亮波透出）。
 
@@ -25,23 +28,24 @@ const STEP_TIME := 30
 const BAN_COUNT := 3
 const PICK_COUNT := 3
 
-# ── 牌库网格（46 全池一屏·均匀四行 12/12/12/10·阶段条撤掉后上移加高）──
+# ── 牌库网格（46 全池一屏·均匀四行 12/12/12/10·对手席加高后整体下移 40）──
 # 边距核算：行内容宽 1441（12 卡）→ 左右余 40；血量爱心探出卡左上 ≈(-19,-20)
-# → 首行 y216 时心顶 196，距池顶 170 余 26px——任何边框不触池框。
-const POOL := Rect2(200, 170, 1520, 664)
+# → 首行 y256 时心顶 236，距池顶 210 余 26px——任何边框不触池框。
+const POOL := Rect2(200, 210, 1520, 664)
 const CARD_SCALE := 0.846          # 130×158 → 110×134
-const HAND_SCALE := 150.0 / 130.0  # 手牌大卡
 const STEP_X := 121.0
 const ROW_H := 146.0
-const ROW_Y0 := 216.0
+const ROW_Y0 := 256.0
 # [起始索引, 张数, 行起点x]；末值=该行左缘（每行池内居中）
 const ROWS: Array = [[0, 12, 240.0], [12, 12, 240.0], [24, 12, 240.0], [36, 10, 360.5]]
 
-# ── 席位槽（OppBand / MyBand 内相对坐标·对手槽与手牌槽中心上下对齐）──
-const OPP_SLOTS: Array = [Vector2(789, 16), Vector2(969, 16), Vector2(1149, 16)]
-const OPP_SLOT_SIZE := Vector2(92, 116)
-const HAND_SLOTS: Array = [Vector2(760, 16), Vector2(940, 16), Vector2(1120, 16)]
-const HAND_SLOT_SIZE := Vector2(150, 182)
+# ── 席位槽（OppBand / MyBand 内相对坐标）──
+# 双方槽**同规格同坐标**（卡原生 130×158·x 770/950/1130）：上下严格对齐 + 手牌卡免缩放
+# （HAND_SCALE 已废——缩放配合 ButtonJuice 中心 pivot 会让卡相对槽底偏左上）。
+const OPP_SLOTS: Array = [Vector2(770, 16), Vector2(950, 16), Vector2(1130, 16)]
+const OPP_SLOT_SIZE := Vector2(130, 158)
+const HAND_SLOTS: Array = [Vector2(770, 16), Vector2(950, 16), Vector2(1130, 16)]
+const HAND_SLOT_SIZE := Vector2(130, 158)
 
 # ── 仪式排位（全局坐标）──
 const CER_X0 := 700.0
@@ -126,6 +130,12 @@ func _setup_ui() -> void:
 	for p in HAND_SLOTS:
 		_make_slot_pit(my_band, Rect2(p, HAND_SLOT_SIZE), "空")
 
+	# 右上信息底板（2026-06-12 Eddy：裸文字格格不入）——槽位暗井同语言，
+	# 与下方确认钮同列同宽（360 @ x1460）成上下呼应；文字 z 提到板上层。
+	_make_slot_pit(opp_band, Rect2(1460, 50, 360, 90), "")
+	opp_progress.z_index = 1
+	timer_label.z_index = 1
+
 	# 确认钮：金大钮（主菜单匹配钮同级）
 	for s in ["normal", "hover", "pressed", "focus", "disabled"]:
 		confirm_btn.add_theme_stylebox_override(s, StyleBoxEmpty.new())
@@ -180,6 +190,7 @@ func _build_pool() -> void:
 			card.position = Vector2(x0 + c * STEP_X, ROW_Y0 + r * ROW_H)
 			card.pressed.connect(_on_card_clicked.bind(i))
 			pool_area.add_child(card)
+			card.compensate_name_scale(CARD_SCALE)   # 名字整数像素渲染（防糊）
 			var bj := card.get_node_or_null("ButtonJuice") as ButtonJuice
 			if bj:
 				bj.base_scale = CARD_SCALE
@@ -264,7 +275,7 @@ func _play_phase_announce() -> void:
 	layer.add_child(title)
 
 	var sub := Label.new()
-	sub.text = "盲选禁用 3 名 · 双方同时翻开" if is_ban else "盲选出战 3 名 · 允许镜像"
+	sub.text = "禁用 3 名英雄" if is_ban else "选择你的英雄"
 	FontManager.apply(sub, 20)
 	sub.add_theme_color_override("font_color", Color(TIN_DIM, 0.9))
 	sub.add_theme_constant_override("outline_size", 4)
@@ -328,14 +339,10 @@ func _add_to_hand(idx: int, instant: bool = false) -> void:
 	hc.max_hp = h.max_hp
 	hc.portrait_path = h.portrait_path
 	hc.card_state = HeroCard.CardState.SELECTED
-	hc.scale = Vector2(HAND_SCALE, HAND_SCALE)
 	hc.position = HAND_SLOTS[slot]
 	hc.set_meta("hero_idx", idx)
 	hc.pressed.connect(_on_hand_card_pressed.bind(hc))
 	my_band.add_child(hc)
-	var bj := hc.get_node_or_null("ButtonJuice") as ButtonJuice
-	if bj:
-		bj.base_scale = HAND_SCALE
 	hand_cards.append(hc)
 	if not instant:
 		hc.modulate.a = 0.0
@@ -404,8 +411,8 @@ func _update_all_cards() -> void:
 
 
 func _sync_step_ui() -> void:
-	var verb := "确认盖牌" if step == Step.BAN else "确认出战"
-	confirm_btn.text = "%s  %d/3" % [verb, my_sel.size()]
+	# BAN/PICK 统一「确认选择」（2026-06-12 Eddy）；REVEAL 的「开始战斗」另设不走此处。
+	confirm_btn.text = "确认选择  %d/3" % my_sel.size()
 	_set_confirm_enabled(my_sel.size() == 3)
 
 
@@ -455,7 +462,7 @@ func _opp_cover_next() -> void:
 
 
 func _update_opp_progress() -> void:
-	opp_progress.text = "对手已盖 %d/3" % _opp_covered
+	opp_progress.text = "对手已选 %d/3" % _opp_covered
 
 
 func _update_timer_label() -> void:
@@ -520,7 +527,7 @@ func _on_confirm() -> void:
 
 
 ## 翻牌仪式（共用骨架）：双方 3 张推中央 → 对手牌背翻开 →
-## ban=撞车对白闪合并 → 应用并入下一步；pick=王冠+撞波闪+开始战斗。
+## ban=撞车对原地标红✕ → 应用并入下一步；pick=对峙亮相+开始战斗。
 func _run_ceremony(is_ban: bool) -> void:
 	_ceremony = true
 	bp_timer.stop()
@@ -564,12 +571,10 @@ func _run_ceremony(is_ban: bool) -> void:
 		if s < hand_cards.size():
 			hand_cards[s].visible = false
 		var c := _spawn_cer_card(cer, all_heroes[mine[s]], HeroCard.CardState.PICKED_P1)
-		c.scale = Vector2(HAND_SCALE, HAND_SCALE)
 		c.position = start_pos
-		var tw := create_tween().set_parallel(true)
+		var tw := create_tween()
 		tw.tween_property(c, "position", target, 0.35)\
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
-		tw.tween_property(c, "scale", Vector2.ONE, 0.35)
 		my_cer.append(c)
 
 	# 对手牌背推往上排 → 错落翻开
@@ -578,17 +583,16 @@ func _run_ceremony(is_ban: bool) -> void:
 		if s < _opp_backs.size():
 			_opp_backs[s].visible = false
 		var back := _make_card_back(cer, Rect2(opp_band.global_position + (OPP_SLOTS[s] as Vector2), OPP_SLOT_SIZE))
-		var tw := create_tween().set_parallel(true)
+		var tw := create_tween()
 		tw.tween_property(back, "position", target, 0.35)\
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
-		tw.tween_property(back, "size", Vector2(130, 158), 0.35)
 		await get_tree().create_timer(0.12).timeout
 		opp_cer.append(null)   # 占位，翻开后回填
 		_flip_open(cer, back, all_heroes[theirs[s]], target, opp_cer, s)
 	await get_tree().create_timer(1.0).timeout
 
 	if is_ban:
-		await _play_collisions(cer, my_cer, opp_cer)
+		_show_collisions(cer, my_cer, opp_cer)
 		await get_tree().create_timer(0.9).timeout
 		# 收场：仪式卡淡出 → 应用禁用 → 进 PICK
 		var fade := create_tween()
@@ -601,25 +605,10 @@ func _run_ceremony(is_ban: bool) -> void:
 		_ceremony = false
 		_enter_step(Step.PICK)
 	else:
-		# 阵容亮相：王冠砸落弹定 + 开始战斗（仪式卡与暗幕保留=对峙画面）。
-		# ⛔全屏白闪已删（Eddy 2026-06-11：确认后的瞬间白闪不适）——加冕的份量交给砸落动作。
-		var crown := TextureRect.new()
-		crown.texture = PixelGlyphs.crown_texture()
-		crown.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		crown.stretch_mode = TextureRect.STRETCH_SCALE
-		crown.size = Vector2(crown.texture.get_size()) * 3.0
-		var crown_home := Vector2(960 - crown.size.x * 0.5, 505)
-		crown.position = crown_home + Vector2(0, -56)
-		crown.modulate.a = 0.0
-		cer.add_child(crown)
-		var ct := create_tween()
-		ct.tween_property(crown, "modulate:a", 1.0, 0.10)
-		ct.parallel().tween_property(crown, "position", crown_home, 0.18)\
-			.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_IN)
-		ct.tween_property(crown, "position", crown_home + Vector2(0, 8), 0.06)\
-			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		ct.tween_property(crown, "position", crown_home, 0.10)\
-			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		# 阵容亮相：3v3 对扣翻开对峙 + 开始战斗（仪式卡与暗幕保留=对峙画面）。
+		# ⛔全屏白闪已删（2026-06-11）；⛔中央王冠砸落已删（2026-06-12 Eddy）——
+		# 此时刻的中央空位预留给**联机「等待对手 / 加载」动画**（对峙静帧上叠
+		# 加载指示，完成后接 _start_battle；本地版对峙+金钮自明，无需装饰）。
 		step = Step.REVEAL
 		confirm_btn.text = "开始战斗"
 		confirm_btn.visible = true
@@ -627,37 +616,20 @@ func _run_ceremony(is_ban: bool) -> void:
 		_ceremony = false
 
 
-## 撞车合并：双方同禁的对相向合拢 + 白闪 → 留一张盖「禁」。
-func _play_collisions(cer: Control, my_cer: Array[HeroCard], opp_cer: Array) -> void:
+## 撞车展示（2026-06-12 Eddy：⛔归一到中间的合拢动画——只需展示）：
+## 双方同禁的卡**原地**转 BANNED（大红✕当场盖上）+ 中线金字说明，不再移动/合并/闪光。
+func _show_collisions(cer: Control, my_cer: Array[HeroCard], opp_cer: Array) -> void:
 	var collide: Array[int] = []
 	for h in my_bans:
 		if h in ai_bans:
 			collide.append(h)
 	if collide.is_empty():
 		return
-	for k in collide.size():
-		var hero_idx: int = collide[k]
-		var meet := Vector2(960 + (k - (collide.size() - 1) * 0.5) * 260 - 65, 430)
-		var mc := my_cer[my_bans.find(hero_idx)]
+	for hero_idx in collide:
+		my_cer[my_bans.find(hero_idx)].card_state = HeroCard.CardState.BANNED
 		var oc: HeroCard = opp_cer[ai_bans.find(hero_idx)]
-		var tw := create_tween().set_parallel(true)
-		tw.tween_property(mc, "position", meet + Vector2(10, 24), 0.3)\
-			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 		if oc:
-			tw.tween_property(oc, "position", meet, 0.3)\
-				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		await tw.finished
-		# 撞车暖光（局部低强度·全屏白闪同批调柔，2026-06-11 Eddy）
-		var flash := ColorRect.new()
-		flash.color = Color(1, 0.9, 0.62, 0.28)
-		flash.position = meet - Vector2(40, 40)
-		flash.size = Vector2(220, 240)
-		flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		cer.add_child(flash)
-		create_tween().tween_property(flash, "color:a", 0.0, 0.4)
-		if oc:
-			oc.queue_free()
-		mc.card_state = HeroCard.CardState.BANNED
+			oc.card_state = HeroCard.CardState.BANNED
 	var note := "双方同禁「%s」· 并集合一" % all_heroes[collide[0]].hero_name \
 		if collide.size() == 1 else "双方同禁 %d 名 · 并集合一" % collide.size()
 	var lbl := Label.new()
@@ -666,10 +638,12 @@ func _play_collisions(cer: Control, my_cer: Array[HeroCard], opp_cer: Array) -> 
 	lbl.add_theme_color_override("font_color", GOLD_TEXT)
 	lbl.add_theme_constant_override("outline_size", 4)
 	lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 0.95))
-	lbl.position = Vector2(660, 700)
+	lbl.position = Vector2(660, 498)
 	lbl.size = Vector2(600, 40)
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.modulate.a = 0.0
 	cer.add_child(lbl)
+	create_tween().tween_property(lbl, "modulate:a", 1.0, 0.2)
 
 
 ## 牌背翻开：横向压缩 → 换英雄正面 → 展开（回填 opp_cer[slot]）。
@@ -723,11 +697,11 @@ func _start_battle() -> void:
 ## 开桌：上下席位带滑入 + 牌库按行"翻开"扫过（scale.x 0→0.846 错落=发牌翻面）。
 func _play_intro() -> void:
 	var opp_home := opp_band.position
-	opp_band.position.y -= 150.0
+	opp_band.position.y -= 210.0
 	create_tween().tween_property(opp_band, "position", opp_home, 0.45)\
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	var my_home := my_band.position
-	my_band.position.y += 230.0
+	my_band.position.y += 200.0
 	create_tween().tween_property(my_band, "position", my_home, 0.45)\
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 

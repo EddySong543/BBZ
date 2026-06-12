@@ -320,10 +320,19 @@ const ICON_ROWS: Dictionary = {
 
 
 ## icon 纹理：白剪影 + 1px 黑描边（缓存）。size 原生 12+PAD*2，显示端按整数倍放大。
+## 未知 icon 名 → 洋红警示块 fallback + push_warning（写错名一眼可见，不静默报错·2026-06-12）。
 static func icon_texture(icon_name: String) -> ImageTexture:
 	var key := "icon_" + icon_name
 	if _cache.has(key):
 		return _cache[key]
+	if not ICON_ROWS.has(icon_name):
+		push_warning("PixelGlyphs: 未知 icon 名 '%s'，返回洋红警示块（检查调用处拼写）" % icon_name)
+		var fb_size := 12 + PAD * 2
+		var fb_img := Image.create(fb_size, fb_size, false, Image.FORMAT_RGBA8)
+		fb_img.fill_rect(Rect2i(PAD, PAD, 12, 12), Color.MAGENTA)
+		var fb_tex := ImageTexture.create_from_image(fb_img)
+		_cache[key] = fb_tex
+		return fb_tex
 	var rows: Array = ICON_ROWS[icon_name]
 	var w: int = rows[0].length() + PAD * 2
 	var h: int = rows.size() + PAD * 2
@@ -337,6 +346,15 @@ static func icon_texture(icon_name: String) -> ImageTexture:
 	var tex := ImageTexture.create_from_image(img)
 	_cache[key] = tex
 	return tex
+
+
+## 启动预热：一次性生成全部 icon + 王冠并入缓存（boot 调用）。
+## 双重作用：①后续界面取 icon 零等待 ②等于"全部字形可渲染"的启动冒烟检查——
+## 任何字形数据坏了在 boot 就暴露，而不是埋到某个深层界面。
+static func preheat() -> void:
+	for n: String in ICON_ROWS.keys():
+		icon_texture(n)
+	crown_texture()
 
 
 static func _apply_outline(img: Image) -> void:
