@@ -89,13 +89,14 @@ func _refresh_text() -> void:
 
 
 ## 名字反缩放补偿（2026-06-12 Eddy："名字糊在一起"根修）：卡片整体被 parent_scale
-## 缩放时（bp 池/图鉴网格 0.846），16px 像素字会落在 13.5px 非整数采样上发糊。
-## 调用本方法 → 名字改 12px 原生字号 + 标签按 1/parent_scale 反向放大 →
-## 合成变换 = 1.0，Ark12 以整数像素渲染。须在 add_child 之后调用（节点要 ready）。
+## 缩放时（bp 池/图鉴网格 0.846），字会落在非整数采样上发糊。
+## 调用本方法 → 标签按 1/parent_scale 反向放大 → 合成变换 = 1.0，字以整数像素渲染。
+## 2026-06-13 Eddy："图鉴/BP 名字太细太小" → 字号 12→16（f16 原生·反缩放后仍整数渲染、
+## 既清晰又更大；标签宽 130 容 4 字 16px 绰绰有余）。须在 add_child 之后调用（节点要 ready）。
 func compensate_name_scale(parent_scale: float) -> void:
 	if _name_label == null or parent_scale <= 0.0:
 		return
-	FontManager.apply(_name_label, 12)
+	FontManager.apply(_name_label, 16)
 	_name_label.pivot_offset = _name_label.size * 0.5
 	_name_label.scale = Vector2.ONE / parent_scale
 
@@ -118,10 +119,11 @@ func _load_portrait() -> void:
 
 func _refresh_style() -> void:
 	# 边框三层色 + 四角宝石色 + 头像变灰 + 选中放大，按 card_state 切换。
-	var e_outer := Color(0.05, 0.05, 0.06)
-	var e_mid := Color(0.65, 0.67, 0.71)   # 锡灰（中性）
-	var e_inner := Color(0.34, 0.36, 0.39)
-	var gem := Color(0.55, 0.58, 0.64)     # 中性淡宝石
+	# B 典籍朱印（2026-06-13）：常态边转暖骨色（清而不脏），选中=金、P1/P2=阵营蓝/红 不变。
+	var e_outer := Color(0.05, 0.045, 0.04)
+	var e_mid := Color(0.70, 0.64, 0.52)   # 暖骨色（中性·清）
+	var e_inner := Color(0.42, 0.36, 0.26)
+	var gem := Color(0.62, 0.56, 0.46)     # 暖中性淡宝石
 	var port_mod := Color.WHITE
 	var name_col := Color.WHITE
 

@@ -216,16 +216,16 @@ func _init_buttons() -> void:
 	btn_confirm.clip_text = true
 	_attach_button_juice(btn_confirm)
 
-	# 技能按钮「技能」二字单独放大 + 描边，叠在紫色果冻底上清晰可读。
+	# 技能按钮「技能」二字单独放大 + 描边；底已改 B 羊皮 → 墨字压羊皮（暖描边代替纯黑，避免脏）。
 	FontManager.apply_btn(btn_special, 30)
-	btn_special.add_theme_color_override("font_color", Color.WHITE)
-	btn_special.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
+	btn_special.add_theme_color_override("font_color", Color(0.2, 0.14, 0.08))   # 墨字（压羊皮）
+	btn_special.add_theme_color_override("font_outline_color", Color(0.88, 0.82, 0.68, 0.6))
 	btn_special.add_theme_constant_override("outline_size", 4)
 
-	# 结束按钮「结束」二字同样放大 + 描边，配绿色徽章底。
+	# 结束按钮「结束」二字放大 + 描边；底已改鎏金羊皮(主行动·与 BP 确认钮同款)→朱砂墨字 + 暖描边。
 	FontManager.apply_btn(btn_confirm, 30)
-	btn_confirm.add_theme_color_override("font_color", Color.WHITE)
-	btn_confirm.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
+	btn_confirm.add_theme_color_override("font_color", Color(0.52, 0.18, 0.12))   # 朱砂墨（压浅金羊皮）
+	btn_confirm.add_theme_color_override("font_outline_color", Color(0.88, 0.82, 0.68, 0.6))
 	btn_confirm.add_theme_constant_override("outline_size", 4)
 
 	action_btn_list = [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend, btn_special]
@@ -236,11 +236,11 @@ func _init_buttons() -> void:
 	_set_cost_pips(btn_big_defend, ActionDef.BASE_ACTION_DEF[A.BIG_DEFEND]["cost"])
 
 	FontManager.apply(timer_label, 32)   # 顶部常驻回合数(原倒计时位)·紧凑
-	timer_label.add_theme_color_override("font_color", Color.WHITE)
+	timer_label.add_theme_color_override("font_color", Color(0.95, 0.91, 0.8))   # 暖米白（压暗背景）
 	FontManager.apply(status_label, 44)
-	status_label.add_theme_color_override("font_color", Color.WHITE)
+	status_label.add_theme_color_override("font_color", Color(0.95, 0.91, 0.8))   # 暖米白
 	FontManager.apply(big_turn_label, 72)   # 中间「回合开始」横幅 + 倒计时（72=12×6 整数倍·清晰）
-	big_turn_label.add_theme_color_override("font_color", Color.WHITE)
+	big_turn_label.add_theme_color_override("font_color", Color(0.95, 0.91, 0.8))   # 暖米白
 	event_label.visible = false
 	# 备选血量/护甲：现由 ReserveHpRow（❤X[+灰❤X]·自绘居中·任务3b/4）显示，字体/配色在组件内处理，无需此处设置。
 
@@ -668,9 +668,8 @@ func _attach_button_juice(btn: BaseButton) -> void:
 ## 选中态视觉：果冻底常显，选中按钮整体提亮 + 从中心放大（缩放手感交给 ButtonJuice 弹性处理）。
 ## （不再用不透明 StyleBox 盖住果冻 —— 那正是"点击后变回老版"的根因）。
 func _set_btn_selected(btn: Button, on: bool) -> void:
-	# 选中高亮用「冷亮蓝白」而非暖金 —— 暖金会撞 skill_card 的金色书本/羊皮纸（任务2）。
-	# 银色按钮 × 冷亮 → 像通电发光，与金色图鉴格冷暖区分明显。
-	btn.modulate = Color(1.28, 1.42, 1.6) if on else Color.WHITE
+	# B「典籍朱印」：羊皮按钮选中态镀金箔 —— 暖金提亮 modulate，呼应金箔高亮语言（与 skill_card 同体系）。
+	btn.modulate = Color(1.5, 1.32, 0.82) if on else Color.WHITE
 	var juice := btn.get_node_or_null("ButtonJuice") as ButtonJuice
 	if juice != null:
 		juice.set_selected(on)   # 弹性放大/复位（带 overshoot）
@@ -1269,7 +1268,7 @@ func _spawn_action_circle(player: int, action: int) -> Control:
 		bg.material = btn_bg.material
 		bg.color = Color.WHITE              # shader 输出 × COLOR；白 = 全强度
 	else:
-		bg.color = Color("#2a2a4a")         # 无对应按钮(如切换)→ 维持深蓝底
+		bg.color = Color(0.09, 0.085, 0.075)   # 无对应按钮(如切换)→ 近黑暖底（B 典籍）
 	circ.add_child(bg)
 
 	var hi := _hover_icon_for(action)

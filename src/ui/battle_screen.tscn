@@ -66,107 +66,107 @@ shader_parameter/grain_scale = 1.6
 
 [sub_resource type="FontVariation" id="PixelBold16"]
 base_font = ExtResource("23_pixelfont")
-variation_embolden = 1.0
+variation_embolden = 0.0
 
 [sub_resource type="StyleBoxEmpty" id="BtnTransparent"]
 
 [sub_resource type="ShaderMaterial" id="JellyZan"]
 shader = ExtResource("21_jelly")
-shader_parameter/fill_top = Color(0.7, 0.72, 0.77, 1)
-shader_parameter/fill_bottom = Color(0.48, 0.5, 0.56, 1)
-shader_parameter/edge_inner = Color(0.9, 0.92, 0.97, 1)
-shader_parameter/edge_outer = Color(0.32, 0.34, 0.4, 1)
+shader_parameter/fill_top = Color(0.88, 0.82, 0.68, 1)
+shader_parameter/fill_bottom = Color(0.82, 0.75, 0.6, 1)
+shader_parameter/edge_inner = Color(0.6, 0.5, 0.36, 1)
+shader_parameter/edge_outer = Color(0.18, 0.12, 0.07, 1)
 shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 38.0
 shader_parameter/corner = 0.22
 shader_parameter/edge_px = 2.0
 shader_parameter/aspect = 1.0
-shader_parameter/noise_amt = 0.05
-shader_parameter/wear = 0.22
+shader_parameter/noise_amt = 0.08
+shader_parameter/wear = 0.24
 
 [sub_resource type="ShaderMaterial" id="JellyBo"]
 shader = ExtResource("21_jelly")
-shader_parameter/fill_top = Color(0.7, 0.72, 0.77, 1)
-shader_parameter/fill_bottom = Color(0.48, 0.5, 0.56, 1)
-shader_parameter/edge_inner = Color(0.9, 0.92, 0.97, 1)
-shader_parameter/edge_outer = Color(0.32, 0.34, 0.4, 1)
+shader_parameter/fill_top = Color(0.88, 0.82, 0.68, 1)
+shader_parameter/fill_bottom = Color(0.82, 0.75, 0.6, 1)
+shader_parameter/edge_inner = Color(0.6, 0.5, 0.36, 1)
+shader_parameter/edge_outer = Color(0.18, 0.12, 0.07, 1)
 shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 38.0
 shader_parameter/corner = 0.22
 shader_parameter/edge_px = 2.0
 shader_parameter/aspect = 1.0
-shader_parameter/noise_amt = 0.05
-shader_parameter/wear = 0.22
+shader_parameter/noise_amt = 0.08
+shader_parameter/wear = 0.24
 
 [sub_resource type="ShaderMaterial" id="JellyDaBo"]
 shader = ExtResource("21_jelly")
-shader_parameter/fill_top = Color(0.7, 0.72, 0.77, 1)
-shader_parameter/fill_bottom = Color(0.48, 0.5, 0.56, 1)
-shader_parameter/edge_inner = Color(0.9, 0.92, 0.97, 1)
-shader_parameter/edge_outer = Color(0.32, 0.34, 0.4, 1)
+shader_parameter/fill_top = Color(0.88, 0.82, 0.68, 1)
+shader_parameter/fill_bottom = Color(0.82, 0.75, 0.6, 1)
+shader_parameter/edge_inner = Color(0.6, 0.5, 0.36, 1)
+shader_parameter/edge_outer = Color(0.18, 0.12, 0.07, 1)
 shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 38.0
 shader_parameter/corner = 0.22
 shader_parameter/edge_px = 2.0
 shader_parameter/aspect = 1.0
-shader_parameter/noise_amt = 0.05
-shader_parameter/wear = 0.22
+shader_parameter/noise_amt = 0.08
+shader_parameter/wear = 0.24
 
 [sub_resource type="ShaderMaterial" id="JellyFang"]
 shader = ExtResource("21_jelly")
-shader_parameter/fill_top = Color(0.7, 0.72, 0.77, 1)
-shader_parameter/fill_bottom = Color(0.48, 0.5, 0.56, 1)
-shader_parameter/edge_inner = Color(0.9, 0.92, 0.97, 1)
-shader_parameter/edge_outer = Color(0.32, 0.34, 0.4, 1)
+shader_parameter/fill_top = Color(0.88, 0.82, 0.68, 1)
+shader_parameter/fill_bottom = Color(0.82, 0.75, 0.6, 1)
+shader_parameter/edge_inner = Color(0.6, 0.5, 0.36, 1)
+shader_parameter/edge_outer = Color(0.18, 0.12, 0.07, 1)
 shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 38.0
 shader_parameter/corner = 0.22
 shader_parameter/edge_px = 2.0
 shader_parameter/aspect = 1.0
-shader_parameter/noise_amt = 0.05
-shader_parameter/wear = 0.22
+shader_parameter/noise_amt = 0.08
+shader_parameter/wear = 0.24
 
 [sub_resource type="ShaderMaterial" id="JellyDaFang"]
 shader = ExtResource("21_jelly")
-shader_parameter/fill_top = Color(0.7, 0.72, 0.77, 1)
-shader_parameter/fill_bottom = Color(0.48, 0.5, 0.56, 1)
-shader_parameter/edge_inner = Color(0.9, 0.92, 0.97, 1)
-shader_parameter/edge_outer = Color(0.32, 0.34, 0.4, 1)
+shader_parameter/fill_top = Color(0.88, 0.82, 0.68, 1)
+shader_parameter/fill_bottom = Color(0.82, 0.75, 0.6, 1)
+shader_parameter/edge_inner = Color(0.6, 0.5, 0.36, 1)
+shader_parameter/edge_outer = Color(0.18, 0.12, 0.07, 1)
 shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 38.0
 shader_parameter/corner = 0.22
 shader_parameter/edge_px = 2.0
 shader_parameter/aspect = 1.0
-shader_parameter/noise_amt = 0.05
-shader_parameter/wear = 0.22
+shader_parameter/noise_amt = 0.08
+shader_parameter/wear = 0.24
 
 [sub_resource type="ShaderMaterial" id="JellySpecial"]
 shader = ExtResource("21_jelly")
-shader_parameter/fill_top = Color(0.7, 0.72, 0.77, 1)
-shader_parameter/fill_bottom = Color(0.48, 0.5, 0.56, 1)
-shader_parameter/edge_inner = Color(0.9, 0.92, 0.97, 1)
-shader_parameter/edge_outer = Color(0.32, 0.34, 0.4, 1)
+shader_parameter/fill_top = Color(0.88, 0.82, 0.68, 1)
+shader_parameter/fill_bottom = Color(0.82, 0.75, 0.6, 1)
+shader_parameter/edge_inner = Color(0.6, 0.5, 0.36, 1)
+shader_parameter/edge_outer = Color(0.18, 0.12, 0.07, 1)
 shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 38.0
 shader_parameter/corner = 0.22
 shader_parameter/edge_px = 2.0
 shader_parameter/aspect = 1.0
-shader_parameter/noise_amt = 0.05
-shader_parameter/wear = 0.22
+shader_parameter/noise_amt = 0.08
+shader_parameter/wear = 0.24
 
 [sub_resource type="ShaderMaterial" id="JellyConfirm"]
 shader = ExtResource("21_jelly")
-shader_parameter/fill_top = Color(0.42, 0.6, 0.42, 1)
-shader_parameter/fill_bottom = Color(0.24, 0.42, 0.27, 1)
-shader_parameter/edge_inner = Color(0.66, 0.88, 0.66, 1)
-shader_parameter/edge_outer = Color(0.16, 0.3, 0.19, 1)
+shader_parameter/fill_top = Color(0.95, 0.9, 0.76, 1)
+shader_parameter/fill_bottom = Color(0.89, 0.82, 0.67, 1)
+shader_parameter/edge_inner = Color(0.97, 0.85, 0.48, 1)
+shader_parameter/edge_outer = Color(0.4, 0.28, 0.1, 1)
 shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 38.0
 shader_parameter/corner = 0.22
 shader_parameter/edge_px = 2.0
 shader_parameter/aspect = 1.0
-shader_parameter/noise_amt = 0.05
-shader_parameter/wear = 0.22
+shader_parameter/noise_amt = 0.08
+shader_parameter/wear = 0.24
 
 [node name="BattleScreen" type="Control" unique_id=1618077294]
 layout_mode = 3
@@ -298,7 +298,7 @@ wave_idle = true
 wave_speed_by_hp = true
 pip_size = 100.0
 spacing = -50.0
-extra_modulate = Color(0.6177773, 0.6495925, 0.7172231, 1)
+extra_modulate = Color(0.85, 0.82, 0.74, 1)
 
 [node name="P1CoinRow" parent="P1Hud" unique_id=1966048575 instance=ExtResource("4_piprow")]
 texture_filter = 1
@@ -319,7 +319,7 @@ per_row_cap = 10
 row_spacing = -20.0
 show_empty = false
 allow_half = false
-extra_modulate = Color(0.8, 0.82, 0.86, 1)
+extra_modulate = Color(0.85, 0.82, 0.74, 1)
 preview_cur = 10.865
 
 [node name="P1Frame0" parent="P1Hud" unique_id=2129820687 instance=ExtResource("3_hero_frame")]
@@ -369,7 +369,7 @@ offset_left = 22.0
 offset_top = 100.0
 offset_right = 110.0
 offset_bottom = 126.0
-theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_color = Color(0.95, 0.91, 0.8, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 0.7)
 theme_override_constants/outline_size = 3
 theme_override_fonts/font = SubResource("PixelBold16")
@@ -383,7 +383,7 @@ offset_left = 138.0
 offset_top = 100.0
 offset_right = 395.0
 offset_bottom = 126.0
-theme_override_colors/font_color = Color(1, 0.65, 0.12, 1)
+theme_override_colors/font_color = Color(0.957, 0.784, 0.294, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 0.7)
 theme_override_constants/outline_size = 3
 theme_override_fonts/font = SubResource("PixelBold16")
@@ -416,7 +416,7 @@ wave_speed_by_hp = true
 pip_size = 100.0
 spacing = -50.0
 right_to_left = true
-extra_modulate = Color(0.8, 0.82, 0.86, 1)
+extra_modulate = Color(0.85, 0.82, 0.74, 1)
 
 [node name="P2CoinRow" parent="P2Hud" unique_id=1708577516 instance=ExtResource("4_piprow")]
 texture_filter = 1
@@ -438,7 +438,7 @@ per_row_cap = 10
 row_spacing = -20.0
 show_empty = false
 allow_half = false
-extra_modulate = Color(0.8, 0.82, 0.86, 1)
+extra_modulate = Color(0.85, 0.82, 0.74, 1)
 preview_cur = 10.0
 
 [node name="P2Frame0" parent="P2Hud" unique_id=1770616061 instance=ExtResource("3_hero_frame")]
@@ -487,7 +487,7 @@ offset_left = 1810.0
 offset_top = 100.0
 offset_right = 1898.0
 offset_bottom = 126.0
-theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_color = Color(0.95, 0.91, 0.8, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 0.7)
 theme_override_constants/outline_size = 3
 theme_override_fonts/font = SubResource("PixelBold16")
@@ -501,7 +501,7 @@ offset_left = 1527.505
 offset_top = 100.0
 offset_right = 1784.505
 offset_bottom = 126.0
-theme_override_colors/font_color = Color(1, 0.65, 0.12, 1)
+theme_override_colors/font_color = Color(0.957, 0.784, 0.294, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 0.7)
 theme_override_constants/outline_size = 3
 theme_override_fonts/font = SubResource("PixelBold16")

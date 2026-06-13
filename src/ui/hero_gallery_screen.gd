@@ -27,14 +27,20 @@ const ROW_Y0 := 186.0
 # ── 右侧详情板 ──
 const PANEL := Rect2(1132, 140, 728, 900)
 
-# 配色（battle 框语言·bp 同源）
-const EDGE_OUTER := Color(0.05, 0.05, 0.06)
-const EDGE_MID := Color(0.65, 0.67, 0.71)
-const EDGE_INNER := Color(0.34, 0.36, 0.39)
+# 配色（典籍朱印·暖羊皮+墨线+金箔+朱印）
+# 暗底上的中性框 = 暖骨边（outer/mid/inner 三层·替代旧板岩银灰）
+const EDGE_OUTER := Color(0.05, 0.045, 0.04)
+const EDGE_MID := Color(0.70, 0.64, 0.52)
+const EDGE_INNER := Color(0.42, 0.36, 0.26)
 const GOLD_TEXT := Color("#f4c84b")
-const TIN_DIM := Color("#aab4c4")
-const ACTIVE_TAG := Color("#d24a44")    # 主动=赤红（进攻）
-const PASSIVE_TAG := Color("#5a7fa8")   # 被动=黛蓝（恒常）
+const TIN_DIM := Color(0.80, 0.74, 0.60)   # 压暗底次级文字=暖米白次级（替代旧冷锡灰 #aab4c4）
+const ACTIVE_TAG := Color(0.74, 0.24, 0.18)    # 主动=朱砂（进攻）
+const PASSIVE_TAG := Color(0.40, 0.50, 0.62)   # 被动=去饱和冷蓝（恒常）
+
+# 典籍朱印补充令牌
+const DARK_WARM := Color(0.09, 0.085, 0.075)   # 近黑暖暗底（详情板底/牌匾/徽章衬底大暗面）
+const INK_LINE := Color(0.18, 0.12, 0.07)      # 墨线
+const PARCHMENT_HI := Color(0.95, 0.91, 0.80)  # 暖米白（压暗底主文字）
 
 # 三牌系主题色（图例带/卡顶线/详情衬光共用·2026-06-12 去毛坯批）
 const THEME_TEAL := Color(0.36, 0.72, 0.62)     # 十二生肖
@@ -88,7 +94,7 @@ func _setup_top() -> void:
 	_build_collect_badge()
 
 	FontManager.apply_btn(back_btn, 24)
-	back_btn.add_theme_color_override("font_color", Color("#c9d2dc"))
+	back_btn.add_theme_color_override("font_color", PARCHMENT_HI)   # 暖米白（压暗底）
 	for s in ["normal", "hover", "pressed", "focus", "disabled"]:
 		back_btn.add_theme_stylebox_override(s, StyleBoxEmpty.new())
 	var edge := ColorRect.new()
@@ -102,7 +108,7 @@ func _setup_top() -> void:
 	edge.mouse_filter = Control.MOUSE_FILTER_IGNORE   # ⚠ 缺这行=吞点击（返回失效 bug）
 	back_btn.add_child(edge)
 	var backing := ColorRect.new()
-	backing.color = Color(0.10, 0.115, 0.145, 0.92)
+	backing.color = Color(DARK_WARM, 0.92)   # 近黑暖暗底
 	backing.show_behind_parent = true
 	backing.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -122,7 +128,7 @@ func _build_plaque() -> void:
 	backing.name = "PlaqueBacking"
 	var fill := _band_rect(band,
 		Rect2(PLAQUE.position + Vector2(3, 3), PLAQUE.size - Vector2(6, 6)),
-		Color(0.065, 0.075, 0.10, 0.97))
+		Color(DARK_WARM, 0.97))   # 近黑暖暗底
 	fill.name = "PlaqueFill"
 	var frame := _band_rect(band, PLAQUE, Color.WHITE)
 	frame.name = "PlaqueFrame"
@@ -146,18 +152,8 @@ func _build_plaque() -> void:
 	FontManager.apply(title_lbl, 36)
 	title_lbl.add_theme_color_override("font_color", GOLD_TEXT)
 	title_lbl.add_theme_constant_override("outline_size", 2)
-	title_lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 0.95))
-	# 匾顶小王冠（骑匾顶边沿·boot/牌背同源纹理）
-	var crown := TextureRect.new()
-	crown.name = "PlaqueCrown"
-	crown.texture = PixelGlyphs.crown_texture()
-	crown.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	crown.stretch_mode = TextureRect.STRETCH_SCALE
-	crown.size = Vector2(crown.texture.get_size()) * 2.0
-	crown.position = Vector2(960.0 - crown.size.x * 0.5, PLAQUE.position.y - crown.size.y * 0.55)
-	crown.z_index = 2
-	crown.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	band.add_child(crown)
+	title_lbl.add_theme_color_override("font_outline_color", Color(0.05, 0.03, 0.02, 0.95))   # 暖近黑描边（衬金字）
+	# 匾顶小王冠已移除（2026-06-13 Eddy：王冠只用于标题/logo，不做通用 UI 装饰）。
 	# 左右卷轴端头饰线（端头方块 + 细线·与匾垂直居中对齐）
 	var line_y := PLAQUE.position.y + PLAQUE.size.y * 0.5 - 1.0
 	for side: Array in [
@@ -176,7 +172,7 @@ func _build_collect_badge() -> void:
 	edge.name = "BadgeEdge"
 	var fill := _band_rect(band,
 		Rect2(plate.position + Vector2(2, 2), plate.size - Vector2(4, 4)),
-		Color(0.065, 0.075, 0.10, 0.94))
+		Color(DARK_WARM, 0.94))   # 近黑暖暗底
 	fill.name = "BadgeFill"
 	var icon := TextureRect.new()
 	icon.name = "BadgeIcon"
@@ -185,7 +181,7 @@ func _build_collect_badge() -> void:
 	icon.stretch_mode = TextureRect.STRETCH_SCALE
 	icon.position = Vector2(1634, 39)
 	icon.size = Vector2(32, 32)
-	icon.modulate = Color("#c9d2dc")
+	icon.modulate = PARCHMENT_HI   # 暖米白（压暗底 icon）
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	band.add_child(icon)
 	# 计数标签（tscn 节点挪进徽章内）
@@ -214,12 +210,10 @@ func _band_rect(parent: Control, r: Rect2, col: Color) -> ColorRect:
 
 
 ## 左侧牌库（bp 同源霜玻璃 + 0.846 网格八列）。
-## 去毛坯批新增：①顶部三牌系图例带 ②每卡顶沿主题色细线（骑边框·与图例对色）
-## ③选中行微亮条（键盘导航行定位）。8 列网格三系混行 → 行间分组标放不下，
-## 分组可读性改走"图例+卡顶色线"双件套。
+## 2026-06-13 Eddy：去除三系图例带 + 每卡顶主题色细线（生肖/大阿卡那/星座标记
+## 将由"另一套标记"替代，现在先全部移除）。保留选中行微亮条（键盘导航行定位）。
 func _build_pool() -> void:
 	_make_frosted(pool_area, POOL)
-	_build_pool_legend()
 	# 行亮条（先建=画在卡下层）
 	_row_glow = ColorRect.new()
 	_row_glow.color = Color(1, 1, 1, 0.045)
@@ -239,46 +233,12 @@ func _build_pool() -> void:
 		card.pressed.connect(_select.bind(i))
 		pool_area.add_child(card)
 		card.compensate_name_scale(CARD_SCALE)   # 名字整数像素渲染（防糊）
-		# 主题色顶线：骑卡顶边框沿（HP 爱心骑角同语言）·随卡一起缩放/入场动画
-		var strip := ColorRect.new()
-		strip.color = Color(_theme_color_of(i), 0.9)
-		strip.position = Vector2(8, 0)
-		strip.size = Vector2(114, 3)
-		strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		card.add_child(strip)
+		# 主题色顶线已移除（2026-06-13 Eddy：三系标记待"另一套标记"替代）。
 		var bj := card.get_node_or_null("ButtonJuice") as ButtonJuice
 		if bj:
 			bj.base_scale = CARD_SCALE
 		card_cards.append(card)
 	pool_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-
-## 网格顶图例带：三牌系 色点+系名，整组在池内水平居中。
-func _build_pool_legend() -> void:
-	var entries: Array = [
-		["十二生肖", THEME_TEAL], ["大阿卡那", THEME_GOLD], ["十二星座", THEME_PURPLE],
-	]
-	var item_w := 72.0    # 点10 + 间6 + 字56
-	var gap := 48.0
-	var total := item_w * entries.size() + gap * (entries.size() - 1)
-	var x := POOL.position.x + (POOL.size.x - total) * 0.5
-	for e: Array in entries:
-		var dot := ColorRect.new()
-		dot.color = e[1]
-		dot.position = Vector2(x, 156)
-		dot.size = Vector2(10, 10)
-		dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		pool_area.add_child(dot)
-		var lbl := Label.new()
-		lbl.text = e[0]
-		lbl.position = Vector2(x + 16, 150)
-		lbl.size = Vector2(60, 22)
-		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		FontManager.apply(lbl, 14)
-		lbl.add_theme_color_override("font_color", Color(TIN_DIM, 0.8))
-		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		pool_area.add_child(lbl)
-		x += item_w + gap
 
 
 ## 右侧常驻详情板（像素框）：上=idle 动画舞台，下=文字属性。
@@ -290,7 +250,7 @@ func _build_detail_panel() -> void:
 	backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	detail_area.add_child(backing)
 	var fill := ColorRect.new()
-	fill.color = Color(0.065, 0.075, 0.10, 0.97)
+	fill.color = Color(DARK_WARM, 0.97)   # 近黑暖暗底（详情板大暗面保留为暗）
 	fill.position = PANEL.position + Vector2(3, 3)
 	fill.size = PANEL.size - Vector2(6, 6)
 	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -315,7 +275,7 @@ func _build_detail_panel() -> void:
 
 	# ── ① 舞台段：暗井衬底 + 大编号水印 + 主题色衬光 + 台座投影 + idle 动画 ──
 	var stage := ColorRect.new()
-	stage.color = Color(0.03, 0.04, 0.06, 0.85)
+	stage.color = Color(0.04, 0.035, 0.03, 0.85)   # 近黑暖·舞台暗井（去旧冷蓝、保留为暗）
 	stage.position = PANEL.position + Vector2(144, 60)
 	stage.size = Vector2(440, 440)
 	stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -405,11 +365,12 @@ func _build_detail_panel() -> void:
 	band_sep.size = Vector2(band_r.size.x, 2)
 	band_sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	detail_area.add_child(band_sep)
-	_d_name = _make_label(band_r.position + Vector2(0, 4), Vector2(band_r.size.x, 36), 34, GOLD_TEXT)
+	# 32=f16×2 整数倍（34 非整倍数→回退 f12 放大=虚细，2026-06-13 Eddy"太细太小"根修）。
+	_d_name = _make_label(band_r.position + Vector2(0, 4), Vector2(band_r.size.x, 36), 32, GOLD_TEXT)
 	_d_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_d_name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_d_name.add_theme_constant_override("outline_size", 2)
-	_d_name.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 0.95))
+	_d_name.add_theme_constant_override("outline_size", 1)
+	_d_name.add_theme_color_override("font_outline_color", Color(0.05, 0.03, 0.02, 0.95))   # 暖近黑描边（衬金字）
 	_d_theme = _make_label(band_r.position + Vector2(0, 40), Vector2(band_r.size.x, 20), 14, Color(TIN_DIM, 0.85))
 	_d_theme.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_d_theme.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -417,7 +378,7 @@ func _build_detail_panel() -> void:
 	# ── ② 数据段：编号章 + 生命章（两枚药丸章成组居中·_layout_data_chips 按内容重排）──
 	_d_chip1_edge = _chip_rect(Color(EDGE_INNER, 0.55))
 	_d_chip1_fill = _chip_rect(Color(0, 0, 0, 0.35))
-	_d_chip1_lbl = _make_label(Vector2.ZERO, Vector2(120, 34), 16, Color("#c9d2dc"))
+	_d_chip1_lbl = _make_label(Vector2.ZERO, Vector2(120, 34), 16, PARCHMENT_HI)   # 暖米白（压暗底 chip）
 	_d_chip1_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_d_chip1_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_d_chip2_edge = _chip_rect(Color(EDGE_INNER, 0.55))
@@ -433,7 +394,7 @@ func _build_detail_panel() -> void:
 	_d_hp_heart.size = Vector2(26, 26)
 	_d_hp_heart.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	detail_area.add_child(_d_hp_heart)
-	_d_hp_num = _make_label(Vector2.ZERO, Vector2(60, 34), 20, Color("#e86060"))
+	_d_hp_num = _make_label(Vector2.ZERO, Vector2(60, 34), 20, Color("#e0584a"))   # 暖朱红（生命数·朱砂系亮调）
 	_d_hp_num.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
 	# 段间分隔线
@@ -451,9 +412,9 @@ func _build_detail_panel() -> void:
 	detail_area.add_child(_d_tag_bg)
 	_d_tag = _make_label(Vector2.ZERO, Vector2(64, 24), 16, Color.WHITE)
 	_d_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_d_skill_name = _make_label(Vector2.ZERO, Vector2(300, 30), 24, Color("#e4eaf2"))
+	_d_skill_name = _make_label(Vector2.ZERO, Vector2(300, 30), 24, PARCHMENT_HI)   # 暖米白（压暗底）
 	_make_frosted(detail_area, Rect2(px + 70, py + 696, PANEL.size.x - 140, 130))
-	_d_detail = _make_label(Vector2(px + 86, py + 710), Vector2(PANEL.size.x - 172, 104), 16, Color(0.78, 0.81, 0.86))
+	_d_detail = _make_label(Vector2(px + 86, py + 710), Vector2(PANEL.size.x - 172, 104), 16, TIN_DIM)   # 暖米白次级（压详述盒暗底）
 	_d_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_d_detail.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	_d_detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -491,9 +452,9 @@ func _select(idx: int) -> void:
 		_d_fallback.texture = load(h.portrait_path) if ResourceLoader.exists(h.portrait_path) else null
 		_d_fallback.visible = true
 	_d_name.text = h.hero_name
-	_d_theme.text = "%s · %s" % [_theme_of(idx), h.hero_id]
+	_d_theme.text = ""   # 三系归属已移除（2026-06-13 Eddy：待"另一套标记"替代）
 	_d_watermark.text = "%02d" % (idx + 1)
-	_d_glow.modulate = _theme_color_of(idx)
+	_d_glow.modulate = Color(0.92, 0.84, 0.62)   # 暖金中性衬光（典籍朱印·替代旧冷调）
 	_d_chip1_lbl.text = "No.%02d" % (idx + 1)
 	_d_hp_num.text = "%d" % h.max_hp
 	var is_passive := h.skill_type == HeroData.SkillType.PASSIVE
@@ -576,6 +537,7 @@ func _back_to_menu() -> void:
 
 
 ## 主题归属（池顺序固定：h01-12 生肖 / h13-34 大阿卡那 / h35-46 星座）。
+## 2026-06-13：三系标记已从 UI 移除，本对映射函数保留给未来"另一套标记"复用（当前无调用）。
 func _theme_of(idx: int) -> String:
 	if idx < 12:
 		return "十二生肖"
@@ -633,16 +595,16 @@ func _make_label(pos: Vector2, sz: Vector2, font_px: int, col: Color) -> Label:
 	return lbl
 
 
-## 霜玻璃桌面（bp B2 同款）：月光青细边 + 极浅暗底。
+## 典籍暗格（原霜玻璃桌面）：墨线细边 + 近黑暖暗底（替代旧月光青+冷暗底）。
 func _make_frosted(parent: Control, r: Rect2) -> void:
 	var border := ColorRect.new()
-	border.color = Color(0.30, 0.55, 0.85, 0.35)
+	border.color = Color(INK_LINE, 0.55)   # 墨线
 	border.position = r.position
 	border.size = r.size
 	border.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(border)
 	var fill := ColorRect.new()
-	fill.color = Color(0.01, 0.02, 0.05, 0.45)
+	fill.color = Color(DARK_WARM, 0.55)   # 近黑暖暗底
 	fill.position = r.position + Vector2(2, 2)
 	fill.size = r.size - Vector2(4, 4)
 	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE

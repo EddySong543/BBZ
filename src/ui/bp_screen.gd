@@ -53,16 +53,24 @@ const CER_DX := 200.0
 const CER_OPP_Y := 320.0
 const CER_MY_Y := 560.0
 
-# 配色（battle 框语言 + 阵营）
-const EDGE_OUTER := Color(0.05, 0.05, 0.06)
-const EDGE_MID := Color(0.65, 0.67, 0.71)
-const EDGE_INNER := Color(0.34, 0.36, 0.39)
-const GOLD_TEXT := Color("#f4c84b")
-const BAN_RED := Color("#d24a44")
-const TIN_DIM := Color("#aab4c4")
+# 配色「典籍朱印」（2026-06-13 全局换肤）：暖羊皮 + 墨线 + 金箔 + 朱印。
+# 暗底上用「暖骨边」中性框（mid/inner/outer），不再用冷钢灰；标题金、按钮朱砂。
+const EDGE_OUTER := Color(0.05, 0.045, 0.04)   # 暖骨外轮廓（近黑暖）
+const EDGE_MID := Color(0.70, 0.64, 0.52)      # 暖骨中段（替原冷灰）
+const EDGE_INNER := Color(0.42, 0.36, 0.26)    # 暖骨内段（替原冷灰）
+const GOLD_TEXT := Color("#f4c84b")            # 金字标题（暗底，节制）
+const BAN_RED := Color("#d24a44")              # 敌方红（功能色，勿改）
+const CINNABAR := Color(0.74, 0.24, 0.18)      # 朱砂（主行动/确认）
+const CINNABAR_INK := Color(0.52, 0.18, 0.12)  # 朱砂墨（朱砂按钮的字）
+# 暗底文字
+const WARM_IVORY := Color(0.95, 0.91, 0.80)    # 暖米白（压暗背景）
+const WARM_IVORY_DIM := Color(0.80, 0.74, 0.60)  # 暖米白次级
+const DARK_WARM := Color(0.09, 0.085, 0.075)   # 近黑暖暗底（保留为暗的大块面）
+# 确认钮 = 鎏金羊皮主行动钮（2026-06-13 回修：全朱砂大红填充读成危险/取消；主 CTA 应是
+# "鎏金"——与主菜单金色匹配钮同级。羊皮提亮底 + 金箔内边 + 暗金外边，字用朱砂墨点睛）。
 const TIER_GOLD := {
-	"fill_top": Color(0.64, 0.46, 0.17), "fill_bottom": Color(0.33, 0.21, 0.07),
-	"edge_inner": Color(0.98, 0.82, 0.42), "edge_outer": Color(0.12, 0.08, 0.03),
+	"fill_top": Color(0.95, 0.90, 0.76), "fill_bottom": Color(0.89, 0.82, 0.67),
+	"edge_inner": Color(0.97, 0.85, 0.48), "edge_outer": Color(0.40, 0.28, 0.10),
 }
 
 var all_heroes: Array[HeroData] = []
@@ -114,15 +122,15 @@ func _setup_ui() -> void:
 	timer_label.add_theme_color_override("font_color", GOLD_TEXT)
 
 	FontManager.apply($OppBand/OppName, 22)
-	$OppBand/OppName.add_theme_color_override("font_color", Color("#e8a09c"))
+	$OppBand/OppName.add_theme_color_override("font_color", Color("#e0938c"))   # 敌方暖红（暗底）
 	FontManager.apply($OppBand/OppRank, 14)
-	$OppBand/OppRank.add_theme_color_override("font_color", Color(TIN_DIM, 0.7))
+	$OppBand/OppRank.add_theme_color_override("font_color", Color(WARM_IVORY_DIM, 0.8))
 	FontManager.apply(opp_progress, 16)
-	opp_progress.add_theme_color_override("font_color", Color("#e8a09c"))
+	opp_progress.add_theme_color_override("font_color", Color("#e0938c"))      # 敌方暖红（暗底）
 	FontManager.apply($MyBand/MyName, 22)
-	$MyBand/MyName.add_theme_color_override("font_color", Color("#9cc0e8"))
+	$MyBand/MyName.add_theme_color_override("font_color", Color("#9cc0e8"))     # 我方蓝（阵营功能色·勿改）
 	FontManager.apply($MyBand/MyHint, 14)
-	$MyBand/MyHint.add_theme_color_override("font_color", Color(TIN_DIM, 0.7))
+	$MyBand/MyHint.add_theme_color_override("font_color", Color(WARM_IVORY_DIM, 0.8))
 
 	# 席位槽底（对手 3 + 手牌 3）
 	for p in OPP_SLOTS:
@@ -136,10 +144,11 @@ func _setup_ui() -> void:
 	opp_progress.z_index = 1
 	timer_label.z_index = 1
 
-	# 确认钮：金大钮（主菜单匹配钮同级）
+	# 确认钮：鎏金羊皮大钮（主菜单匹配钮同级）·朱砂墨字（压在浅金羊皮上）
 	for s in ["normal", "hover", "pressed", "focus", "disabled"]:
 		confirm_btn.add_theme_stylebox_override(s, StyleBoxEmpty.new())
 	FontManager.apply_btn(confirm_btn, 26)
+	confirm_btn.add_theme_color_override("font_color", CINNABAR_INK)
 	var bg := ColorRect.new()
 	bg.name = "Bg"
 	bg.show_behind_parent = true
@@ -151,8 +160,8 @@ func _setup_ui() -> void:
 		mat.set_shader_parameter(k, TIER_GOLD[k])
 	mat.set_shader_parameter("corner", 0.2)
 	mat.set_shader_parameter("edge_px", 2.0)
-	mat.set_shader_parameter("noise_amt", 0.05)
-	mat.set_shader_parameter("wear", 0.18)
+	mat.set_shader_parameter("noise_amt", 0.08)   # 纸感
+	mat.set_shader_parameter("wear", 0.24)         # 纸感
 	mat.set_shader_parameter("pixel_grid", 38.0)
 	mat.set_shader_parameter("fill_alpha", 0.95)
 	mat.set_shader_parameter("aspect", confirm_btn.size.x / maxf(confirm_btn.size.y, 1.0))
@@ -244,7 +253,7 @@ func _play_phase_announce() -> void:
 
 	# 中央暗带（全宽·从中线纵向展开）：busy 牌库上抬起一条安静的台面给大字
 	var band := ColorRect.new()
-	band.color = Color(0.012, 0.022, 0.045, 0.66)
+	band.color = Color(0.09, 0.085, 0.075, 0.7)   # 近黑暖暗底（替原深蓝）
 	band.position = Vector2(0, 462)
 	band.size = Vector2(1920, 156)
 	band.pivot_offset = band.size * 0.5
@@ -267,7 +276,7 @@ func _play_phase_announce() -> void:
 	FontManager.apply(title, 52)
 	title.add_theme_color_override("font_color", theme_col)
 	title.add_theme_constant_override("outline_size", 8)
-	title.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 0.95))
+	title.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.03, 0.95))
 	title.position = Vector2(0, 478)
 	title.size = Vector2(1920, 64)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -277,9 +286,9 @@ func _play_phase_announce() -> void:
 	var sub := Label.new()
 	sub.text = "禁用 3 名英雄" if is_ban else "选择你的英雄"
 	FontManager.apply(sub, 20)
-	sub.add_theme_color_override("font_color", Color(TIN_DIM, 0.9))
+	sub.add_theme_color_override("font_color", Color(WARM_IVORY, 0.92))
 	sub.add_theme_constant_override("outline_size", 4)
-	sub.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 0.9))
+	sub.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.03, 0.9))
 	sub.position = Vector2(0, 552)
 	sub.size = Vector2(1920, 30)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -542,7 +551,7 @@ func _run_ceremony(is_ban: bool) -> void:
 
 	# 牌库暗幕（独立 ColorRect·⛔modulate）
 	_pool_dim = ColorRect.new()
-	_pool_dim.color = Color(0.015, 0.025, 0.05, 0.0)
+	_pool_dim.color = Color(0.09, 0.085, 0.075, 0.0)   # 近黑暖压暗幕（替原深蓝）
 	_pool_dim.position = POOL.position
 	_pool_dim.size = POOL.size
 	pool_area.add_child(_pool_dim)
@@ -637,7 +646,7 @@ func _show_collisions(cer: Control, my_cer: Array[HeroCard], opp_cer: Array) -> 
 	FontManager.apply(lbl, 24)
 	lbl.add_theme_color_override("font_color", GOLD_TEXT)
 	lbl.add_theme_constant_override("outline_size", 4)
-	lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.04, 0.95))
+	lbl.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.03, 0.95))
 	lbl.position = Vector2(660, 498)
 	lbl.size = Vector2(600, 40)
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -724,26 +733,26 @@ func _play_intro() -> void:
 # 自绘部件（demo 同源）
 # ============================================================
 
-## 霜玻璃桌面（B2）：月光青细边 + 极浅暗底。
+## 牌库桌面（B2）：暖骨细边 + 近黑暖暗底（替原月光青+深蓝；大块面保持暗，别抢立绘）。
 func _make_frosted(parent: Control, r: Rect2) -> void:
 	var border := ColorRect.new()
-	border.color = Color(0.30, 0.55, 0.85, 0.35)
+	border.color = Color(EDGE_MID, 0.35)
 	border.position = r.position
 	border.size = r.size
 	border.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(border)
 	var fill := ColorRect.new()
-	fill.color = Color(0.01, 0.02, 0.05, 0.45)
+	fill.color = Color(DARK_WARM, 0.45)
 	fill.position = r.position + Vector2(2, 2)
 	fill.size = r.size - Vector2(4, 4)
 	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(fill)
 
 
-## 席位暗井槽。
+## 席位暗井槽（近黑暖底 + 暖骨内线 + 暖米白次级提示字）。
 func _make_slot_pit(parent: Control, r: Rect2, hint: String) -> void:
 	var backing := ColorRect.new()
-	backing.color = Color(0.03, 0.04, 0.06, 0.85)
+	backing.color = Color(DARK_WARM, 0.85)
 	backing.position = r.position
 	backing.size = r.size
 	backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -763,7 +772,7 @@ func _make_slot_pit(parent: Control, r: Rect2, hint: String) -> void:
 		var lbl := Label.new()
 		lbl.text = hint
 		FontManager.apply(lbl, 16)
-		lbl.add_theme_color_override("font_color", Color(TIN_DIM, 0.5))
+		lbl.add_theme_color_override("font_color", Color(WARM_IVORY_DIM, 0.55))
 		lbl.position = r.position + Vector2(0, r.size.y * 0.5 - 12)
 		lbl.size = Vector2(r.size.x, 24)
 		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -784,7 +793,7 @@ func _make_card_back(parent: Control, r: Rect2) -> Control:
 	backing.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.add_child(backing)
 	var fill := ColorRect.new()
-	fill.color = Color(0.065, 0.075, 0.10, 0.97)
+	fill.color = Color(0.13, 0.10, 0.07, 0.97)   # 深羊皮书脊衬底（替原蓝黑牌背）
 	fill.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	fill.offset_left = 3
 	fill.offset_top = 3

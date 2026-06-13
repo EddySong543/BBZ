@@ -27,17 +27,22 @@ var _match_state: int = MatchState.IDLE
 var _search_elapsed: float = 0.0
 var _cancel_btn: Button   # 匹配中才出现的「✕ 取消匹配」（_setup_modes 建·常态隐藏）
 
-## 小件像素底板（设置/段位徽章用，钢蓝档；牌面金色只出现在悬停态）。
+## 小件像素底板（设置/段位徽章用）。
+## 2026-06-13 Eddy 选 B「典籍朱印」全局铺·主菜单首屏：底板=哑光羊皮（关糖光渐变）
+## + 墨线框；字/图标=墨色。（常量名仍叫 STEEL 是历史遗留，值已改羊皮。）
 const JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")
 const STEEL := {
-	"fill_top": Color(0.24, 0.30, 0.44), "fill_bottom": Color(0.11, 0.14, 0.24),
-	"edge_inner": Color(0.52, 0.64, 0.88), "edge_outer": Color(0.04, 0.05, 0.10),
+	"fill_top": Color(0.88, 0.82, 0.68), "fill_bottom": Color(0.82, 0.75, 0.60),
+	"edge_inner": Color(0.60, 0.50, 0.36), "edge_outer": Color(0.18, 0.12, 0.07),
 }
+const INK := Color(0.20, 0.14, 0.08)        # 墨（羊皮上的字/图标）
+const INK_SOFT := Color(0.42, 0.34, 0.24)   # 淡墨（次级字）
+const CREAM := Color(0.95, 0.91, 0.80)      # 暖米白（直接压在暗波上的字·非羊皮上）
 
-# 底坞条配色（battle 框语言深色系）
-const DOCK_BACKING := Color(0.05, 0.05, 0.06)
-const DOCK_FILL := Color(0.10, 0.115, 0.145, 0.92)
-const DOCK_TEXT := Color("#c9d2dc")
+# 底坞条配色（典籍羊皮：墨色书脊衬底 + 羊皮页填充 + 墨字）
+const DOCK_BACKING := Color(0.16, 0.11, 0.07)
+const DOCK_FILL := Color(0.86, 0.80, 0.66, 0.96)
+const DOCK_TEXT := Color(0.20, 0.14, 0.08)
 
 @onready var _coming_soon: Label = $UI/ComingSoon
 @onready var _match_card: ModeCard = $UI/ModeMatch
@@ -51,6 +56,7 @@ func _ready() -> void:
 	_setup_modes()
 	_setup_dock()
 	FontManager.apply(_coming_soon, 40)
+	_coming_soon.add_theme_color_override("font_color", CREAM)
 	_coming_soon.modulate.a = 0.0
 	_play_intro()
 
@@ -66,10 +72,10 @@ func _setup_identity() -> void:
 		btn.add_theme_stylebox_override(s, StyleBoxEmpty.new())
 	var name_lbl: Label = $UI/IdentityButton/NameLabel
 	FontManager.apply(name_lbl, 26)
-	name_lbl.add_theme_color_override("font_color", Color("#e8edf4"))
+	name_lbl.add_theme_color_override("font_color", CREAM)   # 直接压暗波上→暖米白
 	var rank_lbl: Label = $UI/IdentityButton/RankLabel
 	FontManager.apply(rank_lbl, 16)
-	rank_lbl.add_theme_color_override("font_color", Color("#aab4c4"))
+	rank_lbl.add_theme_color_override("font_color", INK)     # 段位章在羊皮板上→墨字
 	_add_plate_bg(rank_lbl)
 	# 段位盾徽（icon 排查清单·先程序绘制占位）
 	var shield := TextureRect.new()
@@ -79,7 +85,7 @@ func _setup_identity() -> void:
 	shield.stretch_mode = TextureRect.STRETCH_SCALE
 	shield.position = Vector2(6, 9)
 	shield.size = Vector2(16, 16)
-	shield.modulate = Color("#aab4c4")
+	shield.modulate = INK
 	shield.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	rank_lbl.add_child(shield)
 	btn.pressed.connect(_on_placeholder_pressed.bind("个人资料"))
@@ -88,6 +94,7 @@ func _setup_identity() -> void:
 func _setup_settings() -> void:
 	var btn: Button = $UI/SettingsButton
 	FontManager.apply_btn(btn, 22)
+	btn.add_theme_color_override("font_color", INK)   # 羊皮板上→墨字
 	_apply_plate(btn)
 	_set_btn_left_margin(btn, 36.0)   # 文字让出左侧 icon
 	_add_icon(btn, Rect2(14, 11, 32, 32), "gear")
@@ -97,16 +104,17 @@ func _setup_settings() -> void:
 	# 退出游戏（PC 必备·2026-06-11 icon 排查补缺）
 	var quit_btn: Button = $UI/QuitButton
 	FontManager.apply_btn(quit_btn, 22)
+	quit_btn.add_theme_color_override("font_color", INK)
 	_apply_plate(quit_btn)
 	_set_btn_left_margin(quit_btn, 32.0)
 	_add_icon(quit_btn, Rect2(10, 11, 32, 32), "exit")
 	quit_btn.pressed.connect(func() -> void: get_tree().quit())
 	_attach_juice(quit_btn)
 
-	# 版本号（角落惯例·报 bug 定位用）
+	# 版本号（角落惯例·报 bug 定位用）·压暗波上→暖灰
 	var ver: Label = $UI/VersionLabel
 	FontManager.apply(ver, 14)
-	ver.add_theme_color_override("font_color", Color(0.55, 0.60, 0.68, 0.6))
+	ver.add_theme_color_override("font_color", Color(0.74, 0.66, 0.52, 0.6))
 
 
 ## 三牌阵：匹配对战接真实流程，故事/爬塔占位。悬停金框+放大在 ModeCard 内。
@@ -213,7 +221,7 @@ func _setup_dock() -> void:
 		if i > 0:
 			var sp := ColorRect.new()
 			sp.name = "DockSep"
-			sp.color = Color(0.40, 0.45, 0.52, 0.40)
+			sp.color = Color(0.45, 0.36, 0.24, 0.45)   # 暖墨分隔（羊皮坞上）
 			sp.position = Vector2(0, 16)
 			sp.size = Vector2(2, 38)
 			sp.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -431,8 +439,8 @@ func _jelly_mat(plate_size: Vector2) -> ShaderMaterial:
 	mat.set_shader_parameter("edge_outer", STEEL["edge_outer"])
 	mat.set_shader_parameter("corner", 0.2)
 	mat.set_shader_parameter("edge_px", 2.0)
-	mat.set_shader_parameter("noise_amt", 0.05)
-	mat.set_shader_parameter("wear", 0.18)
+	mat.set_shader_parameter("noise_amt", 0.08)   # 纸纤维
+	mat.set_shader_parameter("wear", 0.24)         # 做旧
 	mat.set_shader_parameter("pixel_grid", 38.0)
 	mat.set_shader_parameter("fill_alpha", 0.95)
 	mat.set_shader_parameter("aspect", plate_size.x / maxf(plate_size.y, 1.0))
@@ -457,7 +465,7 @@ func _add_icon(host: Control, r: Rect2, icon_name: String) -> void:
 	icon.stretch_mode = TextureRect.STRETCH_SCALE
 	icon.position = r.position
 	icon.size = r.size
-	icon.modulate = Color("#c9d2dc")
+	icon.modulate = INK   # 墨色图标（压在羊皮底板/坞页上）
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	host.add_child(icon)
 

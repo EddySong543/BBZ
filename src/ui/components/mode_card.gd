@@ -13,26 +13,36 @@ extends Button
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")
 const WAVE_CLASH_SHADER := preload("res://assets/shaders/wave_clash.gdshader")
 const ROUNDED_FILL_SHADER := preload("res://assets/shaders/canvas_ui_rounded_fill.gdshader")
+const SOFT_SHADOW_SHADER := preload("res://assets/shaders/canvas_ui_soft_shadow.gdshader")
+
+# 柔性投影（2026-06-13 Eddy 选 A）：把牌从动态波流背景里拔出 + hover 抬升加深。
+const SHADOW_BASE := Color(0.0, 0.0, 0.0, 0.5)   # 常态投影色/浓度
+const SHADOW_HOVER_A := 0.64                     # hover 抬升时投影加深
+const SHADOW_SOFT := 16.0                        # 软边宽度(px)=核相对节点边内缩
+const SHADOW_DROP := 12.0                        # 投影下移(px)→方向光投影(顶光)
 
 ## 圆角半径（高度 UV 比例·≈29px@650 高牌=纵向 4 台阶·像素台阶圆角，2026-06-12 Eddy 批）。
 ## 框 shader 与衬底遮罩共用此值+同 pixel_grid/aspect → 台阶逐格对齐。
 ## 0.03 实测台阶只有 2-3 级，读成"缺角"而非圆角 → 0.045。
 const CORNER_RADIUS := 0.045
 
-# battle screen 框语言（hero_frame 同源）
-const EDGE_OUTER := Color(0.05, 0.05, 0.06)
-const SILVER_MID := Color(0.65, 0.67, 0.71)
-const SILVER_INNER := Color(0.34, 0.36, 0.39)
-const GOLD_MID := Color(0.79, 0.65, 0.29)
-const GOLD_INNER := Color(0.45, 0.35, 0.15)
+# 命运牌框语言：2026-06-13 B「典籍朱印」全局铺。命运牌是暗色艺术展示位（卡内有波流/未来
+# 立绘），强行亮羊皮会和艺术打架，故走「暗页暖金牌」：常态=干净暖骨边 + 干净暗页，悬停镀亮金。
+# ⚠ 去脏（2026-06-13 二修）：常态边/填充曾用中明度暖棕(aged bronze + 暖棕页)=泥巴色→脏。
+#   改干净暖骨(高明度低饱和暖中性)边 + 够暗的近黑暖页(暗≠脏)；中明度暖棕是污渍带，绕开。
+const EDGE_OUTER := Color(0.05, 0.045, 0.04)         # 近黑暖（外轮廓）
+const SILVER_MID := Color(0.72, 0.66, 0.52)          # 常态边（干净暖骨色·非泥棕）
+const SILVER_INNER := Color(0.43, 0.38, 0.28)        # 常态内线（暖中性·清）
+const GOLD_MID := Color(0.90, 0.74, 0.36)            # 悬停边（干净亮金箔）
+const GOLD_INNER := Color(0.50, 0.39, 0.18)
 const GOLD_TEXT := Color("#f4c84b")
 
-const FILL_COLD := Color(0.065, 0.075, 0.10, 0.97)   # 常态牌面（深板岩）
-const FILL_WARM := Color(0.095, 0.085, 0.07, 0.97)   # 悬停牌面（微暖）
-const TITLE_COLD := Color("#e4eaf2")
-const SUB_COL := Color(0.667, 0.706, 0.769, 0.90)
-const CAP_COL := Color(0.667, 0.706, 0.769, 0.55)
-const EMBLEM_COL := Color(0.667, 0.706, 0.769, 0.85)
+const FILL_COLD := Color(0.085, 0.080, 0.072, 0.97)  # 常态牌面（近黑暖·暗≠脏）
+const FILL_WARM := Color(0.125, 0.115, 0.10, 0.97)   # 悬停牌面（提亮一档·仍干净）
+const TITLE_COLD := Color(0.95, 0.90, 0.78)          # 常态标题（暖米白）
+const SUB_COL := Color(0.84, 0.78, 0.66, 0.90)
+const CAP_COL := Color(0.84, 0.78, 0.66, 0.55)
+const EMBLEM_COL := Color(0.86, 0.76, 0.58, 0.85)
 
 @export var card_title: String = "模式":
 	set(v):
@@ -64,6 +74,8 @@ const EMBLEM_COL := Color(0.667, 0.706, 0.769, 0.85)
 ## 名牌横带高度占牌高比例。
 @export_range(0.1, 0.3) var band_ratio: float = 0.19
 
+var _shadow: ColorRect               # 柔性投影（最底层·尺寸超出卡体容纳软边）
+var _shadow_mat: ShaderMaterial
 var _backing: ColorRect
 var _backing_mat: ShaderMaterial     # 圆角遮罩（外层·full rect）
 var _fill: ColorRect
@@ -90,6 +102,7 @@ var _crown: TextureRect
 
 var _hot: bool = false
 var _tw: Tween
+var _shadow_tw: Tween
 
 # ---- 牌背模式（盖牌+王冠呼吸）----
 # ⚠ 2026-06-12 起主菜单匹配不再翻面（改 set_battle_ready 临战升温——对波卡面
@@ -123,6 +136,14 @@ func _build() -> void:
 	# 圆角=三层各自按像素台阶自切（backing/fill 用 rounded_fill、art 用 wave_clash
 	# 内置遮罩、框线在 frame shader 内沿弧重算）。⚠ 不能用 clip_children 统一裁：
 	# Godot 的 clip mask 不执行父节点自定义 shader → 子层直角会从弧外露出（实测踩坑）。
+	# 投影必须最先建 → 子节点序最底 → 画在 _backing 之下；ColorRect 自身白色，
+	# alpha 由 shader 的 shadow_color 决定（白色保证继承的 modulate.a 不被染色，仅传递）。
+	_shadow = _rect(Color.WHITE)
+	_shadow_mat = ShaderMaterial.new()
+	_shadow_mat.shader = SOFT_SHADOW_SHADER
+	_shadow_mat.set_shader_parameter("shadow_color", SHADOW_BASE)
+	_shadow_mat.set_shader_parameter("softness_px", SHADOW_SOFT)
+	_shadow.material = _shadow_mat
 	_backing = _rect(EDGE_OUTER)
 	_backing_mat = ShaderMaterial.new()
 	_backing_mat.shader = ROUNDED_FILL_SHADER
@@ -150,7 +171,7 @@ func _build() -> void:
 	_frame_mat = ShaderMaterial.new()
 	_frame_mat.shader = FRAME_SHADER
 	_frame_mat.set_shader_parameter("border_px", 1.5)
-	_frame_mat.set_shader_parameter("noise_amt", 0.06)
+	_frame_mat.set_shader_parameter("noise_amt", 0.035)   # 暖色边降噪→去脏粒（2026-06-13）
 	# 2026-06-11 2A 去科幻感：撤常态青镀线（冷色 emissive 细线=全息/科技 UI 公式）、撤竹节
 	# （细框上等距分段读成铆钉/能量管节）。保留方向光（中性体积感）；金镀线改为 hover 专属
 	# （_apply_palette 随 hot 开关）。质感重心移到四角双色金属包角。
@@ -206,6 +227,14 @@ func _build() -> void:
 func _layout() -> void:
 	pivot_offset = size * 0.5
 	var band_h := size.y * band_ratio
+
+	# 柔性投影：核=卡体大小，节点外扩 softness 容纳软边，整体下移 SHADOW_DROP→顶光方向投影。
+	# 核圆角 = 卡角半径(px)，与卡体圆角一致。
+	_shadow.position = Vector2(-SHADOW_SOFT, -SHADOW_SOFT + SHADOW_DROP)
+	_shadow.size = size + Vector2(SHADOW_SOFT * 2.0, SHADOW_SOFT * 2.0)
+	_shadow_mat.set_shader_parameter("rect_px", _shadow.size)
+	_shadow_mat.set_shader_parameter("softness_px", SHADOW_SOFT)
+	_shadow_mat.set_shader_parameter("corner_px", CORNER_RADIUS * size.y)
 
 	_backing.position = Vector2.ZERO
 	_backing.size = size
@@ -387,6 +416,22 @@ func _set_hot(hot: bool) -> void:
 	_tw = create_tween()
 	_tw.tween_property(self, "scale", Vector2.ONE * (hover_grow if hot else 1.0), 0.18)\
 		.set_trans(Tween.TRANS_BACK if hot else Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	# 投影随抬升加深（卡放大→影变大由父级缩放带动，浓度由本 tween 推）
+	_tween_shadow(SHADOW_HOVER_A if hot else SHADOW_BASE.a)
+
+
+## 投影浓度渐变（hover 抬升=加深 / 离开=回落）。
+func _tween_shadow(to_a: float) -> void:
+	if _shadow_mat == null:
+		return
+	if _shadow_tw and _shadow_tw.is_valid():
+		_shadow_tw.kill()
+	var from_a: float = (_shadow_mat.get_shader_parameter("shadow_color") as Color).a
+	_shadow_tw = create_tween()
+	_shadow_tw.tween_method(
+		func(a: float) -> void:
+			_shadow_mat.set_shader_parameter("shadow_color", Color(SHADOW_BASE.r, SHADOW_BASE.g, SHADOW_BASE.b, a)),
+		from_a, to_a, 0.18).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 
 func _on_down() -> void:
