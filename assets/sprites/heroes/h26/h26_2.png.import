@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://2s0d72vedi46"
-path="res://.godot/imported/h06.png-11c04305d63df297b301b64353a3cf4b.ctex"
+uid="uid://bchy7yuvkulkq"
+path="res://.godot/imported/h26_2.png-386e81dda30d74dd8f983bc142a6cd27.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/NewAssets/h06.png"
-dest_files=["res://.godot/imported/h06.png-11c04305d63df297b301b64353a3cf4b.ctex"]
+source_file="res://assets/sprites/heroes/h26/h26_2.png"
+dest_files=["res://.godot/imported/h26_2.png-386e81dda30d74dd8f983bc142a6cd27.ctex"]
 
 [params]
 
