@@ -738,7 +738,7 @@ func _set_cost_pips(btn: Button, cost: int) -> void:
 		return
 	badge.visible = cost > 0
 	if cost > 0:
-		badge.set_number(cost)
+		badge.set_number(int(round(cost / float(ActionDef.ENERGY_UNIT))))   # cost 为半能 → 显示整能
 
 
 # ============================================================
@@ -843,9 +843,11 @@ func _update_single_frame(frame: HeroFrame, hp_row, player: int, slot: int, is_a
 
 
 func _update_energy_labels() -> void:
-	# 金币能量点：能量为整数，show_empty=false → 画 N 枚金币（在 .tscn 配置）。
-	p1_coin_row.set_value(float(battle.energy[0]), float(battle.energy[0]))
-	p2_coin_row.set_value(float(battle.energy[1]), float(battle.energy[1]))
+	# 金币能量点：energy 内部为半能(×2)，显示除以 ENERGY_UNIT → 整能（0.5 能可显半枚·allow_half）。
+	var e0 := battle.energy[0] / float(ActionDef.ENERGY_UNIT)
+	var e1 := battle.energy[1] / float(ActionDef.ENERGY_UNIT)
+	p1_coin_row.set_value(e0, e0)
+	p2_coin_row.set_value(e1, e1)
 
 
 func _update_hp_labels() -> void:
