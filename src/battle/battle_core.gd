@@ -58,17 +58,17 @@ var _skills: Array = [[], []]             # _skills[player][slot]: HeroSkill 或
 ## 英雄技能组件注册表：hero_id → 组件脚本。未列入者 = 无技能（_skills 为 null）。
 ## 随实装逐个加入。swap 后此表与 v3 _HERO_SKILL_SCRIPTS 合并/替换。
 const _HERO_SKILL_SCRIPTS := {
-	"h01": preload("res://src/battle/skills/h01_qieyun.gd"),
-	"h02": preload("res://src/battle/skills/h02_numu.gd"),
-	"h03": preload("res://src/battle/skills/h03_kexue.gd"),
-	"h04": preload("res://src/battle/skills/h04_sanku.gd"),
-	"h05": preload("res://src/battle/skills/h05_tianwei.gd"),
-	"h06": preload("res://src/battle/skills/h06_shetui.gd"),
+	"h01": preload("res://src/battle/skills/h01_dunshu.gd"),
+	"h02": preload("res://src/battle/skills/h02_panniu.gd"),
+	"h03": preload("res://src/battle/skills/h03_lianpu.gd"),
+	"h04": preload("res://src/battle/skills/h04_jiaotu.gd"),
+	"h05": preload("res://src/battle/skills/h05_liejia.gd"),
+	"h06": preload("res://src/battle/skills/h06_cuidu.gd"),
 	"h08": preload("res://src/battle/skills/h08_tizui.gd"),
-	"h09": preload("res://src/battle/skills/h09_xiongshou.gd"),
-	"h10": preload("res://src/battle/skills/h10_tixiao.gd"),
-	"h11": preload("res://src/battle/skills/h11_qiongzhui.gd"),
-	"h12": preload("res://src/battle/skills/h12_tunshi.gd"),
+	"h09": preload("res://src/battle/skills/h09_liezhao.gd"),
+	"h10": preload("res://src/battle/skills/h10_jianyi.gd"),
+	"h11": preload("res://src/battle/skills/h11_zhuibu.gd"),
+	"h12": preload("res://src/battle/skills/h12_nafu.gd"),
 	"h13": preload("res://src/battle/skills/h13_guzhu.gd"),
 	"h15": preload("res://src/battle/skills/h15_sanjian.gd"),
 	"h16": preload("res://src/battle/skills/h16_zebei.gd"),
@@ -179,6 +179,15 @@ func hp_display(half: int) -> float:
 
 func energy_display(half: int) -> float:
 	return float(half) / float(ActionDef.ENERGY_UNIT)
+
+## 统一能量获得入口：应用出战英雄的 energy_gain_bonus（子鼠囤鼠 = 每次 +1 能），clamp 到 MAX。
+func _gain_energy(player: int, amount: int) -> void:
+	if amount <= 0:
+		return
+	var sk: HeroSkill = _skills[player][active_index[player]]
+	if sk != null and not _is_silenced(player, active_index[player]):
+		amount += sk.energy_gain_bonus(self, player, active_index[player])
+	energy[player] = mini(energy[player] + amount, ActionDef.MAX_ENERGY)
 
 func get_status(player: int, slot: int, key: String, default: Variant = null) -> Variant:
 	return statuses[player][slot].get(key, default)
@@ -436,7 +445,7 @@ func resolve() -> Dictionary:
 			var gain: int = ActionDef.BASE_ACTION_DEF[ActionDef.Action.CHARGE]["energy_gain"]
 			if dbl[p]:
 				gain *= 2   # 梅开二度：攒 ×2
-			energy[p] = mini(energy[p] + gain, ActionDef.MAX_ENERGY)
+			_gain_energy(p, gain)
 			events.append({id = "charge_gain", player = p, amount = gain})
 		elif a[p] == ActionDef.ACTIVE:
 			# 扣能由上面的 _get_cost 完成；cap 计数 + 事件在此；effect 执行延后到 Phase 2.6（切换之后）。
@@ -526,7 +535,7 @@ func resolve() -> Dictionary:
 					statuses[p][s]["burn"] = bn - 1
 	# 被动能量 +1 能/回合（A2）：回合末结算 → 下回合选择时反映
 	for p in [0, 1]:
-		energy[p] = mini(energy[p] + ActionDef.PASSIVE_ENERGY_GAIN, ActionDef.MAX_ENERGY)
+		_gain_energy(p, ActionDef.PASSIVE_ENERGY_GAIN)
 	turn_number += 1
 	var result := {
 		p1_hp = current_hp(0), p2_hp = current_hp(1),
@@ -576,7 +585,8 @@ func can_free_switch(player: int) -> bool:
 	var sk: HeroSkill = _skills[player][slot]
 	if sk == null or not sk.has_free_switch():
 		return false
-	if int(get_status(player, slot, "dangxian_uses", 0)) >= 2:
+	var cap: int = sk.free_switch_cap()
+	if cap >= 0 and int(get_status(player, slot, "dangxian_uses", 0)) >= cap:
 		return false
 	return living_reserves(player).size() > 0
 
@@ -635,6 +645,9 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		blocked = eff_def == ActionDef.Action.BIG_DEFEND or eff_def == ActionDef.Action.DEFEND
 	if blocked:
 		events.append({id = ("big_defend_block" if eff_def == ActionDef.Action.BIG_DEFEND else "defend_block"), player = target_player})
+		var dsk: HeroSkill = _skills[target_player][slot]
+		if dsk != null and not _is_silenced(target_player, slot):
+			dsk.on_block(self, target_player, slot, attacker_player, atk_action, raw)
 		return 0
 
 	# Stage B3: 易伤（燃烧 h32：受到攻击 +1.0）
@@ -677,6 +690,9 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		_dmg_dealt[attacker_player] += dmg
 		dealt = dmg
 		events.append({id = "damage_taken", player = target_player, amount = dmg})
+		var dsk2: HeroSkill = _skills[target_player][slot]
+		if dsk2 != null and not _is_silenced(target_player, slot):
+			dsk2.on_self_damaged(self, target_player, slot, dealt, attacker_player)
 		if hp[target_player][slot] <= 0:
 			_killer[target_player][slot] = attacker_player
 

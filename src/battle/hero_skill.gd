@@ -138,6 +138,33 @@ func on_team_deal_hit(_battle: BattleCore, _player: int, _slot: int, _attacker_s
 	pass
 
 
+## 本英雄（出战）成功防御挡下一次攻击时触发（raw = 被挡攻击的伤害半点）。
+## 丑牛（卸力反震：反弹被挡伤害的 50% 给攻击者）。
+func on_block(_battle: BattleCore, _player: int, _slot: int, _attacker_player: int, _attack_action: int, _raw: int) -> void:
+	pass
+
+
+## 本英雄受到伤害落 HP 后触发（dealt = 实际掉的半点血）。
+## 亥猪（纳福：受伤 → 己方能量 += 等量）。
+func on_self_damaged(_battle: BattleCore, _player: int, _slot: int, _dealt: int, _attacker_player: int) -> void:
+	pass
+
+
+## 本英雄（出战时）给己方每次"获得能量"事件的额外加成（半能）。子鼠囤鼠 = ENERGY_UNIT（每次 +1 能）。
+func energy_gain_bonus(_battle: BattleCore, _player: int, _slot: int) -> int:
+	return 0
+
+
+## 本英雄是否为"致死救援"守护者（替补席存活时，可替将死的出战队友顶伤上场）。未羊 = true。
+func is_lethal_guardian() -> bool:
+	return false
+
+
+## 免费切换次数上限（仅 has_free_switch()=true 时有意义）；-1 = 无限。午马当先 = -1（不限次）。
+func free_switch_cap() -> int:
+	return -1
+
+
 # ============================================================
 # ② 主动技接口（默认无主动技；主动技英雄 override）
 # ============================================================
