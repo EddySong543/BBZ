@@ -18,10 +18,10 @@ const MENU_SCENE := "res://src/ui/main_menu.tscn"
 # ── 左侧牌库网格（46 卡 0.846 缩放=110×134·八列六行）──
 const CARD_SCALE := 0.846
 const POOL := Rect2(60, 140, 1032, 900)
-const COLS := 8
+const COLS := 6   # 首发 12 生肖 = 2 行 ×6（h13+ 隐藏；扩张到 18/24 时改列数重排）
 const STEP_X := 121.0
 const ROW_H := 142.0
-const X0 := 97.0
+const X0 := 218.0   # 6 卡在 POOL(60..1092) 内水平居中
 const ROW_Y0 := 186.0
 
 # ── 右侧详情板 ──
@@ -81,7 +81,7 @@ var _row_glow: ColorRect          # 左网格选中行微亮条（键盘导航�
 
 
 func _ready() -> void:
-	all_heroes = HeroData.create_pool_heroes(HERO_DATA_DIR)
+	all_heroes = HeroData.create_launch_pool(HERO_DATA_DIR)   # 首发只 12 生肖（h13+ 隐藏）
 	_setup_top()
 	_build_pool()
 	_build_detail_panel()

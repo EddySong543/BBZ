@@ -85,5 +85,10 @@ static func create_pool_heroes(heroes_dir: String = HEROES_DIR) -> Array[HeroDat
 	return pool
 
 
+## 首发英雄池：只前 12 生肖（h13+ 暂隐藏）。将来扩张到 18 / 24 改这里的 12。
+static func create_launch_pool(heroes_dir: String = HEROES_DIR) -> Array[HeroData]:
+	return create_pool_heroes(heroes_dir).slice(0, 12)
+
+
 static func create_mvp_heroes() -> Array[HeroData]:
 	return create_pool_heroes().slice(0, 8)
