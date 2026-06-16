@@ -177,6 +177,9 @@ func _validate_skills() -> void:
 func hp_display(half: int) -> float:
 	return float(half) / float(HP_UNIT)
 
+func energy_display(half: int) -> float:
+	return float(half) / float(ActionDef.ENERGY_UNIT)
+
 func get_status(player: int, slot: int, key: String, default: Variant = null) -> Variant:
 	return statuses[player][slot].get(key, default)
 
@@ -466,22 +469,26 @@ func resolve() -> Dictionary:
 
 	# Phase 3: 计算双方造成伤害（快照；含攻击型主动技 h20 倾力）
 	var out: Array[int] = [0, 0]
-	var out_kind: Array[int] = [-1, -1]   # 防御门判定用的攻击类型
+	var out_kind: Array[int] = [-1, -1]   # 攻击判定类型(h10 升判定)
+	var out_pen: Array[int] = [ActionDef.Pen.NORMAL, ActionDef.Pen.NORMAL]   # 防御门穿透档
 	for p in [0, 1]:
 		var aslot: int = active_index[p]
 		if ActionDef.is_attack(a[p]):
 			out[p] = _calc_outgoing(p, a[p])
 			out_kind[p] = a[p]
+			out_pen[p] = ActionDef.base_penetration(a[p])
 			# 攻击判定类型覆盖（h10 啼晓：第 3/6/9… 回合"波"按大波判定 → 穿"防"）
 			var ksk: HeroSkill = _skills[p][aslot]
 			if ksk != null and not _is_silenced(p, aslot):
 				out_kind[p] = ksk.override_attack_kind(a[p], self, p, aslot)
+				out_pen[p] = ksk.attack_penetration(ActionDef.base_penetration(out_kind[p]), a[p], self, p, aslot)
 		elif a[p] == ActionDef.ACTIVE:
 			var sk: HeroSkill = _skills[p][aslot]
 			if sk != null and sk.active_is_attack():
 				out_kind[p] = sk.active_attack_kind()
 				# 攻击型主动技伤害也过团队层出伤修正（h28 契约对象用主动技攻击也 +1）
 				out[p] = _apply_team_outgoing(sk.active_attack_damage(self, p, aslot), out_kind[p], p, aslot)
+				out_pen[p] = sk.attack_penetration(ActionDef.base_penetration(out_kind[p]), ActionDef.ACTIVE, self, p, aslot)
 
 	# Phase 4: 施加伤害（打到 post-switch 出战英雄）；攻击型主动技命中后回调（预留）。
 	# 梅开二度 dbl：攻击执行 2 次（基础攻击 + 攻击型主动技同样翻倍）。
@@ -490,7 +497,7 @@ func resolve() -> Dictionary:
 			continue
 		var hits: int = 2 if dbl[p] else 1
 		for _i in range(hits):
-			var dealt: int = _apply_damage(1 - p, out[p], p, out_kind[p], a[1 - p], events)
+			var dealt: int = _apply_damage(1 - p, out[p], p, out_kind[p], out_pen[p], a[1 - p], events)
 			if a[p] == ActionDef.ACTIVE:
 				var sk2: HeroSkill = _skills[p][active_index[p]]
 				if sk2 != null and sk2.active_is_attack():
@@ -517,6 +524,9 @@ func resolve() -> Dictionary:
 					statuses[p][s].erase("burn")
 				else:
 					statuses[p][s]["burn"] = bn - 1
+	# 被动能量 +1 能/回合（A2）：回合末结算 → 下回合选择时反映
+	for p in [0, 1]:
+		energy[p] = mini(energy[p] + ActionDef.PASSIVE_ENERGY_GAIN, ActionDef.MAX_ENERGY)
 	turn_number += 1
 	var result := {
 		p1_hp = current_hp(0), p2_hp = current_hp(1),
@@ -606,19 +616,35 @@ func _apply_team_outgoing(dmg: int, action: int, player: int, attacker_slot: int
 ## 伤害管线 (§D4)。已实现相位：防御门 → 受伤 hook(平减) → 护盾 → 落 HP。
 ## 转移(h30) / 延迟(h27) / 穿透 / 易伤·月相 等相位待 Step 2.2c+ 接入。
 ## 返回实际落在 HP 上的伤害（半点），供攻击型主动技回调（吞噬吸血）使用。
-func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_action: int, def_action: int, events: Array) -> int:
+func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_action: int, pen: int, def_action: int, events: Array) -> int:
 	var slot: int = active_index[target_player]
 
 	# Stage B4: 防御动作门（大防挡全部；防挡波，不挡大波/穿防攻击）
-	if def_action == ActionDef.Action.BIG_DEFEND:
-		events.append({id = "big_defend_block", player = target_player})
-		return 0
-	if def_action == ActionDef.Action.DEFEND and atk_action == ActionDef.Action.ATTACK:
-		events.append({id = "defend_block", player = target_player})
+	var eff_def: int = def_action
+	var broken: int = int(get_status(target_player, slot, "broken_armor", 0))
+	if broken > 0 and def_action in ActionDef.DEFEND_ACTIONS:
+		set_status(target_player, slot, "broken_armor", broken - 1)
+		eff_def = ActionDef.Action.DEFEND if def_action == ActionDef.Action.BIG_DEFEND else -1
+		events.append({id = "armor_broken", player = target_player})
+	var blocked: bool = false
+	if pen == ActionDef.Pen.TRUE_DMG or pen == ActionDef.Pen.PIERCE_BIGDEF:
+		blocked = false
+	elif pen == ActionDef.Pen.PIERCE_DEF:
+		blocked = eff_def == ActionDef.Action.BIG_DEFEND
+	else:
+		blocked = eff_def == ActionDef.Action.BIG_DEFEND or eff_def == ActionDef.Action.DEFEND
+	if blocked:
+		events.append({id = ("big_defend_block" if eff_def == ActionDef.Action.BIG_DEFEND else "defend_block"), player = target_player})
 		return 0
 
 	# Stage B3: 易伤（燃烧 h32：受到攻击 +1.0）
 	var dmg := raw
+	# Stage B3a: 中毒引爆（命中时引爆全部毒层，每层 +0.5 = 1 半点，随后清空）
+	var poison: int = int(get_status(target_player, slot, "poison", 0))
+	if poison > 0:
+		dmg += poison
+		statuses[target_player][slot].erase("poison")
+		events.append({id = "poison_detonate", player = target_player, layers = poison})
 	if int(get_status(target_player, slot, "burn", 0)) > 0:
 		dmg += ActionDef.HP_UNIT
 		events.append({id = "vulnerable", player = target_player})
@@ -630,7 +656,7 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 	dmg = maxi(dmg, 0)
 
 	# Stage B6: 护盾
-	if dmg > 0 and shield[target_player][slot] > 0:
+	if dmg > 0 and pen != ActionDef.Pen.TRUE_DMG and shield[target_player][slot] > 0:
 		var absorbed: int = mini(shield[target_player][slot], dmg)
 		shield[target_player][slot] -= absorbed
 		dmg -= absorbed
@@ -645,14 +671,29 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 					dmg = bsk.on_ally_take_damage(dmg, slot, self, target_player, s)
 
 	# Stage B9: 落 HP（半点）
+	var dealt: int = 0
 	if dmg > 0:
 		hp[target_player][slot] -= dmg
 		_dmg_dealt[attacker_player] += dmg
+		dealt = dmg
 		events.append({id = "damage_taken", player = target_player, amount = dmg})
 		if hp[target_player][slot] <= 0:
-			_killer[target_player][slot] = attacker_player   # 标记直接攻击致死（供 on_kill 归因）
-		return dmg
-	return 0
+			_killer[target_player][slot] = attacker_player
+
+	# Stage B10: on-hit 触发（穿过防御门即算命中，按 hit_count 次；含队友监听如鸡剑气）
+	var aslot: int = active_index[attacker_player]
+	var atk_skill: HeroSkill = _skills[attacker_player][aslot]
+	var hc: int = 1
+	if atk_skill != null and not _is_silenced(attacker_player, aslot):
+		hc = maxi(1, atk_skill.hit_count(atk_action, self, attacker_player, aslot))
+	for _h in range(hc):
+		if atk_skill != null and not _is_silenced(attacker_player, aslot):
+			atk_skill.on_deal_hit(self, attacker_player, aslot, target_player, slot, dealt, atk_action)
+		for s2 in range(heroes[attacker_player].size()):
+			var tsk: HeroSkill = _skills[attacker_player][s2]
+			if tsk != null and not _is_silenced(attacker_player, s2):
+				tsk.on_team_deal_hit(self, attacker_player, s2, aslot, target_player, slot, dealt)
+	return dealt
 
 
 ## 死亡结算（§D8 基础版）：扫全场，新死亡触发 hook 链；出战位死且有替补 → 待玩家切换。

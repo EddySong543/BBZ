@@ -114,6 +114,30 @@ func on_turn_start(_battle: BattleCore, _player: int, _slot: int) -> void:
 	pass
 
 
+## 攻击穿透等级（二元铁则·防御门用）：本英雄发起攻击时返回穿透档（ActionDef.Pen）。
+## 默认按动作基础穿透（波=NORMAL / 大波=PIERCE_DEF）。
+## 酉鸡（剑气 2 层→穿防、4 层→穿大防）/ 戌狗追击（真伤）等 override。
+func attack_penetration(base_pen: int, _action: int, _battle: BattleCore, _player: int, _slot: int) -> int:
+	return base_pen
+
+
+## 本英雄一次攻击算作几次"命中"（on-hit 触发次数）。默认 1。寅虎连扑返回 2（整体挡下、落地双 proc）。
+func hit_count(_action: int, _battle: BattleCore, _player: int, _slot: int) -> int:
+	return 1
+
+
+## 本英雄攻击【命中（穿过防御门、连接到目标）】后触发：施加自身 on-hit 效果。
+## 巳蛇(叠毒) / 辰龙(破甲) / 申猴(碎能) / 午马(冲撞触发) / 愚者(随机 proc)。引擎按 hit_count 次调用。
+func on_deal_hit(_battle: BattleCore, _player: int, _slot: int, _target_player: int, _target_slot: int, _dealt: int, _action: int) -> void:
+	pass
+
+
+## 己方任一英雄攻击命中敌方时，对本队所有英雄（含替补席）触发：团队级 on-hit 监听。
+## 酉鸡（全队命中 → +1 剑气）。引擎按 hit_count 次调用。
+func on_team_deal_hit(_battle: BattleCore, _player: int, _slot: int, _attacker_slot: int, _target_player: int, _target_slot: int, _dealt: int) -> void:
+	pass
+
+
 # ============================================================
 # ② 主动技接口（默认无主动技；主动技英雄 override）
 # ============================================================
