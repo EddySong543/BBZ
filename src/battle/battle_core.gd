@@ -578,25 +578,39 @@ func _perform_switch(player: int, from_slot: int, to_slot: int, events: Array) -
 		entering.on_switch_in(self, player, to_slot)
 
 
-## h07 当先：免费切换（不占动作槽），cap 2。在【选择阶段】调用：立即换人 + 计 cap，不设 selected_action，
-## 之后玩家照常为新出战英雄选一个动作。
-func can_free_switch(player: int) -> bool:
-	var slot: int = active_index[player]
+## h07 当先：免费切换（不占动作槽；午马 free_switch_cap 默认 -1 = 不限次）。在【选择阶段】调用：
+## 立即换人 + 计 cap，不设 selected_action，之后玩家照常为新出战英雄选一个动作。
+## 二元设计："涉及马的切换"都免动作槽 = 起点（马在场→重定位下场）或终点（顶马上场）任一为午马即免费。
+
+## 指定槽位的英雄当前能否提供免费切换（has_free_switch + 该英雄 cap 未满）。
+func _grants_free_switch(player: int, slot: int) -> bool:
 	var sk: HeroSkill = _skills[player][slot]
 	if sk == null or not sk.has_free_switch():
 		return false
 	var cap: int = sk.free_switch_cap()
 	if cap >= 0 and int(get_status(player, slot, "dangxian_uses", 0)) >= cap:
 		return false
-	return living_reserves(player).size() > 0
+	return true
+
+
+## 当前出战英雄能否免费重定位（任意存活替补都免费）。保留旧语义供 UI / 测试调用。
+func can_free_switch(player: int) -> bool:
+	return _grants_free_switch(player, active_index[player]) and living_reserves(player).size() > 0
+
+
+## 切换到 target 是否免动作槽：起点（出战）或终点（target）任一英雄提供免费切换 → true 走 free_switch。
+func is_free_switch_target(player: int, target: int) -> bool:
+	if target < 0 or target >= hp[player].size() or target == active_index[player] or hp[player][target] <= 0:
+		return false
+	return _grants_free_switch(player, active_index[player]) or _grants_free_switch(player, target)
 
 
 func free_switch(player: int, target: int) -> bool:
-	if not can_free_switch(player):
+	if not is_free_switch_target(player, target):
 		return false
-	if target < 0 or target >= hp[player].size() or target == active_index[player] or hp[player][target] <= 0:
-		return false
-	set_status(player, active_index[player], "dangxian_uses", int(get_status(player, active_index[player], "dangxian_uses", 0)) + 1)
+	# cap 计在"提供"免费切换的英雄上：起点（马在场重定位）优先，否则终点（顶马上场）。
+	var grantor: int = active_index[player] if _grants_free_switch(player, active_index[player]) else target
+	set_status(player, grantor, "dangxian_uses", int(get_status(player, grantor, "dangxian_uses", 0)) + 1)
 	var ev: Array = []
 	_perform_switch(player, active_index[player], target, ev)
 	return true

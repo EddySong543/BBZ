@@ -522,8 +522,8 @@ func _on_reserve_frame_input(event: InputEvent, frame_idx: int) -> void:
 		_arm_switch_frame(frame_idx)          # 第一次左键 → armed（框内显「切换」）
 		return
 	# 同一框再次左键：
-	if battle.can_free_switch(PLAYER):
-		_free_switch_now(frame_idx)           # h07 当先：即时免费换
+	if battle.is_free_switch_target(PLAYER, p1_frame_slots[frame_idx]):
+		_free_switch_now(frame_idx)           # 午马当先：涉及马的切换即时免费（马在场重定位 / 顶马上场）
 	elif _switch_selected:
 		_deselect_switch()                    # 已选 → 取消（回 armed）
 	else:
