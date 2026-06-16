@@ -1,8 +1,12 @@
 extends HeroSkill
 
-## h07 午马【当先】· 单英雄（方案 C 唯一例外）
-## 0 能免费切换、【不占动作槽】，每局 cap 2：当先出战时可先免费换人上来，再正常做一个动作。
-## 引擎通过 has_free_switch() + free_switch() 支持；不走动作槽主动技接口。cap 由引擎计 dangxian_uses。
+## h07 午马【当先】· 节奏
+## ① 涉及马的切换不占动作槽、不限次数（免费切换；free_switch_cap 默认 -1 = 无限）；
+## ② 马切换登场时，对敌方出战造成 0.5 冲撞伤，并触发 on-hit（引爆蛇毒 / 喂鸡剑气）。
 
 func has_free_switch() -> bool:
 	return true
+
+
+func on_switch_in(battle: BattleCore, player: int, _slot: int) -> void:
+	battle.chongzhuang(player)

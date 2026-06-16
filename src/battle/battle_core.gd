@@ -64,7 +64,7 @@ const _HERO_SKILL_SCRIPTS := {
 	"h04": preload("res://src/battle/skills/h04_jiaotu.gd"),
 	"h05": preload("res://src/battle/skills/h05_liejia.gd"),
 	"h06": preload("res://src/battle/skills/h06_cuidu.gd"),
-	"h08": preload("res://src/battle/skills/h08_tizui.gd"),
+	"h08": preload("res://src/battle/skills/h08_jiuyuan.gd"),
 	"h09": preload("res://src/battle/skills/h09_liezhao.gd"),
 	"h10": preload("res://src/battle/skills/h10_jianyi.gd"),
 	"h11": preload("res://src/battle/skills/h11_zhuibu.gd"),
@@ -602,6 +602,27 @@ func free_switch(player: int, target: int) -> bool:
 	return true
 
 
+## 午马登场冲撞：对敌方出战造成 0.5 冲撞伤，走完整 on-hit 管线（引爆毒 / 喂剑气）。
+## 用 PIERCE_BIGDEF 让冲撞无视防御直接连接（登场突袭）；事件用本地数组（不并入 resolve 事件流）。
+func chongzhuang(attacker_player: int) -> void:
+	var opp: int = 1 - attacker_player
+	if hp[opp][active_index[opp]] <= 0:
+		return
+	var ev: Array = []
+	_apply_damage(opp, 1, attacker_player, ActionDef.Action.ATTACK, ActionDef.Pen.PIERCE_BIGDEF, ActionDef.Action.CHARGE, ev)
+
+
+## 找 player 替补席可用的致死救援守护者（未羊：is_lethal_guardian + 每局 < 2 次）；无则 -1。
+func _find_lethal_guardian(player: int) -> int:
+	for s in range(hp[player].size()):
+		if s == active_index[player] or hp[player][s] <= 0:
+			continue
+		var sk: HeroSkill = _skills[player][s]
+		if sk != null and sk.is_lethal_guardian() and int(get_status(player, s, "tizui_uses", 0)) < 2:
+			return s
+	return -1
+
+
 ## 计算 player 本次攻击的造成伤害（半点）。
 ## 出伤 = 基础 → 出战英雄 modify_outgoing_damage → 全队 modify_team_outgoing_damage（团队层 buff）。
 func _calc_outgoing(player: int, action: int) -> int:
@@ -684,6 +705,15 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 					dmg = bsk.on_ally_take_damage(dmg, slot, self, target_player, s)
 
 	# Stage B9: 落 HP（半点）
+	# 致死救援（未羊）：出战将死 + 替补有羊(每局<2次) → 羊顶上、原 carry 获救（强制换人触发狗）
+	if dmg > 0 and dmg >= hp[target_player][slot] and slot == active_index[target_player]:
+		var guard: int = _find_lethal_guardian(target_player)
+		if guard >= 0:
+			set_status(target_player, guard, "tizui_uses", int(get_status(target_player, guard, "tizui_uses", 0)) + 1)
+			events.append({id = "lethal_rescue", player = target_player, guardian = guard})
+			_perform_switch(target_player, slot, guard, events)
+			slot = active_index[target_player]   # 出战改为羊，本次伤害改落羊身上
+
 	var dealt: int = 0
 	if dmg > 0:
 		hp[target_player][slot] -= dmg
