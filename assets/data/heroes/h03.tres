@@ -6,8 +6,8 @@
 script = ExtResource("1_682cf")
 hero_id = "h03"
 hero_name = "寅虎"
-max_hp = 5
-skill_description = "渴血"
-skill_detail = "寅虎击杀一个英雄后，全队的波造成的伤害增加1点，寅虎死亡后消失"
+max_hp = 4
+skill_description = "连扑"
+skill_detail = "寅虎的攻击拆为两段、各自独立结算（命中触发效果翻倍）。"
 portrait_path = "res://assets/sprites/heroes/h03/h03_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h03/h03_idle.tres"

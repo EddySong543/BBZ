@@ -6,8 +6,8 @@
 script = ExtResource("1_j0nfx")
 hero_id = "h12"
 hero_name = "亥猪"
-max_hp = 6
-skill_description = "吞噬"
-skill_detail = "消耗0点能量，当亥猪造成伤害时，回复等量的生命值（0/3）"
+max_hp = 7
+skill_description = "纳福"
+skill_detail = "亥猪受到伤害时，己方获得等量能量。"
 portrait_path = "res://assets/sprites/heroes/h12/h12_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h12/h12_idle.tres"
