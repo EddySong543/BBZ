@@ -6,8 +6,9 @@ extends GutTest
 ## 锁定 5 个基础非切换动作（CHARGE/ATTACK/DEFEND/BIG_ATTACK/BIG_DEFEND）在
 ## 新数值框架 (ADR-002 §D10) + 半点制 (§D3) 下的结算行为。
 ##
-## 与 v3 (test_base_actions.gd) 的关键差异：
-##   - 大波消耗 2 能（v3 为 3）
+## 与 v3 (test_base_actions.gd) 的关键差异（B·2026-06-16 经济迁移后）：
+##   - 大波消耗 3 能（= 6 半能）；能量走半能制（1 能 = 2 半能）；被动 +1 能/回合（+2 半能·回合末结算）
+##   - 各 energy 断言均已含回合末被动 +2 半能
 ##   - 伤害以半点计：波 = 2 半点 (=1.0 HP)，大波 = 4 半点 (=2.0 HP)
 ##   - HP 内部为半点：max_hp(整) × 2
 ##   - 同时独立结算模型保留（B-001/2/3）：双方攻击各受对方满伤、不抵消
@@ -61,8 +62,8 @@ func test_setup_initial_energy_is_one() -> void:
 	var p2: Array = [_make_hero("test_y", HP_INIT)]
 	b.setup(p1, p2, 1)
 	# Assert
-	assert_eq(b.energy[0], 1, "初始能量 = 1 (ADR-002 D10)")
-	assert_eq(b.energy[1], 1)
+	assert_eq(b.energy[0], ActionDef.INITIAL_ENERGY, "初始能量 = 1.0 能 = 2 半能 (ADR-002 D10·半能制)")
+	assert_eq(b.energy[1], ActionDef.INITIAL_ENERGY)
 
 
 func test_setup_hp_stored_as_half_points() -> void:
@@ -76,8 +77,8 @@ func test_setup_hp_stored_as_half_points() -> void:
 func test_charge_vs_charge_both_gain_energy() -> void:
 	var b := _battle()
 	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.CHARGE)
-	assert_eq(b.energy[0], E_INIT + 1, "攒 +1 能量")
-	assert_eq(b.energy[1], E_INIT + 1)
+	assert_eq(b.energy[0], E_INIT + 4, "攒 +1 能(+2 半能) + 被动 +1 能(+2 半能)")
+	assert_eq(b.energy[1], E_INIT + 4)
 	assert_eq(b.current_hp(0), HP_HALF, "无伤")
 	assert_eq(b.current_hp(1), HP_HALF)
 
@@ -85,8 +86,8 @@ func test_charge_vs_charge_both_gain_energy() -> void:
 func test_charge_vs_attack_p1_takes_one_hp() -> void:
 	var b := _battle()
 	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.ATTACK)
-	assert_eq(b.energy[0], E_INIT + 1)
-	assert_eq(b.energy[1], E_INIT - 1, "波 -1 能")
+	assert_eq(b.energy[0], E_INIT + 4, "攒 +2 半能 + 被动 +2 半能")
+	assert_eq(b.energy[1], E_INIT, "波 -2 半能 + 被动 +2 半能 = 净 0")
 	assert_eq(b.current_hp(0), HP_HALF - ATK, "攒无防御，受 1.0 伤 (2 半点)")
 	assert_eq(b.current_hp(1), HP_HALF)
 
@@ -97,8 +98,8 @@ func test_attack_vs_attack_both_take_one_hp() -> void:
 	# B-001 等价（新数值）：双方各受 1.0 伤，不抵消
 	var b := _battle()
 	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.ATTACK)
-	assert_eq(b.energy[0], E_INIT - 1)
-	assert_eq(b.energy[1], E_INIT - 1)
+	assert_eq(b.energy[0], E_INIT, "波 -2 半能 + 被动 +2 = 净 0")
+	assert_eq(b.energy[1], E_INIT)
 	assert_eq(b.current_hp(0), HP_HALF - ATK, "P1 受 1.0")
 	assert_eq(b.current_hp(1), HP_HALF - ATK, "P2 受 1.0")
 
@@ -106,8 +107,8 @@ func test_attack_vs_attack_both_take_one_hp() -> void:
 func test_attack_vs_defend_blocked() -> void:
 	var b := _battle()
 	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.DEFEND)
-	assert_eq(b.energy[0], E_INIT - 1, "波 -1 即使被挡")
-	assert_eq(b.energy[1], E_INIT, "防 0 消耗")
+	assert_eq(b.energy[0], E_INIT, "波 -2 半能 + 被动 +2 = 净 0（即使被挡仍扣）")
+	assert_eq(b.energy[1], E_INIT + 2, "防 0 消耗 + 被动 +2 半能")
 	assert_eq(b.current_hp(1), HP_HALF, "防格挡波")
 
 
@@ -115,8 +116,8 @@ func test_attack_vs_big_attack_both_take_damage() -> void:
 	# B-003 等价：双向都解算，无压制
 	var b := _battle()
 	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.BIG_ATTACK)
-	assert_eq(b.energy[0], E_INIT - 1)
-	assert_eq(b.energy[1], E_INIT - 2, "大波 -2 能 (新数值)")
+	assert_eq(b.energy[0], E_INIT, "波净 0")
+	assert_eq(b.energy[1], E_INIT - 4, "大波 -3 能(-6 半能) + 被动 +2 = 净 -4 半能")
 	assert_eq(b.current_hp(0), HP_HALF - BIG, "P1 受 2.0 (大波)")
 	assert_eq(b.current_hp(1), HP_HALF - ATK, "P2 受 1.0 (波)")
 
@@ -133,7 +134,7 @@ func test_attack_vs_big_defend_blocked() -> void:
 func test_big_attack_vs_charge_p2_takes_two_hp() -> void:
 	var b := _battle()
 	_resolve(b, ActionDef.Action.BIG_ATTACK, ActionDef.Action.CHARGE)
-	assert_eq(b.energy[0], E_INIT - 2, "大波 -2 能 (新数值，v3 为 -3)")
+	assert_eq(b.energy[0], E_INIT - 4, "大波 -3 能(-6 半能) + 被动 +2 = 净 -4 半能")
 	assert_eq(b.current_hp(1), HP_HALF - BIG, "受 2.0 伤")
 
 
@@ -141,8 +142,8 @@ func test_big_attack_vs_big_attack_both_take_two_hp() -> void:
 	# B-002 等价：双方各受 2.0，不抵消
 	var b := _battle()
 	_resolve(b, ActionDef.Action.BIG_ATTACK, ActionDef.Action.BIG_ATTACK)
-	assert_eq(b.energy[0], E_INIT - 2)
-	assert_eq(b.energy[1], E_INIT - 2)
+	assert_eq(b.energy[0], E_INIT - 4, "大波净 -4 半能")
+	assert_eq(b.energy[1], E_INIT - 4)
 	assert_eq(b.current_hp(0), HP_HALF - BIG, "P1 受 2.0")
 	assert_eq(b.current_hp(1), HP_HALF - BIG, "P2 受 2.0")
 

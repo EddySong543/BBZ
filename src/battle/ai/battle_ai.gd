@@ -16,6 +16,11 @@ extends RefCounted
 const RM_ITERS_ROOT := 600    # 根节点 regret-matching 迭代（出抽样策略，要准）
 const RM_ITERS_INNER := 120   # 深层节点迭代（只取博弈值，近似即可）
 const STOCHASTIC_SAMPLES := 3 # 随机技（h13/h23）格的多采样次数 → 按期望值判断、去运气噪声（T3）
+## 终局贴现（2026-06-18·B 选项）：只对【终局胜负】按"已推演步数"贴现——
+## 立刻锁定的胜局 > 拖几回合才赢的同一胜局；同一败局拖得越晚越不糟。
+## 仅作用于 ±W_WIN 终局值（远大于任何启发评估），故胜局恒压一切、只在"同为胜"时偏好更快那手；
+## 非终局启发评估【不贴现】→ 不动已校准的局面权重。
+const WIN_DISCOUNT := 0.95
 
 var search_depth: int = 2
 var eval_profile: int = 0   # 0=基础评估(v2) / 1=v3 牌感评估(熟练优秀玩家)
@@ -114,7 +119,10 @@ func _rollout_once(b: BattleCore, player: int, opp: int, ca: Dictionary, cb: Dic
 
 ## 从 perspective 视角评估状态：终局/深度耗尽 → 静态评估；否则解一层子博弈取博弈值。
 func _state_value(b: BattleCore, perspective: int, depth: int) -> float:
-	if b.game_over or depth <= 0:
+	if b.game_over:
+		# 终局按已推演步数(search_depth-depth)贴现 → 越早的胜局越值钱、越晚的败局越不糟
+		return _eval(b, perspective) * pow(WIN_DISCOUNT, float(search_depth - depth))
+	if depth <= 0:
 		return _eval(b, perspective)
 	var opp: int = 1 - perspective
 	var my: Array = _shortlist(b, perspective)

@@ -115,18 +115,18 @@ func test_clone_reproduces_stochastic_skill() -> void:
 # ---- legal_actions：能量门 + 切换目标 ----
 
 func test_legal_actions_respects_energy_gate() -> void:
-	# Arrange：能量 1
-	var b := _battle2([["h02", 4], ["t01", 10], ["t02", 10]], [["t10", 10], ["t11", 10], ["t12", 10]], 1)
+	# Arrange：能量 2 半能（= 1.0 能）——半能制下波费 2、大波 6、大防 4
+	var b := _battle2([["h02", 4], ["t01", 10], ["t02", 10]], [["t10", 10], ["t11", 10], ["t12", 10]], 2)
 
 	# Act
 	var acts: Array = _actions_of(b.legal_actions(0))
 
-	# Assert：0 费动作 + 波(1费)可用；大波/大防(2费)不可用
+	# Assert：0 费动作 + 波(2 半能)可用；大波(6)/大防(4)不可用
 	assert_true(CHARGE in acts, "攒恒合法")
-	assert_true(ATTACK in acts, "能量 1 可出波")
+	assert_true(ATTACK in acts, "能量 2 半能 可出波(费 2)")
 	assert_true(DEFEND in acts, "防 0 费可用")
-	assert_false(BIG in acts, "能量 1 不足以大波")
-	assert_false(BIG_DEFEND in acts, "能量 1 不足以大防")
+	assert_false(BIG in acts, "能量 2 半能 不足以大波(费 6)")
+	assert_false(BIG_DEFEND in acts, "能量 2 半能 不足以大防(费 4)")
 
 
 func test_legal_actions_lists_switch_targets() -> void:
@@ -145,22 +145,24 @@ func test_legal_actions_lists_switch_targets() -> void:
 
 
 func test_legal_actions_includes_available_active() -> void:
-	# Arrange：h01 窃运（主动 0 费）
-	var b := _battle2([["h01", 4], ["t01", 10], ["t02", 10]], [["t10", 10], ["t11", 10], ["t12", 10]])
+	# Arrange：h10 酉鸡 拔剑一闪（主动 0 费·需剑气>0）
+	var b := _battle2([["h10", 4], ["t01", 10], ["t02", 10]], [["t10", 10], ["t11", 10], ["t12", 10]])
+	b.set_status(0, 0, "jianqi", 1)   # 有剑气 → 主动可用
 
 	# Assert
 	assert_true(ACTIVE in _actions_of(b.legal_actions(0)), "可用主动技应在合法动作内")
 
-	# h02 纯被动 → 无 ACTIVE
-	var b2 := _battle2([["h02", 4], ["t01", 10], ["t02", 10]], [["t10", 10], ["t11", 10], ["t12", 10]])
+	# h01 盾枢 纯被动 → 无 ACTIVE
+	var b2 := _battle2([["h01", 4], ["t01", 10], ["t02", 10]], [["t10", 10], ["t11", 10], ["t12", 10]])
 	assert_false(ACTIVE in _actions_of(b2.legal_actions(0)), "纯被动英雄无主动技选项")
 
 
 # ---- apply_choice：分派正确 ----
 
 func test_apply_choice_dispatches_switch_and_active() -> void:
-	# Arrange
-	var b := _battle2([["h01", 4], ["t01", 10], ["t02", 10]], [["t10", 10], ["t11", 10], ["t12", 10]])
+	# Arrange：h10 酉鸡 有主动技（需剑气>0）
+	var b := _battle2([["h10", 4], ["t01", 10], ["t02", 10]], [["t10", 10], ["t11", 10], ["t12", 10]])
+	b.set_status(0, 0, "jianqi", 1)
 
 	# 切换
 	assert_true(b.apply_choice(0, {action = SWITCH, target = 2}), "切换 choice 合法")
