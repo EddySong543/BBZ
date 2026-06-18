@@ -51,6 +51,13 @@ var _dmg_dealt: Array[int] = [0, 0]                 # 本回合各方造成的�
 var _energy_before: Array[int] = [0, 0]             # 本回合结算开始时的能量快照（倾力 h20 读取）
 var _killer: Array = [[], []]                       # _killer[player][slot]=直接攻击致死该英雄的攻击方;-1=非攻击致死。on_kill 只对直接攻击触发(防 splash/AOE 连锁)
 
+# === 道具状态（ADR-003）===
+var items: Array = [[], []]                  # items[player] = Array[ItemData]：持有/可用的道具（经济系统前由 give_item 直接给）
+var item_uses: Array = [[], []]             # 本回合提交的道具使用（有序）：[{data:ItemData, when:int, target:int}]
+var info_distortion: Array[Dictionary] = [{}, {}]  # 信息层（幻影/迷雾）：持续到该玩家下次用道具
+var item_buffs: Array[Dictionary] = [{}, {}]       # 跨回合道具 buff（风之靴 next_atk_bonus 等）
+var _imod: Array = [{}, {}]                  # 本回合道具修正器累加器（resolve 内重置·transient）
+
 var turn_number: int = 0
 var game_over: bool = false
 var winner: int = WINNER_UNDECIDED
@@ -135,6 +142,11 @@ func setup(p1_heroes: Array, p2_heroes: Array, seed_value: int = 0) -> void:
 	_switch_to = [-1, -1]
 	pending_death_switch = [false, false]
 	_dmg_dealt = [0, 0]
+	items = [[], []]
+	item_uses = [[], []]
+	info_distortion = [{}, {}]
+	item_buffs = [{}, {}]
+	_imod = [{}, {}]
 	turn_number = 0
 	game_over = false
 	winner = WINNER_UNDECIDED
@@ -270,6 +282,8 @@ func _is_silenced(player: int, slot: int) -> bool:
 func _heal(player: int, slot: int, amount: int) -> int:
 	if int(get_status(player, slot, "burn", 0)) > 0:
 		return 0
+	if turn_number == int(get_status(player, slot, "noheal_turn", -999)):
+		return 0   # 妖火：施加的下回合无法回血
 	var before: int = hp[player][slot]
 	hp[player][slot] = mini(hp[player][slot] + amount, max_hp[player][slot])
 	return hp[player][slot] - before
@@ -327,6 +341,71 @@ func both_ready() -> bool:
 	return selected_action[0] >= 0 and selected_action[1] >= 0
 
 
+# === 道具（ADR-003）===
+#
+# 经济状态机（开槽/draft/refill·D5）后续实装；当前 give_item 直接给（测试/临时）。
+# 道具不占动作槽：use_item 与 select_action 正交，可在同一回合都提交。
+
+## 给玩家一件道具（持有/可用池）。返回其在 items[player] 的索引。
+func give_item(player: int, data: ItemData) -> int:
+	items[player].append(data)
+	return items[player].size() - 1
+
+
+## 默认指向解析（§D6）：SELF→己方出战 / ENEMY→敌方出战。target_override >=0 时特指。
+func _resolve_item_target(player: int, data: ItemData, target_override: int) -> int:
+	if target_override >= 0:
+		return target_override
+	if data.target_mode == ItemData.Target.SELF:
+		return active_index[player]
+	return active_index[1 - player]
+
+
+## 提交一次道具使用（盲选阶段·揭示前·§3A）。index = items[player] 下标。
+## 不占动作槽、用时免费、用量不限。返回是否合法。
+func use_item(player: int, index: int, target_override: int = -1) -> bool:
+	if index < 0 or index >= items[player].size():
+		return false
+	var data: ItemData = items[player][index]
+	if data == null or data.effect == null:
+		return false
+	item_uses[player].append({
+		data = data,
+		when = data.resolved_when(),
+		target = _resolve_item_target(player, data, target_override),
+	})
+	return true
+
+
+# --- 本回合道具修正器累加器（_imod·transient）---
+
+func item_mod(player: int, key: String, default: Variant = 0) -> Variant:
+	return _imod[player].get(key, default)
+
+func add_item_mod(player: int, key: String, amount: int) -> void:
+	_imod[player][key] = int(_imod[player].get(key, 0)) + amount
+
+func set_item_mod(player: int, key: String, value: Variant) -> void:
+	_imod[player][key] = value
+
+
+## 护身符：target_player 是否对一次 debuff/干扰免疫；是则【消耗】该次免疫并返回 true。
+## 对敌 debuff 类道具（毒蘑菇/妖火/香蕉皮/分神铃铛…）施加前调用，被免疫则不施加。
+func item_debuff_blocked(target_player: int) -> bool:
+	var n: int = int(_imod[target_player].get("immune", 0))
+	if n > 0:
+		_imod[target_player]["immune"] = n - 1
+		return true
+	return false
+
+
+## 登记一个【动作攻击命中骑乘】（吸血鬼的獠牙/毒刺）：data 在 player 本回合动作攻击连接时触发。
+func add_item_rider(player: int, data: ItemData) -> void:
+	var r: Array = _imod[player].get("riders", [])
+	r.append(data)
+	_imod[player]["riders"] = r
+
+
 # === AI / 模拟支持（纯加法，不改任何结算行为）===
 #
 # clone(): 深拷当前战局供前瞻模拟（AI 枚举各动作后果）。
@@ -356,6 +435,11 @@ func clone() -> BattleCore:
 	c._dmg_dealt = _dmg_dealt.duplicate()
 	c._energy_before = _energy_before.duplicate()
 	c._killer = _killer.duplicate(true)
+	c.items = items.duplicate(true)
+	c.item_uses = item_uses.duplicate(true)
+	c.info_distortion = info_distortion.duplicate(true)
+	c.item_buffs = item_buffs.duplicate(true)
+	c._imod = _imod.duplicate(true)
 	c.turn_number = turn_number
 	c.game_over = game_over
 	c.winner = winner
@@ -439,13 +523,31 @@ func resolve() -> Dictionary:
 				events.append({id = "deferred_damage", player = p, slot = s, amount = pending_damage[p][s]})
 				pending_damage[p][s] = 0
 
-	# Phase 2: 扣能量 / 攒能量 / 主动技执行
+	# Phase IS: 道具 S 相位（ADR-003 D3）。重置本回合修正器 → 注入跨回合 buff →
+	#   用道具者先清旧信息扭曲 → setup_pre(免疫/信息·先于 debuff) → apply_pre(自身向/对敌/动作修正器)。
+	_imod = [{}, {}]
 	for p in [0, 1]:
-		energy[p] -= _get_cost(p, a[p])
+		if item_buffs[p].has("next_atk_bonus"):
+			add_item_mod(p, "atk_bonus", int(item_buffs[p]["next_atk_bonus"]))
+			item_buffs[p].erase("next_atk_bonus")
+		if item_uses[p].size() > 0:
+			info_distortion[p] = {}
+	for p in [0, 1]:
+		for use_s in item_uses[p]:
+			use_s["data"].effect.setup_pre(self, p, use_s["data"])
+	for p in [0, 1]:
+		for use_a in item_uses[p]:
+			if int(use_a["when"]) == ItemData.Seq.PRE:
+				use_a["data"].effect.apply_pre(self, p, int(use_a["target"]), use_a["data"])
+
+	# Phase 2: 扣能量 / 攒能量 / 主动技执行（道具：省力咒省能 / 分神铃铛削攒）
+	for p in [0, 1]:
+		energy[p] -= maxi(0, _get_cost(p, a[p]) - int(item_mod(p, "cost_save", 0)))
 		if a[p] == ActionDef.Action.CHARGE:
 			var gain: int = ActionDef.BASE_ACTION_DEF[ActionDef.Action.CHARGE]["energy_gain"]
 			if dbl[p]:
 				gain *= 2   # 梅开二度：攒 ×2
+			gain = maxi(0, gain - int(item_mod(p, "charge_penalty", 0)))
 			_gain_energy(p, gain)
 			events.append({id = "charge_gain", player = p, amount = gain})
 		elif a[p] == ActionDef.ACTIVE:
@@ -477,41 +579,58 @@ func resolve() -> Dictionary:
 				if dbl[p]:   # 梅开二度：即时主动技效果发动 2 次
 					sk.execute_active(self, p, active_index[p])
 
-	# Phase 3: 计算双方造成伤害（快照；含攻击型主动技 h20 倾力）
-	var out: Array[int] = [0, 0]
-	var out_kind: Array[int] = [-1, -1]   # 攻击判定类型(h10 升判定)
-	var out_pen: Array[int] = [ActionDef.Pen.NORMAL, ActionDef.Pen.NORMAL]   # 防御门穿透档
+	# Phase 3+4: 同时独立结算（含道具伤害 hit·ADR-003 D3）。先把双方完整出伤 hit-list 对快照
+	# 算好（动作前道具 hit → 动作攻击 → 动作后道具 hit），再一起施加 → 保持 B-001/2/3 跨玩家同时。
+	var hitlists: Array = [[], []]
 	for p in [0, 1]:
 		var aslot: int = active_index[p]
-		if ActionDef.is_attack(a[p]):
-			out[p] = _calc_outgoing(p, a[p])
-			out_kind[p] = a[p]
-			out_pen[p] = ActionDef.base_penetration(a[p])
-			# 攻击判定类型覆盖（h10 啼晓：第 3/6/9… 回合"波"按大波判定 → 穿"防"）
+		# 1) 动作【前】道具自身伤害 hit（生锈飞镖/闪电/幸运四叶草）
+		for use_h in item_uses[p]:
+			if int(use_h["when"]) == ItemData.Seq.PRE:
+				for ih in use_h["data"].effect.hits(self, p, int(use_h["target"]), use_h["data"]):
+					hitlists[p].append(ih)
+		# 2) 动作攻击（基础 / 攻击型主动技）+ 道具修正器（先手·赌徒+ / 香蕉皮- / 破盾咒穿透 / 赌徒落空）
+		var nullified: bool = bool(item_mod(p, "atk_nullify", false))
+		if not nullified and ActionDef.is_attack(a[p]):
+			var dmg: int = maxi(_calc_outgoing(p, a[p]) + int(item_mod(p, "atk_bonus", 0)) - int(item_mod(p, "atk_penalty", 0)), 0)
+			var kind: int = a[p]
+			var pen: int = ActionDef.base_penetration(a[p])
 			var ksk: HeroSkill = _skills[p][aslot]
 			if ksk != null and not _is_silenced(p, aslot):
-				out_kind[p] = ksk.override_attack_kind(a[p], self, p, aslot)
-				out_pen[p] = ksk.attack_penetration(ActionDef.base_penetration(out_kind[p]), a[p], self, p, aslot)
-		elif a[p] == ActionDef.ACTIVE:
+				kind = ksk.override_attack_kind(a[p], self, p, aslot)
+				pen = ksk.attack_penetration(ActionDef.base_penetration(kind), a[p], self, p, aslot)
+			var ipen: int = int(item_mod(p, "atk_pen", -1))
+			if ipen >= 0:
+				pen = ipen
+			if dmg > 0:
+				hitlists[p].append({damage = dmg, kind = kind, pen = pen, riders = item_mod(p, "riders", []), action = true, active = false})
+		elif not nullified and a[p] == ActionDef.ACTIVE:
 			var sk: HeroSkill = _skills[p][aslot]
 			if sk != null and sk.active_is_attack():
-				out_kind[p] = sk.active_attack_kind()
-				# 攻击型主动技伤害也过团队层出伤修正（h28 契约对象用主动技攻击也 +1）
-				out[p] = _apply_team_outgoing(sk.active_attack_damage(self, p, aslot), out_kind[p], p, aslot)
-				out_pen[p] = sk.attack_penetration(ActionDef.base_penetration(out_kind[p]), ActionDef.ACTIVE, self, p, aslot)
-
-	# Phase 4: 施加伤害（打到 post-switch 出战英雄）；攻击型主动技命中后回调（预留）。
-	# 梅开二度 dbl：攻击执行 2 次（基础攻击 + 攻击型主动技同样翻倍）。
+				var akind: int = sk.active_attack_kind()
+				var admg: int = maxi(_apply_team_outgoing(sk.active_attack_damage(self, p, aslot), akind, p, aslot) + int(item_mod(p, "atk_bonus", 0)) - int(item_mod(p, "atk_penalty", 0)), 0)
+				var apen: int = sk.attack_penetration(ActionDef.base_penetration(akind), ActionDef.ACTIVE, self, p, aslot)
+				var ipen2: int = int(item_mod(p, "atk_pen", -1))
+				if ipen2 >= 0:
+					apen = ipen2
+				if admg > 0:
+					hitlists[p].append({damage = admg, kind = akind, pen = apen, riders = item_mod(p, "riders", []), action = true, active = true})
+		# 3) 动作【后】道具自身伤害 hit（T1 暂无）
+		for use_h2 in item_uses[p]:
+			if int(use_h2["when"]) == ItemData.Seq.POST:
+				for ih2 in use_h2["data"].effect.hits(self, p, int(use_h2["target"]), use_h2["data"]):
+					hitlists[p].append(ih2)
+	# 施加：值已对快照算好 → 跨玩家同时；己方 hit-list 按序施加（动作前道具 → 动作 → 动作后道具）。
 	for p in [0, 1]:
-		if out[p] <= 0:
-			continue
-		var hits: int = 2 if dbl[p] else 1
-		for _i in range(hits):
-			var dealt: int = _apply_damage(1 - p, out[p], p, out_kind[p], out_pen[p], a[1 - p], events)
-			if a[p] == ActionDef.ACTIVE:
-				var sk2: HeroSkill = _skills[p][active_index[p]]
-				if sk2 != null and sk2.active_is_attack():
-					sk2.on_active_attack_resolved(self, p, active_index[p], dealt)
+		for h in hitlists[p]:
+			var times: int = 2 if (dbl[p] and bool(h.get("action", false))) else 1
+			for _i in range(times):
+				var riders: Array = h.get("riders", [])
+				var dealt: int = _apply_damage(1 - p, int(h["damage"]), p, int(h["kind"]), int(h["pen"]), a[1 - p], events, riders)
+				if bool(h.get("active", false)):
+					var sk2: HeroSkill = _skills[p][active_index[p]]
+					if sk2 != null and sk2.active_is_attack():
+						sk2.on_active_attack_resolved(self, p, active_index[p], dealt)
 
 	# Phase 5: 死亡结算 + 强制切换 + 胜负
 	_resolve_deaths(a, events)
@@ -547,6 +666,7 @@ func resolve() -> Dictionary:
 	}
 	selected_action = [-1, -1]
 	_switch_to = [-1, -1]
+	item_uses = [[], []]
 	return result
 
 
@@ -661,7 +781,7 @@ func _apply_team_outgoing(dmg: int, action: int, player: int, attacker_slot: int
 ## 伤害管线 (§D4)。已实现相位：防御门 → 受伤 hook(平减) → 护盾 → 落 HP。
 ## 转移(h30) / 延迟(h27) / 穿透 / 易伤·月相 等相位待 Step 2.2c+ 接入。
 ## 返回实际落在 HP 上的伤害（半点），供攻击型主动技回调（吞噬吸血）使用。
-func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_action: int, pen: int, def_action: int, events: Array) -> int:
+func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_action: int, pen: int, def_action: int, events: Array, item_riders: Array = []) -> int:
 	var slot: int = active_index[target_player]
 
 	# Stage B4: 防御动作门（大防挡全部；防挡波，不挡大波/穿防攻击）
@@ -671,6 +791,10 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		set_status(target_player, slot, "broken_armor", broken - 1)
 		eff_def = ActionDef.Action.DEFEND if def_action == ActionDef.Action.BIG_DEFEND else -1
 		events.append({id = "armor_broken", player = target_player})
+	# 魔法气泡：本回合"防"临时升级为可挡大波一次（条件=对手大波·已在 apply_pre 校验）
+	if eff_def == ActionDef.Action.DEFEND and int(item_mod(target_player, "def_upgrade", 0)) > 0:
+		set_item_mod(target_player, "def_upgrade", int(item_mod(target_player, "def_upgrade", 0)) - 1)
+		eff_def = ActionDef.Action.BIG_DEFEND
 	var blocked: bool = false
 	if pen == ActionDef.Pen.TRUE_DMG or pen == ActionDef.Pen.PIERCE_BIGDEF:
 		blocked = false
@@ -680,6 +804,11 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		blocked = eff_def == ActionDef.Action.BIG_DEFEND or eff_def == ActionDef.Action.DEFEND
 	if blocked:
 		events.append({id = ("big_defend_block" if eff_def == ActionDef.Action.BIG_DEFEND else "defend_block"), player = target_player})
+		# 魔力源泉：防御成功 → +能量（每回合一次）
+		var be: int = int(item_mod(target_player, "block_energy", 0))
+		if be > 0:
+			set_item_mod(target_player, "block_energy", 0)
+			_gain_energy(target_player, be)
 		var dsk: HeroSkill = _skills[target_player][slot]
 		if dsk != null and not _is_silenced(target_player, slot):
 			dsk.on_block(self, target_player, slot, attacker_player, atk_action, raw)
@@ -753,6 +882,9 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 			var tsk: HeroSkill = _skills[attacker_player][s2]
 			if tsk != null and not _is_silenced(attacker_player, s2):
 				tsk.on_team_deal_hit(self, attacker_player, s2, aslot, target_player, slot, dealt)
+	# 道具骑乘（吸血鬼的獠牙/毒刺）：使用者本回合动作攻击命中（穿过防御门连接）→ 触发一次
+	for rider in item_riders:
+		rider.effect.on_attack_connect(self, attacker_player, target_player, slot, dealt, rider)
 	return dealt
 
 
