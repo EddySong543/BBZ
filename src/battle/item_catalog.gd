@@ -101,10 +101,7 @@ const _DEF := {
 		desc = "本回合你防御成功时 +0.5 能。", params = {energy = 1},
 		script = preload("res://src/battle/items/t1_moli_yuanquan.gd")},
 	# --- 1G 扩展（含变体 / 净化 / 节奏 / 随机）---
-	"t1_duci": {
-		name = "毒刺", dim = "进攻", role = "状态变体", seq = _S_PRE, target = _T_ENEMY,
-		desc = "你这次攻击命中则敌方下回合 −0.5 HP（毒）。", params = {poison = 1},
-		script = preload("res://src/battle/items/t1_duci.gd")},
+	# 注：「毒刺」（命中下毒）已删 —— 与巳蛇 h06 淬毒功能完全相同，禁撞英雄（Eddy 2026-06-18）。
 	"t1_siyecao": {
 		name = "幸运四叶草", dim = "进攻", role = "随机变体", seq = _S_PRE, target = _T_ENEMY,
 		desc = "造成 0.5 伤；若你 HP 比对手低，改为 1.0 伤。", params = {dmg = 1, boon = 2},

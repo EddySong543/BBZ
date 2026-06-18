@@ -150,16 +150,6 @@ func test_item_xixie_yaya_no_heal_when_blocked() -> void:
 	assert_eq(b.hp[0][0], 10)
 
 
-func test_item_duci_poisons_on_hit() -> void:
-	var b := _battle()
-	b.use_item(0, _give(b, 0, "t1_duci"))
-	b.select_action(0, A.ATTACK)
-	b.select_action(1, A.CHARGE)
-	b.resolve()
-	assert_eq(int(b.get_status(1, 0, "poison", 0)), 1)   # 命中下 1 层毒
-	assert_eq(b.hp[1][0], 18)   # 毒刺本身不直接造伤，伤害来自波
-
-
 # === 防御 / 治疗 / 净化 ===
 
 func test_item_jiudun_adds_shield() -> void:
