@@ -19,6 +19,10 @@ extends RefCounted
 
 const HP_UNIT := 2  # 必须与 ActionDef.HP_UNIT 一致
 
+## 英雄机制数值（从引擎逻辑里的裸魔数提出来，集中可调）
+const LETHAL_GUARDIAN_CAP := 2   # 未羊致死救援每局上限（次）
+const CHONGZHUANG_DAMAGE := 1    # 午马登场冲撞 = 0.5 HP（半点）
+
 # Winner 常量（延续 v3 B-007 语义：UNDECIDED=-1 / DRAW=0 / P1=1 / P2=2）
 const WINNER_UNDECIDED := -1
 const WINNER_DRAW := 0
@@ -40,7 +44,6 @@ var disabled_group: Array[int] = [-1, -1]   # 被禁动作系列（h17）：0=�
 var _disabled_on_turn: Array[int] = [-1, -1] # 该禁令生效的回合号（turn_number）
 
 var selected_action: Array[int] = [-1, -1]
-var selected_target: Array[int] = [-1, -1]
 var _switch_to: Array[int] = [-1, -1]               # SWITCH 动作的目标槽位
 var pending_death_switch: Array[bool] = [false, false]  # 出战阵亡待玩家选替补上场
 var _death_processed: Array = [[], []]              # 每槽位死亡 hook 是否已触发（防重复）
@@ -129,7 +132,6 @@ func setup(p1_heroes: Array, p2_heroes: Array, seed_value: int = 0) -> void:
 	disabled_group = [-1, -1]
 	_disabled_on_turn = [-1, -1]
 	selected_action = [-1, -1]
-	selected_target = [-1, -1]
 	_switch_to = [-1, -1]
 	pending_death_switch = [false, false]
 	_dmg_dealt = [0, 0]
@@ -348,7 +350,6 @@ func clone() -> BattleCore:
 	c.disabled_group = disabled_group.duplicate()
 	c._disabled_on_turn = _disabled_on_turn.duplicate()
 	c.selected_action = selected_action.duplicate()
-	c.selected_target = selected_target.duplicate()
 	c._switch_to = _switch_to.duplicate()
 	c.pending_death_switch = pending_death_switch.duplicate()
 	c._death_processed = _death_processed.duplicate(true)
@@ -545,7 +546,6 @@ func resolve() -> Dictionary:
 		turn = turn_number,
 	}
 	selected_action = [-1, -1]
-	selected_target = [-1, -1]
 	_switch_to = [-1, -1]
 	return result
 
@@ -623,7 +623,7 @@ func chongzhuang(attacker_player: int) -> void:
 	if hp[opp][active_index[opp]] <= 0:
 		return
 	var ev: Array = []
-	_apply_damage(opp, 1, attacker_player, ActionDef.Action.ATTACK, ActionDef.Pen.PIERCE_BIGDEF, ActionDef.Action.CHARGE, ev)
+	_apply_damage(opp, CHONGZHUANG_DAMAGE, attacker_player, ActionDef.Action.ATTACK, ActionDef.Pen.PIERCE_BIGDEF, ActionDef.Action.CHARGE, ev)
 
 
 ## 找 player 替补席可用的致死救援守护者（未羊：is_lethal_guardian + 每局 < 2 次）；无则 -1。
@@ -632,7 +632,7 @@ func _find_lethal_guardian(player: int) -> int:
 		if s == active_index[player] or hp[player][s] <= 0:
 			continue
 		var sk: HeroSkill = _skills[player][s]
-		if sk != null and sk.is_lethal_guardian() and int(get_status(player, s, "tizui_uses", 0)) < 2:
+		if sk != null and sk.is_lethal_guardian() and int(get_status(player, s, "tizui_uses", 0)) < LETHAL_GUARDIAN_CAP:
 			return s
 	return -1
 

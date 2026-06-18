@@ -109,11 +109,6 @@ func on_resolve_end(_battle: BattleCore, _player: int, _slot: int) -> void:
 	pass
 
 
-## 回合开始（多数 turn-start 逻辑是引擎级：状态 tick / pending 落地）。预留给需要的英雄。
-func on_turn_start(_battle: BattleCore, _player: int, _slot: int) -> void:
-	pass
-
-
 ## 攻击穿透等级（二元铁则·防御门用）：本英雄发起攻击时返回穿透档（ActionDef.Pen）。
 ## 默认按动作基础穿透（波=NORMAL / 大波=PIERCE_DEF）。
 ## 酉鸡（剑气 2 层→穿防、4 层→穿大防）/ 戌狗追击（真伤）等 override。
@@ -187,11 +182,6 @@ func active_cost(_battle: BattleCore, _player: int, _slot: int) -> int:
 ## 每局使用上限；-1 = 无上限。引擎统一计数 (§D9)。
 func active_per_game_cap() -> int:
 	return -1
-
-
-## 主动技是否占用动作槽。默认 true；h07 当先返回 false（方案 C 唯一例外）。
-func active_occupies_slot() -> bool:
-	return true
 
 
 ## 当前是否可用（能量 / cap / 自定义前置如 h08 HP>1）。引擎已查能量与 cap，

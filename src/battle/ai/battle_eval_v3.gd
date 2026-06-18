@@ -28,10 +28,12 @@ const SETUP_W := {
 	"wheel_def": 8.0,    # 防 buff（h23 命运之轮）
 }
 const FORM_W := 50.0     # h26 收割形态（所有伤害 +1，永久不可逆）
-const THREAT_W := 80.0   # 对手出战在大波斩杀线内（≤2HP）且我有 2 能 → 致命威胁压力
+const THREAT_W := 80.0   # 对手出战在斩杀线内（≤2HP）且我有 ≥1 能（能出波）→ 致命威胁压力
 const PENDING_W := 8.0   # 延迟伤害（将落在某方头上）/半点
 const DISABLE_W := 40.0  # 对手下回合一动作系列被禁（h17，不留 buff → 基础 eval 看不见）
 const CONTRACT_W := 12.0 # 有利契约生效（h28：给契约队友 +攻）
+const THREAT_HP_LINE := 2 * HP_UNIT  # 斩杀威胁线：守方出战 ≤2HP（半点）
+const THREAT_MIN_ENERGY := 2         # 攻方至少 1 能（半能·够出一记波）
 
 
 ## w（可选）= 权重覆盖，透传给基础评估校准（T1）；v3 自身项首轮暂用默认。
@@ -74,7 +76,7 @@ static func _form(b: BattleCore, p: int) -> float:
 ## attacker 对 defender 出战英雄的斩杀威胁压力。
 static func _threat(b: BattleCore, attacker: int, defender: int) -> float:
 	var ds: int = b.active_index[defender]
-	if b.hp[defender][ds] > 0 and b.hp[defender][ds] <= 2 * HP_UNIT and b.energy[attacker] >= 2:
+	if b.hp[defender][ds] > 0 and b.hp[defender][ds] <= THREAT_HP_LINE and b.energy[attacker] >= THREAT_MIN_ENERGY:
 		return THREAT_W
 	return 0.0
 

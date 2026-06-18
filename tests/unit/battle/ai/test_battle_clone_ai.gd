@@ -21,8 +21,6 @@ func _hero(id: String, hp: int) -> HeroData:
 	h.hero_name = id
 	h.max_hp = hp
 	h.skill_type = HeroData.SkillType.PASSIVE
-	h.passive_id = ""
-	h.extra_action_id = -1
 	return h
 
 
