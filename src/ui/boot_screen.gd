@@ -76,7 +76,7 @@ func _update_aspect() -> void:
 
 
 func _build_labels() -> void:
-	# 标题 logo「波波攒之王」+ 副标题「点击进入游戏」：撞击瞬间逐字入场（演出见 title_logo.gd）。
+	# 标题 logo「波波攒」+ 副标题「点击进入游戏」：撞击瞬间逐字入场（演出见 title_logo.gd）。
 	# 旧底部"点击屏幕进入游戏"提示已并入标题组件作副标题（2026-06-10）。
 	_title = TitleLogo.new()
 	_title.impact_shake.connect(_on_title_shake)

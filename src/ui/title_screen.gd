@@ -8,7 +8,7 @@ extends Control
 
 
 func _ready() -> void:
-	title_label.text = "波波攒之王"
+	title_label.text = "波波攒"
 	FontManager.apply(title_label, 48)
 	title_label.add_theme_color_override("font_color", Color("#f5c518"))
 

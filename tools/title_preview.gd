@@ -26,23 +26,22 @@ func _initialize() -> void:
 	var img := root.get_texture().get_image()
 	img.save_png(OUT_PATH)
 	print("saved: ", OUT_PATH)
-	_measure_crown_alignment(img, title)
-	# 再等到首道待机掠光中段（落定 1.25s + 预热 1.5s + 半程 0.3s ≈ 3.05s）补一帧
+	_measure_title_center(img, title)
+	# 再等约 1.5s 进入稳定待机补一帧（漂浮/微粒/水波线流动）
 	await create_timer(1.5).timeout
 	await RenderingServer.frame_post_draw
 	root.get_texture().get_image().save_png(OUT_PATH.replace(".png", "_sheen.png"))
-	print("saved sheen frame")
+	print("saved idle frame")
 	quit()
 
 
-## 像素级测量王冠与「王」字身的水平中心差（正=王冠偏右），供对齐调参。
-func _measure_crown_alignment(img: Image, title: TitleLogo) -> void:
-	var crown := title.get_crown_rect()
-	var king := title.get_king_rect()
-	var crown_c := _bright_center_x(img, crown)
-	var king_c := _bright_center_x(img, king)
-	print("crown_rect=", crown, " king_rect=", king)
-	print("crown_center=%.1f king_center=%.1f delta=%.1f" % [crown_c, king_c, crown_c - king_c])
+## 像素级测量标题整行水平中心 vs 屏幕中心（delta≈0 即居中），供居中调参。
+func _measure_title_center(img: Image, title: TitleLogo) -> void:
+	var row := title.get_title_rect()
+	var row_c := _bright_center_x(img, row)
+	var screen_c := img.get_width() * 0.5
+	print("title_rect=", row)
+	print("title_center=%.1f screen_center=%.1f delta=%.1f" % [row_c, screen_c, row_c - screen_c])
 
 
 ## 区域内亮像素（明度>0.3，排除背景/投影）的 x 范围中心。
