@@ -415,4 +415,4 @@ func test_all_t2_t3_construct_and_run() -> void:
 
 func test_catalog_tier_counts() -> void:
 	assert_eq(ItemCatalog.all_tier2().size(), 28, "T2 实装件数")
-	assert_eq(ItemCatalog.all_tier3().size(), 7, "T3 实装件数")
+	assert_eq(ItemCatalog.all_tier3().size(), 14, "T3 实装件数（7 Tier-A + 7 遗物）")

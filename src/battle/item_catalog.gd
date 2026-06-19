@@ -4,8 +4,8 @@ extends RefCounted
 ## 道具目录（ADR-003 D1）。集中数据源：id → 元数据 + 一句话描述 + 效果参数 + 逻辑脚本。
 ## 逻辑在 src/battle/items/<id>.gd（继承 ItemEffect）。make(id) 构造一件 ItemData（含独立 effect 实例）。
 ##
-## 当前 = T1【非趣味】全部 + T2/T3【非中立·非趣味】Tier-A 批（design/items-list.md · Phase 1 实装 2026-06-19）。
-## 缓做：T2/T3 遗物充能件（Phase 2）+ 经济/UI/PvE 倾向件（Phase 3）+ 中立/趣味两类（独立设计）。
+## 当前 = T1【非趣味】全部 + T2/T3【非中立·非趣味】Tier-A 批（Phase 1）+ T3 遗物 7 件（Phase 2）。
+## 缓做：经济/UI/PvE 倾向件（Phase 3）+ 中立/趣味两类（独立设计）。详见 design/items-list.md。
 ## 道具均为字符串 id（tier 前缀拼音），无数字编号；尚无美术字段。
 
 const _S_PRE := ItemData.Seq.PRE
@@ -276,6 +276,36 @@ const _DEF := {
 		tier = 3, ev = 4, name = "停龙剑", dim = "能量", role = "能→攻", seq = _S_PRE, target = _T_ENEMY,
 		desc = "弃光全部能量，每 1.0 能对敌造 0.5 伤穿大防。", params = {},
 		script = preload("res://src/battle/items/t3_tinglong.gd")},
+
+	# ========== Tier-3 遗物（持久·每回合 tick·Phase 2）==========
+	"t3_jiuzhongtianlei": {
+		tier = 3, ev = 6, name = "九重天雷", dim = "进攻", role = "遗物", seq = _S_ANY, target = _T_SELF,
+		desc = "连续攻击每回合伤害 +0.5 累加，被打断/换动作清零。", params = {relic = true},
+		script = preload("res://src/battle/items/t3_jiuzhongtianlei.gd")},
+	"t3_judingsanhua": {
+		tier = 3, ev = 6, name = "聚鼎三花", dim = "进攻", role = "遗物", seq = _S_ANY, target = _T_SELF,
+		desc = "你每次攻击额外多 1 次命中（伤害不变），3 次后散。", params = {relic = true, hits = 1, charges = 3},
+		script = preload("res://src/battle/items/t3_judingsanhua.gd")},
+	"t3_shixinding": {
+		tier = 3, ev = 6, name = "噬心钉", dim = "进攻", role = "遗物", seq = _S_ANY, target = _T_SELF,
+		desc = "攻击 +1.0 伤，但你无法防御。", params = {relic = true, bonus = 2},
+		script = preload("res://src/battle/items/t3_shixinding.gd")},
+	"t3_budongmingwang": {
+		tier = 3, ev = 6, name = "不动明王甲", dim = "防御", role = "遗物", seq = _S_ANY, target = _T_SELF,
+		desc = "防御成功回 0.5 HP 且 +0.5 能，但攻击 −0.5。", params = {relic = true},
+		script = preload("res://src/battle/items/t3_budongmingwang.gd")},
+	"t3_jingangliuli": {
+		tier = 3, ev = 6, name = "金刚琉璃体", dim = "防御", role = "遗物", seq = _S_ANY, target = _T_SELF,
+		desc = "持有期间每回合末自动 +0.5 甲，3 充后碎。", params = {relic = true, armor = 1, charges = 3},
+		script = preload("res://src/battle/items/t3_jingangliuli.gd")},
+	"t3_xumingxiang": {
+		tier = 3, ev = 6, name = "续命香", dim = "防御", role = "遗物", seq = _S_ANY, target = _T_SELF,
+		desc = "持有期间每回合 +0.5 HP，持续 3 回合。", params = {relic = true, heal = 1, turns = 3},
+		script = preload("res://src/battle/items/t3_xumingxiang.gd")},
+	"t3_qingyuanbaolian": {
+		tier = 3, ev = 6, name = "青元宝莲", dim = "能量", role = "遗物", seq = _S_ANY, target = _T_SELF,
+		desc = "持有期间每回合自动 +0.5 能，3 回合后消失。", params = {relic = true, energy = 1, turns = 3},
+		script = preload("res://src/battle/items/t3_qingyuanbaolian.gd")},
 }
 
 

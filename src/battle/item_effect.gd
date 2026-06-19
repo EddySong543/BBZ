@@ -36,3 +36,15 @@ func hits(_battle: BattleCore, _player: int, _target: int, _data: ItemData) -> A
 ## 吸血鬼的獠牙（回血）/ 毒刺（下毒）。dealt = 该次实际落 HP 半点。默认 no-op。
 func on_attack_connect(_battle: BattleCore, _player: int, _target_player: int, _target_slot: int, _dealt: int, _data: ItemData) -> void:
 	pass
+
+
+## 【遗物·Phase IS】每回合注入本回合的被动修正器（写 _imod，每回合刷新）。
+## state = 该遗物的持久状态（充能计数 / 累加层 等），随战局存活、可在 relic_end 改写。
+func relic_pre(_battle: BattleCore, _player: int, _data: ItemData, _state: Dictionary) -> void:
+	pass
+
+
+## 【遗物·Phase 6】每回合末 tick（产出 HP/能量 / 计数 / 充能；可读 selected_action 判断本回合动作）。
+## 返回 false = 遗物耗尽（碎 / 到期）→ BattleCore 将其移除。默认永久持有（返回 true）。
+func relic_end(_battle: BattleCore, _player: int, _data: ItemData, _state: Dictionary) -> bool:
+	return true

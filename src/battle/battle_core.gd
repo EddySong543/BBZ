@@ -58,6 +58,7 @@ var item_uses: Array = [[], []]             # 本回合提交的道具使用（�
 var info_distortion: Array[Dictionary] = [{}, {}]  # 信息层（幻影/迷雾）：持续到该玩家下次用道具
 var item_buffs: Array[Dictionary] = [{}, {}]       # 跨回合道具 buff（风之靴 next_atk_bonus 等）
 var _imod: Array = [{}, {}]                  # 本回合道具修正器累加器（resolve 内重置·transient）
+var relics: Array = [[], []]                 # relics[player] = Array[{data:ItemData, state:Dictionary}]：激活的遗物（持久·每回合 tick）
 
 var turn_number: int = 0
 var game_over: bool = false
@@ -127,6 +128,7 @@ func setup(p1_heroes: Array, p2_heroes: Array, seed_value: int = 0) -> void:
 	info_distortion = [{}, {}]
 	item_buffs = [{}, {}]
 	_imod = [{}, {}]
+	relics = [[], []]
 	turn_number = 0
 	game_over = false
 	winner = WINNER_UNDECIDED
@@ -349,6 +351,10 @@ func use_item(player: int, index: int, target_override: int = -1) -> bool:
 	var data: ItemData = items[player][index]
 	if data == null or data.effect == null:
 		return false
+	# 遗物（持久·每回合 tick）：激活即登记到 relics，不走一次性 item_uses。
+	if bool(data.params.get("relic", false)):
+		relics[player].append({data = data, state = {}})
+		return true
 	item_uses[player].append({
 		data = data,
 		when = data.resolved_when(),
@@ -421,6 +427,7 @@ func clone() -> BattleCore:
 	c.info_distortion = info_distortion.duplicate(true)
 	c.item_buffs = item_buffs.duplicate(true)
 	c._imod = _imod.duplicate(true)
+	c.relics = relics.duplicate(true)
 	c.turn_number = turn_number
 	c.game_over = game_over
 	c.winner = winner
@@ -530,6 +537,10 @@ func resolve() -> Dictionary:
 		for use_a in item_uses[p]:
 			if int(use_a["when"]) == ItemData.Seq.PRE:
 				use_a["data"].effect.apply_pre(self, p, int(use_a["target"]), use_a["data"])
+	# 遗物·Phase IS：注入本回合被动修正器（_imod）。新激活的遗物本回合也在此生效。
+	for p in [0, 1]:
+		for relic in relics[p]:
+			relic["data"].effect.relic_pre(self, p, relic["data"], relic["state"])
 
 	# Phase 2: 扣能量 / 攒能量 / 主动技执行（道具：省力咒省能 / 分神铃铛削攒）
 	for p in [0, 1]:
@@ -649,6 +660,14 @@ func resolve() -> Dictionary:
 					statuses[p][s].erase("burn")
 				else:
 					statuses[p][s]["burn"] = bn - 1
+	# 遗物·Phase 6：每回合末 tick（产出/计数/充能；读 selected_action 判断本回合是否攻击）。
+	#   返回 false 的遗物移除（碎/耗尽）。在被动能量前结算，故遗物产能也享受不到/不影响被动。
+	for p in [0, 1]:
+		var kept_relics: Array = []
+		for relic in relics[p]:
+			if bool(relic["data"].effect.relic_end(self, p, relic["data"], relic["state"])):
+				kept_relics.append(relic)
+		relics[p] = kept_relics
 	# 被动能量 +1 能/回合（A2）：回合末结算 → 下回合选择时反映
 	for p in [0, 1]:
 		_gain_energy(p, ActionDef.PASSIVE_ENERGY_GAIN)
@@ -794,6 +813,9 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		set_status(target_player, slot, "defend_null", dnull - 1)
 		eff_def = -1
 		events.append({id = "defend_nullified", player = target_player})
+	# 噬心钉：持有者无法防御（其防/大防完全失效）
+	if int(item_mod(target_player, "self_no_defend", 0)) > 0 and def_action in ActionDef.DEFEND_ACTIONS:
+		eff_def = -1
 	# 魔法气泡：本回合"防"临时升级为可挡大波一次（条件=对手大波·已在 apply_pre 校验）
 	if eff_def == ActionDef.Action.DEFEND and int(item_mod(target_player, "def_upgrade", 0)) > 0:
 		set_item_mod(target_player, "def_upgrade", int(item_mod(target_player, "def_upgrade", 0)) - 1)
@@ -812,6 +834,11 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		if be > 0:
 			set_item_mod(target_player, "block_energy", 0)
 			_gain_energy(target_player, be)
+		# 不动明王甲：防御成功 → +HP（每回合一次）
+		var bh: int = int(item_mod(target_player, "block_heal", 0))
+		if bh > 0:
+			set_item_mod(target_player, "block_heal", 0)
+			_heal(target_player, slot, bh)
 		var dsk: HeroSkill = _skills[target_player][slot]
 		if dsk != null and not _is_silenced(target_player, slot):
 			dsk.on_block(self, target_player, slot, attacker_player, atk_action, raw)
