@@ -50,6 +50,7 @@ var _death_processed: Array = [[], []]              # 每槽位死亡 hook 是�
 var _dmg_dealt: Array[int] = [0, 0]                 # 本回合各方造成的实际伤害(半点)，h25 蓄势等用
 var _energy_before: Array[int] = [0, 0]             # 本回合结算开始时的能量快照（倾力 h20 读取）
 var _killer: Array = [[], []]                       # _killer[player][slot]=直接攻击致死该英雄的攻击方;-1=非攻击致死。on_kill 只对直接攻击触发(防 splash/AOE 连锁)
+var _last_action: Array[int] = [-1, -1]             # 上回合双方动作（传说级雪球·惯性件读取）
 
 # === 道具状态（ADR-003）===
 var items: Array = [[], []]                  # items[player] = Array[ItemData]：持有/可用的道具（经济系统前由 give_item 直接给）
@@ -120,6 +121,7 @@ func setup(p1_heroes: Array, p2_heroes: Array, seed_value: int = 0) -> void:
 	_switch_to = [-1, -1]
 	pending_death_switch = [false, false]
 	_dmg_dealt = [0, 0]
+	_last_action = [-1, -1]
 	items = [[], []]
 	item_uses = [[], []]
 	info_distortion = [{}, {}]
@@ -411,6 +413,7 @@ func clone() -> BattleCore:
 	c.pending_death_switch = pending_death_switch.duplicate()
 	c._death_processed = _death_processed.duplicate(true)
 	c._dmg_dealt = _dmg_dealt.duplicate()
+	c._last_action = _last_action.duplicate()
 	c._energy_before = _energy_before.duplicate()
 	c._killer = _killer.duplicate(true)
 	c.items = items.duplicate(true)
@@ -467,6 +470,13 @@ func apply_choice(player: int, choice: Dictionary) -> bool:
 func resolve() -> Dictionary:
 	var events: Array = []
 
+	# Phase 0.4: 龙息力竭（上回合大波被大防挡下）→ 本回合强制 CHARGE（喘息·失这次动作选择）
+	for p in [0, 1]:
+		if bool(item_buffs[p].get("exhausted_next", false)):
+			item_buffs[p].erase("exhausted_next")
+			selected_action[p] = ActionDef.Action.CHARGE
+			events.append({id = "exhausted", player = p})
+
 	# Phase 1: guard 未选动作 / 被禁动作 → CHARGE（延续 v3 B-004）
 	for p in [0, 1]:
 		if selected_action[p] < 0:
@@ -508,6 +518,9 @@ func resolve() -> Dictionary:
 		if item_buffs[p].has("next_atk_bonus"):
 			add_item_mod(p, "atk_bonus", int(item_buffs[p]["next_atk_bonus"]))
 			item_buffs[p].erase("next_atk_bonus")
+		if item_buffs[p].has("next_armor"):
+			shield[p][active_index[p]] += int(item_buffs[p]["next_armor"])
+			item_buffs[p].erase("next_armor")
 		if item_uses[p].size() > 0:
 			info_distortion[p] = {}
 	for p in [0, 1]:
@@ -520,7 +533,7 @@ func resolve() -> Dictionary:
 
 	# Phase 2: 扣能量 / 攒能量 / 主动技执行（道具：省力咒省能 / 分神铃铛削攒）
 	for p in [0, 1]:
-		energy[p] -= maxi(0, _get_cost(p, a[p]) - int(item_mod(p, "cost_save", 0)))
+		energy[p] -= maxi(0, _get_cost(p, a[p]) - int(item_mod(p, "cost_save", 0)) + int(item_mod(p, "cost_add", 0)))
 		if a[p] == ActionDef.Action.CHARGE:
 			var gain: int = ActionDef.BASE_ACTION_DEF[ActionDef.Action.CHARGE]["energy_gain"]
 			if dbl[p]:
@@ -539,6 +552,9 @@ func resolve() -> Dictionary:
 	# Phase 2.5: 切换（甲时机，先于伤害）→ 攻击将打到换上来的新英雄
 	for p in [0, 1]:
 		if a[p] == ActionDef.Action.SWITCH:
+			if int(item_mod(p, "no_switch", 0)) > 0:
+				events.append({id = "switch_locked", player = p})
+				continue
 			var from0: int = active_index[p]
 			_do_switch(p, events)
 			# 梅开二度：再切一次到另一个存活替补（避开刚下场的，连切 2 个不同英雄；无则止）
@@ -571,6 +587,7 @@ func resolve() -> Dictionary:
 		var nullified: bool = bool(item_mod(p, "atk_nullify", false))
 		if not nullified and ActionDef.is_attack(a[p]):
 			var dmg: int = maxi(_calc_outgoing(p, a[p]) + int(item_mod(p, "atk_bonus", 0)) - int(item_mod(p, "atk_penalty", 0)), 0)
+			dmg *= maxi(1, int(item_mod(p, "atk_mult", 1)))
 			var kind: int = a[p]
 			var pen: int = ActionDef.base_penetration(a[p])
 			var ksk: HeroSkill = _skills[p][aslot]
@@ -587,6 +604,7 @@ func resolve() -> Dictionary:
 			if sk != null and sk.active_is_attack():
 				var akind: int = sk.active_attack_kind()
 				var admg: int = maxi(_apply_team_outgoing(sk.active_attack_damage(self, p, aslot), akind, p, aslot) + int(item_mod(p, "atk_bonus", 0)) - int(item_mod(p, "atk_penalty", 0)), 0)
+				admg *= maxi(1, int(item_mod(p, "atk_mult", 1)))
 				var apen: int = sk.attack_penetration(ActionDef.base_penetration(akind), ActionDef.ACTIVE, self, p, aslot)
 				var ipen2: int = int(item_mod(p, "atk_pen", -1))
 				if ipen2 >= 0:
@@ -634,6 +652,7 @@ func resolve() -> Dictionary:
 	# 被动能量 +1 能/回合（A2）：回合末结算 → 下回合选择时反映
 	for p in [0, 1]:
 		_gain_energy(p, ActionDef.PASSIVE_ENERGY_GAIN)
+	_last_action = [a[0], a[1]]
 	turn_number += 1
 	var result := {
 		p1_hp = current_hp(0), p2_hp = current_hp(1),
@@ -769,6 +788,12 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		set_status(target_player, slot, "broken_armor", broken - 1)
 		eff_def = ActionDef.Action.DEFEND if def_action == ActionDef.Action.BIG_DEFEND else -1
 		events.append({id = "armor_broken", player = target_player})
+	# 魔笛：施加的"防御失效"——对手下一次防/大防完全失效（消耗一次）
+	var dnull: int = int(get_status(target_player, slot, "defend_null", 0))
+	if dnull > 0 and def_action in ActionDef.DEFEND_ACTIONS:
+		set_status(target_player, slot, "defend_null", dnull - 1)
+		eff_def = -1
+		events.append({id = "defend_nullified", player = target_player})
 	# 魔法气泡：本回合"防"临时升级为可挡大波一次（条件=对手大波·已在 apply_pre 校验）
 	if eff_def == ActionDef.Action.DEFEND and int(item_mod(target_player, "def_upgrade", 0)) > 0:
 		set_item_mod(target_player, "def_upgrade", int(item_mod(target_player, "def_upgrade", 0)) - 1)
@@ -803,6 +828,12 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 	if int(get_status(target_player, slot, "burn", 0)) > 0:
 		dmg += ActionDef.HP_UNIT
 		events.append({id = "vulnerable", player = target_player})
+	# 猎物印记（易伤）：本回合下次受击 +N（消耗）
+	var marked: int = int(get_status(target_player, slot, "marked", 0))
+	if marked > 0:
+		dmg += marked
+		statuses[target_player][slot].erase("marked")
+		events.append({id = "marked_hit", player = target_player, amount = marked})
 
 	# Stage B5: 受伤 hook（平减；沉默 h15 时跳过）
 	var skill: HeroSkill = _skills[target_player][slot]
@@ -810,8 +841,8 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		dmg = skill.modify_incoming_damage(dmg, atk_action, self, target_player, slot, attacker_player)
 	dmg = maxi(dmg, 0)
 
-	# Stage B6: 护盾
-	if dmg > 0 and pen != ActionDef.Pen.TRUE_DMG and shield[target_player][slot] > 0:
+	# Stage B6: 护盾（丘比特之箭穿甲：无视护甲层、不被吸收）
+	if dmg > 0 and pen != ActionDef.Pen.TRUE_DMG and not bool(item_mod(attacker_player, "pierce_armor", false)) and shield[target_player][slot] > 0:
 		var absorbed: int = mini(shield[target_player][slot], dmg)
 		shield[target_player][slot] -= absorbed
 		dmg -= absorbed
@@ -825,6 +856,14 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 				if bsk != null:
 					dmg = bsk.on_ally_take_damage(dmg, slot, self, target_player, s)
 
+	# 巫毒娃娃：替身吃下这一次伤害（吸收上限 = 娃娃 HP，溢出穿过；挨一下即碎）
+	var decoy: int = int(get_status(target_player, slot, "decoy_hp", 0))
+	if dmg > 0 and decoy > 0:
+		var eaten: int = mini(decoy, dmg)
+		dmg -= eaten
+		statuses[target_player][slot].erase("decoy_hp")
+		events.append({id = "decoy_absorb", player = target_player, amount = eaten})
+
 	# Stage B9: 落 HP（半点）
 	# 致死救援（未羊）：出战将死 + 替补有羊(每局<2次) → 羊顶上、原 carry 获救（强制换人触发狗）
 	if dmg > 0 and dmg >= hp[target_player][slot] and slot == active_index[target_player]:
@@ -834,6 +873,12 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 			events.append({id = "lethal_rescue", player = target_player, guardian = guard})
 			_perform_switch(target_player, slot, guard, events)
 			slot = active_index[target_player]   # 出战改为羊，本次伤害改落羊身上
+
+	# 还魂丹：出战将死且持有"还魂"（本局一次）→ 保留 0.5 HP（1 半点）
+	if dmg > 0 and dmg >= hp[target_player][slot] and slot == active_index[target_player] and int(get_status(target_player, slot, "huanhun_ready", 0)) > 0:
+		set_status(target_player, slot, "huanhun_ready", 0)
+		dmg = maxi(0, hp[target_player][slot] - 1)
+		events.append({id = "huanhun_revive", player = target_player})
 
 	var dealt: int = 0
 	if dmg > 0:
@@ -853,6 +898,7 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 	var hc: int = 1
 	if atk_skill != null and not _is_silenced(attacker_player, aslot):
 		hc = maxi(1, atk_skill.hit_count(atk_action, self, attacker_player, aslot))
+	hc += int(item_mod(attacker_player, "extra_hits", 0))   # 双生咒符：本回合多触发 N 次 on-hit
 	for _h in range(hc):
 		if atk_skill != null and not _is_silenced(attacker_player, aslot):
 			atk_skill.on_deal_hit(self, attacker_player, aslot, target_player, slot, dealt, atk_action)
