@@ -102,6 +102,12 @@ var _skill_index: int = 0
 @onready var p1_coin_row: IconPipRow = $P1Hud/P1CoinRow
 @onready var p2_coin_row: IconPipRow = $P2Hud/P2CoinRow
 
+# 道具栏（M2·占位）：程序化挂在各 HUD 下；位置先猜、F6 看了再调这两个常量。
+const ITEM_ROW_POS_P1 := Vector2(28.0, 188.0)
+const ITEM_ROW_POS_P2 := Vector2(28.0, 188.0)
+var p1_item_row: ItemSlotRow
+var p2_item_row: ItemSlotRow
+
 # ---- 选择 / 样式 ----
 var action_btn_list: Array[Button] = []
 var selected_action: int = -1
@@ -131,6 +137,7 @@ func _ready() -> void:
 	var p1: Array = _resolve_team(BattleSetup.p2_heroes, DEFAULT_P1)
 	BattleSetup.reset()   # 消费即清空：防止下一局（未经 BP）复用本局阵容
 	battle.setup(p0, p1, randi())
+	battle.econ_init()   # 启用道具经济（开局带 1 + 槽位状态机·M1）
 
 	_init_buttons()
 	_connect_frame_signals()
@@ -158,6 +165,7 @@ func _ready() -> void:
 		row.low_hp_flash = true
 		row.low_hp_ratio = LOW_HP_RATIO
 
+	_build_item_rows()
 	_update_all()
 	_show_turn_intro()
 
@@ -745,8 +753,22 @@ func _set_cost_pips(btn: Button, cost: int) -> void:
 # 刷新显示
 # ============================================================
 
+## M2：在各玩家 HUD 下挂道具栏（程序化占位·位置由 ITEM_ROW_POS_* 控制）。
+func _build_item_rows() -> void:
+	p1_item_row = ItemSlotRow.new()
+	p1_item_row.position = ITEM_ROW_POS_P1
+	p1_hud.add_child(p1_item_row)
+	p2_item_row = ItemSlotRow.new()
+	p2_item_row.position = ITEM_ROW_POS_P2
+	p2_hud.add_child(p2_item_row)
+
+
 func _update_all() -> void:
 	_update_hero_frames()
+	if p1_item_row != null:
+		p1_item_row.refresh(battle, 0)
+	if p2_item_row != null:
+		p2_item_row.refresh(battle, 1)
 	_update_character_displays()
 	_update_energy_labels()
 	_update_hp_labels()

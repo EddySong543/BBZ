@@ -131,3 +131,16 @@ func test_clone_copies_slots_independently() -> void:
 	assert_eq(c.slots[0].size(), 3)
 	c.slots[0][0]["state"] = SS.EMPTY
 	assert_eq(b.slot_state(0, 0), SS.CHARGING, "改 clone 槽态不动原局")
+
+
+# === M2：道具栏组件刷新不崩 ===
+
+func test_item_slot_row_refreshes() -> void:
+	var b := _battle(20)
+	b.slots[0][0]["item"] = ItemCatalog.make("t1_feibiao")   # 固定起手便于断言
+	var row := ItemSlotRow.new()
+	add_child_autofree(row)   # 触发 _ready 建子节点
+	row.refresh(b, 0)
+	assert_eq(row._labels.size(), 3, "3 个槽")
+	assert_eq(row._labels[0].text, "生锈的飞镖", "开局带件显示道具名")
+	assert_eq(row._labels[1].text, "—", "未到解锁回合显示锁占位")
