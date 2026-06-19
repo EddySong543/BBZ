@@ -10,6 +10,7 @@ extends Control
 ## 用法：add_child 到 HUD 下 → interactive/connect（仅 P1）→ 每次 _update_all 调 refresh(battle, player, staged)。
 
 signal slot_clicked(slot: int)
+signal slot_upgrade_clicked(slot: int)   # 点击就绪可升级槽右上角「升」角标（C·升级线）
 
 const SLOT_W := 88.0
 const SLOT_H := 88.0
@@ -38,6 +39,7 @@ var _bgs: Array[ColorRect] = []
 var _labels: Array[Label] = []
 var _rings: Array[ColorRect] = []     # 槽位提示外环（ready/staged），平时隐藏
 var _buttons: Array[Button] = []
+var _upgrade_btns: Array[Button] = []  # 每槽右上角「升」角标，仅就绪可升级时显示（C）
 
 
 func _ready() -> void:
@@ -86,15 +88,31 @@ func _ready() -> void:
 		btn.mouse_filter = Control.MOUSE_FILTER_STOP if interactive else Control.MOUSE_FILTER_IGNORE
 		btn.pressed.connect(_on_slot_pressed.bind(i))
 		add_child(btn)
+		# 升级角标（右上角小钮·铺在点击层之上 → 角落点击=升级、槽身=使用）。默认隐藏，refresh 控显。
+		var up := Button.new()
+		up.text = "升"
+		up.focus_mode = Control.FOCUS_NONE
+		up.position = base + Vector2(SLOT_W - 30.0, 2.0)
+		up.size = Vector2(28.0, 24.0)
+		up.add_theme_font_size_override("font_size", 12)
+		up.visible = false
+		up.pressed.connect(_on_upgrade_pressed.bind(i))
+		add_child(up)
 		_rings.append(ring)
 		_bgs.append(bg)
 		_labels.append(lbl)
 		_buttons.append(btn)
+		_upgrade_btns.append(up)
 
 
 func _on_slot_pressed(slot: int) -> void:
 	if interactive:
 		slot_clicked.emit(slot)
+
+
+func _on_upgrade_pressed(slot: int) -> void:
+	if interactive:
+		slot_upgrade_clicked.emit(slot)
 
 
 ## 按经济状态刷新 3 个槽。battle 未启用经济（槽空）时安全跳过。
@@ -152,6 +170,8 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 			ring.visible = true
 		else:
 			ring.visible = false
+		# 升级角标：仅本地玩家行 + 该槽可升级（就绪 + 有 upgrade_to + 能量够）时显示。
+		_upgrade_btns[i].visible = interactive and battle.can_upgrade(player, i)
 		# 点击层 mouse_filter 由 interactive setter / _ready 统一管理（无 refresh 时序依赖）。
 
 

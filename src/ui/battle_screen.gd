@@ -775,6 +775,7 @@ func _build_item_rows() -> void:
 	p1_item_row.position = ITEM_ROW_POS_P1
 	p1_item_row.interactive = true   # M3：本地玩家行可点击
 	p1_item_row.slot_clicked.connect(_on_p1_slot_clicked)
+	p1_item_row.slot_upgrade_clicked.connect(_on_p1_slot_upgrade)   # C：升级角标
 	p1_hud.add_child(p1_item_row)
 	p2_item_row = ItemSlotRow.new()   # P2 = AI·道具-blind（ADR D9）→ 仅显示
 	p2_item_row.position = ITEM_ROW_POS_P2
@@ -812,6 +813,16 @@ func _on_p1_slot_clicked(s: int) -> void:
 				if c2 >= 0:                                        # 取消则留 OPENED·本回合可再抽（draft 已缓存）
 					battle.pick_draft(PLAYER, s, c2)
 				_update_all()
+
+
+## C：升级就绪槽内道具（花能量·换 upgrade_to 件·重新锁 1 回合）。立即生效（公开电报）。
+func _on_p1_slot_upgrade(s: int) -> void:
+	if state != State.PLAYER_SELECT or _drafting:
+		return
+	if battle.can_upgrade(PLAYER, s):
+		battle.upgrade_slot(PLAYER, s)   # 付能量 → 换升级件 → 锁本回合
+		selected_item_slots.erase(s)     # 升级后该槽不再就绪 → 撤销本回合「使用」点选
+		_update_all()
 
 
 ## 弹出 3 选 1 抽取弹窗，await 返回选中 index（-1 = 取消）。抽取期间暂停回合计时 + 拦重入。

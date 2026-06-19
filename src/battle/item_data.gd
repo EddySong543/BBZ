@@ -19,6 +19,7 @@ enum Target { ENEMY, SELF }   ## 默认自动指向（§D6）：敌方出战 / �
 @export var target_mode: int = Target.ENEMY
 @export var description: String = ""       ## 一句话描述（游戏内展示·Eddy 要求）
 @export var ev_half: int = 1              ## 设计 EV（半点·≈0.5 当量 = 1）
+@export var upgrade_to: String = ""       ## 升级线下一级道具 id（空=不可升级·ADR D5）
 @export var params: Dictionary = {}       ## 效果数值（半点等），由 effect 读取
 
 var effect: ItemEffect = null            ## 逻辑组件实例（无状态，可共享；非序列化）

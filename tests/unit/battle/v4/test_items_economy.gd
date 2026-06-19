@@ -218,3 +218,94 @@ func test_battle_screen_script_compiles_with_m3_wiring() -> void:
 	assert_not_null(load("res://src/ui/battle_screen.gd"), "battle_screen.gd 编译通过（M3 引用解析）")
 	assert_not_null(load("res://src/ui/components/item_draft_popup.gd"), "ItemDraftPopup 编译通过")
 	assert_not_null(load("res://src/ui/components/item_slot_row.gd"), "ItemSlotRow 编译通过")
+
+
+# === C：升级线 1→2→3（ADR D5）===
+
+func test_catalog_upgrade_chain_links() -> void:
+	# 4 条升级线（设计：T2 升级线4 + T3 顶2）：飞镖/护盾 T1→T2；生命/法力药水 T1→T2→T3。
+	assert_eq(ItemCatalog.make("t1_feibiao").upgrade_to, "t2_feibiao")
+	assert_eq(ItemCatalog.make("t1_jiudun").upgrade_to, "t2_jiandun")
+	assert_eq(ItemCatalog.make("t1_lzhi_shengming").upgrade_to, "t2_shengming")
+	assert_eq(ItemCatalog.make("t2_shengming").upgrade_to, "t3_shengming")
+	assert_eq(ItemCatalog.make("t1_lzhi_fali").upgrade_to, "t2_fali")
+	assert_eq(ItemCatalog.make("t2_fali").upgrade_to, "t3_fali")
+	assert_eq(ItemCatalog.make("t2_feibiao").upgrade_to, "", "飞镖线 T2 封顶")
+	assert_eq(ItemCatalog.make("t3_shengming").upgrade_to, "", "生命药水 T3 封顶")
+
+
+func test_upgrade_swaps_item_and_relocks() -> void:
+	var b := _battle(20)
+	b.slots[0][0]["item"] = ItemCatalog.make("t1_feibiao")   # 就绪可升
+	assert_true(b.can_upgrade(0, 0))
+	var e0 := b.energy[0]
+	assert_true(b.upgrade_slot(0, 0))
+	assert_eq(e0 - b.energy[0], BattleCore.UPGRADE_COST_T1, "1→2 花 1 能")
+	assert_eq(b.slot_item(0, 0).item_id, "t2_feibiao", "换成升级件")
+	assert_eq(b.slot_item(0, 0).tier, 2)
+	assert_false(b.slot_ready(0, 0), "升级后重新锁本回合（电报）")
+	_advance(b, 1)
+	assert_true(b.slot_ready(0, 0), "下回合可用")
+
+
+func test_upgrade_tier2_to_3_costs_more() -> void:
+	var b := _battle(20)
+	b.slots[0][0]["item"] = ItemCatalog.make("t2_shengming")
+	assert_true(b.can_upgrade(0, 0))
+	var e0 := b.energy[0]
+	b.upgrade_slot(0, 0)
+	assert_eq(e0 - b.energy[0], BattleCore.UPGRADE_COST_T2, "2→3 花 2 能")
+	assert_eq(b.slot_item(0, 0).item_id, "t3_shengming")
+	assert_eq(b.slot_item(0, 0).tier, 3)
+
+
+func test_cannot_upgrade_top_tier_or_non_family() -> void:
+	var b := _battle(20)
+	b.slots[0][0]["item"] = ItemCatalog.make("t3_shengming")   # 顶级·无 upgrade_to
+	assert_false(b.can_upgrade(0, 0), "顶级不可升")
+	assert_false(b.upgrade_slot(0, 0))
+	b.slots[0][0]["item"] = ItemCatalog.make("t1_xianshou")    # 非升级线
+	assert_false(b.can_upgrade(0, 0), "非升级线不可升")
+
+
+func test_cannot_upgrade_without_energy() -> void:
+	var b := _battle(20)
+	b.slots[0][0]["item"] = ItemCatalog.make("t1_feibiao")
+	b.energy[0] = BattleCore.UPGRADE_COST_T1 - 1
+	assert_false(b.can_upgrade(0, 0), "能量不足不可升")
+	assert_false(b.upgrade_slot(0, 0))
+	assert_eq(b.slot_item(0, 0).item_id, "t1_feibiao", "失败不换件")
+
+
+func test_cannot_upgrade_when_not_ready() -> void:
+	var b := _battle(20)
+	b.slots[0][0]["item"] = ItemCatalog.make("t1_feibiao")
+	b.slots[0][0]["since"] = b.turn_number   # 锁本回合（刚抽/刚升）
+	assert_false(b.slot_ready(0, 0))
+	assert_false(b.can_upgrade(0, 0), "未就绪不可升")
+
+
+func test_slot_row_shows_upgrade_badge_when_upgradeable() -> void:
+	var b := _battle(20)
+	b.slots[0][0]["item"] = ItemCatalog.make("t1_feibiao")
+	var row := ItemSlotRow.new()
+	row.interactive = true
+	add_child_autofree(row)
+	row.refresh(b, 0)
+	assert_true(row._upgrade_btns[0].visible, "就绪可升级 → 显示升级角标")
+	b.slots[0][0]["item"] = ItemCatalog.make("t3_shengming")   # 顶级不可升
+	row.refresh(b, 0)
+	assert_false(row._upgrade_btns[0].visible, "顶级不可升 → 角标隐藏")
+
+
+func test_slot_row_upgrade_signal_gated_by_interactive() -> void:
+	var row := ItemSlotRow.new()
+	add_child_autofree(row)
+	var captured := [-99]
+	row.slot_upgrade_clicked.connect(func(s: int) -> void: captured[0] = s)
+	row.interactive = false
+	row._on_upgrade_pressed(1)
+	assert_eq(captured[0], -99, "非交互行不发升级信号")
+	row.interactive = true
+	row._on_upgrade_pressed(2)
+	assert_eq(captured[0], 2, "交互行发升级信号")

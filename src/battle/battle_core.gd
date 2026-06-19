@@ -406,6 +406,8 @@ const SLOT_COUNT := 3
 const SLOT_UNLOCK_TURN := [0, 2, 3]    # 0-indexed turn_number（= 第 1/3/4 回合）
 const ITEM_OPEN_COST := 2              # 开格 1 能（= 2 半能）
 const ITEM_REFILL_COST := 2            # refill 1 能
+const UPGRADE_COST_T1 := 2             # 升级 1→2 花 1 能（= 2 半能·ADR D5）
+const UPGRADE_COST_T2 := 4             # 升级 2→3 花 2 能（= 4 半能·ADR D5）
 const STARTER_ITEM_IDS := ["t1_feibiao", "t1_jiudun", "t1_lzhi_shengming"]  # 开局带 1 随机池
 
 
@@ -499,6 +501,35 @@ func use_slot(player: int, s: int, target_override: int = -1) -> bool:
 		when = data.resolved_when(),
 		target = _resolve_item_target(player, data, target_override),
 	})
+	return true
+
+
+## 升级线下一级的能量成本（半能）：tier1→2 = 1 能 / tier2→3 = 2 能（ADR D5）。
+func upgrade_cost(player: int, s: int) -> int:
+	var item: ItemData = slots[player][s]["item"]
+	if item == null:
+		return 0
+	return UPGRADE_COST_T2 if item.tier >= 2 else UPGRADE_COST_T1
+
+
+## 能否升级（就绪 + 有 upgrade_to + 能量够）：就绪槽的「用 or 升」二选一决策点。
+func can_upgrade(player: int, s: int) -> bool:
+	if not slot_ready(player, s):
+		return false
+	var item: ItemData = slots[player][s]["item"]
+	return item != null and item.upgrade_to != "" and energy[player] >= upgrade_cost(player, s)
+
+
+## 升级：付能量，换成 upgrade_to 件，重新锁 1 回合（CHARGING·下回合可用·电报·ADR D5）。
+func upgrade_slot(player: int, s: int) -> bool:
+	if not can_upgrade(player, s):
+		return false
+	energy[player] -= upgrade_cost(player, s)   # 按【当前】tier 计费，再换件
+	var next_id: String = (slots[player][s]["item"] as ItemData).upgrade_to
+	slots[player][s]["item"] = ItemCatalog.make(next_id)
+	slots[player][s]["state"] = SlotState.CHARGING
+	slots[player][s]["since"] = turn_number      # 锁本回合 → 下回合可用
+	slots[player][s]["used"] = false
 	return true
 
 

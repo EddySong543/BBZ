@@ -18,7 +18,7 @@ const _DEF := {
 	# --- 1A 进攻 ---
 	"t1_feibiao": {
 		name = "生锈的飞镖", dim = "进攻", role = "填隙", seq = _S_ANY, target = _T_ENEMY,
-		desc = "对敌方出战造成 0.5 伤。", params = {dmg = 1},
+		desc = "对敌方出战造成 0.5 伤。", params = {dmg = 1}, upgrade = "t2_feibiao",
 		script = preload("res://src/battle/items/t1_feibiao.gd")},
 	"t1_xianshou": {
 		name = "先手", dim = "进攻", role = "填隙", seq = _S_PRE, target = _T_SELF,
@@ -35,7 +35,7 @@ const _DEF := {
 	# --- 1B 防御 ---
 	"t1_jiudun": {
 		name = "破旧的护盾", dim = "防御", role = "填隙", seq = _S_ANY, target = _T_SELF,
-		desc = "己方出战 +0.5 甲（额外血量层）。", params = {armor = 1},
+		desc = "己方出战 +0.5 甲（额外血量层）。", params = {armor = 1}, upgrade = "t2_jiandun",
 		script = preload("res://src/battle/items/t1_jiudun.gd")},
 	"t1_houshou": {
 		name = "后手", dim = "防御", role = "条件", seq = _S_ANY, target = _T_SELF,
@@ -43,7 +43,7 @@ const _DEF := {
 		script = preload("res://src/battle/items/t1_houshou.gd")},
 	"t1_lzhi_shengming": {
 		name = "劣质生命药水", dim = "防御", role = "治疗", seq = _S_ANY, target = _T_SELF,
-		desc = "己方出战回 0.5 HP。", params = {heal = 1},
+		desc = "己方出战回 0.5 HP。", params = {heal = 1}, upgrade = "t2_shengming",
 		script = preload("res://src/battle/items/t1_lzhi_shengming.gd")},
 	"t1_qipao": {
 		name = "残缺的佛像", dim = "防御", role = "条件", seq = _S_ANY, target = _T_SELF,
@@ -56,7 +56,7 @@ const _DEF := {
 	# --- 1C 能量 ---
 	"t1_lzhi_fali": {
 		name = "劣质法力药水", dim = "能量", role = "条件", seq = _S_ANY, target = _T_SELF,
-		desc = "本回合若你「攒」，额外 +0.5 能。", params = {energy = 1},
+		desc = "本回合若你「攒」，额外 +0.5 能。", params = {energy = 1}, upgrade = "t2_fali",
 		script = preload("res://src/battle/items/t1_lzhi_fali.gd")},
 	"t1_moli_shuijing": {
 		name = "下金蛋的鹅", dim = "能量", role = "条件", seq = _S_ANY, target = _T_SELF,
@@ -170,7 +170,7 @@ const _DEF := {
 	# --- 2C 治疗 ---
 	"t2_shengming": {
 		tier = 2, ev = 2, name = "普通生命药水", dim = "防御", role = "治疗", seq = _S_ANY, target = _T_SELF,
-		desc = "己方出战回 1.0 HP。", params = {heal = 2},
+		desc = "己方出战回 1.0 HP。", params = {heal = 2}, upgrade = "t3_shengming",
 		script = preload("res://src/battle/items/t2_shengming.gd")},
 	"t2_nuanyu": {
 		tier = 2, ev = 2, name = "暖玉", dim = "防御", role = "治疗", seq = _S_ANY, target = _T_SELF,
@@ -179,7 +179,7 @@ const _DEF := {
 	# --- 2D 能量 ---
 	"t2_fali": {
 		tier = 2, ev = 2, name = "普通法力药水", dim = "能量", role = "条件", seq = _S_ANY, target = _T_SELF,
-		desc = "本回合若你「攒」，额外 +1.0 能。", params = {energy = 2},
+		desc = "本回合若你「攒」，额外 +1.0 能。", params = {energy = 2}, upgrade = "t3_fali",
 		script = preload("res://src/battle/items/t2_fali.gd")},
 	"t2_baolie": {
 		tier = 2, ev = 2, name = "爆裂卷轴", dim = "能量", role = "条件", seq = _S_ANY, target = _T_SELF,
@@ -339,6 +339,7 @@ static func make(id: String) -> ItemData:
 	item.target_mode = d["target"]
 	item.description = d["desc"]
 	item.ev_half = int(d.get("ev", 1))
+	item.upgrade_to = d.get("upgrade", "")
 	item.params = (d["params"] as Dictionary).duplicate(true)
 	item.effect = d["script"].new()
 	return item
