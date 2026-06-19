@@ -306,6 +306,20 @@ const _DEF := {
 		tier = 3, ev = 6, name = "青元宝莲", dim = "能量", role = "遗物", seq = _S_ANY, target = _T_SELF,
 		desc = "持有期间每回合自动 +0.5 能，3 回合后消失。", params = {relic = true, energy = 1, turns = 3},
 		script = preload("res://src/battle/items/t3_qingyuanbaolian.gd")},
+
+	# ========== Phase 3A 纯逻辑件（切换替身 / 强制切换 / 信息博弈）==========
+	"t2_caoren": {
+		tier = 2, ev = 2, name = "替身草人", dim = "节奏", role = "切换", seq = _S_ANY, target = _T_SELF,
+		desc = "你「切换」时留个稻草替身，对手本回合对你的攻击落空。", params = {},
+		script = preload("res://src/battle/items/t2_caoren.gd")},
+	"t3_dashenbian": {
+		tier = 3, ev = 4, name = "打神鞭", dim = "干扰", role = "重口", seq = _S_ANY, target = _T_ENEMY,
+		desc = "强制对手本回合切换出战英雄（喂戌狗·偏 PvE）。", params = {},
+		script = preload("res://src/battle/items/t3_dashenbian.gd")},
+	"t3_yiqi": {
+		tier = 3, ev = 4, name = "一气", dim = "随机", role = "信息", seq = _S_ANY, target = _T_SELF,
+		desc = "立 2 个纸扎替身，对手攻击 2/3 概率落空（信息博弈）。", params = {decoys = 2},
+		script = preload("res://src/battle/items/t3_yiqi.gd")},
 }
 
 
