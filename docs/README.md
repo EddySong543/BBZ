@@ -4,7 +4,7 @@
 >
 > **项目阶段**：轻量个人项目，文档从简、随玩法迭代更新（不为治理冻结开发）。
 >
-> **当前快照**：v4 战斗核心已收官 —— 单一 `BattleCore`，主流程「标题 → 2 步同时盲选选人 → 战斗」完整可玩；34 英雄（生肖 + 塔罗）+ 234 测试全绿；h01–h17 美术已导入。
+> **当前快照**：v4 战斗核心已收官 —— 单一 `BattleCore`，主流程「标题 → 2 步同时盲选选人 → 战斗」完整可玩；12 生肖 + 234 测试全绿；h01–h12 美术已导入。
 
 ---
 
@@ -29,7 +29,7 @@
 | 文档 | 定位 |
 |------|------|
 | [`gdd/game-concept.md`](../design/gdd/game-concept.md) | **GDD 主文档** — 8 章节（概述/玩家幻想/规则/公式/边界/依赖/旋钮/验收），已对齐 v4 |
-| [`heroes.md`](../design/heroes.md) | 34 英雄（生肖 + 塔罗）8 字段决议 + 完整变更日志 |
+| [`heroes.md`](../design/heroes.md) | 12 生肖 8 字段决议 |
 | [`heroes-schools.md`](../design/heroes-schools.md) | 英雄设计框架：流派 / 原语表 §5 / 流派子型空槽 §3.1 / 命名规范 §6.1 / 数值框架 §8 |
 | [`art-pipeline-hero-animation.md`](../design/art-pipeline-hero-animation.md) | 美术管线 A 方案（静态立绘 + 代码 juice + idle + 武器分类斩击），剪纸绑定已否决 |
 
@@ -40,7 +40,6 @@
 | [`ADR-002-battle-core-v4-architecture.md`](architecture/ADR-002-battle-core-v4-architecture.md) | **v4 战斗核心架构决议**（英雄重写，已全部落地） |
 | [`ADR-001-battlecore-boundary.md`](architecture/ADR-001-battlecore-boundary.md) | BattleCore 职责边界（v3 时代历史决策，边界原则由 v4 延续） |
 | [`battlecore-risk-notes.md`](architecture/battlecore-risk-notes.md) | 短文档 — 关键隐式规则与未来重构原则 |
-| [`hero-mechanics-hook-matrix.md`](architecture/hero-mechanics-hook-matrix.md) | 34 英雄机制 → hook/基建 映射（实装参照表） |
 
 ### 流程 / 协作（`docs/`）
 

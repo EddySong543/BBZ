@@ -67,7 +67,7 @@
 - 揭示双方阵容后进入战斗。
 - **单机模式**：对手 3 名英雄由 AI 扮演（同时盲选）；联机时把 AI 换成网络对手即可。
 - 实装位置：`src/ui/bp_screen.gd`，3 态状态机 `BAN → PICK → REVEAL`。
-- 共享池：当前 34 个英雄（h01~h34），满足 6 禁用 + 6 出战的最低需求。
+- 共享池：12 生肖（h01~h12）。
 
 > 历史：早期为"3 轮一 Ban 一 Pick、共 12 步顺序双人"，2026-05-19 改为 2 步同时盲选（节奏更快、契合同时回合制盲选基调）。
 
@@ -78,7 +78,7 @@
 - **主动技能**：玩家选择触发的额外动作，通常消耗能量并占用动作槽（部分有每局使用上限）
 - **被动技能**：常驻加成或自动触发的规则，无需玩家选择（作用域分单英雄 / 团队层次，须明示）
 
-> 英雄池规划 46 个（12 生肖 + 22 塔罗 + 12 星座），当前已设计并实装 34 个（h01~h34，生肖 + 塔罗）。详见 `design/heroes.md`。
+> 英雄池 = 12 生肖（h01-h12）。详见 `design/heroes.md`。
 
 ---
 
@@ -137,18 +137,18 @@ E_回合结束 = E_回合开始 − C_本回合消耗 + G_本回合获得
 
 - **HeroData** (`src/battle/hero_data.gd`) — 英雄数据 Resource，提供池子 + 资源路径
 - **BattleCore** (`src/battle/battle_core.gd`) — 战斗逻辑核心（v4，单一核心；纯逻辑、可 headless）
-- **HeroSkill** (`src/battle/hero_skill.gd` + `src/battle/skills/*.gd`) — 英雄技能组件（每英雄一文件，34 个）
+- **HeroSkill** (`src/battle/hero_skill.gd` + `src/battle/skills/*.gd`) — 英雄技能组件（每英雄一文件，12 个）
 - **FontManager** (`src/core/font_manager.gd` autoload) — 像素字体加载
 - **BattleSetup** (`src/battle/battle_setup.gd` autoload) — 场景间传递阵容
 - **UI 对战界面** (`src/ui/battle_screen.tscn` + `.gd`) — 同时盲选 vs AI + juice
 - **UI 选人界面** (`src/ui/bp_screen.tscn` + `.gd`) — 2 步同时盲选
 - **UI 标题** (`src/ui/title_screen.tscn` + `.gd`)
 - **UI 组件** (`src/ui/components/` — CharacterDisplay / HeroCard / HeroFrame / EnergyBar / DeathSwitchOverlay / SlashVFX)
-- **英雄设计** (`design/heroes.md`) — 34 英雄（生肖 + 塔罗）已设计实装
+- **英雄设计** (`design/heroes.md`) — 12 生肖已设计实装
 
 ### 待实装依赖
 
-- 美术导入：h18~h34 立绘/idle/头像（h01~h17 已导入）
+- 美术导入：12 生肖（h01~h12）立绘/idle/头像已导入
 - 音频系统（音效 / BGM）
 - 联网对战（v4 引擎已为服务器权威预留：seed RNG、状态容器、可 headless）
 - 多语言（中/英/日/韩）— 当前 events 与 UI 文本硬编码中文
@@ -188,11 +188,10 @@ E_回合结束 = E_回合开始 − C_本回合消耗 + G_本回合获得
 
 ### 英雄实装
 
-- [x] 34 个英雄（h01~h34）全部拥有可玩独特技能（v4 组件 + 234 测试全绿）
-- [ ] h35~h46（12 星座）设计与实装（暂停）
+- [x] 12 生肖（h01~h12）全部拥有可玩独特技能（v4 组件 + 测试全绿）
 
 ### 工程保护
 
 - [x] GUT v4 测试套件全绿（234 asserts）
 - [x] 单一核心 BattleCore（v3 已删除，无双核）
-- [x] HeroSkill 组件机制（每英雄一文件，34 个）
+- [x] HeroSkill 组件机制（每英雄一文件，12 个）

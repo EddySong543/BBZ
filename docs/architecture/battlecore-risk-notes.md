@@ -4,6 +4,7 @@
 > 详细背景：`tests/BEHAVIOR_NOTES.md`、`tests/unit/battle/*.gd`。
 >
 > **⚠️ v3 历史（2026-05-25）**：本文 §1-§4 的行号/函数名（`_apply_defense`/`_calc_attack_raw`/`_route_damage`/百兽 kit 等）指向**已删除的 v3 `battle_core.gd`**，不对应当前 v4 代码。H6 RNG 风险已由 ADR-002 D7（seed 注入）解决，HeroSkill 迁移（§3/§4）已重启并完成。当前真相源 = v4 `src/battle/battle_core.gd` + `tests/unit/battle/v4/`。正文作历史保留。
+> **⚠ 英雄阵容**：本文英雄示例基于旧 34 阵容；大阿卡那(h13-h34)+星座(h35-h46)已弃（2026-06-19），现仅 12 生肖。
 
 ---
 
@@ -14,7 +15,7 @@
 | H1 | `resolve()` 6 phase 顺序固定，phase 间通过私有 state 通信 | `battle_core.gd:258-486` | 技能组件化时 hook 必须落在正确的 phase |
 | H2 | `_calc_attack_raw` → `_apply_defense` → `_route_damage` 必须依次调用（中间 `_raw_dmg_to[p]` 被设置供反戈读取） | `battle_core.gd:566-595` | 拆函数会破坏反戈反弹链 |
 | H3 | `selected_target` 索引到 shuffle 后的 `clone_order` | `battle_core.gd:209,517` | UI 显示位置必须与 `clone_order` 同步；shuffle 不 deterministic |
-| H4 | `selected_action[p]` 在 phase 1 被 `YU_ZHE`（愚者）改值 | `battle_core.gd:278-283` | UI 拿不到玩家原始选择；网络同步要小心 |
+| H4 | `selected_action[p]` 在 phase 1 被英雄技能改值 | `battle_core.gd:278-283` | UI 拿不到玩家原始选择；网络同步要小心 |
 | H5 | `shield[p][slot]` 按 slot 索引而非 active hero | `battle_core.gd:391,400` | 切换后 shield 在新 slot 上才生效；无 `current_shield(p)` getter |
 | H6 | `randi_range` 直接调用，无 RNG 注入 | `battle_core.gd:89,280,348,522` | 联网/录像无法重放 |
 

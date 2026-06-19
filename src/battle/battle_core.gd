@@ -74,34 +74,12 @@ const _HERO_SKILL_SCRIPTS := {
 	"h04": preload("res://src/battle/skills/h04_jiaotu.gd"),
 	"h05": preload("res://src/battle/skills/h05_liejia.gd"),
 	"h06": preload("res://src/battle/skills/h06_cuidu.gd"),
+	"h07": preload("res://src/battle/skills/h07_dangxian.gd"),
 	"h08": preload("res://src/battle/skills/h08_jiuyuan.gd"),
 	"h09": preload("res://src/battle/skills/h09_liezhao.gd"),
 	"h10": preload("res://src/battle/skills/h10_jianyi.gd"),
 	"h11": preload("res://src/battle/skills/h11_zhuibu.gd"),
 	"h12": preload("res://src/battle/skills/h12_nafu.gd"),
-	"h13": preload("res://src/battle/skills/h13_guzhu.gd"),
-	"h15": preload("res://src/battle/skills/h15_sanjian.gd"),
-	"h16": preload("res://src/battle/skills/h16_zebei.gd"),
-	"h17": preload("res://src/battle/skills/h17_junming.gd"),
-	"h20": preload("res://src/battle/skills/h20_qingli.gd"),
-	"h32": preload("res://src/battle/skills/h32_chiri.gd"),
-	"h18": preload("res://src/battle/skills/h18_jiaohuang.gd"),
-	"h19": preload("res://src/battle/skills/h19_lianren.gd"),
-	"h21": preload("res://src/battle/skills/h21_xianglong.gd"),
-	"h22": preload("res://src/battle/skills/h22_yinzhe.gd"),
-	"h23": preload("res://src/battle/skills/h23_zhouerfushi.gd"),
-	"h25": preload("res://src/battle/skills/h25_yituiweijin.gd"),
-	"h27": preload("res://src/battle/skills/h27_yiroukegang.gd"),
-	"h29": preload("res://src/battle/skills/h29_qingchao.gd"),
-	"h30": preload("res://src/battle/skills/h30_beichen.gd"),
-	"h33": preload("res://src/battle/skills/h33_shenpan.gd"),
-	"h34": preload("res://src/battle/skills/h34_huanyu.gd"),
-	"h07": preload("res://src/battle/skills/h07_dangxian.gd"),
-	"h14": preload("res://src/battle/skills/h14_meikai.gd"),
-	"h24": preload("res://src/battle/skills/h24_tianping.gd"),
-	"h26": preload("res://src/battle/skills/h26_sishen.gd"),
-	"h28": preload("res://src/battle/skills/h28_emo.gd"),
-	"h31": preload("res://src/battle/skills/h31_yueliang.gd"),
 }
 
 ## 注册表整体校验只跑一次（静态守卫）。
@@ -390,7 +368,7 @@ func set_item_mod(player: int, key: String, value: Variant) -> void:
 
 
 ## 护身符：target_player 是否对一次 debuff/干扰免疫；是则【消耗】该次免疫并返回 true。
-## 对敌 debuff 类道具（毒蘑菇/妖火/香蕉皮/分神铃铛…）施加前调用，被免疫则不施加。
+## 对敌 debuff 类道具（妖火/香蕉皮…）施加前调用，被免疫则不施加。
 func item_debuff_blocked(target_player: int) -> bool:
 	var n: int = int(_imod[target_player].get("immune", 0))
 	if n > 0:

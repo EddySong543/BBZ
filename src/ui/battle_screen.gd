@@ -29,8 +29,8 @@ const TOP_UI_DROP := 0.0   # 顶部 UI 整体下移量；0=复原原位（想下
 
 ## 默认阵容 fallback：直接打开 battle_screen.tscn(F6) 测试用，BattleSetup 为空时启用。
 const HERO_DATA_DIR := "res://assets/data/heroes/"
-const DEFAULT_P0 := ["h01", "h05", "h13"]   # 盗天机 / 天威 / 孤注（均有美术 h01-h17）
-const DEFAULT_P1 := ["h02", "h09", "h16"]   # 怒目 / 凶兽 / 泽被苍生（均有美术）
+const DEFAULT_P0 := ["h01", "h05", "h06"]   # 子鼠 / 辰龙 / 巳蛇（首发 12 生肖）
+const DEFAULT_P1 := ["h02", "h09", "h12"]   # 丑牛 / 申猴 / 亥猪（首发 12 生肖）
 
 ## 左侧调试测试按钮（满能量/满血/造伤/加盾）。发布或联机前设 false（或删整块）。
 ## 仅本地调试：直接改 BattleCore 状态后刷新，不走战斗结算管线。

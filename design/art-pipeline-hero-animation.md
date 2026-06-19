@@ -19,7 +19,7 @@
 ---
 
 ## 0. 约束前提
-- 个人开发者，英雄池最终 46 个（当前实装 34 = 12 生肖 + 22 塔罗；**星座 h35-h46 暂停**）；**立绘已生成**。
+- 个人开发者，英雄池 = 12 生肖（h01-h12）；**立绘已生成**。
 - 每英雄**独立武器** → 攻击/技能动作无法简单复用同一套位移。
 - 观感目标：理想是《杀戮尖塔》级独立动画；现实底线 = **能做完**。
 - 品类：同时回合制 1v1 对拼 + 3 英雄切换。
@@ -127,7 +127,7 @@
 **每英雄美术 = 仅 3 张图**：`hXX.png`（立绘）+ `hXX_portrait.png`（头像源）+ `hXX_idle.png`（idle 表，4×4 / 256px）。
 
 **导入步骤**：
-1. **Eddy** 把 34 英雄（12 生肖 + 22 塔罗）的 3 张图改名为 `hXX.png` / `hXX_portrait.png` / `hXX_idle.png`，全部丢进 `assets/sprites/heroes/_incoming/` 一个文件夹。
+1. **Eddy** 把 12 生肖英雄的 3 张图改名为 `hXX.png` / `hXX_portrait.png` / `hXX_idle.png`，全部丢进 `assets/sprites/heroes/_incoming/` 一个文件夹。
 2. **Claude** 写脚本自动：
    - ① 分目录：`_incoming/hXX.*` → `assets/sprites/heroes/hXX/`；
    - ② 批量抠图（立绘背景近纯色 → 色键抠图，如需要）；

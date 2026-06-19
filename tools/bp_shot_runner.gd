@@ -11,36 +11,15 @@ func _ready() -> void:
 	await get_tree().process_frame
 	var bp := (load("res://src/ui/bp_screen.tscn") as PackedScene).instantiate()
 	add_child(bp)
-	await get_tree().create_timer(0.7).timeout      # 阶段宣告中段（带+大字+副注全亮）
-	await _shot("D:/Game/BoBoZan/bp_real_announce.png")
-	await get_tree().create_timer(1.9).timeout      # 开桌入场（含 C1 翻牌扫过）
-	await _shot("D:/Game/BoBoZan/bp_real_ban_empty.png")
+	await get_tree().create_timer(2.6).timeout      # 开桌入场完毕（含 C1 翻牌扫过）
+	await _shot("D:/Game/BoBoZan/bp_cur_pool.png")
 
-	bp._on_card_clicked(5)
-	await get_tree().create_timer(0.5).timeout
-	bp._on_card_clicked(21)
-	bp._on_card_clicked(40)
-	await get_tree().create_timer(0.8).timeout
-	await _shot("D:/Game/BoBoZan/bp_real_ban_hand.png")
-
-	bp._on_confirm()
-	await get_tree().create_timer(2.4).timeout      # 仪式中段（翻开+撞车窗口）
-	await _shot("D:/Game/BoBoZan/bp_real_ban_ceremony.png")
-	await get_tree().create_timer(3.0).timeout      # 仪式收场 → 进 PICK
-	await _shot("D:/Game/BoBoZan/bp_real_pick.png")
-
-	# PICK：选 3 个未被禁的
-	var picked := 0
-	var i := 0
-	while picked < 3 and i < 46:
-		if not (i in bp.banned):
-			bp._on_card_clicked(i)
-			picked += 1
-		i += 1
-	await get_tree().create_timer(0.8).timeout
-	bp._on_confirm()
-	await get_tree().create_timer(3.6).timeout      # 出战仪式 → 对峙亮相
-	await _shot("D:/Game/BoBoZan/bp_real_reveal.png")
+	# 选 2 张已知有效的（12 生肖内）看手牌区
+	bp._on_card_clicked(2)
+	await get_tree().create_timer(0.4).timeout
+	bp._on_card_clicked(7)
+	await get_tree().create_timer(0.6).timeout
+	await _shot("D:/Game/BoBoZan/bp_cur_hand.png")
 	get_tree().quit()
 
 

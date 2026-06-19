@@ -12,15 +12,11 @@ func _ready() -> void:
 	var g := (load("res://src/ui/hero_gallery_screen.tscn") as PackedScene).instantiate()
 	add_child(g)
 	await get_tree().create_timer(1.6).timeout      # 入场扫过完毕（h01 默认选中）
-	await _shot("D:/Game/BoBoZan/gallery_v2_default.png")
+	await _shot("D:/Game/BoBoZan/gallery_cur_default.png")
 
-	g._select(15)                                    # h16 皇后（主动技·详述较长）
+	g._select(7)                                     # 末排某只（12 生肖内有效索引）
 	await get_tree().create_timer(0.5).timeout
-	await _shot("D:/Game/BoBoZan/gallery_v2_h16.png")
-
-	g._select(45)                                    # h46 末位星座（白板美术）
-	await get_tree().create_timer(0.5).timeout
-	await _shot("D:/Game/BoBoZan/gallery_v2_h46.png")
+	await _shot("D:/Game/BoBoZan/gallery_cur_sel.png")
 	get_tree().quit()
 
 

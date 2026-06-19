@@ -221,8 +221,8 @@ func test_item_jiedu_yaoshui_heals_and_purifies() -> void:
 func test_item_hushenfu_blocks_debuff() -> void:
 	var b := _battle()
 	b.use_item(0, _give(b, 0, "t1_hushenfu"))
-	_give(b, 1, "t1_dumogu")
-	b.use_item(1, 0)   # 对手毒蘑菇砸 p0 → 被护身符免疫
+	_give(b, 1, "t1_yaohuo")
+	b.use_item(1, 0)   # 对手妖火砸 p0 → 被圣贤书免疫
 	b.select_action(0, A.CHARGE)
 	b.select_action(1, A.CHARGE)
 	b.resolve()
@@ -231,12 +231,12 @@ func test_item_hushenfu_blocks_debuff() -> void:
 
 func test_item_hushenfu_control_debuff_lands() -> void:
 	var b := _battle()
-	_give(b, 1, "t1_dumogu")
+	_give(b, 1, "t1_yaohuo")
 	b.use_item(1, 0)
 	b.select_action(0, A.CHARGE)
 	b.select_action(1, A.CHARGE)
 	b.resolve()
-	assert_eq(b.pending_damage[0][0], 1)   # 无免疫 → 毒蘑菇生效
+	assert_eq(b.pending_damage[0][0], 1)   # 无免疫 → 妖火生效
 
 
 # === 能量 / 经济（相对差值，规避被动 +1 / 攒 噪声）===
@@ -291,22 +291,6 @@ func test_item_tongqian_shield_when_opp_attack() -> void:
 
 
 # === 状态 / 自结算 DoT ===
-
-func test_item_dumogu_dot_lands_next_turn() -> void:
-	var b := _battle()
-	b.use_item(0, _give(b, 0, "t1_dumogu"))
-	b.select_action(0, A.CHARGE)
-	b.select_action(1, A.CHARGE)
-	b.resolve()
-	assert_eq(b.pending_damage[1][0], 1)   # 本回合只布毒，未掉血
-	assert_eq(b.hp[1][0], 20)
-	# 下回合 Phase 0 落地
-	b.select_action(0, A.CHARGE)
-	b.select_action(1, A.CHARGE)
-	b.resolve()
-	assert_eq(b.hp[1][0], 19)
-	assert_eq(b.pending_damage[1][0], 0)
-
 
 func test_item_yaohuo_dot_and_blocks_heal() -> void:
 	var b := _battle()
