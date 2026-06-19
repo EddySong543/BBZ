@@ -59,6 +59,7 @@ var info_distortion: Array[Dictionary] = [{}, {}]  # 信息层（幻影/迷雾�
 var item_buffs: Array[Dictionary] = [{}, {}]       # 跨回合道具 buff（风之靴 next_atk_bonus 等）
 var _imod: Array = [{}, {}]                  # 本回合道具修正器累加器（resolve 内重置·transient）
 var relics: Array = [[], []]                 # relics[player] = Array[{data:ItemData, state:Dictionary}]：激活的遗物（持久·每回合 tick）
+var slots: Array = [[], []]                  # slots[player] = Array[Dictionary]：道具经济槽位（econ_init 后填充；测试不填→走 give_item）
 
 var turn_number: int = 0
 var game_over: bool = false
@@ -129,6 +130,7 @@ func setup(p1_heroes: Array, p2_heroes: Array, seed_value: int = 0) -> void:
 	item_buffs = [{}, {}]
 	_imod = [{}, {}]
 	relics = [[], []]
+	slots = [[], []]
 	turn_number = 0
 	game_over = false
 	winner = WINNER_UNDECIDED
@@ -392,6 +394,149 @@ func add_item_rider(player: int, data: ItemData) -> void:
 	_imod[player]["riders"] = r
 
 
+# ===== 道具经济（ADR-003 §2·M1·2026-06-19）=====
+# 槽位状态机，与底层 items[]/use_item 并存（单元测试走 give_item 绕过经济）。
+# 开局带 1（slot0·随机基础件·即用·降记忆成本）；slot1/2 第 3/4 回合解锁。
+# 三步部署锁（电报）：开格(1能·锁本回合) → 抽道具(3选1·锁本回合) → 下回合可用；
+#   一次性用后 EMPTY，refill(1能·重抽)。升级(1→2→3) 待升级链数据，本期延后。
+# 槽 dict：{state:int, item:ItemData|null, since:int(进入该态的回合), used:bool, draft:Array}
+
+enum SlotState { SEALED, OPENED, CHARGING, EMPTY }
+const SLOT_COUNT := 3
+const SLOT_UNLOCK_TURN := [0, 2, 3]    # 0-indexed turn_number（= 第 1/3/4 回合）
+const ITEM_OPEN_COST := 2              # 开格 1 能（= 2 半能）
+const ITEM_REFILL_COST := 2            # refill 1 能
+const STARTER_ITEM_IDS := ["t1_feibiao", "t1_jiudun", "t1_lzhi_shengming"]  # 开局带 1 随机池
+
+
+## 启用经济并初始化槽位（实战由 battle_screen 调；单元测试不调 → 槽空、不影响既有行为）。
+func econ_init() -> void:
+	slots = [[], []]
+	for p in [0, 1]:
+		# slot0 = 开局带 1：随机基础件，CHARGING 且 since=-1 → 回合 0 即 turn_number(0) > since(-1)，立刻可用
+		var sid: String = STARTER_ITEM_IDS[rng.randi() % STARTER_ITEM_IDS.size()]
+		slots[p].append({state = SlotState.CHARGING, item = ItemCatalog.make(sid), since = -1, used = false, draft = []})
+		for _s in range(SLOT_COUNT - 1):
+			slots[p].append({state = SlotState.SEALED, item = null, since = -1, used = false, draft = []})
+
+
+func slot_state(player: int, s: int) -> int:
+	return int(slots[player][s]["state"])
+
+
+func slot_item(player: int, s: int) -> ItemData:
+	return slots[player][s]["item"]
+
+
+## 槽本回合是否可用（CHARGING + 部署锁已过 + 未用过）。
+func slot_ready(player: int, s: int) -> bool:
+	var sl: Dictionary = slots[player][s]
+	return int(sl["state"]) == SlotState.CHARGING and not bool(sl["used"]) and turn_number > int(sl["since"])
+
+
+## 能否开格（SEALED + 到解锁回合 + 能量够）。
+func can_open_slot(player: int, s: int) -> bool:
+	return int(slots[player][s]["state"]) == SlotState.SEALED \
+		and turn_number >= int(SLOT_UNLOCK_TURN[s]) and energy[player] >= ITEM_OPEN_COST
+
+
+## 开格：付 1 能，SEALED→OPENED（锁本回合，下回合才能抽）。
+func open_slot(player: int, s: int) -> bool:
+	if not can_open_slot(player, s):
+		return false
+	energy[player] -= ITEM_OPEN_COST
+	slots[player][s]["state"] = SlotState.OPENED
+	slots[player][s]["since"] = turn_number
+	return true
+
+
+## 能否抽道具（OPENED + 已过开格当回合）。
+func can_draw_slot(player: int, s: int) -> bool:
+	return int(slots[player][s]["state"]) == SlotState.OPENED and turn_number > int(slots[player][s]["since"])
+
+
+## 生成并返回 3 选 1 选项（存入槽供 UI 展示；同回合重复调用沿用已生成结果）。
+func begin_draft(player: int, s: int) -> Array:
+	var sl: Dictionary = slots[player][s]
+	if (sl["draft"] as Array).is_empty():
+		var pool: Array = _draft_pool()
+		var opts: Array = []
+		var n: int = mini(3, pool.size())
+		for _i in range(n):
+			opts.append(pool[rng.randi() % pool.size()])
+		sl["draft"] = opts
+	return sl["draft"]
+
+
+## 抽中第 choice 个（OPENED→CHARGING·锁本回合·下回合可用）。
+func pick_draft(player: int, s: int, choice: int) -> bool:
+	if not can_draw_slot(player, s):
+		return false
+	var opts: Array = begin_draft(player, s)
+	if choice < 0 or choice >= opts.size():
+		return false
+	var sl: Dictionary = slots[player][s]
+	sl["item"] = ItemCatalog.make((opts[choice] as ItemData).item_id)   # 独立实例
+	sl["state"] = SlotState.CHARGING
+	sl["since"] = turn_number
+	sl["draft"] = []
+	return true
+
+
+## 用某个已就绪的槽（提交到盲选 item_uses；用后标记 → 结算末置 EMPTY）。
+func use_slot(player: int, s: int, target_override: int = -1) -> bool:
+	if not slot_ready(player, s):
+		return false
+	var data: ItemData = slots[player][s]["item"]
+	if data == null or data.effect == null:
+		return false
+	slots[player][s]["used"] = true
+	if bool(data.params.get("relic", false)):
+		relics[player].append({data = data, state = {}})
+		return true
+	item_uses[player].append({
+		data = data,
+		when = data.resolved_when(),
+		target = _resolve_item_target(player, data, target_override),
+	})
+	return true
+
+
+func can_refill(player: int, s: int) -> bool:
+	return int(slots[player][s]["state"]) == SlotState.EMPTY and energy[player] >= ITEM_REFILL_COST
+
+
+## refill：付 1 能，EMPTY→可抽（格已在，故立即 3 选 1；返回选项供 UI；随后 pick_draft）。
+func start_refill(player: int, s: int) -> Array:
+	if not can_refill(player, s):
+		return []
+	energy[player] -= ITEM_REFILL_COST
+	var sl: Dictionary = slots[player][s]
+	sl["state"] = SlotState.OPENED
+	sl["since"] = turn_number - 1   # 复用格→本回合即可抽
+	sl["used"] = false
+	sl["draft"] = []
+	return begin_draft(player, s)
+
+
+## 抽卡池（占位：T1 地板 + T2 连携；T3/遗物留升级线·待升级系统接入）。
+func _draft_pool() -> Array:
+	var pool: Array = []
+	pool.append_array(ItemCatalog.all_tier1())
+	pool.append_array(ItemCatalog.all_tier2())
+	return pool
+
+
+## 结算末：本回合用掉的槽置 EMPTY（一次性消耗）。在 resolve Phase 6 调。
+func _econ_after_resolve() -> void:
+	for p in [0, 1]:
+		for sl in slots[p]:
+			if bool(sl["used"]):
+				sl["state"] = SlotState.EMPTY
+				sl["item"] = null
+				sl["used"] = false
+
+
 # === AI / 模拟支持（纯加法，不改任何结算行为）===
 #
 # clone(): 深拷当前战局供前瞻模拟（AI 枚举各动作后果）。
@@ -428,6 +573,7 @@ func clone() -> BattleCore:
 	c.item_buffs = item_buffs.duplicate(true)
 	c._imod = _imod.duplicate(true)
 	c.relics = relics.duplicate(true)
+	c.slots = slots.duplicate(true)
 	c.turn_number = turn_number
 	c.game_over = game_over
 	c.winner = winner
@@ -575,6 +721,13 @@ func resolve() -> Dictionary:
 						_perform_switch(p, active_index[p], cand, events)
 						break
 
+	# Phase 2.55: 打神鞭强制切换（forced_switch 由道具在 apply_pre 设·指向某存活替补槽）。
+	#   仅当该方未主动切换、且未被定身（no_switch）时触发；走 _perform_switch → 触发戌狗穷追。
+	for p in [0, 1]:
+		var fs: int = int(item_mod(p, "forced_switch", -1))
+		if fs >= 0 and a[p] != ActionDef.Action.SWITCH and int(item_mod(p, "no_switch", 0)) == 0 and fs < hp[p].size() and hp[p][fs] > 0:
+			_perform_switch(p, active_index[p], fs, events)
+
 	# Phase 2.6: 即时型主动技执行（在切换之后 → 审判/太阳/三缄 命中对手 post-switch 出战位）
 	for p in [0, 1]:
 		if a[p] == ActionDef.ACTIVE:
@@ -671,6 +824,7 @@ func resolve() -> Dictionary:
 	# 被动能量 +1 能/回合（A2）：回合末结算 → 下回合选择时反映
 	for p in [0, 1]:
 		_gain_energy(p, ActionDef.PASSIVE_ENERGY_GAIN)
+	_econ_after_resolve()
 	_last_action = [a[0], a[1]]
 	turn_number += 1
 	var result := {
