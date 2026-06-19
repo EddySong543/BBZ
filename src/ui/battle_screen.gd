@@ -103,10 +103,14 @@ var _skill_index: int = 0
 @onready var p2_coin_row: IconPipRow = $P2Hud/P2CoinRow
 
 # 道具栏（M2·占位）：程序化挂在各 HUD 下；位置先猜、F6 看了再调这两个常量。
+# ⚠ P1/P2 不可同坐标（两排都是全屏 HUD 的子节点 → 会叠在一起、上层吞点击）。P2 暂放右侧镜像。
 const ITEM_ROW_POS_P1 := Vector2(28.0, 188.0)
-const ITEM_ROW_POS_P2 := Vector2(28.0, 188.0)
+const ITEM_ROW_POS_P2 := Vector2(1608.0, 188.0)
 var p1_item_row: ItemSlotRow
 var p2_item_row: ItemSlotRow
+## M3：本回合已点选「使用」的道具槽（仅 P1）；确认时统一 use_slot 提交，进新回合清空。
+var selected_item_slots: Array[int] = []
+var _drafting := false   # draft 弹窗打开中：拦截重入 + 暂停回合计时
 
 # ---- 选择 / 样式 ----
 var action_btn_list: Array[Button] = []
@@ -333,6 +337,7 @@ func _start_player_select() -> void:
 	selected_action = -1
 	selected_switch = -1
 	selected_btn = null
+	selected_item_slots.clear()   # M3：每回合重置「本回合使用」点选
 	status_label.visible = false   # 去除「选择你的动作」提示
 	event_label.visible = false
 	_set_buttons_active(true)
@@ -398,6 +403,11 @@ func _on_confirm_pressed() -> void:
 		battle.select_action(PLAYER, selected_action)
 	else:
 		battle.select_action(PLAYER, A.CHARGE)
+
+	# M3：提交本回合点选的道具（不占动作槽，与动作一起盲选结算）。
+	for s in selected_item_slots:
+		battle.use_slot(PLAYER, s)
+	selected_item_slots.clear()
 
 	# AI 选择
 	_ai_pick(AI)
@@ -757,16 +767,66 @@ func _set_cost_pips(btn: Button, cost: int) -> void:
 func _build_item_rows() -> void:
 	p1_item_row = ItemSlotRow.new()
 	p1_item_row.position = ITEM_ROW_POS_P1
+	p1_item_row.interactive = true   # M3：本地玩家行可点击
+	p1_item_row.slot_clicked.connect(_on_p1_slot_clicked)
 	p1_hud.add_child(p1_item_row)
-	p2_item_row = ItemSlotRow.new()
+	p2_item_row = ItemSlotRow.new()   # P2 = AI·道具-blind（ADR D9）→ 仅显示
 	p2_item_row.position = ITEM_ROW_POS_P2
 	p2_hud.add_child(p2_item_row)
+
+
+## M3：P1 道具槽点击分派（按槽态）。开格/抽/补 = 立即生效（公开电报）；
+## 使用 = 暂存点选（金边），确认时与动作一起盲选提交。
+func _on_p1_slot_clicked(s: int) -> void:
+	if state != State.PLAYER_SELECT or _drafting:
+		return
+	match battle.slot_state(PLAYER, s):
+		BattleCore.SlotState.SEALED:
+			if battle.can_open_slot(PLAYER, s):
+				battle.open_slot(PLAYER, s)   # 付 1 能·SEALED→OPENED·锁本回合
+				_update_all()
+		BattleCore.SlotState.OPENED:
+			if battle.can_draw_slot(PLAYER, s):
+				var c: int = await _show_draft(s, battle.begin_draft(PLAYER, s))
+				if c >= 0:
+					battle.pick_draft(PLAYER, s, c)
+				_update_all()
+		BattleCore.SlotState.CHARGING:
+			if battle.slot_ready(PLAYER, s):
+				if selected_item_slots.has(s):   # 可取消点选（toggle）
+					selected_item_slots.erase(s)
+				else:
+					selected_item_slots.append(s)
+				_update_all()
+		BattleCore.SlotState.EMPTY:
+			if battle.can_refill(PLAYER, s):
+				var opts: Array = battle.start_refill(PLAYER, s)   # 付 1 能→OPENED·本回合可抽
+				_update_all()                                      # 先反映扣能量
+				var c2: int = await _show_draft(s, opts)
+				if c2 >= 0:                                        # 取消则留 OPENED·本回合可再抽（draft 已缓存）
+					battle.pick_draft(PLAYER, s, c2)
+				_update_all()
+
+
+## 弹出 3 选 1 抽取弹窗，await 返回选中 index（-1 = 取消）。抽取期间暂停回合计时 + 拦重入。
+func _show_draft(_s: int, options: Array) -> int:
+	_drafting = true
+	game_timer.stop()
+	var popup := ItemDraftPopup.new()
+	add_child(popup)
+	popup.setup(options, true)
+	var choice: int = await popup.resolved
+	popup.queue_free()
+	_drafting = false
+	if state == State.PLAYER_SELECT and not battle.game_over:
+		game_timer.start(1.0)   # 恢复计时（沿用剩余 timer_seconds）
+	return choice
 
 
 func _update_all() -> void:
 	_update_hero_frames()
 	if p1_item_row != null:
-		p1_item_row.refresh(battle, 0)
+		p1_item_row.refresh(battle, 0, selected_item_slots)
 	if p2_item_row != null:
 		p2_item_row.refresh(battle, 1)
 	_update_character_displays()
