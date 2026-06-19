@@ -185,15 +185,13 @@ func test_slot_row_staged_highlight() -> void:
 	var row := ItemSlotRow.new()
 	row.interactive = true
 	add_child_autofree(row)
-	# 已点选使用 → 金边 + 「✓用」标记。
+	# 已点选使用 → 边框转亮金 + 「✓用」标记。
 	row.refresh(b, 0, [0])
-	assert_true(row._rings[0].visible, "暂存槽显示高亮边")
-	assert_eq(row._rings[0].color, ItemSlotRow.STAGED_RING, "暂存 = 亮金边")
+	assert_eq(row._frame_mats[0].get_shader_parameter("edge_mid"), ItemSlotRow.STAGED_MID, "暂存 = 亮金边框")
 	assert_true(row._labels[0].text.ends_with("✓用"), "暂存槽标 ✓用")
-	# 未点选但本回合可用（interactive）→ 暖金 ready 边、无 ✓用。
+	# 未点选但本回合可用（interactive）→ 边框转暖金、无 ✓用。
 	row.refresh(b, 0, [])
-	assert_true(row._rings[0].visible, "可用槽显示 ready 边")
-	assert_eq(row._rings[0].color, ItemSlotRow.READY_RING, "ready = 暖金边")
+	assert_eq(row._frame_mats[0].get_shader_parameter("edge_mid"), ItemSlotRow.READY_MID, "可用 = 暖金边框")
 	assert_false(row._labels[0].text.ends_with("✓用"))
 
 

@@ -72,13 +72,22 @@ func _build_card(item: ItemData, pos: Vector2, idx: int) -> void:
 	card.pressed.connect(_resolve.bind(idx))
 	add_child(card)
 
-	# 卡底色（维度色）——子节点 IGNORE，点击穿透到 card。
+	# 卡底色（维度色）满铺 → 像素边框 shader 层在其上（中心透明露出底色）——子节点 IGNORE，点击穿透到 card。
 	var face := ColorRect.new()
 	face.color = DIM_COLOR.get(item.dimension if item != null else "", Color(0.42, 0.42, 0.47))
-	face.position = Vector2(4.0, 4.0)
-	face.size = Vector2(CARD_W - 8.0, CARD_H - 8.0)
+	face.position = Vector2.ZERO
+	face.size = Vector2(CARD_W, CARD_H)
 	face.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(face)
+
+	var frame := ColorRect.new()
+	frame.color = Color.WHITE   # shader 乘 COLOR，须白
+	frame.position = Vector2.ZERO
+	frame.size = Vector2(CARD_W, CARD_H)
+	# 与道具框同款暖骨像素边框；卡片非方形 → 锐角(corner=0)避免椭圆角，grid 48 像素清晰可见。
+	frame.material = ItemSlotRow.make_pixel_frame_material(48.0, 0.0)
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(frame)
 
 	var name_lbl := Label.new()
 	name_lbl.text = item.item_name if item != null else "?"
