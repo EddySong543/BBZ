@@ -21,6 +21,9 @@ const STOCHASTIC_SAMPLES := 3 # 随机技（h13/h23）格的多采样次数 → 
 ## 仅作用于 ±W_WIN 终局值（远大于任何启发评估），故胜局恒压一切、只在"同为胜"时偏好更快那手；
 ## 非终局启发评估【不贴现】→ 不动已校准的局面权重。
 const WIN_DISCOUNT := 0.95
+## AI 道具经济（run_item_economy）开格/refill 后想保留的最低能量（半能）：留一手攒/防/小波，
+## 不被发展道具饿死动作。2 = 1.0 能（≥ 一次小波 cost）。
+const AI_ITEM_ENERGY_RESERVE := 2
 
 var search_depth: int = 2
 var eval_profile: int = 0   # 0=基础评估(v2) / 1=v3 牌感评估(熟练优秀玩家)
@@ -78,6 +81,43 @@ func choose_death_switch(b: BattleCore, player: int) -> int:
 				best_score = sc
 				best = slot
 	return best
+
+
+# === 道具经济启发（v1·非搜索）===
+
+## 让 AI 像玩家一样操作道具栏，使试玩两边对等（实战 _ai_pick / sim / 测试通用·纯函数）。
+## 在 AI 选动作【之前】调用：开格立即扣能 → 动作选择据剩余能量决策（与玩家手动点击同语义）。
+## 策略（保守·不饿死动作·ADR D9 首版基础启发，不做最优时机判断）：
+##   1. 用掉所有【就绪】道具（免费·一次性·提交到本回合盲选 item_uses）。
+##   2. 抽取所有【可抽】的已开槽（免费·推进部署流水线）。
+##   3. 富余能量(≥成本+reserve)时：开 1 个可开槽 + refill 1 个空槽（电报渐进·每回合各 ≤1）。
+## ⚠ v1 一就绪就用、不挑时机（offensive/defensive 不区分）；后续可升级为按局面择时。
+static func run_item_economy(b: BattleCore, side: int, rng: RandomNumberGenerator,
+		reserve: int = AI_ITEM_ENERGY_RESERVE) -> void:
+	if side < 0 or side >= b.slots.size() or b.slots[side].size() < BattleCore.SLOT_COUNT:
+		return
+	# 1. 用就绪道具
+	for s in range(BattleCore.SLOT_COUNT):
+		if b.slot_ready(side, s):
+			b.use_slot(side, s)
+	# 2. 抽可抽的槽
+	for s in range(BattleCore.SLOT_COUNT):
+		if b.can_draw_slot(side, s):
+			var opts: Array = b.begin_draft(side, s)
+			if not opts.is_empty():
+				b.pick_draft(side, s, rng.randi() % opts.size())
+	# 3. 富余能量开 1 个槽（电报）
+	for s in range(BattleCore.SLOT_COUNT):
+		if b.can_open_slot(side, s) and b.energy[side] >= BattleCore.ITEM_OPEN_COST + reserve:
+			b.open_slot(side, s)
+			break
+	# 4. 富余能量 refill 1 个空槽
+	for s in range(BattleCore.SLOT_COUNT):
+		if b.can_refill(side, s) and b.energy[side] >= BattleCore.ITEM_REFILL_COST + reserve:
+			var opts2: Array = b.start_refill(side, s)
+			if not opts2.is_empty():
+				b.pick_draft(side, s, rng.randi() % opts2.size())
+			break
 
 
 # === 搜索 ===

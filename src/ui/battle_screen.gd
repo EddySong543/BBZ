@@ -111,6 +111,7 @@ var p2_item_row: ItemSlotRow
 ## M3：本回合已点选「使用」的道具槽（仅 P1）；确认时统一 use_slot 提交，进新回合清空。
 var selected_item_slots: Array[int] = []
 var _drafting := false   # draft 弹窗打开中：拦截重入 + 暂停回合计时
+var _ai_rng := RandomNumberGenerator.new()   # 任务 B：AI 道具抽取选择用（与游戏 rng 分离）
 
 # ---- 选择 / 样式 ----
 var action_btn_list: Array[Button] = []
@@ -136,6 +137,7 @@ var _hitstop_token: int = 0   # hitstop(c) 防重叠：仅最后一次定格负�
 # ============================================================
 
 func _ready() -> void:
+	_ai_rng.randomize()   # 任务 B：AI 道具抽取随机种子
 	battle = BattleCore.new()
 	var p0: Array = _resolve_team(BattleSetup.p1_heroes, DEFAULT_P0)
 	var p1: Array = _resolve_team(BattleSetup.p2_heroes, DEFAULT_P1)
@@ -421,6 +423,10 @@ func _on_confirm_pressed() -> void:
 
 
 func _ai_pick(side: int) -> void:
+	# 道具经济（任务 B）：AI 先像玩家一样操作道具栏（用就绪/抽/开格·开格立即扣能）→
+	# 再据【剩余】能量选动作，使试玩两边对等。基础启发见 BattleAI.run_item_economy。
+	BattleAI.run_item_economy(battle, side, _ai_rng)
+
 	var opts: Array[int] = [A.CHARGE, A.CHARGE, A.DEFEND]
 	if battle.can_afford(side, A.ATTACK):
 		opts.append(A.ATTACK)
