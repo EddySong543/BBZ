@@ -116,53 +116,11 @@ func test_choose_death_switch_picks_healthiest_reserve() -> void:
 	assert_eq(slot, 1, "应选血量更高的替补（槽 1）")
 
 
-# ---- 死亡换人：对位感知（T2）——不只看血量 ----
-
-func test_death_switch_is_matchup_aware() -> void:
-	# Arrange：出战阵亡待换。替补 slot1=高血基础(7HP)、slot2=h33 审判(5HP，执行≤2HP 无视防御)。
-	#   对手仅剩出战 1 名、1 HP（≤2HP 处决线）、替补全亡。
-	#   血量贪心 → 选 slot1(高血)；对位前瞻 → 选 slot2(h33 一招处决直接获胜)。
-	var b := _battle2([["t00", 7], ["t01", 7], ["h33", 5]], [["t10", 5], ["t11", 5], ["t12", 5]])
-	b.active_index[0] = 0
-	b.hp[0] = [0, 14, 10]        # 出战亡；slot1=7HP(14半)，slot2=h33 5HP(10半)
-	b.hp[1] = [2, 0, 0]          # 对手仅出战存活、1 HP；替补全亡
-	b.energy = [6, 2]            # 我方够审判(2能)；对手有 2 能(可大防，但处决无视防御)
-	b.pending_death_switch[0] = true
-	var ai := BattleAI.new(5, 2)  # depth-2 → 换人前瞻生效
-
-	# Act
-	var slot: int = ai.choose_death_switch(b, 0)
-
-	# Assert：选对位制胜的 h33（slot2，且更低血）→ 证明非血量贪心
-	assert_eq(slot, 2, "应选能一招处决取胜的 h33(对位)，而非单纯高血的 slot1")
-	assert_lt(b.hp[0][2], b.hp[0][1], "h33 血量更低 → 印证选择来自对位而非血量")
-
-
-# ---- 随机技多样本评估（T3）----
-
-func test_stochastic_multisample_reduces_variance() -> void:
-	# Arrange：h13 孤注（66% 翻倍）局面——预挂孤注 buff，p0 出波触发翻倍掷骰、p1 攒
-	# （h13 已改 buff 型：发动主动技那步是确定的挂 buff，随机性在「下一次攻击」结算时发生）
-	var b := _battle2([["h13", 5], ["t01", 10], ["t02", 10]], [["t10", 10], ["t11", 10], ["t12", 10]])
-	b.set_status(0, 0, "guzhu_buff", true)   # 孤注 buff 已挂 → 下一次攻击触发 66% 翻倍
-	var ai := BattleAI.new(123, 1)
-	var ca := {action = ATTACK, target = -1}   # p0 出波 → 命中前 guzhu_buff 掷骰
-	var cb := {action = CHARGE, target = -1}
-
-	# Act：单次 rollout vs 多样本 _value_after，各采 30 次
-	var single: Array = []
-	var multi: Array = []
-	for i in range(30):
-		single.append(float(ai._rollout_once(b, 0, 1, ca, cb, 0)["value"]))
-		multi.append(ai._value_after(b, 0, 1, ca, cb, 0))
-
-	# Assert：单次确有方差（随机）；多样本方差更低（降噪）；均值相近（同一期望）
-	var sd_single := _std(single)
-	var sd_multi := _std(multi)
-	assert_gt(sd_single, 0.0, "h13 随机技单次采样应有方差（确认确实随机）")
-	assert_lt(sd_multi, sd_single, "多样本方差应低于单次（按 EV 降运气噪声）")
-	assert_almost_eq(_mean(multi), _mean(single), sd_single, "多样本均值应接近单次均值（同一期望）")
-
+# 注（2026-06-19）：原 test_death_switch_is_matchup_aware（依赖 h33 审判·无视防御处决）
+#   与 test_stochastic_multisample_reduces_variance（依赖 h13 孤注·随机翻倍主动技）已删 ——
+#   两者所需的大阿卡那英雄已弃用，而 12 生肖均为被动、无"无视防御处决"或"随机主动技"
+#   可作等价替身。AI 的对位前瞻 / 随机多样本能力仍在代码中（随机多样本的确定性侧由下方
+#   test_deterministic_cell_not_multisampled 覆盖）；待出现随机/处决型当前内容时再补测。
 
 func test_deterministic_cell_not_multisampled() -> void:
 	# Arrange：纯基础英雄无随机
@@ -176,25 +134,6 @@ func test_deterministic_cell_not_multisampled() -> void:
 		"确定性英雄结算不消耗 rng → stochastic=false")
 	assert_eq(ai._value_after(b, 0, 1, ca, cb, 0), ai._value_after(b, 0, 1, ca, cb, 0),
 		"确定性格多次评估值恒定（无随机噪声）")
-
-
-func _mean(a: Array) -> float:
-	if a.is_empty():
-		return 0.0
-	var s := 0.0
-	for v in a:
-		s += float(v)
-	return s / float(a.size())
-
-
-func _std(a: Array) -> float:
-	if a.size() < 2:
-		return 0.0
-	var m := _mean(a)
-	var sq := 0.0
-	for v in a:
-		sq += (float(v) - m) * (float(v) - m)
-	return sqrt(sq / float(a.size()))
 
 
 # ---- 深层短名单放宽（T4）----
@@ -233,8 +172,8 @@ func test_ai_applies_weight_override() -> void:
 # ---- 深度：depth-1 / depth-2 均返回合法动作 ----
 
 func test_depth_variants_return_legal() -> void:
-	# Arrange：含主动技英雄的常规局面
-	var b := _battle2([["h13", 5], ["h01", 4], ["t02", 10]], [["h32", 4], ["t11", 10], ["t12", 10]])
+	# Arrange：常规多英雄局面（12 生肖均为被动）
+	var b := _battle2([["h01", 5], ["h02", 4], ["t02", 10]], [["h03", 4], ["t11", 10], ["t12", 10]])
 
 	for d in [1, 2]:
 		var ai := BattleAI.new(9, d)
