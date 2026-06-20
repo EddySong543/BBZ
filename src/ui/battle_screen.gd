@@ -27,6 +27,11 @@ const LOW_HP_RATIO := 0.5
 ## 注：当前为运行时代码统一微调(编辑器里仍是基准位)；下移量定稿后可烘焙进 .tscn 使"所见=所得"。
 const TOP_UI_DROP := 0.0   # 顶部 UI 整体下移量；0=复原原位（想下移改这个数即可）
 
+## 顶部头像框尺寸（Eddy 要求整体放大一档·2026-06-20）。出战 / 替补；放大走「底固定向上长」
+## （见 _enlarge_frames），不压下方血行/名字。原基准 72 / 68。
+const FRAME_ACTIVE_SIZE := 80.0
+const FRAME_BENCH_SIZE := 76.0
+
 ## 默认阵容 fallback：直接打开 battle_screen.tscn(F6) 测试用，BattleSetup 为空时启用。
 const HERO_DATA_DIR := "res://assets/data/heroes/"
 const DEFAULT_P0 := ["h01", "h05", "h06"]   # 子鼠 / 辰龙 / 巳蛇（首发 12 生肖）
@@ -171,6 +176,7 @@ func _ready() -> void:
 		row.low_hp_ratio = LOW_HP_RATIO
 
 	_build_item_rows()
+	_enlarge_frames()
 	_update_all()
 	_show_turn_intro()
 
@@ -782,6 +788,17 @@ func _build_item_rows() -> void:
 	p2_hud.add_child(p2_item_row)
 
 
+## 顶部头像框整体放大一档（Eddy·2026-06-20）：尺寸在 _update_single_frame 设（FRAME_*_SIZE），
+## 这里只把每框位置按增量「左移半量 + 上移全量」→ 横向居中变宽、纵向底固定向上长，
+## 不压下方血行/名字、保持顶部 UI 和谐。仅运行一次（_ready）。frame[0]=出战 / 1,2=替补。
+func _enlarge_frames() -> void:
+	for frames in [p1_frames, p2_frames]:
+		for i in range(frames.size()):
+			var f: HeroFrame = frames[i]
+			var d: float = (FRAME_ACTIVE_SIZE - 72.0) if i == 0 else (FRAME_BENCH_SIZE - 68.0)
+			f.position -= Vector2(d * 0.5, d)
+
+
 ## M3：P1 道具槽点击分派（按槽态）。开格/抽/补 = 立即生效（公开电报）；
 ## 使用 = 暂存点选（金边），确认时与动作一起盲选提交。
 func _on_p1_slot_clicked(s: int) -> void:
@@ -927,7 +944,7 @@ func _update_single_frame(frame: HeroFrame, hp_row, player: int, slot: int, is_a
 	frame.is_active = is_active
 	frame.is_dead = dead
 	frame.player_color = pcolor
-	frame.frame_size = Vector2(72, 72) if is_active else Vector2(68, 68)
+	frame.frame_size = Vector2(FRAME_ACTIVE_SIZE, FRAME_ACTIVE_SIZE) if is_active else Vector2(FRAME_BENCH_SIZE, FRAME_BENCH_SIZE)
 
 	# 出战位 / 阵亡位：替补血量行隐藏（出战血量看上方大心条；阵亡不显示 0hp/护盾）。
 	if is_active or dead:

@@ -11,8 +11,8 @@ extends Control
 signal slot_clicked(slot: int)
 signal slot_upgrade_clicked(slot: int)   # 点击就绪可升级槽右上角「升」角标（C·升级线）
 
-const SLOT_W := 58.0   # 道具芯片：明显小于头像框（72）→ 视觉上从属于英雄
-const SLOT_H := 58.0
+const SLOT_W := 64.0   # 道具芯片：略小于头像框（出战80/替补76）→ 仍从属于英雄（2026-06-20 整体放大一档）
+const SLOT_H := 64.0
 const GAP := 8.0
 
 ## 维度 → 芯片底色（与动作按钮 / draft 卡 / 飘字同源的语义色板）。
@@ -40,15 +40,6 @@ const EMP_FT := Color(0.14, 0.14, 0.16)
 const EMP_FB := Color(0.09, 0.09, 0.11)
 const EMP_EI := Color(0.23, 0.23, 0.26)
 
-## 像素边框（保留·给 draft 弹窗卡片复用 → item_draft_popup.gd）。
-const PIXEL_FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")
-const ROUND_MASK_SHADER := preload("res://assets/shaders/canvas_ui_round_mask.gdshader")
-const PF_EDGE_OUTER := Color(0.05, 0.045, 0.04)
-const PF_EDGE_MID := Color(0.70, 0.64, 0.52)
-const PF_EDGE_INNER := Color(0.42, 0.36, 0.26)
-const PIXEL_GRID := 24.0
-const CORNER_RADIUS := 0.0
-
 ## interactive：本地玩家行可点击。setter 立即把按钮 mouse_filter 设为 STOP；P2（false）→ IGNORE。
 var interactive := false:
 	set(v):
@@ -61,30 +52,6 @@ var _chip_mats: Array[ShaderMaterial] = []   # 每槽 jelly 材质（refresh 重
 var _labels: Array[Label] = []
 var _buttons: Array[Button] = []
 var _upgrade_btns: Array[Button] = []          # 每槽右上角「升」金角标，仅就绪可升级时显示（C）
-
-
-## 像素边框 ShaderMaterial（draft 卡复用）。grid 越大格越细。
-static func make_pixel_frame_material(grid := PIXEL_GRID, corner := CORNER_RADIUS, aspect := 1.0) -> ShaderMaterial:
-	var m := ShaderMaterial.new()
-	m.shader = PIXEL_FRAME_SHADER
-	m.set_shader_parameter("edge_outer", PF_EDGE_OUTER)
-	m.set_shader_parameter("edge_mid", PF_EDGE_MID)
-	m.set_shader_parameter("edge_inner", PF_EDGE_INNER)
-	m.set_shader_parameter("pixel_grid", grid)
-	m.set_shader_parameter("border_px", 2.0)
-	m.set_shader_parameter("noise_amt", 0.06)
-	m.set_shader_parameter("corner_radius", corner)
-	m.set_shader_parameter("aspect", aspect)
-	return m
-
-
-## 造圆角遮罩材质（给填充层切同款圆角·防方角戳出圆框）。
-static func make_round_mask_material(grid := PIXEL_GRID, corner := CORNER_RADIUS) -> ShaderMaterial:
-	var m := ShaderMaterial.new()
-	m.shader = ROUND_MASK_SHADER
-	m.set_shader_parameter("corner_radius", corner)
-	m.set_shader_parameter("pixel_grid", grid)
-	return m
 
 
 ## 造 jelly 芯片材质（颜色每次 refresh 重设 fill_top/fill_bottom/edge_inner）。
@@ -124,7 +91,7 @@ func _ready() -> void:
 		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		lbl.clip_text = true   # 长道具名（占位文字）夹在芯片内·勿溢出（待换图标）
-		lbl.add_theme_font_size_override("font_size", 11)
+		lbl.add_theme_font_size_override("font_size", 12)
 		lbl.add_theme_color_override("font_color", Color(0.98, 0.96, 0.9))
 		lbl.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.03, 0.85))
 		lbl.add_theme_constant_override("outline_size", 4)

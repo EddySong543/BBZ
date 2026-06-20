@@ -272,6 +272,34 @@ func test_upgrade_draft_caches_then_clears_on_pick() -> void:
 	assert_eq((b.slots[0][0]["upg_draft"] as Array).size(), 0, "选定后清空升级候选缓存")
 
 
+func test_upgrade_draft_candidates_are_distinct() -> void:
+	var b := _battle(20)
+	b.slots[0][0]["item"] = ItemCatalog.make("t1_feibiao")
+	var opts := b.begin_upgrade_draft(0, 0)
+	var ids := {}
+	for o in opts:
+		ids[(o as ItemData).item_id] = true
+	assert_eq(ids.size(), opts.size(), "升级 3 选 1 候选互不重复")
+
+
+func test_upgrade_draft_weights_favored_upgrade() -> void:
+	# 加权（B2）：预设升级款(t1_feibiao→t2_feibiao)出现应远多于普通 T2 件（权重 5×·稳健于池大小）。
+	var b := _battle(20)
+	var trials := 300
+	var fav := 0
+	var other := 0
+	for _i in range(trials):
+		b.slots[0][0]["item"] = ItemCatalog.make("t1_feibiao")
+		b.slots[0][0]["upg_draft"] = []
+		for o in b.begin_upgrade_draft(0, 0):
+			var id: String = (o as ItemData).item_id
+			if id == "t2_feibiao":
+				fav += 1
+			elif id == "t2_jiandun":   # 任一非升级款 T2 件作对照
+				other += 1
+	assert_gt(fav, other * 2, "升级款(%d) 出现应远多于普通 T2 件(%d)" % [fav, other])
+
+
 func test_cannot_upgrade_top_tier_but_can_upgrade_non_family() -> void:
 	var b := _battle(20)
 	b.slots[0][0]["item"] = ItemCatalog.make("t3_shengming")   # 顶级·无更高 tier

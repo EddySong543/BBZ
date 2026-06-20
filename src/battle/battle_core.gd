@@ -408,6 +408,7 @@ const ITEM_OPEN_COST := 2              # 开格 1 能（= 2 半能）
 const ITEM_REFILL_COST := 2            # refill 1 能
 const UPGRADE_COST_T1 := 2             # 升级 1→2 花 1 能（= 2 半能·ADR D5）
 const UPGRADE_COST_T2 := 4             # 升级 2→3 花 2 能（= 4 半能·ADR D5）
+const UPGRADE_FAVORED_WEIGHT := 5.0    # 升级 3 选 1 里「预设升级款」(upgrade_to) 的相对权重（>1 → 更易出现·B2）
 const STARTER_ITEM_IDS := ["t1_feibiao", "t1_jiudun", "t1_lzhi_shengming"]  # 开局带 1 随机池
 
 
@@ -531,12 +532,31 @@ func begin_upgrade_draft(player: int, s: int) -> Array:
 	if (sl["upg_draft"] as Array).is_empty():
 		var item: ItemData = sl["item"]
 		var pool: Array = ItemCatalog.all_for_tier(item.tier + 1) if item != null else []
-		var opts: Array = []
-		var n: int = mini(3, pool.size())
-		for _i in range(n):
-			opts.append(pool[rng.randi() % pool.size()])
-		sl["upg_draft"] = opts
+		var fav: String = item.upgrade_to if item != null else ""
+		sl["upg_draft"] = _weighted_draft_pick(pool, fav, 3)
 	return sl["upg_draft"]
+
+
+## 加权不重复抽 n 件：预设升级款 favored_id 权重 UPGRADE_FAVORED_WEIGHT× → 更易出现但不保证（B2）。
+## favored_id="" 或不在池中 → 退化为等概率随机。结果 n 个互不重复（升级 3 选 1 不出现重复款）。
+func _weighted_draft_pick(pool: Array, favored_id: String, n: int) -> Array:
+	var remaining: Array = pool.duplicate()
+	var picks: Array = []
+	var count: int = mini(n, remaining.size())
+	for _k in range(count):
+		var total: float = 0.0
+		for it in remaining:
+			total += UPGRADE_FAVORED_WEIGHT if (it as ItemData).item_id == favored_id else 1.0
+		var r: float = rng.randf() * total
+		var idx: int = remaining.size() - 1   # 浮点兜底（落最后一个）
+		for j in range(remaining.size()):
+			r -= UPGRADE_FAVORED_WEIGHT if (remaining[j] as ItemData).item_id == favored_id else 1.0
+			if r <= 0.0:
+				idx = j
+				break
+		picks.append(remaining[idx])
+		remaining.remove_at(idx)
+	return picks
 
 
 ## 选中升级候选第 choice 个：付能量（按【当前】tier 计费）→ 换成该件 → 重新锁 1 回合
