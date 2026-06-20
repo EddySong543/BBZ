@@ -29,6 +29,8 @@ const AI_ITEM_ENERGY_RESERVE := 2
 const AI_ITEM_UPGRADE_BUFFER := 2
 
 var search_depth: int = 2
+var plan_items: bool = true # 搜索推演里是否也跑道具经济（Part 2）：true=AI 规划会考虑未来道具发展；
+                            # false=控制组（实战照常用道具、但 lookahead 当道具冻结·= 旧行为）。供 A/B 实测。
 var eval_profile: int = 0   # 0=基础评估(v2) / 1=v3 牌感评估(熟练优秀玩家)
 var weights: Dictionary = {} # 评估权重覆盖（空=用默认常量）；A/B 校准用（T1）
 var rng := RandomNumberGenerator.new()        # 动作抽样
@@ -178,6 +180,12 @@ func _state_value(b: BattleCore, perspective: int, depth: int) -> float:
 		return _eval(b, perspective) * pow(WIN_DISCOUNT, float(search_depth - depth))
 	if depth <= 0:
 		return _eval(b, perspective)
+	# 道具经济（Part 2）：模拟的未来回合，双方也按实战同款启发自动管理道具栏（开格/抽/用/升），
+	# 在枚举动作【前】跑 → AI 规划会考虑「道具就绪可收割 / 对手有道具威胁 / 该攒能升级」。
+	# 槽未初始化（无经济战局 / 单元测试）时 run_item_economy 守卫早退 = 行为不变（测试安全）。
+	if plan_items:
+		run_item_economy(b, perspective, _eval_rng)
+		run_item_economy(b, 1 - perspective, _eval_rng)
 	var opp: int = 1 - perspective
 	var my: Array = _shortlist(b, perspective)
 	var opp_acts: Array = _shortlist(b, opp)

@@ -3,7 +3,10 @@ extends SceneTree
 ## AI 自对弈批量模拟器 —— 积累平衡测试数据。
 ##
 ## 两个 BattleAI（同时博弈短时最优）对打 N 局，随机阵容（默认 h01–h34 池），
-## 输出：① 每局明细 CSV ② 汇总 md（胜率/回合分布/动作频率/各英雄胜率）。
+## 输出：① 每局明细 CSV ② 汇总 md（胜率/回合分布/动作频率/各英雄胜率/道具使用）。
+##
+## 道具经济（2026-06-20 接入）：每局 econ_init() + 每回合双方在选动作前跑 BattleAI.run_item_economy
+## （与实战 battle_screen._ai_pick 同启发）→ 批量平衡数据现已反映道具系统。
 ##
 ## 运行（项目根目录）：
 ##   godot --headless --path <proj> --script res://tools/sim/run_sim.gd -- --games 200 --seed 42
@@ -13,6 +16,7 @@ extends SceneTree
 ##   --pool A-B       英雄池 hAA..hBB（默认 1-34；星座白板 35-46 默认排除）
 ##   --max-turns T    单局回合上限（默认 120，超出记为未决 capped）
 ##   --out DIR        输出目录（默认 res://tools/sim/out/）
+##   --plan-ab 1      A/B 验证 Part 2：A(规划道具 plan_items) vs B(不规划) 头对头 → out/ab_result.md
 
 const HERO_DATA_DIR := "res://assets/data/heroes/"
 const ROSTER_SIZE := 3
@@ -37,6 +41,7 @@ var use_draft := true   # true=DraftAI 选人 / false=随机阵容
 var depth := 2          # 对战 AI 搜索深度
 var profile := 0        # 对战 AI 评估档：0=基础 / 1=v3 牌感(熟练优秀玩家)
 var ab_variant := ""    # A/B 校准：非空=A(默认权重) vs B(此变体) 头对头（见 AB_VARIANTS）
+var plan_ab := false    # A/B：A(plan_items=true 规划道具) vs B(false 不规划) 头对头（验证 Part 2）
 
 var _hero_data := {}    # hero_id → HeroData（加载一次复用）
 var _pool_hd: Array = []  # Array[HeroData]，与 ids 平行（drafter 用，返回索引）
@@ -59,6 +64,7 @@ func _initialize() -> void:
 	var csv_rows: Array = []
 	var win := {0: 0, 1: 0, 2: 0, -1: 0}   # winner: 0 平 / 1 P1 / 2 P2 / -1 未决(capped)
 	var turns_list: Array = []
+	var item_stat := {}                      # 道具统计（used = 提交盲选的道具次数）
 	var action_count := {}                  # action int → 次数
 	var hero_present := {}                   # hero_id → 出场局数
 	var hero_win := {}                       # hero_id → 所在队获胜局数
@@ -66,9 +72,12 @@ func _initialize() -> void:
 	var ab_b := 0      # A/B：B(变体权重)胜
 	var ab_draw := 0   # A/B：平/未决
 
-	if use_ab():
-		print("【A/B 校准】A=默认权重  vs  B=变体「%s」=%s （交替先后手）" % [
-			ab_variant, str(AB_VARIANTS.get(ab_variant, {}))])
+	if ab_active():
+		if plan_ab:
+			print("【A/B】A=规划道具(plan_items=true) vs B=不规划(false) 头对头（两方实战都用道具·交替先后手）")
+		else:
+			print("【A/B 校准】A=默认权重  vs  B=变体「%s」=%s （交替先后手）" % [
+				ab_variant, str(AB_VARIANTS.get(ab_variant, {}))])
 
 	var setup_rng := RandomNumberGenerator.new()
 	setup_rng.seed = base_seed
@@ -96,6 +105,7 @@ func _initialize() -> void:
 
 		var b := BattleCore.new()
 		b.setup(_to_heroes(r0), _to_heroes(r1), seed_g)
+		b.econ_init()   # 启用道具经济（开局带 1 + 槽位状态机）→ AI 每回合走 run_item_economy
 		# A/B 校准：A=默认权重、B=变体；偶数局 A=P0、奇数局 A=P1 → 抵消位置偏差
 		var w0: Dictionary = {}
 		var w1: Dictionary = {}
@@ -107,12 +117,15 @@ func _initialize() -> void:
 				w0 = wb   # A=P1, B=P0
 		var ai0 := BattleAI.new(seed_g + 1, depth, profile, w0)
 		var ai1 := BattleAI.new(seed_g + 2, depth, profile, w1)
+		if plan_ab:
+			ai0.plan_items = (g % 2 == 0)   # A(规划道具)=偶数局 P0 / 奇数局 P1（抵消先后手偏差）
+			ai1.plan_items = (g % 2 != 0)
 
-		var res: Dictionary = _play(b, ai0, ai1, action_count)
+		var res: Dictionary = _play(b, ai0, ai1, action_count, item_stat)
 		var w: int = res["winner"]
 		win[w] = win.get(w, 0) + 1
 		turns_list.append(res["turns"])
-		if use_ab():
+		if ab_active():
 			var a_side: int = 1 if (g % 2 == 0) else 2   # A 所在 player+1
 			if w == a_side:
 				ab_a += 1
@@ -141,8 +154,8 @@ func _initialize() -> void:
 			print("  ...%d/%d 局完成" % [g + 1, games])
 			_write_progress(g + 1)
 
-	_write_outputs(csv_rows, win, turns_list, action_count, hero_present, hero_win)
-	if use_ab():
+	_write_outputs(csv_rows, win, turns_list, action_count, hero_present, hero_win, item_stat)
+	if ab_active():
 		_write_ab(ab_a, ab_b, ab_draw)
 	_write_progress(games)
 	print("=== 完成 ===")
@@ -151,6 +164,16 @@ func _initialize() -> void:
 
 func use_ab() -> bool:
 	return ab_variant != ""
+
+
+## A/B 计数 / 输出是否激活（权重变体 或 道具规划头对头）。
+func ab_active() -> bool:
+	return ab_variant != "" or plan_ab
+
+
+## A/B 变体名（用于标签）。
+func _ab_name() -> String:
+	return "道具推演规划(plan_items)" if plan_ab else ab_variant
 
 
 ## 进度文件（每 50 局刷新，随时可 Read 查看进度；解决 stdout 缓冲不可见问题）。
@@ -166,24 +189,34 @@ func _write_progress(done: int) -> void:
 func _write_ab(a: int, b: int, draw: int) -> void:
 	var total: int = a + b + draw
 	var decisive: int = a + b
+	var a_label := "规划道具" if plan_ab else "默认权重"
+	var b_label := "不规划" if plan_ab else ("变体" + _ab_name())
+	var desc := ("A=规划道具(plan_items=true) ｜ B=不规划（两方实战都用道具，仅 AI lookahead 不同）" if plan_ab
+		else "A=默认权重 ｜ B=变体「%s」=%s" % [ab_variant, str(AB_VARIANTS.get(ab_variant, {}))])
+	# 关注侧：plan_ab → A(新特性 plan_items)；权重 → B(变体)。
+	var focus := "A(规划道具)" if plan_ab else "B(变体)"
 	var f := FileAccess.open(out_dir + "ab_result.md", FileAccess.WRITE)
 	if f != null:
-		f.store_line("# A/B 权重校准结果\n")
-		f.store_line("- A=默认权重 ｜ B=变体「%s」=%s" % [ab_variant, str(AB_VARIANTS.get(ab_variant, {}))])
+		f.store_line("# A/B %s 结果\n" % ("道具推演规划" if plan_ab else "权重校准"))
+		f.store_line("- %s" % desc)
 		f.store_line("- 对局=%d（交替先后手抵消位置偏差）\n" % total)
 		f.store_line("| 侧 | 胜 | 总占比 | decisive 占比 |")
 		f.store_line("|----|----|------|------|")
-		f.store_line("| A(默认) | %d | %s | %s |" % [a, _pct(a, total), _pct(a, decisive)])
-		f.store_line("| B(%s) | %d | %s | %s |" % [ab_variant, b, _pct(b, total), _pct(b, decisive)])
+		f.store_line("| A(%s) | %d | %s | %s |" % [a_label, a, _pct(a, total), _pct(a, decisive)])
+		f.store_line("| B(%s) | %d | %s | %s |" % [b_label, b, _pct(b, total), _pct(b, decisive)])
 		f.store_line("| 平/未决 | %d | %s | — |" % [draw, _pct(draw, total)])
-		f.store_line("\n> 判读：B 的 decisive 胜率显著 >50% → 变体更强、可纳入新权重；<50% → 更弱、弃。")
+		f.store_line("\n> 判读：%s 的 decisive 胜率显著 >50%% → 更强（可采纳）；≈50%% → 无差异；<50%% → 更弱。" % focus)
 		f.close()
-	print("【A/B】A(默认) %d 胜 / B(%s) %d 胜 / 平%d → %sab_result.md" % [a, ab_variant, b, draw, out_dir])
+	print("【A/B】A(%s) %d 胜 / B(%s) %d 胜 / 平%d → %sab_result.md" % [a_label, a, b_label, b, draw, out_dir])
 
 
 ## 跑一局到结束或回合上限。返回 {winner, turns, p0_alive, p1_alive, p0_hp, p1_hp}。
-func _play(b: BattleCore, ai0: BattleAI, ai1: BattleAI, action_count: Dictionary) -> Dictionary:
+func _play(b: BattleCore, ai0: BattleAI, ai1: BattleAI, action_count: Dictionary, item_stat: Dictionary) -> Dictionary:
 	while not b.game_over and b.turn_number < max_turns:
+		# 道具经济：选动作【前】双方自动管理道具栏（与实战 _ai_pick 同启发·开格立即扣能 → 动作据剩余能量）。
+		BattleAI.run_item_economy(b, 0, ai0.rng)
+		BattleAI.run_item_economy(b, 1, ai1.rng)
+		item_stat["used"] = item_stat.get("used", 0) + b.item_uses[0].size() + b.item_uses[1].size()
 		# 双方从同一结算前状态同时盲选
 		var c0: Dictionary = ai0.choose_action(b, 0)
 		var c1: Dictionary = ai1.choose_action(b, 1)
@@ -261,7 +294,8 @@ func _load_pool() -> Array:
 # === 输出 ===
 
 func _write_outputs(csv_rows: Array, win: Dictionary, turns_list: Array,
-		action_count: Dictionary, hero_present: Dictionary, hero_win: Dictionary) -> void:
+		action_count: Dictionary, hero_present: Dictionary, hero_win: Dictionary,
+		item_stat: Dictionary = {}) -> void:
 	var abs_dir := ProjectSettings.globalize_path(out_dir)
 	DirAccess.make_dir_recursive_absolute(abs_dir)
 
@@ -312,6 +346,12 @@ func _write_outputs(csv_rows: Array, win: Dictionary, turns_list: Array,
 		if action_count.has(k):
 			md.store_line("| %s | %d | %s |" % [_action_label(k), action_count[k], _pct(action_count[k], act_total)])
 	md.store_line("")
+
+	# 道具使用（验证经济已接入·总提交盲选道具次数 / 局均）
+	var items_used: int = int(item_stat.get("used", 0))
+	md.store_line("## 道具使用")
+	md.store_line("- 总提交道具次数：**%d** ｜ 局均：%.2f 次/局\n" % [
+		items_used, (float(items_used) / float(total) if total > 0 else 0.0)])
 
 	# 各英雄胜率（present 降序里按胜率排）
 	md.store_line("## 各英雄胜率（出场 ≥1 局）")
@@ -378,6 +418,7 @@ func _parse_args() -> void:
 			"--profile": profile = int(val)
 			"--draft": use_draft = int(val) != 0
 			"--ab": ab_variant = val
+			"--plan-ab": plan_ab = int(val) != 0
 			"--out": out_dir = val
 			"--pool":
 				var parts := val.split("-")
