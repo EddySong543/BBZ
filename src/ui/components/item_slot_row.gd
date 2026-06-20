@@ -47,8 +47,12 @@ var interactive := false:
 		for b in _buttons:
 			b.mouse_filter = Control.MOUSE_FILTER_STOP if v else Control.MOUSE_FILTER_IGNORE
 
+const ICON_INSET := 6.0                          # 图标内缩（露出芯片边框/状态色）
+
 var _chips: Array[ColorRect] = []
 var _chip_mats: Array[ShaderMaterial] = []   # 每槽 jelly 材质（refresh 重设 fill/edge 做状态/维度色）
+var _icons: Array[TextureRect] = []            # 道具图标层（缺图隐藏 → 回退文字·零回归）
+var _icon_cache := {}                          # id → Texture2D / null（避免每帧 load/exists）
 var _labels: Array[Label] = []
 var _buttons: Array[Button] = []
 var _upgrade_btns: Array[Button] = []          # 每槽右上角「升」金角标，仅就绪可升级时显示（C）
@@ -84,6 +88,16 @@ func _ready() -> void:
 		chip.material = mat
 		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(chip)
+		# 道具图标层（铺在芯片之上、文字之下；缺图隐藏 → 回退文字）。
+		var icon := TextureRect.new()
+		icon.position = base + Vector2(ICON_INSET, ICON_INSET)
+		icon.size = Vector2(SLOT_W - ICON_INSET * 2.0, SLOT_H - ICON_INSET * 2.0)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE   # 小尺寸须 IGNORE_SIZE 否则被纹理顶大
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST   # 像素清晰
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon.visible = false
+		add_child(icon)
 		var lbl := Label.new()
 		lbl.position = base
 		lbl.size = Vector2(SLOT_W, SLOT_H)
@@ -111,6 +125,7 @@ func _ready() -> void:
 		add_child(up)
 		_chips.append(chip)
 		_chip_mats.append(mat)
+		_icons.append(icon)
 		_labels.append(lbl)
 		_buttons.append(btn)
 		_upgrade_btns.append(up)
@@ -174,6 +189,9 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 	for i in range(3):
 		var st: int = battle.slot_state(player, i)
 		var lbl: Label = _labels[i]
+		var icon: TextureRect = _icons[i]
+		icon.visible = false               # 默认隐藏 → 非 CHARGING / 缺图均回退文字（零回归）
+		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		var ready := false                 # 本回合是否「有可操作动作」（决定金边）
 		var cta := GOLD_OPEN               # 召唤操作用的金（经济操作=暗金；道具就绪=亮金）
 		var ft := SEAL_FT
@@ -198,18 +216,28 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 				var item: ItemData = battle.slot_item(player, i)
 				var nm: String = item.item_name if item != null else ""
 				var dim: Color = _dim_color(item)
+				var tex: Texture2D = _icon_for(item.item_id) if item != null else null
+				if tex != null:
+					icon.texture = tex
+					icon.visible = true
+					lbl.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM   # 状态标签落底·不挡图标
 				if battle.slot_ready(player, i):
 					ready = true
 					cta = GOLD_READY          # 道具就绪可用 = 主操作 → 亮金
 					ft = dim.lightened(0.10)
 					fb = dim.darkened(0.30)
 					ei = dim.lightened(0.28)
-					lbl.text = nm + "\n✓用" if staged.has(i) else nm
+					icon.modulate = Color.WHITE
+					if tex != null:
+						lbl.text = "✓用" if staged.has(i) else ""   # 有图 → 只留状态标签
+					else:
+						lbl.text = nm + "\n✓用" if staged.has(i) else nm   # 缺图回退名
 				else:
 					ft = dim.darkened(0.18)   # 锁中 = 维度色压暗（仍认得出归属）
 					fb = dim.darkened(0.48)
 					ei = NEU_EI
-					lbl.text = nm + "\n(锁)"
+					icon.modulate = Color(0.62, 0.62, 0.66)   # 图标压暗 = 读作锁中
+					lbl.text = "(锁)" if tex != null else nm + "\n(锁)"
 			BattleCore.SlotState.EMPTY:
 				if battle.can_refill(player, i):
 					lbl.text = "可补"
@@ -236,3 +264,10 @@ func _dim_color(item: ItemData) -> Color:
 	if item == null:
 		return SEAL_FT
 	return DIM_COLOR.get(item.dimension, Color(0.42, 0.42, 0.47))
+
+
+## 取道具图标（带缓存）；缺图 / 未导入返回 null → 回退占位文字。
+func _icon_for(id: String) -> Texture2D:
+	if not _icon_cache.has(id):
+		_icon_cache[id] = ItemCatalog.load_icon(id)   # 可能为 null，缓存避免每帧 exists/load
+	return _icon_cache[id]

@@ -6,7 +6,11 @@ extends RefCounted
 ##
 ## 当前 = T1【非趣味】全部 + T2/T3【非中立·非趣味】Tier-A 批（Phase 1）+ T3 遗物 7 件（Phase 2）。
 ## 缓做：经济/UI/PvE 倾向件（Phase 3）+ 中立/趣味两类（独立设计）。详见 design/items-list.md。
-## 道具均为字符串 id（tier 前缀拼音），无数字编号；尚无美术字段。
+##
+## 道具均为字符串 id（tier 前缀拼音），无数字编号。⚠ id 拼音为历史化石、≠ 当前显示名
+## （如 t1_xiangjiaopi=「臭鸡蛋」、t1_lingdang=「STEAL技能卡」）——id 是内部稳定主键、永不展示给玩家，
+## 故不随显示名改名。显示名 item_name 已与 design/items-list.md 对齐。
+## 美术：图标按约定路径 ICON_DIR/<id>.png 加载（见底部 icon_path / load_icon）；缺图时 UI 回退占位文字。
 
 const _S_PRE := ItemData.Seq.PRE
 const _S_ANY := ItemData.Seq.ANY
@@ -380,3 +384,36 @@ static func all() -> Array[ItemData]:
 
 static func ids() -> Array:
 	return _DEF.keys()
+
+
+# ========== 美术图标约定（B·2026-06-20）==========
+## 图标按约定路径加载、无需逐件配字段：res://assets/sprites/items/<id>.png。
+## 暂存区 newAssets/ 由 tools/import_item_art.gd 按「中文名→id」分配进来；UI 缺图回退占位文字。
+const ICON_DIR := "res://assets/sprites/items/"
+
+
+## 某 id 的图标约定路径（文件不一定存在）。
+static func icon_path(id: String) -> String:
+	return ICON_DIR + id + ".png"
+
+
+## 加载某 id 的图标；未导入 / 不存在则返回 null（调用方据此回退占位文字）。
+static func load_icon(id: String) -> Texture2D:
+	if id == "":
+		return null
+	var p := icon_path(id)
+	if not ResourceLoader.exists(p):
+		return null
+	return load(p) as Texture2D
+
+
+## 显示名 → id 映射（从 _DEF 实时构建，永不过时）。重名会 push_error（当前全唯一）。
+## 供 tools/import_item_art.gd 把「臭鸡蛋.png」分配为「t1_xiangjiaopi.png」。
+static func name_to_id() -> Dictionary:
+	var m := {}
+	for id in _DEF:
+		var nm: String = (_DEF[id] as Dictionary)["name"]
+		if m.has(nm):
+			push_error("ItemCatalog: 显示名重复『%s』(id %s / %s)，名→id 映射有歧义" % [nm, m[nm], id])
+		m[nm] = id
+	return m

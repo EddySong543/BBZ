@@ -81,6 +81,10 @@ func _build_card(item: ItemData, pos: Vector2, idx: int) -> void:
 	add_child(card)
 
 	var dim: Color = DIM_COLOR.get(item.dimension if item != null else "", Color(0.42, 0.42, 0.47))
+	# 图标（缺图 → 描述区维持原位、卡面与现状一像素不变·零回归）。
+	var tex: Texture2D = ItemCatalog.load_icon(item.item_id) if item != null else null
+	var scrim_top := 184.0 if tex != null else 92.0    # 有图 → 描述区下移给图标腾窗
+	var desc_top := 192.0 if tex != null else 100.0
 	# jelly 卡底（圆角果冻·维度色渐变·与道具栏/按钮同语言）。子节点 IGNORE，点击穿透到 card。
 	var jelly := ColorRect.new()
 	jelly.color = Color.WHITE   # jelly shader 乘 COLOR，须白
@@ -93,8 +97,8 @@ func _build_card(item: ItemData, pos: Vector2, idx: int) -> void:
 	# 描述区暗衬（内缩不碰圆角）：提升长描述在饱和卡上的可读性。
 	var scrim := ColorRect.new()
 	scrim.color = Color(0.0, 0.0, 0.0, 0.26)
-	scrim.position = Vector2(14.0, 92.0)
-	scrim.size = Vector2(CARD_W - 28.0, CARD_H - 108.0)
+	scrim.position = Vector2(14.0, scrim_top)
+	scrim.size = Vector2(CARD_W - 28.0, CARD_H - scrim_top - 16.0)
 	scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(scrim)
 
@@ -111,10 +115,21 @@ func _build_card(item: ItemData, pos: Vector2, idx: int) -> void:
 	name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(name_lbl)
 
+	if tex != null:
+		var icon := TextureRect.new()
+		icon.texture = tex
+		icon.position = Vector2(CARD_W * 0.5 - 48.0, 84.0)
+		icon.size = Vector2(96.0, 96.0)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST   # 像素清晰
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.add_child(icon)
+
 	var desc_lbl := Label.new()
 	desc_lbl.text = item.description if item != null else ""
-	desc_lbl.position = Vector2(18.0, 100.0)
-	desc_lbl.size = Vector2(CARD_W - 36.0, CARD_H - 124.0)
+	desc_lbl.position = Vector2(18.0, desc_top)
+	desc_lbl.size = Vector2(CARD_W - 36.0, CARD_H - desc_top - 24.0)
 	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	desc_lbl.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
