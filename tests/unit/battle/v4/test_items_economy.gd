@@ -1,7 +1,8 @@
 extends GutTest
 
 ## 道具经济状态机（M1·ADR-003 §2）行为锁定测试。
-## 开局带1(slot0即用) / 三步部署锁(开格→抽→可用) / 一次性用后 EMPTY / refill / 解锁回合门 / 能量成本。
+## 开局带1走部署延迟(slot0·turn2才可用·非首回合) / 三步部署锁(开格→抽→可用) / 一次性用后 EMPTY / refill / 解锁回合门 / 能量成本。
+## 注：「测机制」用例走 _battle_ready()(开局件已就绪夹具)，「测时序」用例走 _battle()(真实态·开局件锁住)。
 
 const A := ActionDef.Action
 const SEED := 777
@@ -26,6 +27,13 @@ func _battle(energy: int = 20) -> BattleCore:
 	return b
 
 
+## 开局件已就绪的 battle（绕开「部署延迟」便于测机制；真实首回合开局件是锁住的·时序见 test_starter_*）。
+func _battle_ready(energy: int = 20) -> BattleCore:
+	var b := _battle(energy)
+	b.slots[0][0]["since"] = b.turn_number - 1   # slot0 立即就绪
+	return b
+
+
 func _advance(b: BattleCore, n: int = 1) -> void:
 	for _i in range(n):
 		b.select_action(0, A.CHARGE)
@@ -35,11 +43,16 @@ func _advance(b: BattleCore, n: int = 1) -> void:
 
 # === 开局带 1 ===
 
-func test_starter_slot_ready_at_turn_zero() -> void:
+func test_starter_deploys_with_delay_not_first_turn() -> void:
+	# 设计 §2 部署时序：开局带件也走部署延迟 → turn_number 2（显示回合 3）才可用，前两回合锁住（公开电报）。
 	var b := _battle()
-	assert_eq(b.slot_state(0, 0), SS.CHARGING, "slot0 开局带件")
-	assert_true(b.slot_ready(0, 0), "开局带 1 立即可用")
+	assert_eq(b.slot_state(0, 0), SS.CHARGING, "slot0 开局带件（CHARGING·公开）")
 	assert_not_null(b.slot_item(0, 0))
+	assert_false(b.slot_ready(0, 0), "turn0（显示回合1）锁住·不可用")
+	_advance(b, 1)
+	assert_false(b.slot_ready(0, 0), "turn1（显示回合2）仍锁")
+	_advance(b, 1)
+	assert_true(b.slot_ready(0, 0), "turn2（显示回合3）开局件可用（设计时序）")
 
 
 func test_other_slots_sealed_and_locked_early() -> void:
@@ -51,7 +64,7 @@ func test_other_slots_sealed_and_locked_early() -> void:
 # === 三步部署锁：开格 → 抽 → 可用 ===
 
 func test_open_costs_energy_and_locks() -> void:
-	var b := _battle(20)
+	var b := _battle_ready(20)
 	_advance(b, 2)                       # → turn_number = 2（第 3 回合）
 	assert_true(b.can_open_slot(0, 1), "第 3 回合 slot1 可开格")
 	var e0 := b.energy[0]
@@ -62,7 +75,7 @@ func test_open_costs_energy_and_locks() -> void:
 
 
 func test_draw_next_turn_then_charging() -> void:
-	var b := _battle(20)
+	var b := _battle_ready(20)
 	_advance(b, 2)
 	b.open_slot(0, 1)
 	_advance(b, 1)                       # 下一回合
@@ -75,7 +88,7 @@ func test_draw_next_turn_then_charging() -> void:
 
 
 func test_usable_turn_after_draw() -> void:
-	var b := _battle(20)
+	var b := _battle_ready(20)
 	_advance(b, 2)
 	b.open_slot(0, 1)
 	_advance(b, 1)
@@ -87,7 +100,7 @@ func test_usable_turn_after_draw() -> void:
 # === 一次性用后 EMPTY + refill ===
 
 func test_use_slot_commits_and_empties() -> void:
-	var b := _battle(20)
+	var b := _battle_ready(20)
 	# 用开局带的 slot0
 	assert_true(b.use_slot(0, 0))
 	assert_eq(b.item_uses[0].size(), 1, "提交到盲选 item_uses")
@@ -99,7 +112,7 @@ func test_use_slot_commits_and_empties() -> void:
 
 
 func test_refill_after_empty() -> void:
-	var b := _battle(20)
+	var b := _battle_ready(20)
 	b.use_slot(0, 0)
 	_advance(b, 1)                       # slot0 → EMPTY
 	assert_eq(b.slot_state(0, 0), SS.EMPTY)
@@ -115,7 +128,7 @@ func test_refill_after_empty() -> void:
 # === 不影响既有结算 / clone ===
 
 func test_use_slot_item_resolves() -> void:
-	var b := _battle(20)
+	var b := _battle_ready(20)
 	# 强制 slot0 = 飞镖以验证结算（绕过随机起手）
 	b.slots[0][0]["item"] = ItemCatalog.make("t1_feibiao")
 	b.use_slot(0, 0)
@@ -126,7 +139,7 @@ func test_use_slot_item_resolves() -> void:
 
 
 func test_clone_copies_slots_independently() -> void:
-	var b := _battle(20)
+	var b := _battle_ready(20)
 	var c := b.clone()
 	assert_eq(c.slots[0].size(), 3)
 	c.slots[0][0]["state"] = SS.EMPTY
@@ -136,7 +149,7 @@ func test_clone_copies_slots_independently() -> void:
 # === M2：道具栏组件刷新不崩 ===
 
 func test_item_slot_row_refreshes() -> void:
-	var b := _battle(20)
+	var b := _battle_ready(20)
 	b.slots[0][0]["item"] = ItemCatalog.make("t1_feibiao")   # 固定起手便于断言
 	var row := ItemSlotRow.new()
 	add_child_autofree(row)   # 触发 _ready 建子节点
@@ -150,7 +163,7 @@ func test_item_slot_row_refreshes() -> void:
 
 func test_full_deploy_cycle_open_draw_use_empty() -> void:
 	# 全周期：封印 → 开格 → 抽 → 可用 → 使用 → 置空（M3 点击分派依次驱动的 M1 路径）。
-	var b := _battle(40)
+	var b := _battle_ready(40)
 	_advance(b, 2)                       # 第 3 回合，slot1 可开
 	assert_true(b.open_slot(0, 1))
 	_advance(b, 1)
@@ -180,7 +193,7 @@ func test_slot_row_interactive_gates_click_signal() -> void:
 
 
 func test_slot_row_staged_highlight() -> void:
-	var b := _battle(20)
+	var b := _battle_ready(20)
 	b.slots[0][0]["item"] = ItemCatalog.make("t1_feibiao")
 	var row := ItemSlotRow.new()
 	row.interactive = true
@@ -234,7 +247,7 @@ func test_catalog_upgrade_chain_links() -> void:
 
 func test_upgrade_draft_3_from_next_tier_then_swap_and_relock() -> void:
 	# 新模型（B2）：升级 = 下一级池 3 选 1 → 换件 + 重新锁本回合。
-	var b := _battle(20)
+	var b := _battle_ready(20)
 	b.slots[0][0]["item"] = ItemCatalog.make("t1_feibiao")   # 就绪可升（T1）
 	assert_true(b.can_upgrade(0, 0))
 	var opts := b.begin_upgrade_draft(0, 0)
@@ -251,7 +264,7 @@ func test_upgrade_draft_3_from_next_tier_then_swap_and_relock() -> void:
 
 
 func test_upgrade_tier2_to_3_costs_more() -> void:
-	var b := _battle(20)
+	var b := _battle_ready(20)
 	b.slots[0][0]["item"] = ItemCatalog.make("t2_shengming")
 	assert_true(b.can_upgrade(0, 0))
 	var opts := b.begin_upgrade_draft(0, 0)
@@ -264,7 +277,7 @@ func test_upgrade_tier2_to_3_costs_more() -> void:
 
 
 func test_upgrade_draft_caches_then_clears_on_pick() -> void:
-	var b := _battle(20)
+	var b := _battle_ready(20)
 	b.slots[0][0]["item"] = ItemCatalog.make("t1_feibiao")
 	var first := b.begin_upgrade_draft(0, 0)
 	assert_eq(b.begin_upgrade_draft(0, 0), first, "同回合重复调用沿用同组候选（防 reroll）")
@@ -273,7 +286,7 @@ func test_upgrade_draft_caches_then_clears_on_pick() -> void:
 
 
 func test_upgrade_draft_candidates_are_distinct() -> void:
-	var b := _battle(20)
+	var b := _battle_ready(20)
 	b.slots[0][0]["item"] = ItemCatalog.make("t1_feibiao")
 	var opts := b.begin_upgrade_draft(0, 0)
 	var ids := {}
@@ -284,7 +297,7 @@ func test_upgrade_draft_candidates_are_distinct() -> void:
 
 func test_upgrade_draft_weights_favored_upgrade() -> void:
 	# 加权（B2）：预设升级款(t1_feibiao→t2_feibiao)出现应远多于普通 T2 件（权重 5×·稳健于池大小）。
-	var b := _battle(20)
+	var b := _battle_ready(20)
 	var trials := 300
 	var fav := 0
 	var other := 0
@@ -301,7 +314,7 @@ func test_upgrade_draft_weights_favored_upgrade() -> void:
 
 
 func test_cannot_upgrade_top_tier_but_can_upgrade_non_family() -> void:
-	var b := _battle(20)
+	var b := _battle_ready(20)
 	b.slots[0][0]["item"] = ItemCatalog.make("t3_shengming")   # 顶级·无更高 tier
 	assert_false(b.can_upgrade(0, 0), "顶级（T3）不可升")
 	assert_false(b.pick_upgrade(0, 0, 0))
@@ -312,7 +325,7 @@ func test_cannot_upgrade_top_tier_but_can_upgrade_non_family() -> void:
 
 
 func test_cannot_upgrade_without_energy() -> void:
-	var b := _battle(20)
+	var b := _battle_ready(20)
 	b.slots[0][0]["item"] = ItemCatalog.make("t1_feibiao")
 	b.energy[0] = BattleCore.UPGRADE_COST_T1 - 1
 	assert_false(b.can_upgrade(0, 0), "能量不足不可升")
@@ -321,7 +334,7 @@ func test_cannot_upgrade_without_energy() -> void:
 
 
 func test_cannot_upgrade_when_not_ready() -> void:
-	var b := _battle(20)
+	var b := _battle_ready(20)
 	b.slots[0][0]["item"] = ItemCatalog.make("t1_feibiao")
 	b.slots[0][0]["since"] = b.turn_number   # 锁本回合（刚抽/刚升）
 	assert_false(b.slot_ready(0, 0))
@@ -329,7 +342,7 @@ func test_cannot_upgrade_when_not_ready() -> void:
 
 
 func test_slot_row_shows_upgrade_badge_when_upgradeable() -> void:
-	var b := _battle(20)
+	var b := _battle_ready(20)
 	b.slots[0][0]["item"] = ItemCatalog.make("t1_feibiao")
 	var row := ItemSlotRow.new()
 	row.interactive = true

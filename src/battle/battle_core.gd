@@ -410,15 +410,20 @@ const UPGRADE_COST_T1 := 2             # 升级 1→2 花 1 能（= 2 半能·AD
 const UPGRADE_COST_T2 := 4             # 升级 2→3 花 2 能（= 4 半能·ADR D5）
 const UPGRADE_FAVORED_WEIGHT := 5.0    # 升级 3 选 1 里「预设升级款」(upgrade_to) 的相对权重（>1 → 更易出现·B2）
 const STARTER_ITEM_IDS := ["t1_feibiao", "t1_jiudun", "t1_lzhi_shengming"]  # 开局带 1 随机池
+## 开局带件按设计同样走「部署延迟」：turn_number 2（= 显示回合 3）才可用，**非首回合**
+## （design build-design-framework.md §2 部署时序表：开格①t1→抽①t2→①可用t3）。
+## 自动部署（"带入道具"·玩家不需点开格/抽，降记忆成本）→ CHARGING + since 使其 turn 2 就绪。
+const STARTER_READY_TURN := 2
 
 
 ## 启用经济并初始化槽位（实战由 battle_screen 调；单元测试不调 → 槽空、不影响既有行为）。
 func econ_init() -> void:
 	slots = [[], []]
 	for p in [0, 1]:
-		# slot0 = 开局带 1：随机基础件，CHARGING 且 since=-1 → 回合 0 即 turn_number(0) > since(-1)，立刻可用
+		# slot0 = 开局带 1：随机基础件，CHARGING 但走部署延迟 → since=STARTER_READY_TURN-1，
+		# turn_number 2(显示回合3)才 slot_ready；前两回合显示「(锁)」公开电报，非首回合即用（design §2）。
 		var sid: String = STARTER_ITEM_IDS[rng.randi() % STARTER_ITEM_IDS.size()]
-		slots[p].append({state = SlotState.CHARGING, item = ItemCatalog.make(sid), since = -1, used = false, draft = [], upg_draft = []})
+		slots[p].append({state = SlotState.CHARGING, item = ItemCatalog.make(sid), since = STARTER_READY_TURN - 1, used = false, draft = [], upg_draft = []})
 		for _s in range(SLOT_COUNT - 1):
 			slots[p].append({state = SlotState.SEALED, item = null, since = -1, used = false, draft = [], upg_draft = []})
 
