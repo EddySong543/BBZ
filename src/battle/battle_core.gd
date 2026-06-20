@@ -398,8 +398,8 @@ func add_item_rider(player: int, data: ItemData) -> void:
 # 槽位状态机，与底层 items[]/use_item 并存（单元测试走 give_item 绕过经济）。
 # 开局带 1（slot0·随机基础件·即用·降记忆成本）；slot1/2 第 3/4 回合解锁。
 # 三步部署锁（电报）：开格(1能·锁本回合) → 抽道具(3选1·锁本回合) → 下回合可用；
-#   一次性用后 EMPTY，refill(1能·重抽)。升级(1→2→3) 待升级链数据，本期延后。
-# 槽 dict：{state:int, item:ItemData|null, since:int(进入该态的回合), used:bool, draft:Array}
+#   一次性用后 EMPTY，refill(1能·重抽)。升级 = 就绪件花能量从「下一级池」3 选 1·重新锁本回合。
+# 槽 dict：{state:int, item:ItemData|null, since:int(进入该态的回合), used:bool, draft:Array, upg_draft:Array}
 
 enum SlotState { SEALED, OPENED, CHARGING, EMPTY }
 const SLOT_COUNT := 3
@@ -417,9 +417,9 @@ func econ_init() -> void:
 	for p in [0, 1]:
 		# slot0 = 开局带 1：随机基础件，CHARGING 且 since=-1 → 回合 0 即 turn_number(0) > since(-1)，立刻可用
 		var sid: String = STARTER_ITEM_IDS[rng.randi() % STARTER_ITEM_IDS.size()]
-		slots[p].append({state = SlotState.CHARGING, item = ItemCatalog.make(sid), since = -1, used = false, draft = []})
+		slots[p].append({state = SlotState.CHARGING, item = ItemCatalog.make(sid), since = -1, used = false, draft = [], upg_draft = []})
 		for _s in range(SLOT_COUNT - 1):
-			slots[p].append({state = SlotState.SEALED, item = null, since = -1, used = false, draft = []})
+			slots[p].append({state = SlotState.SEALED, item = null, since = -1, used = false, draft = [], upg_draft = []})
 
 
 func slot_state(player: int, s: int) -> int:
@@ -482,6 +482,7 @@ func pick_draft(player: int, s: int, choice: int) -> bool:
 	sl["state"] = SlotState.CHARGING
 	sl["since"] = turn_number
 	sl["draft"] = []
+	sl["upg_draft"] = []   # 新件 → 旧升级候选作废
 	return true
 
 
@@ -512,24 +513,47 @@ func upgrade_cost(player: int, s: int) -> int:
 	return UPGRADE_COST_T2 if item.tier >= 2 else UPGRADE_COST_T1
 
 
-## 能否升级（就绪 + 有 upgrade_to + 能量够）：就绪槽的「用 or 升」二选一决策点。
+## 能否升级（就绪 + 有更高 tier 可升 + 能量够）：就绪槽的「用 or 升」二选一决策点。
+## 升级 = 花能量从「下一级 tier 池」3 选 1（不再要求预设 upgrade_to —— 多数道具没有升级款；
+## 预设款只是「以后加权让它更易出现」的偏好·B2）。故 T1/T2 件均可升、T3 封顶。
 func can_upgrade(player: int, s: int) -> bool:
 	if not slot_ready(player, s):
 		return false
 	var item: ItemData = slots[player][s]["item"]
-	return item != null and item.upgrade_to != "" and energy[player] >= upgrade_cost(player, s)
+	return item != null and item.tier < 3 and energy[player] >= upgrade_cost(player, s)
 
 
-## 升级：付能量，换成 upgrade_to 件，重新锁 1 回合（CHARGING·下回合可用·电报·ADR D5）。
-func upgrade_slot(player: int, s: int) -> bool:
+## 生成升级 3 选 1 候选（下一级 tier 池随机 3·占位无加权）。存入槽 "upg_draft" 供 UI 展示；
+## 同回合重复调用沿用已生成结果（防 reroll）。换件 / refill / 用掉时清空（见各处 upg_draft=[]）。
+## TODO（B2 加权池）：预设 upgrade_to 存在时提高其出现概率；当前等概率随机。
+func begin_upgrade_draft(player: int, s: int) -> Array:
+	var sl: Dictionary = slots[player][s]
+	if (sl["upg_draft"] as Array).is_empty():
+		var item: ItemData = sl["item"]
+		var pool: Array = ItemCatalog.all_for_tier(item.tier + 1) if item != null else []
+		var opts: Array = []
+		var n: int = mini(3, pool.size())
+		for _i in range(n):
+			opts.append(pool[rng.randi() % pool.size()])
+		sl["upg_draft"] = opts
+	return sl["upg_draft"]
+
+
+## 选中升级候选第 choice 个：付能量（按【当前】tier 计费）→ 换成该件 → 重新锁 1 回合
+## （CHARGING·下回合可用·电报·ADR D5）。取消（不调本函数）则不扣能、候选保留供再选。
+func pick_upgrade(player: int, s: int, choice: int) -> bool:
 	if not can_upgrade(player, s):
 		return false
-	energy[player] -= upgrade_cost(player, s)   # 按【当前】tier 计费，再换件
-	var next_id: String = (slots[player][s]["item"] as ItemData).upgrade_to
-	slots[player][s]["item"] = ItemCatalog.make(next_id)
-	slots[player][s]["state"] = SlotState.CHARGING
-	slots[player][s]["since"] = turn_number      # 锁本回合 → 下回合可用
-	slots[player][s]["used"] = false
+	var opts: Array = begin_upgrade_draft(player, s)
+	if choice < 0 or choice >= opts.size():
+		return false
+	energy[player] -= upgrade_cost(player, s)
+	var sl: Dictionary = slots[player][s]
+	sl["item"] = ItemCatalog.make((opts[choice] as ItemData).item_id)
+	sl["state"] = SlotState.CHARGING
+	sl["since"] = turn_number      # 锁本回合 → 下回合可用
+	sl["used"] = false
+	sl["upg_draft"] = []
 	return true
 
 
@@ -547,6 +571,7 @@ func start_refill(player: int, s: int) -> Array:
 	sl["since"] = turn_number - 1   # 复用格→本回合即可抽
 	sl["used"] = false
 	sl["draft"] = []
+	sl["upg_draft"] = []
 	return begin_draft(player, s)
 
 
@@ -566,6 +591,7 @@ func _econ_after_resolve() -> void:
 				sl["state"] = SlotState.EMPTY
 				sl["item"] = null
 				sl["used"] = false
+				sl["upg_draft"] = []
 
 
 # === AI / 模拟支持（纯加法，不改任何结算行为）===

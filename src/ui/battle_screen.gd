@@ -102,10 +102,9 @@ var _skill_index: int = 0
 @onready var p1_coin_row: IconPipRow = $P1Hud/P1CoinRow
 @onready var p2_coin_row: IconPipRow = $P2Hud/P2CoinRow
 
-# 道具栏（M2·占位）：程序化挂在各 HUD 下；位置先猜、F6 看了再调这两个常量。
-# ⚠ P1/P2 不可同坐标（两排都是全屏 HUD 的子节点 → 会叠在一起、上层吞点击）。P2 暂放右侧镜像。
-const ITEM_ROW_POS_P1 := Vector2(28.0, 188.0)
-const ITEM_ROW_POS_P2 := Vector2(1608.0, 188.0)
+# 道具栏（M2·占位）：程序化挂在各 HUD 下。P1=贴左(对齐左侧框组·28px 内边距)；
+# P2=镜像右贴(右内边距=P1 左内边距)，由 _build_item_rows 随槽宽自动算，修「敌方框偏左」错位。
+const ITEM_ROW_POS_P1 := Vector2(28.0, 168.0)
 var p1_item_row: ItemSlotRow
 var p2_item_row: ItemSlotRow
 ## M3：本回合已点选「使用」的道具槽（仅 P1）；确认时统一 use_slot 提交，进新回合清空。
@@ -230,16 +229,15 @@ func _init_buttons() -> void:
 	btn_confirm.clip_text = true
 	_attach_button_juice(btn_confirm)
 
-	# 技能按钮「技能」二字单独放大 + 描边；底已改 B 羊皮 → 墨字压羊皮（暖描边代替纯黑，避免脏）。
+	# 技能/结束二字放大 + 描边；底已改语义色（技能=紫 / 结束=绿·饱和底）→ 改亮米白字 + 暗描边，任何色底都清晰。
 	FontManager.apply_btn(btn_special, 30)
-	btn_special.add_theme_color_override("font_color", Color(0.2, 0.14, 0.08))   # 墨字（压羊皮）
-	btn_special.add_theme_color_override("font_outline_color", Color(0.88, 0.82, 0.68, 0.6))
+	btn_special.add_theme_color_override("font_color", Color(0.98, 0.96, 0.9))   # 亮米白（压饱和底）
+	btn_special.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.03, 0.85))
 	btn_special.add_theme_constant_override("outline_size", 4)
 
-	# 结束按钮「结束」二字放大 + 描边；底已改鎏金羊皮(主行动·与 BP 确认钮同款)→朱砂墨字 + 暖描边。
 	FontManager.apply_btn(btn_confirm, 30)
-	btn_confirm.add_theme_color_override("font_color", Color(0.52, 0.18, 0.12))   # 朱砂墨（压浅金羊皮）
-	btn_confirm.add_theme_color_override("font_outline_color", Color(0.88, 0.82, 0.68, 0.6))
+	btn_confirm.add_theme_color_override("font_color", Color(0.98, 0.96, 0.9))   # 亮米白（压绿底）
+	btn_confirm.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.03, 0.85))
 	btn_confirm.add_theme_constant_override("outline_size", 4)
 
 	action_btn_list = [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend, btn_special]
@@ -778,7 +776,9 @@ func _build_item_rows() -> void:
 	p1_item_row.slot_upgrade_clicked.connect(_on_p1_slot_upgrade)   # C：升级角标
 	p1_hud.add_child(p1_item_row)
 	p2_item_row = ItemSlotRow.new()   # P2 = AI·道具-blind（ADR D9）→ 仅显示
-	p2_item_row.position = ITEM_ROW_POS_P2
+	# 右贴镜像 P1：P2 右内边距 = P1 左内边距(28) → 与右侧 P2 框组对齐(修敌方道具行偏左)。
+	var row_w := ItemSlotRow.SLOT_W * 3.0 + ItemSlotRow.GAP * 2.0
+	p2_item_row.position = Vector2(SCREEN_W - ITEM_ROW_POS_P1.x - row_w, ITEM_ROW_POS_P1.y)
 	p2_hud.add_child(p2_item_row)
 
 
@@ -815,23 +815,25 @@ func _on_p1_slot_clicked(s: int) -> void:
 				_update_all()
 
 
-## C：升级就绪槽内道具（花能量·换 upgrade_to 件·重新锁 1 回合）。立即生效（公开电报）。
+## C：升级就绪槽内道具（花能量 → 下一级池 3 选 1 → 换件并重新锁 1 回合·公开电报）。
 func _on_p1_slot_upgrade(s: int) -> void:
 	if state != State.PLAYER_SELECT or _drafting:
 		return
 	if battle.can_upgrade(PLAYER, s):
-		battle.upgrade_slot(PLAYER, s)   # 付能量 → 换升级件 → 锁本回合
-		selected_item_slots.erase(s)     # 升级后该槽不再就绪 → 撤销本回合「使用」点选
+		var c: int = await _show_draft(s, battle.begin_upgrade_draft(PLAYER, s), "升级道具（3 选 1）")
+		if c >= 0:
+			battle.pick_upgrade(PLAYER, s, c)   # 付能量 → 换升级件 → 锁本回合
+			selected_item_slots.erase(s)        # 升级后该槽不再就绪 → 撤销本回合「使用」点选
 		_update_all()
 
 
 ## 弹出 3 选 1 抽取弹窗，await 返回选中 index（-1 = 取消）。抽取期间暂停回合计时 + 拦重入。
-func _show_draft(_s: int, options: Array) -> int:
+func _show_draft(_s: int, options: Array, title: String = "抽取道具（3 选 1）") -> int:
 	_drafting = true
 	game_timer.stop()
 	var popup := ItemDraftPopup.new()
 	add_child(popup)
-	popup.setup(options, true)
+	popup.setup(options, true, title)
 	var choice: int = await popup.resolved
 	popup.queue_free()
 	_drafting = false

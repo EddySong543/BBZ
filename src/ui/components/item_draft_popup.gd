@@ -25,7 +25,7 @@ var _can_cancel := true
 var _done := false   # 防重复 resolve（连点 / ESC 抢答）
 
 
-func setup(options: Array, can_cancel: bool = true) -> void:
+func setup(options: Array, can_cancel: bool = true, title_text: String = "抽取道具（3 选 1）") -> void:
 	_can_cancel = can_cancel
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP   # 吃掉所有背景点击（模态）
@@ -37,7 +37,7 @@ func setup(options: Array, can_cancel: bool = true) -> void:
 	add_child(dim)
 
 	var title := Label.new()
-	title.text = "抽取道具（3 选 1）"
+	title.text = title_text   # 区分「抽取」/「升级」3 选 1
 	title.position = Vector2(0.0, SCREEN_H * 0.5 - CARD_H * 0.5 - 70.0)
 	title.size = Vector2(SCREEN_W, 48.0)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

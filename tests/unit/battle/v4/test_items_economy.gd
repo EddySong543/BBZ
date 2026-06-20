@@ -185,13 +185,13 @@ func test_slot_row_staged_highlight() -> void:
 	var row := ItemSlotRow.new()
 	row.interactive = true
 	add_child_autofree(row)
-	# 已点选使用 → 边框转亮金 + 「✓用」标记。
+	# 已点选使用 → 芯片金高光边转最亮金 + 「✓用」标记。
 	row.refresh(b, 0, [0])
-	assert_eq(row._frame_mats[0].get_shader_parameter("edge_mid"), ItemSlotRow.STAGED_MID, "暂存 = 亮金边框")
+	assert_eq(row._chip_mats[0].get_shader_parameter("edge_inner"), ItemSlotRow.GOLD_STAGED, "暂存 = 亮金边")
 	assert_true(row._labels[0].text.ends_with("✓用"), "暂存槽标 ✓用")
-	# 未点选但本回合可用（interactive）→ 边框转暖金、无 ✓用。
+	# 未点选但本回合可用（interactive·道具就绪）→ 金高光边、无 ✓用。
 	row.refresh(b, 0, [])
-	assert_eq(row._frame_mats[0].get_shader_parameter("edge_mid"), ItemSlotRow.READY_MID, "可用 = 暖金边框")
+	assert_eq(row._chip_mats[0].get_shader_parameter("edge_inner"), ItemSlotRow.GOLD_READY, "可用 = 金高光边")
 	assert_false(row._labels[0].text.ends_with("✓用"))
 
 
@@ -232,15 +232,19 @@ func test_catalog_upgrade_chain_links() -> void:
 	assert_eq(ItemCatalog.make("t3_shengming").upgrade_to, "", "生命药水 T3 封顶")
 
 
-func test_upgrade_swaps_item_and_relocks() -> void:
+func test_upgrade_draft_3_from_next_tier_then_swap_and_relock() -> void:
+	# 新模型（B2）：升级 = 下一级池 3 选 1 → 换件 + 重新锁本回合。
 	var b := _battle(20)
-	b.slots[0][0]["item"] = ItemCatalog.make("t1_feibiao")   # 就绪可升
+	b.slots[0][0]["item"] = ItemCatalog.make("t1_feibiao")   # 就绪可升（T1）
 	assert_true(b.can_upgrade(0, 0))
+	var opts := b.begin_upgrade_draft(0, 0)
+	assert_eq(opts.size(), 3, "升级 3 选 1")
+	for o in opts:
+		assert_eq((o as ItemData).tier, 2, "候选全部来自下一级（T2）池")
 	var e0 := b.energy[0]
-	assert_true(b.upgrade_slot(0, 0))
+	assert_true(b.pick_upgrade(0, 0, 0))
 	assert_eq(e0 - b.energy[0], BattleCore.UPGRADE_COST_T1, "1→2 花 1 能")
-	assert_eq(b.slot_item(0, 0).item_id, "t2_feibiao", "换成升级件")
-	assert_eq(b.slot_item(0, 0).tier, 2)
+	assert_eq(b.slot_item(0, 0).tier, 2, "换成下一级件")
 	assert_false(b.slot_ready(0, 0), "升级后重新锁本回合（电报）")
 	_advance(b, 1)
 	assert_true(b.slot_ready(0, 0), "下回合可用")
@@ -250,20 +254,33 @@ func test_upgrade_tier2_to_3_costs_more() -> void:
 	var b := _battle(20)
 	b.slots[0][0]["item"] = ItemCatalog.make("t2_shengming")
 	assert_true(b.can_upgrade(0, 0))
+	var opts := b.begin_upgrade_draft(0, 0)
+	for o in opts:
+		assert_eq((o as ItemData).tier, 3, "候选全部来自 T3 池")
 	var e0 := b.energy[0]
-	b.upgrade_slot(0, 0)
+	b.pick_upgrade(0, 0, 0)
 	assert_eq(e0 - b.energy[0], BattleCore.UPGRADE_COST_T2, "2→3 花 2 能")
-	assert_eq(b.slot_item(0, 0).item_id, "t3_shengming")
 	assert_eq(b.slot_item(0, 0).tier, 3)
 
 
-func test_cannot_upgrade_top_tier_or_non_family() -> void:
+func test_upgrade_draft_caches_then_clears_on_pick() -> void:
 	var b := _battle(20)
-	b.slots[0][0]["item"] = ItemCatalog.make("t3_shengming")   # 顶级·无 upgrade_to
-	assert_false(b.can_upgrade(0, 0), "顶级不可升")
-	assert_false(b.upgrade_slot(0, 0))
-	b.slots[0][0]["item"] = ItemCatalog.make("t1_xianshou")    # 非升级线
-	assert_false(b.can_upgrade(0, 0), "非升级线不可升")
+	b.slots[0][0]["item"] = ItemCatalog.make("t1_feibiao")
+	var first := b.begin_upgrade_draft(0, 0)
+	assert_eq(b.begin_upgrade_draft(0, 0), first, "同回合重复调用沿用同组候选（防 reroll）")
+	assert_true(b.pick_upgrade(0, 0, 0))
+	assert_eq((b.slots[0][0]["upg_draft"] as Array).size(), 0, "选定后清空升级候选缓存")
+
+
+func test_cannot_upgrade_top_tier_but_can_upgrade_non_family() -> void:
+	var b := _battle(20)
+	b.slots[0][0]["item"] = ItemCatalog.make("t3_shengming")   # 顶级·无更高 tier
+	assert_false(b.can_upgrade(0, 0), "顶级（T3）不可升")
+	assert_false(b.pick_upgrade(0, 0, 0))
+	# 新模型：无预设升级款的 T1 件也可升（候选来自下一级池·B2 的核心动机）。
+	b.slots[0][0]["item"] = ItemCatalog.make("t1_xianshou")    # 无 upgrade_to
+	assert_eq(b.slot_item(0, 0).upgrade_to, "", "该件无预设升级款")
+	assert_true(b.can_upgrade(0, 0), "无预设升级款的 T1 件也能升级")
 
 
 func test_cannot_upgrade_without_energy() -> void:
@@ -271,7 +288,7 @@ func test_cannot_upgrade_without_energy() -> void:
 	b.slots[0][0]["item"] = ItemCatalog.make("t1_feibiao")
 	b.energy[0] = BattleCore.UPGRADE_COST_T1 - 1
 	assert_false(b.can_upgrade(0, 0), "能量不足不可升")
-	assert_false(b.upgrade_slot(0, 0))
+	assert_false(b.pick_upgrade(0, 0, 0))
 	assert_eq(b.slot_item(0, 0).item_id, "t1_feibiao", "失败不换件")
 
 

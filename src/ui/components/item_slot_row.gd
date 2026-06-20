@@ -1,38 +1,53 @@
 class_name ItemSlotRow
 extends Control
 
-## 道具栏组件（M2 显示 + M3 交互 + C 升级）：横排 3 个槽，按 BattleCore 经济状态刷新。
-## interactive=true 时（P1 本地玩家）每槽可点击 → 发 slot_clicked(槽位)，由 battle_screen 分派
-## 开格 / 抽 / 使用 / refill；interactive=false 时（P2·AI 道具-blind）仅显示、不吃点击。
-## 像素框风格 = 完全照搬 HeroFrame（canvas_ui_pixel_frame 暖骨边 + 圆角 + round_mask 圆角填充）；
-##   ready/暂存 = 边框本身转金（非另加 ring）。⚠ 位置/尺寸仍占位（ITEM_ROW_POS_*），待 F6 + 美术。
+## 道具栏组件（M2 显示 + M3 交互 + C 升级 + 配色重审 2026-06-20）：横排 3 个圆角 jelly 芯片。
+## 芯片 = 复用动作按钮同款 canvas_button_jelly（圆角果冻·像素质感），按【状态/维度】分色、与按钮同色语言：
+##   安静默认（锁=灰 / 空=暗格）→ 就绪点亮（维度色满铺：进攻红/防御蓝… + 金色高光边 + 升角标）。
+##   原则「框安静、内容响」。interactive=true（P1）每槽可点击发 slot_clicked；false（P2·AI 道具-blind）仅显示、不点亮。
+## ⚠ 行位置由 battle_screen 控（P1 贴左 / P2 镜像右贴）；道具名为占位文字，待换图标。
 ## 用法：add_child → interactive/connect（仅 P1）→ 每次 _update_all 调 refresh(battle, player, staged)。
 
 signal slot_clicked(slot: int)
 signal slot_upgrade_clicked(slot: int)   # 点击就绪可升级槽右上角「升」角标（C·升级线）
 
-const SLOT_W := 88.0
-const SLOT_H := 88.0
-const GAP := 10.0
+const SLOT_W := 58.0   # 道具芯片：明显小于头像框（72）→ 视觉上从属于英雄
+const SLOT_H := 58.0
+const GAP := 8.0
 
-## 维度 → 填充底色（取自 battle-ui-color-palette 取向，可调）。
+## 维度 → 芯片底色（与动作按钮 / draft 卡 / 飘字同源的语义色板）。
 const DIM_COLOR := {
 	"进攻": Color("b8402f"), "防御": Color("3f6fb0"), "能量": Color("d2a32a"),
 	"节奏": Color("c47f33"), "状态": Color("4f9d52"), "干扰": Color("6f5bb0"),
 	"导出": Color("5f8a9a"), "随机": Color("8a8f98"),
 }
-const SEALED_COL := Color(0.11, 0.10, 0.09, 1.0)   # 近黑暖底（同 HeroFrame fill）
 
-## 像素边框 = HeroFrame 同款「暖骨边」（B 典籍朱印·已铺 menu/bp/battle）：高明度低饱和暖中性 → 清晰可见。
+## jelly 芯片（与 battle_screen 动作按钮同款 shader → 统一 UI 语言）。
+const JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")
+const CHIP_CORNER := 0.22                       # 圆角（同动作按钮·非锐角）
+const EDGE_OUTER := Color(0.10, 0.09, 0.11)     # 统一暗轮廓（中性·任何色相都干净·场景无关）
+const GOLD_READY := Color("ffd86a")             # 道具本回合可用（interactive）→ 亮金高光边
+const GOLD_STAGED := Color("fff0a0")            # 已点选使用 → 更亮金边
+const GOLD_OPEN := Color("d8b85a")              # 可开 / 可抽 / 可补 → 提示金边（较暗·次级）
+# 中性态填充（锁 / 待操作 / 空格）：
+const SEAL_FT := Color(0.31, 0.31, 0.34)
+const SEAL_FB := Color(0.20, 0.20, 0.23)
+const SEAL_EI := Color(0.37, 0.37, 0.40)
+const NEU_FT := Color(0.34, 0.32, 0.29)
+const NEU_FB := Color(0.23, 0.21, 0.18)
+const NEU_EI := Color(0.42, 0.40, 0.34)
+const EMP_FT := Color(0.14, 0.14, 0.16)
+const EMP_FB := Color(0.09, 0.09, 0.11)
+const EMP_EI := Color(0.23, 0.23, 0.26)
+
+## 像素边框（保留·给 draft 弹窗卡片复用 → item_draft_popup.gd）。
 const PIXEL_FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")
 const ROUND_MASK_SHADER := preload("res://assets/shaders/canvas_ui_round_mask.gdshader")
-const EDGE_OUTER := Color(0.05, 0.045, 0.04)   # 近黑暖细描边
-const EDGE_MID := Color(0.70, 0.64, 0.52)      # 暖骨色（边框主色·可见）
-const EDGE_INNER := Color(0.42, 0.36, 0.26)    # 暖中性内线
-const READY_MID := Color("dcc060")             # 本回合可用 → 边框转暖金
-const STAGED_MID := Color("f2e08a")            # 已点选使用 → 边框转亮金
-const PIXEL_GRID := 24.0                       # 同 HeroFrame（~3-4px/格）
-const CORNER_RADIUS := 0.25                    # 同 HeroFrame 圆角
+const PF_EDGE_OUTER := Color(0.05, 0.045, 0.04)
+const PF_EDGE_MID := Color(0.70, 0.64, 0.52)
+const PF_EDGE_INNER := Color(0.42, 0.36, 0.26)
+const PIXEL_GRID := 24.0
+const CORNER_RADIUS := 0.0
 
 ## interactive：本地玩家行可点击。setter 立即把按钮 mouse_filter 设为 STOP；P2（false）→ IGNORE。
 var interactive := false:
@@ -41,20 +56,20 @@ var interactive := false:
 		for b in _buttons:
 			b.mouse_filter = Control.MOUSE_FILTER_STOP if v else Control.MOUSE_FILTER_IGNORE
 
-var _bgs: Array[ColorRect] = []
+var _chips: Array[ColorRect] = []
+var _chip_mats: Array[ShaderMaterial] = []   # 每槽 jelly 材质（refresh 重设 fill/edge 做状态/维度色）
 var _labels: Array[Label] = []
-var _frame_mats: Array[ShaderMaterial] = []   # 每槽边框材质（refresh 调 edge_mid 做 ready/暂存金边）
 var _buttons: Array[Button] = []
-var _upgrade_btns: Array[Button] = []          # 每槽右上角「升」角标，仅就绪可升级时显示（C）
+var _upgrade_btns: Array[Button] = []          # 每槽右上角「升」金角标，仅就绪可升级时显示（C）
 
 
-## 造像素边框 ShaderMaterial（道具框 / draft 卡共用）。grid 越大格越细。
+## 像素边框 ShaderMaterial（draft 卡复用）。grid 越大格越细。
 static func make_pixel_frame_material(grid := PIXEL_GRID, corner := CORNER_RADIUS, aspect := 1.0) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = PIXEL_FRAME_SHADER
-	m.set_shader_parameter("edge_outer", EDGE_OUTER)
-	m.set_shader_parameter("edge_mid", EDGE_MID)
-	m.set_shader_parameter("edge_inner", EDGE_INNER)
+	m.set_shader_parameter("edge_outer", PF_EDGE_OUTER)
+	m.set_shader_parameter("edge_mid", PF_EDGE_MID)
+	m.set_shader_parameter("edge_inner", PF_EDGE_INNER)
 	m.set_shader_parameter("pixel_grid", grid)
 	m.set_shader_parameter("border_px", 2.0)
 	m.set_shader_parameter("noise_amt", 0.06)
@@ -72,36 +87,47 @@ static func make_round_mask_material(grid := PIXEL_GRID, corner := CORNER_RADIUS
 	return m
 
 
+## 造 jelly 芯片材质（颜色每次 refresh 重设 fill_top/fill_bottom/edge_inner）。
+func _make_chip_material() -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = JELLY_SHADER
+	m.set_shader_parameter("edge_outer", EDGE_OUTER)
+	m.set_shader_parameter("fill_alpha", 1.0)
+	m.set_shader_parameter("pixel_grid", 30.0)
+	m.set_shader_parameter("corner", CHIP_CORNER)
+	m.set_shader_parameter("edge_px", 2.0)
+	m.set_shader_parameter("aspect", 1.0)
+	m.set_shader_parameter("noise_amt", 0.07)
+	m.set_shader_parameter("wear", 0.20)
+	return m
+
+
 func _ready() -> void:
 	custom_minimum_size = Vector2(SLOT_W * 3 + GAP * 2, SLOT_H)
-	# 根容器不拦截点击：只让每个槽的按钮(STOP)接收。否则容器自身(默认 STOP)会吞掉点击
-	#（尤其 P1/P2 两排叠同位置时，上层容器抢先吃掉点击）。
+	# 根容器不拦截点击：只让每个槽的按钮(STOP)接收（否则上层 HUD 容器会吞点击）。
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	for i in range(3):
 		var base := Vector2(i * (SLOT_W + GAP), 0.0)
-		# 填充层（状态色·refresh 重染）在底 + 圆角遮罩；像素边框层在其上（中心透明露出填充）。
-		var bg := ColorRect.new()
-		bg.color = SEALED_COL
-		bg.position = base
-		bg.size = Vector2(SLOT_W, SLOT_H)
-		bg.material = make_round_mask_material()
-		bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		add_child(bg)
-		var frame := ColorRect.new()
-		frame.color = Color.WHITE   # shader 乘 COLOR，须白
-		frame.position = base
-		frame.size = Vector2(SLOT_W, SLOT_H)
-		var fmat := make_pixel_frame_material()
-		frame.material = fmat
-		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		add_child(frame)
+		# jelly 芯片（一层搞定底色 + 立体边 + 圆角；颜色由 refresh 设）。
+		var chip := ColorRect.new()
+		chip.color = Color.WHITE   # jelly shader 乘 COLOR，须白
+		chip.position = base
+		chip.size = Vector2(SLOT_W, SLOT_H)
+		var mat := _make_chip_material()
+		chip.material = mat
+		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(chip)
 		var lbl := Label.new()
 		lbl.position = base
 		lbl.size = Vector2(SLOT_W, SLOT_H)
 		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		lbl.add_theme_font_size_override("font_size", 12)
+		lbl.clip_text = true   # 长道具名（占位文字）夹在芯片内·勿溢出（待换图标）
+		lbl.add_theme_font_size_override("font_size", 11)
+		lbl.add_theme_color_override("font_color", Color(0.98, 0.96, 0.9))
+		lbl.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.03, 0.85))
+		lbl.add_theme_constant_override("outline_size", 4)
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(lbl)
 		# 点击层（透明 flat 按钮，铺满整格）：仅 interactive 时吃点击。
@@ -113,21 +139,52 @@ func _ready() -> void:
 		btn.mouse_filter = Control.MOUSE_FILTER_STOP if interactive else Control.MOUSE_FILTER_IGNORE
 		btn.pressed.connect(_on_slot_pressed.bind(i))
 		add_child(btn)
-		# 升级角标（右上角小钮·铺在点击层之上 → 角落点击=升级、槽身=使用）。默认隐藏，refresh 控显。
-		var up := Button.new()
-		up.text = "升"
-		up.focus_mode = Control.FOCUS_NONE
-		up.position = base + Vector2(SLOT_W - 30.0, 2.0)
-		up.size = Vector2(28.0, 24.0)
-		up.add_theme_font_size_override("font_size", 12)
-		up.visible = false
-		up.pressed.connect(_on_upgrade_pressed.bind(i))
+		# 升级金角标（右上角·铺在点击层之上 → 角落点击=升级、槽身=使用）。默认隐藏，refresh 控显。
+		var up := _make_upgrade_badge(base, i)
 		add_child(up)
-		_bgs.append(bg)
-		_frame_mats.append(fmat)
+		_chips.append(chip)
+		_chip_mats.append(mat)
 		_labels.append(lbl)
 		_buttons.append(btn)
 		_upgrade_btns.append(up)
+
+
+## 右上角「升」金色角标（jelly 金底 + 墨字·点角=升级·点槽身=使用）。
+func _make_upgrade_badge(base: Vector2, i: int) -> Button:
+	var up := Button.new()
+	up.text = "升"
+	up.flat = true
+	up.focus_mode = Control.FOCUS_NONE
+	up.position = base + Vector2(SLOT_W - 20.0, 1.0)
+	up.size = Vector2(19.0, 17.0)
+	up.add_theme_font_size_override("font_size", 10)
+	up.add_theme_color_override("font_color", Color(0.25, 0.16, 0.04))   # 墨字压金
+	up.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
+	up.add_theme_stylebox_override("hover", StyleBoxEmpty.new())
+	up.add_theme_stylebox_override("pressed", StyleBoxEmpty.new())
+	var bg := ColorRect.new()
+	bg.color = Color.WHITE
+	bg.size = Vector2(19.0, 17.0)
+	bg.show_behind_parent = true
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var bm := ShaderMaterial.new()
+	bm.shader = JELLY_SHADER
+	bm.set_shader_parameter("fill_top", Color("ffd86a"))
+	bm.set_shader_parameter("fill_bottom", Color("c89a30"))
+	bm.set_shader_parameter("edge_inner", Color("fff0b0"))
+	bm.set_shader_parameter("edge_outer", EDGE_OUTER)
+	bm.set_shader_parameter("fill_alpha", 1.0)
+	bm.set_shader_parameter("pixel_grid", 18.0)
+	bm.set_shader_parameter("corner", 0.2)
+	bm.set_shader_parameter("edge_px", 1.5)
+	bm.set_shader_parameter("aspect", 19.0 / 17.0)
+	bm.set_shader_parameter("noise_amt", 0.05)
+	bm.set_shader_parameter("wear", 0.15)
+	bg.material = bm
+	up.add_child(bg)
+	up.visible = false
+	up.pressed.connect(_on_upgrade_pressed.bind(i))
+	return up
 
 
 func _on_slot_pressed(slot: int) -> void:
@@ -140,28 +197,31 @@ func _on_upgrade_pressed(slot: int) -> void:
 		slot_upgrade_clicked.emit(slot)
 
 
-## 按经济状态刷新 3 个槽。battle 未启用经济（槽空）时安全跳过。
-## staged：本回合已点选「使用」的槽位（仅 P1 传入；用于金边高亮）。
+## 按经济状态刷新 3 个芯片（颜色 + 文字）。battle 未启用经济（槽空）时安全跳过。
+## staged：本回合已点选「使用」的槽位（仅 P1 传入；用于亮金高亮）。
 func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 	if battle == null or player < 0 or player >= battle.slots.size():
 		return
-	if battle.slots[player].size() < 3 or _bgs.size() < 3:
+	if battle.slots[player].size() < 3 or _chips.size() < 3:
 		return
 	for i in range(3):
 		var st: int = battle.slot_state(player, i)
-		var bg: ColorRect = _bgs[i]
 		var lbl: Label = _labels[i]
-		var ready := false   # 本回合是否「有可操作动作」（决定边框转金）
+		var ready := false                 # 本回合是否「有可操作动作」（决定金边）
+		var cta := GOLD_OPEN               # 召唤操作用的金（经济操作=暗金；道具就绪=亮金）
+		var ft := SEAL_FT
+		var fb := SEAL_FB
+		var ei := SEAL_EI
 		match st:
 			BattleCore.SlotState.SEALED:
-				bg.color = SEALED_COL
 				if battle.turn_number >= int(BattleCore.SLOT_UNLOCK_TURN[i]):
 					lbl.text = "可开"
 					ready = battle.can_open_slot(player, i)
+					ft = NEU_FT; fb = NEU_FB; ei = NEU_EI
 				else:
-					lbl.text = "—"
+					lbl.text = "—"   # 仍是 SEAL 灰（未到解锁回合）
 			BattleCore.SlotState.OPENED:
-				bg.color = Color(0.18, 0.16, 0.10, 1.0)
+				ft = NEU_FT; fb = NEU_FB; ei = NEU_EI
 				if battle.can_draw_slot(player, i):
 					lbl.text = "可抽"
 					ready = true
@@ -170,33 +230,42 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 			BattleCore.SlotState.CHARGING:
 				var item: ItemData = battle.slot_item(player, i)
 				var nm: String = item.item_name if item != null else ""
+				var dim: Color = _dim_color(item)
 				if battle.slot_ready(player, i):
-					bg.color = _dim_color(item)
-					lbl.text = nm + "\n✓用" if staged.has(i) else nm
 					ready = true
+					cta = GOLD_READY          # 道具就绪可用 = 主操作 → 亮金
+					ft = dim.lightened(0.10)
+					fb = dim.darkened(0.30)
+					ei = dim.lightened(0.28)
+					lbl.text = nm + "\n✓用" if staged.has(i) else nm
 				else:
-					bg.color = Color(0.30, 0.22, 0.08, 1.0)
+					ft = dim.darkened(0.18)   # 锁中 = 维度色压暗（仍认得出归属）
+					fb = dim.darkened(0.48)
+					ei = NEU_EI
 					lbl.text = nm + "\n(锁)"
 			BattleCore.SlotState.EMPTY:
-				bg.color = Color(0.12, 0.12, 0.12, 1.0)
 				if battle.can_refill(player, i):
 					lbl.text = "可补"
 					ready = true
+					ft = NEU_FT; fb = NEU_FB; ei = NEU_EI
 				else:
 					lbl.text = "空"
+					ft = EMP_FT; fb = EMP_FB; ei = EMP_EI
 		lbl.modulate = Color.WHITE
-		# 边框转金：已点选使用=亮金 / 本回合可操作(仅 interactive)=暖金 / 否则=暖骨。
-		var accent := EDGE_MID
+		# 金色「召唤操作」高光边：已点选=最亮金 / 本回合可操作(仅 interactive)=召唤金 / 否则=状态本色边（P2 不点亮）。
 		if staged.has(i):
-			accent = STAGED_MID
+			ei = GOLD_STAGED
 		elif interactive and ready:
-			accent = READY_MID
-		_frame_mats[i].set_shader_parameter("edge_mid", accent)
-		# 升级角标：仅本地玩家行 + 该槽可升级（就绪 + 有 upgrade_to + 能量够）时显示。
+			ei = cta
+		var mat: ShaderMaterial = _chip_mats[i]
+		mat.set_shader_parameter("fill_top", ft)
+		mat.set_shader_parameter("fill_bottom", fb)
+		mat.set_shader_parameter("edge_inner", ei)
+		# 升级角标：仅本地玩家行 + 该槽可升级（就绪 + tier<3 + 能量够）时显示。
 		_upgrade_btns[i].visible = interactive and battle.can_upgrade(player, i)
 
 
 func _dim_color(item: ItemData) -> Color:
 	if item == null:
-		return SEALED_COL
+		return SEAL_FT
 	return DIM_COLOR.get(item.dimension, Color(0.42, 0.42, 0.47))

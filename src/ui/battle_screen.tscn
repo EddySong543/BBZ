@@ -72,10 +72,10 @@ variation_embolden = 0.0
 
 [sub_resource type="ShaderMaterial" id="JellyZan"]
 shader = ExtResource("21_jelly")
-shader_parameter/fill_top = Color(0.88, 0.82, 0.68, 1)
-shader_parameter/fill_bottom = Color(0.82, 0.75, 0.6, 1)
-shader_parameter/edge_inner = Color(0.6, 0.5, 0.36, 1)
-shader_parameter/edge_outer = Color(0.18, 0.12, 0.07, 1)
+shader_parameter/fill_top = Color(0.8784, 0.7098, 0.2902, 1)
+shader_parameter/fill_bottom = Color(0.6588, 0.502, 0.1098, 1)
+shader_parameter/edge_inner = Color(1, 0.851, 0.4784, 1)
+shader_parameter/edge_outer = Color(0.1, 0.09, 0.11, 1)
 shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 38.0
 shader_parameter/corner = 0.22
@@ -86,10 +86,10 @@ shader_parameter/wear = 0.24
 
 [sub_resource type="ShaderMaterial" id="JellyBo"]
 shader = ExtResource("21_jelly")
-shader_parameter/fill_top = Color(0.88, 0.82, 0.68, 1)
-shader_parameter/fill_bottom = Color(0.82, 0.75, 0.6, 1)
-shader_parameter/edge_inner = Color(0.6, 0.5, 0.36, 1)
-shader_parameter/edge_outer = Color(0.18, 0.12, 0.07, 1)
+shader_parameter/fill_top = Color(0.7843, 0.3333, 0.251, 1)
+shader_parameter/fill_bottom = Color(0.5765, 0.2, 0.1216, 1)
+shader_parameter/edge_inner = Color(0.9098, 0.5412, 0.3765, 1)
+shader_parameter/edge_outer = Color(0.1, 0.09, 0.11, 1)
 shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 38.0
 shader_parameter/corner = 0.22
@@ -100,10 +100,10 @@ shader_parameter/wear = 0.24
 
 [sub_resource type="ShaderMaterial" id="JellyDaBo"]
 shader = ExtResource("21_jelly")
-shader_parameter/fill_top = Color(0.88, 0.82, 0.68, 1)
-shader_parameter/fill_bottom = Color(0.82, 0.75, 0.6, 1)
-shader_parameter/edge_inner = Color(0.6, 0.5, 0.36, 1)
-shader_parameter/edge_outer = Color(0.18, 0.12, 0.07, 1)
+shader_parameter/fill_top = Color(0.8471, 0.2863, 0.1804, 1)
+shader_parameter/fill_bottom = Color(0.5412, 0.1529, 0.0941, 1)
+shader_parameter/edge_inner = Color(1, 0.5647, 0.3765, 1)
+shader_parameter/edge_outer = Color(0.1, 0.09, 0.11, 1)
 shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 38.0
 shader_parameter/corner = 0.22
@@ -114,10 +114,10 @@ shader_parameter/wear = 0.24
 
 [sub_resource type="ShaderMaterial" id="JellyFang"]
 shader = ExtResource("21_jelly")
-shader_parameter/fill_top = Color(0.88, 0.82, 0.68, 1)
-shader_parameter/fill_bottom = Color(0.82, 0.75, 0.6, 1)
-shader_parameter/edge_inner = Color(0.6, 0.5, 0.36, 1)
-shader_parameter/edge_outer = Color(0.18, 0.12, 0.07, 1)
+shader_parameter/fill_top = Color(0.3176, 0.5176, 0.7608, 1)
+shader_parameter/fill_bottom = Color(0.1765, 0.3333, 0.5647, 1)
+shader_parameter/edge_inner = Color(0.5176, 0.6902, 0.902, 1)
+shader_parameter/edge_outer = Color(0.1, 0.09, 0.11, 1)
 shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 38.0
 shader_parameter/corner = 0.22
@@ -128,10 +128,10 @@ shader_parameter/wear = 0.24
 
 [sub_resource type="ShaderMaterial" id="JellyDaFang"]
 shader = ExtResource("21_jelly")
-shader_parameter/fill_top = Color(0.88, 0.82, 0.68, 1)
-shader_parameter/fill_bottom = Color(0.82, 0.75, 0.6, 1)
-shader_parameter/edge_inner = Color(0.6, 0.5, 0.36, 1)
-shader_parameter/edge_outer = Color(0.18, 0.12, 0.07, 1)
+shader_parameter/fill_top = Color(0.2471, 0.4471, 0.7686, 1)
+shader_parameter/fill_bottom = Color(0.1333, 0.2902, 0.5255, 1)
+shader_parameter/edge_inner = Color(0.4353, 0.6431, 0.9333, 1)
+shader_parameter/edge_outer = Color(0.1, 0.09, 0.11, 1)
 shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 38.0
 shader_parameter/corner = 0.22
@@ -142,10 +142,10 @@ shader_parameter/wear = 0.24
 
 [sub_resource type="ShaderMaterial" id="JellySpecial"]
 shader = ExtResource("21_jelly")
-shader_parameter/fill_top = Color(0.88, 0.82, 0.68, 1)
-shader_parameter/fill_bottom = Color(0.82, 0.75, 0.6, 1)
-shader_parameter/edge_inner = Color(0.6, 0.5, 0.36, 1)
-shader_parameter/edge_outer = Color(0.18, 0.12, 0.07, 1)
+shader_parameter/fill_top = Color(0.5294, 0.4471, 0.7765, 1)
+shader_parameter/fill_bottom = Color(0.3255, 0.251, 0.5765, 1)
+shader_parameter/edge_inner = Color(0.6784, 0.6, 0.8863, 1)
+shader_parameter/edge_outer = Color(0.1, 0.09, 0.11, 1)
 shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 38.0
 shader_parameter/corner = 0.22
@@ -156,10 +156,10 @@ shader_parameter/wear = 0.24
 
 [sub_resource type="ShaderMaterial" id="JellyConfirm"]
 shader = ExtResource("21_jelly")
-shader_parameter/fill_top = Color(0.95, 0.9, 0.76, 1)
-shader_parameter/fill_bottom = Color(0.89, 0.82, 0.67, 1)
-shader_parameter/edge_inner = Color(0.97, 0.85, 0.48, 1)
-shader_parameter/edge_outer = Color(0.4, 0.28, 0.1, 1)
+shader_parameter/fill_top = Color(0.3608, 0.7216, 0.3882, 1)
+shader_parameter/fill_bottom = Color(0.2196, 0.4863, 0.2471, 1)
+shader_parameter/edge_inner = Color(0.5725, 0.8902, 0.5961, 1)
+shader_parameter/edge_outer = Color(0.1, 0.09, 0.11, 1)
 shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 38.0
 shader_parameter/corner = 0.22
