@@ -5,7 +5,7 @@
 
 ## 引擎与语言
 
-- **Engine（引擎）**: Godot 4.6.2
+- **Engine（引擎）**: Godot 4.7
 - **Language（语言）**: GDScript（主要），GDExtension/C++（性能关键场景）
 - **Rendering（渲染）**: D3D12（Windows 默认），Vulkan（可选）
 - **Physics（物理）**: Jolt Physics（3D 默认）
