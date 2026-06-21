@@ -134,6 +134,7 @@ var _switch_selected: bool = false  # armed 框是否已进入"选择"态（高�
 # 只在受击触发、克制；建筑无 idle 漂移（_ready 关 idle_drift），仅震时才动。F6 调幅在此。
 const SHAKE_BIG := 12.0     # 大波命中
 const SHAKE_HIT := 7.0      # 普通命中
+const PUNCH_RELEASE := 0.35   # P3：大波前推命中后的回弹时长（落在 settle 内）
 var _confirm_pulse: Tween   # 「结束」按钮的呼吸金光（有待确认动作时召唤点击）
 var _cd_home: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]  # 立绘原位（前冲 juice 复位用）
 var _shadow_home: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]  # 阴影原位（跟随角色水平位移用）
@@ -1159,8 +1160,17 @@ func _dbg_next_hero(player: int) -> void:
 ## A 方案 juice：出招（攻击前冲 / 防御蓝闪沉身 / 攒上浮黄闪）→ 命中（白闪 + 斩击光
 ## + 伤害数字 + 震屏）。dmg/dead 为 [p0, p1]。无逐帧 attack/hit 动画，全靠代码表现。
 func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array) -> void:
+	# 结算开始：解除 hover 对焦（镜头从"选招前倾"平滑交给大波前推；punch_zoom>focus_zoom → 净推近无顿挫）。
+	_hover_count = 0
+	stage.set_focus(false)
 	_act_juice(0, a0)
 	_act_juice(1, a1)
+	# P3：仅"大波且确实打中（伤害/击杀）"时镜头前推蓄势，峰值正好落在 0.45*phase 后的命中瞬间，
+	# 与 stage.shake() + _hitstop 合拍（被挡的大波无 impact → 不触发，避免推近落空）。
+	var big_lands := (a0 == A.BIG_ATTACK and (int(dmg[1]) > 0 or bool(dead[1]))) \
+		or (a1 == A.BIG_ATTACK and (int(dmg[0]) > 0 or bool(dead[0])))
+	if big_lands:
+		_big_attack_punch()
 	await get_tree().create_timer(action_phase_duration * 0.45).timeout
 
 	var any := false
@@ -1178,6 +1188,16 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array) -> void:
 		p2_char_display.modulate = Color(0.35, 0.35, 0.35)
 
 	await get_tree().create_timer(action_phase_duration).timeout
+
+
+## P3：大波命中"前推顿帧"。上升时长 = 命中前的 await（0.45×phase）→ 峰值正好落在命中瞬间，
+## 与 stage.shake() + _hitstop 合拍（顿帧期 scaled-time tween 自然冻结 → 推近 hold 在峰值），随后快速回弹。
+## 缩放叠加在 hover 对焦之上，立绘/阴影经 ground_dolly 同步推 → 整场景一起"凑近"那一击。
+func _big_attack_punch() -> void:
+	var rise: float = action_phase_duration * 0.45
+	var tw := create_tween()
+	tw.tween_method(stage.set_punch, 0.0, 1.0, rise).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	tw.tween_method(stage.set_punch, 1.0, 0.0, PUNCH_RELEASE).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 
 func _cd(player: int) -> CharacterDisplay:

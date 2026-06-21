@@ -42,6 +42,8 @@ extends Control
 @export var focus_zoom: float = 0.025
 ## 对焦推近 / 回正的缓动速度（越大越快跟上 hover）。
 @export var focus_speed: float = 9.0
+## 大波命中"前推顿帧"的额外缩放峰值，× parallax_factor（payoff·比 hover 略强·与 hover 叠加）。
+@export var punch_zoom: float = 0.04
 
 var _layers: Array[Control] = []
 var _bases: PackedVector2Array = PackedVector2Array()
@@ -52,6 +54,7 @@ var _shake_amp: float = 0.0
 var _pointer: Vector2 = Vector2.ZERO
 var _focus: float = 0.0           # 当前对焦量（0=静止·1=推近·_process 缓动）
 var _focus_target: float = 0.0    # 目标（hover 底部按钮=1·离开=0）
+var _punch: float = 0.0           # 大波命中前推（0→1→0·由 battle_screen 同步命中时刻 tween）
 
 
 func _ready() -> void:
@@ -105,10 +108,15 @@ func set_focus(on: bool) -> void:
 	_focus_target = 1.0 if on else 0.0
 
 
-## 地面层（站立平面·factor = ground_parallax）当前的推近缩放系数。
+## 大波命中前推强度（0=无·1=峰值）；由 battle_screen 在大波结算时 tween，命中瞬间达峰 → 顿帧合拍。
+func set_punch(v: float) -> void:
+	_punch = v
+
+
+## 地面层（站立平面·factor = ground_parallax）当前的推近缩放系数（hover 对焦 + 大波前推叠加）。
 ## 立绘 / 阴影（不在本舞台、由 battle_screen 归组）按此整体缩放 → 与脚下屋顶层统一推近移动。
 func ground_dolly() -> float:
-	return 1.0 + _focus * focus_zoom * ground_parallax
+	return 1.0 + (_focus * focus_zoom + _punch * punch_zoom) * ground_parallax
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -147,5 +155,5 @@ func _process(delta: float) -> void:
 			(drift_x - _pointer.x) * idle_f + shake_x * f,
 			drift_y * idle_f + shake_y * f)
 		_layers[i].position = _bases[i] + off
-		# 镜头推近：近景层（factor 大）按 _focus 缩放更多，绕对焦点 → 多图层 dolly（UI 不在本舞台、不受影响）。
-		_layers[i].scale = _base_scales[i] * (1.0 + _focus * focus_zoom * f)
+		# 镜头推近：近景层（factor 大）缩放更多，绕对焦点 → 多图层 dolly（hover 对焦 + 大波前推叠加·UI 不受影响）。
+		_layers[i].scale = _base_scales[i] * (1.0 + (_focus * focus_zoom + _punch * punch_zoom) * f)
