@@ -92,6 +92,7 @@ var _skill_index: int = 0
 @onready var skill_card: SkillCard = $SkillCard
 @onready var _death_switch_overlay: DeathSwitchOverlay = $DeathSwitchOverlay
 @onready var game_timer: Timer = $GameTimer
+@onready var stage: BattleStage = $Stage   # 多层视差舞台：受击震屏走 stage.shake 按 parallax_factor 分层（见 battle_stage.gd）
 
 @onready var btn_charge: Button = $Buttons/BtnCharge
 @onready var btn_attack: Button = $Buttons/BtnAttack
@@ -129,12 +130,17 @@ var _armed_switch_frame: int = -1   # 当前 armed 的替补框索引（1 / 2）
 var _switch_selected: bool = false  # armed 框是否已进入"选择"态（高亮·待「结束」提交）
 
 # ---- juice ----
-var _shake := 0.0
+# 受击震屏基幅（实际位移 = 基幅 × 各层 parallax_factor·见 scene1.tscn / battle_stage.gd）。
+# 只在受击触发、克制；建筑无 idle 漂移（_ready 关 idle_drift），仅震时才动。F6 调幅在此。
+const SHAKE_BIG := 12.0     # 大波命中
+const SHAKE_HIT := 7.0      # 普通命中
 var _confirm_pulse: Tween   # 「结束」按钮的呼吸金光（有待确认动作时召唤点击）
 var _cd_home: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]  # 立绘原位（前冲 juice 复位用）
 var _shadow_home: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]  # 阴影原位（跟随角色水平位移用）
 var _prev_hp_disp: Array[float] = [-1.0, -1.0]   # 上次显示的出战 HP（检测变化 → 心条 flinch 脉冲）
 var _hitstop_token: int = 0   # hitstop(c) 防重叠：仅最后一次定格负责恢复 Engine.time_scale
+var _hover_count: int = 0     # P2：当前 hover 中的底部按钮数（>0 → 镜头推近舞台分层·UI 不动）
+var _world: Control = null    # P2b：立绘+阴影的 dolly 组（运行期归组·与背景同对焦点统一推近）
 
 
 # ============================================================
@@ -161,6 +167,9 @@ func _ready() -> void:
 	_shadow_home[0] = p1_shadow.position
 	_shadow_home[1] = p2_shadow.position
 	p2_char_display.flip_h = true
+	# 建筑保持完全静止（去 idle 呼吸·Eddy 2026-06-21）；纵深感只在受击 shake 时由 stage 分层体现。
+	stage.idle_drift = false
+	_setup_world_group()   # P2b：立绘+阴影归入 dolly 组，随镜头推近与背景统一移动（须在 home 缓存后）
 	for f in p2_frames:
 		f.flip_h = true
 
@@ -250,6 +259,11 @@ func _init_buttons() -> void:
 
 	action_btn_list = [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend, btn_special]
 
+	# P2 镜头推近：hover 任一底部按钮 → 舞台分层 dolly 推近（多图层·UI 不动·见 battle_stage.set_focus）。
+	for hb in [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend, btn_special, btn_confirm]:
+		hb.mouse_entered.connect(_on_action_hover.bind(true))
+		hb.mouse_exited.connect(_on_action_hover.bind(false))
+
 	# 动作按钮能量消耗金币数量（基础动作 cost 固定；攒/防=0 不显示）。技能键 cost 动态，随刷新更新。
 	_set_cost_pips(btn_attack, ActionDef.BASE_ACTION_DEF[A.ATTACK]["cost"])
 	_set_cost_pips(btn_big_attack, ActionDef.BASE_ACTION_DEF[A.BIG_ATTACK]["cost"])
@@ -267,6 +281,29 @@ func _init_buttons() -> void:
 	# 出战角色名 / 玩家 id 的字体·字号·颜色·描边·玩家id文本 全部在 battle_screen.tscn 设置
 	# （像素字体 ttf 直接引用·import 已关 AA → 编辑器所见即所得，可在 Inspector 手调位置/大小）。
 	# 代码只负责把角色名文本随出战英雄更新（见 _update_hero_frames）。
+
+
+## P2：hover 底部按钮 → 镜头推近舞台分层（多图层 dolly）。计数避免按钮间移动时闪烁
+## （同帧 exit 旧按钮 + enter 新按钮 → _focus_target 最终仍为 1、_process 缓动无回落）。
+func _on_action_hover(entered: bool) -> void:
+	_hover_count = maxi(0, _hover_count + (1 if entered else -1))
+	stage.set_focus(_hover_count > 0)
+
+
+## P2b：把双方立绘 + 阴影归入一个"世界组"容器，整体随镜头推近（与背景舞台同对焦点 → 统一移动）。
+## 运行期归组、不改 .tscn（Eddy 编辑器里仍是根节点下的 4 个子节点）；容器置于 Stage 之后、
+## dust/后处理/UI 之前 → GodRay/PostFX 仍抓得到角色，UI 仍在最上层不动。
+## 容器缩放与角色自身 pop/前冲 juice 在场景图里相乘合成、互不打架（受击 pop 不会被 dolly 吃掉）。
+func _setup_world_group() -> void:
+	_world = Control.new()
+	_world.name = "WorldGroup"
+	_world.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_world.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_world.pivot_offset = stage.focus_point   # 绕与背景同一对焦点缩放 → 统一推近
+	add_child(_world)
+	move_child(_world, stage.get_index() + 1)   # 紧跟 Stage、在 dust/后处理/UI 之前
+	for n in [p1_shadow, p2_shadow, p1_char_display, p2_char_display]:
+		n.reparent(_world, true)   # keep_global_transform → 静止画面一像素不变
 
 
 func _connect_frame_signals() -> void:
@@ -1060,7 +1097,7 @@ func _dbg_damage_active(player: int, amount: int) -> void:
 	battle.hp[player][s] = maxi(battle.hp[player][s] - amount * BattleCore.HP_UNIT, 0)
 	_update_all()                              # 含心条 flinch（HP 变化检测）
 	_impact(player, amount * BattleCore.HP_UNIT)   # 飘字 + 斩击 + 白闪
-	_shake = 8.0
+	stage.shake(SHAKE_HIT)
 
 
 func _dbg_shield_enemy() -> void:
@@ -1134,7 +1171,7 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array) -> void:
 		_impact(0, int(dmg[0]))
 		any = true
 	if any:
-		_shake = 12.0 if (a0 == A.BIG_ATTACK or a1 == A.BIG_ATTACK) else 7.0
+		stage.shake(SHAKE_BIG if (a0 == A.BIG_ATTACK or a1 == A.BIG_ATTACK) else SHAKE_HIT)
 	if bool(dead[0]):
 		p1_char_display.modulate = Color(0.35, 0.35, 0.35)
 	if bool(dead[1]):
@@ -1292,17 +1329,16 @@ func _flinch_heart_row(row: IconPipRow, is_loss: bool) -> void:
 	tw.tween_property(row, "modulate", Color.WHITE, 0.30).set_trans(Tween.TRANS_SINE)
 
 
-func _process(delta: float) -> void:
-	if _shake > 0.0:
-		position = Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake))
-		# 屏震衰减曲线(c)：指数衰减 → 起手猛、迅速收尾，比线性更"脆"。
-		_shake = lerpf(_shake, 0.0, 1.0 - exp(-13.0 * delta))
-		if _shake < 0.35:
-			_shake = 0.0
-			position = Vector2.ZERO
+func _process(_delta: float) -> void:
+	# 受击震屏已移交舞台分层 stage.shake()（见 battle_stage.gd 按 parallax_factor 分摊衰减）——
+	# 根节点不再整体抖，故 UI 始终不动；震感与纵深由舞台层负责。
 	# 阴影对角色动作反应：水平位移跟随 + 离地缩小淡出 + 冲刺拉长（接地/重量感）。
 	_update_shadow(0)
 	_update_shadow(1)
+	# P2b：立绘+阴影组随镜头推近整体缩放（与地面屋顶层 factor 1.0 同步 → 统一移动；
+	# 组缩放 × 角色自身 juice 由场景图相乘，pop/前冲不受影响）。
+	if _world:
+		_world.scale = Vector2.ONE * stage.ground_dolly()
 
 
 ## A3：阴影随角色动作变形。
