@@ -44,6 +44,8 @@ extends Control
 @export var focus_speed: float = 9.0
 ## 大波命中"前推顿帧"的额外缩放峰值，× parallax_factor（payoff·比 hover 略强·与 hover 叠加）。
 @export var punch_zoom: float = 0.04
+## 对焦点水平偏置（像素）× dir：攻击 dir+1 焦点右移=聚焦敌人 / 防御 dir-1 左移=聚焦自身 / 技能 0 居中。
+@export var focus_bias_x: float = 300.0
 
 var _layers: Array[Control] = []
 var _bases: PackedVector2Array = PackedVector2Array()
@@ -55,21 +57,23 @@ var _pointer: Vector2 = Vector2.ZERO
 var _focus: float = 0.0           # 当前对焦量（0=静止·1=推近·_process 缓动）
 var _focus_target: float = 0.0    # 目标（hover 底部按钮=1·离开=0）
 var _punch: float = 0.0           # 大波命中前推（0→1→0·由 battle_screen 同步命中时刻 tween）
+var _focal: Vector2 = Vector2.ZERO        # 当前对焦点（缩放不动点·随动作左右偏置·_process 缓动）
+var _focal_target: Vector2 = Vector2.ZERO # 目标对焦点（攻击右 / 防御左 / 居中）
 
 
 func _ready() -> void:
 	_randomize_sky_seed()
 	_spawn_constellations()
-	# 一次性缓存所有带 parallax_factor 的层及其基准位置（避免热路径查询/分配）。
+	# 一次性缓存所有带 parallax_factor 的层及其基准位置 + 基准 scale（避免热路径查询/分配）。
 	for child in get_children():
 		if child is Control and child.has_meta("parallax_factor"):
 			_layers.append(child)
 			_bases.append(child.position)
 			_factors.append(float(child.get_meta("parallax_factor")))
-			# 镜头推近：各层绕同一对焦点缩放 → 该点不动、近景按 factor 缩放更多 = 多图层 dolly。
-			# pivot_offset 在 scale=1（静止）时无视觉影响，故此处预设不改变静止画面。
 			_base_scales.append((child as Control).scale)
-			(child as Control).pivot_offset = focus_point - child.position
+	# 镜头推近用动态对焦点（显式 position 数学绕 _focal 缩放·见 _process）→ 焦点可随动作左右偏置。
+	_focal = focus_point
+	_focal_target = focus_point
 
 
 ## 每次进场景给天空(星/云) shader 随机 seed → 每次打开星图/云形都不同。
@@ -103,9 +107,11 @@ func shake(amp: float) -> void:
 	_shake_amp = maxf(_shake_amp, amp)
 
 
-## 设置镜头对焦（true=推近 / false=回正）；hover 底部按钮时由 battle_screen 调用，内部缓动。
-func set_focus(on: bool) -> void:
+## 设置镜头对焦（on=推近；dir 水平偏置：+1 攻击=焦点右移聚焦敌人 / -1 防御=左移聚焦自身 / 0 技能居中）。
+## hover 底部按钮时由 battle_screen 调用；内部缓动 _focus 与 _focal。离开则回零、焦点回正中。
+func set_focus(on: bool, dir: float = 0.0) -> void:
 	_focus_target = 1.0 if on else 0.0
+	_focal_target = Vector2(focus_point.x + dir * focus_bias_x, focus_point.y) if on else focus_point
 
 
 ## 大波命中前推强度（0=无·1=峰值）；由 battle_screen 在大波结算时 tween，命中瞬间达峰 → 顿帧合拍。
@@ -119,6 +125,11 @@ func ground_dolly() -> float:
 	return 1.0 + (_focus * focus_zoom + _punch * punch_zoom) * ground_parallax
 
 
+## 当前对焦点（缓动后）；供 battle_screen 给立绘/阴影组做同焦点缩放（统一移动）。
+func focal() -> Vector2:
+	return _focal
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if demo_click_shake and event is InputEventMouseButton and event.pressed:
 		shake(16.0)
@@ -126,7 +137,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
-	_focus = lerpf(_focus, _focus_target, 1.0 - exp(-focus_speed * delta))
+	var k_ease: float = 1.0 - exp(-focus_speed * delta)
+	_focus = lerpf(_focus, _focus_target, k_ease)
+	_focal = _focal.lerp(_focal_target, k_ease)
 	if _shake_amp > 0.0:
 		_shake_amp = maxf(0.0, _shake_amp - shake_decay * delta * _shake_amp)
 		if _shake_amp < 0.05:
@@ -154,6 +167,8 @@ func _process(delta: float) -> void:
 		var off := Vector2(
 			(drift_x - _pointer.x) * idle_f + shake_x * f,
 			drift_y * idle_f + shake_y * f)
-		_layers[i].position = _bases[i] + off
-		# 镜头推近：近景层（factor 大）缩放更多，绕对焦点 → 多图层 dolly（hover 对焦 + 大波前推叠加·UI 不受影响）。
-		_layers[i].scale = _base_scales[i] * (1.0 + (_focus * focus_zoom + _punch * punch_zoom) * f)
+		# 镜头推近：绕动态对焦点 _focal 缩放（显式 position 数学·焦点随动作左右偏置=聚焦敌/我）。
+		# k=1（静止）时退化为 position=base+off、scale=base → 与原始画面一像素不差。
+		var k: float = 1.0 + (_focus * focus_zoom + _punch * punch_zoom) * f
+		_layers[i].position = _focal + (_bases[i] - _focal) * k + off
+		_layers[i].scale = _base_scales[i] * k

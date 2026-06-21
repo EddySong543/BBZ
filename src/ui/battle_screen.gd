@@ -260,10 +260,16 @@ func _init_buttons() -> void:
 
 	action_btn_list = [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend, btn_special]
 
-	# P2 镜头推近：hover 任一底部按钮 → 舞台分层 dolly 推近（多图层·UI 不动·见 battle_stage.set_focus）。
-	for hb in [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend, btn_special, btn_confirm]:
-		hb.mouse_entered.connect(_on_action_hover.bind(true))
-		hb.mouse_exited.connect(_on_action_hover.bind(false))
+	# P2 镜头推近：hover 动作按钮 → 舞台 dolly + 焦点左右偏置（攻击聚焦敌 / 防御聚焦己 / 技能居中）。
+	# 攒、结束不推近（不连接）。dir：+1 攻击焦点右(敌)、-1 防御焦点左(己)、0 技能居中。
+	for hb in [btn_attack, btn_big_attack]:
+		hb.mouse_entered.connect(_on_action_hover.bind(true, 1.0))
+		hb.mouse_exited.connect(_on_action_hover.bind(false, 1.0))
+	for hb in [btn_defend, btn_big_defend]:
+		hb.mouse_entered.connect(_on_action_hover.bind(true, -1.0))
+		hb.mouse_exited.connect(_on_action_hover.bind(false, -1.0))
+	btn_special.mouse_entered.connect(_on_action_hover.bind(true, 0.0))
+	btn_special.mouse_exited.connect(_on_action_hover.bind(false, 0.0))
 
 	# 动作按钮能量消耗金币数量（基础动作 cost 固定；攒/防=0 不显示）。技能键 cost 动态，随刷新更新。
 	_set_cost_pips(btn_attack, ActionDef.BASE_ACTION_DEF[A.ATTACK]["cost"])
@@ -284,11 +290,16 @@ func _init_buttons() -> void:
 	# 代码只负责把角色名文本随出战英雄更新（见 _update_hero_frames）。
 
 
-## P2：hover 底部按钮 → 镜头推近舞台分层（多图层 dolly）。计数避免按钮间移动时闪烁
-## （同帧 exit 旧按钮 + enter 新按钮 → _focus_target 最终仍为 1、_process 缓动无回落）。
-func _on_action_hover(entered: bool) -> void:
-	_hover_count = maxi(0, _hover_count + (1 if entered else -1))
-	stage.set_focus(_hover_count > 0)
+## P2：hover 动作按钮 → 镜头推近 + 焦点偏置（dir：+1 敌右 / -1 己左 / 0 居中）。计数避免按钮间
+## 移动闪烁；enter 时设方向（同帧 exit 旧 + enter 新 → 最终 target = 新按钮方向、_process 缓动无回落）。
+func _on_action_hover(entered: bool, dir: float) -> void:
+	if entered:
+		_hover_count += 1
+		stage.set_focus(true, dir)
+	else:
+		_hover_count = maxi(0, _hover_count - 1)
+		if _hover_count == 0:
+			stage.set_focus(false)
 
 
 ## P2b：把双方立绘 + 阴影归入一个"世界组"容器，整体随镜头推近（与背景舞台同对焦点 → 统一移动）。
@@ -300,7 +311,7 @@ func _setup_world_group() -> void:
 	_world.name = "WorldGroup"
 	_world.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_world.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_world.pivot_offset = stage.focus_point   # 绕与背景同一对焦点缩放 → 统一推近
+	# 显式 position 数学绕 stage.focal() 缩放（与背景同一动态对焦点·焦点随动作偏置）→ pivot 留 0。
 	add_child(_world)
 	move_child(_world, stage.get_index() + 1)   # 紧跟 Stage、在 dust/后处理/UI 之前
 	for n in [p1_shadow, p2_shadow, p1_char_display, p2_char_display]:
@@ -1355,10 +1366,12 @@ func _process(_delta: float) -> void:
 	# 阴影对角色动作反应：水平位移跟随 + 离地缩小淡出 + 冲刺拉长（接地/重量感）。
 	_update_shadow(0)
 	_update_shadow(1)
-	# P2b：立绘+阴影组随镜头推近整体缩放（与地面屋顶层 factor 1.0 同步 → 统一移动；
-	# 组缩放 × 角色自身 juice 由场景图相乘，pop/前冲不受影响）。
+	# P2b：立绘+阴影组随镜头推近整体缩放 + 绕同一动态对焦点位移（与地面屋顶层 factor 1.0 同步 →
+	# 统一移动·焦点随动作左右偏置）。组缩放 × 角色自身 juice 由场景图相乘，pop/前冲不受影响。
 	if _world:
-		_world.scale = Vector2.ONE * stage.ground_dolly()
+		var gd: float = stage.ground_dolly()
+		_world.scale = Vector2.ONE * gd
+		_world.position = stage.focal() * (1.0 - gd)
 
 
 ## A3：阴影随角色动作变形。
