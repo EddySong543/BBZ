@@ -1,7 +1,7 @@
 extends Control
 
 ## 英雄图鉴 v2（2026-06-12 Eddy 改版：列表左 / 详情右常驻，弃中央浮窗）。
-## 左 = 46 卡八列网格（BP 牌库同缩放 0.846·同语言霜玻璃）；点卡=选中（金框）。
+## 左 = 14 卡六列网格（BP 牌库同缩放 0.846·同语言霜玻璃）；点卡=选中（金框）。
 ## 右 = 常驻详情板（像素框）：**idle 动画实时播放**（sprite_frames 同战斗资源）+
 ##      名字 / 主题归属 / ❤生命 + 主(红)/被(蓝)标签 + 技能名 + 技能详述。
 ## ←/→ 环绕换人（↑/↓ = ±一行），ESC / 返回钮 → 波幕转场回主菜单。
@@ -15,13 +15,13 @@ const HEART_SHEET := preload("res://assets/ui/icons/heart_idle.png")
 const HERO_DATA_DIR := "res://assets/data/heroes/"
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
 
-# ── 左侧牌库网格（14 卡 0.846 缩放=110×134·两行七列）──
+# ── 左侧牌库网格（14 卡 0.846 缩放=110×134·六列固定网格 6+6+2）──
 const CARD_SCALE := 0.846
 const POOL := Rect2(60, 140, 1032, 900)
-const COLS := 7   # 首发 14（12 生肖 + 黑暗子鼠/丑牛）= 2 行 ×7
+const COLS := 6   # 6 列固定网格（后续加英雄按行增长，不随张数改列）；首发 14 = 6+6+2 三行
 const STEP_X := 121.0
 const ROW_H := 142.0
-const X0 := 158.0   # 7 卡在 POOL(60..1092) 内水平居中
+const X0 := 218.0   # 6 卡在 POOL(60..1092) 内水平居中（整数取位保像素硬边）
 const ROW_Y0 := 186.0
 
 # ── 右侧详情板 ──
@@ -204,7 +204,7 @@ func _band_rect(parent: Control, r: Rect2, col: Color) -> ColorRect:
 	return rect
 
 
-## 左侧牌库（bp 同源霜玻璃 + 0.846 网格八列）。
+## 左侧牌库（bp 同源霜玻璃 + 0.846 六列网格）。
 ## 2026-06-13 Eddy：去除三系图例带 + 每卡顶主题色细线（早期生肖/阿卡那/星座标记已全部移除）。
 ## 保留选中行微亮条（键盘导航行定位）。
 func _build_pool() -> void:
