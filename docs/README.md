@@ -4,7 +4,7 @@
 >
 > **项目阶段**：轻量个人项目，文档从简、随玩法迭代更新（不为治理冻结开发）。
 >
-> **当前快照**：v4 战斗核心已收官 —— 单一 `BattleCore`，主流程「标题 → 2 步同时盲选选人 → 战斗」完整可玩；12 生肖 + 234 测试全绿；h01–h12 美术已导入。
+> **当前快照**：v4 战斗核心已收官 —— 单一 `BattleCore`，主流程「标题 → 2 步同时盲选选人 → 战斗」完整可玩；12 生肖 + 198 测试全绿（608 断言）；h01–h12 美术已导入。
 
 ---
 
@@ -13,8 +13,8 @@
 | 系统 | 代码位置 | 设计文档 | 架构/技术文档 |
 |------|---------|---------|--------------|
 | **战斗核心** | `src/battle/battle_core.gd` | `design/gdd/game-concept.md` §3-5（规则/公式/边界） | `ADR-002`（v4 架构）· `ADR-001`（边界·v3 史）· `battlecore-risk-notes.md` |
-| **英雄技能** | `src/battle/skills/*.gd`（34）· `hero_skill.gd` | `design/heroes.md`（逐英雄）· `design/heroes-schools.md`（框架/原语） | `hero-mechanics-hook-matrix.md`（机制→hook） |
-| **英雄数据** | `assets/data/heroes/hXX.tres`（34） | `design/heroes.md` | — |
+| **英雄技能** | `src/battle/skills/*.gd`（12）· `hero_skill.gd` | `design/heroes.md`（逐英雄）· `design/heroes-schools.md`（框架/原语） | — |
+| **英雄数据** | `assets/data/heroes/hXX.tres`（12） | `design/heroes.md` | — |
 | **选人（BP）** | `src/ui/bp_screen.{gd,tscn}` | `game-concept.md` §3.4 · `heroes-schools.md` §8.3 | — |
 | **战斗 UI / juice** | `src/ui/battle_screen.*` · `src/ui/components/` | `game-concept.md` §3 | `prototypes/juice_test/README.md`（juice 来源） |
 | **美术管线** | `tools/import_hero_art.gd` · `assets/sprites/heroes/` | `design/art-pipeline-hero-animation.md`（A 方案） | — |
@@ -64,7 +64,7 @@
 
 | 位置 | 定位 |
 |------|------|
-| `tests/unit/battle/v4/*_v4.gd`（10） | **当前 v4 行为的真相源**（GUT，124 测试 / 234 断言） |
+| `tests/unit/battle/{v4,ai}/*.gd`（13 文件） | **当前 v4 行为的真相源**（GUT，198 测试 / 608 断言全绿） |
 | `tests/BEHAVIOR_NOTES.md` | 行为锁定笔记（含 v3 历史溯源） |
 
 ---

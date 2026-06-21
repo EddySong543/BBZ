@@ -1084,7 +1084,7 @@ func _dbg_next_hero_enemy() -> void:
 var _dbg_art_pool: Array[HeroData] = []
 
 
-## 把 player 的出战英雄换成英雄池里的下一个（h01→h02→...→h46→h01，跳过无美术的）。
+## 把 player 的出战英雄换成英雄池里的下一个（h01→h02→...→h12→h01，跳过无美术的）。
 ## 仅替换 HeroData + 重置该槽位 HP/护盾为新英雄满血 → 立绘/头像/名字/技能卡/爱心数全套联动刷新。
 ## ⚠ 纯美术巡检用：不走结算管线，被动/技能状态不迁移。
 func _dbg_next_hero(player: int) -> void:

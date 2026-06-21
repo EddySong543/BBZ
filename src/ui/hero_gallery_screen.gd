@@ -15,10 +15,10 @@ const HEART_SHEET := preload("res://assets/ui/icons/heart_idle.png")
 const HERO_DATA_DIR := "res://assets/data/heroes/"
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
 
-# ── 左侧牌库网格（46 卡 0.846 缩放=110×134·八列六行）──
+# ── 左侧牌库网格（12 卡 0.846 缩放=110×134·两行六列）──
 const CARD_SCALE := 0.846
 const POOL := Rect2(60, 140, 1032, 900)
-const COLS := 6   # 首发 12 生肖 = 2 行 ×6（h13+ 隐藏；扩张到 18/24 时改列数重排）
+const COLS := 6   # 首发 12 生肖 = 2 行 ×6（h13–h46 已弃用，固定单池）
 const STEP_X := 121.0
 const ROW_H := 142.0
 const X0 := 218.0   # 6 卡在 POOL(60..1092) 内水平居中
@@ -41,11 +41,6 @@ const PASSIVE_TAG := Color(0.40, 0.50, 0.62)   # 被动=去饱和冷蓝（恒常
 const DARK_WARM := Color(0.09, 0.085, 0.075)   # 近黑暖暗底（详情板底/牌匾/徽章衬底大暗面）
 const INK_LINE := Color(0.18, 0.12, 0.07)      # 墨线
 const PARCHMENT_HI := Color(0.95, 0.91, 0.80)  # 暖米白（压暗底主文字）
-
-# 三牌系主题色（图例带/卡顶线/详情衬光共用·2026-06-12 去毛坯批）
-const THEME_TEAL := Color(0.36, 0.72, 0.62)     # 十二生肖
-const THEME_GOLD := Color(0.957, 0.784, 0.294)  # 大阿卡那（=GOLD_TEXT）
-const THEME_PURPLE := Color(0.64, 0.52, 0.86)   # 十二星座
 
 # 顶带「典籍牌匾」落位
 const PLAQUE := Rect2(800, 26, 320, 64)
@@ -210,8 +205,8 @@ func _band_rect(parent: Control, r: Rect2, col: Color) -> ColorRect:
 
 
 ## 左侧牌库（bp 同源霜玻璃 + 0.846 网格八列）。
-## 2026-06-13 Eddy：去除三系图例带 + 每卡顶主题色细线（生肖/大阿卡那/星座标记
-## 将由"另一套标记"替代，现在先全部移除）。保留选中行微亮条（键盘导航行定位）。
+## 2026-06-13 Eddy：去除三系图例带 + 每卡顶主题色细线（早期生肖/阿卡那/星座标记已全部移除）。
+## 保留选中行微亮条（键盘导航行定位）。
 func _build_pool() -> void:
 	_make_frosted(pool_area, POOL)
 	# 行亮条（先建=画在卡下层）
@@ -534,24 +529,6 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _back_to_menu() -> void:
 	TransitionManager.transition_to(MENU_SCENE)
-
-
-## 主题归属（池顺序固定：h01-12 生肖 / h13-34 大阿卡那 / h35-46 星座）。
-## 2026-06-13：三系标记已从 UI 移除，本对映射函数保留给未来"另一套标记"复用（当前无调用）。
-func _theme_of(idx: int) -> String:
-	if idx < 12:
-		return "十二生肖"
-	if idx < 34:
-		return "大阿卡那"
-	return "十二星座"
-
-
-func _theme_color_of(idx: int) -> Color:
-	if idx < 12:
-		return THEME_TEAL
-	if idx < 34:
-		return THEME_GOLD
-	return THEME_PURPLE
 
 
 ## 入场：顶带滑入 + 左侧牌按行翻开扫过（bp C1 同语言）+ 右板淡入。
