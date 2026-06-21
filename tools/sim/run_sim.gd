@@ -17,6 +17,7 @@ extends SceneTree
 ##   --max-turns T    单局回合上限（默认 120，超出记为未决 capped）
 ##   --out DIR        输出目录（默认 res://tools/sim/out/）
 ##   --plan-ab 1      A/B 验证 Part 2：A(规划道具 plan_items) vs B(不规划) 头对头 → out/ab_result.md
+##   --upgrade-ab 1   A/B 验证 B：A(价值搜索升级) vs B(阈值升级) 头对头 → out/ab_result.md
 
 const HERO_DATA_DIR := "res://assets/data/heroes/"
 const ROSTER_SIZE := 3
@@ -42,6 +43,7 @@ var depth := 2          # 对战 AI 搜索深度
 var profile := 0        # 对战 AI 评估档：0=基础 / 1=v3 牌感(熟练优秀玩家)
 var ab_variant := ""    # A/B 校准：非空=A(默认权重) vs B(此变体) 头对头（见 AB_VARIANTS）
 var plan_ab := false    # A/B：A(plan_items=true 规划道具) vs B(false 不规划) 头对头（验证 Part 2）
+var upgrade_ab := false  # A/B：A(search_upgrade=true 价值搜索升级) vs B(false 阈值升级) 头对头（验证 B）
 
 var _hero_data := {}    # hero_id → HeroData（加载一次复用）
 var _pool_hd: Array = []  # Array[HeroData]，与 ids 平行（drafter 用，返回索引）
@@ -73,7 +75,9 @@ func _initialize() -> void:
 	var ab_draw := 0   # A/B：平/未决
 
 	if ab_active():
-		if plan_ab:
+		if upgrade_ab:
+			print("【A/B】A=价值搜索升级(search_upgrade=true) vs B=阈值升级(false) 头对头（交替先后手·验证 B）")
+		elif plan_ab:
 			print("【A/B】A=规划道具(plan_items=true) vs B=不规划(false) 头对头（两方实战都用道具·交替先后手）")
 		else:
 			print("【A/B 校准】A=默认权重  vs  B=变体「%s」=%s （交替先后手）" % [
@@ -120,6 +124,9 @@ func _initialize() -> void:
 		if plan_ab:
 			ai0.plan_items = (g % 2 == 0)   # A(规划道具)=偶数局 P0 / 奇数局 P1（抵消先后手偏差）
 			ai1.plan_items = (g % 2 != 0)
+		if upgrade_ab:
+			ai0.search_upgrade = (g % 2 == 0)   # A(价值搜索升级)=偶数局 P0 / 奇数局 P1
+			ai1.search_upgrade = (g % 2 != 0)
 
 		var res: Dictionary = _play(b, ai0, ai1, action_count, item_stat)
 		var w: int = res["winner"]
@@ -168,12 +175,16 @@ func use_ab() -> bool:
 
 ## A/B 计数 / 输出是否激活（权重变体 或 道具规划头对头）。
 func ab_active() -> bool:
-	return ab_variant != "" or plan_ab
+	return ab_variant != "" or plan_ab or upgrade_ab
 
 
 ## A/B 变体名（用于标签）。
 func _ab_name() -> String:
-	return "道具推演规划(plan_items)" if plan_ab else ab_variant
+	if upgrade_ab:
+		return "升级价值搜索(search_upgrade)"
+	if plan_ab:
+		return "道具推演规划(plan_items)"
+	return ab_variant
 
 
 ## 进度文件（每 50 局刷新，随时可 Read 查看进度；解决 stdout 缓冲不可见问题）。
@@ -189,15 +200,32 @@ func _write_progress(done: int) -> void:
 func _write_ab(a: int, b: int, draw: int) -> void:
 	var total: int = a + b + draw
 	var decisive: int = a + b
-	var a_label := "规划道具" if plan_ab else "默认权重"
-	var b_label := "不规划" if plan_ab else ("变体" + _ab_name())
-	var desc := ("A=规划道具(plan_items=true) ｜ B=不规划（两方实战都用道具，仅 AI lookahead 不同）" if plan_ab
-		else "A=默认权重 ｜ B=变体「%s」=%s" % [ab_variant, str(AB_VARIANTS.get(ab_variant, {}))])
-	# 关注侧：plan_ab → A(新特性 plan_items)；权重 → B(变体)。
-	var focus := "A(规划道具)" if plan_ab else "B(变体)"
+	var a_label: String
+	var b_label: String
+	var desc: String
+	var focus: String
+	var title: String
+	if upgrade_ab:
+		a_label = "价值搜索升级"
+		b_label = "阈值升级"
+		desc = "A=价值搜索升级(search_upgrade=true·plan_economy) ｜ B=阈值升级(run_item_economy)（两方实战同·仅升级择时不同）"
+		focus = "A(价值搜索升级)"
+		title = "升级择时(B)"
+	elif plan_ab:
+		a_label = "规划道具"
+		b_label = "不规划"
+		desc = "A=规划道具(plan_items=true) ｜ B=不规划（两方实战都用道具，仅 AI lookahead 不同）"
+		focus = "A(规划道具)"
+		title = "道具推演规划"
+	else:
+		a_label = "默认权重"
+		b_label = "变体" + _ab_name()
+		desc = "A=默认权重 ｜ B=变体「%s」=%s" % [ab_variant, str(AB_VARIANTS.get(ab_variant, {}))]
+		focus = "B(变体)"
+		title = "权重校准"
 	var f := FileAccess.open(out_dir + "ab_result.md", FileAccess.WRITE)
 	if f != null:
-		f.store_line("# A/B %s 结果\n" % ("道具推演规划" if plan_ab else "权重校准"))
+		f.store_line("# A/B %s 结果\n" % title)
 		f.store_line("- %s" % desc)
 		f.store_line("- 对局=%d（交替先后手抵消位置偏差）\n" % total)
 		f.store_line("| 侧 | 胜 | 总占比 | decisive 占比 |")
@@ -214,8 +242,8 @@ func _write_ab(a: int, b: int, draw: int) -> void:
 func _play(b: BattleCore, ai0: BattleAI, ai1: BattleAI, action_count: Dictionary, item_stat: Dictionary) -> Dictionary:
 	while not b.game_over and b.turn_number < max_turns:
 		# 道具经济：选动作【前】双方自动管理道具栏（与实战 _ai_pick 同启发·开格立即扣能 → 动作据剩余能量）。
-		BattleAI.run_item_economy(b, 0, ai0.rng)
-		BattleAI.run_item_economy(b, 1, ai1.rng)
+		ai0.plan_economy(b, 0, ai0.rng)
+		ai1.plan_economy(b, 1, ai1.rng)
 		item_stat["used"] = item_stat.get("used", 0) + b.item_uses[0].size() + b.item_uses[1].size()
 		# 双方从同一结算前状态同时盲选
 		var c0: Dictionary = ai0.choose_action(b, 0)
@@ -419,6 +447,7 @@ func _parse_args() -> void:
 			"--draft": use_draft = int(val) != 0
 			"--ab": ab_variant = val
 			"--plan-ab": plan_ab = int(val) != 0
+			"--upgrade-ab": upgrade_ab = int(val) != 0
 			"--out": out_dir = val
 			"--pool":
 				var parts := val.split("-")

@@ -116,6 +116,7 @@ var p2_item_row: ItemSlotRow
 var selected_item_slots: Array[int] = []
 var _drafting := false   # draft 弹窗打开中：拦截重入 + 暂停回合计时
 var _ai_rng := RandomNumberGenerator.new()   # 任务 B：AI 道具抽取选择用（与游戏 rng 分离）
+var _ai: BattleAI                             # 试玩对手 = 与 sim 统一的同一套搜索 AI（_ready 实例化）
 
 # ---- 选择 / 样式 ----
 var action_btn_list: Array[Button] = []
@@ -142,6 +143,7 @@ var _hitstop_token: int = 0   # hitstop(c) 防重叠：仅最后一次定格负�
 
 func _ready() -> void:
 	_ai_rng.randomize()   # 任务 B：AI 道具抽取随机种子
+	_ai = BattleAI.new(0, 2, 0, {})   # 与 sim 统一：同一套搜索 AI（随机种子·深度 2·基础评估）
 	battle = BattleCore.new()
 	var p0: Array = _resolve_team(BattleSetup.p1_heroes, DEFAULT_P0)
 	var p1: Array = _resolve_team(BattleSetup.p2_heroes, DEFAULT_P1)
@@ -427,20 +429,12 @@ func _on_confirm_pressed() -> void:
 
 
 func _ai_pick(side: int) -> void:
-	# 道具经济（任务 B）：AI 先像玩家一样操作道具栏（用就绪/抽/开格·开格立即扣能）→
-	# 再据【剩余】能量选动作，使试玩两边对等。基础启发见 BattleAI.run_item_economy。
-	BattleAI.run_item_economy(battle, side, _ai_rng)
-
-	var opts: Array[int] = [A.CHARGE, A.CHARGE, A.DEFEND]
-	if battle.can_afford(side, A.ATTACK):
-		opts.append(A.ATTACK)
-		opts.append(A.ATTACK)
-	if battle.can_afford(side, A.BIG_ATTACK):
-		opts.append(A.BIG_ATTACK)
-	if battle.can_afford(side, A.BIG_DEFEND):
-		opts.append(A.BIG_DEFEND)
-	var pick: int = opts[randi() % opts.size()]
-	battle.select_action(side, pick)   # 被禁/付不起则引擎 resolve guard 兜底为攒
+	# 与 sim 统一：同一套 BattleAI 逻辑——价值搜索道具经济(plan_economy·B) + 同时博弈选动作(choose_action)。
+	# 取代旧「随机加权出招」占位 AI；试玩与平衡模拟现共用一套决策。AI 不偷看玩家已锁动作（搜索按博弈枚举）。
+	_ai.plan_economy(battle, side, _ai_rng)
+	var choice: Dictionary = _ai.choose_action(battle, side)
+	if not battle.apply_choice(side, choice):
+		battle.select_action(side, A.CHARGE)   # 兜底（被禁/付不起→引擎 resolve guard 也兜）
 
 
 func _resolve() -> void:
@@ -484,11 +478,14 @@ func _resolve() -> void:
 		status_label.visible = true
 		return
 
-	# AI 死亡换人：自动选第一个存活替补
+	# AI 死亡换人：与 sim 统一，用搜索 AI 对位选替补（choose_death_switch）；异常兜底首个存活替补。
 	if battle.pending_death_switch[AI]:
-		var ai_reserves: Array[int] = battle.living_reserves(AI)
-		if ai_reserves.size() > 0:
-			battle.execute_death_switch(AI, ai_reserves[0])
+		var ai_slot: int = _ai.choose_death_switch(battle, AI)
+		if ai_slot < 0:
+			var ai_reserves: Array[int] = battle.living_reserves(AI)
+			ai_slot = ai_reserves[0] if ai_reserves.size() > 0 else -1
+		if ai_slot >= 0:
+			battle.execute_death_switch(AI, ai_slot)
 		_update_all()
 
 	# 玩家死亡换人：弹浮窗

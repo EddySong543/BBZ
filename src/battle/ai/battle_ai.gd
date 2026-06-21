@@ -31,6 +31,7 @@ const AI_ITEM_UPGRADE_BUFFER := 2
 var search_depth: int = 2
 var plan_items: bool = true # 搜索推演里是否也跑道具经济（Part 2）：true=AI 规划会考虑未来道具发展；
                             # false=控制组（实战照常用道具、但 lookahead 当道具冻结·= 旧行为）。供 A/B 实测。
+var search_upgrade: bool = false # 升级择时：false=阈值默认(100局A/B价值搜索仅52.2%≈噪声·且贵~10×) / true=价值搜索(plan_economy·一开关可重启)
 var eval_profile: int = 0   # 0=基础评估(v2) / 1=v3 牌感评估(熟练优秀玩家)
 var weights: Dictionary = {} # 评估权重覆盖（空=用默认常量）；A/B 校准用（T1）
 var rng := RandomNumberGenerator.new()        # 动作抽样
@@ -90,30 +91,42 @@ func choose_death_switch(b: BattleCore, player: int) -> int:
 
 # === 道具经济启发（v1·非搜索）===
 
-## 让 AI 像玩家一样操作道具栏，使试玩两边对等（实战 _ai_pick / sim / 测试通用·纯函数）。
-## 在 AI 选动作【之前】调用：开格立即扣能 → 动作选择据剩余能量决策（与玩家手动点击同语义）。
+## 让 AI 像玩家一样操作道具栏，使试玩两边对等（sim / 测试 / 深层 lookahead 通用·纯函数·阈值升级择时）。
+## 选动作【之前】调用：开格立即扣能 → 动作据剩余能量决策（与玩家手动点击同语义）。
 ## 策略（保守·不饿死动作·能量富余才发展）：
-##   1. 就绪槽：能量【明显富余】(≥升级成本+reserve+buffer)且本回合未升过 → 升级 1 个（投资·换更强件·
-##      锁1回合·电报）；其余就绪道具直接用掉（免费·提交本回合盲选 item_uses）。
-##   2. 抽取所有【可抽】的已开槽（免费·推进部署流水线）。
-##   3. 富余能量(≥成本+reserve)时：开 1 个可开槽 + refill 1 个空槽（电报渐进·每回合各 ≤1）。
-## ⚠ v1 择时 = 仅靠「能量富余」近似「局面安全/可投资」（被压时能量紧→自然只用不升）；
-##   不做 HP / 胜负态精细择时（后续可加）。每回合最多升 1 个。
+##   1. 就绪槽：能量【明显富余】(≥升级成本+reserve+buffer)→ 升级 1 个（投资·锁1回合·电报）；其余用掉。
+##   2. 抽所有【可抽】已开槽（免费）。3. 富余能量开 1 槽 + refill 1 空槽（每回合各 ≤1）。
+## ⚠ 阈值择时 = 仅靠「能量富余」近似「局面安全可投资」；**价值搜索版见 `plan_economy`（B）**。
 static func run_item_economy(b: BattleCore, side: int, rng: RandomNumberGenerator,
 		reserve: int = AI_ITEM_ENERGY_RESERVE) -> void:
 	if side < 0 or side >= b.slots.size() or b.slots[side].size() < BattleCore.SLOT_COUNT:
 		return
-	# 1. 就绪槽：富余能量 → 投资升级 1 个（锁1回合·电报）；其余就绪道具用掉。
-	var did_upgrade := false
+	_apply_economy(b, side, rng, reserve, _threshold_upgrade_slot(b, side, reserve))
+
+
+## 阈值升级择时：返回第一个「就绪 + 可升 + 能量明显富余(成本+reserve+buffer)」的槽；无则 -1。
+static func _threshold_upgrade_slot(b: BattleCore, side: int, reserve: int) -> int:
+	for s in range(BattleCore.SLOT_COUNT):
+		if b.slot_ready(side, s) and b.can_upgrade(side, s) \
+				and b.energy[side] >= b.upgrade_cost(side, s) + reserve + AI_ITEM_UPGRADE_BUFFER:
+			return s
+	return -1
+
+
+## 应用一回合道具经济（机械执行·升级目标由调用方给）：
+##   ① 就绪槽——upgrade_slot 那个升级、其余用掉（upgrade_slot=-1 → 全用不升）；
+##   ② 抽所有可抽；③ 富余开 1 格；④ 富余 refill 1 空槽。
+static func _apply_economy(b: BattleCore, side: int, rng: RandomNumberGenerator, reserve: int, upgrade_slot: int) -> void:
+	if side < 0 or side >= b.slots.size() or b.slots[side].size() < BattleCore.SLOT_COUNT:
+		return
+	# 1. 就绪槽
 	for s in range(BattleCore.SLOT_COUNT):
 		if not b.slot_ready(side, s):
 			continue
-		if not did_upgrade and b.can_upgrade(side, s) \
-				and b.energy[side] >= b.upgrade_cost(side, s) + reserve + AI_ITEM_UPGRADE_BUFFER:
+		if s == upgrade_slot and b.can_upgrade(side, s):
 			var uopts: Array = b.begin_upgrade_draft(side, s)
 			if not uopts.is_empty():
 				b.pick_upgrade(side, s, rng.randi() % uopts.size())
-				did_upgrade = true
 				continue
 		b.use_slot(side, s)
 	# 2. 抽可抽的槽
@@ -134,6 +147,59 @@ static func run_item_economy(b: BattleCore, side: int, rng: RandomNumberGenerato
 			if not opts2.is_empty():
 				b.pick_draft(side, s, rng.randi() % opts2.size())
 			break
+
+
+## 升级择时【进阶·价值搜索】（B·root-only）：把"就绪件 用 vs 升"交给搜索而非阈值。
+## 枚举「不升 / 升某个就绪槽」变体，各 clone 应用后用根局面博弈值比较，挑价值最高那个再真应用。
+## search_upgrade=false → 退回阈值 run_item_economy。仅用于 AI 真实根决策（实战 _ai_pick / sim）；
+## 深层 lookahead 仍走便宜的 run_item_economy（见 _state_value）→ 无递归、性能可控。
+func plan_economy(b: BattleCore, side: int, rng: RandomNumberGenerator) -> void:
+	if side < 0 or side >= b.slots.size() or b.slots[side].size() < BattleCore.SLOT_COUNT:
+		return
+	if not search_upgrade:
+		run_item_economy(b, side, rng)
+		return
+	# 候选升级目标 = -1(不升·全用) + 每个「就绪+可升+付得起(成本+reserve)」槽；是否值得交给搜索定。
+	var candidates: Array[int] = [-1]
+	for s in range(BattleCore.SLOT_COUNT):
+		if b.slot_ready(side, s) and b.can_upgrade(side, s) \
+				and b.energy[side] >= b.upgrade_cost(side, s) + AI_ITEM_ENERGY_RESERVE:
+			candidates.append(s)
+	if candidates.size() == 1:
+		_apply_economy(b, side, rng, AI_ITEM_ENERGY_RESERVE, -1)   # 无升级抉择 → 直接全用 + 推进
+		return
+	var best := -1
+	var best_val := -INF
+	for up in candidates:
+		var sim: BattleCore = b.clone()
+		_apply_economy(sim, side, _eval_rng, AI_ITEM_ENERGY_RESERVE, up)
+		var v: float = _root_value(sim, side)
+		if v > best_val:
+			best_val = v
+			best = up
+	_apply_economy(b, side, rng, AI_ITEM_ENERGY_RESERVE, best)
+
+
+## 根局面博弈值：对剪枝动作集解一层根矩阵取安全值，供 plan_economy 比较经济变体（不再二次推进经济）。
+## 用剪枝 _shortlist + RM_ITERS_INNER（值估即可·不需精确策略）→ 单变体 ≈ 一次便宜根求解。
+func _root_value(b: BattleCore, player: int) -> float:
+	if b.game_over:
+		return _eval(b, player)
+	var opp: int = 1 - player
+	var my: Array = _shortlist(b, player)
+	var opp_acts: Array = _shortlist(b, opp)
+	var n: int = my.size()
+	var m: int = opp_acts.size()
+	if n == 0 or m == 0:
+		return _eval(b, player)
+	var payoff: Array = []
+	for i in range(n):
+		var row: Array[float] = []
+		for j in range(m):
+			row.append(_value_after(b, player, opp, my[i], opp_acts[j], search_depth - 1))
+		payoff.append(row)
+	var strat: Array[float] = _solve_mixed(payoff, n, m, RM_ITERS_INNER)
+	return _security_value(payoff, strat, n, m)
 
 
 # === 搜索 ===
