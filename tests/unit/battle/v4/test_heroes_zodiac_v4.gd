@@ -51,13 +51,13 @@ func _resolve(b: BattleCore, a0: int, a1: int) -> void:
 	b.resolve()
 
 
-# ---- h01 子鼠 囤鼠（出战时己方每次得能 +1 能 = +2 半能）----
+# ---- h01 子鼠 囤鼠（出战时己方每次得能 +0.5 能 = +1 半能·2026-06-21 由 +1 能调为 +0.5）----
 
-func test_h01_dunshu_doubles_every_energy_gain() -> void:
+func test_h01_dunshu_adds_half_to_every_energy_gain() -> void:
 	var b := _battle("h01", 5, 8)
 	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.CHARGE)
-	# 子鼠：攒(2+囤鼠2) + 被动(2+囤鼠2) = +8 半能
-	assert_eq(b.energy[0], 8 + 8, "子鼠囤鼠：攒与被动各 +2 半能加成 → +8")
+	# 子鼠：攒(2+囤鼠1) + 被动(2+囤鼠1) = +6 半能
+	assert_eq(b.energy[0], 8 + 6, "子鼠囤鼠：攒与被动各 +1 半能(+0.5 能)加成 → +6")
 	# 对照 plain：攒2 + 被动2 = +4
 	assert_eq(b.energy[1], 8 + 4, "plain 对照 +4 半能")
 

@@ -141,6 +141,12 @@ func energy_gain_bonus(_battle: BattleCore, _player: int, _slot: int) -> int:
 	return 0
 
 
+## 本英雄（出战）对【敌方】施加的"能量封印"（半能）：敌方【可用】能量 = 能量池 − 此值（最低 0）。
+## 封印 = 锁住不可动用、不消耗 / 不入己池、本英雄下场即解。黑暗子鼠 h13【封窟】= 1（封 0.5 能）。
+func enemy_energy_lock(_battle: BattleCore, _player: int, _slot: int) -> int:
+	return 0
+
+
 ## 本英雄是否为"致死救援"守护者（替补席存活时，可替将死的出战队友顶伤上场）。未羊 = true。
 func is_lethal_guardian() -> bool:
 	return false

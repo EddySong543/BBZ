@@ -78,6 +78,8 @@ const _HERO_SKILL_SCRIPTS := {
 	"h10": preload("res://src/battle/skills/h10_jianyi.gd"),
 	"h11": preload("res://src/battle/skills/h11_zhuibu.gd"),
 	"h12": preload("res://src/battle/skills/h12_nafu.gd"),
+	"h13": preload("res://src/battle/skills/h13_fengku.gd"),
+	"h14": preload("res://src/battle/skills/h14_pichuan.gd"),
 }
 
 ## 注册表整体校验只跑一次（静态守卫）。
@@ -221,8 +223,22 @@ func _get_cost(player: int, action: int) -> int:
 	return 0
 
 
+## 敌方出战英雄对本方施加的能量封印（半能·黑暗子鼠 h13【封窟】）。仅敌方【出战】英雄生效、下场即解。
+func _energy_lock_on(player: int) -> int:
+	var opp: int = 1 - player
+	var sk: HeroSkill = _skills[opp][active_index[opp]]
+	if sk != null:
+		return maxi(0, sk.enemy_energy_lock(self, opp, active_index[opp]))
+	return 0
+
+
+## 本方【可用】能量（半能）= 能量池 − 敌方封印（最低 0）。无敌方封窟时 == energy[player]（行为不变）。
+func usable_energy(player: int) -> int:
+	return maxi(0, energy[player] - _energy_lock_on(player))
+
+
 func can_afford(player: int, action: int) -> bool:
-	return energy[player] >= _get_cost(player, action)
+	return usable_energy(player) >= _get_cost(player, action)
 
 
 func select_action(player: int, action: int) -> bool:
@@ -250,7 +266,7 @@ func can_use_active(player: int) -> bool:
 	var cap: int = sk.active_per_game_cap()
 	if cap >= 0 and int(get_status(player, slot, "active_uses", 0)) >= cap:
 		return false
-	if energy[player] < sk.active_cost(self, player, slot):
+	if usable_energy(player) < sk.active_cost(self, player, slot):
 		return false
 	return sk.can_use_active(self, player, slot)
 
@@ -413,7 +429,7 @@ func slot_ready(player: int, s: int) -> bool:
 ## 能否开格（SEALED + 到解锁回合 + 能量够）。
 func can_open_slot(player: int, s: int) -> bool:
 	return int(slots[player][s]["state"]) == SlotState.SEALED \
-		and turn_number >= int(SLOT_UNLOCK_TURN[s]) and energy[player] >= ITEM_OPEN_COST
+		and turn_number >= int(SLOT_UNLOCK_TURN[s]) and usable_energy(player) >= ITEM_OPEN_COST
 
 
 ## 开格：付 1 能，SEALED→OPENED（锁本回合，下回合才能抽）。
@@ -494,7 +510,7 @@ func can_upgrade(player: int, s: int) -> bool:
 	if not slot_ready(player, s):
 		return false
 	var item: ItemData = slots[player][s]["item"]
-	return item != null and item.tier < 3 and energy[player] >= upgrade_cost(player, s)
+	return item != null and item.tier < 3 and usable_energy(player) >= upgrade_cost(player, s)
 
 
 ## 生成升级 3 选 1 候选（下一级 tier 池随机 3·占位无加权）。存入槽 "upg_draft" 供 UI 展示；
@@ -551,7 +567,7 @@ func pick_upgrade(player: int, s: int, choice: int) -> bool:
 
 
 func can_refill(player: int, s: int) -> bool:
-	return int(slots[player][s]["state"]) == SlotState.EMPTY and energy[player] >= ITEM_REFILL_COST
+	return int(slots[player][s]["state"]) == SlotState.EMPTY and usable_energy(player) >= ITEM_REFILL_COST
 
 
 ## refill：付 1 能，EMPTY→可抽（格已在，故立即 3 选 1；返回选项供 UI；随后 pick_draft）。
@@ -923,6 +939,36 @@ func chongzhuang(attacker_player: int) -> void:
 		return
 	var ev: Array = []
 	_apply_damage(opp, CHONGZHUANG_DAMAGE, attacker_player, ActionDef.Action.ATTACK, ActionDef.Pen.PIERCE_BIGDEF, ActionDef.Action.CHARGE, ev)
+
+
+## 黑暗丑牛 h14【劈穿】：把溢出伤害劈穿到 victim 的"下一名"被迫登场英雄（= 最高血存活替补，
+## 与 choose_death_switch 补位规则一致 → 命中其真正顶上的英雄）。在 on_kill（死亡 while-loop 内）调用：
+## 若劈死该替补，外层 _resolve_deaths while-loop 照常连锁处理（§D8）。
+## 穿透击杀 = 无视防御门（替补无防御动作），但仍被其护甲层吸收、触发 on_self_damaged。
+## 不标记 _killer → 劈死的替补不触发 on_kill → 溢出不链式（只来自首次一斧）。
+func carry_overkill_to_next(victim_player: int, overkill: int) -> void:
+	if overkill <= 0:
+		return
+	var target := -1
+	var best_hp := 0
+	for s in range(hp[victim_player].size()):
+		if s != active_index[victim_player] and hp[victim_player][s] > best_hp:
+			best_hp = hp[victim_player][s]
+			target = s
+	if target < 0:
+		return   # 无存活替补（victim 团灭）→ 溢出无处可去
+	var dmg: int = overkill
+	if shield[victim_player][target] > 0:
+		var absorbed: int = mini(shield[victim_player][target], dmg)
+		shield[victim_player][target] -= absorbed
+		dmg -= absorbed
+	if dmg <= 0:
+		return
+	hp[victim_player][target] -= dmg
+	_dmg_dealt[1 - victim_player] += dmg
+	var sk: HeroSkill = _skills[victim_player][target]
+	if sk != null:
+		sk.on_self_damaged(self, victim_player, target, dmg, 1 - victim_player)
 
 
 ## 找 player 替补席可用的致死救援守护者（未羊：is_lethal_guardian + 每局 < 2 次）；无则 -1。

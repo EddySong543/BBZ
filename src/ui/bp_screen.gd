@@ -37,8 +37,8 @@ const STEP_X := 121.0
 const ROW_H := 146.0
 const ROW_Y0 := 400.0
 # [起始索引, 张数, 行起点x]；末值=该行左缘（每行池内居中）。
-# 首发 12 生肖 = 2 行 ×6 居中（x0=602 使 6 卡在 POOL 内水平居中）。扩张到 18/24 时重排此表。
-const ROWS: Array = [[0, 6, 602.0], [6, 6, 602.0]]
+# 首发 14（12 生肖 + 黑暗子鼠/丑牛）= 2 行 ×7 居中（x0=542 使 7 卡在 POOL 内水平居中）。扩张时重排此表。
+const ROWS: Array = [[0, 7, 542.0], [7, 7, 542.0]]
 
 # ── 席位槽（OppBand / MyBand 内相对坐标）──
 # 双方槽**同规格同坐标**（卡原生 130×158·x 770/950/1130）：上下严格对齐 + 手牌卡免缩放
@@ -107,7 +107,7 @@ var _glow_tween: Tween
 
 
 func _ready() -> void:
-	all_heroes = HeroData.create_launch_pool(HERO_DATA_DIR)   # 首发只 12 生肖（h13+ 隐藏）
+	all_heroes = HeroData.create_launch_pool(HERO_DATA_DIR)   # 首发 14（12 生肖 + 黑暗子鼠/丑牛）
 	_setup_ui()
 	_build_pool()
 	_enter_step(Step.PICK)   # 去 ban：12 池容不下 ban，直接 pick-only（BAN 分支保留为死路）
