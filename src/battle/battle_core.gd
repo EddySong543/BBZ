@@ -36,19 +36,14 @@ var energy: Array[int] = [0, 0]           # 团队共享能量池
 var hp: Array = [[], []]                  # hp[player][slot]，半点
 var max_hp: Array = [[], []]              # 半点
 var shield: Array = [[], []]              # shield[player][slot]，半点
-var form: Array = [[], []]                # form[player][slot]，0=默认形态（h26 变身）
-var pending_damage: Array = [[], []]      # 半点，h27 延迟伤害队列
+var pending_damage: Array = [[], []]      # 半点，延迟伤害队列（道具：妖火/藤蔓陷阱施加，Phase0 结算）
 var statuses: Array = [[], []]            # statuses[player][slot]: Dictionary，per-slot 状态容器 (§D5)
-var link: Array[Dictionary] = [{}, {}]    # link[player]: 绑定关系（h19 挚爱 / h28 契约）
-var disabled_group: Array[int] = [-1, -1]   # 被禁动作系列（h17）：0=攻击系 1=防御系
-var _disabled_on_turn: Array[int] = [-1, -1] # 该禁令生效的回合号（turn_number）
 
 var selected_action: Array[int] = [-1, -1]
 var _switch_to: Array[int] = [-1, -1]               # SWITCH 动作的目标槽位
 var pending_death_switch: Array[bool] = [false, false]  # 出战阵亡待玩家选替补上场
 var _death_processed: Array = [[], []]              # 每槽位死亡 hook 是否已触发（防重复）
-var _dmg_dealt: Array[int] = [0, 0]                 # 本回合各方造成的实际伤害(半点)，h25 蓄势等用
-var _energy_before: Array[int] = [0, 0]             # 本回合结算开始时的能量快照（倾力 h20 读取）
+var _dmg_dealt: Array[int] = [0, 0]                 # 本回合各方造成的实际伤害(半点)·通用记账
 var _killer: Array = [[], []]                       # _killer[player][slot]=直接攻击致死该英雄的攻击方;-1=非攻击致死。on_kill 只对直接攻击触发(防 splash/AOE 连锁)
 var _last_action: Array[int] = [-1, -1]             # 上回合双方动作（传说级雪球·惯性件读取）
 
@@ -97,7 +92,6 @@ func setup(p1_heroes: Array, p2_heroes: Array, seed_value: int = 0) -> void:
 	hp = [[], []]
 	max_hp = [[], []]
 	shield = [[], []]
-	form = [[], []]
 	pending_damage = [[], []]
 	statuses = [[], []]
 	_death_processed = [[], []]
@@ -108,7 +102,6 @@ func setup(p1_heroes: Array, p2_heroes: Array, seed_value: int = 0) -> void:
 			hp[p].append(hp_half)
 			max_hp[p].append(hp_half)
 			shield[p].append(0)
-			form[p].append(0)
 			pending_damage[p].append(0)
 			statuses[p].append({})
 			_death_processed[p].append(false)
@@ -116,9 +109,6 @@ func setup(p1_heroes: Array, p2_heroes: Array, seed_value: int = 0) -> void:
 
 	active_index = [0, 0]
 	energy = [ActionDef.INITIAL_ENERGY, ActionDef.INITIAL_ENERGY]
-	link = [{}, {}]
-	disabled_group = [-1, -1]
-	_disabled_on_turn = [-1, -1]
 	selected_action = [-1, -1]
 	_switch_to = [-1, -1]
 	pending_death_switch = [false, false]
@@ -183,7 +173,7 @@ func _gain_energy(player: int, amount: int) -> void:
 	if amount <= 0:
 		return
 	var sk: HeroSkill = _skills[player][active_index[player]]
-	if sk != null and not _is_silenced(player, active_index[player]):
+	if sk != null:
 		amount += sk.energy_gain_bonus(self, player, active_index[player])
 	energy[player] = mini(energy[player] + amount, ActionDef.MAX_ENERGY)
 
@@ -236,36 +226,14 @@ func can_afford(player: int, action: int) -> bool:
 
 
 func select_action(player: int, action: int) -> bool:
-	if is_action_disabled(player, action):
-		return false
 	if not can_afford(player, action):
 		return false
 	selected_action[player] = action
 	return true
 
 
-## 该动作本回合是否被禁（h17 君命）。攒/切换/主动不可禁。
-func is_action_disabled(player: int, action: int) -> bool:
-	if _disabled_on_turn[player] != turn_number:
-		return false
-	match disabled_group[player]:
-		0:
-			return action == ActionDef.Action.ATTACK or action == ActionDef.Action.BIG_ATTACK
-		1:
-			return action == ActionDef.Action.DEFEND or action == ActionDef.Action.BIG_DEFEND
-	return false
-
-
-## 出战英雄被沉默（h15）：被动 hook 失效，直到 statuses["silenced_until"] 回合（含）为止。
-## 默认 -1 → turn_number(≥0) <= -1 恒 false（未沉默）。三缄设 silenced_until = 当前回合+1 → 沉默 2 回合。
-func _is_silenced(player: int, slot: int) -> bool:
-	return turn_number <= int(get_status(player, slot, "silenced_until", -1))
-
-
-## 统一回血入口：燃烧(h32)期间禁回血。返回实际回复量（半点）。
+## 统一回血入口（妖火：施加的下回合禁回血）。返回实际回复量（半点）。
 func _heal(player: int, slot: int, amount: int) -> int:
-	if int(get_status(player, slot, "burn", 0)) > 0:
-		return 0
 	if turn_number == int(get_status(player, slot, "noheal_turn", -999)):
 		return 0   # 妖火：施加的下回合无法回血
 	var before: int = hp[player][slot]
@@ -635,19 +603,14 @@ func clone() -> BattleCore:
 	c.hp = hp.duplicate(true)
 	c.max_hp = max_hp.duplicate(true)
 	c.shield = shield.duplicate(true)
-	c.form = form.duplicate(true)
 	c.pending_damage = pending_damage.duplicate(true)
 	c.statuses = statuses.duplicate(true)
-	c.link = link.duplicate(true)
-	c.disabled_group = disabled_group.duplicate()
-	c._disabled_on_turn = _disabled_on_turn.duplicate()
 	c.selected_action = selected_action.duplicate()
 	c._switch_to = _switch_to.duplicate()
 	c.pending_death_switch = pending_death_switch.duplicate()
 	c._death_processed = _death_processed.duplicate(true)
 	c._dmg_dealt = _dmg_dealt.duplicate()
 	c._last_action = _last_action.duplicate()
-	c._energy_before = _energy_before.duplicate()
 	c._killer = _killer.duplicate(true)
 	c.items = items.duplicate(true)
 	c.item_uses = item_uses.duplicate(true)
@@ -676,7 +639,7 @@ func legal_actions(player: int) -> Array:
 	var out: Array = []
 	for a in [ActionDef.Action.CHARGE, ActionDef.Action.ATTACK, ActionDef.Action.DEFEND,
 			ActionDef.Action.BIG_ATTACK, ActionDef.Action.BIG_DEFEND]:
-		if not is_action_disabled(player, a) and can_afford(player, a):
+		if can_afford(player, a):
 			out.append({action = a, target = -1})
 	if can_afford(player, ActionDef.Action.SWITCH):
 		for t in living_reserves(player):
@@ -717,28 +680,14 @@ func resolve() -> Dictionary:
 		if selected_action[p] < 0:
 			push_warning("BattleCore.resolve(): P%d 未选动作，fallback CHARGE" % (p + 1))
 			selected_action[p] = ActionDef.Action.CHARGE
-		elif is_action_disabled(p, selected_action[p]):
-			push_warning("BattleCore.resolve(): P%d 选了被禁动作，fallback CHARGE" % (p + 1))
-			selected_action[p] = ActionDef.Action.CHARGE
 
 	var a: Array[int] = [selected_action[0], selected_action[1]]
 	_dmg_dealt = [0, 0]
-	_energy_before = energy.duplicate()
 	for p in [0, 1]:
 		for s in range(_killer[p].size()):
 			_killer[p][s] = -1
 
-	# h14 梅开二度：本回合动作执行 2 次（所有动作，含切换/主动技；消耗 meikai）。
-	# 各动作"2 次"语义：攒→gain×2 / 攻击→打 2 下 / 切换→连切 2 个英雄 /
-	#   即时主动→效果发动 2 次 / 攻击主动→打 2 下 / 防御→无额外效果（防仍是防）。
-	# 能量成本只扣一次、cap 也只计一次（成本是代价、翻倍是收益）。
-	var dbl: Array[bool] = [false, false]
-	for p in [0, 1]:
-		if get_status(p, active_index[p], "meikai", false):
-			dbl[p] = true
-			set_status(p, active_index[p], "meikai", false)
-
-	# Phase 0: 结算上回合延迟伤害 (h27 节制；直接扣，不再经节制 cap → "不再平滑")
+	# Phase 0: 结算上回合延迟伤害（道具妖火/藤蔓挂的债；直接扣）
 	for p in [0, 1]:
 		for s in range(hp[p].size()):
 			if pending_damage[p][s] > 0:
@@ -775,8 +724,6 @@ func resolve() -> Dictionary:
 		energy[p] -= maxi(0, _get_cost(p, a[p]) - int(item_mod(p, "cost_save", 0)) + int(item_mod(p, "cost_add", 0)))
 		if a[p] == ActionDef.Action.CHARGE:
 			var gain: int = ActionDef.BASE_ACTION_DEF[ActionDef.Action.CHARGE]["energy_gain"]
-			if dbl[p]:
-				gain *= 2   # 梅开二度：攒 ×2
 			gain = maxi(0, gain - int(item_mod(p, "charge_penalty", 0)))
 			_gain_energy(p, gain)
 			events.append({id = "charge_gain", player = p, amount = gain})
@@ -794,14 +741,7 @@ func resolve() -> Dictionary:
 			if int(item_mod(p, "no_switch", 0)) > 0:
 				events.append({id = "switch_locked", player = p})
 				continue
-			var from0: int = active_index[p]
 			_do_switch(p, events)
-			# 梅开二度：再切一次到另一个存活替补（避开刚下场的，连切 2 个不同英雄；无则止）
-			if dbl[p]:
-				for cand in living_reserves(p):
-					if cand != from0:
-						_perform_switch(p, active_index[p], cand, events)
-						break
 
 	# Phase 2.55: 打神鞭强制切换（forced_switch 由道具在 apply_pre 设·指向某存活替补槽）。
 	#   仅当该方未主动切换、且未被定身（no_switch）时触发；走 _perform_switch → 触发戌狗穷追。
@@ -810,14 +750,12 @@ func resolve() -> Dictionary:
 		if fs >= 0 and a[p] != ActionDef.Action.SWITCH and int(item_mod(p, "no_switch", 0)) == 0 and fs < hp[p].size() and hp[p][fs] > 0:
 			_perform_switch(p, active_index[p], fs, events)
 
-	# Phase 2.6: 即时型主动技执行（在切换之后 → 审判/太阳/三缄 命中对手 post-switch 出战位）
+	# Phase 2.6: 即时型主动技执行（在切换之后 → 命中对手 post-switch 出战位）
 	for p in [0, 1]:
 		if a[p] == ActionDef.ACTIVE:
 			var sk: HeroSkill = _skills[p][active_index[p]]
 			if sk != null and not sk.active_is_attack():
 				sk.execute_active(self, p, active_index[p])
-				if dbl[p]:   # 梅开二度：即时主动技效果发动 2 次
-					sk.execute_active(self, p, active_index[p])
 
 	# Phase 3+4: 同时独立结算（含道具伤害 hit·ADR-003 D3）。先把双方完整出伤 hit-list 对快照
 	# 算好（动作前道具 hit → 动作攻击 → 动作后道具 hit），再一起施加 → 保持 B-001/2/3 跨玩家同时。
@@ -837,7 +775,7 @@ func resolve() -> Dictionary:
 			var kind: int = a[p]
 			var pen: int = ActionDef.base_penetration(a[p])
 			var ksk: HeroSkill = _skills[p][aslot]
-			if ksk != null and not _is_silenced(p, aslot):
+			if ksk != null:
 				kind = ksk.override_attack_kind(a[p], self, p, aslot)
 				pen = ksk.attack_penetration(ActionDef.base_penetration(kind), a[p], self, p, aslot)
 			var ipen: int = int(item_mod(p, "atk_pen", -1))
@@ -865,36 +803,25 @@ func resolve() -> Dictionary:
 	# 施加：值已对快照算好 → 跨玩家同时；己方 hit-list 按序施加（动作前道具 → 动作 → 动作后道具）。
 	for p in [0, 1]:
 		for h in hitlists[p]:
-			var times: int = 2 if (dbl[p] and bool(h.get("action", false))) else 1
-			for _i in range(times):
-				var riders: Array = h.get("riders", [])
-				var dealt: int = _apply_damage(1 - p, int(h["damage"]), p, int(h["kind"]), int(h["pen"]), a[1 - p], events, riders)
-				if bool(h.get("active", false)):
-					var sk2: HeroSkill = _skills[p][active_index[p]]
-					if sk2 != null and sk2.active_is_attack():
-						sk2.on_active_attack_resolved(self, p, active_index[p], dealt)
+			var riders: Array = h.get("riders", [])
+			var dealt: int = _apply_damage(1 - p, int(h["damage"]), p, int(h["kind"]), int(h["pen"]), a[1 - p], events, riders)
+			if bool(h.get("active", false)):
+				var sk2: HeroSkill = _skills[p][active_index[p]]
+				if sk2 != null and sk2.active_is_attack():
+					sk2.on_active_attack_resolved(self, p, active_index[p], dealt)
 
 	# Phase 5: 死亡结算 + 强制切换 + 胜负
 	_resolve_deaths(a, events)
 
-	# Phase 5.5: 回合结算末 hook（连段 h09 / 蓄势 h25；沉默时跳过）
+	# Phase 5.5: 回合结算末 hook（on_resolve_end）
 	for p in [0, 1]:
 		var s: int = active_index[p]
 		if hp[p][s] > 0:
 			var sk: HeroSkill = _skills[p][s]
-			if sk != null and not _is_silenced(p, s):
+			if sk != null:
 				sk.on_resolve_end(self, p, s)
 
 	# Phase 6: cleanup
-	# 燃烧 duration tick（每回合 -1，归 0 移除）
-	for p in [0, 1]:
-		for s in range(hp[p].size()):
-			var bn: int = int(get_status(p, s, "burn", 0))
-			if bn > 0:
-				if bn <= 1:
-					statuses[p][s].erase("burn")
-				else:
-					statuses[p][s]["burn"] = bn - 1
 	# 遗物·Phase 6：每回合末 tick（产出/计数/充能；读 selected_action 判断本回合是否攻击）。
 	#   返回 false 的遗物移除（碎/耗尽）。在被动能量前结算，故遗物产能也享受不到/不影响被动。
 	for p in [0, 1]:
@@ -1015,24 +942,23 @@ func _calc_outgoing(player: int, action: int) -> int:
 	var slot: int = active_index[player]
 	var dmg := ActionDef.get_base_damage(action)
 	var skill: HeroSkill = _skills[player][slot]
-	if skill != null and not _is_silenced(player, slot):
+	if skill != null:
 		dmg = skill.modify_outgoing_damage(dmg, action, self, player, slot)
 	return _apply_team_outgoing(dmg, action, player, slot)
 
 
-## 团队层出伤修正：扫攻击方全队（含替补），让团队 buff 源生效（h03 渴血 / h28 契约）。
+## 团队层出伤修正：扫攻击方全队（含替补），让团队 buff 源生效（modify_team_outgoing_damage hook）。
 ## 基础攻击与攻击型主动技命中前都会过本管线。attacker_slot = 发起攻击的出战英雄槽。
 func _apply_team_outgoing(dmg: int, action: int, player: int, attacker_slot: int) -> int:
 	for s in range(heroes[player].size()):
 		var tsk: HeroSkill = _skills[player][s]
-		if tsk != null and not _is_silenced(player, s):
+		if tsk != null:
 			dmg = tsk.modify_team_outgoing_damage(dmg, action, self, player, attacker_slot, player, s)
 	return dmg
 
 
-## 伤害管线 (§D4)。已实现相位：防御门 → 受伤 hook(平减) → 护盾 → 落 HP。
-## 转移(h30) / 延迟(h27) / 穿透 / 易伤·月相 等相位待 Step 2.2c+ 接入。
-## 返回实际落在 HP 上的伤害（半点），供攻击型主动技回调（吞噬吸血）使用。
+## 伤害管线 (§D4)：防御门 → 中毒引爆 → 受伤 hook(平减) → 护盾 → 落 HP → on-hit 触发。
+## 返回实际落在 HP 上的伤害（半点），供攻击型主动技回调使用。
 func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_action: int, pen: int, def_action: int, events: Array, item_riders: Array = []) -> int:
 	var slot: int = active_index[target_player]
 
@@ -1076,11 +1002,10 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 			set_item_mod(target_player, "block_heal", 0)
 			_heal(target_player, slot, bh)
 		var dsk: HeroSkill = _skills[target_player][slot]
-		if dsk != null and not _is_silenced(target_player, slot):
+		if dsk != null:
 			dsk.on_block(self, target_player, slot, attacker_player, atk_action, raw)
 		return 0
 
-	# Stage B3: 易伤（燃烧 h32：受到攻击 +1.0）
 	var dmg := raw
 	# Stage B3a: 中毒引爆（命中时引爆全部毒层，每层 +0.5 = 1 半点，随后清空）
 	var poison: int = int(get_status(target_player, slot, "poison", 0))
@@ -1088,9 +1013,6 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		dmg += poison
 		statuses[target_player][slot].erase("poison")
 		events.append({id = "poison_detonate", player = target_player, layers = poison})
-	if int(get_status(target_player, slot, "burn", 0)) > 0:
-		dmg += ActionDef.HP_UNIT
-		events.append({id = "vulnerable", player = target_player})
 	# 猎物印记（易伤）：本回合下次受击 +N（消耗）
 	var marked: int = int(get_status(target_player, slot, "marked", 0))
 	if marked > 0:
@@ -1100,7 +1022,7 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 
 	# Stage B5: 受伤 hook（平减；沉默 h15 时跳过）
 	var skill: HeroSkill = _skills[target_player][slot]
-	if skill != null and not _is_silenced(target_player, slot):
+	if skill != null:
 		dmg = skill.modify_incoming_damage(dmg, atk_action, self, target_player, slot, attacker_player)
 	dmg = maxi(dmg, 0)
 
@@ -1110,14 +1032,6 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		shield[target_player][slot] -= absorbed
 		dmg -= absorbed
 		events.append({id = "shield_absorb", player = target_player, amount = absorbed})
-
-	# Stage B7: 后排参战转移 (h30 星星：替补分担一半)
-	if dmg > 0:
-		for s in range(heroes[target_player].size()):
-			if s != slot:
-				var bsk: HeroSkill = _skills[target_player][s]
-				if bsk != null:
-					dmg = bsk.on_ally_take_damage(dmg, slot, self, target_player, s)
 
 	# 巫毒娃娃：替身吃下这一次伤害（吸收上限 = 娃娃 HP，溢出穿过；挨一下即碎）
 	var decoy: int = int(get_status(target_player, slot, "decoy_hp", 0))
@@ -1150,7 +1064,7 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		dealt = dmg
 		events.append({id = "damage_taken", player = target_player, amount = dmg})
 		var dsk2: HeroSkill = _skills[target_player][slot]
-		if dsk2 != null and not _is_silenced(target_player, slot):
+		if dsk2 != null:
 			dsk2.on_self_damaged(self, target_player, slot, dealt, attacker_player)
 		if hp[target_player][slot] <= 0:
 			_killer[target_player][slot] = attacker_player
@@ -1159,15 +1073,15 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 	var aslot: int = active_index[attacker_player]
 	var atk_skill: HeroSkill = _skills[attacker_player][aslot]
 	var hc: int = 1
-	if atk_skill != null and not _is_silenced(attacker_player, aslot):
+	if atk_skill != null:
 		hc = maxi(1, atk_skill.hit_count(atk_action, self, attacker_player, aslot))
 	hc += int(item_mod(attacker_player, "extra_hits", 0))   # 双生咒符：本回合多触发 N 次 on-hit
 	for _h in range(hc):
-		if atk_skill != null and not _is_silenced(attacker_player, aslot):
+		if atk_skill != null:
 			atk_skill.on_deal_hit(self, attacker_player, aslot, target_player, slot, dealt, atk_action)
 		for s2 in range(heroes[attacker_player].size()):
 			var tsk: HeroSkill = _skills[attacker_player][s2]
-			if tsk != null and not _is_silenced(attacker_player, s2):
+			if tsk != null:
 				tsk.on_team_deal_hit(self, attacker_player, s2, aslot, target_player, slot, dealt)
 	# 道具骑乘（吸血鬼的獠牙/毒刺）：使用者本回合动作攻击命中（穿过防御门连接）→ 触发一次
 	for rider in item_riders:
@@ -1178,7 +1092,7 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 ## 死亡结算（§D8 基础版）：扫全场，新死亡触发 hook 链；出战位死且有替补 → 待玩家切换。
 ## 参数 a = 本回合双方动作（cleanup 前缓存，用于判定击杀者）。
 func _resolve_deaths(_a: Array[int], events: Array) -> void:
-	# 连锁死亡（§D8）：死亡 hook（殉情 h19 / 溢出 h29 等）可能造成新死亡 → 反复扫到稳定。
+	# 连锁死亡（§D8）：死亡 hook 可能造成新死亡 → 反复扫到稳定。
 	# guard 防无限连锁（如设计错误导致互杀循环）。
 	var guard := 0
 	var changed := true
@@ -1190,14 +1104,14 @@ func _resolve_deaths(_a: Array[int], events: Array) -> void:
 				if hp[p][slot] > 0 or _death_processed[p][slot]:
 					continue
 				var skill: HeroSkill = _skills[p][slot]
-				# 致死拦截（h06 蛇蜕重生；组件自管"每局1次"）
+				# 致死拦截（on_before_death hook：组件自管"每局1次"重生等）
 				if skill != null and skill.on_before_death(self, p, slot):
 					continue
 				_death_processed[p][slot] = true
 				changed = true
 				var overkill: int = maxi(-hp[p][slot], 0)
 				# 击杀者 on_kill：仅【直接攻击致死】触发（_killer 标记）。
-				# splash(h29)/AOE(h34)/殉情(h19)/延迟(h27)/处决(h33) 不归因 → 不触发 → 防连锁。
+				# 非直接攻击致死（道具延迟伤害等）不归因 → 不触发 → 防连锁。
 				var killer: int = _killer[p][slot]
 				if killer >= 0:
 					var ks: HeroSkill = _skills[killer][active_index[killer]]

@@ -742,7 +742,7 @@ func _refresh_action_affordance() -> void:
 			btn.disabled = not battle.can_use_active(PLAYER)
 		else:
 			var act: int = _btn_action(btn)
-			btn.disabled = battle.is_action_disabled(PLAYER, act) or not battle.can_afford(PLAYER, act)
+			btn.disabled = not battle.can_afford(PLAYER, act)
 	# 技能键能量消耗随出战英雄主动技动态变化（0 不显示）。
 	_set_cost_pips(btn_special, battle._get_cost(PLAYER, ACTIVE))
 	btn_confirm.disabled = false

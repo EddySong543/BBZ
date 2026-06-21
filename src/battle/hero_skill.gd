@@ -17,8 +17,8 @@ extends RefCounted
 ##   player / slot = 本组件所属英雄的位置；battle = 引擎实例（读写状态）。
 ##
 ## hook 全集按 12 生肖真实需求定，无投机抽象（部分 hook 现无人 override，留作扩展接口）。
-## 多数 hook 仅对【出战英雄】触发；团队级 hook（on_ally_take_damage 后排分担、
-##   契约扣血）会对含替补的全 3 槽扫描 —— 由引擎决定触发范围。
+## 多数 hook 仅对【出战英雄】触发；团队级 hook（on_team_deal_hit 等）
+##   会对含替补的全 3 槽扫描 —— 由引擎决定触发范围。
 
 
 # ============================================================
@@ -54,13 +54,6 @@ func modify_incoming_damage(dmg: int, _action: int, _battle: BattleCore, _player
 ## attacker_(player/slot) = 正在攻击的队友；self_(player/slot) = 本组件所属英雄。
 ## 当前 12 生肖无人 override，留作扩展接口（团队级伤害加成的范例 hook）。
 func modify_team_outgoing_damage(dmg: int, _action: int, _battle: BattleCore, _attacker_player: int, _attacker_slot: int, _self_player: int, _self_slot: int) -> int:
-	return dmg
-
-
-## 后排参战：出战队友受伤时，本英雄（在替补席）可重定向其伤害。
-## 返回【应留在该队友身上的伤害】（半点）；重定向到自身的部分由实现内写 battle。
-## 当前 12 生肖无人 override，留作扩展接口（替补分担出战队友伤害的范例 hook）。
-func on_ally_take_damage(dmg: int, _ally_slot: int, _battle: BattleCore, _player: int, _slot: int) -> int:
 	return dmg
 
 

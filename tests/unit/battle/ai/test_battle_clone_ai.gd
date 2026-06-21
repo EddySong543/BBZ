@@ -57,13 +57,13 @@ func test_clone_state_is_independent() -> void:
 	c.hp[0][0] = 999
 	c.energy[0] = 17
 	c.set_status(0, 0, "foo", 42)
-	c.link[0]["bar"] = 7
+	c.info_distortion[0]["bar"] = 7
 
 	# Assert：原局完全不受影响
 	assert_eq(b.hp[0][0], 8, "原局 hp 不随克隆改动（4HP=8 半点）")
 	assert_eq(b.energy[0], 6, "原局能量不随克隆改动")
 	assert_eq(int(b.get_status(0, 0, "foo", -1)), -1, "原局 status 不随克隆改动")
-	assert_false(b.link[0].has("bar"), "原局 link 不随克隆改动")
+	assert_false(b.info_distortion[0].has("bar"), "原局 info_distortion 不随克隆改动")
 
 
 # ---- clone：推演不污染原局 ----
@@ -90,24 +90,20 @@ func test_clone_resolve_does_not_mutate_original() -> void:
 	assert_eq(c.turn_number, turn_before + 1, "克隆体回合已推进")
 
 
-# ---- clone：rng 状态复制保真（概率技可复现）----
+# ---- clone：rng 状态复制保真（概率道具 / AI 推演可复现）----
 
-func test_clone_reproduces_stochastic_skill() -> void:
-	# Arrange：h13 孤注一掷（66% 翻倍，走 battle.rng）
-	var b := _battle2([["h13", 5], ["t01", 10], ["t02", 10]], [["t10", 10], ["t11", 10], ["t12", 10]])
+func test_clone_reproduces_rng_state() -> void:
+	# Arrange：推进原局 rng 到某状态（模拟战局已消耗若干随机数）
+	var b := _battle2([["h01", 5], ["t01", 10], ["t02", 10]], [["t10", 10], ["t11", 10], ["t12", 10]])
+	b.rng.randi()
 
-	# Act：从同一原局克隆两份，各自用相同动作结算
+	# Act：从同一原局克隆两份
 	var c1 := b.clone()
 	var c2 := b.clone()
-	c1.select_active(0)
-	c1.select_action(1, CHARGE)
-	c1.resolve()
-	c2.select_active(0)
-	c2.select_action(1, CHARGE)
-	c2.resolve()
 
-	# Assert：相同 rng 状态 + 相同动作 → 概率技结果一致
-	assert_eq(c1.hp[1][0], c2.hp[1][0], "克隆 rng 状态保真 → 概率技推演确定可复现")
+	# Assert：相同 rng 状态 → 两克隆下一个随机数一致
+	assert_eq(c1.rng.randi(), c2.rng.randi(),
+		"克隆 rng 状态保真 → 概率推演确定可复现")
 
 
 # ---- legal_actions：能量门 + 切换目标 ----

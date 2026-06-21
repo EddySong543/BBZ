@@ -13,7 +13,6 @@ const W_ALIVE := 600.0       # 每多存活 1 英雄
 const W_HP := 10.0           # 每半点 HP 差（1 HP = 2 半点 = 20 分）
 const W_SHIELD := 6.0        # 每半点护盾差
 const W_ACTIVE_HP := 4.0     # 出战位 HP 差额外加权（前线存活更重要）
-const W_BURN := 30.0         # 出战位燃烧（易伤 +1.0 / 禁回血）
 
 ## 能量边际递减：前 ENERGY_FULL_CAP 能（够一记大波）满价 W_ENERGY，
 ## 之后每点仅 W_ENERGY_EXTRA → 抑制 1-ply 短视下的"无意义屯能不出手"。
@@ -38,7 +37,6 @@ static func score(b: BattleCore, player: int, w: Dictionary = {}) -> float:
 	var w_hp: float = w.get("W_HP", W_HP)
 	var w_shield: float = w.get("W_SHIELD", W_SHIELD)
 	var w_active: float = w.get("W_ACTIVE_HP", W_ACTIVE_HP)
-	var w_burn: float = w.get("W_BURN", W_BURN)
 	var w_en: float = w.get("W_ENERGY", W_ENERGY)
 	var w_en_x: float = w.get("W_ENERGY_EXTRA", W_ENERGY_EXTRA)
 
@@ -48,12 +46,6 @@ static func score(b: BattleCore, player: int, w: Dictionary = {}) -> float:
 	s += _energy_value(b.energy[player], w_en, w_en_x) - _energy_value(b.energy[opp], w_en, w_en_x)
 	s += w_shield * float(_shield_sum(b, player) - _shield_sum(b, opp))
 	s += w_active * float(_active_hp(b, player) - _active_hp(b, opp))
-
-	# 燃烧：对手出战中烧 = 利好；自己出战中烧 = 不利
-	if int(b.get_status(opp, b.active_index[opp], "burn", 0)) > 0:
-		s += w_burn
-	if int(b.get_status(player, b.active_index[player], "burn", 0)) > 0:
-		s -= w_burn
 
 	return s
 

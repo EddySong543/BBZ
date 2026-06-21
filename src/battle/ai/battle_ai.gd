@@ -15,7 +15,7 @@ extends RefCounted
 
 const RM_ITERS_ROOT := 600    # 根节点 regret-matching 迭代（出抽样策略，要准）
 const RM_ITERS_INNER := 120   # 深层节点迭代（只取博弈值，近似即可）
-const STOCHASTIC_SAMPLES := 3 # 随机技（h13/h23）格的多采样次数 → 按期望值判断、去运气噪声（T3）
+const STOCHASTIC_SAMPLES := 3 # 随机道具（赌徒硬币/锦囊/命运骰子/疑兵）格的多采样次数 → 按期望值判断、去运气噪声（T3）
 ## 终局贴现（2026-06-18·B 选项）：只对【终局胜负】按"已推演步数"贴现——
 ## 立刻锁定的胜局 > 拖几回合才赢的同一胜局；同一败局拖得越晚越不糟。
 ## 仅作用于 ±W_WIN 终局值（远大于任何启发评估），故胜局恒压一切、只在"同为胜"时偏好更快那手；
@@ -144,7 +144,7 @@ func _eval(b: BattleCore, p: int) -> float:
 
 
 ## 提交 (我=ca, 对手=cb) 结算一回合后，从 player 视角的子局价值（递归 depth 层）。
-## 随机技（h13/h23）格：多次采样取均值 → 按期望值判断、去运气噪声（T3）。
+## 随机道具格：多次采样取均值 → 按期望值判断、去运气噪声（T3）。
 ## 仅对真消耗 rng 的格多采样（结算后比对 rng 状态检测）；确定性格 1 次即精确，零额外开销。
 func _value_after(b: BattleCore, player: int, opp: int, ca: Dictionary, cb: Dictionary, depth: int) -> float:
 	var first: Dictionary = _rollout_once(b, player, opp, ca, cb, depth)
@@ -211,7 +211,7 @@ func _shortlist(b: BattleCore, player: int) -> Array:
 	out.append({action = ActionDef.Action.CHARGE, target = -1})   # 攒恒合法
 	for a in [ActionDef.Action.ATTACK, ActionDef.Action.BIG_ATTACK,
 			ActionDef.Action.DEFEND, ActionDef.Action.BIG_DEFEND]:
-		if b.can_afford(player, a) and not b.is_action_disabled(player, a):
+		if b.can_afford(player, a):
 			out.append({action = a, target = -1})
 	if b.can_use_active(player):
 		out.append({action = ActionDef.ACTIVE, target = -1})
