@@ -39,6 +39,10 @@ Desktop.ini
 assets/font" *
 **/* && cp *
 
+# === Local sim / tooling scratch outputs (per-run, regenerated; never shipped) ===
+# run_sim.gd 写出的临时平衡/烟雾测试目录（out_btest / out_smoke14 / out_upgrade_ab / out_planab …）。
+/tools/sim/out_*/
+
 # === Claude Code Local ===
 .claude/settings.local.json
 .claude/docs/UPGRADE-PLAN.md
