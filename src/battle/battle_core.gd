@@ -22,6 +22,7 @@ const HP_UNIT := 2  # 必须与 ActionDef.HP_UNIT 一致
 ## 英雄机制数值（从引擎逻辑里的裸魔数提出来，集中可调）
 const LETHAL_GUARDIAN_CAP := 2   # 未羊致死救援每局上限（次）
 const CHONGZHUANG_DAMAGE := 1    # 午马登场冲撞 = 0.5 HP（半点）
+const SHUCHAO_CAP_PER_TURN := 3  # 黑暗子鼠 h13【鼠潮】每回合 combo→能量返还封顶 = 3 次 proc = 1.5 能（回路刹车·PvE 可解封顶·§6/§10）
 
 # Winner 常量（延续 v3 B-007 语义：UNDECIDED=-1 / DRAW=0 / P1=1 / P2=2）
 const WINNER_UNDECIDED := -1
@@ -44,6 +45,7 @@ var _switch_to: Array[int] = [-1, -1]               # SWITCH 动作的目标槽�
 var pending_death_switch: Array[bool] = [false, false]  # 出战阵亡待玩家选替补上场
 var _death_processed: Array = [[], []]              # 每槽位死亡 hook 是否已触发（防重复）
 var _dmg_dealt: Array[int] = [0, 0]                 # 本回合各方造成的实际伤害(半点)·通用记账
+var _shuchao_procs: Array[int] = [0, 0]             # 本回合各方已计入的 combo proc 数（鼠潮 h13·每回合封顶 SHUCHAO_CAP_PER_TURN）
 var _killer: Array = [[], []]                       # _killer[player][slot]=直接攻击致死该英雄的攻击方;-1=非攻击致死。on_kill 只对直接攻击触发(防 splash/AOE 连锁)
 var _last_action: Array[int] = [-1, -1]             # 上回合双方动作（传说级雪球·惯性件读取）
 
@@ -67,7 +69,7 @@ var _skills: Array = [[], []]             # _skills[player][slot]: HeroSkill 或
 ## 随实装逐个加入。swap 后此表与 v3 _HERO_SKILL_SCRIPTS 合并/替换。
 const _HERO_SKILL_SCRIPTS := {
 	"h01": preload("res://src/battle/skills/h01_dunshu.gd"),
-	"h02": preload("res://src/battle/skills/h02_panniu.gd"),
+	"h02": preload("res://src/battle/skills/h02_xiejin.gd"),
 	"h03": preload("res://src/battle/skills/h03_lianpu.gd"),
 	"h04": preload("res://src/battle/skills/h04_jiaotu.gd"),
 	"h05": preload("res://src/battle/skills/h05_liejia.gd"),
@@ -78,8 +80,9 @@ const _HERO_SKILL_SCRIPTS := {
 	"h10": preload("res://src/battle/skills/h10_jianyi.gd"),
 	"h11": preload("res://src/battle/skills/h11_zhuibu.gd"),
 	"h12": preload("res://src/battle/skills/h12_nafu.gd"),
-	"h13": preload("res://src/battle/skills/h13_fengku.gd"),
-	"h14": preload("res://src/battle/skills/h14_pichuan.gd"),
+	"h13": preload("res://src/battle/skills/h13_shuchao.gd"),
+	"h14": preload("res://src/battle/skills/h14_fanzhen.gd"),
+	"h15": preload("res://src/battle/skills/h15_xueyong.gd"),
 }
 
 ## 注册表整体校验只跑一次（静态守卫）。
@@ -115,6 +118,7 @@ func setup(p1_heroes: Array, p2_heroes: Array, seed_value: int = 0) -> void:
 	_switch_to = [-1, -1]
 	pending_death_switch = [false, false]
 	_dmg_dealt = [0, 0]
+	_shuchao_procs = [0, 0]
 	_last_action = [-1, -1]
 	items = [[], []]
 	item_uses = [[], []]
@@ -179,6 +183,24 @@ func _gain_energy(player: int, amount: int) -> void:
 		amount += sk.energy_gain_bonus(self, player, active_index[player])
 	energy[player] = mini(energy[player] + amount, ActionDef.MAX_ENERGY)
 
+
+## 黑暗子鼠 h13【鼠潮】：player 队触发一次 combo 效果时，引擎在该结算点调本函数。
+## 在场（含替补·存活）有鼠潮型英雄 → 团队能量 +其 combo_proc_energy()（走 _gain_energy·享囤鼠叠加），
+## 每回合封顶 SHUCHAO_CAP_PER_TURN 次（回路刹车）。无鼠潮 / 已达上限 = no-op。
+func _note_combo_proc(player: int) -> void:
+	if _shuchao_procs[player] >= SHUCHAO_CAP_PER_TURN:
+		return
+	var amt := 0
+	for s in range(heroes[player].size()):
+		if hp[player][s] > 0:
+			var sk2: HeroSkill = _skills[player][s]
+			if sk2 != null:
+				amt += sk2.combo_proc_energy()
+	if amt <= 0:
+		return
+	_shuchao_procs[player] += 1
+	_gain_energy(player, amt)
+
 func get_status(player: int, slot: int, key: String, default: Variant = null) -> Variant:
 	return statuses[player][slot].get(key, default)
 
@@ -223,21 +245,20 @@ func _get_cost(player: int, action: int) -> int:
 	return 0
 
 
-## 敌方出战英雄对本方施加的能量封印（半能·黑暗子鼠 h13【封窟】）。仅敌方【出战】英雄生效、下场即解。
-func _energy_lock_on(player: int) -> int:
-	var opp: int = 1 - player
-	var sk: HeroSkill = _skills[opp][active_index[opp]]
-	if sk != null:
-		return maxi(0, sk.enemy_energy_lock(self, opp, active_index[opp]))
-	return 0
-
-
-## 本方【可用】能量（半能）= 能量池 − 敌方封印（最低 0）。无敌方封窟时 == energy[player]（行为不变）。
+## 本方【可用】能量（半能）= 能量池（最低 0）。
 func usable_energy(player: int) -> int:
-	return maxi(0, energy[player] - _energy_lock_on(player))
+	return maxi(0, energy[player])
+
+
+## 出战英雄是否可用防/大防（黑暗寅虎 h15【血勇】= 不可）。下场即恢复（按出战英雄判定）。
+func _can_defend(player: int) -> bool:
+	var sk: HeroSkill = _skills[player][active_index[player]]
+	return sk == null or sk.can_defend()
 
 
 func can_afford(player: int, action: int) -> bool:
+	if action in ActionDef.DEFEND_ACTIONS and not _can_defend(player):
+		return false   # 血勇：嗜杀红温·防/大防不合法（单一收口，legal_actions/UI/AI 全走此）
 	return usable_energy(player) >= _get_cost(player, action)
 
 
@@ -626,6 +647,7 @@ func clone() -> BattleCore:
 	c.pending_death_switch = pending_death_switch.duplicate()
 	c._death_processed = _death_processed.duplicate(true)
 	c._dmg_dealt = _dmg_dealt.duplicate()
+	c._shuchao_procs = _shuchao_procs.duplicate()
 	c._last_action = _last_action.duplicate()
 	c._killer = _killer.duplicate(true)
 	c.items = items.duplicate(true)
@@ -699,6 +721,7 @@ func resolve() -> Dictionary:
 
 	var a: Array[int] = [selected_action[0], selected_action[1]]
 	_dmg_dealt = [0, 0]
+	_shuchao_procs = [0, 0]
 	for p in [0, 1]:
 		for s in range(_killer[p].size()):
 			_killer[p][s] = -1
@@ -939,36 +962,7 @@ func chongzhuang(attacker_player: int) -> void:
 		return
 	var ev: Array = []
 	_apply_damage(opp, CHONGZHUANG_DAMAGE, attacker_player, ActionDef.Action.ATTACK, ActionDef.Pen.PIERCE_BIGDEF, ActionDef.Action.CHARGE, ev)
-
-
-## 黑暗丑牛 h14【劈穿】：把溢出伤害劈穿到 victim 的"下一名"被迫登场英雄（= 最高血存活替补，
-## 与 choose_death_switch 补位规则一致 → 命中其真正顶上的英雄）。在 on_kill（死亡 while-loop 内）调用：
-## 若劈死该替补，外层 _resolve_deaths while-loop 照常连锁处理（§D8）。
-## 穿透击杀 = 无视防御门（替补无防御动作），但仍被其护甲层吸收、触发 on_self_damaged。
-## 不标记 _killer → 劈死的替补不触发 on_kill → 溢出不链式（只来自首次一斧）。
-func carry_overkill_to_next(victim_player: int, overkill: int) -> void:
-	if overkill <= 0:
-		return
-	var target := -1
-	var best_hp := 0
-	for s in range(hp[victim_player].size()):
-		if s != active_index[victim_player] and hp[victim_player][s] > best_hp:
-			best_hp = hp[victim_player][s]
-			target = s
-	if target < 0:
-		return   # 无存活替补（victim 团灭）→ 溢出无处可去
-	var dmg: int = overkill
-	if shield[victim_player][target] > 0:
-		var absorbed: int = mini(shield[victim_player][target], dmg)
-		shield[victim_player][target] -= absorbed
-		dmg -= absorbed
-	if dmg <= 0:
-		return
-	hp[victim_player][target] -= dmg
-	_dmg_dealt[1 - victim_player] += dmg
-	var sk: HeroSkill = _skills[victim_player][target]
-	if sk != null:
-		sk.on_self_damaged(self, victim_player, target, dmg, 1 - victim_player)
+	_note_combo_proc(attacker_player)   # 鼠潮：午马登场冲撞 = 一次 combo proc
 
 
 ## 找 player 替补席可用的致死救援守护者（未羊：is_lethal_guardian + 每局 < 2 次）；无则 -1。
@@ -1059,12 +1053,14 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		dmg += poison
 		statuses[target_player][slot].erase("poison")
 		events.append({id = "poison_detonate", player = target_player, layers = poison})
+		_note_combo_proc(attacker_player)   # 鼠潮：毒爆 = 一次 combo proc
 	# 猎物印记（易伤）：本回合下次受击 +N（消耗）
 	var marked: int = int(get_status(target_player, slot, "marked", 0))
 	if marked > 0:
 		dmg += marked
 		statuses[target_player][slot].erase("marked")
 		events.append({id = "marked_hit", player = target_player, amount = marked})
+		_note_combo_proc(attacker_player)   # 鼠潮：易伤消费 = 一次 combo proc
 
 	# Stage B5: 受伤 hook（平减；沉默 h15 时跳过）
 	var skill: HeroSkill = _skills[target_player][slot]

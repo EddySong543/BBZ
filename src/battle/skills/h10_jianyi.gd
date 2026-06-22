@@ -10,7 +10,10 @@ const CAP := 4
 
 func on_team_deal_hit(battle: BattleCore, player: int, slot: int, _attacker_slot: int, _target_player: int, _target_slot: int, _dealt: int) -> void:
 	var j: int = int(battle.get_status(player, slot, "jianqi", 0))
-	battle.set_status(player, slot, "jianqi", mini(CAP, j + 1))
+	if j >= CAP:
+		return   # 剑气已满 → 不再累积 → 不算 combo proc
+	battle.set_status(player, slot, "jianqi", j + 1)
+	battle._note_combo_proc(player)   # 鼠潮：攒剑意 = 一次 combo proc（虎双段 → 两次）
 
 
 func has_active() -> bool:

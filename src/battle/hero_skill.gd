@@ -141,12 +141,6 @@ func energy_gain_bonus(_battle: BattleCore, _player: int, _slot: int) -> int:
 	return 0
 
 
-## 本英雄（出战）对【敌方】施加的"能量封印"（半能）：敌方【可用】能量 = 能量池 − 此值（最低 0）。
-## 封印 = 锁住不可动用、不消耗 / 不入己池、本英雄下场即解。黑暗子鼠 h13【封窟】= 1（封 0.5 能）。
-func enemy_energy_lock(_battle: BattleCore, _player: int, _slot: int) -> int:
-	return 0
-
-
 ## 本英雄是否为"致死救援"守护者（替补席存活时，可替将死的出战队友顶伤上场）。未羊 = true。
 func is_lethal_guardian() -> bool:
 	return false
@@ -155,6 +149,21 @@ func is_lethal_guardian() -> bool:
 ## 免费切换次数上限（仅 has_free_switch()=true 时有意义）；-1 = 无限。午马当先 = -1（不限次）。
 func free_switch_cap() -> int:
 	return -1
+
+
+## 本英雄（出战时）是否可以使用「防 / 大防」。默认 true。
+## 黑暗寅虎 h15【血勇】= false（嗜杀红温·有进无退·彻底放弃防御）。
+## 引擎在 can_afford() 统一 gate：返 false 时防/大防变不合法（legal_actions 不列、UI 按钮禁用、AI 不选）。
+func can_defend() -> bool:
+	return true
+
+
+## 「鼠潮」型（黑暗子鼠 h13）：本英雄在场（含替补·存活）时，己方每触发一次 combo 效果
+## （毒爆 / 易伤 / 破甲 / 碎能 / 剑意 / 反震 / 冲撞 / 溢杀…），团队能量额外 +本值（半能）。
+## 引擎在每个 combo 结算点调 BattleCore._note_combo_proc() 累计（每回合封顶·见 SHUCHAO_CAP_PER_TURN）。
+## 默认 0（不产出）；黑暗子鼠 override 返回 1（= +0.5 能/proc）。这是"combo→能量"共享原语的产出端。
+func combo_proc_energy() -> int:
+	return 0
 
 
 # ============================================================

@@ -62,13 +62,25 @@ func test_h01_dunshu_adds_half_to_every_energy_gain() -> void:
 	assert_eq(b.energy[1], 8 + 4, "plain 对照 +4 半能")
 
 
-# ---- h02 丑牛 磐牛（防/大防挡下 → 反弹所挡 50% 真伤）----
+# ---- h02 丑牛 卸劲（挨打 → 其他存活队友各 +0.5HP 护盾·封顶 1.0HP·自己不获）----
 
-func test_h02_panniu_reflects_half_blocked_wave() -> void:
-	var b := _battle("h02", 7, 8)   # 牛 HP7 = 14 半点
-	_resolve(b, ActionDef.Action.DEFEND, ActionDef.Action.ATTACK)
-	assert_eq(b.hp[0][0], 14, "牛防住波，无伤")
-	assert_eq(b.hp[1][0], 10 - 1, "反弹所挡波 50% = 1 半点(0.5HP)真伤给攻击者(对手 plain HP5=10半)")
+func test_h02_xiejin_shields_allies_when_damaged() -> void:
+	# 丑牛(出战 HP7)攒(不防)挨对手波 → 两替补各 +1 半点(0.5HP)护盾；丑牛自己不获
+	var b := _battle_team(["h02", "test_p1_1", "test_p1_2"], 7, 8)
+	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.ATTACK)
+	assert_eq(b.hp[0][0], 14 - 2, "丑牛挨波 2 半点(没防=诱饵盾)")
+	assert_eq(b.shield[0][1], 1, "替补1 获 1 层护盾(1 半点=0.5HP)")
+	assert_eq(b.shield[0][2], 1, "替补2 获 1 层护盾")
+	assert_eq(b.shield[0][0], 0, "丑牛自己不获盾(卸给队友)")
+
+
+func test_h02_xiejin_shield_caps_per_ally() -> void:
+	# 连续两回合挨打 → 替补护盾封顶 2 半点(1.0HP)、不超
+	var b := _battle_team(["h02", "test_p1_1", "test_p1_2"], 7, 12)
+	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.ATTACK)
+	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.ATTACK)
+	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.ATTACK)
+	assert_eq(b.shield[0][1], 2, "三次挨打但替补护盾封顶 2 半点(1.0HP)")
 
 
 # ---- h03 寅虎 连扑（hit_count=2 → 队友 on-hit 翻倍：喂鸡剑气 ×2）----
