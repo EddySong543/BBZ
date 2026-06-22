@@ -86,6 +86,8 @@ const _HERO_SKILL_SCRIPTS := {
 	"h14": preload("res://src/battle/skills/h14_fanzhen.gd"),
 	"h15": preload("res://src/battle/skills/h15_xueyong.gd"),
 	"h16": preload("res://src/battle/skills/h16_jifeng.gd"),
+	"h17": preload("res://src/battle/skills/h17_bizhan.gd"),
+	"h18": preload("res://src/battle/skills/h18_chanrao.gd"),
 }
 
 ## 注册表整体校验只跑一次（静态守卫）。
@@ -260,9 +262,19 @@ func _can_defend(player: int) -> bool:
 	return sk == null or sk.can_defend()
 
 
+## player 能否【主动切换】：对手出战是"缠绕"英雄(黑暗巳蛇 h18·存活) → 不能（被缠住）。
+## 只锁主动切换；死亡换人/救援/道具强制切换走各自路径、不经此 gate。
+func _can_switch(player: int) -> bool:
+	var e: int = 1 - player
+	var sk: HeroSkill = _skills[e][active_index[e]]
+	return not (sk != null and hp[e][active_index[e]] > 0 and sk.locks_enemy_switch())
+
+
 func can_afford(player: int, action: int) -> bool:
 	if action in ActionDef.DEFEND_ACTIONS and not _can_defend(player):
 		return false   # 血勇：嗜杀红温·防/大防不合法（单一收口，legal_actions/UI/AI 全走此）
+	if action == ActionDef.Action.SWITCH and not _can_switch(player):
+		return false   # 缠绕：对手出战是暗蛇 → 切换不合法（legal_actions/select_switch/UI 全走此）
 	return usable_energy(player) >= _get_cost(player, action)
 
 
@@ -379,6 +391,23 @@ func double_uses_left(player: int) -> int:
 		if sk != null and sk.double_action_cap() > 0:
 			best = maxi(best, sk.double_action_cap() - int(get_status(player, s, "jifeng_uses", 0)))
 	return best
+
+
+## player 的出战英雄是否"逼战"型（黑暗辰龙 h17）且存活 → 对手不攻它就挨饿（UI/AI/resolve 用）。
+func _forces_enemy_attack(player: int) -> bool:
+	var s: int = active_index[player]
+	var sk: HeroSkill = _skills[player][s]
+	return sk != null and hp[player][s] > 0 and sk.forces_enemy_attack()
+
+
+## p 本回合的动作 act 是否"攻击"（波/大波 或 攻击型主动技）——逼战判定 + 通用。
+func _is_attack_action(p: int, act: int) -> bool:
+	if ActionDef.is_attack(act):
+		return true
+	if act == ActionDef.ACTIVE:
+		var sk: HeroSkill = _skills[p][active_index[p]]
+		return sk != null and sk.active_is_attack()
+	return false
 
 
 ## 切换"附加动作"开关（须先选好可双的主动作）。on=true 时校验 can_double。
@@ -949,7 +978,11 @@ func resolve() -> Dictionary:
 				kept_relics.append(relic)
 		relics[p] = kept_relics
 	# 被动能量 +1 能/回合（A2）：回合末结算 → 下回合选择时反映
+	# 逼战（h17 暗龙）：对手出战是逼战龙 + 本回合 p 没攻击它 → p 失去本回合被动 +1 能。
 	for p in [0, 1]:
+		if _forces_enemy_attack(1 - p) and not _is_attack_action(p, a[p]):
+			events.append({id = "bizhan_starve", player = p})
+			continue
 		_gain_energy(p, ActionDef.PASSIVE_ENERGY_GAIN)
 	_econ_after_resolve()
 	_last_action = [a[0], a[1]]
@@ -1020,6 +1053,8 @@ func can_free_switch(player: int) -> bool:
 func is_free_switch_target(player: int, target: int) -> bool:
 	if target < 0 or target >= hp[player].size() or target == active_index[player] or hp[player][target] <= 0:
 		return false
+	if not _can_switch(player):
+		return false   # 缠绕：暗蛇也锁午马的免费切换
 	return _grants_free_switch(player, active_index[player]) or _grants_free_switch(player, target)
 
 

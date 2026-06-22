@@ -636,10 +636,12 @@ func _on_reserve_frame_input(event: InputEvent, frame_idx: int) -> void:
 		_select_switch(frame_idx)             # armed → 选择（动画+高亮·待「结束」提交）
 
 
-## 该替补框是否可换人（索引 1/2、槽位有效、存活、非出战位）。
+## 该替补框是否可换人（索引 1/2、槽位有效、存活、非出战位；缠绕时全锁）。
 func _is_switchable_reserve(frame_idx: int) -> bool:
 	if frame_idx < 1 or frame_idx >= p1_frames.size():
 		return false
+	if not battle._can_switch(PLAYER):
+		return false   # 缠绕：对手出战是黑暗巳蛇 → 锁住主动切换
 	var slot: int = p1_frame_slots[frame_idx]
 	return slot >= 0 and slot != battle.active_index[PLAYER] and battle.hp[PLAYER][slot] > 0
 

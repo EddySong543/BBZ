@@ -7,6 +7,8 @@ extends GutTest
 ## h14【卸力反震】= 防御：防/大防挡下 → 反弹所挡 50% 真伤给攻击者（机制迁自磐牛·on_block 触发）。
 ## h15【血勇】= 进攻：出战时无法用防/大防（can_afford gate·下场即解）+ 波穿防（attack_penetration）。
 ## h16【疾风】= 节奏：在场(含替补)时，己方每局 2 次可把同一动作再做一次（波/大波/攒·技能/切换/防除外）。
+## h17【逼战】= 干扰：出战时，对手本回合若不攻击它，则失去本回合被动 +1 能。
+## h18【缠绕】= 状态：出战时，对手无法主动切换（含午马免费切换）；死亡换人不受影响。
 ##
 ## 经济基线（半能制）：1 能=2 半能；波 2 半能 / 大波 6 半能 / 大防 4 半能；HP 半点制(1.0=2 半点)。
 ## ============================================================================
@@ -224,3 +226,77 @@ func test_h16_jifeng_works_from_reserve() -> void:
 	b.resolve()
 	assert_eq(b.hp[1][0], 10 - 4, "双波 4 半点")
 	assert_eq(int(b.get_status(0, 1, "jifeng_uses", 0)), 1, "cap 计在暗兔(替补 slot1)")
+
+
+# ---- h17 黑暗辰龙 逼战（出战时对手本回合不攻击它 → 失去被动 +1 能）----
+
+func test_h17_bizhan_starves_non_attacker() -> void:
+	# 暗龙(P0 出战) vs P1；P1 攒(不攻龙) → P1 失去本回合被动 +2 半能
+	var b := _battle_team(["h17", "test_p0_1", "test_p0_2"], 6, 8)
+	b.select_action(0, ActionDef.Action.CHARGE)
+	b.select_action(1, ActionDef.Action.CHARGE)   # P1 攒·没攻击龙
+	b.resolve()
+	assert_eq(b.energy[1], 8 + 2, "P1 攒(不攻龙) → 只得攒 +2、被动被逼战吞掉(8→10)")
+
+
+func test_h17_bizhan_attacker_keeps_passive() -> void:
+	# P1 攻击龙(波) → 保留被动 +1 能
+	var b := _battle_team(["h17", "test_p0_1", "test_p0_2"], 6, 8)
+	b.select_action(0, ActionDef.Action.CHARGE)
+	b.select_action(1, ActionDef.Action.ATTACK)   # P1 攻龙
+	b.resolve()
+	assert_eq(b.energy[1], 8 - 2 + 2, "P1 攻龙 → 付波费 2、保留被动 +2(8→8)")
+	assert_eq(b.hp[0][0], 12 - 2, "暗龙(HP6=12半)挨 P1 波 2 半点")
+
+
+func test_h17_bizhan_only_while_active() -> void:
+	# 暗龙在替补、出战是 plain → 无逼战（对手不攻也不挨饿·下场即解）
+	var b := _battle_team(["test_p0_0", "h17", "test_p0_2"], 6, 8)
+	b.select_action(0, ActionDef.Action.CHARGE)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(b.energy[1], 8 + 2 + 2, "暗龙在替补 → 无逼战、P1 正常得攒+被动(8→12)")
+
+
+# ---- h18 黑暗巳蛇 缠绕（出战时对手无法主动切换；死亡换人不受影响）----
+
+func test_h18_chanrao_locks_enemy_switch() -> void:
+	# 暗蛇(P0 出战) → P1 无法主动切换；暗蛇自己一方不受影响
+	var b := _battle("h18", 4, 8)
+	assert_false(b.can_afford(1, ActionDef.Action.SWITCH), "对手出战是暗蛇 → P1 切换不合法")
+	assert_false(b.select_switch(1, 1), "P1 主动切换被拒")
+	var has_switch := false
+	for c in b.legal_actions(1):
+		if int(c["action"]) == ActionDef.Action.SWITCH:
+			has_switch = true
+	assert_false(has_switch, "P1 legal_actions 不含切换")
+	assert_true(b.can_afford(0, ActionDef.Action.SWITCH), "暗蛇自己一方不受缠绕、正常能切")
+
+
+func test_h18_chanrao_only_while_active() -> void:
+	# 暗蛇在 P0 替补、出战是 plain → P1 不被缠（能切）
+	var b := _battle_team(["test_p0_0", "h18", "test_p0_2"], 4, 8)
+	assert_true(b.can_afford(1, ActionDef.Action.SWITCH), "暗蛇在替补 → P1 能切换")
+
+
+func test_h18_chanrao_locks_free_switch() -> void:
+	# P0 出战午马(有免费切换) + P1 出战暗蛇 → 午马的免费切换也被缠绕锁住
+	var p1: Array = [_hero("h07", 5), _hero("test_a", 5), _hero("test_b", 5)]
+	var p2: Array = [_hero("h18", 4), _hero("test_c", 5), _hero("test_d", 5)]
+	var b := BattleCore.new()
+	b.setup(p1, p2, 555)
+	b.energy = [8, 8]
+	assert_false(b.is_free_switch_target(0, 1), "P1 暗蛇缠绕 → P0 午马免费切换被锁")
+	assert_false(b.can_afford(0, ActionDef.Action.SWITCH), "P0 普通切换也被锁")
+
+
+func test_h18_chanrao_allows_death_switch() -> void:
+	# 缠绕只锁【主动】切换；死亡换人（强制补位）不受影响
+	var p1: Array = [_hero("test_a", 5), _hero("test_b", 5), _hero("test_c", 5)]
+	var p2: Array = [_hero("h18", 4), _hero("test_d", 5), _hero("test_e", 5)]
+	var b := BattleCore.new()
+	b.setup(p1, p2, 555)
+	b.hp[0][0] = 0                      # P0 出战阵亡
+	b.pending_death_switch[0] = true
+	assert_true(b.execute_death_switch(0, 1), "缠绕下死亡换人仍可执行（强制补位不受锁）")
+	assert_eq(b.active_index[0], 1, "已补位")

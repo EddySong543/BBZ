@@ -173,6 +173,19 @@ func double_action_cap() -> int:
 	return 0
 
 
+## 「逼战」型（黑暗辰龙 h17）：本英雄【出战·存活】时，对手本回合若不攻击它（不出波/大波/攻击型主动技）
+## → 对手失去本回合被动 +1 能（龙威逼战）。引擎在 resolve 末被动能量发放处统一 gate。默认 false。
+func forces_enemy_attack() -> bool:
+	return false
+
+
+## 「缠绕」型（黑暗巳蛇 h18）：本英雄【出战·存活】时，对手【无法主动切换】（含午马免费切换）。
+## 死亡换人 / 致死救援 / 道具强制切换等"被动·触发"切换不受影响。引擎在 can_afford(SWITCH) +
+## is_free_switch_target 统一 gate（_can_switch）。默认 false。
+func locks_enemy_switch() -> bool:
+	return false
+
+
 # ============================================================
 # ② 主动技接口（默认无主动技；主动技英雄 override）
 # ============================================================
