@@ -6,6 +6,7 @@ extends GutTest
 ## h13【鼠潮】= 能量：在场(含替补)时，己方每触发一次 combo 效果 → 团队 +0.5 能（每回合封顶 1.5）。
 ## h14【卸力反震】= 防御：防/大防挡下 → 反弹所挡 50% 真伤给攻击者（机制迁自磐牛·on_block 触发）。
 ## h15【血勇】= 进攻：出战时无法用防/大防（can_afford gate·下场即解）+ 波穿防（attack_penetration）。
+## h16【疾风】= 节奏：在场(含替补)时，己方每局 2 次可把同一动作再做一次（波/大波/攒·技能/切换/防除外）。
 ##
 ## 经济基线（半能制）：1 能=2 半能；波 2 半能 / 大波 6 半能 / 大防 4 半能；HP 半点制(1.0=2 半点)。
 ## ============================================================================
@@ -146,3 +147,70 @@ func test_h15_xueyong_wave_blocked_by_big_defend() -> void:
 	b.select_action(1, ActionDef.Action.BIG_DEFEND)
 	b.resolve()
 	assert_eq(b.hp[1][0], 10, "血勇波被大防挡下：plain 无伤")
+
+
+# ---- h16 黑暗卯兔 疾风（每局 2 次把同一动作再做一次·波/大波/攒·技能/切换/防除外）----
+
+func test_h16_jifeng_double_wave_hits_twice() -> void:
+	# 暗兔(P0)波 + 附加 → 敌出战吃两次波(2×2=4 半点)；消耗 1 次疾风
+	var b := _battle("h16", 4, 8)
+	b.select_action(0, ActionDef.Action.ATTACK)
+	assert_true(b.can_double(0), "波可附加(在场暗兔 + 能量够双份)")
+	b.select_double(0, true)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(b.hp[1][0], 10 - 4, "双波：敌吃 2×2=4 半点(2.0HP)")
+	assert_eq(int(b.get_status(0, 0, "jifeng_uses", 0)), 1, "消耗 1 次疾风")
+
+
+func test_h16_jifeng_double_charge_doubles_gain() -> void:
+	# 暗兔攒 + 附加 → 攒两次(+2+2)，外加被动 +2 → 8→14
+	var b := _battle("h16", 4, 8)
+	b.select_action(0, ActionDef.Action.CHARGE)
+	b.select_double(0, true)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(b.energy[0], 14, "双攒：+2 +2 + 被动 +2 = +6 半能(8→14)")
+
+
+func test_h16_jifeng_cap_two_per_game() -> void:
+	# 每局上限 2 次：第 3 次不可附加
+	var b := _battle("h16", 4, 20)
+	for i in range(2):
+		b.select_action(0, ActionDef.Action.CHARGE)
+		assert_true(b.select_double(0, true), "前 2 次可附加")
+		b.select_action(1, ActionDef.Action.CHARGE)
+		b.resolve()
+	assert_eq(int(b.get_status(0, 0, "jifeng_uses", 0)), 2, "已用满 2 次")
+	b.select_action(0, ActionDef.Action.CHARGE)
+	assert_false(b.can_double(0), "第 3 次：cap 满 → 不可附加")
+	assert_false(b.select_double(0, true), "第 3 次附加被拒")
+
+
+func test_h16_jifeng_requires_dark_rabbit() -> void:
+	# 队中无暗兔 → 不可附加
+	var b := _battle("test_p0_0", 4, 8)
+	b.select_action(0, ActionDef.Action.ATTACK)
+	assert_false(b.can_double(0), "无暗兔 → 波不可附加")
+
+
+func test_h16_jifeng_defend_doubleable_switch_excluded() -> void:
+	# 防可附加(Eddy"防也算上"·虽二元挡无额外效果)；切换不可附加
+	var b := _battle("h16", 4, 8)
+	b.select_action(0, ActionDef.Action.DEFEND)
+	assert_true(b.can_double(0), "防可附加(防也算上)")
+	var b2 := _battle_team(["h16", "test_p1_1", "test_p1_2"], 4, 8)
+	b2.select_switch(0, 1)
+	assert_false(b2.can_double(0), "切换不可附加")
+
+
+func test_h16_jifeng_works_from_reserve() -> void:
+	# 暗兔在替补、出战是 plain → 仍可附加（在场含替补·cap 计在暗兔身上）
+	var b := _battle_team(["test_p0_0", "h16", "test_p0_2"], 4, 8)
+	b.select_action(0, ActionDef.Action.ATTACK)
+	assert_true(b.can_double(0), "暗兔在替补 → 出战队友仍可附加")
+	b.select_double(0, true)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(b.hp[1][0], 10 - 4, "双波 4 半点")
+	assert_eq(int(b.get_status(0, 1, "jifeng_uses", 0)), 1, "cap 计在暗兔(替补 slot1)")

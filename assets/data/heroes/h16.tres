@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="HeroData" format=3]
+
+[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_h16"]
+
+[resource]
+script = ExtResource("1_h16")
+hero_id = "h16"
+hero_name = "黑暗卯兔"
+max_hp = 4
+skill_description = "疾风"
+skill_detail = "黑暗卯兔在场时，己方每局 2 次可把同一个动作再做一次（波/大波/攒/防）。"
+portrait_path = "res://assets/sprites/heroes/h16/h16_portrait.png"
+sprite_frames_path = "res://assets/sprites/heroes/h16/h16_idle.tres"

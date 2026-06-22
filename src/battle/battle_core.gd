@@ -23,6 +23,7 @@ const HP_UNIT := 2  # 必须与 ActionDef.HP_UNIT 一致
 const LETHAL_GUARDIAN_CAP := 2   # 未羊致死救援每局上限（次）
 const CHONGZHUANG_DAMAGE := 1    # 午马登场冲撞 = 0.5 HP（半点）
 const SHUCHAO_CAP_PER_TURN := 3  # 黑暗子鼠 h13【鼠潮】每回合 combo→能量返还封顶 = 3 次 proc = 1.5 能（回路刹车·PvE 可解封顶·§6/§10）
+const DOUBLEABLE_ACTIONS := [ActionDef.Action.ATTACK, ActionDef.Action.BIG_ATTACK, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND, ActionDef.Action.BIG_DEFEND]  # 黑暗卯兔 h16【疾风】可"附加同种再做一次"的动作（仅技能/切换除外·防/大防可选但二元整体挡=无额外效果）
 
 # Winner 常量（延续 v3 B-007 语义：UNDECIDED=-1 / DRAW=0 / P1=1 / P2=2）
 const WINNER_UNDECIDED := -1
@@ -46,6 +47,7 @@ var pending_death_switch: Array[bool] = [false, false]  # 出战阵亡待玩家�
 var _death_processed: Array = [[], []]              # 每槽位死亡 hook 是否已触发（防重复）
 var _dmg_dealt: Array[int] = [0, 0]                 # 本回合各方造成的实际伤害(半点)·通用记账
 var _shuchao_procs: Array[int] = [0, 0]             # 本回合各方已计入的 combo proc 数（鼠潮 h13·每回合封顶 SHUCHAO_CAP_PER_TURN）
+var _double: Array[bool] = [false, false]           # 本回合各方是否"附加同种动作再做一次"（疾风 h16·选择阶段设·resolve 末重置）
 var _killer: Array = [[], []]                       # _killer[player][slot]=直接攻击致死该英雄的攻击方;-1=非攻击致死。on_kill 只对直接攻击触发(防 splash/AOE 连锁)
 var _last_action: Array[int] = [-1, -1]             # 上回合双方动作（传说级雪球·惯性件读取）
 
@@ -83,6 +85,7 @@ const _HERO_SKILL_SCRIPTS := {
 	"h13": preload("res://src/battle/skills/h13_shuchao.gd"),
 	"h14": preload("res://src/battle/skills/h14_fanzhen.gd"),
 	"h15": preload("res://src/battle/skills/h15_xueyong.gd"),
+	"h16": preload("res://src/battle/skills/h16_jifeng.gd"),
 }
 
 ## 注册表整体校验只跑一次（静态守卫）。
@@ -119,6 +122,7 @@ func setup(p1_heroes: Array, p2_heroes: Array, seed_value: int = 0) -> void:
 	pending_death_switch = [false, false]
 	_dmg_dealt = [0, 0]
 	_shuchao_procs = [0, 0]
+	_double = [false, false]
 	_last_action = [-1, -1]
 	items = [[], []]
 	item_uses = [[], []]
@@ -328,6 +332,39 @@ func execute_death_switch(player: int, slot: int) -> bool:
 
 func both_ready() -> bool:
 	return selected_action[0] >= 0 and selected_action[1] >= 0
+
+
+# === 黑暗卯兔 h16【疾风】：附加同种动作（resolve 内按 _double 处理）===
+
+## player 队是否有"疾风"型存活英雄（含替补）且其每局 cap 未满 → 返回该英雄槽，否则 -1。
+func _double_grantor(player: int) -> int:
+	for s in range(heroes[player].size()):
+		if hp[player][s] <= 0:
+			continue
+		var sk: HeroSkill = _skills[player][s]
+		if sk != null:
+			var cap: int = sk.double_action_cap()
+			if cap > 0 and int(get_status(player, s, "jifeng_uses", 0)) < cap:
+				return s
+	return -1
+
+
+## 当前已选动作能否"附加再做一次"：动作可双（波/大波/攒）+ 在场有疾风且 cap 未满 + 能量够付双份。
+func can_double(player: int) -> bool:
+	var a: int = selected_action[player]
+	if a < 0 or not (a in DOUBLEABLE_ACTIONS):
+		return false
+	if _double_grantor(player) < 0:
+		return false
+	return usable_energy(player) >= 2 * _get_cost(player, a)
+
+
+## 切换"附加动作"开关（须先选好可双的主动作）。on=true 时校验 can_double。
+func select_double(player: int, on: bool) -> bool:
+	if on and not can_double(player):
+		return false
+	_double[player] = on
+	return true
 
 
 # === 道具（ADR-003）===
@@ -643,6 +680,7 @@ func clone() -> BattleCore:
 	c.pending_damage = pending_damage.duplicate(true)
 	c.statuses = statuses.duplicate(true)
 	c.selected_action = selected_action.duplicate()
+	c._double = _double.duplicate()
 	c._switch_to = _switch_to.duplicate()
 	c.pending_death_switch = pending_death_switch.duplicate()
 	c._death_processed = _death_processed.duplicate(true)
@@ -773,6 +811,19 @@ func resolve() -> Dictionary:
 			if sk != null:
 				set_status(p, slot, "active_uses", int(get_status(p, slot, "active_uses", 0)) + 1)
 				events.append({id = "active_used", player = p, slot = slot})
+		# 疾风 h16：附加同种动作 —— 合法则付第二份能 + 计 cap；攒额外再产一次能（攻击的第二段在 Phase 3+4 挂 hitlist）
+		if _double[p]:
+			var g: int = _double_grantor(p)
+			if a[p] in DOUBLEABLE_ACTIONS and g >= 0:
+				set_status(p, g, "jifeng_uses", int(get_status(p, g, "jifeng_uses", 0)) + 1)
+				energy[p] -= _get_cost(p, a[p])   # 第二份按原始费用（不重复享道具折扣）
+				if a[p] == ActionDef.Action.CHARGE:
+					var gd: int = ActionDef.BASE_ACTION_DEF[ActionDef.Action.CHARGE]["energy_gain"]
+					_gain_energy(p, gd)
+					events.append({id = "charge_gain", player = p, amount = gd})
+				events.append({id = "jifeng_double", player = p, action = a[p]})
+			else:
+				_double[p] = false   # 非法双动作（不可双 / 无疾风）→ 撤销，Phase 3+4 不再 double
 
 	# Phase 2.5: 切换（甲时机，先于伤害）→ 攻击将打到换上来的新英雄
 	for p in [0, 1]:
@@ -821,7 +872,10 @@ func resolve() -> Dictionary:
 			if ipen >= 0:
 				pen = ipen
 			if dmg > 0:
-				hitlists[p].append({damage = dmg, kind = kind, pen = pen, riders = item_mod(p, "riders", []), action = true, active = false})
+				var hit := {damage = dmg, kind = kind, pen = pen, riders = item_mod(p, "riders", []), action = true, active = false}
+				hitlists[p].append(hit)
+				if _double[p] and a[p] in DOUBLEABLE_ACTIONS:   # 疾风：附加同一攻击再打一次
+					hitlists[p].append(hit.duplicate(true))
 		elif not nullified and a[p] == ActionDef.ACTIVE:
 			var sk: HeroSkill = _skills[p][aslot]
 			if sk != null and sk.active_is_attack():
@@ -884,6 +938,7 @@ func resolve() -> Dictionary:
 	}
 	selected_action = [-1, -1]
 	_switch_to = [-1, -1]
+	_double = [false, false]
 	item_uses = [[], []]
 	return result
 
