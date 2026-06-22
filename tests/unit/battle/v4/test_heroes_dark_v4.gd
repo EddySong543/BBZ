@@ -204,6 +204,16 @@ func test_h16_jifeng_defend_doubleable_switch_excluded() -> void:
 	assert_false(b2.can_double(0), "切换不可附加")
 
 
+func test_h16_jifeng_apply_choice_double() -> void:
+	# AI 路径：apply_choice 带 double=true → 内部 select_double → 双波
+	var b := _battle("h16", 4, 8)
+	b.apply_choice(0, {action = ActionDef.Action.ATTACK, target = -1, double = true})
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(b.hp[1][0], 10 - 4, "apply_choice double=true → 双波 4 半点")
+	assert_eq(int(b.get_status(0, 0, "jifeng_uses", 0)), 1, "消耗 1 次疾风")
+
+
 func test_h16_jifeng_works_from_reserve() -> void:
 	# 暗兔在替补、出战是 plain → 仍可附加（在场含替补·cap 计在暗兔身上）
 	var b := _battle_team(["test_p0_0", "h16", "test_p0_2"], 4, 8)

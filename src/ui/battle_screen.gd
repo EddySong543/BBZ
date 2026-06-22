@@ -125,6 +125,10 @@ var selected_action: int = -1
 var selected_switch: int = -1
 var selected_btn: Button = null
 
+# ---- 黑暗卯兔 h16【疾风】：附加同种动作开关（程序化创建·不入 .tscn）----
+var btn_jifeng: Button = null
+var _double_armed: bool = false   # 本回合是否 armed「附加同种动作」（确认时随动作一起 select_double 提交）
+
 # ---- 主动换人（任务5）：点替补框→框内显「切换」(armed)→再次点=选择(动画)→「结束」提交 ----
 var _armed_switch_frame: int = -1   # 当前 armed 的替补框索引（1 / 2），-1=无
 var _switch_selected: bool = false  # armed 框是否已进入"选择"态（高亮·待「结束」提交）
@@ -260,6 +264,29 @@ func _init_buttons() -> void:
 
 	action_btn_list = [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend, btn_special]
 
+	# 疾风开关：程序化创建（不动 .tscn）。节奏=紫底圆角；位置/尺寸运行期跟「结束」键上方（_refresh_jifeng）。
+	btn_jifeng = Button.new()
+	btn_jifeng.name = "BtnJifeng"
+	btn_jifeng.text = "疾风"
+	btn_jifeng.focus_mode = Control.FOCUS_NONE
+	btn_jifeng.clip_text = true
+	btn_jifeng.size = Vector2(120.0, 56.0)
+	var _jsb := StyleBoxFlat.new()
+	_jsb.bg_color = Color(0.45, 0.38, 0.62)        # 节奏=紫（与技能同维度色系）
+	_jsb.set_corner_radius_all(10)
+	_jsb.set_border_width_all(2)
+	_jsb.border_color = Color(0.85, 0.78, 0.5)     # 暖金边
+	for st in ["normal", "hover", "pressed", "disabled"]:
+		btn_jifeng.add_theme_stylebox_override(st, _jsb)
+	FontManager.apply_btn(btn_jifeng, 22)
+	btn_jifeng.add_theme_color_override("font_color", Color(0.98, 0.96, 0.9))
+	btn_jifeng.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.03, 0.85))
+	btn_jifeng.add_theme_constant_override("outline_size", 4)
+	_attach_button_juice(btn_jifeng)
+	btn_jifeng.pressed.connect(_on_jifeng_pressed)
+	btn_jifeng.visible = false
+	buttons_ctrl.add_child(btn_jifeng)
+
 	# P2 镜头推近：hover 动作按钮 → 舞台 dolly + 焦点左右偏置（攻击聚焦敌 / 防御聚焦己 / 技能居中）。
 	# 攒、结束不推近（不连接）。dir：+1 攻击焦点右(敌)、-1 防御焦点左(己)、0 技能居中。
 	for hb in [btn_attack, btn_big_attack]:
@@ -394,6 +421,7 @@ func _start_player_select() -> void:
 	selected_action = -1
 	selected_switch = -1
 	selected_btn = null
+	_double_armed = false
 	selected_item_slots.clear()   # M3：每回合重置「本回合使用」点选
 	status_label.visible = false   # 去除「选择你的动作」提示
 	event_label.visible = false
@@ -444,6 +472,7 @@ func _on_circle_pressed(action: int, btn: Button) -> void:
 	selected_btn = btn
 	_set_btn_selected(btn, true)
 	_set_confirm_active(true)
+	_refresh_jifeng()   # 新选的动作是否可双 → 更新疾风开关
 
 
 func _on_confirm_pressed() -> void:
@@ -458,6 +487,8 @@ func _on_confirm_pressed() -> void:
 		battle.select_switch(PLAYER, selected_switch)
 	elif selected_action >= 0:
 		battle.select_action(PLAYER, selected_action)
+		if _double_armed and battle.can_double(PLAYER):
+			battle.select_double(PLAYER, true)   # 疾风：附加同种动作随主动作一起盲选提交
 	else:
 		battle.select_action(PLAYER, A.CHARGE)
 
@@ -472,6 +503,7 @@ func _on_confirm_pressed() -> void:
 	selected_action = -1
 	selected_switch = -1
 	selected_btn = null
+	_double_armed = false
 	_reset_button_styles()
 	_set_confirm_active(false)   # 停止呼吸：已确认提交
 	await _resolve()
@@ -687,6 +719,8 @@ func _clear_action_selection_full() -> void:
 func _set_buttons_active(active: bool, dim_inactive: bool = true) -> void:
 	if not active:
 		_disarm_switch()   # 离开选择阶段 → 退出 armed「切换」态
+		if btn_jifeng:
+			btn_jifeng.visible = false   # 结算/过场：藏疾风开关
 	# 底部 UI 始终可见。
 	for btn in action_btn_list + [btn_confirm]:
 		btn.visible = true
@@ -792,6 +826,36 @@ func _refresh_action_affordance() -> void:
 	# 技能键能量消耗随出战英雄主动技动态变化（0 不显示）。
 	_set_cost_pips(btn_special, battle._get_cost(PLAYER, ACTIVE))
 	btn_confirm.disabled = false
+	_refresh_jifeng()
+
+
+## 疾风开关（点击 = arm/disarm「附加同种动作」）。仅当前已选动作可双时有效。
+func _on_jifeng_pressed() -> void:
+	if state != State.PLAYER_SELECT:
+		return
+	if not battle.can_double_action(PLAYER, selected_action):
+		return
+	_double_armed = not _double_armed
+	_refresh_jifeng()
+
+
+## 刷新疾风开关：在场有疾风英雄 → 显示（结束键正上方）；已选可双动作 → 可点；armed 态高亮 + 剩余次数。
+func _refresh_jifeng() -> void:
+	if btn_jifeng == null:
+		return
+	if not battle.has_double(PLAYER):
+		_double_armed = false
+		btn_jifeng.visible = false
+		return
+	btn_jifeng.visible = true
+	btn_jifeng.size = btn_confirm.size
+	btn_jifeng.position = btn_confirm.position + Vector2(0.0, -btn_confirm.size.y - 12.0)
+	var ok: bool = battle.can_double_action(PLAYER, selected_action)
+	if not ok:
+		_double_armed = false
+	btn_jifeng.disabled = not ok
+	btn_jifeng.text = "疾风×%d" % battle.double_uses_left(PLAYER)
+	_set_btn_selected(btn_jifeng, _double_armed)
 
 
 func _btn_action(btn: Button) -> int:

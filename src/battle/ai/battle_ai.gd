@@ -53,6 +53,15 @@ func choose_action(b: BattleCore, player: int) -> Dictionary:
 	var my: Array = b.legal_actions(player)
 	if my.is_empty():
 		return {action = ActionDef.Action.CHARGE, target = -1}
+	# 疾风 h16：为每个可双的动作追加"附加同种"变体（root-only·让博弈搜索决定值不值得花 double）。
+	if b.has_double(player):
+		var doubles: Array = []
+		for c in my:
+			if b.can_double_action(player, int(c["action"])):
+				var d: Dictionary = c.duplicate()
+				d["double"] = true
+				doubles.append(d)
+		my += doubles
 	if my.size() == 1:
 		return my[0]
 	var opp_acts: Array = b.legal_actions(opp)

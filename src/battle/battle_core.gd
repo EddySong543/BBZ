@@ -349,14 +349,36 @@ func _double_grantor(player: int) -> int:
 	return -1
 
 
-## 当前已选动作能否"附加再做一次"：动作可双（波/大波/攒）+ 在场有疾风且 cap 未满 + 能量够付双份。
-func can_double(player: int) -> bool:
-	var a: int = selected_action[player]
-	if a < 0 or not (a in DOUBLEABLE_ACTIONS):
+## 指定动作能否"附加再做一次"：动作可双（波/大波/攒/防/大防）+ 在场有疾风且 cap 未满 + 能量够付双份。
+## 取 action 参数（不读 selected_action）→ UI 在【提交前】可用本地待选动作校验。
+func can_double_action(player: int, action: int) -> bool:
+	if action < 0 or not (action in DOUBLEABLE_ACTIONS):
 		return false
 	if _double_grantor(player) < 0:
 		return false
-	return usable_energy(player) >= 2 * _get_cost(player, a)
+	return usable_energy(player) >= 2 * _get_cost(player, action)
+
+
+## 当前【已提交】动作能否附加（AI / 提交后用）。
+func can_double(player: int) -> bool:
+	return can_double_action(player, selected_action[player])
+
+
+## 本队是否有"疾风"型存活英雄且 cap 未满（UI 决定是否显示疾风开关）。
+func has_double(player: int) -> bool:
+	return _double_grantor(player) >= 0
+
+
+## 本队疾风剩余可用次数（UI 标签；无疾风英雄返 0）。
+func double_uses_left(player: int) -> int:
+	var best := 0
+	for s in range(heroes[player].size()):
+		if hp[player][s] <= 0:
+			continue
+		var sk: HeroSkill = _skills[player][s]
+		if sk != null and sk.double_action_cap() > 0:
+			best = maxi(best, sk.double_action_cap() - int(get_status(player, s, "jifeng_uses", 0)))
+	return best
 
 
 ## 切换"附加动作"开关（须先选好可双的主动作）。on=true 时校验 can_double。
@@ -732,7 +754,10 @@ func apply_choice(player: int, choice: Dictionary) -> bool:
 		return select_active(player)
 	if a == ActionDef.Action.SWITCH:
 		return select_switch(player, int(choice["target"]))
-	return select_action(player, a)
+	var ok: bool = select_action(player, a)
+	if ok and bool(choice.get("double", false)):
+		select_double(player, true)   # 疾风：附加同种动作（select_double 内部 can_double 校验·不合法则忽略）
+	return ok
 
 
 # === resolve ===
