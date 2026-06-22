@@ -24,6 +24,7 @@ const LETHAL_GUARDIAN_CAP := 2   # 未羊致死救援每局上限（次）
 const CHONGZHUANG_DAMAGE := 1    # 午马登场冲撞 = 0.5 HP（半点）
 const SHUCHAO_CAP_PER_TURN := 3  # 黑暗子鼠 h13【鼠潮】每回合 combo→能量返还封顶 = 3 次 proc = 1.5 能（回路刹车·PvE 可解封顶·§6/§10）
 const DOUBLEABLE_ACTIONS := [ActionDef.Action.ATTACK, ActionDef.Action.BIG_ATTACK, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND, ActionDef.Action.BIG_DEFEND]  # 黑暗卯兔 h16【疾风】可"附加同种再做一次"的动作（仅技能/切换除外·防/大防可选但二元整体挡=无额外效果）
+const DUANZUI_THRESHOLD := 2  # 黑暗未羊 h20【断罪】处决阈值 = 2 半点(1.0HP)：印记目标出战血量 ≤ 此值即斩（主旋钮）
 
 # Winner 常量（延续 v3 B-007 语义：UNDECIDED=-1 / DRAW=0 / P1=1 / P2=2）
 const WINNER_UNDECIDED := -1
@@ -88,6 +89,8 @@ const _HERO_SKILL_SCRIPTS := {
 	"h16": preload("res://src/battle/skills/h16_jifeng.gd"),
 	"h17": preload("res://src/battle/skills/h17_bizhan.gd"),
 	"h18": preload("res://src/battle/skills/h18_chanrao.gd"),
+	"h19": preload("res://src/battle/skills/h19_jianta.gd"),
+	"h20": preload("res://src/battle/skills/h20_duanzui.gd"),
 }
 
 ## 注册表整体校验只跑一次（静态守卫）。
@@ -957,6 +960,13 @@ func resolve() -> Dictionary:
 				if sk2 != null and sk2.active_is_attack():
 					sk2.on_active_attack_resolved(self, p, active_index[p], dealt)
 
+	# Phase 4.9: 断罪处决（h20 暗羊）——印记目标【出战】血量 ≤ 阈值 → 斩杀(置 0)，随后走正常死亡结算(还魂/救援仍可拦)。
+	for p in [0, 1]:
+		var ds: int = active_index[p]
+		if hp[p][ds] > 0 and hp[p][ds] <= DUANZUI_THRESHOLD and int(get_status(p, ds, "duanzui", 0)) > 0:
+			hp[p][ds] = 0
+			events.append({id = "duanzui_execute", player = p, slot = ds})
+
 	# Phase 5: 死亡结算 + 强制切换 + 胜负
 	_resolve_deaths(a, events)
 
@@ -1078,6 +1088,32 @@ func chongzhuang(attacker_player: int) -> void:
 	var ev: Array = []
 	_apply_damage(opp, CHONGZHUANG_DAMAGE, attacker_player, ActionDef.Action.ATTACK, ActionDef.Pen.PIERCE_BIGDEF, ActionDef.Action.CHARGE, ev)
 	_note_combo_proc(attacker_player)   # 鼠潮：午马登场冲撞 = 一次 combo proc
+
+
+## 把伤害"踏/溅"到 victim_player 最高血存活替补（午马 h19 践踏溢出用·shield 先吸·触发 on_self_damaged）。
+func _splash_to_reserve(victim_player: int, dmg: int) -> void:
+	if dmg <= 0:
+		return
+	var target := -1
+	var best_hp := 0
+	for s in range(hp[victim_player].size()):
+		if s != active_index[victim_player] and hp[victim_player][s] > best_hp:
+			best_hp = hp[victim_player][s]
+			target = s
+	if target < 0:
+		return   # 无存活替补 → 溢出无处可去
+	var d: int = dmg
+	if shield[victim_player][target] > 0:
+		var absorbed: int = mini(shield[victim_player][target], d)
+		shield[victim_player][target] -= absorbed
+		d -= absorbed
+	if d <= 0:
+		return
+	hp[victim_player][target] -= d
+	_dmg_dealt[1 - victim_player] += d
+	var sk: HeroSkill = _skills[victim_player][target]
+	if sk != null:
+		sk.on_self_damaged(self, victim_player, target, d, 1 - victim_player)
 
 
 ## 找 player 替补席可用的致死救援守护者（未羊：is_lethal_guardian + 每局 < 2 次）；无则 -1。

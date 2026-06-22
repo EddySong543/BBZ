@@ -9,6 +9,8 @@ extends GutTest
 ## h16【疾风】= 节奏：在场(含替补)时，己方每局 2 次可把同一动作再做一次（波/大波/攒·技能/切换/防除外）。
 ## h17【逼战】= 干扰：出战时，对手本回合若不攻击它，则失去本回合被动 +1 能。
 ## h18【缠绕】= 状态：出战时，对手无法主动切换（含午马免费切换）；死亡换人不受影响。
+## h19【践踏】= 进攻：攻击命中时，这一击超过 1.0HP 的溢出部分碾到敌方最高血替补（封顶 1.0）。
+## h20【圣剑·断罪】= 状态·主动技：烙「断罪印」，印记目标出战血量 ≤1.0HP 即斩杀（处决）。
 ##
 ## 经济基线（半能制）：1 能=2 半能；波 2 半能 / 大波 6 半能 / 大防 4 半能；HP 半点制(1.0=2 半点)。
 ## ============================================================================
@@ -300,3 +302,69 @@ func test_h18_chanrao_allows_death_switch() -> void:
 	b.pending_death_switch[0] = true
 	assert_true(b.execute_death_switch(0, 1), "缠绕下死亡换人仍可执行（强制补位不受锁）")
 	assert_eq(b.active_index[0], 1, "已补位")
+
+
+# ---- h19 黑暗午马 践踏（攻击溢出 1.0HP 的部分碾到最高血替补）----
+
+func test_h19_jianta_overflow_tramples_reserve() -> void:
+	# 午马大波(4半=2.0HP)命中 → 溢出(4−2=2半)碾到最高血替补
+	var b := _battle("h19", 5, 12)
+	b.select_action(0, ActionDef.Action.BIG_ATTACK)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(b.hp[1][0], 10 - 4, "大波 4 半点命中出战")
+	assert_eq(b.hp[1][1], 10 - 2, "溢出 2 半点(1.0HP)踏到最高血替补(slot1)")
+	assert_eq(b.hp[1][2], 10, "另一替补未受影响")
+
+
+func test_h19_jianta_normal_wave_no_trample() -> void:
+	# 波(2半=1.0HP)不溢出 → 替补不受踏
+	var b := _battle("h19", 5, 8)
+	b.select_action(0, ActionDef.Action.ATTACK)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(b.hp[1][0], 10 - 2, "波 2 半点命中出战")
+	assert_eq(b.hp[1][1], 10, "波不溢出(1.0≤1.0) → 替补不受踏")
+
+
+func test_h19_jianta_blocked_no_trample() -> void:
+	# 大防挡下大波(dealt=0) → on_deal_hit 不触发 → 不踏
+	var b := _battle("h19", 5, 12)
+	b.select_action(0, ActionDef.Action.BIG_ATTACK)
+	b.select_action(1, ActionDef.Action.BIG_DEFEND)
+	b.resolve()
+	assert_eq(b.hp[1][0], 10, "大防挡下大波·出战无伤")
+	assert_eq(b.hp[1][1], 10, "被挡 → 替补不受踏")
+
+
+# ---- h20 黑暗未羊 圣剑·断罪（主动技烙印·印记目标出战血量≤1.0HP 即处决）----
+
+func test_h20_duanzui_executes_marked_low_hp() -> void:
+	# 暗羊用断罪标记 P1 出战(残血 1.0HP=2半·≤阈值) → 同回合处决
+	var b := _battle("h20", 5, 8)
+	b.hp[1][0] = 2
+	assert_true(b.select_active(0), "断罪主动技可用(费2能·cap)")
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_true(b.hp[1][0] <= 0, "印记目标血量≤阈值(2半) → 被断罪处决")
+
+
+func test_h20_duanzui_spares_above_threshold() -> void:
+	# 印记目标血量 > 阈值 → 不处决、印记悬着
+	var b := _battle("h20", 5, 8)
+	b.hp[1][0] = 3   # 1.5HP·>阈值2
+	b.select_active(0)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(b.hp[1][0], 3, "血量>阈值 → 不处决")
+	assert_eq(int(b.get_status(1, 0, "duanzui", 0)), 1, "断罪印已烙上、悬着")
+
+
+func test_h20_duanzui_no_mark_no_execute() -> void:
+	# 没烙印记 → 残血也不处决
+	var b := _battle("h20", 5, 8)
+	b.hp[1][0] = 2
+	b.select_action(0, ActionDef.Action.CHARGE)   # 暗羊不用断罪
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(b.hp[1][0], 2, "没断罪印 → 残血也不处决")
