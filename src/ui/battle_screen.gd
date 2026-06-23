@@ -144,7 +144,7 @@ var _cd_home: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]  # 立绘原位（�
 var _shadow_home: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]  # 阴影原位（跟随角色水平位移用）
 var _prev_hp_disp: Array[float] = [-1.0, -1.0]   # 上次显示的出战 HP（检测变化 → 心条 flinch 脉冲）
 var _hitstop_token: int = 0   # hitstop(c) 防重叠：仅最后一次定格负责恢复 Engine.time_scale
-var _hover_count: int = 0     # P2：当前 hover 中的底部按钮数（>0 → 镜头推近舞台分层·UI 不动）
+var _act_focus_active: bool = false   # 执行动作期间镜头是否在偏焦（保留位·当前由 set_focus 直接驱动）
 var _world: Control = null    # P2b：立绘+阴影的 dolly 组（运行期归组·与背景同对焦点统一推近）
 
 
@@ -287,16 +287,8 @@ func _init_buttons() -> void:
 	btn_jifeng.visible = false
 	buttons_ctrl.add_child(btn_jifeng)
 
-	# P2 镜头推近：hover 动作按钮 → 舞台 dolly + 焦点左右偏置（攻击聚焦敌 / 防御聚焦己 / 技能居中）。
-	# 攒、结束不推近（不连接）。dir：+1 攻击焦点右(敌)、-1 防御焦点左(己)、0 技能居中。
-	for hb in [btn_attack, btn_big_attack]:
-		hb.mouse_entered.connect(_on_action_hover.bind(true, 1.0))
-		hb.mouse_exited.connect(_on_action_hover.bind(false, 1.0))
-	for hb in [btn_defend, btn_big_defend]:
-		hb.mouse_entered.connect(_on_action_hover.bind(true, -1.0))
-		hb.mouse_exited.connect(_on_action_hover.bind(false, -1.0))
-	btn_special.mouse_entered.connect(_on_action_hover.bind(true, 0.0))
-	btn_special.mouse_exited.connect(_on_action_hover.bind(false, 0.0))
+	# 镜头偏焦改由「执行动作」触发（见 _play_battle_anims）：波/大波→右聚敌、防/大防→左聚己、其余回正。
+	# 旧「hover 底部按钮 → 推近」已取消（2026-06-23 Eddy）。
 
 	# 动作按钮能量消耗金币数量（基础动作 cost 固定；攒/防=0 不显示）。技能键 cost 动态，随刷新更新。
 	_set_cost_pips(btn_attack, ActionDef.BASE_ACTION_DEF[A.ATTACK]["cost"])
@@ -317,16 +309,15 @@ func _init_buttons() -> void:
 	# 代码只负责把角色名文本随出战英雄更新（见 _update_hero_frames）。
 
 
-## P2：hover 动作按钮 → 镜头推近 + 焦点偏置（dir：+1 敌右 / -1 己左 / 0 居中）。计数避免按钮间
-## 移动闪烁；enter 时设方向（同帧 exit 旧 + enter 新 → 最终 target = 新按钮方向、_process 缓动无回落）。
-func _on_action_hover(entered: bool, dir: float) -> void:
-	if entered:
-		_hover_count += 1
-		stage.set_focus(true, dir)
-	else:
-		_hover_count = maxi(0, _hover_count - 1)
-		if _hover_count == 0:
-			stage.set_focus(false)
+## 执行动作时的镜头偏焦方向：波/大波→+1(右·聚敌) / 防/大防→−1(左·聚己) / 其余→0(不偏·回正)。
+func _focus_dir_for(action: int) -> float:
+	match action:
+		A.ATTACK, A.BIG_ATTACK:
+			return 1.0
+		A.DEFEND, A.BIG_DEFEND:
+			return -1.0
+		_:
+			return 0.0
 
 
 ## P2b：把双方立绘 + 阴影归入一个"世界组"容器，整体随镜头推近（与背景舞台同对焦点 → 统一移动）。
@@ -1237,9 +1228,9 @@ func _dbg_next_hero(player: int) -> void:
 ## A 方案 juice：出招（攻击前冲 / 防御蓝闪沉身 / 攒上浮黄闪）→ 命中（白闪 + 斩击光
 ## + 伤害数字 + 震屏）。dmg/dead 为 [p0, p1]。无逐帧 attack/hit 动画，全靠代码表现。
 func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array) -> void:
-	# 结算开始：解除 hover 对焦（镜头从"选招前倾"平滑交给大波前推；punch_zoom>focus_zoom → 净推近无顿挫）。
-	_hover_count = 0
-	stage.set_focus(false)
+	# 执行动作 → 镜头按玩家(P1)动作偏焦：波/大波 右聚敌、防/大防 左聚己、其余回正（取代旧 hover 触发）。
+	var fdir: float = _focus_dir_for(a0)
+	stage.set_focus(fdir != 0.0, fdir)
 	_act_juice(0, a0)
 	_act_juice(1, a1)
 	# P3：仅"大波且确实打中（伤害/击杀）"时镜头前推蓄势，峰值正好落在 0.45*phase 后的命中瞬间，
@@ -1265,6 +1256,7 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array) -> void:
 		p2_char_display.modulate = Color(0.35, 0.35, 0.35)
 
 	await get_tree().create_timer(action_phase_duration).timeout
+	stage.set_focus(false)   # 动作结束 → 镜头回正中
 
 
 ## P3：大波命中"前推顿帧"。上升时长 = 命中前的 await（0.45×phase）→ 峰值正好落在命中瞬间，
