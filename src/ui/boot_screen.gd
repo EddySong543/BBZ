@@ -46,6 +46,7 @@ var _title: TitleLogo
 
 
 func _ready() -> void:
+	GameSettings.load_and_apply()   # 应用持久化设置（窗口模式 / 音量 / 界面主色翻转）
 	PixelGlyphs.preheat()   # icon/王冠预热：缓存全量生成 + 字形可渲染冒烟检查
 	_mat = _wave.material as ShaderMaterial
 	_update_aspect()

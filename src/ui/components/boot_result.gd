@@ -15,6 +15,10 @@ static var last_blue_wins: bool = true
 ## 是否真的经历过一次 boot 对波（用于区分"默认值"与"真结局"，备用）。
 static var has_result: bool = false
 
+## 界面主色翻转开关（设置项·由 GameSettings 持久化、启动时设置）。
+## true = 红 / 蓝整体对调——过场色幕、菜单 / BP 波流背景全部按对调后的色相走。
+static var invert_colors: bool = false
+
 
 ## boot_screen 在分出胜负时调用，记下胜方色。
 static func set_winner(blue_wins: bool) -> void:
@@ -22,8 +26,13 @@ static func set_winner(blue_wins: bool) -> void:
 	has_result = true
 
 
+## 应用翻转后的"有效蓝胜"——颜色与方向都按它走（翻转开关在此并入）。
+static func effective_blue_wins() -> bool:
+	return last_blue_wins != invert_colors
+
+
 ## boot→menu 衔接用的"胜方色幕"颜色。
 ## 取该色波场亮浪头档位的色相（蓝/红），让 boot 末尾决堤色幕、菜单进场色幕、
 ## 与波流背景三者同色相连贯——无白闪硬切。色值对应 canvas_env_wave_flow 的 ramp 高档。
 static func dip_color() -> Color:
-	return Color(0.36, 0.64, 1.0) if last_blue_wins else Color(0.96, 0.37, 0.25)
+	return Color(0.36, 0.64, 1.0) if effective_blue_wins() else Color(0.96, 0.37, 0.25)

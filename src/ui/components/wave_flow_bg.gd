@@ -18,6 +18,7 @@ var _wave_t: float = 0.0
 
 
 func _ready() -> void:
+	add_to_group("wave_flow_bg")   # 设置面板翻转颜色时 call_group 实时刷新
 	_mat = material as ShaderMaterial
 	if _mat == null:
 		push_warning("wave_flow_bg: 缺少 ShaderMaterial")
@@ -28,9 +29,15 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_update_aspect)
 
 
-## 继承 boot 胜方色与推进方向。
+## 设置面板翻转「界面主色」时实时重应用（call_group("wave_flow_bg", "refresh_colors")）。
+func refresh_colors() -> void:
+	if _mat != null:
+		_apply_winner()
+
+
+## 继承 boot 胜方色与推进方向（含界面主色翻转开关）。
 func _apply_winner() -> void:
-	var blue: bool = BootResult.last_blue_wins
+	var blue: bool = BootResult.effective_blue_wins()
 	_mat.set_shader_parameter("use_blue", 1.0 if blue else 0.0)
 	_mat.set_shader_parameter("drift_dir", 1.0 if blue else -1.0)
 

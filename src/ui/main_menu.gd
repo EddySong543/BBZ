@@ -98,7 +98,7 @@ func _setup_settings() -> void:
 	_apply_plate(btn)
 	_set_btn_left_margin(btn, 36.0)   # 文字让出左侧 icon
 	_add_icon(btn, Rect2(14, 11, 32, 32), "gear")
-	btn.pressed.connect(_on_placeholder_pressed.bind("设置"))
+	btn.pressed.connect(_open_settings)
 	_attach_juice(btn)
 
 	# 退出游戏（PC 必备·2026-06-11 icon 排查补缺）
@@ -115,6 +115,15 @@ func _setup_settings() -> void:
 	var ver: Label = $UI/VersionLabel
 	FontManager.apply(ver, 14)
 	ver.add_theme_color_override("font_color", Color(0.74, 0.66, 0.52, 0.6))
+
+
+## 打开设置弹框（单例·已开则忽略）。改动即时应用 + 持久化，颜色翻转实时刷新背景。
+func _open_settings() -> void:
+	if has_node("SettingsPanel"):
+		return
+	var panel := SettingsPanel.new()
+	panel.name = "SettingsPanel"
+	add_child(panel)
 
 
 ## 三牌阵：匹配对战接真实流程，故事/爬塔占位。悬停金框+放大在 ModeCard 内。
