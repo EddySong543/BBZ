@@ -58,7 +58,23 @@ func _ready() -> void:
 	FontManager.apply(_coming_soon, 40)
 	_coming_soon.add_theme_color_override("font_color", CREAM)
 	_coming_soon.modulate.a = 0.0
+	# 远征卡山脊母题跟随背景对波色：蓝胜=冷夜版 / 红胜=暖日版。借背景同款广播组，
+	# 设置面板翻转「界面主色」时（call_group("wave_flow_bg", "refresh_colors")）一并刷新。
+	add_to_group("wave_flow_bg")
+	_refresh_tower_warm()
 	_play_intro()
+
+
+## 远征卡冷暖随 boot 胜方色：蓝胜→冷夜(warm 0)、红胜→暖日(warm 1)。
+func _refresh_tower_warm() -> void:
+	var tower := $UI/ModeTower as ModeCard
+	if tower != null:
+		tower.set_art_warm(0.0 if BootResult.effective_blue_wins() else 1.0)
+
+
+## 设置面板翻转界面主色时由 call_group("wave_flow_bg", "refresh_colors") 触发（与背景同步）。
+func refresh_colors() -> void:
+	_refresh_tower_warm()
 
 
 # ============================================================

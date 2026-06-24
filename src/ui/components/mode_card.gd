@@ -12,6 +12,8 @@ extends Button
 
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")
 const WAVE_CLASH_SHADER := preload("res://assets/shaders/wave_clash.gdshader")
+const CAMPFIRE_SHADER := preload("res://assets/shaders/canvas_ui_campfire.gdshader")
+const RIDGES_SHADER := preload("res://assets/shaders/canvas_ui_mountain_ridges.gdshader")
 const ROUNDED_FILL_SHADER := preload("res://assets/shaders/canvas_ui_rounded_fill.gdshader")
 const SOFT_SHADOW_SHADER := preload("res://assets/shaders/canvas_ui_soft_shadow.gdshader")
 
@@ -65,9 +67,11 @@ const EMBLEM_COL := Color(0.86, 0.76, 0.58, 0.85)
 		if _emblem:
 			_emblem.text = v
 @export var use_crown: bool = false
-## 牌面美术 = 活的蓝红对波（boot wave_clash 同 shader 低速常燃·匹配对战卡专属）。
-## 与静态贴图美术互斥；故事/爬塔卡走贴图槽（美术就绪后替换纹章）。
-@export var art_wave_clash: bool = false
+## 牌面程序美术母题（全 shader 生成·零贴图·三卡动效语言统一·2026-06-24 B 路线）：
+##   WAVE_CLASH 活的蓝红对波（匹配卡）/ CAMPFIRE 炉火夜话暖篝火（故事卡）/
+##   RIDGES 登天关冷山脊纵深（远征卡）。母题层垫在框线之下、名牌带文字加描边压住保可读。
+enum ArtKind { NONE, WAVE_CLASH, CAMPFIRE, RIDGES }
+@export var art_kind: ArtKind = ArtKind.NONE
 @export var title_font_size: int = 32
 ## 悬停/焦点放大倍率（高亮+放大=悬停专属效果）。
 @export_range(1.0, 1.2) var hover_grow: float = 1.05
@@ -86,6 +90,7 @@ var _art_phase_l: float = 0.0
 var _art_phase_r: float = 0.37       # 错相起步：左右波不同步更像两军各自涌
 var _art_time: float = 0.0
 var _art_speed: float = 1.0          # 对波速率倍率（匹配中"临战升温"渐升至 READY 档）
+var _art_warm: float = 0.0           # 山脊母题冷暖（0=冷夜配蓝背景 / 1=暖日配红背景·main_menu 据胜方色设）
 var _ready_tw: Tween                 # 升温/回落渐变
 var _frame: ColorRect
 var _frame_mat: ShaderMaterial
@@ -152,20 +157,36 @@ func _build() -> void:
 	_fill_mat = ShaderMaterial.new()
 	_fill_mat.shader = ROUNDED_FILL_SHADER
 	_fill.material = _fill_mat
-	# 对波美术层：boot wave_clash 同 shader，低速"常燃"参数（无大波推进/无爆发，
-	# 仅双侧小波涌入 + 中央僵持微光柱）——主菜单里的一张活的对局预告。
-	if art_wave_clash and not Engine.is_editor_hint():
+	# 程序美术母题层（框线之下·名牌带之上）。三卡同走 shader 语言、零贴图。
+	# WAVE_CLASH=低速常燃对波（无大波推进/无爆发，双侧小波涌入 + 中央僵持微光柱）；
+	# CAMPFIRE=暗暖炉火 + 上升火星 + 呼吸；RIDGES=冷色多层山脊纵深 + 视差 + 山谷雾。
+	if art_kind != ArtKind.NONE and not Engine.is_editor_hint():
 		_art = _rect(Color.WHITE)
 		_art_mat = ShaderMaterial.new()
-		_art_mat.shader = WAVE_CLASH_SHADER
-		_art_mat.set_shader_parameter("clash_pos", 0.5)
-		_art_mat.set_shader_parameter("cells_x", 48.0)
-		_art_mat.set_shader_parameter("intensity", 0.85)
-		_art_mat.set_shader_parameter("pulse_amp", 0.0)
-		_art_mat.set_shader_parameter("center_amp", 0.30)
-		_art_mat.set_shader_parameter("wave_amp", 0.42)
-		_art_mat.set_shader_parameter("levels", 40)
-		_art_mat.set_shader_parameter("dither_amt", 1.0)
+		match art_kind:
+			ArtKind.WAVE_CLASH:
+				_art_mat.shader = WAVE_CLASH_SHADER
+				_art_mat.set_shader_parameter("clash_pos", 0.5)
+				_art_mat.set_shader_parameter("cells_x", 48.0)
+				_art_mat.set_shader_parameter("intensity", 0.85)
+				_art_mat.set_shader_parameter("pulse_amp", 0.0)
+				_art_mat.set_shader_parameter("center_amp", 0.30)
+				_art_mat.set_shader_parameter("wave_amp", 0.42)
+				_art_mat.set_shader_parameter("levels", 40)
+				_art_mat.set_shader_parameter("dither_amt", 1.0)
+			ArtKind.CAMPFIRE:
+				_art_mat.shader = CAMPFIRE_SHADER
+				_art_mat.set_shader_parameter("cells_x", 54.0)
+				_art_mat.set_shader_parameter("intensity", 1.0)
+				_art_mat.set_shader_parameter("levels", 40)   # 光晕过渡更细 → banding 更弱
+				_art_mat.set_shader_parameter("dither_amt", 1.0)
+			ArtKind.RIDGES:
+				_art_mat.shader = RIDGES_SHADER
+				_art_mat.set_shader_parameter("cells_x", 54.0)
+				_art_mat.set_shader_parameter("intensity", 1.0)
+				_art_mat.set_shader_parameter("levels", 32)
+				_art_mat.set_shader_parameter("dither_amt", 1.0)
+				_art_mat.set_shader_parameter("warm", _art_warm)
 		_art.material = _art_mat
 	_frame = _rect(Color.WHITE)
 	_frame_mat = ShaderMaterial.new()
@@ -361,19 +382,32 @@ func _apply_palette() -> void:
 func _process(delta: float) -> void:
 	if _art_mat == null:
 		return
-	_art_phase_l += delta * 0.085 * _art_speed
-	_art_phase_r += delta * 0.097 * _art_speed
-	_art_time += delta * 1.2 * _art_speed
-	_art_mat.set_shader_parameter("phase_l", _art_phase_l)
-	_art_mat.set_shader_parameter("phase_r", _art_phase_r)
-	_art_mat.set_shader_parameter("wave_time", _art_time)
+	if art_kind == ArtKind.WAVE_CLASH:
+		_art_phase_l += delta * 0.085 * _art_speed
+		_art_phase_r += delta * 0.097 * _art_speed
+		_art_time += delta * 1.2 * _art_speed
+		_art_mat.set_shader_parameter("phase_l", _art_phase_l)
+		_art_mat.set_shader_parameter("phase_r", _art_phase_r)
+		_art_mat.set_shader_parameter("wave_time", _art_time)
+	else:
+		# 篝火/山脊：单一 anim_time 驱动（火焰演化/火星上升/呼吸 与 山脊视差/雾气漂移同源）
+		_art_time += delta
+		_art_mat.set_shader_parameter("anim_time", _art_time)
+
+
+## 山脊母题冷暖切换（0=冷夜配蓝背景 / 1=暖日配红背景）。main_menu 据 boot 胜方色调用，
+## 设置面板翻转界面主色时也会重调，使远征卡始终与背景对波色协调。仅 RIDGES 母题生效。
+func set_art_warm(w: float) -> void:
+	_art_warm = w
+	if _art_mat != null and art_kind == ArtKind.RIDGES:
+		_art_mat.set_shader_parameter("warm", w)
 
 
 ## 临战升温（匹配中状态·2026-06-12 取代翻面盖牌——把全场最活的卡翻成静态王冠=出戏）：
 ## on=波速渐升 ×3 + 中央僵持光柱上探 + 整卡亮度微升 + 金框常驻 ——"两军开始集结"；
 ## off=各参数缓落回常燃档。文案切换由调用方（main_menu）负责。
 func set_battle_ready(on: bool) -> void:
-	if _art_mat == null:
+	if _art_mat == null or art_kind != ArtKind.WAVE_CLASH:
 		return
 	_gold_locked = on
 	# 升温期间抑制悬停缩放（金框已常驻·放大会盖住下方取消钮）：归位并复位 hot 态
@@ -490,7 +524,7 @@ func found_flash() -> void:
 	_stop_back_anims()
 	if _ready_tw and _ready_tw.is_valid():
 		_ready_tw.kill()
-	if _art_mat:
+	if _art_mat and art_kind == ArtKind.WAVE_CLASH:
 		var t := create_tween().set_parallel(true)
 		t.tween_method(
 			func(v: float) -> void: _art_mat.set_shader_parameter("hit_flash", v),

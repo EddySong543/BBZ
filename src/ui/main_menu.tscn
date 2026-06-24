@@ -99,7 +99,7 @@ script = ExtResource("3_modecard")
 card_title = "故事模式"
 card_subtitle = "英雄列传"
 card_caption = "过去"
-emblem_char = "卷"
+art_kind = 2
 
 [node name="ModeMatch" type="Button" parent="UI"]
 layout_mode = 0
@@ -112,7 +112,7 @@ card_title = "匹配对战"
 card_subtitle = "1v1 同时盲选对决"
 card_caption = "现在"
 use_crown = true
-art_wave_clash = true
+art_kind = 1
 title_font_size = 40
 
 [node name="ModeTower" type="Button" parent="UI"]
@@ -125,7 +125,7 @@ script = ExtResource("3_modecard")
 card_title = "远征"
 card_subtitle = "单人闯关挑战"
 card_caption = "未来"
-emblem_char = "征"
+art_kind = 3
 
 [node name="NavHeroes" type="Button" parent="UI"]
 layout_mode = 0
