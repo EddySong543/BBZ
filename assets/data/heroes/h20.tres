@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="HeroData" format=3]
+
+[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_h20"]
+
+[resource]
+script = ExtResource("1_h20")
+hero_id = "h20"
+hero_name = "黑暗未羊"
+max_hp = 5
+skill_description = "断罪"
+skill_detail = "黑暗未羊主动挥圣剑给敌方出战烙下『断罪印』（占动作·费 2 能·每局 2 次）：被烙印者出战时血量 ≤ 1.0HP 即被斩杀（处决）。印记跟身不消，换下场可暂避、换回来又悬着。"
+portrait_path = "res://assets/sprites/heroes/h20/h20_portrait.png"
+sprite_frames_path = "res://assets/sprites/heroes/h20/h20_idle.tres"

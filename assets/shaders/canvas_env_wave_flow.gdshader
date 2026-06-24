@@ -32,6 +32,16 @@ uniform int levels : hint_range(8, 96) = 40;
 uniform float dither_amt : hint_range(0.0, 2.0) = 1.0;
 uniform float use_blue : hint_range(0.0, 1.0) = 1.0;    // 1 = 蓝 / 0 = 红（boot 胜方）
 
+// ── 降疲劳 · B「平息动效」+ E「静息区」（2026-06-24，由 wave_flow_bg.gd 驱动）─────
+// 默认全关（breath=0 / rest_enable=0）→ 与并入前完全一致；驱动脚本按 @export 旋钮开启。
+uniform float breath = 0.0;                              // 【B】振幅缓慢呼吸（脚本喂 sin 值，动而不躁）
+uniform float rest_enable = 0.0;                         // 【E】0 关 / 1 开
+uniform vec2  rest_center = vec2(0.5, 0.47);            // 【E】静息区中心（UV·对准三卡区）
+uniform vec2  rest_size   = vec2(0.40, 0.33);          // 【E】椭圆半径（UV）
+uniform float rest_soft : hint_range(0.02, 1.0) = 0.55; // 【E】边缘羽化（越大越柔·越不像盖板）
+uniform float rest_motion : hint_range(0.0, 1.0) = 0.25;// 【E】区内保留多少波振幅（0=静止·1=满）
+uniform float rest_smooth : hint_range(0.0, 1.0) = 0.40;// 【E】区内保留多少颗粒/抖动（0=玻璃滑·1=满）
+
 const int WAVE_COUNT = 4;                               // 同时在屏的波列道数
 
 // Bayer 4x4 有序抖动矩阵（值 0..15，用于档位边界棋盘交错）——与 boot 一致
@@ -95,15 +105,27 @@ float wave_field(float x) {
 	return acc;
 }
 
-// 每格中心算亮度 L (0~1)
-float energy(vec2 cuv, vec2 ci) {
+// 【E】区外 = 1 / 区内 = 0（带羽化）。rest_enable=0 时恒为 1（= 并入前，无影响）。
+float rest_outside(vec2 uv) {
+	if (rest_enable < 0.5) return 1.0;
+	vec2 d = (uv - rest_center) / max(rest_size, vec2(0.001));
+	float r = length(d);                        // 1.0 在椭圆边界
+	return smoothstep(1.0 - rest_soft, 1.0, r); // 内 0 → 外 1
+}
+
+// 每格中心算亮度 L (0~1)。outf = rest_outside（区内压振幅 + 压颗粒）。
+float energy(vec2 cuv, vec2 ci, float outf) {
 	// 2D 格点 hash 颗粒（与 boot 一致：随机点而非水平长条）
 	float cell_hash = fract(sin(dot(ci, vec2(12.9898, 78.233))) * 43758.5453);
-	float L_base = base_level + (cell_hash - 0.5) * 0.05;
+	float grain = cell_hash - 0.5;
+	float grain_scale = mix(rest_smooth, 1.0, outf);            // 【E】区内压颗粒
+	float L_base = base_level + grain * 0.05 * grain_scale;
 	// 纵向振幅调制：sin 波纹起伏 + 格点颗粒
-	float y_amp = 0.80 + sin(cuv.y * 12.0 + wave_time) * 0.18 + (cell_hash - 0.5) * 0.30;
+	float y_amp = 0.80 + sin(cuv.y * 12.0 + wave_time) * 0.18 + grain * 0.30 * grain_scale;
 	float w = wave_field(cuv.x);
-	float L = L_base + w * wave_amp * y_amp;
+	float amp = wave_amp * (1.0 + breath);                     // 【B】呼吸
+	amp *= mix(rest_motion, 1.0, outf);                        // 【E】区内压振幅
+	float L = L_base + w * amp * y_amp;
 	return clamp(L * intensity, 0.0, 0.9999);
 }
 
@@ -112,13 +134,16 @@ void fragment() {
 	vec2 ci = floor(UV * grid);
 	vec2 cuv = (ci + 0.5) / grid;
 
-	float L = energy(cuv, ci);
+	float outf = rest_outside(cuv);
+	float L = energy(cuv, ci, outf);
 
 	// Bayer 抖动后量化：档位边界棋盘交错（复古像素渐变）——与 boot 一致
+	// （区内同步压抖动幅度，避免静息区里还有棋盘颗粒）
 	int bx = int(mod(ci.x, 4.0));
 	int by = int(mod(ci.y, 4.0));
 	float dith = (BAYER[by * 4 + bx] + 0.5) / 16.0 - 0.5;
-	L = clamp(L + dith * dither_amt / float(levels), 0.0, 0.9999);
+	float dith_scale = mix(rest_smooth, 1.0, outf);
+	L = clamp(L + dith * dither_amt * dith_scale / float(levels), 0.0, 0.9999);
 	L = floor(L * float(levels)) / float(levels);
 
 	vec3 col = use_blue > 0.5 ? blue_color_at(L) : red_color_at(L);

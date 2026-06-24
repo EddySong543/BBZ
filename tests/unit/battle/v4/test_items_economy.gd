@@ -155,7 +155,9 @@ func test_item_slot_row_refreshes() -> void:
 	add_child_autofree(row)   # 触发 _ready 建子节点
 	row.refresh(b, 0)
 	assert_eq(row._labels.size(), 3, "3 个槽")
-	assert_eq(row._labels[0].text, "生锈的飞镖", "开局带件显示道具名")
+	# t1_feibiao（生锈的暗器）已有图标 → 走图标路径：图标层显示、文字位让给图标（见 item_slot_row 220-234）。
+	assert_true(row._icons[0].visible, "带图标道具 → 显示图标层")
+	assert_eq(row._labels[0].text, "", "有图标 → 文字位空出给图标（无图才回退显示名）")
 	assert_eq(row._labels[1].text, "—", "未到解锁回合显示锁占位")
 
 

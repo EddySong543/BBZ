@@ -21,7 +21,7 @@ const _T_SELF := ItemData.Target.SELF
 const _DEF := {
 	# --- 1A 进攻 ---
 	"t1_feibiao": {
-		name = "生锈的飞镖", dim = "进攻", role = "填隙", seq = _S_ANY, target = _T_ENEMY,
+		name = "生锈的暗器", dim = "进攻", role = "填隙", seq = _S_ANY, target = _T_ENEMY,
 		desc = "对敌方出战造成 0.5 伤。", params = {dmg = 1}, upgrade = "t2_feibiao",
 		script = preload("res://src/battle/items/t1_feibiao.gd")},
 	"t1_xianshou": {
@@ -111,11 +111,11 @@ const _DEF := {
 		desc = "降对手防御一级 1 回合（大防→防、防→无）。", params = {},
 		script = preload("res://src/battle/items/t2_shitiechong.gd")},
 	"t2_pomoshi": {
-		tier = 2, ev = 2, name = "破魔失", dim = "进攻", role = "穿透", seq = _S_PRE, target = _T_SELF,
+		tier = 2, ev = 2, name = "破魔矢", dim = "进攻", role = "穿透", seq = _S_PRE, target = _T_SELF,
 		desc = "你这次「波」改为穿防。", params = {},
 		script = preload("res://src/battle/items/t2_pomoshi.gd")},
 	"t2_qiubite": {
-		tier = 2, ev = 2, name = "丘比特之箭", dim = "进攻", role = "穿甲", seq = _S_PRE, target = _T_SELF,
+		tier = 2, ev = 2, name = "心脏掌握魔法", dim = "进攻", role = "穿甲", seq = _S_PRE, target = _T_SELF,
 		desc = "你这次攻击无视对手护甲层（穿甲）。", params = {},
 		script = preload("res://src/battle/items/t2_qiubite.gd")},
 	# --- 2B 防御 ---
@@ -193,7 +193,7 @@ const _DEF := {
 		desc = "本回合「大波」翻倍（4.0 穿防）；被「大防」挡下 → 下回合力竭。", params = {},
 		script = preload("res://src/battle/items/t3_longxi.gd")},
 	"t3_yujin": {
-		tier = 3, ev = 6, name = "不死鸟的余烬", dim = "进攻", role = "自成核", seq = _S_PRE, target = _T_SELF,
+		tier = 3, ev = 6, name = "不死鸟的羽毛", dim = "进攻", role = "自成核", seq = _S_PRE, target = _T_SELF,
 		desc = "若你 HP ≤ 1.0，这次攻击 +3.0 伤穿大防。", params = {threshold = 2, bonus = 6},
 		script = preload("res://src/battle/items/t3_yujin.gd")},
 	"t3_jianyi": {

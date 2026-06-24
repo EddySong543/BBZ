@@ -1,6 +1,6 @@
 extends ItemEffect
 
-## 不死鸟的余烬：若你出战 HP ≤ 1.0，这次攻击 +3.0 伤穿大防（背水一战·gate 在濒死公开 condition）。
+## 不死鸟的羽毛：若你出战 HP ≤ 1.0，这次攻击 +3.0 伤穿大防（背水一战·gate 在濒死公开 condition）。
 func apply_pre(battle: BattleCore, player: int, _target: int, data: ItemData) -> void:
 	if not ActionDef.is_attack(battle.selected_action[player]):
 		return
