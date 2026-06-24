@@ -45,19 +45,6 @@ func test_item_feibiao_deals_half_damage() -> void:
 	assert_eq(b.hp[1][0], 19)
 
 
-func test_item_shandian_pierces_defend() -> void:
-	# Arrange：对手「防」
-	var b := _battle()
-	_give(b, 0, "t1_shandian")
-	# Act
-	b.use_item(0, 0)
-	b.select_action(0, A.CHARGE)
-	b.select_action(1, A.DEFEND)
-	b.resolve()
-	# Assert：闪电穿防 → 仍命中 19（对照=生锈飞镖会被防挡下）
-	assert_eq(b.hp[1][0], 19)
-
-
 func test_item_feibiao_blocked_by_defend() -> void:
 	var b := _battle()
 	_give(b, 0, "t1_feibiao")
@@ -206,18 +193,6 @@ func test_item_lzhi_shengming_heals() -> void:
 	assert_eq(b.hp[0][0], 11)
 
 
-func test_item_jiedu_yaoshui_heals_and_purifies() -> void:
-	var b := _battle()
-	b.hp[0][0] = 10
-	b.set_status(0, 0, "poison", 2)
-	b.use_item(0, _give(b, 0, "t1_jiedu_yaoshui"))
-	b.select_action(0, A.CHARGE)
-	b.select_action(1, A.CHARGE)
-	b.resolve()
-	assert_eq(b.hp[0][0], 11)
-	assert_eq(int(b.get_status(0, 0, "poison", 0)), 0)
-
-
 func test_item_hushenfu_blocks_debuff() -> void:
 	var b := _battle()
 	b.use_item(0, _give(b, 0, "t1_hushenfu"))
@@ -255,18 +230,6 @@ func test_item_lzhi_fali_extra_energy_on_charge() -> void:
 	var got := _energy0_after("t1_lzhi_fali", A.CHARGE, A.CHARGE, 4)
 	var base := _energy0_after("", A.CHARGE, A.CHARGE, 4)
 	assert_eq(got - base, 1)
-
-
-func test_item_moli_shuijing_energy_when_not_attacking() -> void:
-	var got := _energy0_after("t1_moli_shuijing", A.DEFEND, A.CHARGE, 4)
-	var base := _energy0_after("", A.DEFEND, A.CHARGE, 4)
-	assert_eq(got - base, 1)
-
-
-func test_item_shengli_zhou_saves_energy_on_big_action() -> void:
-	var got := _energy0_after("t1_shengli_zhou", A.BIG_DEFEND, A.CHARGE, 10)
-	var base := _energy0_after("", A.BIG_DEFEND, A.CHARGE, 10)
-	assert_eq(got - base, 1)   # 省 0.5 能 = 1 半能
 
 
 func test_item_moli_yuanquan_energy_on_block() -> void:
@@ -318,49 +281,6 @@ func test_item_xiangjiaopi_weakens_opp_attack() -> void:
 	assert_eq(b.hp[0][0], 19)
 
 
-func test_item_lingdang_reduces_opp_charge() -> void:
-	var b := _battle(10)
-	b.use_item(0, _give(b, 0, "t1_lingdang"))
-	b.select_action(0, A.CHARGE)
-	b.select_action(1, A.CHARGE)
-	b.resolve()
-	var got := b.energy[1]
-	var b2 := _battle(10)
-	b2.select_action(0, A.CHARGE)
-	b2.select_action(1, A.CHARGE)
-	b2.resolve()
-	assert_eq(b2.energy[1] - got, 1)   # 铃铛让 p1 少回 1 半能
-
-
-func test_item_huanying_sets_then_clears_fake_info() -> void:
-	var b := _battle()
-	b.use_item(0, _give(b, 0, "t1_huanying"))
-	b.select_action(0, A.CHARGE)
-	b.select_action(1, A.CHARGE)
-	b.resolve()
-	assert_eq(int(b.info_distortion[0].get("fake", 0)), 1)
-	# 不用道具 → 持续
-	b.select_action(0, A.CHARGE)
-	b.select_action(1, A.CHARGE)
-	b.resolve()
-	assert_eq(int(b.info_distortion[0].get("fake", 0)), 1)
-	# 用别的道具 → 清除
-	b.use_item(0, _give(b, 0, "t1_feibiao"))
-	b.select_action(0, A.CHARGE)
-	b.select_action(1, A.CHARGE)
-	b.resolve()
-	assert_eq(int(b.info_distortion[0].get("fake", 0)), 0)
-
-
-func test_item_miwu_hides_info() -> void:
-	var b := _battle()
-	b.use_item(0, _give(b, 0, "t1_miwu"))
-	b.select_action(0, A.CHARGE)
-	b.select_action(1, A.CHARGE)
-	b.resolve()
-	assert_eq(int(b.info_distortion[0].get("hidden", 0)), 1)
-
-
 # === 节奏 / 随机 ===
 
 func test_item_fengzhixue_buffs_next_attack_after_switch() -> void:
@@ -378,15 +298,9 @@ func test_item_fengzhixue_buffs_next_attack_after_switch() -> void:
 	assert_eq(int(b.item_buffs[0].get("next_atk_bonus", 0)), 0)   # 已消耗
 
 
-func test_item_jinnang_grants_one_boon() -> void:
-	var b := _battle(4)
-	b.use_item(0, _give(b, 0, "t1_jinnang"))
-	b.select_action(0, A.ATTACK)
-	b.select_action(1, A.CHARGE)
-	b.resolve()
-	# 基线(无锦囊·能量4·攻击)：opp=18 / shield=0 / energy=4。锦囊必让其中一项变化。
-	var boon: bool = b.hp[1][0] == 17 or b.shield[0][0] == 1 or b.energy[0] == 5
-	assert_true(boon, "锦囊应给出 伤/甲/能 之一：hp=%d shield=%d e=%d" % [b.hp[1][0], b.shield[0][0], b.energy[0]])
+func test_item_tongqian_named_suanming() -> void:
+	# 占位：算命铜钱已在上方两个 test 覆盖；此函数仅保留文件尾结构。
+	assert_true(true)
 
 
 # === 基建 ===

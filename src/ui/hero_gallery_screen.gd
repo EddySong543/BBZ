@@ -15,10 +15,10 @@ const HEART_SHEET := preload("res://assets/ui/icons/heart_idle.png")
 const HERO_DATA_DIR := "res://assets/data/heroes/"
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
 
-# ── 左侧牌库网格（15 卡 0.846 缩放=110×134·六列固定网格 6+6+3）──
+# ── 左侧牌库网格（19 卡 0.846 缩放=110×134·六列固定网格 6+6+6+1·i%COLS 动态·POOL 高 900 容 4 行）──
 const CARD_SCALE := 0.846
 const POOL := Rect2(60, 140, 1032, 900)
-const COLS := 6   # 6 列固定网格（后续加英雄按行增长，不随张数改列）；首发 15 = 6+6+3 三行
+const COLS := 6   # 6 列固定网格（后续加英雄按行增长，不随张数改列）；首发 19 = 6+6+6+1 四行（POOL 高 900 容得下）
 const STEP_X := 121.0
 const ROW_H := 142.0
 const X0 := 218.0   # 6 卡在 POOL(60..1092) 内水平居中（整数取位保像素硬边）
@@ -76,7 +76,7 @@ var _row_glow: ColorRect          # 左网格选中行微亮条（键盘导航�
 
 
 func _ready() -> void:
-	all_heroes = HeroData.create_launch_pool(HERO_DATA_DIR)   # 首发 15（12 生肖 + 黑暗子鼠/丑牛/寅虎）
+	all_heroes = HeroData.create_launch_pool(HERO_DATA_DIR)   # 首发 19（12 生肖 + 黑暗 子鼠/丑牛/寅虎/卯兔/辰龙/巳蛇/午马）
 	_setup_top()
 	_build_pool()
 	_build_detail_panel()

@@ -44,7 +44,7 @@ func test_switch_changes_active_and_costs_zero() -> void:
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
 	assert_eq(b.active_index[0], 1, "出战切到 slot 1")
-	assert_eq(b.energy[0], E_INIT + 2, "切换 0 能消耗 + 被动 +2 半能")
+	assert_eq(b.energy[0], E_INIT, "切换 0 能消耗·被动已去除")
 
 
 func test_switch_works_at_zero_energy() -> void:

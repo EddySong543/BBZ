@@ -62,6 +62,6 @@ static func create_pool_heroes(heroes_dir: String = HEROES_DIR) -> Array[HeroDat
 	return pool
 
 
-## 首发英雄池：12 生肖 + 黑暗子鼠/丑牛/寅虎/卯兔/辰龙/巳蛇（h01-h18）。将来扩张改这里的数字。
+## 首发英雄池：12 生肖 + 黑暗 子鼠/丑牛/寅虎/卯兔/辰龙/巳蛇/午马（h01-h19）。将来扩张改这里的数字。
 static func create_launch_pool(heroes_dir: String = HEROES_DIR) -> Array[HeroData]:
-	return create_pool_heroes(heroes_dir).slice(0, 18)
+	return create_pool_heroes(heroes_dir).slice(0, 19)

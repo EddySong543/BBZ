@@ -66,7 +66,6 @@ shader_parameter/grain_scale = 1.6
 
 [sub_resource type="FontVariation" id="PixelBold16"]
 base_font = ExtResource("23_pixelfont")
-variation_embolden = 0.0
 
 [sub_resource type="StyleBoxEmpty" id="BtnTransparent"]
 

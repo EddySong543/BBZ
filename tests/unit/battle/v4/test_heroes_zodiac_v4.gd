@@ -8,10 +8,10 @@ extends GutTest
 ## 现版本只发布 12 生肖；后续新增英雄再加测试文件。
 ##
 ## 经济基线（B·2026-06-16 已实装）：能量半能制(1 能=2 半能)；大波 6 半能(3 能)；
-##   被动 +1 能/回合(=+2 半能·回合末结算)；HP 半点制(1.0 HP=2 半点)。
+##   被动能量已去除(2026-06-24·PASSIVE_ENERGY_GAIN=0)；HP 半点制(1.0 HP=2 半点)。
 ## ============================================================================
 
-const PASSIVE := 2   # 被动能量 = +2 半能/回合（回合末）
+const PASSIVE := 0   # 被动能量已去除（2026-06-24）·原 +2 半能/回合（当前未被引用）
 
 
 func _hero(id: String, hp: int = 5) -> HeroData:
@@ -56,10 +56,10 @@ func _resolve(b: BattleCore, a0: int, a1: int) -> void:
 func test_h01_dunshu_adds_half_to_every_energy_gain() -> void:
 	var b := _battle("h01", 5, 8)
 	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.CHARGE)
-	# 子鼠：攒(2+囤鼠1) + 被动(2+囤鼠1) = +6 半能
-	assert_eq(b.energy[0], 8 + 6, "子鼠囤鼠：攒与被动各 +1 半能(+0.5 能)加成 → +6")
-	# 对照 plain：攒2 + 被动2 = +4
-	assert_eq(b.energy[1], 8 + 4, "plain 对照 +4 半能")
+	# 子鼠：攒(2+囤鼠1) = +3 半能（被动已去除；_gain_energy(0) 不触发囤鼠加成）
+	assert_eq(b.energy[0], 8 + 3, "子鼠囤鼠：攒 +2 +囤鼠 +1 = +3 半能·被动已去除")
+	# 对照 plain：攒2 = +2
+	assert_eq(b.energy[1], 8 + 2, "plain 对照 +2 半能·被动已去除")
 
 
 # ---- h02 丑牛 卸劲（挨打 → 其他存活队友各 +0.5HP 护盾·封顶 1.0HP·自己不获）----
@@ -163,7 +163,7 @@ func test_h09_liezhao_shatters_energy_equal_to_damage() -> void:
 	# 猴波命中(2 半点) → 碎对手 2 半能。对手攒(+2)，被碎(-2)，被动(+2) → 净 +2
 	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.CHARGE)
 	assert_eq(b.hp[1][0], 10 - 2, "猴波命中 1.0 (对手 HP5=10半)")
-	assert_eq(b.energy[1], 8 + 2, "对手攒+2 −碎能2 +被动2 = 净 +2（无碎能应 +4）")
+	assert_eq(b.energy[1], 8, "对手攒+2 −碎能2 = 净 0·被动已去除（无碎能应 +2）")
 
 
 # ---- h10 酉鸡 剑意（攒剑气 + 拔剑一闪穿防）----
@@ -201,4 +201,4 @@ func test_h12_nafu_gains_energy_when_damaged() -> void:
 	b.select_action(1, ActionDef.Action.ATTACK)   # 对手波 → 猪受 2 半点
 	b.resolve()
 	assert_eq(b.hp[0][0], 14 - 2, "猪受 1.0 伤")
-	assert_eq(b.energy[0], 8 + 6, "纳福：受伤 +2 + 攒2 + 被动2 = +6 半能")
+	assert_eq(b.energy[0], 8 + 4, "纳福：受伤 +2 + 攒2 = +4 半能·被动已去除")

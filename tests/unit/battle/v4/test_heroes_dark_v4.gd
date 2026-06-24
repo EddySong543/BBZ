@@ -7,7 +7,7 @@ extends GutTest
 ## h14【卸力反震】= 防御：防/大防挡下 → 反弹所挡 50% 真伤给攻击者（机制迁自磐牛·on_block 触发）。
 ## h15【血勇】= 进攻：出战时无法用防/大防（can_afford gate·下场即解）+ 波穿防（attack_penetration）。
 ## h16【疾风】= 节奏：在场(含替补)时，己方每局 2 次可把同一动作再做一次（波/大波/攒·技能/切换/防除外）。
-## h17【逼战】= 干扰：出战时，对手本回合若不攻击它，则失去本回合被动 +1 能。
+## h17【镇压】= 干扰·主动技：占动作+费2能+每局2次，沉默对手出战英雄 unique 2 回合（下回合起算）。
 ## h18【缠绕】= 状态：出战时，对手无法主动切换（含午马免费切换）；死亡换人不受影响。
 ## h19【践踏】= 进攻：攻击命中时，这一击超过 1.0HP 的溢出部分碾到敌方最高血替补（封顶 1.0）。
 ## h20【圣剑·断罪】= 状态·主动技：烙「断罪印」，印记目标出战血量 ≤1.0HP 即斩杀（处决）。
@@ -168,13 +168,13 @@ func test_h16_jifeng_double_wave_hits_twice() -> void:
 
 
 func test_h16_jifeng_double_charge_doubles_gain() -> void:
-	# 暗兔攒 + 附加 → 攒两次(+2+2)，外加被动 +2 → 8→14
+	# 暗兔攒 + 附加 → 攒两次(+2+2)·被动已去除 → 8→12
 	var b := _battle("h16", 4, 8)
 	b.select_action(0, ActionDef.Action.CHARGE)
 	b.select_double(0, true)
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(b.energy[0], 14, "双攒：+2 +2 + 被动 +2 = +6 半能(8→14)")
+	assert_eq(b.energy[0], 12, "双攒：+2 +2 = +4 半能·被动已去除(8→12)")
 
 
 func test_h16_jifeng_cap_two_per_game() -> void:
@@ -230,34 +230,72 @@ func test_h16_jifeng_works_from_reserve() -> void:
 	assert_eq(int(b.get_status(0, 1, "jifeng_uses", 0)), 1, "cap 计在暗兔(替补 slot1)")
 
 
-# ---- h17 黑暗辰龙 逼战（出战时对手本回合不攻击它 → 失去被动 +1 能）----
+# ---- h17 黑暗辰龙【镇压】(主动技·沉默对手出战 unique 2 回合·2026-06-24 重设计) ----
 
-func test_h17_bizhan_starves_non_attacker() -> void:
-	# 暗龙(P0 出战) vs P1；P1 攒(不攻龙) → P1 失去本回合被动 +2 半能
-	var b := _battle_team(["h17", "test_p0_1", "test_p0_2"], 6, 8)
-	b.select_action(0, ActionDef.Action.CHARGE)
-	b.select_action(1, ActionDef.Action.CHARGE)   # P1 攒·没攻击龙
+## 自定义双队对局（P0 队 + P1 队），便于测"沉默对手指定英雄"。
+func _battle_vs(p0_ids: Array, p1_ids: Array, hp: int = 6, e: int = 8) -> BattleCore:
+	var t0: Array = []
+	for id in p0_ids:
+		t0.append(_hero(id, hp))
+	var t1: Array = []
+	for id in p1_ids:
+		t1.append(_hero(id, hp))
+	var b := BattleCore.new()
+	b.setup(t0, t1, 555)
+	b.energy = [e, e]
+	return b
+
+
+func test_h17_zhenya_silences_enemy_passive() -> void:
+	# 暗龙(P0)镇压 → 沉默 P1 出战的子鼠。cast 当回合子鼠仍生效，【下回合起】囤鼠加成失效。
+	var b := _battle_vs(["h17", "test_p0_1", "test_p0_2"], ["h01", "test_p1_1", "test_p1_2"], 6, 8)
+	# 回合1：P0 镇压(费2能=4半能)、P1 攒(子鼠未沉默 → +3：攒2+囤鼠1)
+	assert_true(b.select_active(0), "暗龙可发动镇压(敌出战存活)")
+	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(b.energy[1], 8 + 2, "P1 攒(不攻龙) → 只得攒 +2、被动被逼战吞掉(8→10)")
-
-
-func test_h17_bizhan_attacker_keeps_passive() -> void:
-	# P1 攻击龙(波) → 保留被动 +1 能
-	var b := _battle_team(["h17", "test_p0_1", "test_p0_2"], 6, 8)
-	b.select_action(0, ActionDef.Action.CHARGE)
-	b.select_action(1, ActionDef.Action.ATTACK)   # P1 攻龙
-	b.resolve()
-	assert_eq(b.energy[1], 8 - 2 + 2, "P1 攻龙 → 付波费 2、保留被动 +2(8→8)")
-	assert_eq(b.hp[0][0], 12 - 2, "暗龙(HP6=12半)挨 P1 波 2 半点")
-
-
-func test_h17_bizhan_only_while_active() -> void:
-	# 暗龙在替补、出战是 plain → 无逼战（对手不攻也不挨饿·下场即解）
-	var b := _battle_team(["test_p0_0", "h17", "test_p0_2"], 6, 8)
+	assert_eq(int(b.get_status(1, 0, "silenced", 0)), 2, "P1 子鼠被烙沉默=2 回合")
+	assert_eq(b.energy[0], 8 - 4, "镇压费 2 能(4 半能)")
+	assert_eq(int(b.get_status(0, 0, "active_uses", 0)), 1, "镇压计 1 次使用")
+	assert_eq(b.energy[1], 8 + 3, "cast 当回合子鼠仍生效：攒+2 +囤鼠+1 = +3")
+	# 回合2：双攒 → 子鼠已沉默 → P1 只 +2(囤鼠失效)
 	b.select_action(0, ActionDef.Action.CHARGE)
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(b.energy[1], 8 + 2 + 2, "暗龙在替补 → 无逼战、P1 正常得攒+被动(8→12)")
+	assert_eq(b.energy[1], 11 + 2, "子鼠被沉默：攒只 +2、囤鼠加成失效")
+	assert_eq(int(b.get_status(1, 0, "silenced", 0)), 1, "沉默递减 → 剩 1 回合")
+
+
+func test_h17_zhenya_silence_expires_after_two_turns() -> void:
+	# 沉默恰好 2 个完整回合(回合2、3)，回合4 囤鼠恢复。起手 4 能(避开 MAX_ENERGY=20 截顶)。
+	var b := _battle_vs(["h17", "test_p0_1", "test_p0_2"], ["h01", "test_p1_1", "test_p1_2"], 6, 4)
+	b.select_active(0)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()                                   # 回合1：cast(子鼠仍生效 +3)
+	for _t in range(2):                           # 回合2、3：沉默中，各 +2
+		b.select_action(0, ActionDef.Action.CHARGE)
+		b.select_action(1, ActionDef.Action.CHARGE)
+		b.resolve()
+	assert_eq(int(b.get_status(1, 0, "silenced", 0)), 0, "2 回合后沉默到期")
+	var before: int = b.energy[1]
+	b.select_action(0, ActionDef.Action.CHARGE)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()                                   # 回合4：子鼠恢复 → +3
+	assert_eq(b.energy[1] - before, 3, "沉默到期 → 囤鼠恢复，攒 +3")
+
+
+func test_h17_zhenya_disables_enemy_active_and_caps() -> void:
+	# ① 被沉默英雄的主动技不可用 ② 镇压每局上限 2 次。
+	var b := _battle_vs(["h17", "test_p0_1", "test_p0_2"], ["h20", "test_p1_1", "test_p1_2"], 6, 20)
+	b.select_active(0)                            # 回合1：镇压沉默 P1 暗羊(h20 断罪)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_false(b.can_use_active(1), "被沉默的暗羊：断罪主动技不可用")
+	# 上限：回合2 再镇压 → 第3次应被拒(cap=2)
+	b.select_active(0)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(int(b.get_status(0, 0, "active_uses", 0)), 2, "镇压已用 2 次")
+	assert_false(b.can_use_active(0), "镇压每局上限 2 → 第 3 次不可用")
 
 
 # ---- h18 黑暗巳蛇 缠绕（出战时对手无法主动切换；死亡换人不受影响）----

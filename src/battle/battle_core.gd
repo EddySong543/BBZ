@@ -87,7 +87,7 @@ const _HERO_SKILL_SCRIPTS := {
 	"h14": preload("res://src/battle/skills/h14_fanzhen.gd"),
 	"h15": preload("res://src/battle/skills/h15_xueyong.gd"),
 	"h16": preload("res://src/battle/skills/h16_jifeng.gd"),
-	"h17": preload("res://src/battle/skills/h17_bizhan.gd"),
+	"h17": preload("res://src/battle/skills/h17_zhenya.gd"),
 	"h18": preload("res://src/battle/skills/h18_chanrao.gd"),
 	"h19": preload("res://src/battle/skills/h19_jianta.gd"),
 	"h20": preload("res://src/battle/skills/h20_duanzui.gd"),
@@ -259,9 +259,17 @@ func usable_energy(player: int) -> int:
 	return maxi(0, energy[player])
 
 
+## 沉默感知技能取用（黑暗辰龙 h17【镇压】）：被沉默英雄(silenced>0) 视作"无 unique"(返回 null)。
+## resolve 期间另有「置 null 换位」统一收口所有 hook；本 helper 供 resolve 外的选择门(防/切换/主动技)用。
+func _eff_skill(player: int, slot: int) -> HeroSkill:
+	if int(get_status(player, slot, "silenced", 0)) > 0:
+		return null
+	return _skills[player][slot]
+
+
 ## 出战英雄是否可用防/大防（黑暗寅虎 h15【血勇】= 不可）。下场即恢复（按出战英雄判定）。
 func _can_defend(player: int) -> bool:
-	var sk: HeroSkill = _skills[player][active_index[player]]
+	var sk: HeroSkill = _eff_skill(player, active_index[player])
 	return sk == null or sk.can_defend()
 
 
@@ -269,7 +277,7 @@ func _can_defend(player: int) -> bool:
 ## 只锁主动切换；死亡换人/救援/道具强制切换走各自路径、不经此 gate。
 func _can_switch(player: int) -> bool:
 	var e: int = 1 - player
-	var sk: HeroSkill = _skills[e][active_index[e]]
+	var sk: HeroSkill = _eff_skill(e, active_index[e])
 	return not (sk != null and hp[e][active_index[e]] > 0 and sk.locks_enemy_switch())
 
 
@@ -300,7 +308,7 @@ func _heal(player: int, slot: int, amount: int) -> int:
 ## 当前出战英雄的主动技是否可用（has_active + cap 未满 + 能量够 + 组件自定前置）。
 func can_use_active(player: int) -> bool:
 	var slot: int = active_index[player]
-	var sk: HeroSkill = _skills[player][slot]
+	var sk: HeroSkill = _eff_skill(player, slot)   # 沉默 → null → 主动技不可用
 	if sk == null or not sk.has_active():
 		return false
 	var cap: int = sk.active_per_game_cap()
@@ -449,6 +457,10 @@ func use_item(player: int, index: int, target_override: int = -1) -> bool:
 	var data: ItemData = items[player][index]
 	if data == null or data.effect == null:
 		return false
+	# 封印卷轴 / 天罗地网：你的道具槽被对手封住 → 消耗一次锁、本次用道具被拒。
+	if int(item_buffs[player].get("item_lock", 0)) > 0:
+		item_buffs[player]["item_lock"] = int(item_buffs[player]["item_lock"]) - 1
+		return false
 	# 遗物（持久·每回合 tick）：激活即登记到 relics，不走一次性 item_uses。
 	if bool(data.params.get("relic", false)):
 		relics[player].append({data = data, state = {}})
@@ -488,6 +500,14 @@ func add_item_rider(player: int, data: ItemData) -> void:
 	var r: Array = _imod[player].get("riders", [])
 	r.append(data)
 	_imod[player]["riders"] = r
+
+
+## 某玩家是否持有指定 id 的遗物（鹤顶红毒爆放大 / 夜明珠登场冲撞读此判定）。
+func _has_relic(player: int, item_id: String) -> bool:
+	for rl in relics[player]:
+		if rl["data"].item_id == item_id:
+			return true
+	return false
 
 
 # ===== 道具经济（ADR-003 §2·M1·2026-06-19）=====
@@ -801,6 +821,16 @@ func apply_choice(player: int, choice: Dictionary) -> bool:
 func resolve() -> Dictionary:
 	var events: Array = []
 
+	# Phase 0.3: 沉默换位（黑暗辰龙 h17【镇压】）——被沉默英雄(silenced>0)的技能槽临时置 null，
+	#   借引擎全程 null-check 统一收口其【所有 hook】(=unique 失效)。resolve 末还原 + 递减时长。
+	#   只递减本回合生效过的（cast 当回合 silenced 在本 swap 之后才写入 → 不计 → 恰好 2 个完整回合）。
+	var _silenced_swap: Array = []
+	for sp in [0, 1]:
+		for ss in range(_skills[sp].size()):
+			if int(get_status(sp, ss, "silenced", 0)) > 0 and _skills[sp][ss] != null:
+				_silenced_swap.append([sp, ss, _skills[sp][ss]])
+				_skills[sp][ss] = null
+
 	# Phase 0.4: 龙息力竭（上回合大波被大防挡下）→ 本回合强制 CHARGE（喘息·失这次动作选择）
 	for p in [0, 1]:
 		if bool(item_buffs[p].get("exhausted_next", false)):
@@ -839,6 +869,9 @@ func resolve() -> Dictionary:
 		if item_buffs[p].has("next_armor"):
 			shield[p][active_index[p]] += int(item_buffs[p]["next_armor"])
 			item_buffs[p].erase("next_armor")
+		if item_buffs[p].has("next_energy_penalty"):
+			energy[p] = maxi(0, energy[p] - int(item_buffs[p]["next_energy_penalty"]))
+			item_buffs[p].erase("next_energy_penalty")
 		if item_uses[p].size() > 0:
 			info_distortion[p] = {}
 	for p in [0, 1]:
@@ -987,13 +1020,13 @@ func resolve() -> Dictionary:
 			if bool(relic["data"].effect.relic_end(self, p, relic["data"], relic["state"])):
 				kept_relics.append(relic)
 		relics[p] = kept_relics
-	# 被动能量 +1 能/回合（A2）：回合末结算 → 下回合选择时反映
-	# 逼战（h17 暗龙）：对手出战是逼战龙 + 本回合 p 没攻击它 → p 失去本回合被动 +1 能。
+	# 被动能量入口（A2 引入·2026-06-24 去除 → PASSIVE_ENERGY_GAIN=0·当前 no-op；保留入口便于将来重调）。
 	for p in [0, 1]:
-		if _forces_enemy_attack(1 - p) and not _is_attack_action(p, a[p]):
-			events.append({id = "bizhan_starve", player = p})
-			continue
 		_gain_energy(p, ActionDef.PASSIVE_ENERGY_GAIN)
+	# 沉默还原 + 递减时长（黑暗辰龙 h17【镇压】；只递减本回合生效过的，见 Phase 0.3）。
+	for sw in _silenced_swap:
+		_skills[sw[0]][sw[1]] = sw[2]
+		set_status(sw[0], sw[1], "silenced", maxi(0, int(get_status(sw[0], sw[1], "silenced", 0)) - 1))
 	_econ_after_resolve()
 	_last_action = [a[0], a[1]]
 	turn_number += 1
@@ -1037,6 +1070,14 @@ func _perform_switch(player: int, from_slot: int, to_slot: int, events: Array) -
 	var entering: HeroSkill = _skills[player][to_slot]
 	if entering != null:
 		entering.on_switch_in(self, player, to_slot)
+
+	# 夜明珠遗物：你切换登场 → 本回合攻击 +0.5（_imod）+ 登场冲撞 0.5 给敌方出战（直接真伤·简化版）。
+	if _has_relic(player, "t3_yemingzhu"):
+		add_item_mod(player, "atk_bonus", 1)
+		var oa: int = active_index[opp]
+		if hp[opp][oa] > 0:
+			hp[opp][oa] -= 1
+			events.append({id = "yemingzhu_charge", player = player})
 
 
 ## h07 当先：免费切换（不占动作槽；午马 free_switch_cap 默认 -1 = 不限次）。在【选择阶段】调用：
@@ -1202,6 +1243,8 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 	var poison: int = int(get_status(target_player, slot, "poison", 0))
 	if poison > 0:
 		dmg += poison
+		if _has_relic(attacker_player, "t3_hedinghong"):
+			dmg += 2   # 鹤顶红遗物：引爆毒额外 +1.0（2 半点）
 		statuses[target_player][slot].erase("poison")
 		events.append({id = "poison_detonate", player = target_player, layers = poison})
 		_note_combo_proc(attacker_player)   # 鼠潮：毒爆 = 一次 combo proc
@@ -1320,6 +1363,13 @@ func _resolve_deaths(_a: Array[int], events: Array) -> void:
 						if ally_skill != null:
 							ally_skill.on_ally_death(slot, self, p, ally)
 				events.append({id = "hero_died", player = p, slot = slot})
+				# 尾后针：你出战阵亡 → 对敌方出战 0.5 真伤（无视防御/护甲），随后消耗标记。
+				if slot == active_index[p] and int(item_buffs[p].get("death_reflect", 0)) > 0:
+					item_buffs[p].erase("death_reflect")
+					var ea: int = active_index[1 - p]
+					if hp[1 - p][ea] > 0:
+						hp[1 - p][ea] -= 1
+						events.append({id = "weihouzhen_sting", player = p})
 
 	# 出战位阵亡 → 待玩家选替补（甲死亡换人）
 	for p in [0, 1]:

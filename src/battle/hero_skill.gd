@@ -173,8 +173,8 @@ func double_action_cap() -> int:
 	return 0
 
 
-## 「逼战」型（黑暗辰龙 h17）：本英雄【出战·存活】时，对手本回合若不攻击它（不出波/大波/攻击型主动技）
-## → 对手失去本回合被动 +1 能（龙威逼战）。引擎在 resolve 末被动能量发放处统一 gate。默认 false。
+## 「逼战」型 hook ——⚠ 已弃用（2026-06-24）：原黑暗辰龙 h17【逼战】依赖被动能量，去被动后报废，
+## h17 已重设计为【镇压·沉默】（h17_zhenya.gd）。当前无人 override，默认 false（留作扩展接口）。
 func forces_enemy_attack() -> bool:
 	return false
 

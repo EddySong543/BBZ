@@ -58,35 +58,6 @@ func test_control_switch_without_caoren_takes_hit() -> void:
 	assert_eq(b.hp[0][1], 18, "对照：切换无草人 → 新出战挨波")
 
 
-# === 打神鞭：强制对手切换 ===
-
-func test_dashenbian_forces_opponent_switch() -> void:
-	var b := _battle()
-	b.use_item(0, _give(b, 0, "t3_dashenbian"))
-	b.select_action(0, A.CHARGE)
-	b.select_action(1, A.CHARGE)
-	b.resolve()
-	assert_eq(b.active_index[1], 1, "对手被强制切到首个存活替补")
-
-
-func test_dashenbian_control_no_force() -> void:
-	var b := _battle()
-	b.select_action(0, A.CHARGE)
-	b.select_action(1, A.CHARGE)
-	b.resolve()
-	assert_eq(b.active_index[1], 0)
-
-
-func test_dashenbian_blocked_by_immunity() -> void:
-	var b := _battle()
-	b.use_item(0, _give(b, 0, "t3_dashenbian"))
-	b.use_item(1, _give(b, 1, "t1_hushenfu"))   # 对手圣贤书免疫一次干扰
-	b.select_action(0, A.CHARGE)
-	b.select_action(1, A.CHARGE)
-	b.resolve()
-	assert_eq(b.active_index[1], 0, "被免疫 → 未被强制切换")
-
-
 # === 一气：信息博弈，2/3 概率落空（概率性·跨种子） ===
 
 func test_yiqi_dodges_some_attacks() -> void:

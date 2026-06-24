@@ -64,7 +64,7 @@ func test_relic_qingyuanbaolian_gains_energy() -> void:
 	var b := _battle(4)
 	b.use_item(0, _give(b, 0, "t3_qingyuanbaolian"))
 	_aa(b, A.DEFEND, A.DEFEND)   # 无动作能量变化
-	var got := b.energy[0]       # 4 + 遗物 1 + 被动 2 = 7
+	var got := b.energy[0]       # 4 + 遗物 1 = 5（被动已去除）；下方用相对差值，与被动无关
 	var base := _battle(4)
 	base.select_action(0, A.DEFEND)
 	base.select_action(1, A.DEFEND)
@@ -80,22 +80,6 @@ func test_relic_qingyuanbaolian_expires_after_three() -> void:
 	_aa(b, A.DEFEND, A.DEFEND)
 	_aa(b, A.DEFEND, A.DEFEND)
 	assert_eq(b.relics[0].size(), 0)
-
-
-# === 金刚琉璃体：每回合末 +0.5 甲 × 3 后碎 ===
-
-func test_relic_jingangliuli_armor_per_turn() -> void:
-	var b := _battle()
-	b.use_item(0, _give(b, 0, "t3_jingangliuli"))
-	_cc(b)
-	assert_eq(b.shield[0][0], 1)
-	_cc(b)
-	assert_eq(b.shield[0][0], 2)
-	_cc(b)
-	assert_eq(b.shield[0][0], 3)
-	assert_eq(b.relics[0].size(), 0)
-	_cc(b)
-	assert_eq(b.shield[0][0], 3)   # 已碎 → 不再加甲
 
 
 # === 噬心钉：攻击 +1.0 伤 + 无法防御 ===
@@ -137,29 +121,6 @@ func test_relic_budongmingwang_attack_penalty() -> void:
 	assert_eq(b.hp[1][0], 19)   # 波 2 − 0.5 = 1
 
 
-# === 九重天雷：连攻累加 + 打断清零 ===
-
-func test_relic_jiuzhongtianlei_escalates() -> void:
-	var b := _battle()
-	b.use_item(0, _give(b, 0, "t3_jiuzhongtianlei"))
-	_aa(b, A.ATTACK, A.CHARGE)
-	assert_eq(b.hp[1][0], 18)   # 波 2（首攻无累加）
-	_aa(b, A.ATTACK, A.CHARGE)
-	assert_eq(b.hp[1][0], 15)   # 波 2 + 1 = 3
-	_aa(b, A.ATTACK, A.CHARGE)
-	assert_eq(b.hp[1][0], 11)   # 波 2 + 2 = 4
-
-
-func test_relic_jiuzhongtianlei_resets_on_charge() -> void:
-	var b := _battle()
-	b.use_item(0, _give(b, 0, "t3_jiuzhongtianlei"))
-	_aa(b, A.ATTACK, A.CHARGE)   # opp 18, stack→1
-	_aa(b, A.ATTACK, A.CHARGE)   # opp 15, stack→2
-	_aa(b, A.CHARGE, A.CHARGE)   # 打断 → stack→0
-	_aa(b, A.ATTACK, A.CHARGE)
-	assert_eq(b.hp[1][0], 13)    # 重置后回到 波 2（15-2），证明清零
-
-
 # === 聚鼎三花：3 次攻击后散（extra_hits 行为需英雄 on-hit，本测仅锁充能/不自伤）===
 
 func test_relic_judingsanhua_expires_after_three_attacks() -> void:
@@ -186,12 +147,12 @@ func test_relic_persists_across_turns() -> void:
 
 func test_clone_copies_relics_independently() -> void:
 	var b := _battle()
-	b.use_item(0, _give(b, 0, "t3_jiuzhongtianlei"))
-	_aa(b, A.ATTACK, A.CHARGE)   # stack→1
+	b.use_item(0, _give(b, 0, "t3_qingyuanbaolian"))
+	_cc(b)   # tick 一次 → state.used→1
 	var c := b.clone()
 	assert_eq(c.relics[0].size(), 1)
-	c.relics[0][0]["state"]["stack"] = 99
-	assert_ne(int(b.relics[0][0]["state"].get("stack", 0)), 99, "改 clone 的遗物状态不影响原局")
+	c.relics[0][0]["state"]["used"] = 99
+	assert_ne(int(b.relics[0][0]["state"].get("used", 0)), 99, "改 clone 的遗物状态不影响原局")
 
 
 func test_all_relics_run_many_turns() -> void:

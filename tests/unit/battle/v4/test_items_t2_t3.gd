@@ -96,23 +96,6 @@ func test_t2_shitiechong_control_big_defend_blocks() -> void:
 	assert_eq(b.hp[1][0], 20)
 
 
-func test_t2_modi_nullifies_defend() -> void:
-	var b := _battle()
-	b.use_item(0, _give(b, 0, "t2_modi"))
-	b.select_action(0, A.ATTACK)
-	b.select_action(1, A.DEFEND)   # 防失效 → 波命中
-	b.resolve()
-	assert_eq(b.hp[1][0], 18)
-
-
-func test_t2_modi_control_defend_blocks() -> void:
-	var b := _battle()
-	b.select_action(0, A.ATTACK)
-	b.select_action(1, A.DEFEND)
-	b.resolve()
-	assert_eq(b.hp[1][0], 20)
-
-
 func test_t2_pomoshi_pierces_defend() -> void:
 	var b := _battle()
 	b.use_item(0, _give(b, 0, "t2_pomoshi"))
@@ -231,25 +214,7 @@ func test_t2_daijia_taxes_big_action() -> void:
 	assert_eq(b2.energy[1] - got, 2)   # 多耗 1 能 = 2 半能
 
 
-func test_t2_tengman_punishes_switch_next_turn() -> void:
-	var b := _battle()
-	b.use_item(0, _give(b, 0, "t2_tengman"))
-	b.select_action(0, A.CHARGE)
-	b.select_switch(1, 1)   # 对手切换 → 被换下者(slot0)受 0.5 伤(延迟)
-	b.resolve()
-	assert_eq(b.pending_damage[1][0], 1)
-	_resolve_cc(b)
-	assert_eq(b.hp[1][0], 19)   # 延迟伤害落地
-
-
 # === T2 导出 ===
-
-func test_t2_huwan_energy_to_armor() -> void:
-	var b := _battle(10)
-	b.use_item(0, _give(b, 0, "t2_huwan"))
-	_resolve_cc(b)
-	assert_eq(b.shield[0][0], 2)   # +1.0 甲
-
 
 func test_t2_xiongyao_blood_for_damage() -> void:
 	var b := _battle()
@@ -269,45 +234,6 @@ func test_t2_jike_heals_on_hit() -> void:
 	b.select_action(1, A.CHARGE)
 	b.resolve()
 	assert_eq(b.hp[0][0], 12)   # 命中回 1.0 HP
-
-
-# === T2 跨回合 buff（next_armor / next_atk_bonus）===
-
-func test_t2_suozijia_armor_next_turn() -> void:
-	var b := _battle()
-	b.use_item(0, _give(b, 0, "t2_suozijia"))
-	b.select_action(0, A.BIG_DEFEND)
-	b.select_action(1, A.CHARGE)
-	b.resolve()
-	assert_eq(int(b.item_buffs[0].get("next_armor", 0)), 1)
-	_resolve_cc(b)
-	assert_eq(b.shield[0][0], 1)   # 下回合 +0.5 甲落地
-
-
-func test_t2_fengbao_attack_after_defend() -> void:
-	var b := _battle()
-	b.use_item(0, _give(b, 0, "t2_fengbao"))
-	b.select_action(0, A.DEFEND)
-	b.select_action(1, A.CHARGE)
-	b.resolve()
-	b.select_action(0, A.ATTACK)
-	b.select_action(1, A.CHARGE)
-	b.resolve()
-	assert_eq(b.hp[1][0], 17)   # 波 2 + 0.5 = 3
-
-
-# === T2 惯性（_last_action）===
-
-func test_t2_xueqiu_rewards_repeat_attack() -> void:
-	var b := _battle()
-	b.select_action(0, A.ATTACK)   # 第一波 → 记录 last_action
-	b.select_action(1, A.CHARGE)
-	b.resolve()   # opp 20 → 18
-	b.use_item(0, _give(b, 0, "t2_xueqiu"))
-	b.select_action(0, A.ATTACK)   # 连攻 → +0.5 伤
-	b.select_action(1, A.CHARGE)
-	b.resolve()
-	assert_eq(b.hp[1][0], 15)   # 18 - (2+1)
 
 
 # === T3 ===
@@ -363,17 +289,6 @@ func test_t3_longxi_exhausts_when_blocked() -> void:
 	assert_eq(b.hp[1][0], 20)   # 力竭 → 攻击没打出
 
 
-func test_t3_hongyu_doubles_all_attacks() -> void:
-	var b := _battle()
-	b.hp[0][0] = 10
-	b.use_item(0, _give(b, 0, "t3_hongyu"))
-	b.select_action(0, A.ATTACK)
-	b.select_action(1, A.CHARGE)
-	b.resolve()
-	assert_eq(b.hp[0][0], 6)    # 弃 2.0 HP
-	assert_eq(b.hp[1][0], 16)   # 波 2 ×2 = 4
-
-
 func test_t3_shengming_heals_2hp() -> void:
 	var b := _battle()
 	b.hp[0][0] = 10
@@ -389,7 +304,7 @@ func test_t3_tinglong_dumps_energy_as_piercing_damage() -> void:
 	b.select_action(1, A.BIG_DEFEND)   # 穿大防 → 砸穿
 	b.resolve()
 	assert_eq(b.hp[1][0], 15)   # 5.0 能 → 2.5 HP = 5 半点
-	assert_eq(b.energy[0], 2)   # 清零后回合末被动 +1 能
+	assert_eq(b.energy[0], 0)   # 清零后无被动加成（被动已去除）
 
 
 # === 基建：全件可构造 + 不崩 ===
@@ -414,5 +329,5 @@ func test_all_t2_t3_construct_and_run() -> void:
 
 
 func test_catalog_tier_counts() -> void:
-	assert_eq(ItemCatalog.all_tier2().size(), 29, "T2 实装件数（+替身草人）")
-	assert_eq(ItemCatalog.all_tier3().size(), 16, "T3 实装件数（7 Tier-A + 7 遗物 + 打神鞭/一气）")
+	assert_eq(ItemCatalog.all_tier2().size(), 24, "T2 实装件数（首发对齐 items-firstrelease）")
+	assert_eq(ItemCatalog.all_tier3().size(), 17, "T3 实装件数（首发对齐 items-firstrelease）")

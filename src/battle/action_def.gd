@@ -10,7 +10,7 @@ extends RefCounted
 ##
 ## 数值要点（A2·2026-06-16 起）：
 ##   - 大波消耗 3 能（= 6 半能；穿防），大防 2 能（= 4 半能）
-##   - 被动 +1 能/回合（PASSIVE_ENERGY_GAIN）+ 攒额外 +1 能
+##   - 被动能量已去除（2026-06-24·PASSIVE_ENERGY_GAIN=0）：能量收入仅靠「攒」(+1，鼠额外+1) → 攒回归核心反龟手段
 ##   - 切换 0 能（占动作槽，h07 唯一例外，在引擎处理）
 ##   - 初始能量 1.0 能（= 2 半能）
 ##   - 英雄专属主动技不进全局 Action enum；改由英雄组件声明 (§D9)。
@@ -35,7 +35,7 @@ const MIN_DAMAGE := 1    # 最小伤害 = 1 半点 = 0.5 HP
 const ENERGY_UNIT := 2          # 1 能 = 2 半能（支持 0.5 能）
 const INITIAL_ENERGY := 2       # = 1.0 能
 const MAX_ENERGY := 20          # = 10 能
-const PASSIVE_ENERGY_GAIN := 2  # 每回合被动 +1 能（A2）
+const PASSIVE_ENERGY_GAIN := 0  # 被动能量已去除（2026-06-24·去被动+1·让「攒」回归核心反龟，见纲领 §4.5 修订）；旧 A2 = 2 半能
 
 ## key = Action enum int；damage 单位为半点；cost / energy_gain 单位为【半能】(=能×2)。
 const BASE_ACTION_DEF := {

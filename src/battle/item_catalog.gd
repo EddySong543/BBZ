@@ -54,7 +54,7 @@ const _DEF := {
 		desc = "若对手「大波」，你这次「防」可挡下大波一次。", params = {},
 		script = preload("res://src/battle/items/t1_qipao.gd")},
 	"t1_tongqian": {
-		name = "算命先生的铜钱", dim = "防御", role = "对冲", seq = _S_ANY, target = _T_SELF,
+		name = "算命铜钱", dim = "博弈", role = "对冲", seq = _S_ANY, target = _T_SELF,
 		desc = "若对手攻击则 +0.5 甲，否则 +0.5 能。", params = {armor = 1, energy = 1},
 		script = preload("res://src/battle/items/t1_tongqian.gd")},
 	# --- 1C 能量 ---
@@ -62,14 +62,6 @@ const _DEF := {
 		name = "劣质法力药水", dim = "能量", role = "条件", seq = _S_ANY, target = _T_SELF,
 		desc = "本回合若你「攒」，额外 +0.5 能。", params = {energy = 1}, upgrade = "t2_fali",
 		script = preload("res://src/battle/items/t1_lzhi_fali.gd")},
-	"t1_moli_shuijing": {
-		name = "下金蛋的鹅", dim = "能量", role = "条件", seq = _S_ANY, target = _T_SELF,
-		desc = "本回合你不攻击，则 +0.5 能。", params = {energy = 1},
-		script = preload("res://src/battle/items/t1_moli_shuijing.gd")},
-	"t1_shengli_zhou": {
-		name = "四两", dim = "能量", role = "条件", seq = _S_ANY, target = _T_SELF,
-		desc = "本回合你用大波 / 大防，省 0.5 能。", params = {save = 1},
-		script = preload("res://src/battle/items/t1_shengli_zhou.gd")},
 	# --- 1D 状态 ---
 	"t1_yaohuo": {
 		name = "妖火", dim = "状态", role = "", seq = _S_ANY, target = _T_ENEMY,
@@ -80,18 +72,6 @@ const _DEF := {
 		name = "臭鸡蛋", dim = "干扰", role = "填隙", seq = _S_ANY, target = _T_ENEMY,
 		desc = "对手本回合攻击 −0.5 伤。", params = {penalty = 1},
 		script = preload("res://src/battle/items/t1_xiangjiaopi.gd")},
-	"t1_lingdang": {
-		name = "STEAL技能卡", dim = "干扰", role = "", seq = _S_ANY, target = _T_ENEMY,
-		desc = "对手本回合若「攒」，少回 0.5 能。", params = {penalty = 1},
-		script = preload("res://src/battle/items/t1_lingdang.gd")},
-	"t1_huanying": {
-		name = "伪造的宝石", dim = "干扰", role = "诈唬", seq = _S_ANY, target = _T_SELF,
-		desc = "你的道具栏对对手多显示 1 个假道具，直到你下次用道具。", params = {},
-		script = preload("res://src/battle/items/t1_huanying.gd")},
-	"t1_miwu": {
-		name = "一片树叶", dim = "干扰", role = "信息", seq = _S_ANY, target = _T_SELF,
-		desc = "你的 1 个道具对对手隐藏，直到你下次用道具。", params = {},
-		script = preload("res://src/battle/items/t1_miwu.gd")},
 	# --- 1F 导出 ---
 	"t1_xixie_yaya": {
 		name = "血魔的獠牙", dim = "导出", role = "进攻→防御", seq = _S_PRE, target = _T_SELF,
@@ -107,14 +87,6 @@ const _DEF := {
 		name = "最后一箭", dim = "进攻", role = "随机变体", seq = _S_PRE, target = _T_ENEMY,
 		desc = "造成 0.5 伤；若你 HP 比对手低，改为 1.0 伤。", params = {dmg = 1, boon = 2},
 		script = preload("res://src/battle/items/t1_siyecao.gd")},
-	"t1_shandian": {
-		name = "暗箭", dim = "进攻", role = "破防", seq = _S_ANY, target = _T_ENEMY,
-		desc = "对敌方出战 0.5 伤，无视「防」。", params = {dmg = 1},
-		script = preload("res://src/battle/items/t1_shandian.gd")},
-	"t1_jiedu_yaoshui": {
-		name = "解毒药水", dim = "防御", role = "治疗", seq = _S_ANY, target = _T_SELF,
-		desc = "回 0.5 HP，并解除自身全部毒 / 灼。", params = {heal = 1},
-		script = preload("res://src/battle/items/t1_jiedu_yaoshui.gd")},
 	"t1_hushenfu": {
 		name = "圣贤书", dim = "防御", role = "净化", seq = _S_ANY, target = _T_SELF,
 		desc = "本回合免疫对手对你的一次干扰 / debuff。", params = {immune = 1},
@@ -123,10 +95,6 @@ const _DEF := {
 		name = "回马枪", dim = "节奏", role = "", seq = _S_ANY, target = _T_SELF,
 		desc = "本回合若你「切换」，下回合你的攻击 +0.5 伤。", params = {bonus = 1},
 		script = preload("res://src/battle/items/t1_fengzhixue.gd")},
-	"t1_jinnang": {
-		name = "不太鼓的锦囊", dim = "随机", role = "", seq = _S_ANY, target = _T_SELF,
-		desc = "随机获得 +0.5 伤 / +0.5 甲 / +0.5 能 之一。", params = {},
-		script = preload("res://src/battle/items/t1_jinnang.gd")},
 
 	# ========== Tier-2（连携件 ≈1.0·非中立/非趣味·Phase 1）==========
 	# --- 2A 进攻 ---
@@ -142,10 +110,6 @@ const _DEF := {
 		tier = 2, ev = 2, name = "噬铁虫", dim = "进攻", role = "破防", seq = _S_PRE, target = _T_ENEMY,
 		desc = "降对手防御一级 1 回合（大防→防、防→无）。", params = {},
 		script = preload("res://src/battle/items/t2_shitiechong.gd")},
-	"t2_modi": {
-		tier = 2, ev = 2, name = "魔笛", dim = "进攻", role = "破防", seq = _S_ANY, target = _T_ENEMY,
-		desc = "敌方下一次「防 / 大防」失效。", params = {},
-		script = preload("res://src/battle/items/t2_modi.gd")},
 	"t2_pomoshi": {
 		tier = 2, ev = 2, name = "破魔失", dim = "进攻", role = "穿透", seq = _S_PRE, target = _T_SELF,
 		desc = "你这次「波」改为穿防。", params = {},
@@ -159,10 +123,6 @@ const _DEF := {
 		tier = 2, ev = 2, name = "坚固的护盾", dim = "防御", role = "填隙", seq = _S_ANY, target = _T_SELF,
 		desc = "己方出战 +1.0 甲（额外血量层）。", params = {armor = 2},
 		script = preload("res://src/battle/items/t2_jiandun.gd")},
-	"t2_suozijia": {
-		tier = 2, ev = 2, name = "锁子连环甲", dim = "防御", role = "续航", seq = _S_ANY, target = _T_SELF,
-		desc = "你「大防」后，下回合 +0.5 甲。", params = {armor = 1},
-		script = preload("res://src/battle/items/t2_suozijia.gd")},
 	"t2_wudouwawa": {
 		tier = 2, ev = 2, name = "巫毒娃娃", dim = "防御", role = "", seq = _S_ANY, target = _T_SELF,
 		desc = "放一个 HP1 替身，下次受伤由它吃下（溢出穿过、挨一下即碎）。", params = {hp = 2},
@@ -189,15 +149,7 @@ const _DEF := {
 		tier = 2, ev = 2, name = "爆裂卷轴", dim = "能量", role = "条件", seq = _S_ANY, target = _T_SELF,
 		desc = "你这次「大波」少耗 1 能。", params = {save = 2},
 		script = preload("res://src/battle/items/t2_baolie.gd")},
-	"t2_panshi": {
-		tier = 2, ev = 2, name = "磐石卷轴", dim = "能量", role = "条件", seq = _S_ANY, target = _T_SELF,
-		desc = "你这次「大防」少耗 1 能。", params = {save = 2},
-		script = preload("res://src/battle/items/t2_panshi.gd")},
 	# --- 2E 节奏 ---
-	"t2_xueqiu": {
-		tier = 2, ev = 2, name = "传说级雪球", dim = "节奏", role = "惯性", seq = _S_ANY, target = _T_SELF,
-		desc = "重复上回合动作类型：连攻 +0.5 伤 / 连防 +0.5 甲。", params = {bonus = 1},
-		script = preload("res://src/battle/items/t2_xueqiu.gd")},
 	# --- 2F 状态 ---
 	"t2_duyao": {
 		tier = 2, ev = 2, name = "毒药瓶", dim = "状态", role = "连携", seq = _S_ANY, target = _T_ENEMY,
@@ -212,18 +164,10 @@ const _DEF := {
 		tier = 2, ev = 2, name = "力量的代价", dim = "干扰", role = "元件层", seq = _S_ANY, target = _T_ENEMY,
 		desc = "对手本回合费能动作（大波/大防）多耗 1 能。", params = {tax = 2},
 		script = preload("res://src/battle/items/t2_daijia.gd")},
-	"t2_tengman": {
-		tier = 2, ev = 2, name = "藤蔓陷阱", dim = "干扰", role = "", seq = _S_ANY, target = _T_ENEMY,
-		desc = "对手本回合若「切换」，被换下者受 0.5 伤。", params = {dmg = 1},
-		script = preload("res://src/battle/items/t2_tengman.gd")},
 	"t2_dingshen": {
 		tier = 2, ev = 2, name = "定身符", dim = "干扰", role = "元件层", seq = _S_ANY, target = _T_ENEMY,
 		desc = "对手本回合无法「切换」。", params = {},
 		script = preload("res://src/battle/items/t2_dingshen.gd")},
-	"t2_doupeng": {
-		tier = 2, ev = 2, name = "迷雾斗篷", dim = "干扰", role = "信息", seq = _S_ANY, target = _T_SELF,
-		desc = "你的道具栏对对手全部隐藏，直到你下次用道具。", params = {},
-		script = preload("res://src/battle/items/t2_doupeng.gd")},
 	# --- 2H 导出 ---
 	"t2_jike": {
 		tier = 2, ev = 2, name = "扭曲的饥渴", dim = "导出", role = "攻→防", seq = _S_PRE, target = _T_SELF,
@@ -233,21 +177,13 @@ const _DEF := {
 		tier = 2, ev = 2, name = "秘银充能护手", dim = "导出", role = "攻→能", seq = _S_PRE, target = _T_SELF,
 		desc = "你攻击命中时 +0.5 能。", params = {energy = 1},
 		script = preload("res://src/battle/items/t2_huoshou.gd")},
-	"t2_huwan": {
-		tier = 2, ev = 2, name = "秘银护腕", dim = "导出", role = "能→防", seq = _S_ANY, target = _T_SELF,
-		desc = "弃 1 能 → +1.0 甲。", params = {cost = 2, armor = 2},
-		script = preload("res://src/battle/items/t2_huwan.gd")},
-	"t2_fengbao": {
-		tier = 2, ev = 2, name = "瓶装风暴", dim = "导出", role = "防→攻", seq = _S_ANY, target = _T_SELF,
-		desc = "你「防御」后，下回合攻击 +0.5。", params = {bonus = 1},
-		script = preload("res://src/battle/items/t2_fengbao.gd")},
 	"t2_xiongyao": {
 		tier = 2, ev = 2, name = "凶药", dim = "导出", role = "HP→攻", seq = _S_PRE, target = _T_SELF,
 		desc = "弃 0.5 HP，你这次攻击 +1.0 伤。", params = {pay = 1, bonus = 2},
 		script = preload("res://src/battle/items/t2_xiongyao.gd")},
 	# --- 2I 博弈 ---
 	"t2_shaizi": {
-		tier = 2, ev = 2, name = "命运的骰子", dim = "随机", role = "博弈", seq = _S_ANY, target = _T_SELF,
+		tier = 2, ev = 2, name = "命运骰子", dim = "博弈", role = "博弈", seq = _S_ANY, target = _T_SELF,
 		desc = "随机 +1.0 伤 / 甲 / 能 之一。", params = {amount = 2},
 		script = preload("res://src/battle/items/t2_shaizi.gd")},
 
@@ -264,10 +200,6 @@ const _DEF := {
 		tier = 3, ev = 4, name = "至臻剑意", dim = "进攻", role = "穿透", seq = _S_PRE, target = _T_SELF,
 		desc = "你这次「大波」改为穿大防一次。", params = {},
 		script = preload("res://src/battle/items/t3_jianyi.gd")},
-	"t3_hongyu": {
-		tier = 3, ev = 4, name = "渴血红玉", dim = "进攻", role = "自成核", seq = _S_PRE, target = _T_SELF,
-		desc = "弃 2.0 HP，本回合你的攻击翻倍。", params = {pay = 4},
-		script = preload("res://src/battle/items/t3_hongyu.gd")},
 	"t3_shengming": {
 		tier = 3, ev = 4, name = "上等生命药水", dim = "防御", role = "治疗", seq = _S_ANY, target = _T_SELF,
 		desc = "己方出战回 2.0 HP。", params = {heal = 4},
@@ -282,10 +214,6 @@ const _DEF := {
 		script = preload("res://src/battle/items/t3_tinglong.gd")},
 
 	# ========== Tier-3 遗物（持久·每回合 tick·Phase 2）==========
-	"t3_jiuzhongtianlei": {
-		tier = 3, ev = 6, name = "九重天雷", dim = "进攻", role = "遗物", seq = _S_ANY, target = _T_SELF,
-		desc = "连续攻击每回合伤害 +0.5 累加，被打断/换动作清零。", params = {relic = true},
-		script = preload("res://src/battle/items/t3_jiuzhongtianlei.gd")},
 	"t3_judingsanhua": {
 		tier = 3, ev = 6, name = "聚鼎三花", dim = "进攻", role = "遗物", seq = _S_ANY, target = _T_SELF,
 		desc = "你每次攻击额外多 1 次命中（伤害不变），3 次后散。", params = {relic = true, hits = 1, charges = 3},
@@ -298,10 +226,6 @@ const _DEF := {
 		tier = 3, ev = 6, name = "不动明王甲", dim = "防御", role = "遗物", seq = _S_ANY, target = _T_SELF,
 		desc = "防御成功回 0.5 HP 且 +0.5 能，但攻击 −0.5。", params = {relic = true},
 		script = preload("res://src/battle/items/t3_budongmingwang.gd")},
-	"t3_jingangliuli": {
-		tier = 3, ev = 6, name = "金刚琉璃体", dim = "防御", role = "遗物", seq = _S_ANY, target = _T_SELF,
-		desc = "持有期间每回合末自动 +0.5 甲，3 充后碎。", params = {relic = true, armor = 1, charges = 3},
-		script = preload("res://src/battle/items/t3_jingangliuli.gd")},
 	"t3_xumingxiang": {
 		tier = 3, ev = 6, name = "续命香", dim = "防御", role = "遗物", seq = _S_ANY, target = _T_SELF,
 		desc = "持有期间每回合 +0.5 HP，持续 3 回合。", params = {relic = true, heal = 1, turns = 3},
@@ -316,14 +240,56 @@ const _DEF := {
 		tier = 2, ev = 2, name = "替身草人", dim = "节奏", role = "切换", seq = _S_ANY, target = _T_SELF,
 		desc = "你「切换」时留个稻草替身，对手本回合对你的攻击落空。", params = {},
 		script = preload("res://src/battle/items/t2_caoren.gd")},
-	"t3_dashenbian": {
-		tier = 3, ev = 4, name = "打神鞭", dim = "干扰", role = "重口", seq = _S_ANY, target = _T_ENEMY,
-		desc = "强制对手本回合切换出战英雄（喂戌狗·偏 PvE）。", params = {},
-		script = preload("res://src/battle/items/t3_dashenbian.gd")},
 	"t3_yiqi": {
-		tier = 3, ev = 4, name = "一气", dim = "随机", role = "信息", seq = _S_ANY, target = _T_SELF,
+		tier = 3, ev = 4, name = "气", dim = "博弈", role = "信息", seq = _S_ANY, target = _T_SELF,
 		desc = "立 2 个纸扎替身，对手攻击 2/3 概率落空（信息博弈）。", params = {decoys = 2},
 		script = preload("res://src/battle/items/t3_yiqi.gd")},
+
+	# ========== 首发补全：节奏/状态/干扰 capstone + 中立/趣味/meta 留种（2026-06-24·items-firstrelease）==========
+	"t1_weihouzhen": {
+		name = "尾后针", dim = "中立", role = "结构", seq = _S_ANY, target = _T_SELF,
+		desc = "你出战阵亡时，对敌方出战造成 0.5 真伤（临死反咬）。", params = {},
+		script = preload("res://src/battle/items/t1_weihouzhen.gd")},
+	"t1_guike": {
+		name = "占卜龟壳", dim = "中立", role = "meta", seq = _S_ANY, target = _T_SELF,
+		desc = "你下次 3 选 1 不满意，可整批重抽一次。", params = {},
+		script = preload("res://src/battle/items/t1_guike.gd")},
+	"t1_ronglu": {
+		name = "随身熔炉", dim = "中立", role = "meta", seq = _S_ANY, target = _T_SELF,
+		desc = "烧掉你一件未使用道具，立即 +0.5 能。", params = {energy = 1},
+		script = preload("res://src/battle/items/t1_ronglu.gd")},
+	"t2_fengyin": {
+		tier = 2, ev = 2, name = "封印卷轴", dim = "干扰", role = "元件层", seq = _S_ANY, target = _T_ENEMY,
+		desc = "封住对手 1 个道具槽本回合（下回合自解）。", params = {},
+		script = preload("res://src/battle/items/t2_fengyin.gd")},
+	"t2_mojing": {
+		tier = 2, ev = 2, name = "闪亮的魔晶", dim = "中立", role = "结构", seq = _S_ANY, target = _T_SELF,
+		desc = "本回合立即 +1 能，下回合 −1 能（借明天的钱）。", params = {energy = 2, penalty = 2},
+		script = preload("res://src/battle/items/t2_mojing.gd")},
+	"t2_dianjinshi": {
+		tier = 2, ev = 2, name = "点金石", dim = "中立", role = "meta", seq = _S_ANY, target = _T_SELF,
+		desc = "立即把你一件 T1 道具升为 T2（免部署锁 + 定向你选）。", params = {},
+		script = preload("res://src/battle/items/t2_dianjinshi.gd")},
+	"t3_yemingzhu": {
+		tier = 3, ev = 4, name = "夜明珠", dim = "节奏", role = "遗物", seq = _S_ANY, target = _T_SELF,
+		desc = "你切换登场的英雄，本回合攻击 +0.5 且登场冲撞 0.5。", params = {relic = true},
+		script = preload("res://src/battle/items/t3_yemingzhu.gd")},
+	"t3_hedinghong": {
+		tier = 3, ev = 4, name = "鹤顶红", dim = "状态", role = "遗物", seq = _S_ANY, target = _T_SELF,
+		desc = "你引爆毒时，伤害额外 +1.0（毒爆放大器）。", params = {relic = true},
+		script = preload("res://src/battle/items/t3_hedinghong.gd")},
+	"t3_tianluodiwang": {
+		tier = 3, ev = 4, name = "天罗地网", dim = "干扰", role = "一次性", seq = _S_ANY, target = _T_ENEMY,
+		desc = "本回合封住对手全部道具槽 + 禁止切换（下回合自解）。", params = {},
+		script = preload("res://src/battle/items/t3_tianluodiwang.gd")},
+	"t3_mengdie": {
+		tier = 3, ev = 4, name = "梦蝶", dim = "趣味", role = "一次性", seq = _S_ANY, target = _T_SELF,
+		desc = "本局一次：把你与对手当前的 HP / 能量 / 道具栏整体对调。", params = {},
+		script = preload("res://src/battle/items/t3_mengdie.gd")},
+	"t3_morihuozhong": {
+		tier = 3, ev = 4, name = "末日火种", dim = "中立", role = "结构", seq = _S_ANY, target = _T_SELF,
+		desc = "你仅剩 1 名英雄存活时，其攻击与防御各 +1.0。", params = {atk = 2, armor = 2},
+		script = preload("res://src/battle/items/t3_morihuozhong.gd")},
 }
 
 
