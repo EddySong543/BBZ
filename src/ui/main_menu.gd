@@ -51,6 +51,7 @@ var _toast_tween: Tween
 
 
 func _ready() -> void:
+	_build_vignette()
 	_setup_identity()
 	_setup_settings()
 	_setup_modes()
@@ -80,6 +81,35 @@ func refresh_colors() -> void:
 # ============================================================
 # 各区初始化
 # ============================================================
+
+## 暗角衬底（方案A·2026-06-26）：径向暗角压住四周平淡波流 + 给中央主战卡聚光衬底 → 制造纵深、
+## 让 UI/主 CTA 跳出（治"背景平"）。纯叠加层（scoped 本菜单·不碰共享波 shader、不影响 BP），
+## 一个 alpha 控浓度、随时可关。垫在 Background 之上、UI 之下。
+func _build_vignette() -> void:
+	var vig := TextureRect.new()
+	vig.name = "Vignette"
+	var grad := Gradient.new()
+	grad.offsets = PackedFloat32Array([0.0, 0.55, 1.0])
+	grad.colors = PackedColorArray([
+		Color(0.02, 0.03, 0.06, 0.0),   # 中央透明（不压主战卡）
+		Color(0.02, 0.03, 0.06, 0.0),
+		Color(0.02, 0.03, 0.06, 0.5),   # 四周暗navy（聚光衬底·调 alpha 改浓度）
+	])
+	var tex := GradientTexture2D.new()
+	tex.gradient = grad
+	tex.fill = GradientTexture2D.FILL_RADIAL
+	tex.fill_from = Vector2(0.5, 0.5)
+	tex.fill_to = Vector2(1.0, 1.0)
+	tex.width = 256
+	tex.height = 256
+	vig.texture = tex
+	vig.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR   # 平滑暗角（非像素硬边）
+	vig.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	vig.stretch_mode = TextureRect.STRETCH_SCALE
+	vig.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(vig)
+	move_child(vig, 1)   # Background(0) < Vignette(1) < UI(2)
+
 
 ## 顶左身份带：头像框(HeroFrame)+名字+段位占位，整体=资料入口。
 func _setup_identity() -> void:

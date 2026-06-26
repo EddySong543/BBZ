@@ -287,6 +287,8 @@ func _layout() -> void:
 	if _art_mat:
 		_art_mat.set_shader_parameter("corner_radius", inner_rr)
 		_art_mat.set_shader_parameter("corner_grid", inner_grid)
+		# 像素格随卡宽缩放 → 各卡像素尺寸一致（横向大卡不再比小卡粗·目标 ≈10px/格）。
+		_art_mat.set_shader_parameter("cells_x", maxf(roundf(size.x / 10.0), 24.0))
 
 	# 内细线框
 	var inset := 18.0

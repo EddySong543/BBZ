@@ -91,41 +91,45 @@ mouse_filter = 2
 
 [node name="ModeStory" type="Button" parent="UI"]
 layout_mode = 0
-offset_left = 220.0
-offset_top = 180.0
-offset_right = 660.0
-offset_bottom = 830.0
+offset_left = 1230.0
+offset_top = 535.0
+offset_right = 1740.0
+offset_bottom = 875.0
 script = ExtResource("3_modecard")
 card_title = "故事模式"
 card_subtitle = "英雄列传"
 card_caption = "过去"
 art_kind = 2
+title_font_size = 22
+band_ratio = 0.26
 
 [node name="ModeMatch" type="Button" parent="UI"]
 layout_mode = 0
-offset_left = 720.0
-offset_top = 160.0
-offset_right = 1200.0
-offset_bottom = 850.0
+offset_left = 180.0
+offset_top = 165.0
+offset_right = 1160.0
+offset_bottom = 875.0
 script = ExtResource("3_modecard")
 card_title = "匹配对战"
 card_subtitle = "1v1 同时盲选对决"
 card_caption = "现在"
 use_crown = true
 art_kind = 1
-title_font_size = 40
+title_font_size = 52
 
 [node name="ModeTower" type="Button" parent="UI"]
 layout_mode = 0
-offset_left = 1260.0
-offset_top = 180.0
-offset_right = 1700.0
-offset_bottom = 830.0
+offset_left = 1230.0
+offset_top = 165.0
+offset_right = 1740.0
+offset_bottom = 505.0
 script = ExtResource("3_modecard")
 card_title = "远征"
 card_subtitle = "单人闯关挑战"
 card_caption = "未来"
 art_kind = 3
+title_font_size = 22
+band_ratio = 0.26
 
 [node name="NavHeroes" type="Button" parent="UI"]
 layout_mode = 0

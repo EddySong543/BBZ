@@ -34,10 +34,24 @@ extends ColorRect
 ## 区内保留多少颗粒 / 抖动（0 = 玻璃滑 · 1 = 满）。
 @export_range(0.0, 1.0, 0.01) var rest_smooth: float = 0.40
 
+@export_group("色彩弧 · 舒适淡色↔满饱和（方案C 暮色靛金）")
+## 蓝胜方舒适淡锚色（哑光钢靛蓝）。
+@export var pale_blue: Color = Color("a6bcd0")
+## 红胜方舒适淡锚色（哑光赤陶玫瑰）。
+@export var pale_red: Color = Color("dbb0a0")
+## 静息饱和度（0 = 全淡锚色 / 1 = 满饱和）。亮主调恒定：撤掉重度降饱和(原 0.25=洗白/平)。
+@export_range(0.0, 1.0, 0.01) var sat_rest: float = 0.6
+## 揭幕初始饱和度：入菜单先满饱和胜方波，再平息回淡（接揭幕一波闪）。
+@export_range(0.0, 1.0, 0.01) var sat_intro: float = 1.0
+## 平息时长（秒·从 sat_intro 缓到 sat_rest）。
+@export_range(0.0, 4.0, 0.1) var intro_time: float = 1.5
+
 var _mat: ShaderMaterial
 var _phase: float = 0.0
 var _wave_t: float = 0.0
 var _breath_t: float = 0.0
+var _sat_t: float = 0.0      # 揭幕平息计时
+var _blue: bool = true       # 当前胜方（决定淡锚色取蓝/红）
 
 
 func _ready() -> void:
@@ -61,6 +75,7 @@ func refresh_colors() -> void:
 ## 继承 boot 胜方色与推进方向（含界面主色翻转开关）。
 func _apply_winner() -> void:
 	var blue: bool = BootResult.effective_blue_wins()
+	_blue = blue
 	_mat.set_shader_parameter("use_blue", 1.0 if blue else 0.0)
 	_mat.set_shader_parameter("drift_dir", 1.0 if blue else -1.0)
 
@@ -86,3 +101,9 @@ func _process(delta: float) -> void:
 	_mat.set_shader_parameter("rest_soft", rest_soft)
 	_mat.set_shader_parameter("rest_motion", rest_motion)
 	_mat.set_shader_parameter("rest_smooth", rest_smooth)
+	# 色彩弧：揭幕 sat 从 sat_intro(满) 平息到 sat_rest(淡)·ease-out；pale_color 按胜方取方案C 淡锚色。
+	_sat_t = minf(_sat_t + delta, maxf(intro_time, 0.0001))
+	var k: float = _sat_t / maxf(intro_time, 0.0001)
+	var sat: float = lerpf(sat_intro, sat_rest, 1.0 - (1.0 - k) * (1.0 - k))
+	_mat.set_shader_parameter("sat", sat)
+	_mat.set_shader_parameter("pale_color", pale_blue if _blue else pale_red)

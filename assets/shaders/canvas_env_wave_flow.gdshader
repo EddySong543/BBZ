@@ -32,6 +32,11 @@ uniform int levels : hint_range(8, 96) = 40;
 uniform float dither_amt : hint_range(0.0, 2.0) = 1.0;
 uniform float use_blue : hint_range(0.0, 1.0) = 1.0;    // 1 = 蓝 / 0 = 红（boot 胜方）
 
+// ── 色彩弧 ·「舒适淡色 ↔ 满饱和」（2026-06-24·方案C·由 wave_flow_bg.gd 驱动）─────
+// 揭幕入菜单 sat 从 1（满饱和胜方波）平息到 sat_rest（淡锚色）；pale_color = 方案C 按胜方取淡靛蓝/淡赤陶。
+uniform vec3 pale_color : source_color = vec3(0.65, 0.74, 0.82);  // 当前侧舒适淡锚色（脚本设）
+uniform float sat : hint_range(0.0, 1.0) = 1.0;          // 0 = 全淡锚色 / 1 = 满饱和 ramp
+
 // ── 降疲劳 · B「平息动效」+ E「静息区」（2026-06-24，由 wave_flow_bg.gd 驱动）─────
 // 默认全关（breath=0 / rest_enable=0）→ 与并入前完全一致；驱动脚本按 @export 旋钮开启。
 uniform float breath = 0.0;                              // 【B】振幅缓慢呼吸（脚本喂 sin 值，动而不躁）
@@ -146,6 +151,9 @@ void fragment() {
 	L = clamp(L + dith * dither_amt * dith_scale / float(levels), 0.0, 0.9999);
 	L = floor(L * float(levels)) / float(levels);
 
-	vec3 col = use_blue > 0.5 ? blue_color_at(L) : red_color_at(L);
+	vec3 col_full = use_blue > 0.5 ? blue_color_at(L) : red_color_at(L);
+	// 淡色场：淡锚色 × 随波亮度的轻微起伏（封顶 0.98 避免纯白浪尖）——保留波形但安静。
+	vec3 col_pale = clamp(pale_color * (0.80 + 0.32 * L), vec3(0.0), vec3(0.98));
+	vec3 col = mix(col_pale, col_full, sat);             // 色彩弧：淡 ↔ 满
 	COLOR = vec4(col, 1.0);
 }
