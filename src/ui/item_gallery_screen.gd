@@ -3,8 +3,8 @@ extends Control
 ## 道具图鉴（2026-06-26）。镜像英雄图鉴的「列表左 / 详情右常驻」骨架，材质走典籍朱印暖骨。
 ## 左 = 当前阶的道具网格（六列·维度色 jelly 小卡=icon+名）；点卡=选中（金框）。
 ## 右 = 常驻详情板（像素框）：放大图标 + 名 + 阶章 + 维度章 + 一句话描述。
-## 顶带 = 标题牌匾 + 三阶标签页（一级/二级/三级）+ 当前阶计数。
-## ←/→ 环绕换道具（↑/↓ = ±一行）·一级/二级/三级标签页切阶·ESC/返回钮 → 波幕转场回主菜单。
+## 顶带 = 标题牌匾 + 三阶标签页（普通/稀有/传说）+ 当前阶计数。
+## ←/→ 环绕换道具（↑/↓ = ±一行）·普通/稀有/传说标签页切阶·ESC/返回钮 → 波幕转场回主菜单。
 ## ⚠ 装饰 ColorRect 必须 mouse_filter=IGNORE（否则吞点击=返回/切阶失效·英雄图鉴踩过坑）。
 
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")
@@ -32,16 +32,18 @@ const DIM_FALLBACK := Color(0.42, 0.42, 0.47)
 
 # 阶 → 暖系稀有度斜坡（守典籍朱印暖调·不碰冷钢）+ 标签。
 const TIER_COLOR := {1: Color("b08a5a"), 2: Color("c0a878"), 3: Color("f4c84b")}
-const TIER_LABEL := {1: "一级", 2: "二级", 3: "三级"}
+const TIER_LABEL := {1: "普通", 2: "稀有", 3: "传说"}
 
 # ── 左侧网格（六列·当前阶最多 24 件=6×4·POOL 高 900 容得下）──
 const POOL := Rect2(60, 140, 1032, 900)
 const COLS := 6
-const CARD_W := 152.0
-const CARD_H := 172.0
+const BOX := 140.0       # 道具方框（正方·icon 居中其内）
+const NAME_H := 40.0      # 框【外】下方名字带高（名字不在框内）
+const CARD_W := BOX       # 卡宽 = 方框宽（名字在框外·不撑宽卡）
+const CARD_H := BOX + NAME_H   # 方框 + 框外名字带
 const STEP_X := 166.0
-const ROW_H := 188.0
-const X0 := 85.0        # 6 卡在 POOL(60..1092) 内水平居中（整数取位保像素硬边）
+const ROW_H := 194.0
+const X0 := 91.0        # 6 框在 POOL(60..1092) 内水平居中（整数取位保像素硬边）
 const ROW_Y0 := 190.0
 
 # ── 右侧详情板 ──
@@ -136,7 +138,7 @@ func _build_plaque() -> void:
 		_band_rect(band, side[1], Color(EDGE_MID, 0.7))
 
 
-## 三阶标签页（一级/二级/三级）：选中=金框暖底，未选=暗底压字。点击切阶。
+## 三阶标签页（普通/稀有/传说）：选中=金框暖底，未选=暗底压字。点击切阶。
 func _build_tier_tabs() -> void:
 	var band := $TopBand as Control
 	var tab_w := 132.0
@@ -277,51 +279,44 @@ func _make_item_card(item: ItemData, idx: int) -> Button:
 	sel_edge.name = "SelEdge"
 	sel_edge.color = GOLD_TEXT
 	sel_edge.show_behind_parent = true
-	sel_edge.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	sel_edge.offset_left = -3
-	sel_edge.offset_top = -3
-	sel_edge.offset_right = 3
-	sel_edge.offset_bottom = 3
+	sel_edge.position = Vector2(-3, -3)        # 只包【方框】（不含框外名字）
+	sel_edge.size = Vector2(BOX + 6, BOX + 6)
 	sel_edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	sel_edge.visible = false
 	card.add_child(sel_edge)
-	# jelly 卡底（维度色·与抽卡/道具栏同 shader）
+	# jelly 方框（正方·维度色·与抽卡/道具栏同 shader）
 	var jelly := ColorRect.new()
 	jelly.color = Color.WHITE   # jelly shader 乘 COLOR，须白
-	jelly.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	jelly.position = Vector2.ZERO
+	jelly.size = Vector2(BOX, BOX)
 	jelly.material = _make_card_jelly(dim_col)
 	jelly.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(jelly)
-	# 图标
+	# 图标（居中于正方框）
 	var tex: Texture2D = ItemCatalog.load_icon(item.item_id)
 	if tex != null:
 		var icon := TextureRect.new()
 		icon.texture = tex
-		icon.position = Vector2(CARD_W * 0.5 - 48.0, 16.0)
-		icon.size = Vector2(96.0, 96.0)
+		var isz := 108.0
+		icon.position = Vector2((BOX - isz) * 0.5, (BOX - isz) * 0.5)
+		icon.size = Vector2(isz, isz)
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card.add_child(icon)
-	# 名字暗衬 + 名字
-	var scrim := ColorRect.new()
-	scrim.color = Color(0, 0, 0, 0.26)
-	scrim.position = Vector2(10.0, 118.0)
-	scrim.size = Vector2(CARD_W - 20.0, CARD_H - 118.0 - 10.0)
-	scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(scrim)
+	# 名字（移到方框【外】下方·描边压蓝波背景保可读·暖米白）
 	var name_lbl := Label.new()
 	name_lbl.text = item.item_name
-	name_lbl.position = Vector2(8.0, 120.0)
-	name_lbl.size = Vector2(CARD_W - 16.0, 44.0)
+	name_lbl.position = Vector2(-12.0, BOX + 2.0)
+	name_lbl.size = Vector2(BOX + 24.0, NAME_H)
 	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	name_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	FontManager.apply(name_lbl, 16)
-	name_lbl.add_theme_color_override("font_color", Color(0.99, 0.97, 0.92))
-	name_lbl.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.03, 0.9))
-	name_lbl.add_theme_constant_override("outline_size", 4)
+	name_lbl.add_theme_color_override("font_color", PARCHMENT_HI)
+	name_lbl.add_theme_color_override("font_outline_color", Color(0.04, 0.03, 0.02, 0.95))
+	name_lbl.add_theme_constant_override("outline_size", 3)
 	name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(name_lbl)
 	card.pressed.connect(_select.bind(idx))
@@ -342,7 +337,7 @@ func _make_card_jelly(dim: Color) -> ShaderMaterial:
 	m.set_shader_parameter("pixel_grid", 42.0)
 	m.set_shader_parameter("corner", 0.09)
 	m.set_shader_parameter("edge_px", 2.0)
-	m.set_shader_parameter("aspect", CARD_W / CARD_H)
+	m.set_shader_parameter("aspect", 1.0)   # 正方框
 	m.set_shader_parameter("noise_amt", 0.06)
 	m.set_shader_parameter("wear", 0.18)
 	return m
@@ -507,7 +502,7 @@ func _build_detail_panel() -> void:
 	var hint := _make_label(
 		Vector2(PANEL.position.x, PANEL.position.y + PANEL.size.y - 40),
 		Vector2(PANEL.size.x, 24), 14, Color(TIN_DIM, 0.55))
-	hint.text = "← → 切换道具 · 一级/二级/三级 切阶 · ESC 返回"
+	hint.text = "← → 切换道具 · 普通/稀有/传说 切阶 · ESC 返回"
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 
