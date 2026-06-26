@@ -5,7 +5,7 @@ extends Control
 ## 中央 = 三张命运牌（ModeCard）：故事(过去) / 匹配对战(现在·稍大) / 爬塔(未来)。
 ##   高亮(金框)+放大 = 悬停/焦点专属效果（ModeCard 内实现），不属于某张固定的牌。
 ## 边缘件：顶左身份带(头像框+名字+段位占位=资料入口) / 顶右设置(icon锚位) /
-##   底坞 英雄(图鉴·已实装)|道具|商店(icon锚位+字·未来收集层入口；小队已删 2026-06-12)。
+##   底坞 英雄(图鉴·已实装)|道具(图鉴·已实装 2026-06-26)|商店(icon锚位+字·未来收集层入口；小队已删 2026-06-12)。
 ## 现仅「匹配对战」接入实际流程（→ bp_screen → 战斗），其余占位（点击弹"敬请期待"）。
 ## ⚠️ 历史否决（勿再走）：海面化 / 星空压暗 / 中央大物或留白 / 公告卡 / 今日一抽（第七轮裁掉）。
 
@@ -254,6 +254,8 @@ func _setup_dock() -> void:
 		_add_icon(btn, Rect2(30, 19, 32, 32), navs[i][2])
 		if btn == $UI/NavHeroes:
 			btn.pressed.connect(_on_heroes_pressed)   # 英雄图鉴（2026-06-12 实装）
+		elif btn == $UI/NavItems:
+			btn.pressed.connect(_on_items_pressed)    # 道具图鉴（2026-06-26 实装）
 		else:
 			btn.pressed.connect(_on_placeholder_pressed.bind(navs[i][1]))
 		_attach_juice(btn)
@@ -264,6 +266,13 @@ func _on_heroes_pressed() -> void:
 	if _match_state != MatchState.IDLE:
 		return
 	TransitionManager.transition_to("res://src/ui/hero_gallery_screen.tscn")
+
+
+## 道具图鉴入口：波幕转场（menu↔gallery 同语言）。匹配中不离队。
+func _on_items_pressed() -> void:
+	if _match_state != MatchState.IDLE:
+		return
+	TransitionManager.transition_to("res://src/ui/item_gallery_screen.tscn")
 
 
 # ============================================================
