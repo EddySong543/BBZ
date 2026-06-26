@@ -31,7 +31,7 @@ const DIM_COLOR := {
 const DIM_FALLBACK := Color(0.42, 0.42, 0.47)
 
 # 阶 → 暖系稀有度斜坡（守典籍朱印暖调·不碰冷钢）+ 标签。
-const TIER_COLOR := {1: Color("b08a5a"), 2: Color("c0a878"), 3: Color("f4c84b")}
+const TIER_COLOR := {1: Color("8c887e"), 2: Color("8a4fc4"), 3: Color("dca12e")}   # 稀有度色(普通灰/稀有紫/传说金)·与框/卡同源
 const TIER_LABEL := {1: "普通", 2: "稀有", 3: "传说"}
 
 # ── 左侧网格（六列·当前阶最多 24 件=6×4·POOL 高 900 容得下）──
@@ -265,9 +265,9 @@ func _build_pool() -> void:
 	pool_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
-## 单件道具卡（维度色 jelly 小卡·icon + 名）。选中态金框由 _select 刷。
+## 单件道具卡（稀有度色 jelly 方框·icon + 框外名）。选中态金框由 _select 刷。
 func _make_item_card(item: ItemData, idx: int) -> Button:
-	var dim_col: Color = DIM_COLOR.get(item.dimension, DIM_FALLBACK)
+	var box_col: Color = ItemCatalog.rarity_color(item.tier)   # 框背景按稀有度(普通灰/稀有蓝/传说金)
 	var card := Button.new()
 	card.flat = true
 	card.focus_mode = Control.FOCUS_NONE
@@ -284,12 +284,12 @@ func _make_item_card(item: ItemData, idx: int) -> Button:
 	sel_edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	sel_edge.visible = false
 	card.add_child(sel_edge)
-	# jelly 方框（正方·维度色·与抽卡/道具栏同 shader）
+	# jelly 方框（正方·稀有度色·与抽卡/道具栏同 shader）
 	var jelly := ColorRect.new()
 	jelly.color = Color.WHITE   # jelly shader 乘 COLOR，须白
 	jelly.position = Vector2.ZERO
 	jelly.size = Vector2(BOX, BOX)
-	jelly.material = _make_card_jelly(dim_col)
+	jelly.material = _make_card_jelly(box_col)
 	jelly.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(jelly)
 	# 图标（居中于正方框）

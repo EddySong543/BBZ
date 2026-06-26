@@ -373,6 +373,15 @@ static func load_icon(id: String) -> Texture2D:
 	return load(p) as Texture2D
 
 
+## 稀有度底色（按 tier·2026-06-26 Eddy：道具框背景改按稀有度而非维度划分）。
+## 通用约定色：普通=暖灰 / 稀有=蓝 / 传说=金。图鉴卡 / 战斗道具栏芯片 / 抽卡卡 统一引用。
+static func rarity_color(tier: int) -> Color:
+	match tier:
+		2: return Color("8a4fc4")   # 稀有 = 紫（避开蓝波背景撞色·高稀有度惯例色）
+		3: return Color("dca12e")   # 传说 = 金
+		_: return Color("8c887e")   # 普通 = 暖灰
+
+
 ## 显示名 → id 映射（从 _DEF 实时构建，永不过时）。重名会 push_error（当前全唯一）。
 ## 供 tools/import_item_art.gd 把「臭鸡蛋.png」分配为「t1_xiangjiaopi.png」。
 static func name_to_id() -> Dictionary:

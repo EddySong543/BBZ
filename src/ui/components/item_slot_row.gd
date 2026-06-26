@@ -215,7 +215,7 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 			BattleCore.SlotState.CHARGING:
 				var item: ItemData = battle.slot_item(player, i)
 				var nm: String = item.item_name if item != null else ""
-				var dim: Color = _dim_color(item)
+				var dim: Color = _rarity_color(item)   # 框色按稀有度（变量名 dim 历史遗留）
 				var tex: Texture2D = _icon_for(item.item_id) if item != null else null
 				if tex != null:
 					icon.texture = tex
@@ -260,10 +260,11 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 		_upgrade_btns[i].visible = interactive and battle.can_upgrade(player, i)
 
 
-func _dim_color(item: ItemData) -> Color:
+## 芯片底色（2026-06-26 Eddy：改按【稀有度】而非维度——普通灰/稀有蓝/传说金·与图鉴/抽卡同源）。
+func _rarity_color(item: ItemData) -> Color:
 	if item == null:
 		return SEAL_FT
-	return DIM_COLOR.get(item.dimension, Color(0.42, 0.42, 0.47))
+	return ItemCatalog.rarity_color(item.tier)
 
 
 ## 取道具图标（带缓存）；缺图 / 未导入返回 null → 回退占位文字。

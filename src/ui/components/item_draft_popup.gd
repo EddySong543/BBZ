@@ -80,7 +80,8 @@ func _build_card(item: ItemData, pos: Vector2, idx: int) -> void:
 	card.pressed.connect(_resolve.bind(idx))
 	add_child(card)
 
-	var dim: Color = DIM_COLOR.get(item.dimension if item != null else "", Color(0.42, 0.42, 0.47))
+	# 卡底改按【稀有度】上色（2026-06-26 Eddy·普通灰/稀有蓝/传说金·变量名 dim 历史遗留）。
+	var dim: Color = ItemCatalog.rarity_color(item.tier) if item != null else Color(0.42, 0.42, 0.47)
 	# 图标（缺图 → 描述区维持原位、卡面与现状一像素不变·零回归）。
 	var tex: Texture2D = ItemCatalog.load_icon(item.item_id) if item != null else null
 	var scrim_top := 184.0 if tex != null else 92.0    # 有图 → 描述区下移给图标腾窗
