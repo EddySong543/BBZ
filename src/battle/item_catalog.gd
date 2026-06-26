@@ -4,8 +4,8 @@ extends RefCounted
 ## 道具目录（ADR-003 D1）。集中数据源：id → 元数据 + 一句话描述 + 效果参数 + 逻辑脚本。
 ## 逻辑在 src/battle/items/<id>.gd（继承 ItemEffect）。make(id) 构造一件 ItemData（含独立 effect 实例）。
 ##
-## 当前 = T1【非趣味】全部 + T2/T3【非中立·非趣味】Tier-A 批（Phase 1）+ T3 遗物 7 件（Phase 2）。
-## 缓做：经济/UI/PvE 倾向件（Phase 3）+ 中立/趣味两类（独立设计）。详见 design/items-list.md。
+## 当前已实装 = 首发 61 件（T1 20 / T2 24 / T3 17·含中立 / 趣味）= design/items-firstrelease.md（真相源）。
+## 全集 112 件（design/items-list.md）中未入选的 51 件为延后释放池，按版本逐批上线。
 ##
 ## 道具均为字符串 id（tier 前缀拼音），无数字编号。⚠ id 拼音为历史化石、≠ 当前显示名
 ## （如 t1_xiangjiaopi=「臭鸡蛋」、t1_lingdang=「STEAL技能卡」）——id 是内部稳定主键、永不展示给玩家，
@@ -184,7 +184,7 @@ const _DEF := {
 	# --- 2I 博弈 ---
 	"t2_shaizi": {
 		tier = 2, ev = 2, name = "命运骰子", dim = "博弈", role = "博弈", seq = _S_ANY, target = _T_SELF,
-		desc = "随机 +1.0 伤 / 甲 / 能 之一。", params = {amount = 2},
+		desc = "随机 +1.0 伤 / 甲 / 能 之一，可重抛一次（取对你更有利的一面）。", params = {amount = 2},
 		script = preload("res://src/battle/items/t2_shaizi.gd")},
 
 	# ========== Tier-3（超模 / build-around·非中立/非趣味·Phase 1 可实装子集）==========

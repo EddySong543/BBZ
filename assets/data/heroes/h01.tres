@@ -8,6 +8,6 @@ hero_id = "h01"
 hero_name = "子鼠"
 max_hp = 4
 skill_description = "囤鼠"
-skill_detail = "子鼠在场时，己方获得的所有能量 +1。"
+skill_detail = "子鼠在场时，己方获得的所有能量 +0.5。"
 portrait_path = "res://assets/sprites/heroes/h01/h01_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h01/h01_idle.tres"

@@ -136,7 +136,7 @@ func on_self_damaged(_battle: BattleCore, _player: int, _slot: int, _dealt: int,
 	pass
 
 
-## 本英雄（出战时）给己方每次"获得能量"事件的额外加成（半能）。子鼠囤鼠 = ENERGY_UNIT（每次 +1 能）。
+## 本英雄（出战时）给己方每次"获得能量"事件的额外加成（半能）。子鼠囤鼠 override 返 1 半能（= 每次得能 +0.5）。
 func energy_gain_bonus(_battle: BattleCore, _player: int, _slot: int) -> int:
 	return 0
 

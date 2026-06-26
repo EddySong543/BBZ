@@ -25,14 +25,6 @@ enum SkillType { PASSIVE, EXTRA_ACTION, ENHANCED_ACTION }
 const HEROES_DIR := "res://assets/data/heroes/"
 
 
-static func get_portrait_path(hero_id: String) -> String:
-	return "res://assets/sprites/heroes/%s/%s_portrait.png" % [hero_id, hero_id]
-
-
-static func get_spritesheet_path(hero_id: String) -> String:
-	return "res://assets/sprites/heroes/%s/%s_spritesheet.png" % [hero_id, hero_id]
-
-
 ## 从 assets/data/heroes/*.tres 加载所有英雄。
 ## 按文件名字典序排序（h01 < h02 < ... < h13），保证稳定顺序。
 static func create_pool_heroes(heroes_dir: String = HEROES_DIR) -> Array[HeroData]:
