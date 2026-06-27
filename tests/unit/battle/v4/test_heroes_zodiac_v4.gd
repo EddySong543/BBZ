@@ -143,17 +143,45 @@ func test_h07_dangxian_chongzhuang_on_switch_in() -> void:
 	assert_eq(b.hp[1][0], 10 - 1, "马登场冲撞 0.5HP = 1 半点 给对手出战(对手 HP5=10半)")
 
 
-# ---- h08 未羊 救援（队友将致死 → 羊顶上承伤）----
+# ---- h08 未羊 牧养（在场时你方替补席存活英雄每回合回 0.5HP·出战不回·2026-06-27 替罪→牧养重设计）----
 
-func test_h08_jiuyuan_guards_ally_from_lethal() -> void:
-	# carry(slot0) 残血 1.0；羊(slot1)在替补；对手大波致死 carry → 羊救援
-	var b := _battle_team(["test_carry", "h08", "test_p1_2"], 5, 8)
-	b.hp[0][0] = 2                              # carry 残血 1.0 (2 半点)
+func test_h08_muyang_heals_reserve_each_turn() -> void:
+	# 未羊出战 + 残血替补(slot1) → 每回合替补回 0.5HP(1 半点)；出战未羊不回。
+	var b := _battle_team(["h08", "test_p0_1", "test_p0_2"], 6, 8)
+	b.hp[0][1] = 4                       # 替补残血(2.0HP=4 半点)
+	b.hp[0][0] = 8                       # 未羊出战残血(4.0HP)——验证出战不回
 	b.select_action(0, ActionDef.Action.CHARGE)
-	b.select_action(1, ActionDef.Action.BIG_ATTACK)   # 大波 4 半点 → 致死 carry
+	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_false(b.game_over, "羊救援 → 游戏未结束")
-	assert_gt(b.hp[0][0], 0, "carry 被救下、未死")
+	assert_eq(b.hp[0][1], 5, "替补每回合回 0.5HP(1 半点)：4→5")
+	assert_eq(b.hp[0][0], 8, "出战未羊不回（在前线）")
+
+
+func test_h08_muyang_caps_at_max_and_requires_sheep() -> void:
+	# 满血替补不溢出；无未羊则残血替补不回。
+	var b := _battle_team(["h08", "test_p0_1", "test_p0_2"], 6, 8)
+	b.select_action(0, ActionDef.Action.CHARGE)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(b.hp[0][1], 12, "满血替补不溢出（封顶 max_hp）")
+	var nb := _battle_team(["test_p0_0", "test_p0_1", "test_p0_2"], 6, 8)
+	nb.hp[0][1] = 4
+	nb.select_action(0, ActionDef.Action.CHARGE)
+	nb.select_action(1, ActionDef.Action.CHARGE)
+	nb.resolve()
+	assert_eq(nb.hp[0][1], 4, "无未羊 → 替补不回血")
+
+
+func test_h08_muyang_works_from_reserve() -> void:
+	# 未羊在替补、出战 plain → 仍生效（在场含替补）；未羊自己在替补也回。
+	var b := _battle_team(["test_p0_0", "h08", "test_p0_2"], 6, 8)
+	b.hp[0][1] = 4   # 未羊(替补)残血
+	b.hp[0][2] = 4   # 另一替补残血
+	b.select_action(0, ActionDef.Action.CHARGE)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(b.hp[0][1], 5, "未羊在替补也生效·自身回 0.5HP")
+	assert_eq(b.hp[0][2], 5, "另一替补也回 0.5HP")
 
 
 # ---- h09 申猴 裂爪（命中 → 碎对手等量能量）----

@@ -141,9 +141,32 @@ func energy_gain_bonus(_battle: BattleCore, _player: int, _slot: int) -> int:
 	return 0
 
 
-## 本英雄是否为"致死救援"守护者（替补席存活时，可替将死的出战队友顶伤上场）。未羊 = true。
+## 「致死救援」型守护者（swap-in 顶替型：替补席存活时，替将死的出战队友顶伤上场）。
+## ⚠ 当前【无英雄使用】——原未羊 h08 已转【牧养】(reserve_heal_per_turn)，守护职能移交黑暗戌狗 h23
+## (走另一套语义 is_protect_guardian·替死碎掉非顶替)。保留本 hook 作 swap-in 顶替型守护的扩展接口。
 func is_lethal_guardian() -> bool:
 	return false
+
+
+## 「牧养 / 休养生息」型（光版未羊 h08）：本英雄在场（含替补·存活）时，你方退到【替补席】的存活英雄
+## 每回合回本值（半点）HP（退下火线休养；出战英雄不回）。引擎在 resolve Phase 5.6 走 _heal 入账。
+## 默认 0（不产出）；未羊 override 返回 1（= +0.5 HP/回合）。共享原语 = 轮换续航（配午马免费切换）。
+func reserve_heal_per_turn() -> int:
+	return 0
+
+
+## 「护主」型守护者（黑暗戌狗 h23）：在替补席存活时，出战队友受【致命一击】→ 本英雄替它挡下：
+## 这一击完全免除、本英雄碎掉下场、出战 carry【留前线】（每局一次）。与 is_lethal_guardian（未羊·carry
+## 下场羊顶上承伤）区别 = 自我牺牲、carry 不退场不打断节奏。默认 false；黑暗戌狗 override。
+func is_protect_guardian() -> bool:
+	return false
+
+
+## 「饕餮」型（黑暗亥猪 h24）：本英雄在场（含替补·存活）时，战场上【任一】英雄阵亡（敌我皆可）
+## → 本英雄所属队【团队】能量 +本值（半能）。引擎在 _resolve_deaths 每个死亡点扫双方存活英雄累计。
+## 默认 0（不产出）；黑暗亥猪 override 返回 4（= +2.0 能/死）。
+func death_energy_bonus() -> int:
+	return 0
 
 
 ## 免费切换次数上限（仅 has_free_switch()=true 时有意义）；-1 = 无限。午马当先 = -1（不限次）。
@@ -166,6 +189,14 @@ func combo_proc_energy() -> int:
 	return 0
 
 
+## 「一鸣惊人 / 蓄势」型（黑暗酉鸡 h22）：本英雄在场（含替补·存活）时，己方可「空过」一回合
+## （ActionDef.STORE·不行动/不拿能量/无防御）把这次行动【存起来】；之后任意回合连同当回合行动一起打出
+## （= 复用疾风的双动作结算·消耗 1 次存储）。与疾风区别 = 净零（先空过换之后双动作·总数不变·非每局白送）。
+## 默认 false；黑暗酉鸡 override 返回 true。引擎在 can_store/STORE 入账/can_double_action 处理（stored_action[]）。
+func grants_action_store() -> bool:
+	return false
+
+
 ## 「疾风」型（黑暗卯兔 h16）：本英雄在场（含替补·存活）时，己方每局可 N 次把【同一个动作】
 ## 再做一次（附加动作·波/大波/攒可双·技能/切换/防御除外）。返回每局上限 N（0 = 不提供）。
 ## 引擎在 can_double()/select_double()/resolve() 处理；cap 计在本英雄 slot 的 "jifeng_uses"。
@@ -180,7 +211,7 @@ func forces_enemy_attack() -> bool:
 
 
 ## 「缠绕」型（黑暗巳蛇 h18）：本英雄【出战·存活】时，对手【无法主动切换】（含午马免费切换）。
-## 死亡换人 / 致死救援 / 道具强制切换等"被动·触发"切换不受影响。引擎在 can_afford(SWITCH) +
+## 死亡换人 / 申猴调虎离山 / 道具强制切换等"被动·触发"切换不受影响。引擎在 can_afford(SWITCH) +
 ## is_free_switch_target 统一 gate（_can_switch）。默认 false。
 func locks_enemy_switch() -> bool:
 	return false

@@ -20,7 +20,9 @@ extends RefCounted
 const HP_UNIT := 2  # 必须与 ActionDef.HP_UNIT 一致
 
 ## 英雄机制数值（从引擎逻辑里的裸魔数提出来，集中可调）
-const LETHAL_GUARDIAN_CAP := 2   # 未羊致死救援每局上限（次）
+const LETHAL_GUARDIAN_CAP := 2   # 顶替型致死救援每局上限·⚠当前无英雄用(原未羊已转牧养·守护见 h23 护主)
+const HUZHU_CAP := 1             # 黑暗戌狗 h23【护主】替死每局上限（次）
+const STORED_CAP := 2            # 黑暗酉鸡 h22【一鸣惊人】可囤积的「存储行动」上限（防无限攒）
 const CHONGZHUANG_DAMAGE := 1    # 午马登场冲撞 = 0.5 HP（半点）
 const SHUCHAO_CAP_PER_TURN := 3  # 黑暗子鼠 h13【鼠潮】每回合 combo→能量返还封顶 = 3 次 proc = 1.5 能（回路刹车·PvE 可解封顶·§6/§10）
 const DOUBLEABLE_ACTIONS := [ActionDef.Action.ATTACK, ActionDef.Action.BIG_ATTACK, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND, ActionDef.Action.BIG_DEFEND]  # 黑暗卯兔 h16【疾风】可"附加同种再做一次"的动作（仅技能/切换除外·防/大防可选但二元整体挡=无额外效果）
@@ -44,11 +46,13 @@ var statuses: Array = [[], []]            # statuses[player][slot]: Dictionary�
 
 var selected_action: Array[int] = [-1, -1]
 var _switch_to: Array[int] = [-1, -1]               # SWITCH 动作的目标槽位
+var _forced_pull: Array[int] = [-1, -1]             # 黑暗申猴 h21【调虎离山】：_forced_pull[受害方]=被强制揪上场的替补槽（execute_active 设·resolve Phase 2.7 执行后清）
 var pending_death_switch: Array[bool] = [false, false]  # 出战阵亡待玩家选替补上场
 var _death_processed: Array = [[], []]              # 每槽位死亡 hook 是否已触发（防重复）
 var _dmg_dealt: Array[int] = [0, 0]                 # 本回合各方造成的实际伤害(半点)·通用记账
 var _shuchao_procs: Array[int] = [0, 0]             # 本回合各方已计入的 combo proc 数（鼠潮 h13·每回合封顶 SHUCHAO_CAP_PER_TURN）
 var _double: Array[bool] = [false, false]           # 本回合各方是否"附加同种动作再做一次"（疾风 h16·选择阶段设·resolve 末重置）
+var stored_action: Array[int] = [0, 0]              # 黑暗酉鸡 h22【一鸣惊人】各方已存储的行动数（空过囤积·跨回合保留·release 时 -1）
 var _killer: Array = [[], []]                       # _killer[player][slot]=直接攻击致死该英雄的攻击方;-1=非攻击致死。on_kill 只对直接攻击触发(防 splash/AOE 连锁)
 var _last_action: Array[int] = [-1, -1]             # 上回合双方动作（传说级雪球·惯性件读取）
 
@@ -78,7 +82,7 @@ const _HERO_SKILL_SCRIPTS := {
 	"h05": preload("res://src/battle/skills/h05_liejia.gd"),
 	"h06": preload("res://src/battle/skills/h06_cuidu.gd"),
 	"h07": preload("res://src/battle/skills/h07_dangxian.gd"),
-	"h08": preload("res://src/battle/skills/h08_jiuyuan.gd"),
+	"h08": preload("res://src/battle/skills/h08_muyang.gd"),
 	"h09": preload("res://src/battle/skills/h09_liezhao.gd"),
 	"h10": preload("res://src/battle/skills/h10_jianyi.gd"),
 	"h11": preload("res://src/battle/skills/h11_zhuibu.gd"),
@@ -91,6 +95,10 @@ const _HERO_SKILL_SCRIPTS := {
 	"h18": preload("res://src/battle/skills/h18_chanrao.gd"),
 	"h19": preload("res://src/battle/skills/h19_jianta.gd"),
 	"h20": preload("res://src/battle/skills/h20_duanzui.gd"),
+	"h21": preload("res://src/battle/skills/h21_diaohu.gd"),
+	"h22": preload("res://src/battle/skills/h22_yiming.gd"),
+	"h23": preload("res://src/battle/skills/h23_huzhu.gd"),
+	"h24": preload("res://src/battle/skills/h24_taotie.gd"),
 }
 
 ## 注册表整体校验只跑一次（静态守卫）。
@@ -124,10 +132,12 @@ func setup(p1_heroes: Array, p2_heroes: Array, seed_value: int = 0) -> void:
 	energy = [ActionDef.INITIAL_ENERGY, ActionDef.INITIAL_ENERGY]
 	selected_action = [-1, -1]
 	_switch_to = [-1, -1]
+	_forced_pull = [-1, -1]
 	pending_death_switch = [false, false]
 	_dmg_dealt = [0, 0]
 	_shuchao_procs = [0, 0]
 	_double = [false, false]
+	stored_action = [0, 0]
 	_last_action = [-1, -1]
 	items = [[], []]
 	item_uses = [[], []]
@@ -282,6 +292,8 @@ func _can_switch(player: int) -> bool:
 
 
 func can_afford(player: int, action: int) -> bool:
+	if action == ActionDef.STORE:
+		return can_store(player)   # 一鸣惊人：空过存行动·仅在场有 h22 + 存储未满（0 能）
 	if action in ActionDef.DEFEND_ACTIONS and not _can_defend(player):
 		return false   # 血勇：嗜杀红温·防/大防不合法（单一收口，legal_actions/UI/AI 全走此）
 	if action == ActionDef.Action.SWITCH and not _can_switch(player):
@@ -372,13 +384,13 @@ func _double_grantor(player: int) -> int:
 	return -1
 
 
-## 指定动作能否"附加再做一次"：动作可双（波/大波/攒/防/大防）+ 在场有疾风且 cap 未满 + 能量够付双份。
-## 取 action 参数（不读 selected_action）→ UI 在【提交前】可用本地待选动作校验。
+## 指定动作能否"附加再做一次"：动作可双（波/大波/攒/防/大防）+ 在场有疾风(cap 未满)或有存储行动(h22)
+## + 能量够付双份。取 action 参数（不读 selected_action）→ UI 在【提交前】可用本地待选动作校验。
 func can_double_action(player: int, action: int) -> bool:
 	if action < 0 or not (action in DOUBLEABLE_ACTIONS):
 		return false
-	if _double_grantor(player) < 0:
-		return false
+	if _double_grantor(player) < 0 and stored_action[player] <= 0:
+		return false   # 既无疾风（cap 未满）又无存储行动 → 不可双
 	return usable_energy(player) >= 2 * _get_cost(player, action)
 
 
@@ -387,14 +399,14 @@ func can_double(player: int) -> bool:
 	return can_double_action(player, selected_action[player])
 
 
-## 本队是否有"疾风"型存活英雄且 cap 未满（UI 决定是否显示疾风开关）。
+## 本队是否可双（疾风 cap 未满 或 有存储行动 h22）——UI 决定是否显示「附加」开关。
 func has_double(player: int) -> bool:
-	return _double_grantor(player) >= 0
+	return _double_grantor(player) >= 0 or stored_action[player] > 0
 
 
-## 本队疾风剩余可用次数（UI 标签；无疾风英雄返 0）。
+## 本队"附加"剩余可用次数（UI 标签；= 疾风剩余 与 存储行动数 取大；都无返 0）。
 func double_uses_left(player: int) -> int:
-	var best := 0
+	var best := stored_action[player]
 	for s in range(heroes[player].size()):
 		if hp[player][s] <= 0:
 			continue
@@ -402,6 +414,24 @@ func double_uses_left(player: int) -> int:
 		if sk != null and sk.double_action_cap() > 0:
 			best = maxi(best, sk.double_action_cap() - int(get_status(player, s, "jifeng_uses", 0)))
 	return best
+
+
+# === 黑暗酉鸡 h22【一鸣惊人 / 蓄势】：空过存行动 → 之后双动作释放 ===
+
+## 本队是否有"一鸣惊人"型存活英雄（含替补）→ 可空过存行动 / 可释放双动作。
+func _has_action_store(player: int) -> bool:
+	for s in range(heroes[player].size()):
+		if hp[player][s] <= 0:
+			continue
+		var sk: HeroSkill = _skills[player][s]
+		if sk != null and sk.grants_action_store():
+			return true
+	return false
+
+
+## player 当前能否"空过存行动"（在场有 h22 + 存储未满）。空过 0 能、无防御。
+func can_store(player: int) -> bool:
+	return _has_action_store(player) and stored_action[player] < STORED_CAP
 
 
 ## player 的出战英雄是否"逼战"型（黑暗辰龙 h17）且存活 → 对手不攻它就挨饿（UI/AI/resolve 用）。
@@ -755,7 +785,9 @@ func clone() -> BattleCore:
 	c.statuses = statuses.duplicate(true)
 	c.selected_action = selected_action.duplicate()
 	c._double = _double.duplicate()
+	c.stored_action = stored_action.duplicate()
 	c._switch_to = _switch_to.duplicate()
+	c._forced_pull = _forced_pull.duplicate()
 	c.pending_death_switch = pending_death_switch.duplicate()
 	c._death_processed = _death_processed.duplicate(true)
 	c._dmg_dealt = _dmg_dealt.duplicate()
@@ -796,6 +828,8 @@ func legal_actions(player: int) -> Array:
 			out.append({action = ActionDef.Action.SWITCH, target = t})
 	if can_use_active(player):
 		out.append({action = ActionDef.ACTIVE, target = -1})
+	if can_store(player):
+		out.append({action = ActionDef.STORE, target = -1})   # 一鸣惊人：空过存行动
 	return out
 
 
@@ -901,11 +935,20 @@ func resolve() -> Dictionary:
 			if sk != null:
 				set_status(p, slot, "active_uses", int(get_status(p, slot, "active_uses", 0)) + 1)
 				events.append({id = "active_used", player = p, slot = slot})
-		# 疾风 h16：附加同种动作 —— 合法则付第二份能 + 计 cap；攒额外再产一次能（攻击的第二段在 Phase 3+4 挂 hitlist）
+		elif a[p] == ActionDef.STORE:
+			# 一鸣惊人 h22：空过 —— 不行动、不拿能量（_get_cost=0 已无扣）、无防御，存储 +1（封顶 STORED_CAP）。
+			stored_action[p] = mini(stored_action[p] + 1, STORED_CAP)
+			events.append({id = "yiming_store", player = p, count = stored_action[p]})
+		# 附加同种动作（疾风 h16 / 一鸣惊人 h22 释放）——付第二份能；攒额外再产一次能（攻击第二段在 Phase 3+4 挂 hitlist）。
 		if _double[p]:
 			var g: int = _double_grantor(p)
-			if a[p] in DOUBLEABLE_ACTIONS and g >= 0:
-				set_status(p, g, "jifeng_uses", int(get_status(p, g, "jifeng_uses", 0)) + 1)
+			if a[p] in DOUBLEABLE_ACTIONS and (stored_action[p] > 0 or g >= 0):
+				# 优先消耗"存储行动"（h22 玩家刻意囤的资源），其次才用疾风每局 cap。
+				if stored_action[p] > 0:
+					stored_action[p] -= 1
+					events.append({id = "yiming_release", player = p, action = a[p]})
+				else:
+					set_status(p, g, "jifeng_uses", int(get_status(p, g, "jifeng_uses", 0)) + 1)
 				energy[p] -= _get_cost(p, a[p])   # 第二份按原始费用（不重复享道具折扣）
 				if a[p] == ActionDef.Action.CHARGE:
 					var gd: int = ActionDef.BASE_ACTION_DEF[ActionDef.Action.CHARGE]["energy_gain"]
@@ -913,7 +956,7 @@ func resolve() -> Dictionary:
 					events.append({id = "charge_gain", player = p, amount = gd})
 				events.append({id = "jifeng_double", player = p, action = a[p]})
 			else:
-				_double[p] = false   # 非法双动作（不可双 / 无疾风）→ 撤销，Phase 3+4 不再 double
+				_double[p] = false   # 非法双动作（不可双 / 既无疾风又无存储）→ 撤销，Phase 3+4 不再 double
 
 	# Phase 2.5: 切换（甲时机，先于伤害）→ 攻击将打到换上来的新英雄
 	for p in [0, 1]:
@@ -936,6 +979,15 @@ func resolve() -> Dictionary:
 			var sk: HeroSkill = _skills[p][active_index[p]]
 			if sk != null and not sk.active_is_attack():
 				sk.execute_active(self, p, active_index[p])
+
+	# Phase 2.7: 黑暗申猴 h21【调虎离山】强制揪人 —— execute_active 设的 _forced_pull[受害方]
+	#   在此执行（切换之后、伤害之前）→ 被揪英雄成为对手出战、本回合攻击落它身上、原出战下场触发
+	#   我方 on_enemy_switch_out（光狗穷追）。与打神鞭强制切换同语义、独立计揪。
+	for p in [0, 1]:
+		var pull: int = _forced_pull[p]
+		if pull >= 0 and pull < hp[p].size() and hp[p][pull] > 0 and pull != active_index[p]:
+			_perform_switch(p, active_index[p], pull, events)
+		_forced_pull[p] = -1
 
 	# Phase 3+4: 同时独立结算（含道具伤害 hit·ADR-003 D3）。先把双方完整出伤 hit-list 对快照
 	# 算好（动作前道具 hit → 动作攻击 → 动作后道具 hit），再一起施加 → 保持 B-001/2/3 跨玩家同时。
@@ -1010,6 +1062,22 @@ func resolve() -> Dictionary:
 			var sk: HeroSkill = _skills[p][s]
 			if sk != null:
 				sk.on_resolve_end(self, p, s)
+
+	# Phase 5.6: 牧养（光版未羊 h08）——在场有未羊(含替补·存活) → 你方存活【替补席】英雄每回合回 reserve_heal 半点。
+	#   退下火线休养、出战英雄不回；走 _heal（尊重妖火禁回血、封顶 max_hp）。
+	for p in [0, 1]:
+		var rheal := 0
+		for s in range(heroes[p].size()):
+			if hp[p][s] > 0:
+				var msk: HeroSkill = _skills[p][s]
+				if msk != null:
+					rheal = maxi(rheal, msk.reserve_heal_per_turn())
+		if rheal > 0:
+			for s in range(hp[p].size()):
+				if s != active_index[p] and hp[p][s] > 0:
+					var got: int = _heal(p, s, rheal)
+					if got > 0:
+						events.append({id = "muyang_heal", player = p, slot = s, amount = got})
 
 	# Phase 6: cleanup
 	# 遗物·Phase 6：每回合末 tick（产出/计数/充能；读 selected_action 判断本回合是否攻击）。
@@ -1157,13 +1225,25 @@ func _splash_to_reserve(victim_player: int, dmg: int) -> void:
 		sk.on_self_damaged(self, victim_player, target, d, 1 - victim_player)
 
 
-## 找 player 替补席可用的致死救援守护者（未羊：is_lethal_guardian + 每局 < 2 次）；无则 -1。
+## 找 player 替补席可用的「顶替型」致死救援守护者（is_lethal_guardian + 每局 < 2 次）；无则 -1。
+## ⚠ 当前无英雄 override is_lethal_guardian（原未羊已转牧养·守护见 h23 护主 is_protect_guardian）；保留作扩展接口。
 func _find_lethal_guardian(player: int) -> int:
 	for s in range(hp[player].size()):
 		if s == active_index[player] or hp[player][s] <= 0:
 			continue
 		var sk: HeroSkill = _skills[player][s]
 		if sk != null and sk.is_lethal_guardian() and int(get_status(player, s, "tizui_uses", 0)) < LETHAL_GUARDIAN_CAP:
+			return s
+	return -1
+
+
+## 找 player 替补席可用的「护主」守护者（黑暗戌狗 h23：is_protect_guardian + 每局 < HUZHU_CAP 次）；无则 -1。
+func _find_protect_guardian(player: int) -> int:
+	for s in range(hp[player].size()):
+		if s == active_index[player] or hp[player][s] <= 0:
+			continue
+		var sk: HeroSkill = _skills[player][s]
+		if sk != null and sk.is_protect_guardian() and int(get_status(player, s, "huzhu_uses", 0)) < HUZHU_CAP:
 			return s
 	return -1
 
@@ -1278,7 +1358,16 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		events.append({id = "decoy_absorb", player = target_player, amount = eaten})
 
 	# Stage B9: 落 HP（半点）
-	# 致死救援（未羊）：出战将死 + 替补有羊(每局<2次) → 羊顶上、原 carry 获救（强制换人触发狗）
+	# 护主（黑暗戌狗 h23）：出战将死 + 替补有狗(每局<HUZHU_CAP) → 狗替死碎掉下场、这一击完全免除、
+	#   carry 留前线。「完全免除」优先于未羊「顶替承伤」，故先判。狗的死亡走 Phase 5 正常结算(触发亥猪饕餮等)。
+	if dmg > 0 and dmg >= hp[target_player][slot] and slot == active_index[target_player]:
+		var protector: int = _find_protect_guardian(target_player)
+		if protector >= 0:
+			set_status(target_player, protector, "huzhu_uses", int(get_status(target_player, protector, "huzhu_uses", 0)) + 1)
+			hp[target_player][protector] = 0   # 狗碎掉（替补位阵亡）
+			events.append({id = "huzhu_protect", player = target_player, guardian = protector})
+			return 0   # 这一击完全免除·carry 不掉血、不触发 on-hit（视同挡下）
+	# 致死救援（顶替型·扩展接口·当前无英雄用→原未羊已转牧养）：出战将死 + 替补有 is_lethal_guardian → 顶上、原 carry 获救（强制换人触发狗）
 	if dmg > 0 and dmg >= hp[target_player][slot] and slot == active_index[target_player]:
 		var guard: int = _find_lethal_guardian(target_player)
 		if guard >= 0:
@@ -1363,6 +1452,18 @@ func _resolve_deaths(_a: Array[int], events: Array) -> void:
 						if ally_skill != null:
 							ally_skill.on_ally_death(slot, self, p, ally)
 				events.append({id = "hero_died", player = p, slot = slot})
+				# 饕餮（黑暗亥猪 h24）：任一英雄阵亡(敌我皆可) → 在场(含替补·存活)的亥猪 → 其【团队】+能。
+				#   扫双方存活英雄(死者已 hp≤0 自动不计=尸不自食)；走 _gain_energy 享囤鼠叠加。
+				for pp in [0, 1]:
+					var feast: int = 0
+					for hs in range(hp[pp].size()):
+						if hp[pp][hs] > 0:
+							var hsk: HeroSkill = _skills[pp][hs]
+							if hsk != null:
+								feast += hsk.death_energy_bonus()
+					if feast > 0:
+						_gain_energy(pp, feast)
+						events.append({id = "taotie_feast", player = pp, amount = feast})
 				# 尾后针：你出战阵亡 → 对敌方出战 0.5 真伤（无视防御/护甲），随后消耗标记。
 				if slot == active_index[p] and int(item_buffs[p].get("death_reflect", 0)) > 0:
 					item_buffs[p].erase("death_reflect")

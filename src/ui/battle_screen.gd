@@ -8,6 +8,7 @@ extends Control
 
 const A := ActionDef.Action
 const ACTIVE := ActionDef.ACTIVE
+const STORE := ActionDef.STORE   # 一鸣惊人 h22「空过/蓄势」哨兵动作
 
 # 动作按钮"能量消耗"金币（1 能量 1 球）= battle_screen.tscn 内每个按钮下的 CostPips 节点，
 # 位置/大小/间距在 Godot 编辑器里可视化调整（可视化设计·任务2）；代码只在运行时填入数量。
@@ -127,6 +128,7 @@ var selected_btn: Button = null
 
 # ---- 黑暗卯兔 h16【疾风】：附加同种动作开关（程序化创建·不入 .tscn）----
 var btn_jifeng: Button = null
+var btn_store: Button = null   # 一鸣惊人 h22「蓄势/空过」按钮（在场有 h22 时显示·疾风开关之上）
 var _double_armed: bool = false   # 本回合是否 armed「附加同种动作」（确认时随动作一起 select_double 提交）
 
 # ---- 主动换人（任务5）：点替补框→框内显「切换」(armed)→再次点=选择(动画)→「结束」提交 ----
@@ -286,6 +288,29 @@ func _init_buttons() -> void:
 	btn_jifeng.pressed.connect(_on_jifeng_pressed)
 	btn_jifeng.visible = false
 	buttons_ctrl.add_child(btn_jifeng)
+
+	# 蓄势键（一鸣惊人 h22）：程序化创建；节奏=紫底圆角（与疾风同维度色系），运行期跟疾风开关上方。
+	btn_store = Button.new()
+	btn_store.name = "BtnStore"
+	btn_store.text = "蓄势"
+	btn_store.focus_mode = Control.FOCUS_NONE
+	btn_store.clip_text = true
+	btn_store.size = Vector2(120.0, 56.0)
+	var _ssb := StyleBoxFlat.new()
+	_ssb.bg_color = Color(0.45, 0.38, 0.62)        # 节奏=紫
+	_ssb.set_corner_radius_all(10)
+	_ssb.set_border_width_all(2)
+	_ssb.border_color = Color(0.85, 0.78, 0.5)     # 暖金边
+	for st in ["normal", "hover", "pressed", "disabled"]:
+		btn_store.add_theme_stylebox_override(st, _ssb)
+	FontManager.apply_btn(btn_store, 22)
+	btn_store.add_theme_color_override("font_color", Color(0.98, 0.96, 0.9))
+	btn_store.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.03, 0.85))
+	btn_store.add_theme_constant_override("outline_size", 4)
+	_attach_button_juice(btn_store)
+	btn_store.pressed.connect(_on_store_pressed)
+	btn_store.visible = false
+	buttons_ctrl.add_child(btn_store)
 
 	# 镜头偏焦改由「执行动作」触发（见 _play_battle_anims）：波/大波→右聚敌、防/大防→左聚己、其余回正。
 	# 旧「hover 底部按钮 → 推近」已取消（2026-06-23 Eddy）。
@@ -714,6 +739,8 @@ func _set_buttons_active(active: bool, dim_inactive: bool = true) -> void:
 		_disarm_switch()   # 离开选择阶段 → 退出 armed「切换」态
 		if btn_jifeng:
 			btn_jifeng.visible = false   # 结算/过场：藏疾风开关
+		if btn_store:
+			btn_store.visible = false    # 结算/过场：藏蓄势键
 	# 底部 UI 始终可见。
 	for btn in action_btn_list + [btn_confirm]:
 		btn.visible = true
@@ -754,6 +781,8 @@ func _player_has_active() -> bool:
 func _reset_button_styles() -> void:
 	for btn in action_btn_list:
 		_set_btn_selected(btn, false)
+	if btn_store != null:
+		_set_btn_selected(btn_store, false)   # 蓄势键不在 action_btn_list，单独清选中态
 	_set_confirm_active(false)
 	_disarm_switch()   # 退出 armed「切换」态（换人选中随之消失）
 
@@ -820,6 +849,7 @@ func _refresh_action_affordance() -> void:
 	_set_cost_pips(btn_special, battle._get_cost(PLAYER, ACTIVE))
 	btn_confirm.disabled = false
 	_refresh_jifeng()
+	_refresh_store()
 
 
 ## 疾风开关（点击 = arm/disarm「附加同种动作」）。仅当前已选动作可双时有效。
@@ -830,6 +860,26 @@ func _on_jifeng_pressed() -> void:
 		return
 	_double_armed = not _double_armed
 	_refresh_jifeng()
+
+
+## 蓄势键（一鸣惊人 h22）：点击 = 选「空过/蓄势」动作（再点取消）。空过 0 能、无防御、存行动。
+func _on_store_pressed() -> void:
+	if state != State.PLAYER_SELECT or not battle.can_store(PLAYER):
+		return
+	if selected_action == STORE:   # 再点同一个 = 取消
+		selected_action = -1
+		selected_switch = -1
+		selected_btn = null
+		_reset_button_styles()
+		_update_button_states()
+		return
+	selected_action = STORE
+	selected_switch = -1
+	_reset_button_styles()
+	selected_btn = null   # 蓄势键不在 action_btn_list，单独高亮（_refresh_store 据 selected_action 刷）
+	_set_btn_selected(btn_store, true)
+	_set_confirm_active(true)
+	_refresh_jifeng()     # 空过不可双 → 疾风开关随之失效
 
 
 ## 刷新疾风开关：在场有疾风英雄 → 显示（结束键正上方）；已选可双动作 → 可点；armed 态高亮 + 剩余次数。
@@ -847,8 +897,32 @@ func _refresh_jifeng() -> void:
 	if not ok:
 		_double_armed = false
 	btn_jifeng.disabled = not ok
-	btn_jifeng.text = "疾风×%d" % battle.double_uses_left(PLAYER)
+	# 标签随来源自适应：在场有疾风(h16) → 「疾风」；否则双动作来自 h22 存储 → 「爆发」(释放蓄势)。
+	var is_jifeng: bool = battle._double_grantor(PLAYER) >= 0
+	btn_jifeng.text = ("疾风×%d" if is_jifeng else "爆发×%d") % battle.double_uses_left(PLAYER)
 	_set_btn_selected(btn_jifeng, _double_armed)
+
+
+## 刷新蓄势键（一鸣惊人 h22）：在场有 h22 且存储未满 → 显示（疾风开关之上；疾风不显时退到结束键之上）。
+## 标签带当前存储数；选中态据 selected_action 高亮。
+func _refresh_store() -> void:
+	if btn_store == null:
+		return
+	if not battle.can_store(PLAYER):
+		if selected_action == STORE:
+			selected_action = -1   # 失去存储能力（h22 全死/存满）→ 撤销已选空过
+		btn_store.visible = false
+		return
+	btn_store.visible = true
+	btn_store.size = btn_confirm.size
+	var base_y: float = btn_confirm.position.y - btn_confirm.size.y - 12.0
+	if btn_jifeng != null and btn_jifeng.visible:
+		base_y -= btn_confirm.size.y + 12.0   # 疾风开关也显时，蓄势键再上移一格
+	btn_store.position = Vector2(btn_confirm.position.x, base_y)
+	btn_store.disabled = false
+	var n: int = battle.stored_action[PLAYER]
+	btn_store.text = "蓄势×%d" % n if n > 0 else "蓄势"
+	_set_btn_selected(btn_store, selected_action == STORE)
 
 
 func _btn_action(btn: Button) -> int:

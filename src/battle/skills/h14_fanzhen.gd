@@ -10,7 +10,7 @@ extends HeroSkill
 ##   dark 味 = 撞这头牛鬼者业报反噬（以牙还牙）。
 ##   共享原语 = 反伤（攻击者所受反弹可喂虎处决 / on-hit 收割端）；攻防双向 yomi
 ##     （攻牛 = 自伤、大波砸牛反弹更疼 → 逼对手不攻/换人/绕道，把"防"变陷阱）。
-##   维度 = 防御（与丑牛 h02 卸劲、未羊 h08 致死救援 同维不同机制）。
+##   维度 = 防御（与丑牛 h02 卸劲、未羊 h08 牧养 同维不同机制）。
 
 func on_block(battle: BattleCore, player: int, _slot: int, attacker_player: int, _attack_action: int, raw: int) -> void:
 	var reflect: int = roundi(raw * 0.5)   # 半点：挡波 raw=2→反1(0.5HP)、挡大波 raw=4→反2(1.0HP)

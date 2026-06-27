@@ -11,6 +11,9 @@ extends GutTest
 ## h18【缠绕】= 状态：出战时，对手无法主动切换（含午马免费切换）；死亡换人不受影响。
 ## h19【践踏】= 进攻：攻击命中时，这一击超过 1.0HP 的溢出部分碾到敌方最高血替补（封顶 1.0）。
 ## h20【圣剑·断罪】= 状态·主动技：烙「断罪印」，印记目标出战血量 ≤1.0HP 即斩杀（处决）。
+## h21【调虎离山】= 干扰·主动技：占动作+费2能+每局2次+须出战，强制对手换人、揪其存活替补中血量最低者上场。
+## h23【护主】= 防御：替补席存活时，出战 carry 受致命一击 → 狗替死碎掉、这一击完全免除、carry 留前线（每局1次）。
+## h24【饕餮】= 能量：在场(含替补)时，战场任一英雄阵亡(敌我皆可) → 你方团队 +2.0 能（4 半能）。
 ##
 ## 经济基线（半能制）：1 能=2 半能；波 2 半能 / 大波 6 半能 / 大防 4 半能；HP 半点制(1.0=2 半点)。
 ## ============================================================================
@@ -406,3 +409,185 @@ func test_h20_duanzui_no_mark_no_execute() -> void:
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
 	assert_eq(b.hp[1][0], 2, "没断罪印 → 残血也不处决")
+
+
+# ---- h21 黑暗申猴 调虎离山（主动技·强制对手换人·揪存活替补血量最低者）----
+
+func test_h21_diaohu_pulls_lowest_hp_reserve() -> void:
+	# 暗猴(P0 出战) vs P1 出战 + 2 替补(slot1 残血=揪目标 / slot2 高血)。猴调虎离山 → P1 被强制揪上 slot1。
+	var b := _battle_vs(["h21", "test_p0_1", "test_p0_2"], ["test_p1_0", "test_p1_1", "test_p1_2"], 5, 8)
+	b.hp[1][1] = 2   # P1 slot1 残血（脆皮 carry）
+	b.hp[1][2] = 8   # P1 slot2 高血
+	assert_true(b.select_active(0), "暗猴可调虎离山（敌有存活替补）")
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(b.active_index[1], 1, "对手被强制揪上血量最低的替补（slot1）")
+	assert_eq(b.energy[0], 8 - 4, "调虎离山费 2 能（4 半能）")
+	assert_eq(int(b.get_status(0, 0, "active_uses", 0)), 1, "计 1 次使用")
+
+
+func test_h21_diaohu_requires_enemy_reserve() -> void:
+	# 对手只剩出战（替补全死）→ 无人可揪 → 主动技不可用
+	var b := _battle_vs(["h21", "test_p0_1", "test_p0_2"], ["test_p1_0", "test_p1_1", "test_p1_2"], 5, 8)
+	b.hp[1][1] = 0
+	b.hp[1][2] = 0
+	assert_false(b.can_use_active(0), "对手无存活替补 → 调虎离山不可用")
+
+
+func test_h21_diaohu_caps_two_per_game() -> void:
+	# 每局上限 2 次（对手始终 3 满血 → 总有替补可揪）
+	var b := _battle_vs(["h21", "test_p0_1", "test_p0_2"], ["test_p1_0", "test_p1_1", "test_p1_2"], 5, 20)
+	for _i in range(2):
+		assert_true(b.select_active(0), "前 2 次可调虎离山")
+		b.select_action(1, ActionDef.Action.CHARGE)
+		b.resolve()
+	assert_eq(int(b.get_status(0, 0, "active_uses", 0)), 2, "已用满 2 次")
+	assert_false(b.can_use_active(0), "每局上限 2 → 第 3 次不可用")
+
+
+# ---- h23 黑暗戌狗 护主（替补狗替死·完全免除·carry 留前线·每局一次）----
+
+func test_h23_huzhu_protects_carry_from_lethal() -> void:
+	# P0 出战 carry 残血(1.0HP) + 替补暗狗(slot1)。对手大波致死 → 狗替死碎掉、carry 满免除留前线。
+	var b := _battle_team(["test_p0_0", "h23", "test_p0_2"], 5, 12)
+	b.hp[0][0] = 2
+	b.select_action(0, ActionDef.Action.CHARGE)
+	b.select_action(1, ActionDef.Action.BIG_ATTACK)   # 大波 4 半点 ≥ 2 → 致死
+	b.resolve()
+	assert_eq(b.hp[0][0], 2, "carry 受致命一击被完全免除·血量不变")
+	assert_eq(b.active_index[0], 0, "carry 留前线（不退场）")
+	assert_eq(b.hp[0][1], 0, "护主狗替死碎掉（替补位阵亡）")
+	assert_eq(int(b.get_status(0, 1, "huzhu_uses", 0)), 1, "护主计 1 次")
+
+
+func test_h23_huzhu_once_per_game() -> void:
+	# 狗只护一次：第二次致命一击 → 狗已碎 → carry 真死
+	var b := _battle_team(["test_p0_0", "h23", "test_p0_2"], 5, 20)
+	b.hp[0][0] = 2
+	b.select_action(0, ActionDef.Action.CHARGE)
+	b.select_action(1, ActionDef.Action.BIG_ATTACK)
+	b.resolve()
+	assert_eq(b.hp[0][1], 0, "第一次：狗替死碎掉")
+	assert_eq(b.hp[0][0], 2, "第一次：carry 获救留前线")
+	b.select_action(0, ActionDef.Action.CHARGE)
+	b.select_action(1, ActionDef.Action.BIG_ATTACK)
+	b.resolve()
+	assert_true(b.hp[0][0] <= 0, "狗只护一次 → 第二次致命一击 carry 真死")
+
+
+func test_h23_huzhu_only_from_reserve_not_lethal_no_trigger() -> void:
+	# 非致命一击 → 不触发护主（狗不白碎）
+	var b := _battle_team(["test_p0_0", "h23", "test_p0_2"], 5, 12)
+	# carry 满血(10)，挨一记波(2 半点)非致命
+	b.select_action(0, ActionDef.Action.CHARGE)
+	b.select_action(1, ActionDef.Action.ATTACK)
+	b.resolve()
+	assert_eq(b.hp[0][0], 10 - 2, "非致命 → carry 正常吃伤")
+	assert_eq(b.hp[0][1], 10, "护主狗未触发（不白碎）")
+	assert_eq(int(b.get_status(0, 1, "huzhu_uses", 0)), 0, "护主未计数")
+
+
+# ---- h24 黑暗亥猪 饕餮（任一英雄阵亡敌我皆可 → 团队 +2.0 能）----
+
+func test_h24_taotie_feasts_on_ally_death() -> void:
+	# P0 出战 carry 残血 + 替补暗猪。对手致死 carry → P0 团队 +2.0 能（对照无猪）。
+	var b := _battle_team(["test_p0_0", "h24", "test_p0_2"], 5, 8)
+	b.hp[0][0] = 2
+	b.select_action(0, ActionDef.Action.CHARGE)
+	b.select_action(1, ActionDef.Action.BIG_ATTACK)
+	b.resolve()
+	var nb := _battle_team(["test_p0_0", "test_p0_1", "test_p0_2"], 5, 8)
+	nb.hp[0][0] = 2
+	nb.select_action(0, ActionDef.Action.CHARGE)
+	nb.select_action(1, ActionDef.Action.BIG_ATTACK)
+	nb.resolve()
+	assert_true(b.hp[0][0] <= 0, "carry 被大波致死")
+	assert_eq(b.energy[0] - nb.energy[0], 4, "暗猪在场 → 队友阵亡喂 +2.0 能（4 半能）")
+
+
+func test_h24_taotie_feasts_on_enemy_death() -> void:
+	# 敌方英雄阵亡也喂猪：暗猪波打死 P1 残血出战 → P0 +2.0 能（敌我皆吃）。
+	var b := _battle_vs(["h24", "test_p0_1", "test_p0_2"], ["test_p1_0", "test_p1_1", "test_p1_2"], 5, 8)
+	b.hp[1][0] = 2
+	var ctrl := _battle_vs(["test_p0_0", "test_p0_1", "test_p0_2"], ["test_p1_0", "test_p1_1", "test_p1_2"], 5, 8)
+	ctrl.hp[1][0] = 2
+	b.select_action(0, ActionDef.Action.ATTACK)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	ctrl.select_action(0, ActionDef.Action.ATTACK)
+	ctrl.select_action(1, ActionDef.Action.CHARGE)
+	ctrl.resolve()
+	assert_true(b.hp[1][0] <= 0, "P1 出战被波打死")
+	assert_eq(b.energy[0] - ctrl.energy[0], 4, "敌方阵亡也喂暗猪 +2.0 能（4 半能）")
+
+
+# ---- h22 黑暗酉鸡 一鸣惊人（空过存行动 → 之后双动作释放·净零 tempo）----
+
+func test_h22_yiming_store_then_release_double_wave() -> void:
+	# 回合1 空过(存行动·不拿能量)；回合2 波+释放 → 敌吃两次波(2×2=4 半点)，消耗 1 次存储。
+	var b := _battle_team(["h22", "test_p0_1", "test_p0_2"], 4, 8)
+	assert_true(b.can_store(0), "在场暗鸡 → 可空过存行动")
+	var e_before: int = b.energy[0]
+	assert_true(b.select_action(0, ActionDef.STORE), "选空过")
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(b.stored_action[0], 1, "存储 +1")
+	assert_eq(b.energy[0], e_before, "空过不拿能量、不花能量（能量不变）")
+	assert_true(b.can_double_action(0, ActionDef.Action.ATTACK), "有存储 → 波可双")
+	b.select_action(0, ActionDef.Action.ATTACK)
+	b.select_double(0, true)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(b.hp[1][0], 10 - 4, "释放双波：敌吃 2×2=4 半点（2.0HP）")
+	assert_eq(b.stored_action[0], 0, "释放消耗 1 次存储")
+
+
+func test_h22_yiming_requires_chicken() -> void:
+	# 队中无暗鸡 → 不能空过存行动
+	var b := _battle_team(["test_p0_0", "test_p0_1", "test_p0_2"], 4, 8)
+	assert_false(b.can_store(0), "无暗鸡 → 不可空过")
+	assert_false(b.select_action(0, ActionDef.STORE), "选空过被拒")
+
+
+func test_h22_yiming_store_caps_at_limit() -> void:
+	# 存储封顶 STORED_CAP=2
+	var b := _battle_team(["h22", "test_p0_1", "test_p0_2"], 4, 20)
+	for _i in range(2):
+		b.select_action(0, ActionDef.STORE)
+		b.select_action(1, ActionDef.Action.CHARGE)
+		b.resolve()
+	assert_eq(b.stored_action[0], 2, "存满 2")
+	assert_false(b.can_store(0), "存储已满 → 不能再空过")
+
+
+func test_h22_yiming_works_from_reserve() -> void:
+	# 暗鸡在替补、出战 plain → 仍可空过 + 释放（在场含替补）
+	var b := _battle_team(["test_p0_0", "h22", "test_p0_2"], 4, 8)
+	assert_true(b.can_store(0), "暗鸡在替补 → 仍可空过")
+	b.select_action(0, ActionDef.STORE)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(b.stored_action[0], 1, "替补暗鸡也能存")
+	b.select_action(0, ActionDef.Action.ATTACK)
+	b.select_double(0, true)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(b.hp[1][0], 10 - 4, "释放双波 4 半点")
+
+
+func test_h22_yiming_ai_legal_actions_and_apply_choice() -> void:
+	# AI 路径：legal_actions 含 STORE；apply_choice STORE → 存行动；之后 double=true 释放双波。
+	var b := _battle_team(["h22", "test_p0_1", "test_p0_2"], 4, 8)
+	var acts: Array = []
+	for c in b.legal_actions(0):
+		acts.append(int(c["action"]))
+	assert_has(acts, ActionDef.STORE, "legal_actions 含空过(STORE)")
+	assert_true(b.apply_choice(0, {action = ActionDef.STORE, target = -1}), "apply_choice 空过")
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(b.stored_action[0], 1, "apply_choice STORE → 存 +1")
+	assert_true(b.apply_choice(0, {action = ActionDef.Action.ATTACK, target = -1, double = true}), "apply_choice 波+释放")
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(b.hp[1][0], 10 - 4, "AI 释放双波 4 半点")
+	assert_eq(b.stored_action[0], 0, "消耗存储")
