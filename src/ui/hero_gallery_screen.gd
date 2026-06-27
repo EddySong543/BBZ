@@ -27,20 +27,22 @@ const ROW_Y0 := 186.0
 # ── 右侧详情板 ──
 const PANEL := Rect2(1132, 140, 728, 900)
 
-# 配色（典籍朱印·暖羊皮+墨线+金箔+朱印）
-# 暗底上的中性框 = 暖骨边（outer/mid/inner 三层·替代旧板岩银灰）
-const EDGE_OUTER := Color(0.05, 0.045, 0.04)
-const EDGE_MID := Color(0.70, 0.64, 0.52)
-const EDGE_INNER := Color(0.42, 0.36, 0.26)
-const GOLD_TEXT := Color("#f4c84b")
-const TIN_DIM := Color(0.80, 0.74, 0.60)   # 压暗底次级文字=暖米白次级（替代旧冷锡灰 #aab4c4）
-const ACTIVE_TAG := Color(0.74, 0.24, 0.18)    # 主动=朱砂（进攻）
-const PASSIVE_TAG := Color(0.40, 0.50, 0.62)   # 被动=去饱和冷蓝（恒常）
+# 配色「明亮泥金手抄本」(2026-06-27 重做：近黑→亮羊皮纸·墨字·青铜金框·金留作泥金点缀)。
+# ⚠ 单一浅表面模型：DARK_WARM / PARCHMENT_HI 名沿用但【值已翻转】——
+#   DARK_WARM 现=浅羊皮纸(原近黑·所有 Color(DARK_WARM,*) 大面随之变亮)；PARCHMENT_HI 现=墨字(原暖米白)。
+const EDGE_OUTER := Color(0.24, 0.16, 0.09)    # 框外轮廓=深褐（替近黑·浅页上柔和勾边）
+const EDGE_MID := Color(0.62, 0.46, 0.24)      # 框主带=青铜金（浅页上读得出）
+const EDGE_INNER := Color(0.44, 0.31, 0.16)    # 框内线=深金褐
+const GOLD_TEXT := Color("#caa033")            # 泥金（标题/英雄名·偏深金·浅底上配深描边读得出）
+const TIN_DIM := Color(0.46, 0.37, 0.26)       # 页面次级文字=淡墨（替原暖米白次级）
+const ACTIVE_TAG := Color(0.74, 0.24, 0.18)    # 主动=朱砂（彩印章·浅底上跳）
+const PASSIVE_TAG := Color(0.30, 0.42, 0.58)   # 被动=靛蓝（彩印章）
 
-# 典籍朱印补充令牌
-const DARK_WARM := Color(0.09, 0.085, 0.075)   # 近黑暖暗底（详情板底/牌匾/徽章衬底大暗面）
-const INK_LINE := Color(0.18, 0.12, 0.07)      # 墨线
-const PARCHMENT_HI := Color(0.95, 0.91, 0.80)  # 暖米白（压暗底主文字）
+# 浅羊皮 + 墨令牌
+const DARK_WARM := Color(0.88, 0.81, 0.64)     # 羊皮纸（书页/匾/徽/钮 大面·原近黑→浅·名沿用）
+const PAGE_INSET := Color(0.79, 0.71, 0.53)    # 凹格/插图板/铭牌/描述盒（略深羊皮·recessed）
+const INK_LINE := Color(0.40, 0.30, 0.17)      # 墨线（浅页上分隔·够深）
+const PARCHMENT_HI := Color(0.22, 0.15, 0.09)  # 页面主文字=墨（替原暖米白·名沿用）
 
 # 顶带「典籍牌匾」落位
 const PLAQUE := Rect2(800, 26, 320, 64)
@@ -212,7 +214,7 @@ func _build_pool() -> void:
 	_build_spine(pool_area)              # 中缝书脊（装订带）
 	# 行亮条（先建=画在卡下层）
 	_row_glow = ColorRect.new()
-	_row_glow.color = Color(1, 1, 1, 0.045)
+	_row_glow.color = Color(EDGE_MID, 0.16)   # 选中行微亮条：浅页上用淡铜金（替原白·白在浅页隐形）
 	_row_glow.position = Vector2(85, ROW_Y0 - 3)
 	_row_glow.size = Vector2(982, 140)
 	_row_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -276,7 +278,7 @@ func _build_codex_page(parent: Control, r: Rect2) -> void:
 			Rect2(inset.position, Vector2(1, inset.size.y)),
 			Rect2(Vector2(inset.end.x - 1, inset.position.y), Vector2(1, inset.size.y))]:
 		var ln := ColorRect.new()
-		ln.color = Color(EDGE_MID, 0.16)
+		ln.color = Color(INK_LINE, 0.22)
 		ln.position = er.position
 		ln.size = er.size
 		ln.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -289,7 +291,7 @@ func _build_spine(parent: Control) -> void:
 	var top: float = POOL.position.y
 	var h: float = POOL.size.y
 	var core := ColorRect.new()
-	core.color = Color(0.03, 0.025, 0.022, 0.92)   # 装订暗芯
+	core.color = Color(0.20, 0.14, 0.09, 0.92)   # 装订暗芯（深褐书脊·浅页间的装订阴影）
 	core.position = Vector2(gx - 9.0, top)
 	core.size = Vector2(18.0, h)
 	core.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -343,7 +345,7 @@ func _build_detail_panel() -> void:
 
 	# ── ① 舞台段：暗井衬底 + 大编号水印 + 主题色衬光 + 台座投影 + idle 动画 ──
 	var stage := ColorRect.new()
-	stage.color = Color(0.04, 0.035, 0.03, 0.85)   # 近黑暖·舞台暗井（去旧冷蓝、保留为暗）
+	stage.color = Color(PAGE_INSET, 1.0)   # 插图板=略深羊皮（recessed·深/彩像素角色在浅板上都跳得出）
 	stage.position = PANEL.position + Vector2(144, 60)
 	stage.size = Vector2(440, 440)
 	stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -361,15 +363,15 @@ func _build_detail_panel() -> void:
 		detail_area.add_child(ln)
 
 	# 大编号水印（格斗选人语言·α 极淡压在暗井上）。192=16 基底 ×12 整数倍（防糊）
-	_d_watermark = _make_label(stage.position, stage.size, 192, Color(1, 1, 1, 0.05))
+	_d_watermark = _make_label(stage.position, stage.size, 192, Color(PARCHMENT_HI, 0.06))
 	_d_watermark.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_d_watermark.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
 	# 主题色径向衬光（白→透明纹理 + modulate 上三系色·立绘背后一圈柔光）
 	_d_glow = TextureRect.new()
 	var grad := Gradient.new()
-	grad.set_color(0, Color(1, 1, 1, 0.16))
-	grad.set_color(1, Color(1, 1, 1, 0.0))
+	grad.set_color(0, Color(1.0, 0.86, 0.52, 0.10))   # 立绘背后柔暖泥金光晕（浅板上极淡·添暖不washout）
+	grad.set_color(1, Color(1.0, 0.86, 0.52, 0.0))
 	var gtex := GradientTexture2D.new()
 	gtex.gradient = grad
 	gtex.fill = GradientTexture2D.FILL_RADIAL
@@ -422,7 +424,7 @@ func _build_detail_panel() -> void:
 	# 名牌横带：紧贴舞台底沿（台座名牌·mode_card 名牌带同语言）——名字"长"在舞台上
 	var band_r := Rect2(stage.position.x, stage.position.y + stage.size.y, stage.size.x, 64)
 	var band_fill := ColorRect.new()
-	band_fill.color = Color(0, 0, 0, 0.45)
+	band_fill.color = Color(0.20, 0.14, 0.09, 0.95)   # 名牌=深黑铜铭牌（浅页上的金属配件·泥金名在其上跳）
 	band_fill.position = band_r.position
 	band_fill.size = band_r.size
 	band_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -445,12 +447,12 @@ func _build_detail_panel() -> void:
 
 	# ── ② 数据段：编号章 + 生命章（两枚药丸章成组居中·_layout_data_chips 按内容重排）──
 	_d_chip1_edge = _chip_rect(Color(EDGE_INNER, 0.55))
-	_d_chip1_fill = _chip_rect(Color(0, 0, 0, 0.35))
+	_d_chip1_fill = _chip_rect(Color(PAGE_INSET, 0.95))
 	_d_chip1_lbl = _make_label(Vector2.ZERO, Vector2(120, 34), 16, PARCHMENT_HI)   # 暖米白（压暗底 chip）
 	_d_chip1_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_d_chip1_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_d_chip2_edge = _chip_rect(Color(EDGE_INNER, 0.55))
-	_d_chip2_fill = _chip_rect(Color(0, 0, 0, 0.35))
+	_d_chip2_fill = _chip_rect(Color(PAGE_INSET, 0.95))
 	_d_hp_heart = TextureRect.new()
 	var atlas := AtlasTexture.new()
 	atlas.atlas = HEART_SHEET
@@ -467,7 +469,7 @@ func _build_detail_panel() -> void:
 
 	# 段间分隔线
 	var sep := ColorRect.new()
-	sep.color = Color(EDGE_MID, 0.22)
+	sep.color = Color(INK_LINE, 0.35)
 	sep.position = Vector2(px + 120, py + 634)
 	sep.size = Vector2(PANEL.size.x - 240, 1)
 	sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -522,7 +524,7 @@ func _select(idx: int) -> void:
 	_d_name.text = h.hero_name
 	_d_theme.text = ""   # 三系归属已移除（2026-06-13 Eddy：待"另一套标记"替代）
 	_d_watermark.text = "%02d" % (idx + 1)
-	_d_glow.modulate = Color(0.92, 0.84, 0.62)   # 暖金中性衬光（典籍朱印·替代旧冷调）
+	_d_glow.modulate = Color.WHITE   # 衬光保持暖泥金原色（不再按主题染色）
 	_d_chip1_lbl.text = "No.%02d" % (idx + 1)
 	_d_hp_num.text = "%d" % h.max_hp
 	var is_passive := h.skill_type == HeroData.SkillType.PASSIVE
@@ -654,7 +656,7 @@ func _make_frosted(parent: Control, r: Rect2) -> void:
 	border.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(border)
 	var fill := ColorRect.new()
-	fill.color = Color(DARK_WARM, 0.55)   # 近黑暖暗底
+	fill.color = Color(PAGE_INSET, 0.92)   # 描述盒=略深羊皮（recessed·墨字在其上读得清）
 	fill.position = r.position + Vector2(2, 2)
 	fill.size = r.size - Vector2(4, 4)
 	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE

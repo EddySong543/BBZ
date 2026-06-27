@@ -11,15 +11,17 @@ const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshad
 const JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
 
-# ── 配色（典籍朱印·暖羊皮+墨线+金箔·与英雄图鉴同源）──
-const EDGE_OUTER := Color(0.05, 0.045, 0.04)
-const EDGE_MID := Color(0.70, 0.64, 0.52)
-const EDGE_INNER := Color(0.42, 0.36, 0.26)
-const GOLD_TEXT := Color("#f4c84b")
-const TIN_DIM := Color(0.80, 0.74, 0.60)
-const DARK_WARM := Color(0.09, 0.085, 0.075)
-const INK_LINE := Color(0.18, 0.12, 0.07)
-const PARCHMENT_HI := Color(0.95, 0.91, 0.80)
+# ── 配色「明亮泥金手抄本」(2026-06-27 重做·与英雄图鉴同源)：近黑→亮羊皮纸·墨字·青铜金框 ──
+# ⚠ DARK_WARM / PARCHMENT_HI 名沿用但【值已翻转】= 浅羊皮 / 墨字（详见 hero_gallery_screen.gd 注）。
+const EDGE_OUTER := Color(0.24, 0.16, 0.09)    # 框外轮廓=深褐
+const EDGE_MID := Color(0.62, 0.46, 0.24)      # 框主带=青铜金
+const EDGE_INNER := Color(0.44, 0.31, 0.16)    # 框内线=深金褐
+const GOLD_TEXT := Color("#caa033")            # 泥金（标题·配深描边）
+const TIN_DIM := Color(0.46, 0.37, 0.26)       # 页面次级文字=淡墨
+const DARK_WARM := Color(0.88, 0.81, 0.64)     # 羊皮纸（大面·原近黑→浅·名沿用）
+const PAGE_INSET := Color(0.79, 0.71, 0.53)    # 凹格/插图板/铭牌/描述盒（略深羊皮）
+const INK_LINE := Color(0.40, 0.30, 0.17)      # 墨线
+const PARCHMENT_HI := Color(0.22, 0.15, 0.09)  # 页面主文字=墨（名沿用）
 
 # 维度 → 语义色（与 ItemDraftPopup / ItemSlotRow / 动作按钮同源色板·扩展中立/博弈/趣味）。
 const DIM_COLOR := {
@@ -254,7 +256,7 @@ func _build_pool() -> void:
 	_build_spine(pool_area)              # 中缝书脊（装订带）
 	# 行亮条（先建=画在卡下层·键盘导航行定位）
 	_row_glow = ColorRect.new()
-	_row_glow.color = Color(1, 1, 1, 0.045)
+	_row_glow.color = Color(EDGE_MID, 0.16)   # 选中行微亮条：浅页上用淡铜金（白在浅页隐形）
 	_row_glow.position = Vector2(X0 - 6, ROW_Y0 - 6)
 	_row_glow.size = Vector2(COLS * STEP_X - (STEP_X - CARD_W) + 12, CARD_H + 12)
 	_row_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -306,7 +308,7 @@ func _build_codex_page(parent: Control, r: Rect2) -> void:
 			Rect2(inset.position, Vector2(1, inset.size.y)),
 			Rect2(Vector2(inset.end.x - 1, inset.position.y), Vector2(1, inset.size.y))]:
 		var ln := ColorRect.new()
-		ln.color = Color(EDGE_MID, 0.16)
+		ln.color = Color(INK_LINE, 0.22)
 		ln.position = er.position
 		ln.size = er.size
 		ln.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -319,7 +321,7 @@ func _build_spine(parent: Control) -> void:
 	var top: float = POOL.position.y
 	var h: float = POOL.size.y
 	var core := ColorRect.new()
-	core.color = Color(0.03, 0.025, 0.022, 0.92)   # 装订暗芯
+	core.color = Color(0.20, 0.14, 0.09, 0.92)   # 装订暗芯（深褐书脊）
 	core.position = Vector2(gx - 9.0, top)
 	core.size = Vector2(18.0, h)
 	core.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -388,9 +390,9 @@ func _make_item_card(item: ItemData, idx: int) -> Button:
 	name_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	name_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	FontManager.apply(name_lbl, 16)
-	name_lbl.add_theme_color_override("font_color", PARCHMENT_HI)
-	name_lbl.add_theme_color_override("font_outline_color", Color(0.04, 0.03, 0.02, 0.95))
-	name_lbl.add_theme_constant_override("outline_size", 3)
+	name_lbl.add_theme_color_override("font_color", PARCHMENT_HI)   # 墨字（名沿用·现为深墨）
+	name_lbl.add_theme_color_override("font_outline_color", Color(0.90, 0.83, 0.66, 0.85))   # 浅羊皮描边（墨字在浅页上的细halo·替原深描边）
+	name_lbl.add_theme_constant_override("outline_size", 2)
 	name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(name_lbl)
 	card.pressed.connect(_select.bind(idx))
@@ -453,7 +455,7 @@ func _build_detail_panel() -> void:
 
 	# ── ① 舞台段：暗井 + 大编号水印 + 维度衬光 + 台座投影 + 放大图标 ──
 	var stage := ColorRect.new()
-	stage.color = Color(0.04, 0.035, 0.03, 0.85)
+	stage.color = Color(PAGE_INSET, 1.0)   # 插图板=略深羊皮（recessed·彩色道具图标在浅板上跳得出）
 	stage.position = PANEL.position + Vector2(144, 60)
 	stage.size = Vector2(440, 440)
 	stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -470,15 +472,15 @@ func _build_detail_panel() -> void:
 		ln.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		detail_area.add_child(ln)
 
-	_d_watermark = _make_label(stage.position, stage.size, 192, Color(1, 1, 1, 0.05))
+	_d_watermark = _make_label(stage.position, stage.size, 192, Color(PARCHMENT_HI, 0.06))
 	_d_watermark.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_d_watermark.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
 	# 维度色径向衬光（白→透明纹理 + modulate 维度色）
 	_d_glow = TextureRect.new()
 	var grad := Gradient.new()
-	grad.set_color(0, Color(1, 1, 1, 0.18))
-	grad.set_color(1, Color(1, 1, 1, 0.0))
+	grad.set_color(0, Color(1.0, 0.86, 0.52, 0.10))   # 图标背后柔暖泥金光晕（浅板上极淡）
+	grad.set_color(1, Color(1.0, 0.86, 0.52, 0.0))
 	var gtex := GradientTexture2D.new()
 	gtex.gradient = grad
 	gtex.fill = GradientTexture2D.FILL_RADIAL
@@ -527,7 +529,7 @@ func _build_detail_panel() -> void:
 	# 名牌横带：紧贴舞台底沿（名字"长"在舞台上）
 	var band_r := Rect2(stage.position.x, stage.position.y + stage.size.y, stage.size.x, 64)
 	var band_fill := ColorRect.new()
-	band_fill.color = Color(0, 0, 0, 0.45)
+	band_fill.color = Color(0.20, 0.14, 0.09, 0.95)   # 名牌=深黑铜铭牌（泥金道具名在其上跳）
 	band_fill.position = band_r.position
 	band_fill.size = band_r.size
 	band_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -546,19 +548,19 @@ func _build_detail_panel() -> void:
 
 	# ── ② 数据段：阶章 + 维度章（两枚药丸章成组居中·_layout_chips 按内容重排）──
 	_d_tier_edge = _chip_rect(Color(EDGE_INNER, 0.55))
-	_d_tier_fill = _chip_rect(Color(0, 0, 0, 0.35))
+	_d_tier_fill = _chip_rect(Color(PAGE_INSET, 0.95))
 	_d_tier_lbl = _make_label(Vector2.ZERO, Vector2(120, 34), 18, PARCHMENT_HI)
 	_d_tier_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_d_tier_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_d_dim_edge = _chip_rect(Color(EDGE_INNER, 0.55))
-	_d_dim_fill = _chip_rect(Color(0, 0, 0, 0.35))
+	_d_dim_fill = _chip_rect(Color(PAGE_INSET, 0.95))
 	_d_dim_lbl = _make_label(Vector2.ZERO, Vector2(120, 34), 18, PARCHMENT_HI)
 	_d_dim_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_d_dim_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
 	# 段间分隔线
 	var sep := ColorRect.new()
-	sep.color = Color(EDGE_MID, 0.22)
+	sep.color = Color(INK_LINE, 0.35)
 	sep.position = Vector2(PANEL.position.x + 120, PANEL.position.y + 690)
 	sep.size = Vector2(PANEL.size.x - 240, 1)
 	sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -610,7 +612,7 @@ func _select(idx: int) -> void:
 		_d_icon.visible = false
 		_d_icon_fallback.text = it.item_name
 		_d_icon_fallback.visible = true
-	_d_glow.modulate = dim_col.lightened(0.15)
+	_d_glow.modulate = Color.WHITE   # 衬光保持暖泥金原色（浅底上不再按维度色染·维度由彩色章表达）
 	_d_name.text = it.item_name
 	_d_watermark.text = "%02d" % (idx + 1)
 	_d_tier_lbl.text = TIER_LABEL[it.tier]
@@ -727,7 +729,7 @@ func _make_frosted(parent: Control, r: Rect2) -> void:
 	border.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(border)
 	var fill := ColorRect.new()
-	fill.color = Color(DARK_WARM, 0.55)
+	fill.color = Color(PAGE_INSET, 0.92)   # 描述盒=略深羊皮（recessed）
 	fill.position = r.position + Vector2(2, 2)
 	fill.size = r.size - Vector2(4, 4)
 	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE

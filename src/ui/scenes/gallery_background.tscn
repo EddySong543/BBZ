@@ -4,12 +4,12 @@
 
 [sub_resource type="ShaderMaterial" id="CodexMat"]
 shader = ExtResource("1_codex_sh")
-shader_parameter/top_color = Color(0.155, 0.118, 0.085, 1)
-shader_parameter/bottom_color = Color(0.072, 0.056, 0.045, 1)
-shader_parameter/corner_color = Color(0.04, 0.032, 0.028, 1)
+shader_parameter/top_color = Color(0.52, 0.43, 0.31, 1)
+shader_parameter/bottom_color = Color(0.4, 0.32, 0.23, 1)
+shader_parameter/corner_color = Color(0.3, 0.23, 0.16, 1)
 shader_parameter/aspect = 1.777
-shader_parameter/vignette = 0.85
-shader_parameter/vignette_radius = 0.62
+shader_parameter/vignette = 0.5
+shader_parameter/vignette_radius = 0.66
 shader_parameter/grain_amt = 0.03
 shader_parameter/grain_px = 540.0
 shader_parameter/levels = 48.0
