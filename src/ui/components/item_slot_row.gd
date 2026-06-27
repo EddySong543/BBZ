@@ -24,7 +24,7 @@ const DIM_COLOR := {
 
 ## jelly 芯片（与 battle_screen 动作按钮同款 shader → 统一 UI 语言）。
 const JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")
-const ItemCellDeco := preload("res://src/ui/components/item_cell_deco.gd")   # 格底祥云装饰（共用件）
+const CELL_BG_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")   # 格底云纹（叠加层·仅传说·与图鉴同 shader）
 const CHIP_CORNER := 0.22                       # 圆角（同动作按钮·非锐角）
 const EDGE_OUTER := Color(0.10, 0.09, 0.11)     # 统一暗轮廓（中性·任何色相都干净·场景无关）
 const GOLD_READY := Color("ffd86a")             # 道具本回合可用（interactive）→ 亮金高光边
@@ -52,6 +52,7 @@ const ICON_INSET := 6.0                          # 图标内缩（露出芯片�
 
 var _chips: Array[ColorRect] = []
 var _chip_mats: Array[ShaderMaterial] = []   # 每槽 jelly 材质（refresh 重设 fill/edge 做状态/维度色）
+var _clouds: Array[ColorRect] = []           # 每槽云纹叠加层（仅传说·覆芯片上·图标之下·refresh 控显隐）
 var _icons: Array[TextureRect] = []            # 道具图标层（缺图隐藏 → 回退文字·零回归）
 var _icon_cache := {}                          # id → Texture2D / null（避免每帧 load/exists）
 var _labels: Array[Label] = []
@@ -89,8 +90,23 @@ func _ready() -> void:
 		chip.material = mat
 		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(chip)
-		# 格底祥云装饰（芯片之上、图标之下·共用件·idle 流光微动）。
-		ItemCellDeco.add(self, base, Vector2(SLOT_W, SLOT_H), i)
+		# 格底云纹叠加层（覆芯片上、图标之下·仅传说显·与图鉴同 shader 的叠加模式）。
+		var cloud := ColorRect.new()
+		cloud.color = Color.WHITE
+		cloud.position = base
+		cloud.size = Vector2(SLOT_W, SLOT_H)
+		cloud.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cloud.visible = false
+		var clm := ShaderMaterial.new()
+		clm.shader = CELL_BG_SHADER
+		clm.set_shader_parameter("fill_opaque", 0.0)        # 叠加模式·仅金云、透明底
+		clm.set_shader_parameter("cloud_on", 1.0)
+		clm.set_shader_parameter("cloud_alpha", 0.16)
+		clm.set_shader_parameter("corner_radius", CHIP_CORNER)
+		clm.set_shader_parameter("pixel_grid", 30.0)        # 与 jelly 芯片同格
+		cloud.material = clm
+		add_child(cloud)
+		_clouds.append(cloud)
 		# 道具图标层（铺在芯片之上、文字之下；缺图隐藏 → 回退文字）。
 		var icon := TextureRect.new()
 		icon.position = base + Vector2(ICON_INSET, ICON_INSET)
@@ -194,6 +210,8 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 		var lbl: Label = _labels[i]
 		var icon: TextureRect = _icons[i]
 		icon.visible = false               # 默认隐藏 → 非 CHARGING / 缺图均回退文字（零回归）
+		if i < _clouds.size():
+			_clouds[i].visible = false     # 云纹默认隐（仅传说道具显）
 		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		var ready := false                 # 本回合是否「有可操作动作」（决定金边）
 		var cta := GOLD_OPEN               # 召唤操作用的金（经济操作=暗金；道具就绪=亮金）
@@ -217,6 +235,8 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 					lbl.text = "开格\n(锁)"
 			BattleCore.SlotState.CHARGING:
 				var item: ItemData = battle.slot_item(player, i)
+				if item != null and item.tier >= 3 and i < _clouds.size():
+					_clouds[i].visible = true   # 传说道具 → 显格底云纹
 				var nm: String = item.item_name if item != null else ""
 				var dim: Color = _rarity_color(item)   # 框色按稀有度（变量名 dim 历史遗留）
 				var tex: Texture2D = _icon_for(item.item_id) if item != null else null

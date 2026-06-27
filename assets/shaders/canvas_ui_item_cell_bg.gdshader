@@ -11,6 +11,7 @@ shader_type canvas_item;
 group_uniforms palette;
 uniform vec4 fill_color : source_color = vec4(0.20, 0.10, 0.08, 1.0); // 稀有度深底（=外框色深调）
 uniform vec4 cloud_color : source_color = vec4(0.97, 0.84, 0.50, 1.0); // 云纹金
+uniform float fill_opaque : hint_range(0.0, 1.0) = 1.0; // 1=实底(图鉴) / 0=仅云纹叠加层(战斗·覆在 jelly 芯片上)
 group_uniforms cloud;
 uniform float cloud_on = 0.0;                          // 0=无云纹（普通/稀有）/ 1=铺满云纹（传说）
 uniform float cloud_alpha : hint_range(0.0, 0.6) = 0.17; // 云纹强度（tone-on-tone·克制）
@@ -41,23 +42,24 @@ float spiral(vec2 uv, vec2 sc, float t) {
 }
 
 void fragment() {
-	vec3 col = fill_color.rgb;
-	if (cloud_on > 0.5) {
-		float t = TIME * drift_speed;
-		// 轻微 swirl 扭曲 → 云气有流动感
-		vec2 q = UV;
-		q.x += warp_amt * sin(UV.y * 6.2831853 + t);
-		q.y += warp_amt * sin(UV.x * 6.2831853 * 0.8 - t * 0.7);
-		// 流动云气线（两层对角等值线·一密一疏）
-		float f1 = sin((q.x - q.y) * 6.2831853 * flow_freq);
-		float lines = smoothstep(0.80, 0.97, abs(f1));
-		float f2 = sin((q.x * 0.6 + q.y) * 6.2831853 * (flow_freq * 0.7) + 1.3);
-		lines = max(lines, smoothstep(0.86, 0.99, abs(f2)) * 0.7);
-		// 对角两朵涡卷云头
-		lines = max(lines, spiral(UV, vec2(0.80, 0.20), t));
-		lines = max(lines, spiral(UV, vec2(0.20, 0.80), t));
-		col = mix(col, cloud_color.rgb, clamp(lines, 0.0, 1.0) * cloud_alpha);
-	}
-	COLOR = vec4(col, 1.0);
+	float t = TIME * drift_speed;
+	// 轻微 swirl 扭曲 → 云气有流动感
+	vec2 q = UV;
+	q.x += warp_amt * sin(UV.y * 6.2831853 + t);
+	q.y += warp_amt * sin(UV.x * 6.2831853 * 0.8 - t * 0.7);
+	// 流动云气线（两层对角等值线·一密一疏）
+	float f1 = sin((q.x - q.y) * 6.2831853 * flow_freq);
+	float lines = smoothstep(0.80, 0.97, abs(f1));
+	float f2 = sin((q.x * 0.6 + q.y) * 6.2831853 * (flow_freq * 0.7) + 1.3);
+	lines = max(lines, smoothstep(0.86, 0.99, abs(f2)) * 0.7);
+	// 对角两朵涡卷云头
+	lines = max(lines, spiral(UV, vec2(0.80, 0.20), t));
+	lines = max(lines, spiral(UV, vec2(0.20, 0.80), t));
+	lines *= step(0.5, cloud_on);                       // 无云纹时门控为 0（branchless）
+	float cl = clamp(lines, 0.0, 1.0) * cloud_alpha;
+	// 两模式无分支切换：实底(fill_opaque=1·图鉴)=底色+云纹混入·不透明；叠加(=0·战斗)=仅金云·低 alpha 覆在芯片上
+	vec3 fill_col = mix(fill_color.rgb, cloud_color.rgb, cl);
+	COLOR.rgb = mix(cloud_color.rgb, fill_col, fill_opaque);
+	COLOR.a = mix(cl, 1.0, fill_opaque);
 	COLOR.a *= corner_round_alpha(UV, corner_radius, pixel_grid);
 }
