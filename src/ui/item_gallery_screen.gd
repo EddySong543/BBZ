@@ -10,6 +10,8 @@ extends Control
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")
 const CELL_BG_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")   # 格底：圆角+稀有度底+传说云纹
 const ROUND_MASK_SHADER := preload("res://assets/shaders/canvas_ui_round_mask.gdshader")  # 选中金框圆角
+const LEGENDARY_BG := preload("res://assets/ui/gold_bottom.png")                          # 传说道具金云纹背景(Eddy 美术)
+const LEGENDARY_BG_TINT := Color(1.0, 1.0, 1.0, 1.0)                                       # 原图亮度·不做暗处理(Eddy 2026-06-27)
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
 
 # ── 配色 v3「深框亮页典籍」(2026-06-27·与英雄图鉴同源) ──
@@ -398,10 +400,18 @@ func _make_item_card(item: ItemData, idx: int) -> Button:
 	cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var cm := ShaderMaterial.new()
 	cm.shader = CELL_BG_SHADER
-	cm.set_shader_parameter("fill_color", rc.darkened(0.78))
-	cm.set_shader_parameter("cloud_on", 1.0 if item.tier == 3 else 0.0)
+	cm.set_shader_parameter("fill_color", rc.darkened(0.5))   # 普通/稀有底色调亮(原 0.78 太暗)·仍纯色不换云纹
 	cm.set_shader_parameter("corner_radius", 0.18)
 	cm.set_shader_parameter("pixel_grid", BOX / 6.0)
+	cm.set_shader_parameter("center_glow", 0.6)               # 中心圆形高亮凸显道具(传说由 use_tex 自动排除)
+	cm.set_shader_parameter("glow_radius", 0.55)
+	# 传说：外部美术图 gold_bottom 当格底（替代程序云纹）——采进格底 shader，随同一套 corner_round_alpha
+	# 圆角裁切被**约束到格内**（避开 round_mask 对 TextureRect 不可靠的坑）；压暗去饱和与暗格协调；在道具美术之下。
+	if item.tier == 3:
+		cm.set_shader_parameter("use_tex", 1.0)
+		cm.set_shader_parameter("bg_tex", LEGENDARY_BG)
+		cm.set_shader_parameter("tex_tint", LEGENDARY_BG_TINT)
+	cm.set_shader_parameter("cloud_on", 0.0)
 	cell.material = cm
 	card.add_child(cell)
 	# 像素框（边=稀有度色·与英雄卡同 shader·圆角）
