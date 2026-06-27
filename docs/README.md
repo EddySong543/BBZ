@@ -19,7 +19,7 @@
 | **战斗 UI / juice** | `src/ui/battle_screen.*` · `src/ui/components/` | `game-concept.md` §3 | `prototypes/juice_test/README.md`（juice 来源） |
 | **美术管线** | `tools/import_hero_art.gd` · `assets/sprites/heroes/` | `design/art-pipeline-hero-animation.md`（A 方案） | — |
 | **数值框架** | `assets/data/heroes/` · `battle_core.gd` 常量 | `heroes-schools.md` §8 · `game-concept.md` §4/§7 | — |
-| **道具系统** | `src/battle/item_*.gd` · `src/battle/items/*.gd`（70 件） | `items-list.md`（清单真相源）· `build-design-framework.md` §2 | `items-reconciliation.md`（三方对账）· 图标管线 `tools/import_item_art.gd` |
+| **道具系统** | `src/battle/item_*.gd` · `src/battle/items/*.gd`（70 件） | `items-list.md`（清单真相源）· `build-design-framework.md` §2 | 图标管线 `tools/import_item_art.gd` |
 
 ---
 
@@ -35,7 +35,6 @@
 | [`art-pipeline-hero-animation.md`](../design/art-pipeline-hero-animation.md) | 美术管线 A 方案（静态立绘 + 代码 juice + idle + 武器分类斩击），剪纸绑定已否决 |
 | [`build-design-framework.md`](../design/build-design-framework.md) | **设计纲领** — 资源三层 / 道具骨架 §2 / 标准值 §4 / 连携主定理 §6 / 元件类型 §7 / 反固化 §8 / 判据 §14 / 系统操作层 §15 |
 | [`items-list.md`](../design/items-list.md) | **道具清单当前真相源** — 98 件 + 系统操作层（按 tier → 维度） |
-| [`items-reconciliation.md`](../design/items-reconciliation.md) | 道具三方对账（items.md / items-list / 代码 分叉 + 归一建议） |
 | [`items.md`](../design/items.md) | ⚠ 历史快照 · 已被 items-list 取代（2026-06-17 旧奇幻命名版，仅溯源） |
 
 ### 技术 / 架构（`docs/architecture/`）
@@ -52,7 +51,6 @@
 |------|------|
 | [`COLLABORATIVE-DESIGN-PRINCIPLE.md`](COLLABORATIVE-DESIGN-PRINCIPLE.md) | 协作设计协议（提问→选项→决定→草稿→审批→批量执行） |
 | [`WORKFLOW-GUIDE.md`](WORKFLOW-GUIDE.md) | 完整工作流指南（代理架构从零到发布） |
-| [`examples/`](examples/README.md) | 端到端协作会话示例 |
 
 ### 引擎参考（`docs/engine-reference/`）
 
