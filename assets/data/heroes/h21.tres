@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="HeroData" format=3]
+
+[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_h21"]
+
+[resource]
+script = ExtResource("1_h21")
+hero_id = "h21"
+hero_name = "黑暗申猴"
+max_hp = 4
+skill_type = 1
+skill_description = "调虎离山"
+skill_detail = "主动技（占动作·耗 2 能·每局 2 次·须亲自出战）：强制对手换人，并由你指定把对手后排的哪名英雄揪到台前。"
+portrait_path = "res://assets/sprites/heroes/h21/h21_portrait.png"
+sprite_frames_path = "res://assets/sprites/heroes/h21/h21_idle.tres"

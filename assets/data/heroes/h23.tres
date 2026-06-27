@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="HeroData" format=3]
+
+[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_h23"]
+
+[resource]
+script = ExtResource("1_h23")
+hero_id = "h23"
+hero_name = "黑暗戌狗"
+max_hp = 6
+skill_description = "护主"
+skill_detail = "被动（每局一次）：黑暗戌狗在替补席存活时，你方出战英雄受到致命一击，它冲上去替挡——这一击完全免除，自己碎掉下场，出战英雄留在前线。"
+portrait_path = "res://assets/sprites/heroes/h23/h23_portrait.png"
+sprite_frames_path = "res://assets/sprites/heroes/h23/h23_idle.tres"

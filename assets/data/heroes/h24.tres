@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="HeroData" format=3]
+
+[ext_resource type="Script" path="res://src/battle/hero_data.gd" id="1_h24"]
+
+[resource]
+script = ExtResource("1_h24")
+hero_id = "h24"
+hero_name = "黑暗亥猪"
+max_hp = 6
+skill_description = "饕餮"
+skill_detail = "被动：战场上任一英雄阵亡时（敌我皆可），黑暗亥猪吞噬尸身，你方全队 +2.0 能量。"
+portrait_path = "res://assets/sprites/heroes/h24/h24_portrait.png"
+sprite_frames_path = "res://assets/sprites/heroes/h24/h24_idle.tres"
