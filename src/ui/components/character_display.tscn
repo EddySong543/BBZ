@@ -12,7 +12,7 @@ script = ExtResource("1_script")
 [node name="SubViewport" type="SubViewport" parent="." unique_id=1325957388]
 transparent_bg = true
 handle_input_locally = false
-size = Vector2i(500, 500)
+size = Vector2i(768, 768)
 render_target_update_mode = 4
 
 [node name="ViewportBorder" type="ReferenceRect" parent="SubViewport" unique_id=1625547335]
@@ -23,7 +23,7 @@ border_width = 2.0
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="SubViewport" unique_id=1622338484]
 texture_filter = 1
-position = Vector2(170, 154)
-scale = Vector2(1.9, 1.9)
+position = Vector2(384, 384)
+scale = Vector2(2.2, 2.2)
 sprite_frames = ExtResource("2_3v6dl")
 animation = &"idle"

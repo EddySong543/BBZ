@@ -209,10 +209,10 @@ expand_mode = 1
 
 [node name="P1CharDisplay" parent="." unique_id=1642938575 instance=ExtResource("2_char_display")]
 layout_mode = 0
-offset_left = 310.0
-offset_top = 490.0
-offset_right = 650.0
-offset_bottom = 850.0
+offset_left = 96.0
+offset_top = 244.0
+offset_right = 864.0
+offset_bottom = 1012.0
 anim_fps = 12.0
 rim_strength = 0.4
 backlight = 0.05
@@ -220,10 +220,10 @@ warmth_amount = 0.0
 
 [node name="P2CharDisplay" parent="." unique_id=915119977 instance=ExtResource("2_char_display")]
 layout_mode = 0
-offset_left = 1270.0
-offset_top = 490.0
-offset_right = 1610.0
-offset_bottom = 850.0
+offset_left = 1056.0
+offset_top = 244.0
+offset_right = 1824.0
+offset_bottom = 1012.0
 anim_fps = 12.0
 backlight = 0.125
 light_dir = Vector2(1.6, -1.6)

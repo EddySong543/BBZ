@@ -1,9 +1,16 @@
+@tool
 class_name CharacterDisplay
 extends SubViewportContainer
 
 ## Self-contained character display: SubViewport + AnimatedSprite2D.
 ## Drop into any scene, set spritesheet_path, see idle animation in editor.
 ## Supports attack/hit/defend via additional spritesheets.
+##
+## 【可视化调整·2026-06-27】加 @tool 后，在编辑器选中本节点(如 battle_screen 的
+## P1CharDisplay/P2CharDisplay)，直接在 Inspector 改 sprite_scale(大小) / sprite_offset(位置)，
+## 视口里立绘**实时**更新；每个实例可各自 override → 每个英雄独立站位/大小。
+## (旧 bug：sprite_scale 之前是死值——_ready 没应用它、场景里 AnimatedSprite2D.scale 才生效，
+##  且非 @tool 脚本在编辑器不跑 setter，所以改了"没反应、还是原来大小"。现已修。)
 
 @export var spritesheet_path: String = "":
 	set(v):
@@ -19,15 +26,19 @@ extends SubViewportContainer
 		sprite_frames = v
 		if is_node_ready() and _sprite and v:
 			_sprite.sprite_frames = v
+			_apply_idle_speed()
 			_sprite.play("idle")
 
-@export var sprite_scale: Vector2 = Vector2(2.0, 2.0):
+## 立绘缩放（所见即所得·@tool 实时）。⚠ 立绘像素尺寸 = idle 帧尺寸(256) × scale，
+## 不得超过 SubViewport.size（当前 768 → 支持 scale ≤ 3.0），否则立绘被 viewport 边界裁切。
+## 要更大立绘：先把 character_display.tscn 的 SubViewport size 调大、并同步 battle 容器 offset。
+@export var sprite_scale: Vector2 = Vector2(2.2, 2.2):
 	set(v):
 		sprite_scale = v
 		if is_node_ready() and _sprite:
 			_sprite.scale = v
 
-@export var sprite_offset: Vector2 = Vector2(64, 120):
+@export var sprite_offset: Vector2 = Vector2(384, 384):
 	set(v):
 		sprite_offset = v
 		if is_node_ready() and _sprite:
@@ -46,6 +57,20 @@ extends SubViewportContainer
 		if is_node_ready() and _sprite and _sprite.sprite_frames:
 			for anim_name in _sprite.sprite_frames.get_animation_names():
 				_sprite.sprite_frames.set_animation_speed(anim_name, v)
+			_apply_idle_speed()   # idle 不跟 anim_fps，按帧数动态覆盖（少帧放慢）
+
+@export_group("Idle 动态调速")
+## idle 满帧时的播放帧率（基准）。帧数 ≥ idle_ref_frames 的 idle 用此值。
+@export var idle_base_fps: float = 12.0:
+	set(v):
+		idle_base_fps = v
+		_apply_idle_speed()
+## idle 基准帧数（满帧）。帧数 < 此值的 idle 按比例放慢、循环时长与满帧一致；
+## 帧数 ≥ 此值不加速（封顶 base_fps）。多数英雄 idle = 5~6 帧，个别 12 帧。
+@export var idle_ref_frames: int = 6:
+	set(v):
+		idle_ref_frames = maxi(1, v)
+		_apply_idle_speed()
 
 
 @export var sprite_frames_path: String = "":
@@ -165,6 +190,10 @@ func _ready() -> void:
 		_sprite.animation_finished.connect(_on_anim_finished)
 
 	_sprite.flip_h = flip_h
+	# 应用导出的 sprite_scale / sprite_offset（修旧 bug：原先这俩 export 不生效·只有场景里
+	# AnimatedSprite2D 的值生效）→ 现在它们是唯一真相源，Inspector 改值即所见即所得（@tool 实时）。
+	_sprite.scale = sprite_scale
+	_sprite.position = sprite_offset
 	# 像素清晰：SubViewport 内默认是 Linear 过滤会把精灵放大糊掉，强制 Nearest（容器 + 精灵）
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -175,6 +204,7 @@ func _ready() -> void:
 		fmat.set_shader_parameter("flash_amount", 0.0)
 		_sprite.material = fmat
 	_apply_light()  # 应用 rim/背光 export 参数（含 flip_h 朝向）
+	_apply_idle_speed()  # 按 idle 帧数动态设循环速度（少帧放慢·见函数注释）
 
 
 func _build_nodes() -> void:
@@ -215,6 +245,7 @@ func _load_spritesheet() -> void:
 				frames.add_frame("idle", atlas)
 		_sprite_cache[spritesheet_path] = frames
 		_sprite.sprite_frames = frames
+	_apply_idle_speed()
 	_sprite.play("idle")
 
 
@@ -226,6 +257,7 @@ func _load_frames_resource(path: String) -> void:
 		return
 	var sf: SpriteFrames = load(path)
 	_sprite.sprite_frames = sf
+	_apply_idle_speed()
 	_sprite.play("idle")
 
 
@@ -302,6 +334,23 @@ func pulse_rim(boost: float = 0.8, duration: float = 0.25) -> void:
 	tw.tween_method(
 		func(v: float) -> void: mat.set_shader_parameter("rim_strength", v),
 		base + boost, base, duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+
+## 按 idle 帧数动态设循环速度（解决"少帧 idle 播太快显急促"）：
+##   fps = idle_base_fps × min(帧数, idle_ref_frames) / idle_ref_frames
+##   → 满帧(≥ref)用 base_fps；少帧按比例降速、循环时长与满帧一致；多帧封顶 base_fps 不被加速。
+##   例(base 12 / ref 6)：6帧→12fps(0.5s)、5帧→10fps(0.5s)、12帧→12fps(1.0s)。
+## ⚠ 改的是共享 SpriteFrames 资源的 speed（同一英雄 .tres 多处实例一致·不同英雄各自独立）。
+func _apply_idle_speed() -> void:
+	if not _sprite or not _sprite.sprite_frames:
+		return
+	if not _sprite.sprite_frames.has_animation("idle"):
+		return
+	var n: int = _sprite.sprite_frames.get_frame_count("idle")
+	if n <= 0 or idle_ref_frames <= 0:
+		return
+	var fps: float = idle_base_fps * minf(float(n), float(idle_ref_frames)) / float(idle_ref_frames)
+	_sprite.sprite_frames.set_animation_speed("idle", fps)
 
 
 ## 把当前光照 export 参数应用到角色 shader（_ready 后建立 / Inspector 实时调用）。
