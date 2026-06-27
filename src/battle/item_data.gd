@@ -17,7 +17,8 @@ enum Target { ENEMY, SELF }   ## 默认自动指向（§D6）：敌方出战 / �
 @export var role: String = ""             ## 元件角色（填隙/导出/随机…），可空
 @export var sequence_tag: int = Seq.ANY
 @export var target_mode: int = Target.ENEMY
-@export var description: String = ""       ## 一句话描述（游戏内展示·Eddy 要求）
+@export var description: String = ""       ## 一句话机制描述（游戏内展示·Eddy 要求）
+@export var flavor: String = ""            ## 风味文字（氛围/调性·区别于机制 description·Eddy 2026-06-27）
 @export var ev_half: int = 1              ## 设计 EV（半点·≈0.5 当量 = 1）
 @export var upgrade_to: String = ""       ## 升级线下一级道具 id（空=不可升级·ADR D5）
 @export var params: Dictionary = {}       ## 效果数值（半点等），由 effect 读取

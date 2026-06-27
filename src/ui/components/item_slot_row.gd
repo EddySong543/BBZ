@@ -24,6 +24,7 @@ const DIM_COLOR := {
 
 ## jelly 芯片（与 battle_screen 动作按钮同款 shader → 统一 UI 语言）。
 const JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")
+const ItemCellDeco := preload("res://src/ui/components/item_cell_deco.gd")   # 格底祥云装饰（共用件）
 const CHIP_CORNER := 0.22                       # 圆角（同动作按钮·非锐角）
 const EDGE_OUTER := Color(0.10, 0.09, 0.11)     # 统一暗轮廓（中性·任何色相都干净·场景无关）
 const GOLD_READY := Color("ffd86a")             # 道具本回合可用（interactive）→ 亮金高光边
@@ -88,6 +89,8 @@ func _ready() -> void:
 		chip.material = mat
 		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(chip)
+		# 格底祥云装饰（芯片之上、图标之下·共用件·idle 流光微动）。
+		ItemCellDeco.add(self, base, Vector2(SLOT_W, SLOT_H), i)
 		# 道具图标层（铺在芯片之上、文字之下；缺图隐藏 → 回退文字）。
 		var icon := TextureRect.new()
 		icon.position = base + Vector2(ICON_INSET, ICON_INSET)
