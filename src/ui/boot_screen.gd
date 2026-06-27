@@ -156,16 +156,21 @@ func _input(event: InputEvent) -> void:
 func _trigger_sweep() -> void:
 	_phase = "sweeping"
 	var blue_wins := randf() < 0.5
-	BootResult.set_winner(blue_wins)  # 记下胜方色 → main_menu / bp_screen 单色波流背景继承
+	BootResult.set_winner(blue_wins)  # 记下原始随机胜方 → effective_blue_wins() 再叠加界面主色翻转
+	# ⚠ 决堤实际"盖屏色"必须用 effective（含界面主色翻转开关），否则翻转开时
+	#    boot 决堤是蓝、菜单/BP/过场幕却走红——胜方色与背景色对不上（2026-06-27 修复）。
+	#    show_blue 既驱动 clash 朝哪侧崩溃决堤，也决定盖屏色（蓝填左/红填右），
+	#    与 wave_flow_bg / TransitionManager 同读 effective → 全链路同色。
+	var show_blue := BootResult.effective_blue_wins()
 	# 胜方加速冲锋，败方被压制（波变疏弱）
-	if blue_wins:
+	if show_blue:
 		_speed_l = CHARGE_PHASE_SPEED
 		_speed_r = LOSER_PHASE_SPEED
 	else:
 		_speed_r = CHARGE_PHASE_SPEED
 		_speed_l = LOSER_PHASE_SPEED
 	# 标题退场延后到决堤瞬间（_run_combo 内）——连击期间标题留场随每击被震推
-	_run_combo(blue_wins)
+	_run_combo(show_blue)
 
 
 ## 连击序列：4 击猛攻（中线阻尼震颤 + 每击局部闪/轻 shake 蓄力）→ 第 5 下崩溃决堤。
