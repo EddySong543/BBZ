@@ -15,10 +15,10 @@ const HEART_SHEET := preload("res://assets/ui/icons/heart_idle.png")
 const HERO_DATA_DIR := "res://assets/data/heroes/"
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
 
-# ── 左侧牌库网格（20 卡 0.846 缩放=110×134·六列固定网格 6+6+6+2·i%COLS 动态·POOL 高 900 容 4 行）──
+# ── 左侧牌库网格（24 卡 0.846 缩放=110×134·六列固定网格 6×4·i%COLS 动态·POOL 高 900 容 4 行）──
 const CARD_SCALE := 0.846
 const POOL := Rect2(60, 140, 1032, 900)
-const COLS := 6   # 6 列固定网格（后续加英雄按行增长，不随张数改列）；首发 20 = 6+6+6+2 四行（POOL 高 900 容得下）
+const COLS := 6   # 6 列固定网格（后续加英雄按行增长，不随张数改列）；首发 24 = 6×4 满四行（POOL 高 900 容得下）
 const STEP_X := 121.0
 const ROW_H := 142.0
 const X0 := 218.0   # 6 卡在 POOL(60..1092) 内水平居中（整数取位保像素硬边）
@@ -76,7 +76,7 @@ var _row_glow: ColorRect          # 左网格选中行微亮条（键盘导航�
 
 
 func _ready() -> void:
-	all_heroes = HeroData.create_launch_pool(HERO_DATA_DIR)   # 首发 20（12 生肖 + 黑暗 子鼠/丑牛/寅虎/卯兔/辰龙/巳蛇/午马/未羊）
+	all_heroes = HeroData.create_launch_pool(HERO_DATA_DIR)   # 首发 24（12 生肖 + 黑暗全 12·子鼠…亥猪 h01-h24）
 	_setup_top()
 	_build_pool()
 	_build_detail_panel()
@@ -208,7 +208,8 @@ func _band_rect(parent: Control, r: Rect2, col: Color) -> ColorRect:
 ## 2026-06-13 Eddy：去除三系图例带 + 每卡顶主题色细线（早期生肖/阿卡那/星座标记已全部移除）。
 ## 保留选中行微亮条（键盘导航行定位）。
 func _build_pool() -> void:
-	_make_frosted(pool_area, POOL)
+	_build_codex_page(pool_area, POOL)   # 左书页（暖金框页·与右详情页对称=翻开的图典）
+	_build_spine(pool_area)              # 中缝书脊（装订带）
 	# 行亮条（先建=画在卡下层）
 	_row_glow = ColorRect.new()
 	_row_glow.color = Color(1, 1, 1, 0.045)
@@ -234,6 +235,78 @@ func _build_pool() -> void:
 			bj.base_scale = CARD_SCALE
 		card_cards.append(card)
 	pool_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+
+## 「书页」：与右侧详情板同材质的暖金像素框页（backing+fill+frame）+ 内墨边。
+## 左(网格)页 / 右(详情)页 同框 + 中缝书脊 = 一本翻开的命运图典（替代旧毛玻璃托板）。
+func _build_codex_page(parent: Control, r: Rect2) -> void:
+	var backing := ColorRect.new()
+	backing.color = EDGE_OUTER
+	backing.position = r.position
+	backing.size = r.size
+	backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(backing)
+	var fill := ColorRect.new()
+	fill.color = Color(DARK_WARM, 0.97)   # 近黑暖暗底（页面暗·衬金字/立绘）
+	fill.position = r.position + Vector2(3, 3)
+	fill.size = r.size - Vector2(6, 6)
+	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(fill)
+	var frame := ColorRect.new()
+	var m := ShaderMaterial.new()
+	m.shader = FRAME_SHADER
+	m.set_shader_parameter("edge_outer", EDGE_OUTER)
+	m.set_shader_parameter("edge_mid", EDGE_MID)
+	m.set_shader_parameter("edge_inner", EDGE_INNER)
+	m.set_shader_parameter("pixel_grid", r.size.x / 6.0)   # 大页按尺寸折算 ≈6px/格
+	m.set_shader_parameter("border_px", 1.5)
+	m.set_shader_parameter("noise_amt", 0.06)
+	m.set_shader_parameter("light_amount", 0.13)
+	m.set_shader_parameter("aspect", r.size.x / r.size.y)
+	frame.material = m
+	frame.position = r.position
+	frame.size = r.size
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(frame)
+	# 内墨边（细墨线内嵌框·页边留白感·极淡）
+	var inset := r.grow(-18.0)
+	for er: Rect2 in [
+			Rect2(inset.position, Vector2(inset.size.x, 1)),
+			Rect2(Vector2(inset.position.x, inset.end.y - 1), Vector2(inset.size.x, 1)),
+			Rect2(inset.position, Vector2(1, inset.size.y)),
+			Rect2(Vector2(inset.end.x - 1, inset.position.y), Vector2(1, inset.size.y))]:
+		var ln := ColorRect.new()
+		ln.color = Color(EDGE_MID, 0.16)
+		ln.position = er.position
+		ln.size = er.size
+		ln.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		parent.add_child(ln)
+
+
+## 中缝书脊：左右两页之间的装订带（暗芯 + 金心线 + 上下端头方块，呼应匾额卷轴端头）。
+func _build_spine(parent: Control) -> void:
+	var gx: float = (POOL.end.x + PANEL.position.x) * 0.5   # 中缝中心 x
+	var top: float = POOL.position.y
+	var h: float = POOL.size.y
+	var core := ColorRect.new()
+	core.color = Color(0.03, 0.025, 0.022, 0.92)   # 装订暗芯
+	core.position = Vector2(gx - 9.0, top)
+	core.size = Vector2(18.0, h)
+	core.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(core)
+	var line := ColorRect.new()
+	line.color = Color(EDGE_MID, 0.5)   # 金心线
+	line.position = Vector2(gx - 1.0, top)
+	line.size = Vector2(2.0, h)
+	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(line)
+	for yy: float in [top - 4.0, top + h - 4.0]:
+		var cap := ColorRect.new()
+		cap.color = Color(EDGE_MID, 0.7)
+		cap.position = Vector2(gx - 5.0, yy)
+		cap.size = Vector2(10.0, 8.0)
+		cap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		parent.add_child(cap)
 
 
 ## 右侧常驻详情板（像素框）：上=idle 动画舞台，下=文字属性。

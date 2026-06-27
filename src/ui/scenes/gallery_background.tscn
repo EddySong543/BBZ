@@ -1,0 +1,35 @@
+[gd_scene format=3 uid="uid://cq1codexbg7x2"]
+
+[ext_resource type="Shader" path="res://assets/shaders/canvas_env_codex.gdshader" id="1_codex_sh"]
+
+[sub_resource type="ShaderMaterial" id="CodexMat"]
+shader = ExtResource("1_codex_sh")
+shader_parameter/top_color = Color(0.155, 0.118, 0.085, 1)
+shader_parameter/bottom_color = Color(0.072, 0.056, 0.045, 1)
+shader_parameter/corner_color = Color(0.04, 0.032, 0.028, 1)
+shader_parameter/aspect = 1.777
+shader_parameter/vignette = 0.85
+shader_parameter/vignette_radius = 0.62
+shader_parameter/grain_amt = 0.03
+shader_parameter/grain_px = 540.0
+shader_parameter/levels = 48.0
+shader_parameter/dither_amt = 1.0
+
+[node name="GalleryBackground" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Codex" type="ColorRect" parent="."]
+material = SubResource("CodexMat")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 1)
