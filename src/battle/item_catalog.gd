@@ -353,14 +353,16 @@ static func ids() -> Array:
 
 
 # ========== 美术图标约定（B·2026-06-20）==========
-## 图标按约定路径加载、无需逐件配字段：res://assets/sprites/items/<id>.png。
-## 暂存区 newAssets/ 由 tools/import_item_art.gd 按「中文名→id」分配进来；UI 缺图回退占位文字。
+## 图标按约定路径加载、无需逐件配字段：res://assets/sprites/items/<中文道具名>.png。
+## 2026-06-27 Eddy：图标文件名 = 游戏内中文道具名（与 _DEF[id].name 同步），便于按名更新美术；
+##   暂存区 newAssets/ 同样按中文名命名（tools/import_item_art.gd 直接同名拷入）；UI 缺图回退占位文字。
 const ICON_DIR := "res://assets/sprites/items/"
 
 
-## 某 id 的图标约定路径（文件不一定存在）。
+## 某 id 的图标约定路径（文件不一定存在）。文件名 = 该 id 的中文道具名（_DEF[id].name）。
 static func icon_path(id: String) -> String:
-	return ICON_DIR + id + ".png"
+	var nm: String = _DEF[id]["name"] if _DEF.has(id) else id
+	return ICON_DIR + nm + ".png"
 
 
 ## 加载某 id 的图标；未导入 / 不存在则返回 null（调用方据此回退占位文字）。

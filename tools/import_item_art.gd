@@ -1,15 +1,16 @@
 extends SceneTree
 
-## 道具图标导入 / 分配（B·2026-06-20）。
-## 把 assets/sprites/items/newAssets/ 里【按中文名命名】的图标，分配到正式目录、改名为 <id>.png。
+## 道具图标导入 / 分配（B·2026-06-20·2026-06-27 改：正式目录图标 = 中文道具名.png，与游戏内名同步）。
+## 把 assets/sprites/items/newAssets/ 里【按中文名命名】的图标，同名拷入正式目录 assets/sprites/items/。
 ## 运行：<godot> --headless --path <proj> --script res://tools/import_item_art.gd
 ##
 ## 设计：
-## - 「中文名 → id」映射从 ItemCatalog 实时构建（ItemCatalog.name_to_id()），永不过时。
-## - 也支持源文件直接用 id 命名（t1_xiangjiaopi.png）→ 原样放行。
+## - 校验：源文件中文名须是已实装道具名（ItemCatalog 实时·永不过时）；也容旧 id 命名（向后兼容）。
+## - 目标文件名 = ItemCatalog.icon_path(id) = <中文道具名>.png（与显示名一致·便于按名更新美术）。
 ## - 未匹配（打错字 / 简写 / 该道具还没实装）只报告、不瞎猜。
 ## - 非破坏式：copy（保留 newAssets 源文件）；确认无误后用户自行清空暂存区。
-## - 顺带生成 assets/sprites/items/_name_id_map.md（最新「中文名 ↔ id」对照表）。
+## - 顺带生成 assets/sprites/items/_name_id_map.md（「中文名 ↔ 代码 id」对照表）。
+## - 注：图标现已是中文名，你也可直接把 <中文名>.png 丢进正式目录、跳过本工具。
 
 const SRC := "res://assets/sprites/items/newAssets/"
 const MAP_DOC := "res://assets/sprites/items/_name_id_map.md"
@@ -48,7 +49,7 @@ func _initialize() -> void:
 		var err := DirAccess.copy_absolute(g_from, g_to)
 		if err == OK:
 			matched += 1
-			print("[导入] %s → %s.png" % [f, id])
+			print("[导入] %s → %s" % [f, ItemCatalog.icon_path(id).get_file()])
 		else:
 			push_error("[失败] 复制 %s → %s（err=%d）" % [f, id, err])
 
@@ -71,13 +72,14 @@ func _write_map_doc() -> void:
 	lines.append("# 道具「中文名 ↔ 代码 id」对照表")
 	lines.append("")
 	lines.append("> 由 `tools/import_item_art.gd` 从 `ItemCatalog` 实时生成，**勿手改**（改了会被覆盖）。")
-	lines.append("> 用途：你按中文名给图标命名，工具据此改成 id。⚠ id 拼音是历史化石、≠ 显示名。")
+	lines.append("> **图标文件名 = 中文道具名**（与游戏内显示名一致·按名更新美术）；下表 id 仅代码内部用。")
+	lines.append("> ⚠ id 拼音是历史化石、≠ 显示名（如 `t1_siyecao`=最后一箭）；命名美术只看「中文名」列。")
 	lines.append("> 当前实装 %d 件（设计全集见 design/items-list.md）。" % items.size())
 	lines.append("")
 	for t in [1, 2, 3]:
 		lines.append("## T%d" % t)
 		lines.append("")
-		lines.append("| 中文名（命名用此列） | 代码 id（图标最终文件名） | 维度 |")
+		lines.append("| 中文名（= 图标文件名） | 代码 id（仅代码内部） | 维度 |")
 		lines.append("|---|---|---|")
 		for it in items:
 			if it.tier == t:
