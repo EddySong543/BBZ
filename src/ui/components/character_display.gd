@@ -61,7 +61,8 @@ extends SubViewportContainer
 
 @export_group("Idle 动态调速")
 ## idle 满帧时的播放帧率（基准）。帧数 ≥ idle_ref_frames 的 idle 用此值。
-@export var idle_base_fps: float = 12.0:
+## 8.0=循环约 0.75s（2026-06-28 Eddy：原 12.0≈0.5s 普遍偏快→放慢）；想更慢往 6 调(≈1.0s)。
+@export var idle_base_fps: float = 8.0:
 	set(v):
 		idle_base_fps = v
 		_apply_idle_speed()
