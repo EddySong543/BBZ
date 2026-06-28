@@ -39,11 +39,6 @@ const INK := Color(0.20, 0.14, 0.08)        # 墨（羊皮上的字/图标）
 const INK_SOFT := Color(0.42, 0.34, 0.24)   # 淡墨（次级字）
 const CREAM := Color(0.95, 0.91, 0.80)      # 暖米白（直接压在暗波上的字·非羊皮上）
 
-# 底坞条配色（典籍羊皮：墨色书脊衬底 + 羊皮页填充 + 墨字）
-const DOCK_BACKING := Color(0.16, 0.11, 0.07)
-const DOCK_FILL := Color(0.86, 0.80, 0.66, 0.96)
-const DOCK_TEXT := Color(0.20, 0.14, 0.08)
-
 @onready var _coming_soon: Label = $UI/ComingSoon
 @onready var _match_card: ModeCard = $UI/ModeMatch
 
@@ -241,8 +236,9 @@ func _show_cancel_button(on: bool) -> void:
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 
-## 底坞：三个入口连排成一根坞条（深色底+icon 锚位+字+段间分隔线）。
-## 「小队」已删（2026-06-12 Eddy）；「英雄」接英雄图鉴，道具/商店仍占位。
+## 底坞：英雄/道具/商店三入口。美术与顶部设置/退出统一——同款 jelly 羊皮板
+## （_apply_plate·2026-06-28 同步；原纯色双层坞底+段间分隔线弃用，质感与其余功能钮不一致）。
+## 「小队」已删（2026-06-12 Eddy）；「英雄」接英雄图鉴、「道具」接道具图鉴，商店仍占位。
 func _setup_dock() -> void:
 	var navs: Array = [
 		[$UI/NavHeroes, "英雄", "hero"],
@@ -250,37 +246,10 @@ func _setup_dock() -> void:
 	]
 	for i in navs.size():
 		var btn: Button = navs[i][0]
+		_apply_plate(btn)                 # 与设置/退出同款 jelly 羊皮板（统一三按钮美术）
 		_set_btn_left_margin(btn, 40.0)   # 文字让出左侧 icon 锚位
 		FontManager.apply_btn(btn, 24)
-		btn.add_theme_color_override("font_color", DOCK_TEXT)
-		# 深色坞底两层（backing + fill）
-		var backing := ColorRect.new()
-		backing.name = "DockBacking"
-		backing.color = DOCK_BACKING
-		backing.show_behind_parent = true
-		backing.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		btn.add_child(backing)
-		var fill := ColorRect.new()
-		fill.name = "DockFill"
-		fill.color = DOCK_FILL
-		fill.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		fill.offset_left = 0 if i > 0 else 3
-		fill.offset_top = 3
-		fill.offset_right = 0 if i < navs.size() - 1 else -3
-		fill.offset_bottom = -3
-		fill.show_behind_parent = true
-		fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		btn.add_child(fill)
-		# 段间分隔线（除第一段外，画在左缘）
-		if i > 0:
-			var sp := ColorRect.new()
-			sp.name = "DockSep"
-			sp.color = Color(0.45, 0.36, 0.24, 0.45)   # 暖墨分隔（羊皮坞上）
-			sp.position = Vector2(0, 16)
-			sp.size = Vector2(2, 38)
-			sp.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			btn.add_child(sp)
+		btn.add_theme_color_override("font_color", INK)   # 羊皮板上→墨字
 		_add_icon(btn, Rect2(30, 19, 32, 32), navs[i][2])
 		if btn == $UI/NavHeroes:
 			btn.pressed.connect(_on_heroes_pressed)   # 英雄图鉴（2026-06-12 实装）

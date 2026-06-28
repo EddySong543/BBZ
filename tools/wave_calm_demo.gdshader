@@ -18,8 +18,8 @@ shader_type canvas_item;
 // ── 与生产一致的基础旋钮 ─────
 uniform float aspect = 1.777;
 uniform float cells_x = 64.0;
-uniform float intensity : hint_range(0.0, 2.0) = 1.0;
-uniform float base_level : hint_range(0.0, 1.0) = 0.30;
+uniform float intensity : hint_range(0.0, 2.0) = 1.08;   // 对齐生产菜单材质
+uniform float base_level : hint_range(0.0, 1.0) = 0.46;  // 对齐生产菜单材质
 uniform float wave_amp : hint_range(0.0, 0.6) = 0.18;
 uniform float phase = 0.0;
 uniform float wave_time = 0.0;
@@ -27,6 +27,10 @@ uniform float drift_dir = 1.0;
 uniform int levels : hint_range(8, 96) = 40;
 uniform float dither_amt : hint_range(0.0, 2.0) = 1.0;
 uniform float use_blue : hint_range(0.0, 1.0) = 1.0;
+
+// ── 色彩弧 · 「舒适淡色 ↔ 满饱和对撞」（脚本驱动）─────
+uniform vec3 pale_color : source_color = vec3(0.76, 0.83, 0.85);  // 当前侧舒适淡锚色（脚本按 调色板+胜方 设）
+uniform float sat : hint_range(0.0, 1.0) = 1.0;          // 0 = 全淡锚色 / 1 = 满饱和 ramp（点击→点燃升 sat）
 
 // ── 【B】呼吸：脚本驱动 breath = sin(t·spd)·amt，乘进振幅；范围约 -amt..+amt ─────
 uniform float breath = 0.0;
@@ -136,6 +140,9 @@ void fragment() {
 	L = clamp(L + dith * dither_amt * dith_scale / float(levels), 0.0, 0.9999);
 	L = floor(L * float(levels)) / float(levels);
 
-	vec3 col = use_blue > 0.5 ? blue_color_at(L) : red_color_at(L);
+	vec3 col_full = use_blue > 0.5 ? blue_color_at(L) : red_color_at(L);
+	// 淡色场：淡锚色 × 随波亮度的轻微起伏（封顶 0.98 避免纯白浪尖）——保留波形但安静。
+	vec3 col_pale = clamp(pale_color * (0.80 + 0.32 * L), vec3(0.0), vec3(0.98));
+	vec3 col = mix(col_pale, col_full, sat);             // 色彩弧：淡 ↔ 满
 	COLOR = vec4(col, 1.0);
 }

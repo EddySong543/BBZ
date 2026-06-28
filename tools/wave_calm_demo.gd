@@ -1,26 +1,45 @@
 extends Control
 
-## 一次性 DEMO：菜单波「B 平息动效 + E 静息区」对比调参台。F6 跑本场景即可。
+## 一次性 DEMO：菜单波「降疲劳」调参台 —— B 平息动效 + E 静息区 + 色彩弧(舒适淡色↔满饱和)。F6 跑本场景。
 ##
-## 不引用任何生产文件。背景 shader = tools/wave_calm_demo.gdshader（生产波拷贝 + B/E 旋钮）。
+## 不引用任何生产文件。背景 shader = tools/wave_calm_demo.gdshader（生产波拷贝 + B/E/色彩弧 旋钮·已对齐生产菜单亮度）。
 ## 用法：
-##   · 右上四个预设钮快速切 [生产基线 / 只B / 只E / B+E]，先用它一眼比出差别。
-##   · 左侧滑块细调；右下「当前数值」实时显示，调到满意把数字记下，喊我并回 canvas_env_wave_flow。
-##   · 「红/蓝」切胜方色；「卡牌参考框」叠出三卡真实位置，看静息区是否罩住卡。
-##   · Esc 退出。
+##   · 顶部【色彩弧】：选调色板 A/B/C → 拖 sat 看「淡↔满」任意定格 → 按「▶ 播放色彩弧」一键看完
+##     静息淡 → 点击点燃 → 红蓝对撞峰值 → 一波闪平息回淡 的全过程。
+##   · 「蓝/红」切胜方色（菜单保留胜方色 → 淡色也按胜方取蓝侧/红侧锚色）。
+##   · 中段【B 平息】【E 静息区】滑块细调静息态；预设钮快切对比。
+##   · 右下「当前数值」实时显示，调满意把数字 + 选定调色板发我，我并回生产。Esc 退出。
 
 const SHADER := preload("res://tools/wave_calm_demo.gdshader")
 
-# —— 生产默认（= 基线，rest 关闭时与现网完全一致）——
+# —— 生产默认（= 满饱和基线）——
 const PROD_DRIFT := 0.045
 const PROD_YDRIFT := 0.6
 const PROD_AMP := 0.18
 
-# —— B「平息动效」预设 ——
+# —— B「平息动效」预设（= 开局默认）——
 const B_DRIFT := 0.022
 const B_YDRIFT := 0.30
 const B_AMP := 0.11
 const B_BREATH := 0.12
+
+# —— 舒适淡色调色板（每套一对：蓝胜 / 红胜·见对话提案 A/B/C）——
+const PALETTES := [
+	{name = "A 破晓宣纸", blue = Color("c2d4d8"), red = Color("ebd0c2")},
+	{name = "B 晨雾天光", blue = Color("bad2e8"), red = Color("f2cec4")},
+	{name = "C 暮色靛金", blue = Color("a6bcd0"), red = Color("dbb0a0")},
+]
+
+# —— 色彩弧时间线（秒）——
+const SAT_IDLE := 0.25                  # 静息态饱和度（淡）
+const ARC_HOLD0 := 0.5                  # 开场静息保持
+const ARC_RISE := 0.8                   # 点击点燃·升到满
+const ARC_PEAK := 0.5                   # 对撞峰值保持
+const ARC_FALL := 1.7                   # 一波闪后平息回淡
+const ARC_T1 := ARC_HOLD0
+const ARC_T2 := ARC_T1 + ARC_RISE
+const ARC_T3 := ARC_T2 + ARC_PEAK
+const ARC_END := ARC_T3 + ARC_FALL
 
 # —— 三卡真实位置（1920×1080 参考分辨率换算成 UV 锚点）——
 const CARD_RECTS := [
@@ -37,13 +56,19 @@ var _phase := 0.0
 var _wave_t := 0.0
 var _breath_t := 0.0
 
-# —— 可调状态（滑块/钮写入，_process / _push_static 推给 shader）——
-var _drift := PROD_DRIFT
-var _ydrift := PROD_YDRIFT
-var _amp := PROD_AMP
-var _breath_amt := 0.0
+# —— 色彩弧状态 ——
+var _palette_idx := 0
+var _sat_manual := SAT_IDLE              # sat 滑块值（不播放时生效）
+var _playing := false
+var _arc_t := 0.0
+
+# —— 可调状态（开局 = B 平息 + E 开）——
+var _drift := B_DRIFT
+var _ydrift := B_YDRIFT
+var _amp := B_AMP
+var _breath_amt := B_BREATH
 var _breath_speed := 0.5
-var _rest_on := false
+var _rest_on := true
 var _rest_cy := 0.47
 var _rest_sx := 0.40
 var _rest_sy := 0.33
@@ -52,12 +77,14 @@ var _rest_motion := 0.25
 var _rest_smooth := 0.40
 var _use_blue := true
 
-var _sliders: Dictionary = {}        # key -> HSlider
-var _vlabels: Dictionary = {}        # key -> Label（数值）
+var _sliders: Dictionary = {}
+var _vlabels: Dictionary = {}
 var _rest_check: CheckButton
 var _blue_check: CheckButton
 var _guide_check: CheckButton
 var _readout: Label
+var _phase_label: Label
+var _palette_btns: Array[Button] = []
 
 
 func _ready() -> void:
@@ -66,13 +93,14 @@ func _ready() -> void:
 	_build_guides()
 	_build_panel()
 	_push_static()
+	_refresh_palette_btns()
 	_refresh_readout()
 
 
 func _build_background() -> void:
 	var bg := ColorRect.new()
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	bg.color = Color.WHITE                       # shader 乘 COLOR，须白
+	bg.color = Color.WHITE
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_mat = ShaderMaterial.new()
 	_mat.shader = SHADER
@@ -110,13 +138,11 @@ func _build_guides() -> void:
 
 func _build_panel() -> void:
 	var scroll := ScrollContainer.new()
-	scroll.position = Vector2(20, 20)
-	scroll.custom_minimum_size = Vector2(520, 0)
 	scroll.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	scroll.offset_left = 20.0
 	scroll.offset_top = 20.0
-	scroll.offset_right = 560.0
-	scroll.offset_bottom = 1040.0
+	scroll.offset_right = 580.0
+	scroll.offset_bottom = 1050.0
 	var panel := PanelContainer.new()
 	scroll.add_child(panel)
 	var margin := MarginContainer.new()
@@ -129,19 +155,36 @@ func _build_panel() -> void:
 	box.add_theme_constant_override("separation", 6)
 	margin.add_child(box)
 
-	_add_title(box, "菜单波 · B 平息动效 + E 静息区 · 调参台")
-	_add_hint(box, "先用预设一眼比差别，再用滑块细调。Esc 退出。")
+	_add_title(box, "菜单波调参台 · B 平息 + E 静息区 + 色彩弧")
+	_add_hint(box, "选调色板 → 拖 sat 或按▶播放色彩弧。Esc 退出。")
 
-	# —— 预设钮 ——
-	var presets := HBoxContainer.new()
-	presets.add_theme_constant_override("separation", 6)
-	box.add_child(presets)
-	_add_button(presets, "生产基线", _apply_baseline)
-	_add_button(presets, "只 B", _apply_only_b)
-	_add_button(presets, "只 E", _apply_only_e)
-	_add_button(presets, "B + E", _apply_be)
+	# ===== 色彩弧 =====
+	_add_section(box, "色彩弧 · 舒适淡色 ↔ 满饱和对撞")
+	var prow := HBoxContainer.new()
+	prow.add_theme_constant_override("separation", 6)
+	box.add_child(prow)
+	for i in PALETTES.size():
+		var b := Button.new()
+		b.text = PALETTES[i]["name"]
+		b.toggle_mode = true
+		b.pressed.connect(_set_palette.bind(i))
+		prow.add_child(b)
+		_palette_btns.append(b)
+	_add_slider(box, "sat 饱和度(0淡/1满)", "sat", 0.0, 1.0, 0.01, _sat_manual)
+	var arow := HBoxContainer.new()
+	arow.add_theme_constant_override("separation", 8)
+	box.add_child(arow)
+	var play := Button.new()
+	play.text = "▶ 播放色彩弧"
+	play.pressed.connect(_play_arc)
+	arow.add_child(play)
+	_phase_label = Label.new()
+	_phase_label.add_theme_font_size_override("font_size", 14)
+	_phase_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.6))
+	_phase_label.text = "静息·舒适淡色"
+	arow.add_child(_phase_label)
 
-	# —— 全局开关 ——
+	# ===== 全局开关 =====
 	_rest_check = _add_check(box, "E 静息区 开", _rest_on, func(on: bool) -> void:
 		_rest_on = on
 		_push_static()
@@ -152,6 +195,15 @@ func _build_panel() -> void:
 		_refresh_readout())
 	_guide_check = _add_check(box, "显示卡牌参考框", false, func(on: bool) -> void:
 		_guides.visible = on)
+
+	# ===== 预设 =====
+	var presets := HBoxContainer.new()
+	presets.add_theme_constant_override("separation", 6)
+	box.add_child(presets)
+	_add_button(presets, "满饱和基线", _apply_baseline)
+	_add_button(presets, "只 B", _apply_only_b)
+	_add_button(presets, "只 E", _apply_only_e)
+	_add_button(presets, "B + E", _apply_be)
 
 	_add_section(box, "B · 平息动效")
 	_add_slider(box, "drift 横向流速", "drift", 0.005, 0.08, 0.001, _drift)
@@ -255,6 +307,9 @@ func _fmt(v: float) -> String:
 
 func _set_param(key: String, v: float) -> void:
 	match key:
+		"sat":
+			_sat_manual = v
+			_playing = false   # 手动拖 sat → 停止播放
 		"drift": _drift = v
 		"ydrift": _ydrift = v
 		"amp": _amp = v
@@ -269,7 +324,7 @@ func _set_param(key: String, v: float) -> void:
 	_refresh_readout()
 
 
-## 把所有「非时间」uniform 推给 shader（时间相位在 _process 推）。
+## 推「非时间 / 非 sat」uniform（sat 与相位在 _process 推）。
 func _push_static() -> void:
 	if _mat == null:
 		return
@@ -282,6 +337,13 @@ func _push_static() -> void:
 	_mat.set_shader_parameter("rest_soft", _rest_soft)
 	_mat.set_shader_parameter("rest_motion", _rest_motion)
 	_mat.set_shader_parameter("rest_smooth", _rest_smooth)
+	_mat.set_shader_parameter("pale_color", _current_pale())
+
+
+## 当前 调色板 + 胜方 对应的舒适淡锚色。
+func _current_pale() -> Color:
+	var p: Dictionary = PALETTES[_palette_idx]
+	return p["blue"] if _use_blue else p["red"]
 
 
 func _update_aspect() -> void:
@@ -292,23 +354,70 @@ func _update_aspect() -> void:
 		_mat.set_shader_parameter("aspect", s.x / s.y)
 
 
+func _refresh_palette_btns() -> void:
+	for i in _palette_btns.size():
+		_palette_btns[i].button_pressed = (i == _palette_idx)
+
+
 func _refresh_readout() -> void:
 	if _readout == null:
 		return
+	var pale := _current_pale()
+	var p: Dictionary = PALETTES[_palette_idx]
 	var lines := [
-		"drift_speed   = %.3f" % _drift,
-		"y_drift_speed = %.3f" % _ydrift,
-		"wave_amp      = %.3f" % _amp,
-		"breath_amt    = %.3f" % _breath_amt,
-		"rest_enable   = %s" % ("true" if _rest_on else "false"),
-		"rest_center   = (0.50, %.2f)" % _rest_cy,
-		"rest_size     = (%.2f, %.2f)" % [_rest_sx, _rest_sy],
-		"rest_soft     = %.2f" % _rest_soft,
-		"rest_motion   = %.2f" % _rest_motion,
-		"rest_smooth   = %.2f" % _rest_smooth,
-		"color         = %s" % ("蓝" if _use_blue else "红"),
+		"调色板 = %s" % p["name"],
+		"侧 = %s  淡锚色 = #%s" % ["蓝" if _use_blue else "红", pale.to_html(false)],
+		"sat(静息) = %.2f" % _sat_manual,
+		"—— B 平息 ——",
+		"drift_speed=%.3f  y_drift=%.3f" % [_drift, _ydrift],
+		"wave_amp=%.3f  breath_amt=%.3f" % [_amp, _breath_amt],
+		"—— E 静息区 ——",
+		"rest_enable=%s  center=(0.50,%.2f)" % [str(_rest_on), _rest_cy],
+		"rest_size=(%.2f,%.2f) soft=%.2f" % [_rest_sx, _rest_sy, _rest_soft],
+		"rest_motion=%.2f  rest_smooth=%.2f" % [_rest_motion, _rest_smooth],
 	]
 	_readout.text = "\n".join(lines)
+
+
+# ── 色彩弧 ────────────────────────────────────────────────
+
+func _set_palette(idx: int) -> void:
+	_palette_idx = idx
+	_refresh_palette_btns()
+	_push_static()
+	_refresh_readout()
+
+
+func _play_arc() -> void:
+	_playing = true
+	_arc_t = 0.0
+
+
+## 色彩弧 sat(t)：静息淡 → 点燃升满 → 峰值 → 平息回淡。
+func _arc_sat(t: float) -> float:
+	if t < ARC_T1:
+		return SAT_IDLE
+	if t < ARC_T2:
+		var u := (t - ARC_T1) / ARC_RISE
+		return lerpf(SAT_IDLE, 1.0, u * u)                 # ease-in 点燃
+	if t < ARC_T3:
+		return 1.0                                          # 对撞峰值
+	if t < ARC_END:
+		var u := (t - ARC_T3) / ARC_FALL
+		return lerpf(1.0, SAT_IDLE, 1.0 - (1.0 - u) * (1.0 - u))  # ease-out 平息
+	return SAT_IDLE
+
+
+func _arc_phase(t: float) -> String:
+	if t < ARC_T1:
+		return "① 静息·舒适淡色"
+	if t < ARC_T2:
+		return "② 点击 → 冲击波点燃"
+	if t < ARC_T3:
+		return "③ 红蓝对撞·峰值"
+	if t < ARC_END:
+		return "④ 一波闪 → 平息入菜单"
+	return "静息·舒适淡色"
 
 
 # ── 预设 ─────────────────────────────────────────────────
@@ -316,7 +425,7 @@ func _refresh_readout() -> void:
 func _set_slider(key: String, v: float) -> void:
 	var s: HSlider = _sliders.get(key)
 	if s != null:
-		s.value = v      # 触发 value_changed → _set_param → 推 shader + 刷读数
+		s.value = v
 
 
 func _apply_baseline() -> void:
@@ -357,10 +466,24 @@ func _process(delta: float) -> void:
 	_phase += delta * _drift
 	_wave_t += delta * _ydrift
 	_breath_t += delta * _breath_speed
-	if _mat != null:
-		_mat.set_shader_parameter("phase", _phase)
-		_mat.set_shader_parameter("wave_time", _wave_t)
-		_mat.set_shader_parameter("breath", sin(_breath_t) * _breath_amt)
+	if _mat == null:
+		return
+	_mat.set_shader_parameter("phase", _phase)
+	_mat.set_shader_parameter("wave_time", _wave_t)
+	_mat.set_shader_parameter("breath", sin(_breath_t) * _breath_amt)
+	# 色彩弧：播放时按时间线推 sat，否则用滑块值。
+	var sat_eff := _sat_manual
+	if _playing:
+		_arc_t += delta
+		sat_eff = _arc_sat(_arc_t)
+		if _phase_label != null:
+			_phase_label.text = _arc_phase(_arc_t)
+		if _arc_t >= ARC_END:
+			_playing = false
+			sat_eff = SAT_IDLE
+			if _phase_label != null:
+				_phase_label.text = "静息·舒适淡色"
+	_mat.set_shader_parameter("sat", sat_eff)
 
 
 func _unhandled_input(event: InputEvent) -> void:
