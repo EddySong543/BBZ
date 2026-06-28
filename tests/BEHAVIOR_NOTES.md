@@ -3,7 +3,7 @@
 本文件记录 **`src/battle/battle_core.gd` 当前实现** 与
 **`design/gdd/game-concept.md` / `design/heroes.md` 设计文档** 之间的不一致点。
 
-> **⚠️ v3 历史（2026-05-25）**：以下 B-001~B-007 锁定的是**已删除的 v3 实现**的行为，其代码行号/函数名（`_apply_defense`/`select_action`/`_baishou_spent` 等）均已失效。B-001/2/3（同时攻击不抵消、双向独立解算）的结论已作为正式行为迁入 v4（数值更新：大波 2 能）；其余条目（百兽 kit / clone / v3 transient 数组等）所涉机制已在 v4 重做。**当前 v4 行为的真相源 = `tests/unit/battle/v4/` 的 10 个 `*_v4.gd`。** 本文作历史溯源保留。
+> **⚠️ v3 历史（2026-05-25）**：以下 B-001~B-007 锁定的是**已删除的 v3 实现**的行为，其代码行号/函数名（`_apply_defense`/`select_action`/`_baishou_spent` 等）均已失效。B-001/2/3（同时攻击不抵消、双向独立解算）的结论已作为正式行为迁入 v4（数值更新：大波 3 能）；其余条目（百兽 kit / clone / v3 transient 数组等）所涉机制已在 v4 重做。**当前 v4 行为的真相源 = `tests/unit/battle/v4/` 的 9 个 `.gd` 文件。** 本文作历史溯源保留。
 
 ---
 

@@ -4,7 +4,7 @@
 > 详细背景：`tests/BEHAVIOR_NOTES.md`、`tests/unit/battle/*.gd`。
 >
 > **⚠️ v3 历史（2026-05-25）**：本文 §1-§4 的行号/函数名（`_apply_defense`/`_calc_attack_raw`/`_route_damage`/百兽 kit 等）指向**已删除的 v3 `battle_core.gd`**，不对应当前 v4 代码。H6 RNG 风险已由 ADR-002 D7（seed 注入）解决，HeroSkill 迁移（§3/§4）已重启并完成。当前真相源 = v4 `src/battle/battle_core.gd` + `tests/unit/battle/v4/`。正文作历史保留。
-> **⚠ 英雄阵容**：本文英雄示例基于旧 34 阵容；大阿卡那(h13-h34)+星座(h35-h46)已弃（2026-06-19），现仅 12 生肖。
+> **⚠ 英雄阵容**：本文英雄示例基于旧 34 阵容；大阿卡那(h13-h34)+星座(h35-h46)已弃（2026-06-19），槽位复用为暗生肖，现 24（h01–h24：12 生肖 + 12 暗生肖）。
 
 ---
 

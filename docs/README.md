@@ -4,7 +4,7 @@
 >
 > **项目阶段**：轻量个人项目，文档从简、随玩法迭代更新（不为治理冻结开发）。
 >
-> **当前快照**：v4 战斗核心已收官 —— 单一 `BattleCore`，主流程「标题 → 2 步同时盲选选人 → 战斗」完整可玩；12 生肖 + 198 测试全绿（608 断言）；h01–h12 美术已导入。
+> **当前快照**：v4 战斗核心已收官 —— 单一 `BattleCore`，主流程「标题 → 2 步同时盲选选人 → 战斗」完整可玩；24 英雄（h01–h24）+ 220 测试全绿（474 断言）；h01–h24 美术已导入。
 
 ---
 
@@ -13,13 +13,13 @@
 | 系统 | 代码位置 | 设计文档 | 架构/技术文档 |
 |------|---------|---------|--------------|
 | **战斗核心** | `src/battle/battle_core.gd` | `design/gdd/game-concept.md` §3-5（规则/公式/边界） | `ADR-002`（v4 架构）· `ADR-001`（边界·v3 史）· `battlecore-risk-notes.md` |
-| **英雄技能** | `src/battle/skills/*.gd`（12）· `hero_skill.gd` | `design/heroes.md`（逐英雄）· `design/heroes-schools.md`（框架/原语） | — |
-| **英雄数据** | `assets/data/heroes/hXX.tres`（12） | `design/heroes.md` | — |
+| **英雄技能** | `src/battle/skills/*.gd`（24）· `hero_skill.gd` | `design/heroes.md`（逐英雄）· `design/heroes-schools.md`（框架/原语） | — |
+| **英雄数据** | `assets/data/heroes/hXX.tres`（24） | `design/heroes.md` | — |
 | **选人（BP）** | `src/ui/bp_screen.{gd,tscn}` | `game-concept.md` §3.4 · `heroes-schools.md` §8.3 | — |
 | **战斗 UI / juice** | `src/ui/battle_screen.*` · `src/ui/components/` | `game-concept.md` §3 | `prototypes/juice_test/README.md`（juice 来源） |
 | **美术管线** | `tools/import_hero_art.gd` · `assets/sprites/heroes/` | `design/art-pipeline-hero-animation.md`（A 方案） | — |
 | **数值框架** | `assets/data/heroes/` · `battle_core.gd` 常量 | `heroes-schools.md` §8 · `game-concept.md` §4/§7 | — |
-| **道具系统** | `src/battle/item_*.gd` · `src/battle/items/*.gd`（70 件） | `items-list.md`（清单真相源）· `build-design-framework.md` §2 | 图标管线 `tools/import_item_art.gd` |
+| **道具系统** | `src/battle/item_*.gd` · `src/battle/items/*.gd`（61 件） | `items-firstrelease.md`（首发真相源）· `build-design-framework.md` §2 | 图标管线 `tools/import_item_art.gd` |
 
 ---
 
@@ -30,12 +30,13 @@
 | 文档 | 定位 |
 |------|------|
 | [`gdd/game-concept.md`](../design/gdd/game-concept.md) | **GDD 主文档** — 8 章节（概述/玩家幻想/规则/公式/边界/依赖/旋钮/验收），已对齐 v4 |
-| [`heroes.md`](../design/heroes.md) | 12 生肖 8 字段决议 |
+| [`heroes.md`](../design/heroes.md) | 24 英雄（h01–h24）8 字段决议 |
 | [`heroes-schools.md`](../design/heroes-schools.md) | 英雄设计框架：流派 / 原语表 §5 / 流派子型空槽 §3.1 / 命名规范 §6.1 / 数值框架 §8 |
 | [`art-pipeline-hero-animation.md`](../design/art-pipeline-hero-animation.md) | 美术管线 A 方案（静态立绘 + 代码 juice + idle + 武器分类斩击），剪纸绑定已否决 |
 | [`build-design-framework.md`](../design/build-design-framework.md) | **设计纲领** — 资源三层 / 道具骨架 §2 / 标准值 §4 / 连携主定理 §6 / 元件类型 §7 / 反固化 §8 / 判据 §14 / 系统操作层 §15 |
-| [`items-list.md`](../design/items-list.md) | **道具清单当前真相源** — 98 件 + 系统操作层（按 tier → 维度） |
-| [`items.md`](../design/items.md) | ⚠ 历史快照 · 已被 items-list 取代（2026-06-17 旧奇幻命名版，仅溯源） |
+| [`items-firstrelease.md`](../design/items-firstrelease.md) | **首发道具真相源** — 61 件（T1 20/T2 24/T3 17），与代码对齐 |
+| [`items-list.md`](../design/items-list.md) | **后续已审批全集池**（首发见 items-firstrelease.md）— 含系统操作层（按 tier → 维度） |
+| [`items.md`](../design/items.md) | 给实现/Claude 看的详细版（实现细节归此） |
 
 ### 技术 / 架构（`docs/architecture/`）
 
@@ -56,13 +57,13 @@
 
 | 文档 | 定位 |
 |------|------|
-| [`godot/VERSION.md`](engine-reference/godot/VERSION.md) | Godot 4.6.2 版本锁定 + 知识缺口警告 + 迁移来源 |
+| [`godot/VERSION.md`](engine-reference/godot/VERSION.md) | Godot 4.7 版本锁定 + 知识缺口警告 + 迁移来源 |
 
 ### 测试真相源（`tests/`）
 
 | 位置 | 定位 |
 |------|------|
-| `tests/unit/battle/{v4,ai}/*.gd`（13 文件） | **当前 v4 行为的真相源**（GUT，198 测试 / 608 断言全绿） |
+| `tests/unit/battle/{v4,ai}/*.gd`（14 文件） | **当前 v4 行为的真相源**（GUT，220 测试 / 474 断言全绿） |
 | `tests/BEHAVIOR_NOTES.md` | 行为锁定笔记（含 v3 历史溯源） |
 
 ---

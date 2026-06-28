@@ -1,5 +1,7 @@
 # 升级 Claude Code Game Studios
 
+> ⚠️ 本文件是上游模板框架（Claude Code Game Studios）的版本升级指南，**与「波波攒之王」游戏开发无关**，保留仅供框架溯源。游戏本身的文档见 [`docs/README.md`](docs/README.md)。
+
 本指南涵盖将你现有的游戏项目仓库从模板的一个版本升级到下一个版本。
 
 **查找你的当前版本**，在 git log 中：
