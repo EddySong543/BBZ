@@ -27,6 +27,8 @@ const LOW_HP_RATIO := 0.5
 ## 顶部 UI 整体下移量(px)：原布局太贴屏幕顶端 → 下沉一点留呼吸。改这一个数即可整组调整。
 ## 注：当前为运行时代码统一微调(编辑器里仍是基准位)；下移量定稿后可烘焙进 .tscn 使"所见=所得"。
 const TOP_UI_DROP := 26.0   # 顶部 UI 整体下移量（2026-06-28 Eddy：44太多→回调到26）；0=复原原位
+const BUBBLE_HEAD_RISE := 112.0  # 出招气泡锚点：角色显示容器「中心」上移此值（越大气泡越高·够高才不压角色）
+const BUBBLE_SIDE_X := 100.0     # 出招气泡水平偏移：己方(P0)放头「右上」/ 敌方(P1)镜像「左上」（越大越往外侧·够大才不和角色重合）
 
 ## 顶部头像框尺寸（Eddy 要求整体放大一档·2026-06-20）。出战 / 替补；放大走「底固定向上长」
 ## （见 _enlarge_frames），不压下方血行/名字。原基准 72 / 68。
@@ -1569,7 +1571,13 @@ func _spawn_action_circle(player: int, action: int) -> Control:
 	var sz := 92.0
 	var circ := Control.new()
 	circ.size = Vector2(sz, sz)
-	circ.position = cd.position + Vector2(cd.size.x * 0.5 - sz * 0.5, -sz - 12.0)
+	# 气泡位置：己方(P0)=人物头「右上方」/ 敌方(P1)=镜像「左上方」+ pop 小动画（_animate_bubble_pop）。
+	# 锚用容器「中心」(不随 viewport 放大飞走)：中心上移 BUBBLE_HEAD_RISE 到头顶、再按阵营左右偏 BUBBLE_SIDE_X。
+	var cd_center := cd.position + cd.size * 0.5
+	var side := 1.0 if player == PLAYER else -1.0   # 己方右 / 敌方左·镜像
+	circ.position = Vector2(
+		cd_center.x + side * BUBBLE_SIDE_X - sz * 0.5,
+		cd_center.y - BUBBLE_HEAD_RISE - sz)
 	circ.pivot_offset = Vector2(sz, sz) * 0.5   # 从中心 pop
 	circ.z_index = 80
 	circ.mouse_filter = Control.MOUSE_FILTER_IGNORE

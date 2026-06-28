@@ -400,11 +400,12 @@ func _make_item_card(item: ItemData, idx: int) -> Button:
 	cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var cm := ShaderMaterial.new()
 	cm.shader = CELL_BG_SHADER
-	cm.set_shader_parameter("fill_color", rc.darkened(0.5))   # 普通/稀有底色调亮(原 0.78 太暗)·仍纯色不换云纹
+	# 内外渐变（2026-06-28 Eddy：参传说 gold_bottom 实测内外区分·中心亮/四角深）：从稀有度色算 fill(四角深·V0.85更饱和) + inner(中心亮·V0.97略浅)。
+	cm.set_shader_parameter("fill_color", Color.from_hsv(rc.h, minf(rc.s * 1.05, 1.0), 0.76))
+	cm.set_shader_parameter("inner_color", Color.from_hsv(rc.h, rc.s * 0.85, 0.89))
+	cm.set_shader_parameter("center_glow", 1.0)              # 1=完整内外渐变（传说由 use_tex 自动排除）
 	cm.set_shader_parameter("corner_radius", 0.18)
 	cm.set_shader_parameter("pixel_grid", BOX / 6.0)
-	cm.set_shader_parameter("center_glow", 0.6)               # 中心圆形高亮凸显道具(传说由 use_tex 自动排除)
-	cm.set_shader_parameter("glow_radius", 0.55)
 	# 传说：外部美术图 gold_bottom 当格底（替代程序云纹）——采进格底 shader，随同一套 corner_round_alpha
 	# 圆角裁切被**约束到格内**（避开 round_mask 对 TextureRect 不可靠的坑）；压暗去饱和与暗格协调；在道具美术之下。
 	if item.tier == 3:

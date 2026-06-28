@@ -233,7 +233,8 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 		var ft := SEAL_FT
 		var fb := SEAL_FB                   # = 暗格底色（fill_color）
 		var ei := EMPTY_EDGE               # = 框 edge_mid；无道具=中性灰，有道具→下方设稀有度色
-		var glow := 0.0                    # 中心高亮（有道具→凸显图标·传说由金底图自带不用）
+		var glow := 0.0                    # 内外渐变强度（有道具→1·中心亮四角深；传说=0 走金底图）
+		var cell_inner := Color.WHITE      # 格底中心亮色（有道具时=稀有度亮调）
 		var legend := false                # 传说→格底用 gold_bottom 美术图
 		var has_item := false              # 该槽是否装着道具（有→框走稀有度色·不被经济金边覆盖）
 		match st:
@@ -256,9 +257,12 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 				has_item = item != null                     # 有道具 → 框走稀有度色（不被经济金边覆盖）
 				legend = has_item and item.tier >= 3        # 传说 → 格底用 gold_bottom 金底图
 				if has_item:
-					glow = 0.0 if legend else 0.5           # 中心高亮凸显图标（传说金底图自带亮心）
+					glow = 0.0 if legend else 1.0           # 内外渐变（传说金底图自带亮心·不用）
 				var nm: String = item.item_name if item != null else ""
 				var dim: Color = _rarity_color(item)   # 框色按稀有度（变量名 dim 历史遗留）
+				# 格底内外色（参传说 gold_bottom：中心亮/四角深·与图鉴同算法）。
+				var c_out: Color = Color.from_hsv(dim.h, minf(dim.s * 1.05, 1.0), 0.76)   # 四角深·更饱和
+				var c_in: Color = Color.from_hsv(dim.h, dim.s * 0.85, 0.89)               # 中心亮·略浅
 				var tex: Texture2D = _icon_for(item.item_id) if item != null else null
 				if tex != null:
 					icon.texture = tex
@@ -266,8 +270,9 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 					lbl.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM   # 状态标签落底·不挡图标
 				if battle.slot_ready(player, i):
 					ready = true
-					# 就绪 = 稀有度色满亮框 + 暗格底 + 中心高亮（与图鉴卡同；"可用"靠亮度/高亮而非金边）。
-					fb = dim.darkened(0.5)    # 暗格底（=图鉴 rc.darkened(0.5)）
+					# 就绪 = 稀有度内外渐变格底（中心亮四角深·与图鉴同）+ 稀有度框。
+					fb = c_out                # 四角深
+					cell_inner = c_in         # 中心亮
 					ei = dim                  # 框 = 稀有度色（普通蓝/稀有紫/传说金）
 					icon.modulate = Color.WHITE
 					if tex != null:
@@ -275,10 +280,10 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 					else:
 						lbl.text = nm + "\n✓用" if staged.has(i) else nm   # 缺图回退名
 				else:
-					# 锁中 = 稀有度色压暗（仍认得出蓝/紫/金归属）+ 图标压暗。
-					fb = dim.darkened(0.62)
+					# 锁中 = 稀有度内外渐变压暗（仍认得出蓝/紫/金归属）+ 图标压暗。
+					fb = c_out.darkened(0.32)
+					cell_inner = c_in.darkened(0.32)
 					ei = dim.darkened(0.35)
-					glow = 0.0
 					icon.modulate = Color(0.62, 0.62, 0.66)   # 图标压暗 = 读作锁中
 					lbl.text = "(锁)" if tex != null else nm + "\n(锁)"
 			BattleCore.SlotState.EMPTY:
@@ -298,6 +303,7 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 		# 应用到双层（图鉴形式）：暗格底 cell_bg（fill=fb 暗底 + center_glow 凸显图标 + 传说金底图）+ 稀有度像素框（edge=ei 状态色）。
 		var cmat: ShaderMaterial = _cell_mats[i]
 		cmat.set_shader_parameter("fill_color", fb)
+		cmat.set_shader_parameter("inner_color", cell_inner)
 		cmat.set_shader_parameter("center_glow", glow)
 		cmat.set_shader_parameter("use_tex", 1.0 if legend else 0.0)
 		if legend:
