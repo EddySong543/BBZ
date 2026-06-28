@@ -11,9 +11,9 @@ extends Control
 signal slot_clicked(slot: int)
 signal slot_upgrade_clicked(slot: int)   # 点击就绪可升级槽右上角「升」角标（C·升级线）
 
-const SLOT_W := 64.0   # 道具芯片：略小于头像框（出战80/替补76）→ 仍从属于英雄（2026-06-20 整体放大一档）
-const SLOT_H := 64.0
-const GAP := 8.0
+const SLOT_W := 68.0   # 道具框（2026-06-28 Eddy：76→缩小一些）
+const SLOT_H := 68.0
+const GAP := 9.0
 
 ## 维度 → 芯片底色（与动作按钮 / draft 卡 / 飘字同源的语义色板）。
 const DIM_COLOR := {
@@ -22,24 +22,33 @@ const DIM_COLOR := {
 	"导出": Color("5f8a9a"), "随机": Color("8a8f98"),
 }
 
-## jelly 芯片（与 battle_screen 动作按钮同款 shader → 统一 UI 语言）。
-const JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")
-const CELL_BG_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")   # 格底云纹（叠加层·仅传说·与图鉴同 shader）
-const CHIP_CORNER := 0.22                       # 圆角（同动作按钮·非锐角）
-const EDGE_OUTER := Color(0.10, 0.09, 0.11)     # 统一暗轮廓（中性·任何色相都干净·场景无关）
+## 道具框形式（2026-06-28 Eddy：战斗道具栏统一为「道具图鉴」同款形式）：
+##   双层 = 暗格底 canvas_ui_item_cell_bg（稀有度暗底 + 中心高亮 + 传说金底图）+ 稀有度像素框 canvas_ui_pixel_frame。
+##   与 item_gallery_screen 完全同源（像素框 + 暗格 + 居中图标 + 全圆角）。jelly 仅保留给右上「升」角标。
+const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")        # 稀有度像素框（同图鉴/英雄卡）
+const CELL_BG_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")     # 暗格底：圆角 + 稀有度暗底 + 中心高亮 + 传说金底图
+const JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")          # 仅「升」角标用
+const LEGENDARY_BG := preload("res://assets/ui/gold_bottom.png")                            # 传说道具金云纹背景（Eddy 美术·与图鉴同源）
+const LEGENDARY_BG_TINT := Color(1.0, 1.0, 1.0, 1.0)
+const FRAME_EDGE_OUTER := Color(0.16, 0.10, 0.06)   # 框外轮廓=深咖（与图鉴同）
+const CELL_CORNER := 0.18                            # 圆角（格底与框一致·与图鉴同·全圆角无方角）
+const CELL_GRID := 23.0    # 像素格数（= 图鉴 BOX/6）。用「格数」而非 SLOT_W/6 → 边框按比例随框缩放、不会在小框上变粗（2026-06-28 Eddy：去掉过厚棕边·与图鉴完全一致）
+const EDGE_OUTER := Color(0.11, 0.09, 0.075)    # 统一暗轮廓（暖黑·与暖色UI同温·任何色相都干净）
 const GOLD_READY := Color("ffd86a")             # 道具本回合可用（interactive）→ 亮金高光边
 const GOLD_STAGED := Color("fff0a0")            # 已点选使用 → 更亮金边
 const GOLD_OPEN := Color("d8b85a")              # 可开 / 可抽 / 可补 → 提示金边（较暗·次级）
-# 中性态填充（锁 / 待操作 / 空格）：
-const SEAL_FT := Color(0.31, 0.31, 0.34)
-const SEAL_FB := Color(0.20, 0.20, 0.23)
-const SEAL_EI := Color(0.37, 0.37, 0.40)
-const NEU_FT := Color(0.34, 0.32, 0.29)
-const NEU_FB := Color(0.23, 0.21, 0.18)
-const NEU_EI := Color(0.42, 0.40, 0.34)
-const EMP_FT := Color(0.14, 0.14, 0.16)
-const EMP_FB := Color(0.09, 0.09, 0.11)
-const EMP_EI := Color(0.23, 0.23, 0.26)
+# 中性态填充（锁 / 待操作 / 空格）。2026-06-28：原冷暗灰 → 暖石色 + 整体提亮，与暖色动作按钮同温、不再显暗。
+const SEAL_FT := Color(0.51, 0.46, 0.38)        # 锁：暖石灰（上）·2026-06-28 再提亮一档
+const SEAL_FB := Color(0.36, 0.32, 0.26)
+const SEAL_EI := Color(0.63, 0.57, 0.46)
+const NEU_FT := Color(0.54, 0.49, 0.40)         # 待操作：暖石（上）
+const NEU_FB := Color(0.39, 0.35, 0.28)
+const NEU_EI := Color(0.66, 0.60, 0.48)
+const EMP_FT := Color(0.31, 0.28, 0.23)         # 空格：暖石褐（非近黑冷）
+const EMP_FB := Color(0.21, 0.19, 0.15)
+const EMP_EI := Color(0.44, 0.40, 0.32)
+# 无道具态（空/未解锁/不可操作）框色：去饱和中性灰（2026-06-28 Eddy：去掉"木色"边框；有道具一律走稀有度色）。
+const EMPTY_EDGE := Color(0.43, 0.42, 0.41)
 
 ## interactive：本地玩家行可点击。setter 立即把按钮 mouse_filter 设为 STOP；P2（false）→ IGNORE。
 var interactive := false:
@@ -48,11 +57,12 @@ var interactive := false:
 		for b in _buttons:
 			b.mouse_filter = Control.MOUSE_FILTER_STOP if v else Control.MOUSE_FILTER_IGNORE
 
-const ICON_INSET := 6.0                          # 图标内缩（露出芯片边框/状态色）
+const ICON_INSET := 9.0                          # 图标内缩（露出框·与图鉴 17/138≈12% 同比例·落在内框里不溢出）
 
-var _chips: Array[ColorRect] = []
-var _chip_mats: Array[ShaderMaterial] = []   # 每槽 jelly 材质（refresh 重设 fill/edge 做状态/维度色）
-var _clouds: Array[ColorRect] = []           # 每槽云纹叠加层（仅传说·覆芯片上·图标之下·refresh 控显隐）
+var _cells: Array[ColorRect] = []              # 每槽暗格底（cell_bg：稀有度暗底 + 中心高亮 + 传说金底图）
+var _cell_mats: Array[ShaderMaterial] = []     # refresh 重设 fill_color / center_glow / use_tex
+var _frames: Array[ColorRect] = []             # 每槽稀有度像素框（pixel_frame）
+var _frame_mats: Array[ShaderMaterial] = []    # refresh 重设 edge_mid / edge_inner（状态/稀有度色）
 var _icons: Array[TextureRect] = []            # 道具图标层（缺图隐藏 → 回退文字·零回归）
 var _icon_cache := {}                          # id → Texture2D / null（避免每帧 load/exists）
 var _labels: Array[Label] = []
@@ -60,18 +70,31 @@ var _buttons: Array[Button] = []
 var _upgrade_btns: Array[Button] = []          # 每槽右上角「升」金角标，仅就绪可升级时显示（C）
 
 
-## 造 jelly 芯片材质（颜色每次 refresh 重设 fill_top/fill_bottom/edge_inner）。
-func _make_chip_material() -> ShaderMaterial:
+## 暗格底材质（cell_bg·与图鉴同 shader）：稀有度暗底 + 中心高亮 + 传说金底图。颜色/高亮每次 refresh 重设。
+func _make_cell_material() -> ShaderMaterial:
 	var m := ShaderMaterial.new()
-	m.shader = JELLY_SHADER
-	m.set_shader_parameter("edge_outer", EDGE_OUTER)
-	m.set_shader_parameter("fill_alpha", 1.0)
-	m.set_shader_parameter("pixel_grid", 30.0)
-	m.set_shader_parameter("corner", CHIP_CORNER)
-	m.set_shader_parameter("edge_px", 2.0)
+	m.shader = CELL_BG_SHADER
+	m.set_shader_parameter("fill_opaque", 1.0)        # 实底（非叠加）
+	m.set_shader_parameter("cloud_on", 0.0)
+	m.set_shader_parameter("use_tex", 0.0)
+	m.set_shader_parameter("corner_radius", CELL_CORNER)
+	m.set_shader_parameter("pixel_grid", CELL_GRID)   # = 图鉴格数·边框/圆角与图鉴等比
+	m.set_shader_parameter("center_glow", 0.55)
+	m.set_shader_parameter("glow_radius", 0.62)
+	return m
+
+
+## 稀有度像素框材质（pixel_frame·与图鉴/英雄卡同 shader）。edge_mid/inner 每次 refresh 设状态/稀有度色。
+func _make_frame_material() -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = FRAME_SHADER
+	m.set_shader_parameter("edge_outer", FRAME_EDGE_OUTER)
+	m.set_shader_parameter("pixel_grid", CELL_GRID)   # = 图鉴格数·边框等比变薄（小框不再粗棕边）
+	m.set_shader_parameter("border_px", 2.0)
+	m.set_shader_parameter("noise_amt", 0.05)
+	m.set_shader_parameter("light_amount", 0.18)     # 方向光浮雕（上/左提亮）
 	m.set_shader_parameter("aspect", 1.0)
-	m.set_shader_parameter("noise_amt", 0.07)
-	m.set_shader_parameter("wear", 0.20)
+	m.set_shader_parameter("corner_radius", CELL_CORNER)
 	return m
 
 
@@ -81,33 +104,25 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	for i in range(3):
 		var base := Vector2(i * (SLOT_W + GAP), 0.0)
-		# jelly 芯片（一层搞定底色 + 立体边 + 圆角；颜色由 refresh 设）。
-		var chip := ColorRect.new()
-		chip.color = Color.WHITE   # jelly shader 乘 COLOR，须白
-		chip.position = base
-		chip.size = Vector2(SLOT_W, SLOT_H)
-		var mat := _make_chip_material()
-		chip.material = mat
-		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		add_child(chip)
-		# 格底云纹叠加层（覆芯片上、图标之下·仅传说显·与图鉴同 shader 的叠加模式）。
-		var cloud := ColorRect.new()
-		cloud.color = Color.WHITE
-		cloud.position = base
-		cloud.size = Vector2(SLOT_W, SLOT_H)
-		cloud.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		cloud.visible = false
-		var clm := ShaderMaterial.new()
-		clm.shader = CELL_BG_SHADER
-		clm.set_shader_parameter("fill_opaque", 0.0)        # 叠加模式·仅金云、透明底
-		clm.set_shader_parameter("cloud_on", 1.0)
-		clm.set_shader_parameter("cloud_alpha", 0.16)
-		clm.set_shader_parameter("corner_radius", CHIP_CORNER)
-		clm.set_shader_parameter("pixel_grid", 30.0)        # 与 jelly 芯片同格
-		cloud.material = clm
-		add_child(cloud)
-		_clouds.append(cloud)
-		# 道具图标层（铺在芯片之上、文字之下；缺图隐藏 → 回退文字）。
+		# 暗格底（cell_bg）：稀有度暗底 + 中心高亮 + 传说金底图；颜色由 refresh 设。
+		var cell := ColorRect.new()
+		cell.color = Color.WHITE   # shader 乘 COLOR，须白
+		cell.position = base
+		cell.size = Vector2(SLOT_W, SLOT_H)
+		var cmat := _make_cell_material()
+		cell.material = cmat
+		cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(cell)
+		# 稀有度像素框（pixel_frame·中心透明只画边）：覆在格底上、图标之下。
+		var frame := ColorRect.new()
+		frame.color = Color.WHITE
+		frame.position = base
+		frame.size = Vector2(SLOT_W, SLOT_H)
+		var fmat := _make_frame_material()
+		frame.material = fmat
+		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(frame)
+		# 道具图标层（铺在框之上、文字之下；缺图隐藏 → 回退文字）。
 		var icon := TextureRect.new()
 		icon.position = base + Vector2(ICON_INSET, ICON_INSET)
 		icon.size = Vector2(SLOT_W - ICON_INSET * 2.0, SLOT_H - ICON_INSET * 2.0)
@@ -142,8 +157,10 @@ func _ready() -> void:
 		# 升级金角标（右上角·铺在点击层之上 → 角落点击=升级、槽身=使用）。默认隐藏，refresh 控显。
 		var up := _make_upgrade_badge(base, i)
 		add_child(up)
-		_chips.append(chip)
-		_chip_mats.append(mat)
+		_cells.append(cell)
+		_cell_mats.append(cmat)
+		_frames.append(frame)
+		_frame_mats.append(fmat)
 		_icons.append(icon)
 		_labels.append(lbl)
 		_buttons.append(btn)
@@ -203,31 +220,32 @@ func _on_upgrade_pressed(slot: int) -> void:
 func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 	if battle == null or player < 0 or player >= battle.slots.size():
 		return
-	if battle.slots[player].size() < 3 or _chips.size() < 3:
+	if battle.slots[player].size() < 3 or _cells.size() < 3:
 		return
 	for i in range(3):
 		var st: int = battle.slot_state(player, i)
 		var lbl: Label = _labels[i]
 		var icon: TextureRect = _icons[i]
 		icon.visible = false               # 默认隐藏 → 非 CHARGING / 缺图均回退文字（零回归）
-		if i < _clouds.size():
-			_clouds[i].visible = false     # 云纹默认隐（仅传说道具显）
 		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		var ready := false                 # 本回合是否「有可操作动作」（决定金边）
 		var cta := GOLD_OPEN               # 召唤操作用的金（经济操作=暗金；道具就绪=亮金）
 		var ft := SEAL_FT
-		var fb := SEAL_FB
-		var ei := SEAL_EI
+		var fb := SEAL_FB                   # = 暗格底色（fill_color）
+		var ei := EMPTY_EDGE               # = 框 edge_mid；无道具=中性灰，有道具→下方设稀有度色
+		var glow := 0.0                    # 中心高亮（有道具→凸显图标·传说由金底图自带不用）
+		var legend := false                # 传说→格底用 gold_bottom 美术图
+		var has_item := false              # 该槽是否装着道具（有→框走稀有度色·不被经济金边覆盖）
 		match st:
 			BattleCore.SlotState.SEALED:
 				if battle.turn_number >= int(BattleCore.SLOT_UNLOCK_TURN[i]):
 					lbl.text = "可开"
 					ready = battle.can_open_slot(player, i)
-					ft = NEU_FT; fb = NEU_FB; ei = NEU_EI
+					ft = NEU_FT; fb = NEU_FB; ei = EMPTY_EDGE
 				else:
 					lbl.text = "—"   # 仍是 SEAL 灰（未到解锁回合）
 			BattleCore.SlotState.OPENED:
-				ft = NEU_FT; fb = NEU_FB; ei = NEU_EI
+				ft = NEU_FT; fb = NEU_FB; ei = EMPTY_EDGE
 				if battle.can_draw_slot(player, i):
 					lbl.text = "可抽"
 					ready = true
@@ -235,8 +253,10 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 					lbl.text = "开格\n(锁)"
 			BattleCore.SlotState.CHARGING:
 				var item: ItemData = battle.slot_item(player, i)
-				if item != null and item.tier >= 3 and i < _clouds.size():
-					_clouds[i].visible = true   # 传说道具 → 显格底云纹
+				has_item = item != null                     # 有道具 → 框走稀有度色（不被经济金边覆盖）
+				legend = has_item and item.tier >= 3        # 传说 → 格底用 gold_bottom 金底图
+				if has_item:
+					glow = 0.0 if legend else 0.5           # 中心高亮凸显图标（传说金底图自带亮心）
 				var nm: String = item.item_name if item != null else ""
 				var dim: Color = _rarity_color(item)   # 框色按稀有度（变量名 dim 历史遗留）
 				var tex: Texture2D = _icon_for(item.item_id) if item != null else null
@@ -246,39 +266,46 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 					lbl.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM   # 状态标签落底·不挡图标
 				if battle.slot_ready(player, i):
 					ready = true
-					cta = GOLD_READY          # 道具就绪可用 = 主操作 → 亮金
-					ft = dim.lightened(0.10)
-					fb = dim.darkened(0.30)
-					ei = dim.lightened(0.28)
+					# 就绪 = 稀有度色满亮框 + 暗格底 + 中心高亮（与图鉴卡同；"可用"靠亮度/高亮而非金边）。
+					fb = dim.darkened(0.5)    # 暗格底（=图鉴 rc.darkened(0.5)）
+					ei = dim                  # 框 = 稀有度色（普通蓝/稀有紫/传说金）
 					icon.modulate = Color.WHITE
 					if tex != null:
 						lbl.text = "✓用" if staged.has(i) else ""   # 有图 → 只留状态标签
 					else:
 						lbl.text = nm + "\n✓用" if staged.has(i) else nm   # 缺图回退名
 				else:
-					ft = dim.darkened(0.18)   # 锁中 = 维度色压暗（仍认得出归属）
-					fb = dim.darkened(0.48)
-					ei = NEU_EI
+					# 锁中 = 稀有度色压暗（仍认得出蓝/紫/金归属）+ 图标压暗。
+					fb = dim.darkened(0.62)
+					ei = dim.darkened(0.35)
+					glow = 0.0
 					icon.modulate = Color(0.62, 0.62, 0.66)   # 图标压暗 = 读作锁中
 					lbl.text = "(锁)" if tex != null else nm + "\n(锁)"
 			BattleCore.SlotState.EMPTY:
 				if battle.can_refill(player, i):
 					lbl.text = "可补"
 					ready = true
-					ft = NEU_FT; fb = NEU_FB; ei = NEU_EI
+					ft = NEU_FT; fb = NEU_FB; ei = EMPTY_EDGE
 				else:
 					lbl.text = "空"
-					ft = EMP_FT; fb = EMP_FB; ei = EMP_EI
+					ft = EMP_FT; fb = EMP_FB; ei = EMPTY_EDGE
 		lbl.modulate = Color.WHITE
-		# 金色「召唤操作」高光边：已点选=最亮金 / 本回合可操作(仅 interactive)=召唤金 / 否则=状态本色边（P2 不点亮）。
+		# 金边只给「选中使用」和「经济可操作(可开/可抽/可补)」；有道具的框一律保持稀有度色（不被金边覆盖）。
 		if staged.has(i):
 			ei = GOLD_STAGED
-		elif interactive and ready:
+		elif interactive and ready and not has_item:
 			ei = cta
-		var mat: ShaderMaterial = _chip_mats[i]
-		mat.set_shader_parameter("fill_top", ft)
-		mat.set_shader_parameter("fill_bottom", fb)
-		mat.set_shader_parameter("edge_inner", ei)
+		# 应用到双层（图鉴形式）：暗格底 cell_bg（fill=fb 暗底 + center_glow 凸显图标 + 传说金底图）+ 稀有度像素框（edge=ei 状态色）。
+		var cmat: ShaderMaterial = _cell_mats[i]
+		cmat.set_shader_parameter("fill_color", fb)
+		cmat.set_shader_parameter("center_glow", glow)
+		cmat.set_shader_parameter("use_tex", 1.0 if legend else 0.0)
+		if legend:
+			cmat.set_shader_parameter("bg_tex", LEGENDARY_BG)
+			cmat.set_shader_parameter("tex_tint", LEGENDARY_BG_TINT)
+		var fmat: ShaderMaterial = _frame_mats[i]
+		fmat.set_shader_parameter("edge_mid", ei)
+		fmat.set_shader_parameter("edge_inner", ei.darkened(0.5))
 		# 升级角标：仅本地玩家行 + 该槽可升级（就绪 + tier<3 + 能量够）时显示。
 		_upgrade_btns[i].visible = interactive and battle.can_upgrade(player, i)
 

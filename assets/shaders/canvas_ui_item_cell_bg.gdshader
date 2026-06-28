@@ -67,9 +67,12 @@ void fragment() {
 	// 传说: 用美术背景图(压暗)替代程序底色+云纹; 非传说=程序底色。
 	// 关键: 不论哪种, 最后都过同一套 corner_round_alpha → 纹理被裁到圆角格内(被框约束)。
 	vec3 solid = mix(fill_col, texture(bg_tex, UV).rgb * tex_tint.rgb, use_tex);
-	// 中心圆形高亮（柔和暖白·加性·凸显道具）。仅非纹理格(传说背景图自带亮心·×(1-use_tex) 排除)。
-	float cg = smoothstep(glow_radius, 0.0, distance(UV, vec2(0.5))) * center_glow * (1.0 - use_tex);
-	solid += cg * vec3(0.17, 0.16, 0.13);
+	// 四角压暗 + 中心提亮（vignette·把居中道具托起来）。仅非纹理格(传说背景图自带亮心·×(1-use_tex) 排除)。
+	float vg = center_glow * (1.0 - use_tex);
+	float rr = clamp(distance(UV, vec2(0.5)) / 0.71, 0.0, 1.0);   // 0=中心 → 1=四角
+	solid *= 1.0 - vg * 0.6 * smoothstep(0.12, 1.0, rr);          // 四角压暗（离心越远越暗）
+	float cg = smoothstep(glow_radius, 0.0, distance(UV, vec2(0.5))) * vg;  // 中心柔和暖白加性
+	solid += cg * vec3(0.24, 0.22, 0.17);
 	COLOR.rgb = mix(cloud_color.rgb, solid, fill_opaque);
 	COLOR.a = mix(cl, 1.0, fill_opaque);
 	COLOR.a *= corner_round_alpha(UV, corner_radius, pixel_grid);

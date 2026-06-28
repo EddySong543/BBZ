@@ -26,7 +26,7 @@ const LOW_HP_RATIO := 0.5
 
 ## 顶部 UI 整体下移量(px)：原布局太贴屏幕顶端 → 下沉一点留呼吸。改这一个数即可整组调整。
 ## 注：当前为运行时代码统一微调(编辑器里仍是基准位)；下移量定稿后可烘焙进 .tscn 使"所见=所得"。
-const TOP_UI_DROP := 0.0   # 顶部 UI 整体下移量；0=复原原位（想下移改这个数即可）
+const TOP_UI_DROP := 26.0   # 顶部 UI 整体下移量（2026-06-28 Eddy：44太多→回调到26）；0=复原原位
 
 ## 顶部头像框尺寸（Eddy 要求整体放大一档·2026-06-20）。出战 / 替补；放大走「底固定向上长」
 ## （见 _enlarge_frames），不压下方血行/名字。原基准 72 / 68。
@@ -111,7 +111,7 @@ var _skill_index: int = 0
 
 # 道具栏（M2·占位）：程序化挂在各 HUD 下。P1=贴左(对齐左侧框组·28px 内边距)；
 # P2=镜像右贴(右内边距=P1 左内边距)，由 _build_item_rows 随槽宽自动算，修「敌方框偏左」错位。
-const ITEM_ROW_POS_P1 := Vector2(28.0, 168.0)
+const ITEM_ROW_POS_P1 := Vector2(28.0, 150.0)   # 2026-06-28 Eddy：道具栏上移一些(168→150)
 var p1_item_row: ItemSlotRow
 var p2_item_row: ItemSlotRow
 ## M3：本回合已点选「使用」的道具槽（仅 P1）；确认时统一 use_slot 提交，进新回合清空。
