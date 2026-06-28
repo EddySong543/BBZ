@@ -27,8 +27,12 @@ uniform float aspect : hint_range(0.25, 8.0) = 1.0;   // 矩形宽/高；>1=横�
 group_uniforms;
 
 group_uniforms texture_feel;
-uniform float noise_amt : hint_range(0.0, 0.2) = 0.05; // 内部像素噪点(纹理感)
-uniform float wear : hint_range(0.0, 0.6) = 0.22;      // 边缘磨损做旧强度
+uniform float noise_amt : hint_range(0.0, 0.3) = 0.05; // 内部噪点纹理强度
+uniform float wear : hint_range(0.0, 0.6) = 0.22;      // 边缘磨损做旧强度(随机点黑·会让内圈呈离散灰点)
+// 连续深色内描边：开 → 亮色边内侧画一条「连续不断的深色描边」(参考 ref12 实线深边)，
+//   并取消随机磨损点(否则那圈深边会变成一个个分开的灰点·离散感)。关(默认) → 沿用原磨损做旧。
+uniform bool solid_rim = false;
+uniform float rim_px : hint_range(0.0, 4.0) = 1.5;     // 内描边宽度(像素格)
 group_uniforms;
 
 float hash(vec2 p) {
@@ -57,19 +61,26 @@ void fragment() {
 	float ew = edge_px * upx;
 	float outer = step(-ew, d) * inside;                              // 最外暗轮廓
 	float inner = step(-2.0 * ew, d) * (1.0 - step(-ew, d)) * inside; // 次外亮高光边
+	// 连续深色内描边：亮边内侧一条等宽暗带(实线·不随机·solid_rim 时启用)
+	float rw = rim_px * upx;
+	float rim = solid_rim
+		? step(-(2.0 * ew + rw), d) * (1.0 - step(-2.0 * ew, d)) * inside
+		: 0.0;
 
-	// 底：垂直渐变(上亮下暗) + 像素噪点纹理
+	// 底：垂直渐变(上亮下暗) + 内部像素噪点
 	vec3 col = mix(fill_top.rgb, fill_bottom.rgb, clamp(puv.y + 0.5, 0.0, 1.0));
 	col *= 1.0 + (hash(cell) - 0.5) * noise_amt;
 
-	// 磨损做旧：靠边缘的像素格随机压暗
+	// 磨损做旧：靠边缘的像素格随机压暗。solid_rim 时关掉(否则内圈呈一个个离散灰点)。
 	float near = step(-3.0 * ew, d) * inside;
-	col *= 1.0 - wear * near * step(0.72, hash(cell + 5.1));
+	float wear_dots = solid_rim ? 0.0 : step(0.72, hash(cell + 5.1));
+	col *= 1.0 - wear * near * wear_dots;
 
-	// 多层边：内亮高光(立体凸起) + 外暗轮廓
+	// 多层边：内亮高光(立体凸起) + 连续深色内描边 + 外暗轮廓
 	col = mix(col, edge_inner.rgb, inner);
+	col = mix(col, edge_outer.rgb, rim);
 	col = mix(col, edge_outer.rgb, outer);
 
-	float a = mix(fill_alpha, 1.0, max(inner, outer));
+	float a = mix(fill_alpha, 1.0, max(max(inner, outer), rim));
 	COLOR = vec4(col, a * inside) * COLOR;
 }

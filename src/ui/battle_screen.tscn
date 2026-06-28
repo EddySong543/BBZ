@@ -82,6 +82,8 @@ shader_parameter/edge_px = 2.0
 shader_parameter/aspect = 1.0
 shader_parameter/noise_amt = 0.08
 shader_parameter/wear = 0.24
+shader_parameter/solid_rim = true
+shader_parameter/rim_px = 1.5
 
 [sub_resource type="ShaderMaterial" id="JellyBo"]
 shader = ExtResource("21_jelly")
@@ -96,6 +98,8 @@ shader_parameter/edge_px = 2.0
 shader_parameter/aspect = 1.0
 shader_parameter/noise_amt = 0.08
 shader_parameter/wear = 0.24
+shader_parameter/solid_rim = true
+shader_parameter/rim_px = 1.5
 
 [sub_resource type="ShaderMaterial" id="JellyDaBo"]
 shader = ExtResource("21_jelly")
@@ -110,6 +114,8 @@ shader_parameter/edge_px = 2.0
 shader_parameter/aspect = 1.0
 shader_parameter/noise_amt = 0.08
 shader_parameter/wear = 0.24
+shader_parameter/solid_rim = true
+shader_parameter/rim_px = 1.5
 
 [sub_resource type="ShaderMaterial" id="JellyFang"]
 shader = ExtResource("21_jelly")
@@ -124,6 +130,8 @@ shader_parameter/edge_px = 2.0
 shader_parameter/aspect = 1.0
 shader_parameter/noise_amt = 0.08
 shader_parameter/wear = 0.24
+shader_parameter/solid_rim = true
+shader_parameter/rim_px = 1.5
 
 [sub_resource type="ShaderMaterial" id="JellyDaFang"]
 shader = ExtResource("21_jelly")
@@ -138,6 +146,8 @@ shader_parameter/edge_px = 2.0
 shader_parameter/aspect = 1.0
 shader_parameter/noise_amt = 0.08
 shader_parameter/wear = 0.24
+shader_parameter/solid_rim = true
+shader_parameter/rim_px = 1.5
 
 [sub_resource type="ShaderMaterial" id="JellySpecial"]
 shader = ExtResource("21_jelly")
