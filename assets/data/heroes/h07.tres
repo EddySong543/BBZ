@@ -8,6 +8,6 @@ hero_id = "h07"
 hero_name = "午马"
 max_hp = 5
 skill_description = "当先"
-skill_detail = "午马的切换不占动作槽、不限次数；切换登场时对敌方出战造成 0.5 冲撞伤（触发命中效果）。"
+skill_detail = "午马切换不占用行动，登场时对敌方造成 0.5 点伤害。"
 portrait_path = "res://assets/sprites/heroes/h07/h07_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h07/h07_idle.tres"

@@ -8,6 +8,6 @@ hero_id = "h24"
 hero_name = "黑暗亥猪"
 max_hp = 6
 skill_description = "饕餮"
-skill_detail = "被动：战场上任一英雄阵亡时（敌我皆可），黑暗亥猪吞噬尸身，你方全队 +2.0 能量。"
+skill_detail = "任意一名英雄死亡时（无论敌我），己方立刻获得 2 点能量。"
 portrait_path = "res://assets/sprites/heroes/h24/h24_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h24/h24_idle.tres"

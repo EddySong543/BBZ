@@ -8,6 +8,6 @@ hero_id = "h14"
 hero_name = "黑暗丑牛"
 max_hp = 6
 skill_description = "卸力反震"
-skill_detail = "黑暗丑牛防御成功挡下攻击时，向攻击者反弹所挡伤害的 50%。"
+skill_detail = "黑暗丑牛防御成功时，向攻击者反弹所挡伤害的一半。"
 portrait_path = "res://assets/sprites/heroes/h14/h14_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h14/h14_idle.tres"

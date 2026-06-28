@@ -8,6 +8,6 @@ hero_id = "h15"
 hero_name = "黑暗寅虎"
 max_hp = 7
 skill_description = "血勇"
-skill_detail = "黑暗寅虎无法使用「防 / 大防」（嗜杀红温·有进无退）；作为补偿，其「波」穿防——对手须用「大防」才挡得下（大波仍穿防）。"
+skill_detail = "黑暗寅虎的波穿防，但无法使用「防」和「大防」。"
 portrait_path = "res://assets/sprites/heroes/h15/h15_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h15/h15_idle.tres"

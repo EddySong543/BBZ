@@ -8,6 +8,6 @@ hero_id = "h11"
 hero_name = "戌狗"
 max_hp = 5
 skill_description = "穷追"
-skill_detail = "对手切换英雄下场时，被换下的英雄受到 1 点真实伤害（无视防御与护甲）。"
+skill_detail = "对手切换英雄时，被换下的英雄受到 1 点真实伤害。"
 portrait_path = "res://assets/sprites/heroes/h11/h11_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h11/h11_idle.tres"

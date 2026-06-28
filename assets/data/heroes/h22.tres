@@ -8,6 +8,6 @@ hero_id = "h22"
 hero_name = "黑暗酉鸡"
 max_hp = 4
 skill_description = "一鸣惊人"
-skill_detail = "被动：你方英雄可『空过』一回合（不行动、不拿能量），把这次行动存起来；之后任意回合连同当回合一起打出，攒成一个爆发回合。"
+skill_detail = "黑暗酉鸡在场时，己方英雄可以空过一回合（不行动、不获得能量）存下行动，之后任意回合连同当回合一起打出。"
 portrait_path = "res://assets/sprites/heroes/h22/h22_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h22/h22_idle.tres"

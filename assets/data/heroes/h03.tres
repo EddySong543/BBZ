@@ -8,6 +8,6 @@ hero_id = "h03"
 hero_name = "寅虎"
 max_hp = 4
 skill_description = "连扑"
-skill_detail = "寅虎的攻击拆为两段、各自独立结算（命中触发效果翻倍）。"
+skill_detail = "寅虎的波、大波分为 2 段，分别结算。"
 portrait_path = "res://assets/sprites/heroes/h03/h03_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h03/h03_idle.tres"

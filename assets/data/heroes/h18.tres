@@ -8,6 +8,6 @@ hero_id = "h18"
 hero_name = "黑暗巳蛇"
 max_hp = 4
 skill_description = "缠绕"
-skill_detail = "黑暗巳蛇出战时，对手无法主动切换（被死死缠住）。"
+skill_detail = "黑暗巳蛇在场时，对手无法主动切换英雄。"
 portrait_path = "res://assets/sprites/heroes/h18/h18_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h18/h18_idle.tres"

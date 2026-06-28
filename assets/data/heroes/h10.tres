@@ -8,6 +8,6 @@ hero_id = "h10"
 hero_name = "酉鸡"
 max_hp = 5
 skill_description = "剑意"
-skill_detail = "全队攻击命中累积剑气（上限 4）；可拔剑一闪，消耗全部剑气强力一击（剑气≥2 穿防、满 4 穿大防）。"
+skill_detail = "全队每次攻击命中，积累 1 点剑气（最多 4 点）；酉鸡可消耗全部剑气发动强力一击（2 点剑气击穿防，4 点剑气击穿大防）。"
 portrait_path = "res://assets/sprites/heroes/h10/h10_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h10/h10_idle.tres"
