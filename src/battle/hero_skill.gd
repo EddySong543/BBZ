@@ -80,7 +80,7 @@ func on_before_death(_battle: BattleCore, _player: int, _slot: int) -> bool:
 	return false
 
 
-## 本英雄登场（开局首发 + 每次切换上场）。卯兔 h04(登场 + 护甲) / 午马 h07(登场冲撞)。
+## 本英雄登场（开局首发 + 每次切换上场）。房日 h04(登场 + 护甲) / 星日 h07(登场冲撞)。
 func on_switch_in(_battle: BattleCore, _player: int, _slot: int) -> void:
 	pass
 
@@ -102,116 +102,116 @@ func on_resolve_end(_battle: BattleCore, _player: int, _slot: int) -> void:
 
 ## 攻击穿透等级（二元铁则·防御门用）：本英雄发起攻击时返回穿透档（ActionDef.Pen）。
 ## 默认按动作基础穿透（波=NORMAL / 大波=PIERCE_DEF）。
-## 酉鸡 h10（剑气 2 层→穿防、4 层→穿大防）override。（戌狗 h11 追击真伤走 on_enemy_switch_out，不经本 hook。）
+## 昴日 h10（剑气 2 层→穿防、4 层→穿大防）override。（娄金 h11 追击真伤走 on_enemy_switch_out，不经本 hook。）
 func attack_penetration(base_pen: int, _action: int, _battle: BattleCore, _player: int, _slot: int) -> int:
 	return base_pen
 
 
-## 本英雄一次攻击算作几次"命中"（on-hit 触发次数）。默认 1。寅虎连扑返回 2（整体挡下、落地双 proc）。
+## 本英雄一次攻击算作几次"命中"（on-hit 触发次数）。默认 1。尾火连扑返回 2（整体挡下、落地双 proc）。
 func hit_count(_action: int, _battle: BattleCore, _player: int, _slot: int) -> int:
 	return 1
 
 
 ## 本英雄攻击【命中（穿过防御门、连接到目标）】后触发：施加自身 on-hit 效果。
-## 巳蛇 h06(叠毒) / 辰龙 h05(破甲) / 申猴 h09(碎能)。引擎按 hit_count 次调用。
+## 翼火 h06(叠毒) / 亢金 h05(破甲) / 紫火 h09(碎能)。引擎按 hit_count 次调用。
 func on_deal_hit(_battle: BattleCore, _player: int, _slot: int, _target_player: int, _target_slot: int, _dealt: int, _action: int) -> void:
 	pass
 
 
 ## 己方任一英雄攻击命中敌方时，对本队所有英雄（含替补席）触发：团队级 on-hit 监听。
-## 酉鸡（全队命中 → +1 剑气）。引擎按 hit_count 次调用。
+## 昴日（全队命中 → +1 剑气）。引擎按 hit_count 次调用。
 func on_team_deal_hit(_battle: BattleCore, _player: int, _slot: int, _attacker_slot: int, _target_player: int, _target_slot: int, _dealt: int) -> void:
 	pass
 
 
 ## 本英雄（出战）成功防御挡下一次攻击时触发（raw = 被挡攻击的伤害半点）。
-## 丑牛（卸力反震：反弹被挡伤害的 50% 给攻击者）。
+## 牛金（卸力反震：反弹被挡伤害的 50% 给攻击者）。
 func on_block(_battle: BattleCore, _player: int, _slot: int, _attacker_player: int, _attack_action: int, _raw: int) -> void:
 	pass
 
 
 ## 本英雄受到伤害落 HP 后触发（dealt = 实际掉的半点血）。
-## 亥猪（纳福：受伤 → 己方能量 += 等量）。
+## 室火（纳福：受伤 → 己方能量 += 等量）。
 func on_self_damaged(_battle: BattleCore, _player: int, _slot: int, _dealt: int, _attacker_player: int) -> void:
 	pass
 
 
-## 本英雄（出战时）给己方每次"获得能量"事件的额外加成（半能）。子鼠囤鼠 override 返 1 半能（= 每次得能 +0.5）。
+## 本英雄（出战时）给己方每次"获得能量"事件的额外加成（半能）。虚日囤鼠 override 返 1 半能（= 每次得能 +0.5）。
 func energy_gain_bonus(_battle: BattleCore, _player: int, _slot: int) -> int:
 	return 0
 
 
 ## 「致死救援」型守护者（swap-in 顶替型：替补席存活时，替将死的出战队友顶伤上场）。
-## ⚠ 当前【无英雄使用】——原未羊 h08 已转【牧养】(reserve_heal_per_turn)，守护职能移交黑暗戌狗 h23
+## ⚠ 当前【无英雄使用】——原鬼金 h08 已转【牧养】(reserve_heal_per_turn)，守护职能移交天狗 h23
 ## (走另一套语义 is_protect_guardian·替死碎掉非顶替)。保留本 hook 作 swap-in 顶替型守护的扩展接口。
 func is_lethal_guardian() -> bool:
 	return false
 
 
-## 「牧养 / 休养生息」型（光版未羊 h08）：本英雄在场（含替补·存活）时，你方退到【替补席】的存活英雄
+## 「牧养 / 休养生息」型（光版鬼金 h08）：本英雄在场（含替补·存活）时，你方退到【替补席】的存活英雄
 ## 每回合回本值（半点）HP（退下火线休养；出战英雄不回）。引擎在 resolve Phase 5.6 走 _heal 入账。
-## 默认 0（不产出）；未羊 override 返回 1（= +0.5 HP/回合）。共享原语 = 轮换续航（配午马免费切换）。
+## 默认 0（不产出）；鬼金 override 返回 1（= +0.5 HP/回合）。共享原语 = 轮换续航（配星日免费切换）。
 func reserve_heal_per_turn() -> int:
 	return 0
 
 
-## 「护主」型守护者（黑暗戌狗 h23）：在替补席存活时，出战队友受【致命一击】→ 本英雄替它挡下：
-## 这一击完全免除、本英雄碎掉下场、出战 carry【留前线】（每局一次）。与 is_lethal_guardian（未羊·carry
-## 下场羊顶上承伤）区别 = 自我牺牲、carry 不退场不打断节奏。默认 false；黑暗戌狗 override。
+## 「护主」型守护者（天狗 h23）：在替补席存活时，出战队友受【致命一击】→ 本英雄替它挡下：
+## 这一击完全免除、本英雄碎掉下场、出战 carry【留前线】（每局一次）。与 is_lethal_guardian（鬼金·carry
+## 下场羊顶上承伤）区别 = 自我牺牲、carry 不退场不打断节奏。默认 false；天狗 override。
 func is_protect_guardian() -> bool:
 	return false
 
 
-## 「饕餮」型（黑暗亥猪 h24）：本英雄在场（含替补·存活）时，战场上【任一】英雄阵亡（敌我皆可）
+## 「饕餮」型（并封 h24）：本英雄在场（含替补·存活）时，战场上【任一】英雄阵亡（敌我皆可）
 ## → 本英雄所属队【团队】能量 +本值（半能）。引擎在 _resolve_deaths 每个死亡点扫双方存活英雄累计。
-## 默认 0（不产出）；黑暗亥猪 override 返回 4（= +2.0 能/死）。
+## 默认 0（不产出）；并封 override 返回 4（= +2.0 能/死）。
 func death_energy_bonus() -> int:
 	return 0
 
 
-## 免费切换次数上限（仅 has_free_switch()=true 时有意义）；-1 = 无限。午马当先 = -1（不限次）。
+## 免费切换次数上限（仅 has_free_switch()=true 时有意义）；-1 = 无限。星日当先 = -1（不限次）。
 func free_switch_cap() -> int:
 	return -1
 
 
 ## 本英雄（出战时）是否可以使用「防 / 大防」。默认 true。
-## 黑暗寅虎 h15【血勇】= false（嗜杀红温·有进无退·彻底放弃防御）。
+## 穷奇 h15【血勇】= false（嗜杀红温·有进无退·彻底放弃防御）。
 ## 引擎在 can_afford() 统一 gate：返 false 时防/大防变不合法（legal_actions 不列、UI 按钮禁用、AI 不选）。
 func can_defend() -> bool:
 	return true
 
 
-## 「鼠潮」型（黑暗子鼠 h13）：本英雄在场（含替补·存活）时，己方每触发一次 combo 效果
+## 「鼠潮」型（玄冥 h13）：本英雄在场（含替补·存活）时，己方每触发一次 combo 效果
 ## （毒爆 / 易伤 / 破甲 / 碎能 / 剑意 / 反震 / 冲撞 / 溢杀…），团队能量额外 +本值（半能）。
 ## 引擎在每个 combo 结算点调 BattleCore._note_combo_proc() 累计（每回合封顶·见 SHUCHAO_CAP_PER_TURN）。
-## 默认 0（不产出）；黑暗子鼠 override 返回 1（= +0.5 能/proc）。这是"combo→能量"共享原语的产出端。
+## 默认 0（不产出）；玄冥 override 返回 1（= +0.5 能/proc）。这是"combo→能量"共享原语的产出端。
 func combo_proc_energy() -> int:
 	return 0
 
 
-## 「一鸣惊人 / 蓄势」型（黑暗酉鸡 h22）：本英雄在场（含替补·存活）时，己方可「空过」一回合
+## 「一鸣惊人 / 蓄势」型（毕方 h22）：本英雄在场（含替补·存活）时，己方可「空过」一回合
 ## （ActionDef.STORE·不行动/不拿能量/无防御）把这次行动【存起来】；之后任意回合连同当回合行动一起打出
 ## （= 复用疾风的双动作结算·消耗 1 次存储）。与疾风区别 = 净零（先空过换之后双动作·总数不变·非每局白送）。
-## 默认 false；黑暗酉鸡 override 返回 true。引擎在 can_store/STORE 入账/can_double_action 处理（stored_action[]）。
+## 默认 false；毕方 override 返回 true。引擎在 can_store/STORE 入账/can_double_action 处理（stored_action[]）。
 func grants_action_store() -> bool:
 	return false
 
 
-## 「疾风」型（黑暗卯兔 h16）：本英雄在场（含替补·存活）时，己方每局可 N 次把【同一个动作】
+## 「疾风」型（广寒 h16）：本英雄在场（含替补·存活）时，己方每局可 N 次把【同一个动作】
 ## 再做一次（附加动作·波/大波/攒可双·技能/切换/防御除外）。返回每局上限 N（0 = 不提供）。
 ## 引擎在 can_double()/select_double()/resolve() 处理；cap 计在本英雄 slot 的 "jifeng_uses"。
 func double_action_cap() -> int:
 	return 0
 
 
-## 「逼战」型 hook ——⚠ 已弃用（2026-06-24）：原黑暗辰龙 h17【逼战】依赖被动能量，去被动后报废，
+## 「逼战」型 hook ——⚠ 已弃用（2026-06-24）：原烛阴 h17【逼战】依赖被动能量，去被动后报废，
 ## h17 已重设计为【镇压·沉默】（h17_zhenya.gd）。当前无人 override，默认 false（留作扩展接口）。
 func forces_enemy_attack() -> bool:
 	return false
 
 
-## 「缠绕」型（黑暗巳蛇 h18）：本英雄【出战·存活】时，对手【无法主动切换】（含午马免费切换）。
-## 死亡换人 / 申猴调虎离山 / 道具强制切换等"被动·触发"切换不受影响。引擎在 can_afford(SWITCH) +
+## 「缠绕」型（相柳 h18）：本英雄【出战·存活】时，对手【无法主动切换】（含星日免费切换）。
+## 死亡换人 / 紫火调虎离山 / 道具强制切换等"被动·触发"切换不受影响。引擎在 can_afford(SWITCH) +
 ## is_free_switch_target 统一 gate（_can_switch）。默认 false。
 func locks_enemy_switch() -> bool:
 	return false
@@ -253,7 +253,7 @@ func execute_active(_battle: BattleCore, _player: int, _slot: int) -> void:
 	pass
 
 
-# --- 攻击型主动技（伤害走伤害管线，§D9）。酉鸡 h10 拔剑一闪 = 当前唯一攻击型主动技 ---
+# --- 攻击型主动技（伤害走伤害管线，§D9）。昴日 h10 拔剑一闪 = 当前唯一攻击型主动技 ---
 
 ## 本主动技是否是一次"攻击"（造成伤害、走 _apply_damage 管线）。默认 false（即时型）。
 func active_is_attack() -> bool:

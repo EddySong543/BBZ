@@ -20,13 +20,13 @@ extends RefCounted
 const HP_UNIT := 2  # 必须与 ActionDef.HP_UNIT 一致
 
 ## 英雄机制数值（从引擎逻辑里的裸魔数提出来，集中可调）
-const LETHAL_GUARDIAN_CAP := 2   # 顶替型致死救援每局上限·⚠当前无英雄用(原未羊已转牧养·守护见 h23 护主)
-const HUZHU_CAP := 1             # 黑暗戌狗 h23【护主】替死每局上限（次）
-const STORED_CAP := 2            # 黑暗酉鸡 h22【一鸣惊人】可囤积的「存储行动」上限（防无限攒）
-const CHONGZHUANG_DAMAGE := 1    # 午马登场冲撞 = 0.5 HP（半点）
-const SHUCHAO_CAP_PER_TURN := 3  # 黑暗子鼠 h13【鼠潮】每回合 combo→能量返还封顶 = 3 次 proc = 1.5 能（回路刹车·PvE 可解封顶·§6/§10）
-const DOUBLEABLE_ACTIONS := [ActionDef.Action.ATTACK, ActionDef.Action.BIG_ATTACK, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND, ActionDef.Action.BIG_DEFEND]  # 黑暗卯兔 h16【疾风】可"附加同种再做一次"的动作（仅技能/切换除外·防/大防可选但二元整体挡=无额外效果）
-const DUANZUI_THRESHOLD := 2  # 黑暗未羊 h20【断罪】处决阈值 = 2 半点(1.0HP)：印记目标出战血量 ≤ 此值即斩（主旋钮）
+const LETHAL_GUARDIAN_CAP := 2   # 顶替型致死救援每局上限·⚠当前无英雄用(原鬼金已转牧养·守护见 h23 护主)
+const HUZHU_CAP := 1             # 天狗 h23【护主】替死每局上限（次）
+const STORED_CAP := 2            # 毕方 h22【一鸣惊人】可囤积的「存储行动」上限（防无限攒）
+const CHONGZHUANG_DAMAGE := 1    # 星日登场冲撞 = 0.5 HP（半点）
+const SHUCHAO_CAP_PER_TURN := 3  # 玄冥 h13【鼠潮】每回合 combo→能量返还封顶 = 3 次 proc = 1.5 能（回路刹车·PvE 可解封顶·§6/§10）
+const DOUBLEABLE_ACTIONS := [ActionDef.Action.ATTACK, ActionDef.Action.BIG_ATTACK, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND, ActionDef.Action.BIG_DEFEND]  # 广寒 h16【疾风】可"附加同种再做一次"的动作（仅技能/切换除外·防/大防可选但二元整体挡=无额外效果）
+const DUANZUI_THRESHOLD := 2  # 触邪 h20【断罪】处决阈值 = 2 半点(1.0HP)：印记目标出战血量 ≤ 此值即斩（主旋钮）
 
 # Winner 常量（延续 v3 B-007 语义：UNDECIDED=-1 / DRAW=0 / P1=1 / P2=2）
 const WINNER_UNDECIDED := -1
@@ -46,13 +46,13 @@ var statuses: Array = [[], []]            # statuses[player][slot]: Dictionary�
 
 var selected_action: Array[int] = [-1, -1]
 var _switch_to: Array[int] = [-1, -1]               # SWITCH 动作的目标槽位
-var _forced_pull: Array[int] = [-1, -1]             # 黑暗申猴 h21【调虎离山】：_forced_pull[受害方]=被强制揪上场的替补槽（execute_active 设·resolve Phase 2.7 执行后清）
+var _forced_pull: Array[int] = [-1, -1]             # 枭阳 h21【调虎离山】：_forced_pull[受害方]=被强制揪上场的替补槽（execute_active 设·resolve Phase 2.7 执行后清）
 var pending_death_switch: Array[bool] = [false, false]  # 出战阵亡待玩家选替补上场
 var _death_processed: Array = [[], []]              # 每槽位死亡 hook 是否已触发（防重复）
 var _dmg_dealt: Array[int] = [0, 0]                 # 本回合各方造成的实际伤害(半点)·通用记账
 var _shuchao_procs: Array[int] = [0, 0]             # 本回合各方已计入的 combo proc 数（鼠潮 h13·每回合封顶 SHUCHAO_CAP_PER_TURN）
 var _double: Array[bool] = [false, false]           # 本回合各方是否"附加同种动作再做一次"（疾风 h16·选择阶段设·resolve 末重置）
-var stored_action: Array[int] = [0, 0]              # 黑暗酉鸡 h22【一鸣惊人】各方已存储的行动数（空过囤积·跨回合保留·release 时 -1）
+var stored_action: Array[int] = [0, 0]              # 毕方 h22【一鸣惊人】各方已存储的行动数（空过囤积·跨回合保留·release 时 -1）
 var _killer: Array = [[], []]                       # _killer[player][slot]=直接攻击致死该英雄的攻击方;-1=非攻击致死。on_kill 只对直接攻击触发(防 splash/AOE 连锁)
 var _last_action: Array[int] = [-1, -1]             # 上回合双方动作（传说级雪球·惯性件读取）
 
@@ -193,7 +193,7 @@ func hp_display(half: int) -> float:
 func energy_display(half: int) -> float:
 	return float(half) / float(ActionDef.ENERGY_UNIT)
 
-## 统一能量获得入口：应用出战英雄的 energy_gain_bonus（子鼠囤鼠 = 每次 +1 能），clamp 到 MAX。
+## 统一能量获得入口：应用出战英雄的 energy_gain_bonus（虚日囤鼠 = 每次 +1 能），clamp 到 MAX。
 func _gain_energy(player: int, amount: int) -> void:
 	if amount <= 0:
 		return
@@ -203,7 +203,7 @@ func _gain_energy(player: int, amount: int) -> void:
 	energy[player] = mini(energy[player] + amount, ActionDef.MAX_ENERGY)
 
 
-## 黑暗子鼠 h13【鼠潮】：player 队触发一次 combo 效果时，引擎在该结算点调本函数。
+## 玄冥 h13【鼠潮】：player 队触发一次 combo 效果时，引擎在该结算点调本函数。
 ## 在场（含替补·存活）有鼠潮型英雄 → 团队能量 +其 combo_proc_energy()（走 _gain_energy·享囤鼠叠加），
 ## 每回合封顶 SHUCHAO_CAP_PER_TURN 次（回路刹车）。无鼠潮 / 已达上限 = no-op。
 func _note_combo_proc(player: int) -> void:
@@ -269,7 +269,7 @@ func usable_energy(player: int) -> int:
 	return maxi(0, energy[player])
 
 
-## 沉默感知技能取用（黑暗辰龙 h17【镇压】）：被沉默英雄(silenced>0) 视作"无 unique"(返回 null)。
+## 沉默感知技能取用（烛阴 h17【镇压】）：被沉默英雄(silenced>0) 视作"无 unique"(返回 null)。
 ## resolve 期间另有「置 null 换位」统一收口所有 hook；本 helper 供 resolve 外的选择门(防/切换/主动技)用。
 func _eff_skill(player: int, slot: int) -> HeroSkill:
 	if int(get_status(player, slot, "silenced", 0)) > 0:
@@ -277,13 +277,13 @@ func _eff_skill(player: int, slot: int) -> HeroSkill:
 	return _skills[player][slot]
 
 
-## 出战英雄是否可用防/大防（黑暗寅虎 h15【血勇】= 不可）。下场即恢复（按出战英雄判定）。
+## 出战英雄是否可用防/大防（穷奇 h15【血勇】= 不可）。下场即恢复（按出战英雄判定）。
 func _can_defend(player: int) -> bool:
 	var sk: HeroSkill = _eff_skill(player, active_index[player])
 	return sk == null or sk.can_defend()
 
 
-## player 能否【主动切换】：对手出战是"缠绕"英雄(黑暗巳蛇 h18·存活) → 不能（被缠住）。
+## player 能否【主动切换】：对手出战是"缠绕"英雄(相柳 h18·存活) → 不能（被缠住）。
 ## 只锁主动切换；死亡换人/救援/道具强制切换走各自路径、不经此 gate。
 func _can_switch(player: int) -> bool:
 	var e: int = 1 - player
@@ -369,7 +369,7 @@ func both_ready() -> bool:
 	return selected_action[0] >= 0 and selected_action[1] >= 0
 
 
-# === 黑暗卯兔 h16【疾风】：附加同种动作（resolve 内按 _double 处理）===
+# === 广寒 h16【疾风】：附加同种动作（resolve 内按 _double 处理）===
 
 ## player 队是否有"疾风"型存活英雄（含替补）且其每局 cap 未满 → 返回该英雄槽，否则 -1。
 func _double_grantor(player: int) -> int:
@@ -416,7 +416,7 @@ func double_uses_left(player: int) -> int:
 	return best
 
 
-# === 黑暗酉鸡 h22【一鸣惊人 / 蓄势】：空过存行动 → 之后双动作释放 ===
+# === 毕方 h22【一鸣惊人 / 蓄势】：空过存行动 → 之后双动作释放 ===
 
 ## 本队是否有"一鸣惊人"型存活英雄（含替补）→ 可空过存行动 / 可释放双动作。
 func _has_action_store(player: int) -> bool:
@@ -434,7 +434,7 @@ func can_store(player: int) -> bool:
 	return _has_action_store(player) and stored_action[player] < STORED_CAP
 
 
-## player 的出战英雄是否"逼战"型（黑暗辰龙 h17）且存活 → 对手不攻它就挨饿（UI/AI/resolve 用）。
+## player 的出战英雄是否"逼战"型（烛阴 h17）且存活 → 对手不攻它就挨饿（UI/AI/resolve 用）。
 func _forces_enemy_attack(player: int) -> bool:
 	var s: int = active_index[player]
 	var sk: HeroSkill = _skills[player][s]
@@ -855,7 +855,7 @@ func apply_choice(player: int, choice: Dictionary) -> bool:
 func resolve() -> Dictionary:
 	var events: Array = []
 
-	# Phase 0.3: 沉默换位（黑暗辰龙 h17【镇压】）——被沉默英雄(silenced>0)的技能槽临时置 null，
+	# Phase 0.3: 沉默换位（烛阴 h17【镇压】）——被沉默英雄(silenced>0)的技能槽临时置 null，
 	#   借引擎全程 null-check 统一收口其【所有 hook】(=unique 失效)。resolve 末还原 + 递减时长。
 	#   只递减本回合生效过的（cast 当回合 silenced 在本 swap 之后才写入 → 不计 → 恰好 2 个完整回合）。
 	var _silenced_swap: Array = []
@@ -967,7 +967,7 @@ func resolve() -> Dictionary:
 			_do_switch(p, events)
 
 	# Phase 2.55: 打神鞭强制切换（forced_switch 由道具在 apply_pre 设·指向某存活替补槽）。
-	#   仅当该方未主动切换、且未被定身（no_switch）时触发；走 _perform_switch → 触发戌狗穷追。
+	#   仅当该方未主动切换、且未被定身（no_switch）时触发；走 _perform_switch → 触发娄金穷追。
 	for p in [0, 1]:
 		var fs: int = int(item_mod(p, "forced_switch", -1))
 		if fs >= 0 and a[p] != ActionDef.Action.SWITCH and int(item_mod(p, "no_switch", 0)) == 0 and fs < hp[p].size() and hp[p][fs] > 0:
@@ -980,7 +980,7 @@ func resolve() -> Dictionary:
 			if sk != null and not sk.active_is_attack():
 				sk.execute_active(self, p, active_index[p])
 
-	# Phase 2.7: 黑暗申猴 h21【调虎离山】强制揪人 —— execute_active 设的 _forced_pull[受害方]
+	# Phase 2.7: 枭阳 h21【调虎离山】强制揪人 —— execute_active 设的 _forced_pull[受害方]
 	#   在此执行（切换之后、伤害之前）→ 被揪英雄成为对手出战、本回合攻击落它身上、原出战下场触发
 	#   我方 on_enemy_switch_out（光狗穷追）。与打神鞭强制切换同语义、独立计揪。
 	for p in [0, 1]:
@@ -1063,7 +1063,7 @@ func resolve() -> Dictionary:
 			if sk != null:
 				sk.on_resolve_end(self, p, s)
 
-	# Phase 5.6: 牧养（光版未羊 h08）——在场有未羊(含替补·存活) → 你方存活【替补席】英雄每回合回 reserve_heal 半点。
+	# Phase 5.6: 牧养（光版鬼金 h08）——在场有鬼金(含替补·存活) → 你方存活【替补席】英雄每回合回 reserve_heal 半点。
 	#   退下火线休养、出战英雄不回；走 _heal（尊重妖火禁回血、封顶 max_hp）。
 	for p in [0, 1]:
 		var rheal := 0
@@ -1091,7 +1091,7 @@ func resolve() -> Dictionary:
 	# 被动能量入口（A2 引入·2026-06-24 去除 → PASSIVE_ENERGY_GAIN=0·当前 no-op；保留入口便于将来重调）。
 	for p in [0, 1]:
 		_gain_energy(p, ActionDef.PASSIVE_ENERGY_GAIN)
-	# 沉默还原 + 递减时长（黑暗辰龙 h17【镇压】；只递减本回合生效过的，见 Phase 0.3）。
+	# 沉默还原 + 递减时长（烛阴 h17【镇压】；只递减本回合生效过的，见 Phase 0.3）。
 	for sw in _silenced_swap:
 		_skills[sw[0]][sw[1]] = sw[2]
 		set_status(sw[0], sw[1], "silenced", maxi(0, int(get_status(sw[0], sw[1], "silenced", 0)) - 1))
@@ -1148,9 +1148,9 @@ func _perform_switch(player: int, from_slot: int, to_slot: int, events: Array) -
 			events.append({id = "yemingzhu_charge", player = player})
 
 
-## h07 当先：免费切换（不占动作槽；午马 free_switch_cap 默认 -1 = 不限次）。在【选择阶段】调用：
+## h07 当先：免费切换（不占动作槽；星日 free_switch_cap 默认 -1 = 不限次）。在【选择阶段】调用：
 ## 立即换人 + 计 cap，不设 selected_action，之后玩家照常为新出战英雄选一个动作。
-## 二元设计："涉及马的切换"都免动作槽 = 起点（马在场→重定位下场）或终点（顶马上场）任一为午马即免费。
+## 二元设计："涉及马的切换"都免动作槽 = 起点（马在场→重定位下场）或终点（顶马上场）任一为星日即免费。
 
 ## 指定槽位的英雄当前能否提供免费切换（has_free_switch + 该英雄 cap 未满）。
 func _grants_free_switch(player: int, slot: int) -> bool:
@@ -1173,7 +1173,7 @@ func is_free_switch_target(player: int, target: int) -> bool:
 	if target < 0 or target >= hp[player].size() or target == active_index[player] or hp[player][target] <= 0:
 		return false
 	if not _can_switch(player):
-		return false   # 缠绕：暗蛇也锁午马的免费切换
+		return false   # 缠绕：暗蛇也锁星日的免费切换
 	return _grants_free_switch(player, active_index[player]) or _grants_free_switch(player, target)
 
 
@@ -1188,7 +1188,7 @@ func free_switch(player: int, target: int) -> bool:
 	return true
 
 
-## 午马登场冲撞：对敌方出战造成 0.5 冲撞伤，走完整 on-hit 管线（引爆毒 / 喂剑气）。
+## 星日登场冲撞：对敌方出战造成 0.5 冲撞伤，走完整 on-hit 管线（引爆毒 / 喂剑气）。
 ## 用 PIERCE_BIGDEF 让冲撞无视防御直接连接（登场突袭）；事件用本地数组（不并入 resolve 事件流）。
 func chongzhuang(attacker_player: int) -> void:
 	var opp: int = 1 - attacker_player
@@ -1196,10 +1196,10 @@ func chongzhuang(attacker_player: int) -> void:
 		return
 	var ev: Array = []
 	_apply_damage(opp, CHONGZHUANG_DAMAGE, attacker_player, ActionDef.Action.ATTACK, ActionDef.Pen.PIERCE_BIGDEF, ActionDef.Action.CHARGE, ev)
-	_note_combo_proc(attacker_player)   # 鼠潮：午马登场冲撞 = 一次 combo proc
+	_note_combo_proc(attacker_player)   # 鼠潮：星日登场冲撞 = 一次 combo proc
 
 
-## 把伤害"踏/溅"到 victim_player 最高血存活替补（午马 h19 践踏溢出用·shield 先吸·触发 on_self_damaged）。
+## 把伤害"踏/溅"到 victim_player 最高血存活替补（星日 h19 践踏溢出用·shield 先吸·触发 on_self_damaged）。
 func _splash_to_reserve(victim_player: int, dmg: int) -> void:
 	if dmg <= 0:
 		return
@@ -1226,7 +1226,7 @@ func _splash_to_reserve(victim_player: int, dmg: int) -> void:
 
 
 ## 找 player 替补席可用的「顶替型」致死救援守护者（is_lethal_guardian + 每局 < 2 次）；无则 -1。
-## ⚠ 当前无英雄 override is_lethal_guardian（原未羊已转牧养·守护见 h23 护主 is_protect_guardian）；保留作扩展接口。
+## ⚠ 当前无英雄 override is_lethal_guardian（原鬼金已转牧养·守护见 h23 护主 is_protect_guardian）；保留作扩展接口。
 func _find_lethal_guardian(player: int) -> int:
 	for s in range(hp[player].size()):
 		if s == active_index[player] or hp[player][s] <= 0:
@@ -1237,7 +1237,7 @@ func _find_lethal_guardian(player: int) -> int:
 	return -1
 
 
-## 找 player 替补席可用的「护主」守护者（黑暗戌狗 h23：is_protect_guardian + 每局 < HUZHU_CAP 次）；无则 -1。
+## 找 player 替补席可用的「护主」守护者（天狗 h23：is_protect_guardian + 每局 < HUZHU_CAP 次）；无则 -1。
 func _find_protect_guardian(player: int) -> int:
 	for s in range(hp[player].size()):
 		if s == active_index[player] or hp[player][s] <= 0:
@@ -1358,8 +1358,8 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		events.append({id = "decoy_absorb", player = target_player, amount = eaten})
 
 	# Stage B9: 落 HP（半点）
-	# 护主（黑暗戌狗 h23）：出战将死 + 替补有狗(每局<HUZHU_CAP) → 狗替死碎掉下场、这一击完全免除、
-	#   carry 留前线。「完全免除」优先于未羊「顶替承伤」，故先判。狗的死亡走 Phase 5 正常结算(触发亥猪饕餮等)。
+	# 护主（天狗 h23）：出战将死 + 替补有狗(每局<HUZHU_CAP) → 狗替死碎掉下场、这一击完全免除、
+	#   carry 留前线。「完全免除」优先于鬼金「顶替承伤」，故先判。狗的死亡走 Phase 5 正常结算(触发室火饕餮等)。
 	if dmg > 0 and dmg >= hp[target_player][slot] and slot == active_index[target_player]:
 		var protector: int = _find_protect_guardian(target_player)
 		if protector >= 0:
@@ -1367,7 +1367,7 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 			hp[target_player][protector] = 0   # 狗碎掉（替补位阵亡）
 			events.append({id = "huzhu_protect", player = target_player, guardian = protector})
 			return 0   # 这一击完全免除·carry 不掉血、不触发 on-hit（视同挡下）
-	# 致死救援（顶替型·扩展接口·当前无英雄用→原未羊已转牧养）：出战将死 + 替补有 is_lethal_guardian → 顶上、原 carry 获救（强制换人触发狗）
+	# 致死救援（顶替型·扩展接口·当前无英雄用→原鬼金已转牧养）：出战将死 + 替补有 is_lethal_guardian → 顶上、原 carry 获救（强制换人触发狗）
 	if dmg > 0 and dmg >= hp[target_player][slot] and slot == active_index[target_player]:
 		var guard: int = _find_lethal_guardian(target_player)
 		if guard >= 0:
@@ -1452,7 +1452,7 @@ func _resolve_deaths(_a: Array[int], events: Array) -> void:
 						if ally_skill != null:
 							ally_skill.on_ally_death(slot, self, p, ally)
 				events.append({id = "hero_died", player = p, slot = slot})
-				# 饕餮（黑暗亥猪 h24）：任一英雄阵亡(敌我皆可) → 在场(含替补·存活)的亥猪 → 其【团队】+能。
+				# 饕餮（并封 h24）：任一英雄阵亡(敌我皆可) → 在场(含替补·存活)的室火 → 其【团队】+能。
 				#   扫双方存活英雄(死者已 hp≤0 自动不计=尸不自食)；走 _gain_energy 享囤鼠叠加。
 				for pp in [0, 1]:
 					var feast: int = 0

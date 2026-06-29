@@ -139,7 +139,7 @@ func test_legal_actions_lists_switch_targets() -> void:
 
 
 func test_legal_actions_includes_available_active() -> void:
-	# Arrange：h10 酉鸡 拔剑一闪（主动 0 费·需剑气>0）
+	# Arrange：h10 昴日 拔剑一闪（主动 0 费·需剑气>0）
 	var b := _battle2([["h10", 4], ["t01", 10], ["t02", 10]], [["t10", 10], ["t11", 10], ["t12", 10]])
 	b.set_status(0, 0, "jianqi", 1)   # 有剑气 → 主动可用
 
@@ -154,7 +154,7 @@ func test_legal_actions_includes_available_active() -> void:
 # ---- apply_choice：分派正确 ----
 
 func test_apply_choice_dispatches_switch_and_active() -> void:
-	# Arrange：h10 酉鸡 有主动技（需剑气>0）
+	# Arrange：h10 昴日 有主动技（需剑气>0）
 	var b := _battle2([["h10", 4], ["t01", 10], ["t02", 10]], [["t10", 10], ["t11", 10], ["t12", 10]])
 	b.set_status(0, 0, "jianqi", 1)
 

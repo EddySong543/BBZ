@@ -107,7 +107,7 @@
 - **Status**：✅ Resolved (Code Fixed) — 2026-05-18 by Eddy. `_get_action_cost(BAI_SHOU)` 改为 `clampi(energy, BAI_SHOU_MIN_COST, BAI_SHOU_DAMAGE_CAP)`，与 resolve() 内一致
 - **Impact**：低（当前无调用方读取，UI 不基于此值显示）；中（未来 AI / 网络 / UI 显示真实成本时会偏离）
 - **位置**：`battle_core.gd:137 _get_action_cost` vs `battle_core.gd:294 resolve()` Phase 1 内 `spent = clampi(energy[p], 1, BAI_SHOU_DAMAGE_CAP)`
-- **Design Intent**：`design/heroes.md` h03 寅虎："**百兽**（消耗全部能量(上限6)），造成等量次数的1点伤害"
+- **Design Intent**：`design/heroes.md` h03 尾火："**百兽**（消耗全部能量(上限6)），造成等量次数的1点伤害"
 - **Current Behavior**：两处 cost 计算不一致：
   - `_get_action_cost(p, BAI_SHOU)` = `maxi(energy[p], 1)` → 能量 10 时返回 10
   - `resolve()` 内 `spent` = `clampi(energy[p], 1, 6)` → 能量 10 时实际花费 6

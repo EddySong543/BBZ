@@ -1,14 +1,14 @@
 extends GutTest
 
 ## ============================================================================
-## 黑暗面英雄（h13 黑暗子鼠 / h14 黑暗丑牛 / h15 黑暗寅虎）技能测试 —— 锁定【当前代码行为】。
+## 黑暗面英雄（h13 玄冥 / h14 蚩尤 / h15 穷奇）技能测试 —— 锁定【当前代码行为】。
 ##
 ## h13【鼠潮】= 能量：在场(含替补)时，己方每触发一次 combo 效果 → 团队 +0.5 能（每回合封顶 1.5）。
 ## h14【卸力反震】= 防御：防/大防挡下 → 反弹所挡 50% 真伤给攻击者（机制迁自磐牛·on_block 触发）。
 ## h15【血勇】= 进攻：出战时无法用防/大防（can_afford gate·下场即解）+ 波穿防（attack_penetration）。
 ## h16【疾风】= 节奏：在场(含替补)时，己方每局 2 次可把同一动作再做一次（波/大波/攒·技能/切换/防除外）。
 ## h17【镇压】= 干扰·主动技：占动作+费2能+每局2次，沉默对手出战英雄 unique 2 回合（下回合起算）。
-## h18【缠绕】= 状态：出战时，对手无法主动切换（含午马免费切换）；死亡换人不受影响。
+## h18【缠绕】= 状态：出战时，对手无法主动切换（含星日免费切换）；死亡换人不受影响。
 ## h19【践踏】= 进攻：攻击命中时，这一击超过 1.0HP 的溢出部分碾到敌方最高血替补（封顶 1.0）。
 ## h20【圣剑·断罪】= 状态·主动技：烙「断罪印」，印记目标出战血量 ≤1.0HP 即斩杀（处决）。
 ## h21【调虎离山】= 干扰·主动技：占动作+费2能+每局2次+须出战，强制对手换人、揪其存活替补中血量最低者上场。
@@ -50,7 +50,7 @@ func _battle_team(p0_ids: Array, hp: int = 5, e: int = 8) -> BattleCore:
 	return b
 
 
-# ---- h13 黑暗子鼠 鼠潮（在场时己方每触发 combo 效果 → 团队 +0.5 能·每回合封顶 1.5）----
+# ---- h13 玄冥 鼠潮（在场时己方每触发 combo 效果 → 团队 +0.5 能·每回合封顶 1.5）----
 
 func test_h13_shuchao_combo_proc_grants_team_energy() -> void:
 	# 龙(破甲·on_deal_hit)出战 + 暗鼠在替补 → 龙波命中 = 1 次 combo proc → 团队 +0.5 能(1 半能)
@@ -93,7 +93,7 @@ func test_h13_shuchao_caps_per_turn() -> void:
 	assert_eq(b._shuchao_procs[0], 3, "4 个 proc 事件(毒爆/易伤/鸡剑意×2) → 鼠潮封顶 3 次")
 
 
-# ---- h14 黑暗丑牛 卸力反震（防/大防挡下 → 反弹所挡 50% 真伤给攻击者·迁自磐牛）----
+# ---- h14 蚩尤 卸力反震（防/大防挡下 → 反弹所挡 50% 真伤给攻击者·迁自磐牛）----
 
 func test_h14_fanzhen_reflects_half_blocked_wave() -> void:
 	# 暗牛(P0 HP6=12 半点)防住对手波 → 反弹 50%(挡波 raw=2 → 反 1 半点)给攻击者
@@ -115,7 +115,7 @@ func test_h14_fanzhen_no_reflect_when_not_blocking() -> void:
 	assert_eq(b.hp[0][0], 12 - 2, "暗牛挨波 2 半点")
 
 
-# ---- h15 黑暗寅虎 血勇（出战不能防御 + 波穿防）----
+# ---- h15 穷奇 血勇（出战不能防御 + 波穿防）----
 
 func test_h15_xueyong_cannot_defend() -> void:
 	var b := _battle("h15", 7, 8)   # 暗虎出战；8 半能（够大防/大波）
@@ -156,7 +156,7 @@ func test_h15_xueyong_wave_blocked_by_big_defend() -> void:
 	assert_eq(b.hp[1][0], 10, "血勇波被大防挡下：plain 无伤")
 
 
-# ---- h16 黑暗卯兔 疾风（每局 2 次把同一动作再做一次·波/大波/攒·技能/切换/防除外）----
+# ---- h16 广寒 疾风（每局 2 次把同一动作再做一次·波/大波/攒·技能/切换/防除外）----
 
 func test_h16_jifeng_double_wave_hits_twice() -> void:
 	# 暗兔(P0)波 + 附加 → 敌出战吃两次波(2×2=4 半点)；消耗 1 次疾风
@@ -233,7 +233,7 @@ func test_h16_jifeng_works_from_reserve() -> void:
 	assert_eq(int(b.get_status(0, 1, "jifeng_uses", 0)), 1, "cap 计在暗兔(替补 slot1)")
 
 
-# ---- h17 黑暗辰龙【镇压】(主动技·沉默对手出战 unique 2 回合·2026-06-24 重设计) ----
+# ---- h17 烛阴【镇压】(主动技·沉默对手出战 unique 2 回合·2026-06-24 重设计) ----
 
 ## 自定义双队对局（P0 队 + P1 队），便于测"沉默对手指定英雄"。
 func _battle_vs(p0_ids: Array, p1_ids: Array, hp: int = 6, e: int = 8) -> BattleCore:
@@ -250,21 +250,21 @@ func _battle_vs(p0_ids: Array, p1_ids: Array, hp: int = 6, e: int = 8) -> Battle
 
 
 func test_h17_zhenya_silences_enemy_passive() -> void:
-	# 暗龙(P0)镇压 → 沉默 P1 出战的子鼠。cast 当回合子鼠仍生效，【下回合起】囤鼠加成失效。
+	# 暗龙(P0)镇压 → 沉默 P1 出战的虚日。cast 当回合虚日仍生效，【下回合起】囤鼠加成失效。
 	var b := _battle_vs(["h17", "test_p0_1", "test_p0_2"], ["h01", "test_p1_1", "test_p1_2"], 6, 8)
-	# 回合1：P0 镇压(费2能=4半能)、P1 攒(子鼠未沉默 → +3：攒2+囤鼠1)
+	# 回合1：P0 镇压(费2能=4半能)、P1 攒(虚日未沉默 → +3：攒2+囤鼠1)
 	assert_true(b.select_active(0), "暗龙可发动镇压(敌出战存活)")
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(int(b.get_status(1, 0, "silenced", 0)), 2, "P1 子鼠被烙沉默=2 回合")
+	assert_eq(int(b.get_status(1, 0, "silenced", 0)), 2, "P1 虚日被烙沉默=2 回合")
 	assert_eq(b.energy[0], 8 - 4, "镇压费 2 能(4 半能)")
 	assert_eq(int(b.get_status(0, 0, "active_uses", 0)), 1, "镇压计 1 次使用")
-	assert_eq(b.energy[1], 8 + 3, "cast 当回合子鼠仍生效：攒+2 +囤鼠+1 = +3")
-	# 回合2：双攒 → 子鼠已沉默 → P1 只 +2(囤鼠失效)
+	assert_eq(b.energy[1], 8 + 3, "cast 当回合虚日仍生效：攒+2 +囤鼠+1 = +3")
+	# 回合2：双攒 → 虚日已沉默 → P1 只 +2(囤鼠失效)
 	b.select_action(0, ActionDef.Action.CHARGE)
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(b.energy[1], 11 + 2, "子鼠被沉默：攒只 +2、囤鼠加成失效")
+	assert_eq(b.energy[1], 11 + 2, "虚日被沉默：攒只 +2、囤鼠加成失效")
 	assert_eq(int(b.get_status(1, 0, "silenced", 0)), 1, "沉默递减 → 剩 1 回合")
 
 
@@ -273,7 +273,7 @@ func test_h17_zhenya_silence_expires_after_two_turns() -> void:
 	var b := _battle_vs(["h17", "test_p0_1", "test_p0_2"], ["h01", "test_p1_1", "test_p1_2"], 6, 4)
 	b.select_active(0)
 	b.select_action(1, ActionDef.Action.CHARGE)
-	b.resolve()                                   # 回合1：cast(子鼠仍生效 +3)
+	b.resolve()                                   # 回合1：cast(虚日仍生效 +3)
 	for _t in range(2):                           # 回合2、3：沉默中，各 +2
 		b.select_action(0, ActionDef.Action.CHARGE)
 		b.select_action(1, ActionDef.Action.CHARGE)
@@ -282,7 +282,7 @@ func test_h17_zhenya_silence_expires_after_two_turns() -> void:
 	var before: int = b.energy[1]
 	b.select_action(0, ActionDef.Action.CHARGE)
 	b.select_action(1, ActionDef.Action.CHARGE)
-	b.resolve()                                   # 回合4：子鼠恢复 → +3
+	b.resolve()                                   # 回合4：虚日恢复 → +3
 	assert_eq(b.energy[1] - before, 3, "沉默到期 → 囤鼠恢复，攒 +3")
 
 
@@ -301,7 +301,7 @@ func test_h17_zhenya_disables_enemy_active_and_caps() -> void:
 	assert_false(b.can_use_active(0), "镇压每局上限 2 → 第 3 次不可用")
 
 
-# ---- h18 黑暗巳蛇 缠绕（出战时对手无法主动切换；死亡换人不受影响）----
+# ---- h18 相柳 缠绕（出战时对手无法主动切换；死亡换人不受影响）----
 
 func test_h18_chanrao_locks_enemy_switch() -> void:
 	# 暗蛇(P0 出战) → P1 无法主动切换；暗蛇自己一方不受影响
@@ -323,13 +323,13 @@ func test_h18_chanrao_only_while_active() -> void:
 
 
 func test_h18_chanrao_locks_free_switch() -> void:
-	# P0 出战午马(有免费切换) + P1 出战暗蛇 → 午马的免费切换也被缠绕锁住
+	# P0 出战星日(有免费切换) + P1 出战暗蛇 → 星日的免费切换也被缠绕锁住
 	var p1: Array = [_hero("h07", 5), _hero("test_a", 5), _hero("test_b", 5)]
 	var p2: Array = [_hero("h18", 4), _hero("test_c", 5), _hero("test_d", 5)]
 	var b := BattleCore.new()
 	b.setup(p1, p2, 555)
 	b.energy = [8, 8]
-	assert_false(b.is_free_switch_target(0, 1), "P1 暗蛇缠绕 → P0 午马免费切换被锁")
+	assert_false(b.is_free_switch_target(0, 1), "P1 暗蛇缠绕 → P0 星日免费切换被锁")
 	assert_false(b.can_afford(0, ActionDef.Action.SWITCH), "P0 普通切换也被锁")
 
 
@@ -345,10 +345,10 @@ func test_h18_chanrao_allows_death_switch() -> void:
 	assert_eq(b.active_index[0], 1, "已补位")
 
 
-# ---- h19 黑暗午马 践踏（攻击溢出 1.0HP 的部分碾到最高血替补）----
+# ---- h19 乌骓 践踏（攻击溢出 1.0HP 的部分碾到最高血替补）----
 
 func test_h19_jianta_overflow_tramples_reserve() -> void:
-	# 午马大波(4半=2.0HP)命中 → 溢出(4−2=2半)碾到最高血替补
+	# 星日大波(4半=2.0HP)命中 → 溢出(4−2=2半)碾到最高血替补
 	var b := _battle("h19", 5, 12)
 	b.select_action(0, ActionDef.Action.BIG_ATTACK)
 	b.select_action(1, ActionDef.Action.CHARGE)
@@ -378,7 +378,7 @@ func test_h19_jianta_blocked_no_trample() -> void:
 	assert_eq(b.hp[1][1], 10, "被挡 → 替补不受踏")
 
 
-# ---- h20 黑暗未羊 圣剑·断罪（主动技烙印·印记目标出战血量≤1.0HP 即处决）----
+# ---- h20 触邪 圣剑·断罪（主动技烙印·印记目标出战血量≤1.0HP 即处决）----
 
 func test_h20_duanzui_executes_marked_low_hp() -> void:
 	# 暗羊用断罪标记 P1 出战(残血 1.0HP=2半·≤阈值) → 同回合处决
@@ -411,7 +411,7 @@ func test_h20_duanzui_no_mark_no_execute() -> void:
 	assert_eq(b.hp[1][0], 2, "没断罪印 → 残血也不处决")
 
 
-# ---- h21 黑暗申猴 调虎离山（主动技·强制对手换人·揪存活替补血量最低者）----
+# ---- h21 枭阳 调虎离山（主动技·强制对手换人·揪存活替补血量最低者）----
 
 func test_h21_diaohu_pulls_lowest_hp_reserve() -> void:
 	# 暗猴(P0 出战) vs P1 出战 + 2 替补(slot1 残血=揪目标 / slot2 高血)。猴调虎离山 → P1 被强制揪上 slot1。
@@ -445,7 +445,7 @@ func test_h21_diaohu_caps_two_per_game() -> void:
 	assert_false(b.can_use_active(0), "每局上限 2 → 第 3 次不可用")
 
 
-# ---- h23 黑暗戌狗 护主（替补狗替死·完全免除·carry 留前线·每局一次）----
+# ---- h23 天狗 护主（替补狗替死·完全免除·carry 留前线·每局一次）----
 
 func test_h23_huzhu_protects_carry_from_lethal() -> void:
 	# P0 出战 carry 残血(1.0HP) + 替补暗狗(slot1)。对手大波致死 → 狗替死碎掉、carry 满免除留前线。
@@ -487,7 +487,7 @@ func test_h23_huzhu_only_from_reserve_not_lethal_no_trigger() -> void:
 	assert_eq(int(b.get_status(0, 1, "huzhu_uses", 0)), 0, "护主未计数")
 
 
-# ---- h24 黑暗亥猪 饕餮（任一英雄阵亡敌我皆可 → 团队 +2.0 能）----
+# ---- h24 并封 饕餮（任一英雄阵亡敌我皆可 → 团队 +2.0 能）----
 
 func test_h24_taotie_feasts_on_ally_death() -> void:
 	# P0 出战 carry 残血 + 替补暗猪。对手致死 carry → P0 团队 +2.0 能（对照无猪）。
@@ -521,7 +521,7 @@ func test_h24_taotie_feasts_on_enemy_death() -> void:
 	assert_eq(b.energy[0] - ctrl.energy[0], 4, "敌方阵亡也喂暗猪 +2.0 能（4 半能）")
 
 
-# ---- h22 黑暗酉鸡 一鸣惊人（空过存行动 → 之后双动作释放·净零 tempo）----
+# ---- h22 毕方 一鸣惊人（空过存行动 → 之后双动作释放·净零 tempo）----
 
 func test_h22_yiming_store_then_release_double_wave() -> void:
 	# 回合1 空过(存行动·不拿能量)；回合2 波+释放 → 敌吃两次波(2×2=4 半点)，消耗 1 次存储。

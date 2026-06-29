@@ -54,7 +54,7 @@ static func create_pool_heroes(heroes_dir: String = HEROES_DIR) -> Array[HeroDat
 	return pool
 
 
-## 首发英雄池：12 生肖 + 黑暗全 12（子鼠…亥猪·h01-h24）。将来扩张改这里的数字。
+## 首发英雄池：12 生肖 + 黑暗全 12（虚日…室火·h01-h24）。将来扩张改这里的数字。
 ## ⚠ 改池大小须同步 bp_screen.gd 的 ROWS 网格行配置（否则末排英雄不显示）。
 static func create_launch_pool(heroes_dir: String = HEROES_DIR) -> Array[HeroData]:
 	return create_pool_heroes(heroes_dir).slice(0, 24)
