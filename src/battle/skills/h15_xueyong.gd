@@ -1,6 +1,6 @@
 extends HeroSkill
 
-## h15 穷奇【血勇】被动 · 进攻 · HP7（厚血狂战）
+## h15 穷奇【凌云蔽日】被动 · 进攻 · HP7（厚血狂战）
 ## 穷奇嗜杀红温、有进无退：
 ##   ① 无法使用「防 / 大防」（can_defend → false；引擎在 can_afford gate 掉，下场即恢复）；
 ##   ② 作为补偿，其「波」穿防（attack_penetration：波 → PIERCE_DEF）——对手须用「大防」才挡得下；

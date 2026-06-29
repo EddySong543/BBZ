@@ -102,6 +102,21 @@ func test_h04_jiaotu_gains_shield_on_switch_in() -> void:
 	assert_eq(b.active_index[0], 1, "已切到兔")
 	assert_eq(b.shield[0][1], 1, "兔上场 +0.5 护甲 = 1 半点额外血量层")
 
+func test_h04_jiaotu_reduces_item_lock_on_switch_in() -> void:
+	var b := _battle_team(["test_p1_0", "h04", "test_p1_2"], 5, 8)
+	b.item_buffs[0]["item_lock"] = 2            # 被封印/天罗地网锁住 2 层
+	b.select_switch(0, 1)                       # 切到兔
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(int(b.item_buffs[0].get("item_lock", 0)), 1, "兔上场 → 道具锁 2 减到 1")
+
+func test_h04_jiaotu_item_lock_floors_at_zero() -> void:
+	var b := _battle_team(["test_p1_0", "h04", "test_p1_2"], 5, 8)
+	b.select_switch(0, 1)                       # 无锁时切到兔（item_lock 缺省 0）
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(int(b.item_buffs[0].get("item_lock", 0)), 0, "无锁时上场 → 道具锁保持 0、不变负")
+
 
 # ---- h05 亢金 裂甲（命中 → 给目标破甲）----
 

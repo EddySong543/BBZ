@@ -1,6 +1,6 @@
 extends HeroSkill
 
-## h24 并封【饕餮 / 食腐】被动 · 能量 · HP6（死亡产能·配击杀节奏）
+## h24 并封【吞尽八荒】被动 · 能量 · HP6（死亡产能·配击杀节奏）
 ## 在场（含替补·存活）时，战场上【任一】英雄阵亡（敌我皆可）→ 你方【团队】+2.0 能（从死亡盛宴暴食）。
 ##
 ## 引擎：BattleCore._resolve_deaths 每个死亡点扫双方存活英雄的 death_energy_bonus() 累计、_gain_energy 入账
