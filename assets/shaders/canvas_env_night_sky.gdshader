@@ -31,7 +31,7 @@ group_uniforms;
 
 group_uniforms texture_feel;
 uniform float dither_amount : hint_range(0.0, 0.06) = 0.012;
-uniform int posterize_steps : hint_range(2, 64) = 64;
+uniform int posterize_steps : hint_range(2, 256) = 64;  // 上限提到 256：暗渐变需更多级数压色带(banding)
 uniform vec2 pixel_grid = vec2(1920.0, 1080.0);
 group_uniforms;
 

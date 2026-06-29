@@ -63,7 +63,8 @@ var _focal_target: Vector2 = Vector2.ZERO # 目标对焦点（攻击右 / 防御
 
 func _ready() -> void:
 	_randomize_sky_seed()
-	_spawn_constellations()
+	# 星座连线已停用（生肖座确认不使用·2026-06-29）；函数体留作批次5统一清理。
+	# _spawn_constellations()
 	# 一次性缓存所有带 parallax_factor 的层及其基准位置 + 基准 scale（避免热路径查询/分配）。
 	for child in get_children():
 		if child is Control and child.has_meta("parallax_factor"):

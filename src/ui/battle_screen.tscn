@@ -24,8 +24,8 @@
 [ext_resource type="Script" uid="uid://dvdbihej8rx16" path="res://src/ui/components/icon_badge.gd" id="25_iconbadge"]
 
 [sub_resource type="Gradient" id="ShadowGradient"]
-offsets = PackedFloat32Array(0, 0.95913464, 0.99759614, 1)
-colors = PackedColorArray(0, 0, 0, 0.6, 0, 0, 0, 0.024519205, 0, 0, 0, 0.07932693, 0, 0, 0, 0)
+offsets = PackedFloat32Array(0, 0.55, 1)
+colors = PackedColorArray(0, 0, 0, 0.85, 0, 0, 0, 0.35, 0, 0, 0, 0)
 
 [sub_resource type="GradientTexture2D" id="ShadowTex"]
 gradient = SubResource("ShadowGradient")
@@ -35,7 +35,7 @@ fill_to = Vector2(1, 0.5)
 
 [sub_resource type="ShaderMaterial" id="GodRayMat"]
 shader = ExtResource("9_godray")
-shader_parameter/light_pos = Vector2(0.774, 0.385)
+shader_parameter/light_pos = Vector2(0.646, 0.25)
 shader_parameter/density = 1.00000004424012
 shader_parameter/decay = 0.8880000161009299
 shader_parameter/weight = 0.4
@@ -162,6 +162,8 @@ shader_parameter/edge_px = 2.0
 shader_parameter/aspect = 1.0
 shader_parameter/noise_amt = 0.08
 shader_parameter/wear = 0.24
+shader_parameter/solid_rim = true
+shader_parameter/rim_px = 1.5
 
 [sub_resource type="ShaderMaterial" id="JellyConfirm"]
 shader = ExtResource("21_jelly")
@@ -176,6 +178,8 @@ shader_parameter/edge_px = 2.0
 shader_parameter/aspect = 1.0
 shader_parameter/noise_amt = 0.08
 shader_parameter/wear = 0.24
+shader_parameter/solid_rim = true
+shader_parameter/rim_px = 1.5
 
 [node name="BattleScreen" type="Control" unique_id=1618077294]
 layout_mode = 3
@@ -223,10 +227,13 @@ offset_left = 96.0
 offset_top = 244.0
 offset_right = 864.0
 offset_bottom = 1012.0
+mouse_filter = 2
 anim_fps = 12.0
-rim_strength = 0.4
+rim_strength = 1.2
+rim_width = 4.5
 backlight = 0.05
-warmth_amount = 0.0
+light_dir = Vector2(1, -0.5)
+warmth_amount = 0.2
 
 [node name="P2CharDisplay" parent="." unique_id=915119977 instance=ExtResource("2_char_display")]
 layout_mode = 0
@@ -234,23 +241,24 @@ offset_left = 1056.0
 offset_top = 244.0
 offset_right = 1824.0
 offset_bottom = 1012.0
+mouse_filter = 2
 anim_fps = 12.0
+rim_strength = 0.72
 backlight = 0.125
 light_dir = Vector2(1.6, -1.6)
-warmth_amount = 0.0
+warmth_amount = 0.12
 
 [node name="ForeDust" parent="." unique_id=844619574 instance=ExtResource("12_foredust")]
-visible = false
 
 [node name="LowerDust" parent="." unique_id=802756316 instance=ExtResource("12_foredust")]
-visible = false
 position = Vector2(960, 900)
 amount = 60
 
 [node name="GodRayGrab" type="BackBufferCopy" parent="." unique_id=2107110591]
-copy_mode = 2
+copy_mode = 0
 
 [node name="GodRay" type="ColorRect" parent="." unique_id=1709473458]
+visible = false
 material = SubResource("GodRayMat")
 layout_mode = 1
 anchors_preset = 15
