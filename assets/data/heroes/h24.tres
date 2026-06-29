@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_h24")
 hero_id = "h24"
-hero_name = "黑暗亥猪"
+hero_name = "并封【猪】"
 max_hp = 6
 skill_description = "饕餮"
 skill_detail = "任意一名英雄死亡时（无论敌我），己方立刻获得 2 点能量。"

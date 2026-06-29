@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_h21")
 hero_id = "h21"
-hero_name = "黑暗申猴"
+hero_name = "枭阳【猴】"
 max_hp = 4
 skill_type = 1
 skill_description = "调虎离山"

@@ -5,9 +5,9 @@
 [resource]
 script = ExtResource("1_uo01y")
 hero_id = "h09"
-hero_name = "申猴"
+hero_name = "紫火【猴】"
 max_hp = 4
 skill_description = "裂爪"
-skill_detail = "申猴对敌方造成伤害时，移除对手等量的能量。"
+skill_detail = "紫火对敌方造成伤害时，移除对手等量的能量。"
 portrait_path = "res://assets/sprites/heroes/h09/h09_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h09/h09_idle.tres"

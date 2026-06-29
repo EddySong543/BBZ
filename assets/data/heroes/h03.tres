@@ -5,9 +5,9 @@
 [resource]
 script = ExtResource("1_682cf")
 hero_id = "h03"
-hero_name = "寅虎"
+hero_name = "尾火【虎】"
 max_hp = 4
 skill_description = "连扑"
-skill_detail = "寅虎的波、大波分为 2 段，分别结算。"
+skill_detail = "尾火的波、大波分为 2 段，分别结算。"
 portrait_path = "res://assets/sprites/heroes/h03/h03_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h03/h03_idle.tres"

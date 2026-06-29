@@ -5,9 +5,9 @@
 [resource]
 script = ExtResource("1_fnq8d")
 hero_id = "h08"
-hero_name = "未羊"
+hero_name = "鬼金【羊】"
 max_hp = 6
 skill_description = "牧养"
-skill_detail = "未羊在场时，其余每名存活的队友每回合回复 0.5 点生命。"
+skill_detail = "鬼金在场时，其余每名存活的队友每回合回复 0.5 点生命。"
 portrait_path = "res://assets/sprites/heroes/h08/h08_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h08/h08_idle.tres"

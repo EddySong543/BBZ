@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_h20")
 hero_id = "h20"
-hero_name = "黑暗未羊"
+hero_name = "触邪【羊】"
 max_hp = 5
 skill_type = 1
 skill_description = "断罪"

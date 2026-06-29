@@ -5,9 +5,9 @@
 [resource]
 script = ExtResource("1_8sbv0")
 hero_id = "h02"
-hero_name = "丑牛"
+hero_name = "牛金【牛】"
 max_hp = 7
 skill_description = "卸劲"
-skill_detail = "丑牛受到伤害时，其他每名队友获得 0.5 点护盾（最多叠到 1 点）。"
+skill_detail = "牛金受到伤害时，其他每名队友获得 0.5 点护盾（最多叠到 1 点）。"
 portrait_path = "res://assets/sprites/heroes/h02/h02_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h02/h02_idle.tres"

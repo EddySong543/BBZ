@@ -5,9 +5,9 @@
 [resource]
 script = ExtResource("1_hy0pe")
 hero_id = "h05"
-hero_name = "辰龙"
+hero_name = "亢金【龙】"
 max_hp = 5
 skill_description = "破甲"
-skill_detail = "辰龙攻击命中时，目标下一次防御降低一级。"
+skill_detail = "亢金攻击命中时，目标下一次防御降低一级。"
 portrait_path = "res://assets/sprites/heroes/h05/h05_portrait.png"
 sprite_frames_path = "res://assets/sprites/heroes/h05/h05_idle.tres"
