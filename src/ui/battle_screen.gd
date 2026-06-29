@@ -394,7 +394,7 @@ func _refresh_skill_card() -> void:
 	var sk: HeroSkill = battle._skills[p][slot]
 	var is_active: bool = sk != null and (sk.has_active() or sk.has_free_switch())
 	# 立绘一律朝右；阵营靠底色区分（己方冷蓝 / 对方暖红）。
-	skill_card.populate(h.hero_name, h.skill_description, h.skill_detail, is_active, h.portrait_path, p == PLAYER)
+	skill_card.populate(h.hero_name, h.skill_description, h.skill_detail, is_active, h.portrait_path, p == PLAYER, h.skill_icon_path)
 
 
 ## 左键点击展示格 → 翻到下一个英雄，循环。

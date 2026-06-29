@@ -10,4 +10,5 @@ max_hp = 4
 skill_description = "灵蚀噬魂"
 skill_detail = "翼火攻击命中时，使目标中毒（可叠加）；中毒目标再次被攻击时，引爆全部毒层造成伤害。"
 portrait_path = "res://assets/sprites/heroes/h06/h06_portrait.png"
+skill_icon_path = "res://assets/sprites/heroes/h06/h06_skill.png"
 sprite_frames_path = "res://assets/sprites/heroes/h06/h06_idle.tres"

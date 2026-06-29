@@ -39,6 +39,13 @@ const PASSIVE_COLOR := Color(0.34, 0.4, 0.46)  # 黛蓝灰（去饱和·被动=�
 		if is_node_ready():
 			_refresh_portrait()
 
+## 技能图标（符号徽记·插画窗右下角徽章）；空或不存在则隐藏。
+@export var skill_icon_path: String = "":
+	set(v):
+		skill_icon_path = v
+		if is_node_ready():
+			_refresh_skill_icon()
+
 ## 英雄名（显示为右页顶部标题，原「主动/被动技能」位置）。
 @export var hero_name: String = "":
 	set(v):
@@ -76,6 +83,7 @@ const PASSIVE_COLOR := Color(0.34, 0.4, 0.46)  # 黛蓝灰（去饱和·被动=�
 
 @onready var _page: ColorRect = $Page
 @onready var _portrait: TextureRect = $PortraitCell/Portrait
+@onready var _skill_icon: TextureRect = $PortraitCell/SkillIcon
 @onready var _type_label: Label = $TypeLabel
 @onready var _desc_label: RichTextLabel = $DescLabel
 @onready var _corners: Control = $PortraitCell/Corners
@@ -88,6 +96,7 @@ func _ready() -> void:
 	_apply_fonts()
 	_refresh_faction()
 	_refresh_portrait()
+	_refresh_skill_icon()
 	_refresh_text()
 
 
@@ -112,13 +121,14 @@ func _apply_fonts() -> void:
 
 
 ## 一次性填充（外部翻页时调用）。
-func populate(p_hero_name: String, p_skill_name: String, p_skill_detail: String, p_is_active: bool, p_portrait: String, p_is_ally: bool) -> void:
+func populate(p_hero_name: String, p_skill_name: String, p_skill_detail: String, p_is_active: bool, p_portrait: String, p_is_ally: bool, p_skill_icon: String = "") -> void:
 	hero_name = p_hero_name
 	skill_name = p_skill_name
 	skill_detail = p_skill_detail
 	is_active_skill = p_is_active
 	is_ally = p_is_ally
 	portrait_path = p_portrait
+	skill_icon_path = p_skill_icon
 
 
 ## 阵营区分：羊皮纸冷/暖 + 插画窗四角宝石蓝/红（文字一律黑色，敌我只靠宝石+羊皮冷暖）。
@@ -143,6 +153,22 @@ func _refresh_portrait() -> void:
 		_tex_cache[portrait_path] = tex
 	_portrait.texture = tex
 	_portrait.visible = true
+
+
+func _refresh_skill_icon() -> void:
+	if not _skill_icon:
+		return
+	if skill_icon_path == "" or not ResourceLoader.exists(skill_icon_path):
+		_skill_icon.visible = false
+		return
+	var tex: Texture2D
+	if _tex_cache.has(skill_icon_path):
+		tex = _tex_cache[skill_icon_path]
+	else:
+		tex = load(skill_icon_path)
+		_tex_cache[skill_icon_path] = tex
+	_skill_icon.texture = tex
+	_skill_icon.visible = true
 
 
 func _refresh_text() -> void:

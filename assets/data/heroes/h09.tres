@@ -10,4 +10,5 @@ max_hp = 4
 skill_description = "攫灵裂空"
 skill_detail = "紫火对敌方造成伤害时，移除对手等量的能量。"
 portrait_path = "res://assets/sprites/heroes/h09/h09_portrait.png"
+skill_icon_path = "res://assets/sprites/heroes/h09/h09_skill.png"
 sprite_frames_path = "res://assets/sprites/heroes/h09/h09_idle.tres"

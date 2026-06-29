@@ -10,4 +10,5 @@ max_hp = 4
 skill_description = "踏月乘风"
 skill_detail = "广寒在场时，己方每局有 2 次机会让一个动作连做两次（波 / 大波 / 攒 / 防）。"
 portrait_path = "res://assets/sprites/heroes/h16/h16_portrait.png"
+skill_icon_path = "res://assets/sprites/heroes/h16/h16_skill.png"
 sprite_frames_path = "res://assets/sprites/heroes/h16/h16_idle.tres"

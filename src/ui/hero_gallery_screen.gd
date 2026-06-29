@@ -71,6 +71,7 @@ var _d_tag: Label
 var _d_tag_bg: ColorRect
 var _d_tag_edge: ColorRect
 var _d_skill_name: Label
+var _d_skill_icon: TextureRect    # 技能图标（符号徽记·技能名左侧）
 var _d_detail: Label
 var _d_glow: TextureRect          # 立绘背后柔光
 var _d_chip1_edge: ColorRect      # 编号章（No.XX）
@@ -509,6 +510,12 @@ func _build_detail_panel() -> void:
 	_d_tag.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_d_skill_name = _make_label(Vector2.ZERO, Vector2(300, 30), 24, IVORY)
 	_d_skill_name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_d_skill_icon = TextureRect.new()
+	_d_skill_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_d_skill_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_d_skill_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_d_skill_icon.visible = false
+	detail_area.add_child(_d_skill_icon)
 	_make_desc_box(detail_area, Rect2(px + 64, py + 700, PANEL.size.x - 128, 150))
 	_d_detail = _make_label(Vector2(px + 84, py + 714), Vector2(PANEL.size.x - 168, 122), 16, IVORY)
 	_d_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -554,6 +561,11 @@ func _select(idx: int) -> void:
 	_d_tag.text = "被动" if is_passive else "主动"
 	_d_tag_bg.color = PASSIVE_TAG if is_passive else ACTIVE_TAG
 	_d_skill_name.text = h.skill_description
+	if h.skill_icon_path != "" and ResourceLoader.exists(h.skill_icon_path):
+		_d_skill_icon.texture = load(h.skill_icon_path)
+		_d_skill_icon.visible = true
+	else:
+		_d_skill_icon.visible = false
 	_d_detail.text = h.skill_detail if h.skill_detail != "" else h.skill_description
 	_layout_data_chips()
 	_layout_skill_row()
@@ -596,17 +608,23 @@ func _layout_skill_row() -> void:
 	var fs: int = _d_skill_name.get_theme_font_size("font_size")
 	var name_w: float = f.get_string_size(_d_skill_name.text,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-	var total: float = 64.0 + 14.0 + name_w
+	var icon_on: bool = _d_skill_icon != null and _d_skill_icon.visible
+	var icon_block: float = 40.0 if icon_on else 0.0   # 32 图标 + 8 间距
+	var total: float = icon_block + 64.0 + 14.0 + name_w
 	var x0: float = PANEL.position.x + (PANEL.size.x - total) * 0.5
 	var y0: float = PANEL.position.y + 648
-	_d_tag_edge.position = Vector2(x0 - 2, y0 - 2)
+	if icon_on:
+		_d_skill_icon.position = Vector2(x0, y0 - 1)
+		_d_skill_icon.size = Vector2(32, 32)
+	var gx: float = x0 + icon_block   # tag/技能名组起点（图标之后）
+	_d_tag_edge.position = Vector2(gx - 2, y0 - 2)
 	_d_tag_edge.size = Vector2(68, 34)
 	_d_tag_edge.color = Color(EDGE_OUTER, 0.85)
-	_d_tag_bg.position = Vector2(x0, y0)
+	_d_tag_bg.position = Vector2(gx, y0)
 	_d_tag_bg.size = Vector2(64, 30)
-	_d_tag.position = Vector2(x0, y0 + 2)
+	_d_tag.position = Vector2(gx, y0 + 2)
 	_d_tag.size = Vector2(64, 26)
-	_d_skill_name.position = Vector2(x0 + 78, y0)
+	_d_skill_name.position = Vector2(gx + 78, y0)
 	_d_skill_name.size = Vector2(name_w + 8, 30)
 
 

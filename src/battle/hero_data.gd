@@ -15,6 +15,7 @@ enum SkillType { PASSIVE, EXTRA_ACTION, ENHANCED_ACTION }
 @export var role: String = ""
 @export var position: String = ""
 @export var portrait_path: String = ""
+@export var skill_icon_path: String = ""  ## 技能图标（符号徽记·res://...png）；空或不存在则不显示。
 @export var spritesheet_path: String = ""
 @export var sprite_frames_path: String = ""
 @export var attack_spritesheet_path: String = ""

@@ -10,4 +10,5 @@ max_hp = 4
 skill_description = "北冥归墟"
 skill_detail = "玄冥在场时，己方每触发一次附加效果，获得 0.5 点能量（每回合最多 1.5 点）。"
 portrait_path = "res://assets/sprites/heroes/h13/h13_portrait.png"
+skill_icon_path = "res://assets/sprites/heroes/h13/h13_skill.png"
 sprite_frames_path = "res://assets/sprites/heroes/h13/h13_idle.tres"

@@ -10,4 +10,5 @@ max_hp = 5
 skill_description = "亢龙振九霄"
 skill_detail = "亢金攻击命中时，目标下一次防御降低一级。"
 portrait_path = "res://assets/sprites/heroes/h05/h05_portrait.png"
+skill_icon_path = "res://assets/sprites/heroes/h05/h05_skill.png"
 sprite_frames_path = "res://assets/sprites/heroes/h05/h05_idle.tres"

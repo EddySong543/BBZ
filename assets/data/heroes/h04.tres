@@ -10,4 +10,5 @@ max_hp = 4
 skill_description = "灵跃藏锋"
 skill_detail = "房日上场时，道具锁减少 1 回合，并获得 0.5 点护盾。"
 portrait_path = "res://assets/sprites/heroes/h04/h04_portrait.png"
+skill_icon_path = "res://assets/sprites/heroes/h04/h04_skill.png"
 sprite_frames_path = "res://assets/sprites/heroes/h04/h04_idle.tres"

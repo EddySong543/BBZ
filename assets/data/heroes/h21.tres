@@ -11,4 +11,5 @@ skill_type = 1
 skill_description = "惊蛰"
 skill_detail = "指定对手的一名替补英雄上场，替换对手当前的出战英雄。"
 portrait_path = "res://assets/sprites/heroes/h21/h21_portrait.png"
+skill_icon_path = "res://assets/sprites/heroes/h21/h21_skill.png"
 sprite_frames_path = "res://assets/sprites/heroes/h21/h21_idle.tres"

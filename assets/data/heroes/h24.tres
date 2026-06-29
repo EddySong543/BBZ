@@ -10,4 +10,5 @@ max_hp = 6
 skill_description = "吞尽八荒"
 skill_detail = "任意一名英雄死亡时（无论敌我），己方立刻获得 2 点能量。"
 portrait_path = "res://assets/sprites/heroes/h24/h24_portrait.png"
+skill_icon_path = "res://assets/sprites/heroes/h24/h24_skill.png"
 sprite_frames_path = "res://assets/sprites/heroes/h24/h24_idle.tres"

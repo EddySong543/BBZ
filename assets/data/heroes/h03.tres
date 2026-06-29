@@ -10,4 +10,5 @@ max_hp = 4
 skill_description = "银虎掠影"
 skill_detail = "尾火的波、大波分为 2 段，分别结算。"
 portrait_path = "res://assets/sprites/heroes/h03/h03_portrait.png"
+skill_icon_path = "res://assets/sprites/heroes/h03/h03_skill.png"
 sprite_frames_path = "res://assets/sprites/heroes/h03/h03_idle.tres"
