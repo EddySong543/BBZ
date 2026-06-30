@@ -567,10 +567,10 @@ func _resolve() -> void:
 		var msg := "平局"
 		var col := Color("#dddddd")
 		if w == BattleCore.WINNER_P1:
-			msg = "你胜利！"
+			msg = "胜利！"
 			col = Color("#5fd86b")
 		elif w != BattleCore.WINNER_DRAW:
-			msg = "你失败"
+			msg = "失败"
 			col = Color("#e0574b")
 		status_label.text = msg
 		status_label.add_theme_color_override("font_color", col)

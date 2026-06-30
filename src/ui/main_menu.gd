@@ -392,7 +392,7 @@ func _process(delta: float) -> void:
 ## + 屏幕轻震 → 波幕转场进 BP——卡里的战争打响，与进 BP 叙事连贯。
 func _on_match_found() -> void:
 	_match_state = MatchState.FOUND
-	_match_card.card_title = "对手已找到！"
+	_match_card.card_title = "敌方已找到！"
 	_match_card.card_subtitle = ""
 	_show_cancel_button(false)
 	_match_card.found_flash()

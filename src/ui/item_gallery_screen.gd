@@ -626,7 +626,6 @@ func _select(idx: int) -> void:
 	(_cards[idx].get_node("SelEdge") as ColorRect).visible = true
 
 	var it := _items[idx]
-	var dim_col: Color = DIM_COLOR.get(it.dimension, DIM_FALLBACK)
 	var rc: Color = TIER_COLOR[it.tier]
 	var tex: Texture2D = ItemCatalog.load_icon(it.item_id)
 	if tex != null:
@@ -640,8 +639,6 @@ func _select(idx: int) -> void:
 	_d_name.text = it.item_name
 	_d_tier_lbl.text = TIER_LABEL[it.tier]
 	_d_tier_fill.color = rc
-	_d_dim_lbl.text = it.dimension
-	_d_dim_fill.color = dim_col
 	_d_desc.text = it.description
 	_d_flavor.text = it.flavor
 	_layout_chips()
@@ -650,28 +647,23 @@ func _select(idx: int) -> void:
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 
-## 阶章 + 维度章作为一组在板内水平居中（章宽随文字 → 每次按内容重排）。
+## 阶章在板内水平居中（章宽随文字 → 每次按内容重排）。
+## 维度章已隐藏：维度（进攻/导出/博弈…）是内部设计分类、含设计术语，不对玩家展示（Eddy 2026-06-30）。
 func _layout_chips() -> void:
 	var y0: float = PANEL.position.y + 580
 	var f: Font = _d_tier_lbl.get_theme_font("font")
 	var fs: int = _d_tier_lbl.get_theme_font_size("font_size")
 	var w1: float = f.get_string_size(_d_tier_lbl.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 40.0
-	var w2: float = f.get_string_size(_d_dim_lbl.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 40.0
-	var total: float = w1 + 16.0 + w2
-	var x0: float = PANEL.position.x + (PANEL.size.x - total) * 0.5
+	var x0: float = PANEL.position.x + (PANEL.size.x - w1) * 0.5
 	_d_tier_edge.position = Vector2(x0, y0)
 	_d_tier_edge.size = Vector2(w1, 38)
 	_d_tier_fill.position = Vector2(x0 + 1, y0 + 1)
 	_d_tier_fill.size = Vector2(w1 - 2, 36)
 	_d_tier_lbl.position = Vector2(x0, y0)
 	_d_tier_lbl.size = Vector2(w1, 38)
-	var x2: float = x0 + w1 + 16.0
-	_d_dim_edge.position = Vector2(x2, y0)
-	_d_dim_edge.size = Vector2(w2, 38)
-	_d_dim_fill.position = Vector2(x2 + 1, y0 + 1)
-	_d_dim_fill.size = Vector2(w2 - 2, 36)
-	_d_dim_lbl.position = Vector2(x2, y0)
-	_d_dim_lbl.size = Vector2(w2, 38)
+	_d_dim_edge.visible = false
+	_d_dim_fill.visible = false
+	_d_dim_lbl.visible = false
 
 
 # ============================================================

@@ -64,7 +64,7 @@ offset_left = 334.0
 offset_top = 65.0
 offset_right = 540.0
 offset_bottom = 97.0
-text = "对手"
+text = "敌方"
 mouse_filter = 2
 
 [node name="OppRank" type="Label" parent="OppBand"]

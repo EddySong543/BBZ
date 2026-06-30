@@ -285,7 +285,7 @@ func _play_phase_announce() -> void:
 	layer.add_child(title)
 
 	var sub := Label.new()
-	sub.text = "禁用 3 名英雄" if is_ban else "选择你的英雄"
+	sub.text = "禁用 3 名英雄" if is_ban else "选择 3 名英雄"
 	FontManager.apply(sub, 20)
 	sub.add_theme_color_override("font_color", Color(WARM_IVORY, 0.92))
 	sub.add_theme_constant_override("outline_size", 4)
@@ -472,7 +472,7 @@ func _opp_cover_next() -> void:
 
 
 func _update_opp_progress() -> void:
-	opp_progress.text = "对手已选 %d/3" % _opp_covered
+	opp_progress.text = "敌方已选 %d/3" % _opp_covered
 
 
 func _update_timer_label() -> void:
