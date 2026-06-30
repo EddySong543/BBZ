@@ -640,8 +640,8 @@ func _show_collisions(cer: Control, my_cer: Array[HeroCard], opp_cer: Array) -> 
 		var oc: HeroCard = opp_cer[ai_bans.find(hero_idx)]
 		if oc:
 			oc.card_state = HeroCard.CardState.BANNED
-	var note := "双方同禁「%s」· 并集合一" % all_heroes[collide[0]].hero_name \
-		if collide.size() == 1 else "双方同禁 %d 名 · 并集合一" % collide.size()
+	var note := "双方同禁「%s」" % all_heroes[collide[0]].hero_name \
+		if collide.size() == 1 else "双方同禁 %d 名" % collide.size()
 	var lbl := Label.new()
 	lbl.text = note
 	FontManager.apply(lbl, 24)
