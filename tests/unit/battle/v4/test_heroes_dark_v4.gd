@@ -535,73 +535,46 @@ func test_h24_taotie_feasts_on_enemy_death() -> void:
 	assert_eq(b.energy[0] - ctrl.energy[0], 4, "敌方阵亡也喂暗猪 +2.0 能（4 半能）")
 
 
-# ---- h22 毕方 一鸣惊人（空过存行动 → 之后双动作释放·净零 tempo）----
+# ---- h22 毕方 引而后发（主动技·打出穿防大波·每局 2 次·费 2 能）----
 
-func test_h22_yiming_store_then_release_double_wave() -> void:
-	# 回合1 空过(存行动·不拿能量)；回合2 波+释放 → 敌吃两次波(2×2=4 半点)，消耗 1 次存储。
-	var b := _battle_team(["h22", "test_p0_1", "test_p0_2"], 4, 8)
-	assert_true(b.can_store(0), "在场暗鸡 → 可空过存行动")
-	var e_before: int = b.energy[0]
-	assert_true(b.select_action(0, ActionDef.STORE), "选空过")
+func test_h22_yinfa_active_fires_piercing_bigwave() -> void:
+	# 毕方引而后发主动技 → 打出大波级穿防强击(4 半点=2.0HP)；费 2 能
+	var b := _battle("h22", 4, 8)
+	var e0: int = b.energy[0]
+	assert_true(b.select_active(0), "引而后发主动技可用")
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(b.stored_action[0], 1, "存储 +1")
-	assert_eq(b.energy[0], e_before, "空过不拿能量、不花能量（能量不变）")
-	assert_true(b.can_double_action(0, ActionDef.Action.ATTACK), "有存储 → 波可双")
-	b.select_action(0, ActionDef.Action.ATTACK)
-	b.select_double(0, true)
+	assert_eq(b.hp[1][0], 10 - 4, "引而后发打出 2.0(4 半点)")
+	assert_eq(e0 - b.energy[0], 4, "费 2 能(4 半能)")
+
+
+func test_h22_yinfa_pierces_defend_blocked_by_big_defend() -> void:
+	# 穿防：敌「防」挡不住、敌「大防」挡下
+	var b := _battle("h22", 4, 8)
+	b.select_active(0)
+	b.select_action(1, ActionDef.Action.DEFEND)
+	b.resolve()
+	assert_eq(b.hp[1][0], 10 - 4, "穿防 → 敌「防」挡不住·吃 4 半点")
+	var b2 := _battle("h22", 4, 8)
+	b2.select_active(0)
+	b2.select_action(1, ActionDef.Action.BIG_DEFEND)
+	b2.resolve()
+	assert_eq(b2.hp[1][0], 10, "敌「大防」挡下引而后发·无伤")
+
+
+func test_h22_yinfa_cap_two_per_game() -> void:
+	# 每局上限 2 次
+	var b := _battle("h22", 4, 20)
+	assert_true(b.select_active(0))
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(b.hp[1][0], 10 - 4, "释放双波：敌吃 2×2=4 半点（2.0HP）")
-	assert_eq(b.stored_action[0], 0, "释放消耗 1 次存储")
+	assert_true(b.select_active(0))
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_false(b.can_use_active(0), "引而后发每局上限 2 → 第 3 次不可用")
 
 
-func test_h22_yiming_requires_chicken() -> void:
-	# 队中无暗鸡 → 不能空过存行动
-	var b := _battle_team(["test_p0_0", "test_p0_1", "test_p0_2"], 4, 8)
-	assert_false(b.can_store(0), "无暗鸡 → 不可空过")
-	assert_false(b.select_action(0, ActionDef.STORE), "选空过被拒")
-
-
-func test_h22_yiming_store_caps_at_limit() -> void:
-	# 存储封顶 STORED_CAP=2
-	var b := _battle_team(["h22", "test_p0_1", "test_p0_2"], 4, 20)
-	for _i in range(2):
-		b.select_action(0, ActionDef.STORE)
-		b.select_action(1, ActionDef.Action.CHARGE)
-		b.resolve()
-	assert_eq(b.stored_action[0], 2, "存满 2")
-	assert_false(b.can_store(0), "存储已满 → 不能再空过")
-
-
-func test_h22_yiming_works_from_reserve() -> void:
-	# 暗鸡在替补、出战 plain → 仍可空过 + 释放（在场含替补）
+func test_h22_yinfa_requires_active_bifang() -> void:
+	# 主动技 = 出战英雄的技能：毕方在替补、出战 plain → 无引而后发可放
 	var b := _battle_team(["test_p0_0", "h22", "test_p0_2"], 4, 8)
-	assert_true(b.can_store(0), "暗鸡在替补 → 仍可空过")
-	b.select_action(0, ActionDef.STORE)
-	b.select_action(1, ActionDef.Action.CHARGE)
-	b.resolve()
-	assert_eq(b.stored_action[0], 1, "替补暗鸡也能存")
-	b.select_action(0, ActionDef.Action.ATTACK)
-	b.select_double(0, true)
-	b.select_action(1, ActionDef.Action.CHARGE)
-	b.resolve()
-	assert_eq(b.hp[1][0], 10 - 4, "释放双波 4 半点")
-
-
-func test_h22_yiming_ai_legal_actions_and_apply_choice() -> void:
-	# AI 路径：legal_actions 含 STORE；apply_choice STORE → 存行动；之后 double=true 释放双波。
-	var b := _battle_team(["h22", "test_p0_1", "test_p0_2"], 4, 8)
-	var acts: Array = []
-	for c in b.legal_actions(0):
-		acts.append(int(c["action"]))
-	assert_has(acts, ActionDef.STORE, "legal_actions 含空过(STORE)")
-	assert_true(b.apply_choice(0, {action = ActionDef.STORE, target = -1}), "apply_choice 空过")
-	b.select_action(1, ActionDef.Action.CHARGE)
-	b.resolve()
-	assert_eq(b.stored_action[0], 1, "apply_choice STORE → 存 +1")
-	assert_true(b.apply_choice(0, {action = ActionDef.Action.ATTACK, target = -1, double = true}), "apply_choice 波+释放")
-	b.select_action(1, ActionDef.Action.CHARGE)
-	b.resolve()
-	assert_eq(b.hp[1][0], 10 - 4, "AI 释放双波 4 半点")
-	assert_eq(b.stored_action[0], 0, "消耗存储")
+	assert_false(b.can_use_active(0), "毕方在替补·出战无引而后发 → 主动技不可用")
