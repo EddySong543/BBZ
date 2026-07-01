@@ -10,7 +10,7 @@ extends GutTest
 ## h17【镇压】= 干扰·主动技：占动作+费2能+每局2次，沉默对手出战英雄 unique 2 回合（下回合起算）。
 ## h18【缠绕】= 状态：出战时，对手无法主动切换（含星日免费切换）；死亡换人不受影响。
 ## h19【践踏】= 进攻：攻击命中时，这一击超过 1.0HP 的溢出部分碾到敌方随机替补（无封顶）。
-## h20【圣剑·断罪】= 状态·主动技：烙「断罪印」，印记目标出战血量 ≤1.0HP 即斩杀（处决）。
+## h20【罪已昭】= 状态·被动：命中敌方出战附「易伤印」(vuln)，被印英雄受伤 +0.5，直到换下场（换下清）。
 ## h21【调虎离山】= 干扰·主动技：占动作+费2能+每局2次+须出战，强制对手换人、揪其存活替补中血量最低者上场。
 ## h23【护主】= 防御：替补席存活时，我方英雄受致命伤害 → 天狗顶替登场承受这一击、原 carry 退替补获救（每局一次·天狗可能吃死）。
 ## h24【饕餮】= 能量：在场(含替补)时，战场任一英雄阵亡(敌我皆可) → 你方团队 +2.0 能（4 半能）。
@@ -288,11 +288,11 @@ func test_h17_zhenya_silence_expires_after_two_turns() -> void:
 
 func test_h17_zhenya_disables_enemy_active_and_caps() -> void:
 	# ① 被沉默英雄的主动技不可用 ② 镇压每局上限 2 次。
-	var b := _battle_vs(["h17", "test_p0_1", "test_p0_2"], ["h20", "test_p1_1", "test_p1_2"], 6, 20)
-	b.select_active(0)                            # 回合1：镇压沉默 P1 暗羊(h20 断罪)
+	var b := _battle_vs(["h17", "test_p0_1", "test_p0_2"], ["h21", "test_p1_1", "test_p1_2"], 6, 20)
+	b.select_active(0)                            # 回合1：镇压沉默 P1 暗猴(h21 调虎离山)
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_false(b.can_use_active(1), "被沉默的暗羊：断罪主动技不可用")
+	assert_false(b.can_use_active(1), "被沉默的暗猴：调虎离山主动技不可用")
 	# 上限：回合2 再镇压 → 第3次应被拒(cap=2)
 	b.select_active(0)
 	b.select_action(1, ActionDef.Action.CHARGE)
@@ -379,37 +379,42 @@ func test_h19_jianta_blocked_no_trample() -> void:
 	assert_eq(b.hp[1][1], 10, "被挡 → 替补不受踏")
 
 
-# ---- h20 触邪 圣剑·断罪（主动技烙印·印记目标出战血量≤1.0HP 即处决）----
+# ---- h20 触邪 罪已昭（持续易伤：命中敌方出战附印·被印受伤 +0.5·换下场清）----
 
-func test_h20_duanzui_executes_marked_low_hp() -> void:
-	# 暗羊用断罪标记 P1 出战(残血 1.0HP=2半·≤阈值) → 同回合处决
+func test_h20_zuiyizhao_marks_and_amplifies() -> void:
+	# 触邪波命中敌方出战 → 附易伤印；此后对该目标的攻击 +0.5(1 半点)
 	var b := _battle("h20", 5, 8)
-	b.hp[1][0] = 2
-	assert_true(b.select_active(0), "断罪主动技可用(费2能·cap)")
+	b.select_action(0, ActionDef.Action.ATTACK)   # 触邪波命中 → 附印（附印那击不放大自己）
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_true(b.hp[1][0] <= 0, "印记目标血量≤阈值(2半) → 被断罪处决")
-
-
-func test_h20_duanzui_spares_above_threshold() -> void:
-	# 印记目标血量 > 阈值 → 不处决、印记悬着
-	var b := _battle("h20", 5, 8)
-	b.hp[1][0] = 3   # 1.5HP·>阈值2
-	b.select_active(0)
+	assert_eq(b.hp[1][0], 10 - 2, "首击 2 半点·未放大")
+	assert_eq(int(b.get_status(1, 0, "vuln", 0)), 1, "敌方出战已附易伤印")
+	# 第二回合再波 → 这次受易伤放大 +0.5：2 + 1 = 3 半点
+	b.select_action(0, ActionDef.Action.ATTACK)
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(b.hp[1][0], 3, "血量>阈值 → 不处决")
-	assert_eq(int(b.get_status(1, 0, "duanzui", 0)), 1, "断罪印已烙上、悬着")
+	assert_eq(b.hp[1][0], 8 - 3, "被印后受伤 +0.5 → 波打 3 半点")
 
 
-func test_h20_duanzui_no_mark_no_execute() -> void:
-	# 没烙印记 → 残血也不处决
-	var b := _battle("h20", 5, 8)
-	b.hp[1][0] = 2
-	b.select_action(0, ActionDef.Action.CHARGE)   # 暗羊不用断罪
+func test_h20_zuiyizhao_amplifies_any_attacker() -> void:
+	# 易伤对全队生效：直接给敌方出战附印，普通英雄的波也 +0.5
+	var b := _battle("test_p0_0", 5, 8)
+	b.set_status(1, 0, "vuln", 1)                 # 手动附易伤印
+	b.select_action(0, ActionDef.Action.ATTACK)
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(b.hp[1][0], 2, "没断罪印 → 残血也不处决")
+	assert_eq(b.hp[1][0], 10 - 3, "被印目标受任意攻击 +0.5 → 波打 3 半点")
+
+
+func test_h20_zuiyizhao_cleared_on_switch_out() -> void:
+	# 被印敌方英雄换下场 → 易伤印清除（换回来需重新烙）
+	var b := _battle("h20", 5, 8)
+	b.select_action(0, ActionDef.Action.ATTACK)   # 触邪命中 P1 出战 → 附印
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(int(b.get_status(1, 0, "vuln", 0)), 1, "P1 出战已附印")
+	b._perform_switch(1, 0, 1, [])                # 模拟 P1 把 slot0 换下
+	assert_eq(int(b.get_status(1, 0, "vuln", 0)), 0, "换下场 → 易伤印清除")
 
 
 # ---- h21 枭阳 调虎离山（主动技·强制对手换人·揪存活替补血量最低者）----

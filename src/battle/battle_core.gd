@@ -24,7 +24,6 @@ const HUZHU_CAP := 1             # 天狗 h23【护主·顶替承伤】每局上
 const STORED_CAP := 2            # 毕方 h22【一鸣惊人】可囤积的「存储行动」上限（防无限攒）
 const CHONGZHUANG_DAMAGE := 1    # 星日登场冲撞 = 0.5 HP（半点）
 const DOUBLEABLE_ACTIONS := [ActionDef.Action.ATTACK, ActionDef.Action.BIG_ATTACK, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND, ActionDef.Action.BIG_DEFEND]  # 广寒 h16【疾风】可"附加同种再做一次"的动作（仅技能/切换除外·防/大防可选但二元整体挡=无额外效果）
-const DUANZUI_THRESHOLD := 2  # 触邪 h20【断罪】处决阈值 = 2 半点(1.0HP)：印记目标出战血量 ≤ 此值即斩（主旋钮）
 
 # Winner 常量（延续 v3 B-007 语义：UNDECIDED=-1 / DRAW=0 / P1=1 / P2=2）
 const WINNER_UNDECIDED := -1
@@ -1041,13 +1040,6 @@ func resolve() -> Dictionary:
 				if sk2 != null and sk2.active_is_attack():
 					sk2.on_active_attack_resolved(self, p, active_index[p], dealt)
 
-	# Phase 4.9: 断罪处决（h20 暗羊）——印记目标【出战】血量 ≤ 阈值 → 斩杀(置 0)，随后走正常死亡结算(还魂/救援仍可拦)。
-	for p in [0, 1]:
-		var ds: int = active_index[p]
-		if hp[p][ds] > 0 and hp[p][ds] <= DUANZUI_THRESHOLD and int(get_status(p, ds, "duanzui", 0)) > 0:
-			hp[p][ds] = 0
-			events.append({id = "duanzui_execute", player = p, slot = ds})
-
 	# Phase 5: 死亡结算 + 强制切换 + 胜负
 	_resolve_deaths(a, events)
 
@@ -1129,6 +1121,7 @@ func _perform_switch(player: int, from_slot: int, to_slot: int, events: Array) -
 		opp_active.on_enemy_switch_out(from_slot, self, opp, active_index[opp])
 
 	active_index[player] = to_slot
+	set_status(player, from_slot, "vuln", 0)   # 罪已昭（触邪 h20）：易伤印随出战英雄换下场清除
 	events.append({id = "switch", player = player, from_to = [from_slot, to_slot]})
 
 	var entering: HeroSkill = _skills[player][to_slot]
@@ -1318,6 +1311,11 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		statuses[target_player][slot].erase("marked")
 		events.append({id = "marked_hit", player = target_player, amount = marked})
 		_note_combo_proc(attacker_player)   # 鼠潮：易伤消费 = 一次 combo proc
+	# 罪已昭（触邪 h20·持续易伤）：被印敌方出战英雄受到的伤害 +N（不消耗·换下场清；附印那次由触邪 on_deal_hit 记 proc）
+	var vuln: int = int(get_status(target_player, slot, "vuln", 0))
+	if vuln > 0:
+		dmg += vuln
+		events.append({id = "vuln_hit", player = target_player, amount = vuln})
 
 	# Stage B5: 受伤 hook（平减；沉默 h15 时跳过）
 	var skill: HeroSkill = _skills[target_player][slot]
