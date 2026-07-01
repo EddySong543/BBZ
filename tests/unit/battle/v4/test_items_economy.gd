@@ -200,13 +200,13 @@ func test_slot_row_staged_highlight() -> void:
 	var row := ItemSlotRow.new()
 	row.interactive = true
 	add_child_autofree(row)
-	# 已点选使用 → 芯片金高光边转最亮金 + 「✓用」标记。
+	# 已点选使用 → 框边转最亮金(GOLD_STAGED) + 「✓用」标记。
 	row.refresh(b, 0, [0])
-	assert_eq(row._chip_mats[0].get_shader_parameter("edge_inner"), ItemSlotRow.GOLD_STAGED, "暂存 = 亮金边")
+	assert_eq(row._frame_mats[0].get_shader_parameter("edge_mid"), ItemSlotRow.GOLD_STAGED, "暂存 = 最亮金边")
 	assert_true(row._labels[0].text.ends_with("✓用"), "暂存槽标 ✓用")
-	# 未点选但本回合可用（interactive·道具就绪）→ 金高光边、无 ✓用。
+	# 取消点选 → 就绪道具保持稀有度框色（2026 重构：金边只给暂存 / 空槽可操作·有道具的框走稀有度色）、无 ✓用。
 	row.refresh(b, 0, [])
-	assert_eq(row._chip_mats[0].get_shader_parameter("edge_inner"), ItemSlotRow.GOLD_READY, "可用 = 金高光边")
+	assert_eq(row._frame_mats[0].get_shader_parameter("edge_mid"), ItemCatalog.rarity_color(b.slot_item(0, 0).tier), "取消点选就绪道具 = 稀有度框色(非金)")
 	assert_false(row._labels[0].text.ends_with("✓用"))
 
 
