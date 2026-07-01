@@ -1,7 +1,7 @@
 extends HeroSkill
 
 ## h13 玄冥【北冥归墟】被动 · 能量 · HP4（脆）
-## 暗鼠在场（含替补·存活）时，己方【每触发一次 combo 效果】→ 团队能量 +0.5（每回合封顶 1.5 能）。
+## 暗鼠在场（含替补·存活）时，我方【每触发一次 combo 效果】→ 团队能量 +0.5（无封顶·2026-07-01 去回路刹车）。
 ## 战场越乱、鼠群越肥：把"全队 combo 活动"翻译成"全队燃料"，再循环放大更多 combo。
 ##
 ## 计入的 combo proc（引擎在各结算点调 BattleCore._note_combo_proc）：
@@ -16,7 +16,7 @@ extends HeroSkill
 ##     共享原语 = 「combo → 能量」—— 挂在全队每一个 combo proc 的下游，连通度最高的那种。
 ##     系间乘算（§6）：combo 越密 → 经济越快 → 部署更多 combo 件 → 又触发更多 proc。
 ##   agency / yomi：你主动编排"高 proc 回合"滚能量；对手被逼掐链（抢在引爆前换人 / 优先点掉脆皮鼠 = 关引擎）。
-##   §4.4：低标泛连携（放宽）；回路（combo→能→combo）已显式标注 + 装刹车（每回合封顶 1.5 能·见 §6）；
+##   §4.4：低标泛连携（放宽）；回路（combo→能→combo）已显式标注（2026-07-01 去每回合封顶·刹车移除·见 §6/§10）；
 ##     PvE 远征可解封顶（§10：回路在 PvE 可指数放飞）。
 ##   二元铁则无涉（不碰护甲 / 穿透）；纯被动 0 代价（被动优先·快节奏）。
 ##
@@ -24,7 +24,7 @@ extends HeroSkill
 ##   故不走单英雄 per-hit hook，而由 BattleCore._note_combo_proc 在各 combo 结算点统一收口、
 ##   扫队伍存活英雄的 combo_proc_energy() 求和（本组件唯一 override 的 hook）。
 
-const PROC_ENERGY := 1   # 每次 combo proc 返还 1 半能 = +0.5 能（cap 由 BattleCore.SHUCHAO_CAP_PER_TURN 控）
+const PROC_ENERGY := 1   # 每次 combo proc 返还 1 半能 = +0.5 能（2026-07-01 去每回合封顶·无 cap）
 
 
 func combo_proc_energy() -> int:

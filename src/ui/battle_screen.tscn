@@ -335,7 +335,7 @@ spacing = 5.0
 per_row_cap = 10
 row_spacing = -20.0
 show_empty = false
-allow_half = false
+allow_half = true
 extra_modulate = Color(0.85, 0.82, 0.74, 1)
 preview_cur = 10.865
 
@@ -454,7 +454,7 @@ right_to_left = true
 per_row_cap = 10
 row_spacing = -20.0
 show_empty = false
-allow_half = false
+allow_half = true
 extra_modulate = Color(0.85, 0.82, 0.74, 1)
 preview_cur = 10.0
 

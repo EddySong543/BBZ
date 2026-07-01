@@ -20,11 +20,9 @@ extends RefCounted
 const HP_UNIT := 2  # 必须与 ActionDef.HP_UNIT 一致
 
 ## 英雄机制数值（从引擎逻辑里的裸魔数提出来，集中可调）
-const LETHAL_GUARDIAN_CAP := 2   # 顶替型致死救援每局上限·⚠当前无英雄用(原鬼金已转牧养·守护见 h23 护主)
-const HUZHU_CAP := 1             # 天狗 h23【护主】替死每局上限（次）
+const HUZHU_CAP := 1             # 天狗 h23【护主·顶替承伤】每局上限（次）
 const STORED_CAP := 2            # 毕方 h22【一鸣惊人】可囤积的「存储行动」上限（防无限攒）
 const CHONGZHUANG_DAMAGE := 1    # 星日登场冲撞 = 0.5 HP（半点）
-const SHUCHAO_CAP_PER_TURN := 3  # 玄冥 h13【鼠潮】每回合 combo→能量返还封顶 = 3 次 proc = 1.5 能（回路刹车·PvE 可解封顶·§6/§10）
 const DOUBLEABLE_ACTIONS := [ActionDef.Action.ATTACK, ActionDef.Action.BIG_ATTACK, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND, ActionDef.Action.BIG_DEFEND]  # 广寒 h16【疾风】可"附加同种再做一次"的动作（仅技能/切换除外·防/大防可选但二元整体挡=无额外效果）
 const DUANZUI_THRESHOLD := 2  # 触邪 h20【断罪】处决阈值 = 2 半点(1.0HP)：印记目标出战血量 ≤ 此值即斩（主旋钮）
 
@@ -50,7 +48,7 @@ var _forced_pull: Array[int] = [-1, -1]             # 枭阳 h21【调虎离山�
 var pending_death_switch: Array[bool] = [false, false]  # 出战阵亡待玩家选替补上场
 var _death_processed: Array = [[], []]              # 每槽位死亡 hook 是否已触发（防重复）
 var _dmg_dealt: Array[int] = [0, 0]                 # 本回合各方造成的实际伤害(半点)·通用记账
-var _shuchao_procs: Array[int] = [0, 0]             # 本回合各方已计入的 combo proc 数（鼠潮 h13·每回合封顶 SHUCHAO_CAP_PER_TURN）
+var _shuchao_procs: Array[int] = [0, 0]             # 本回合各方已计入的 combo proc 数（鼠潮 h13·仅计数·2026-07-01 去每回合封顶）
 var _double: Array[bool] = [false, false]           # 本回合各方是否"附加同种动作再做一次"（疾风 h16·选择阶段设·resolve 末重置）
 var stored_action: Array[int] = [0, 0]              # 毕方 h22【一鸣惊人】各方已存储的行动数（空过囤积·跨回合保留·release 时 -1）
 var _killer: Array = [[], []]                       # _killer[player][slot]=直接攻击致死该英雄的攻击方;-1=非攻击致死。on_kill 只对直接攻击触发(防 splash/AOE 连锁)
@@ -204,11 +202,9 @@ func _gain_energy(player: int, amount: int) -> void:
 
 
 ## 玄冥 h13【鼠潮】：player 队触发一次 combo 效果时，引擎在该结算点调本函数。
-## 在场（含替补·存活）有鼠潮型英雄 → 团队能量 +其 combo_proc_energy()（走 _gain_energy·享囤鼠叠加），
-## 每回合封顶 SHUCHAO_CAP_PER_TURN 次（回路刹车）。无鼠潮 / 已达上限 = no-op。
+## 在场（含替补·存活）有鼠潮型英雄 → 团队能量 +其 combo_proc_energy()（走 _gain_energy·享囤鼠叠加）。
+## 无鼠潮 = no-op。（2026-07-01 Eddy 去每回合封顶·combo→能量回路刹车移除；_shuchao_procs 仅留计数。）
 func _note_combo_proc(player: int) -> void:
-	if _shuchao_procs[player] >= SHUCHAO_CAP_PER_TURN:
-		return
 	var amt := 0
 	for s in range(heroes[player].size()):
 		if hp[player][s] > 0:
@@ -1199,18 +1195,17 @@ func chongzhuang(attacker_player: int) -> void:
 	_note_combo_proc(attacker_player)   # 鼠潮：星日登场冲撞 = 一次 combo proc
 
 
-## 把伤害"踏/溅"到 victim_player 最高血存活替补（星日 h19 践踏溢出用·shield 先吸·触发 on_self_damaged）。
+## 把伤害"踏/溅"到 victim_player 随机一名存活替补（乌骓 h19 践踏溢出用·shield 先吸·触发 on_self_damaged·2026-07-01 由"最高血"改随机）。
 func _splash_to_reserve(victim_player: int, dmg: int) -> void:
 	if dmg <= 0:
 		return
-	var target := -1
-	var best_hp := 0
+	var candidates: Array[int] = []
 	for s in range(hp[victim_player].size()):
-		if s != active_index[victim_player] and hp[victim_player][s] > best_hp:
-			best_hp = hp[victim_player][s]
-			target = s
-	if target < 0:
+		if s != active_index[victim_player] and hp[victim_player][s] > 0:
+			candidates.append(s)
+	if candidates.is_empty():
 		return   # 无存活替补 → 溢出无处可去
+	var target: int = candidates[rng.randi() % candidates.size()]
 	var d: int = dmg
 	if shield[victim_player][target] > 0:
 		var absorbed: int = mini(shield[victim_player][target], d)
@@ -1225,25 +1220,13 @@ func _splash_to_reserve(victim_player: int, dmg: int) -> void:
 		sk.on_self_damaged(self, victim_player, target, d, 1 - victim_player)
 
 
-## 找 player 替补席可用的「顶替型」致死救援守护者（is_lethal_guardian + 每局 < 2 次）；无则 -1。
-## ⚠ 当前无英雄 override is_lethal_guardian（原鬼金已转牧养·守护见 h23 护主 is_protect_guardian）；保留作扩展接口。
+## 找 player 替补席可用的「顶替承伤」守护者（天狗 h23：is_lethal_guardian + 每局 < HUZHU_CAP 次）；无则 -1。
 func _find_lethal_guardian(player: int) -> int:
 	for s in range(hp[player].size()):
 		if s == active_index[player] or hp[player][s] <= 0:
 			continue
 		var sk: HeroSkill = _skills[player][s]
-		if sk != null and sk.is_lethal_guardian() and int(get_status(player, s, "tizui_uses", 0)) < LETHAL_GUARDIAN_CAP:
-			return s
-	return -1
-
-
-## 找 player 替补席可用的「护主」守护者（天狗 h23：is_protect_guardian + 每局 < HUZHU_CAP 次）；无则 -1。
-func _find_protect_guardian(player: int) -> int:
-	for s in range(hp[player].size()):
-		if s == active_index[player] or hp[player][s] <= 0:
-			continue
-		var sk: HeroSkill = _skills[player][s]
-		if sk != null and sk.is_protect_guardian() and int(get_status(player, s, "huzhu_uses", 0)) < HUZHU_CAP:
+		if sk != null and sk.is_lethal_guardian() and int(get_status(player, s, "huzhu_uses", 0)) < HUZHU_CAP:
 			return s
 	return -1
 
@@ -1358,23 +1341,16 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		events.append({id = "decoy_absorb", player = target_player, amount = eaten})
 
 	# Stage B9: 落 HP（半点）
-	# 护主（天狗 h23）：出战将死 + 替补有狗(每局<HUZHU_CAP) → 狗替死碎掉下场、这一击完全免除、
-	#   carry 留前线。「完全免除」优先于鬼金「顶替承伤」，故先判。狗的死亡走 Phase 5 正常结算(触发室火饕餮等)。
-	if dmg > 0 and dmg >= hp[target_player][slot] and slot == active_index[target_player]:
-		var protector: int = _find_protect_guardian(target_player)
-		if protector >= 0:
-			set_status(target_player, protector, "huzhu_uses", int(get_status(target_player, protector, "huzhu_uses", 0)) + 1)
-			hp[target_player][protector] = 0   # 狗碎掉（替补位阵亡）
-			events.append({id = "huzhu_protect", player = target_player, guardian = protector})
-			return 0   # 这一击完全免除·carry 不掉血、不触发 on-hit（视同挡下）
-	# 致死救援（顶替型·扩展接口·当前无英雄用→原鬼金已转牧养）：出战将死 + 替补有 is_lethal_guardian → 顶上、原 carry 获救（强制换人触发狗）
+	# 护主（天狗 h23·顶替承伤）：出战将死 + 替补有存活天狗(每局<HUZHU_CAP) → 天狗立刻登场顶替，
+	#   原 carry 退居替补获救、这一击改落到天狗身上（天狗吃这下·可能被这下打死＝去掉旧「完全免除+自我碎掉」）。
+	#   走 _perform_switch（含娄金穷追等切换副作用）；天狗若被打死走 Phase 5 正常结算(触发室火饕餮等)。
 	if dmg > 0 and dmg >= hp[target_player][slot] and slot == active_index[target_player]:
 		var guard: int = _find_lethal_guardian(target_player)
 		if guard >= 0:
-			set_status(target_player, guard, "tizui_uses", int(get_status(target_player, guard, "tizui_uses", 0)) + 1)
+			set_status(target_player, guard, "huzhu_uses", int(get_status(target_player, guard, "huzhu_uses", 0)) + 1)
 			events.append({id = "lethal_rescue", player = target_player, guardian = guard})
 			_perform_switch(target_player, slot, guard, events)
-			slot = active_index[target_player]   # 出战改为羊，本次伤害改落羊身上
+			slot = active_index[target_player]   # 出战改为天狗·本次伤害改落天狗身上
 
 	# 还魂丹：出战将死且持有"还魂"（本局一次）→ 保留 0.5 HP（1 半点）
 	if dmg > 0 and dmg >= hp[target_player][slot] and slot == active_index[target_player] and int(get_status(target_player, slot, "huanhun_ready", 0)) > 0:

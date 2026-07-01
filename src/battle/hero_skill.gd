@@ -141,9 +141,9 @@ func energy_gain_bonus(_battle: BattleCore, _player: int, _slot: int) -> int:
 	return 0
 
 
-## 「致死救援」型守护者（swap-in 顶替型：替补席存活时，替将死的出战队友顶伤上场）。
-## ⚠ 当前【无英雄使用】——原鬼金 h08 已转【牧养】(reserve_heal_per_turn)，守护职能移交天狗 h23
-## (走另一套语义 is_protect_guardian·替死碎掉非顶替)。保留本 hook 作 swap-in 顶替型守护的扩展接口。
+## 「顶替承伤」型守护者（天狗 h23）：在替补席存活时，我方英雄受【致命伤害】→ 本英雄立刻登场顶替，
+## 原 carry 退居替补获救、这一击改落到本英雄身上（本英雄吃这下·可能被打死；每局一次）。
+## 默认 false；天狗 override。
 func is_lethal_guardian() -> bool:
 	return false
 
@@ -153,13 +153,6 @@ func is_lethal_guardian() -> bool:
 ## 默认 0（不产出）；鬼金 override 返回 1（= +0.5 HP/回合）。共享原语 = 轮换续航（配星日免费切换）。
 func reserve_heal_per_turn() -> int:
 	return 0
-
-
-## 「护主」型守护者（天狗 h23）：在替补席存活时，出战队友受【致命一击】→ 本英雄替它挡下：
-## 这一击完全免除、本英雄碎掉下场、出战 carry【留前线】（每局一次）。与 is_lethal_guardian（鬼金·carry
-## 下场羊顶上承伤）区别 = 自我牺牲、carry 不退场不打断节奏。默认 false；天狗 override。
-func is_protect_guardian() -> bool:
-	return false
 
 
 ## 「饕餮」型（并封 h24）：本英雄在场（含替补·存活）时，战场上【任一】英雄阵亡（敌我皆可）
@@ -183,7 +176,7 @@ func can_defend() -> bool:
 
 ## 「鼠潮」型（玄冥 h13）：本英雄在场（含替补·存活）时，己方每触发一次 combo 效果
 ## （毒爆 / 易伤 / 破甲 / 碎能 / 剑意 / 反震 / 冲撞 / 溢杀…），团队能量额外 +本值（半能）。
-## 引擎在每个 combo 结算点调 BattleCore._note_combo_proc() 累计（每回合封顶·见 SHUCHAO_CAP_PER_TURN）。
+## 引擎在每个 combo 结算点调 BattleCore._note_combo_proc() 累计（2026-07-01 去每回合封顶）。
 ## 默认 0（不产出）；玄冥 override 返回 1（= +0.5 能/proc）。这是"combo→能量"共享原语的产出端。
 func combo_proc_energy() -> int:
 	return 0

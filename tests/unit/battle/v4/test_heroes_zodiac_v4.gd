@@ -62,7 +62,7 @@ func test_h01_dunshu_adds_half_to_every_energy_gain() -> void:
 	assert_eq(b.energy[1], 8 + 2, "plain 对照 +2 半能·被动已去除")
 
 
-# ---- h02 牛金 卸劲（挨打 → 其他存活队友各 +0.5HP 护盾·封顶 1.0HP·自己不获）----
+# ---- h02 牛金 卸劲（挨打 → 其他存活队友各 +0.5HP 护盾·无封顶·自己不获）----
 
 func test_h02_xiejin_shields_allies_when_damaged() -> void:
 	# 牛金(出战 HP7)攒(不防)挨对手波 → 两替补各 +1 半点(0.5HP)护盾；牛金自己不获
@@ -74,13 +74,13 @@ func test_h02_xiejin_shields_allies_when_damaged() -> void:
 	assert_eq(b.shield[0][0], 0, "牛金自己不获盾(卸给队友)")
 
 
-func test_h02_xiejin_shield_caps_per_ally() -> void:
-	# 连续两回合挨打 → 替补护盾封顶 2 半点(1.0HP)、不超
+func test_h02_xiejin_shield_accumulates_uncapped() -> void:
+	# 连续三回合挨打 → 替补护盾无封顶累积(3 半点=1.5HP)·2026-07-01 废除封顶
 	var b := _battle_team(["h02", "test_p1_1", "test_p1_2"], 7, 12)
 	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.ATTACK)
 	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.ATTACK)
 	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.ATTACK)
-	assert_eq(b.shield[0][1], 2, "三次挨打但替补护盾封顶 2 半点(1.0HP)")
+	assert_eq(b.shield[0][1], 3, "三次挨打→护盾无封顶累积 3 半点(1.5HP)")
 
 
 # ---- h03 尾火 连扑（hit_count=2 → 队友 on-hit 翻倍：喂鸡剑气 ×2）----
