@@ -21,11 +21,13 @@ Desktop.ini
 
 # === Local scratch & un-integrated sources (not shipped; keep out of git history) ===
 # gitignore 不支持行内注释，pattern 必须单独成行。
-# /ref/ = 参考图本地看；/res/ = 临时草稿(cloud.png)；vfx/ = 24M 未集成 VFX 素材库
+# /ref/ = 参考图本地看；/res/ = 临时草稿(cloud.png)
 # *.psd/*.docx = 美术/文档源文件
 /ref/
 /res/
-/assets/sprites/NewAssets/vfx/
+# 外部导入资源统一暂存区（assets/import）：内容不入库·仅保留 README 说明约定
+/assets/import/*
+!/assets/import/README.md
 *.psd
 *.docx
 

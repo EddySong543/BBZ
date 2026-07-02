@@ -1,18 +1,18 @@
 extends SceneTree
 
 ## 道具图标导入 / 分配（B·2026-06-20·2026-06-27 改：正式目录图标 = 中文道具名.png，与游戏内名同步）。
-## 把 assets/sprites/items/newAssets/ 里【按中文名命名】的图标，同名拷入正式目录 assets/sprites/items/。
+## 把 assets/import/ 里【按中文名命名】的图标，同名拷入正式目录 assets/sprites/items/。
 ## 运行：<godot> --headless --path <proj> --script res://tools/import_item_art.gd
 ##
 ## 设计：
 ## - 校验：源文件中文名须是已实装道具名（ItemCatalog 实时·永不过时）；也容旧 id 命名（向后兼容）。
 ## - 目标文件名 = ItemCatalog.icon_path(id) = <中文道具名>.png（与显示名一致·便于按名更新美术）。
 ## - 未匹配（打错字 / 简写 / 该道具还没实装）只报告、不瞎猜。
-## - 非破坏式：copy（保留 newAssets 源文件）；确认无误后用户自行清空暂存区。
+## - 非破坏式：copy（保留 import 源文件）；确认无误后用户自行清空暂存区。
 ## - 顺带生成 assets/sprites/items/_name_id_map.md（「中文名 ↔ 代码 id」对照表）。
 ## - 注：图标现已是中文名，你也可直接把 <中文名>.png 丢进正式目录、跳过本工具。
 
-const SRC := "res://assets/sprites/items/newAssets/"
+const SRC := "res://assets/import/"
 const MAP_DOC := "res://assets/sprites/items/_name_id_map.md"
 
 
@@ -60,7 +60,7 @@ func _initialize() -> void:
 		print("⚠ 未匹配 %d 件（名字对不上·只报告不瞎猜，请对照 %s 核名）：" % [unmatched.size(), MAP_DOC])
 		for f in unmatched:
 			print("    - %s" % f)
-	print("\n提示：matched 文件已【复制】到 assets/sprites/items/；newAssets 源文件保留，确认后可自行清空。")
+	print("\n提示：matched 文件已【复制】到 assets/sprites/items/；import 源文件保留，确认后可自行清空。")
 	print("      再到 Godot 编辑器导入一次（或 --import），游戏里即显示。")
 	quit()
 
