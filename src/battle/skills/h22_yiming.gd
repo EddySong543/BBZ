@@ -19,6 +19,7 @@ extends HeroSkill
 
 const COST := 4    # 4 半能 = 2 能（比大波 3 能省 1·「引而后发·省去大波部分能量」）
 const DMG := 4     # 4 半点 = 2.0HP（大波级）
+const CAP := 2     # 每局可用次数（珍贵·何时拔弓的 yomi）
 
 
 func has_active() -> bool:
@@ -31,7 +32,7 @@ func active_cost(_battle: BattleCore, _player: int, _slot: int) -> int:
 	return COST
 
 func active_per_game_cap() -> int:
-	return 2
+	return CAP
 
 func can_use_active(battle: BattleCore, player: int, _slot: int) -> bool:
 	return battle.hp[1 - player][battle.active_index[1 - player]] > 0   # 敌方出战存活才好放

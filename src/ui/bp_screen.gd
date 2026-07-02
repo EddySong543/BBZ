@@ -108,6 +108,12 @@ var _glow_tween: Tween
 
 func _ready() -> void:
 	all_heroes = HeroData.create_launch_pool(HERO_DATA_DIR)   # 首发 24（12 生肖 + 黑暗全 12·子鼠…亥猪 h01-h24）
+	# B4 启动断言：ROWS 布局容量必须 == 英雄池 size（防"加/减英雄忘同步 ROWS"的静默错位）
+	var _rows_cap: int = 0
+	for _r in ROWS.size():
+		_rows_cap += int(ROWS[_r][1])
+	assert(_rows_cap == all_heroes.size(),
+		"BP 池布局 ROWS 容量(%d) ≠ 英雄池 size(%d)——加/减英雄后忘同步 ROWS（见 create_launch_pool / ROWS 常量）" % [_rows_cap, all_heroes.size()])
 	_setup_ui()
 	_build_pool()
 	_enter_step(Step.PICK)   # 去 ban：12 池容不下 ban，直接 pick-only（BAN 分支保留为死路）

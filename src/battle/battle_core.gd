@@ -9,7 +9,7 @@ extends RefCounted
 ##   Step 2.2a ✅ 基础动作（攒/波/防/大波/大防）+ 同时独立结算 + 伤害管线骨架。
 ##   Step 2.2b ✅ 切换（甲时机：先于伤害→打到换上来的新英雄）+ 死亡结算/强制换人
 ##              + 全部 hook 触发点接入（英雄 no-op 时行为不变）。
-##   ⏳ 待补：高级管线相位（易伤/月相/减免/护盾外的转移 h30/延迟 h27/穿透）、
+##   ⏳ 待补：高级管线相位（月相/减免/穿透；易伤已实装[h20 触邪·罪已昭]，「伤害转移/延迟」原属已弃用的旧塔罗英雄 h27/h30、随塔罗架构弃用作废）、
 ##           overkill 连锁(§D8)、英雄组件注册表(_build_skills)。
 ##
 ## 半点制 (§D3)：HP / 伤害 / 护盾 / pending 内部以"半点"整数存储，
@@ -433,7 +433,7 @@ func select_double(player: int, on: bool) -> bool:
 
 # === 道具（ADR-003）===
 #
-# 经济状态机（开槽/draft/refill·D5）后续实装；当前 give_item 直接给（测试/临时）。
+# 经济状态机（开槽/draft/refill·D5）已实装（见 open_slot / use_slot / can_refill / begin_upgrade_draft 等）；give_item = 测试 / 直接给的旁路。
 # 道具不占动作槽：use_item 与 select_action 正交，可在同一回合都提交。
 
 ## 给玩家一件道具（持有/可用池）。返回其在 items[player] 的索引。
@@ -527,6 +527,11 @@ const ITEM_REFILL_COST := 2            # refill 1 能
 const UPGRADE_COST_T1 := 2             # 升级 1→2 花 1 能（= 2 半能·ADR D5）
 const UPGRADE_COST_T2 := 4             # 升级 2→3 花 2 能（= 4 半能·ADR D5）
 const UPGRADE_FAVORED_WEIGHT := 5.0    # 升级 3 选 1 里「预设升级款」(upgrade_to) 的相对权重（>1 → 更易出现·B2）
+# 遗物效果数值（半点·从裸魔数提出集中可调）
+const YEMINGZHU_ATK_BONUS := 1         # 夜明珠：切换登场当回合攻击 +0.5 HP
+const YEMINGZHU_CHARGE_DMG := 1        # 夜明珠：登场冲撞给敌方出战 0.5 HP 真伤
+const HEDINGHONG_DETONATE_BONUS := 2   # 鹤顶红：毒爆额外 +1.0 HP
+const WEIHOUZHEN_STING_DMG := 1        # 尾后针：出战阵亡反击敌方出战 0.5 HP 真伤
 const STARTER_ITEM_IDS := ["t1_feibiao", "t1_jiudun", "t1_lzhi_shengming"]  # 开局带 1 随机池
 ## 开局带件按设计同样走「部署延迟」：turn_number 2（= 显示回合 3）才可用，**非首回合**
 ## （design build-design-framework.md §2 部署时序表：开格①t1→抽①t2→①可用t3）。
@@ -647,9 +652,8 @@ func can_upgrade(player: int, s: int) -> bool:
 	return item != null and item.tier < 3 and usable_energy(player) >= upgrade_cost(player, s)
 
 
-## 生成升级 3 选 1 候选（下一级 tier 池随机 3·占位无加权）。存入槽 "upg_draft" 供 UI 展示；
-## 同回合重复调用沿用已生成结果（防 reroll）。换件 / refill / 用掉时清空（见各处 upg_draft=[]）。
-## TODO（B2 加权池）：预设 upgrade_to 存在时提高其出现概率；当前等概率随机。
+## 生成升级 3 选 1 候选（下一级 tier 池随机 3·预设 upgrade_to 款加权更易出现·见 _weighted_draft_pick）。
+## 存入槽 "upg_draft" 供 UI 展示；同回合重复调用沿用已生成结果（防 reroll）。换件 / refill / 用掉时清空（见各处 upg_draft=[]）。
 func begin_upgrade_draft(player: int, s: int) -> Array:
 	var sl: Dictionary = slots[player][s]
 	if (sl["upg_draft"] as Array).is_empty():
@@ -1095,10 +1099,10 @@ func _perform_switch(player: int, from_slot: int, to_slot: int, events: Array) -
 
 	# 夜明珠遗物：你切换登场 → 本回合攻击 +0.5（_imod）+ 登场冲撞 0.5 给敌方出战（直接真伤·简化版）。
 	if _has_relic(player, "t3_yemingzhu"):
-		add_item_mod(player, "atk_bonus", 1)
+		add_item_mod(player, "atk_bonus", YEMINGZHU_ATK_BONUS)
 		var oa: int = active_index[opp]
 		if hp[opp][oa] > 0:
-			hp[opp][oa] -= 1
+			hp[opp][oa] -= YEMINGZHU_CHARGE_DMG
 			events.append({id = "yemingzhu_charge", player = player})
 
 
@@ -1265,7 +1269,7 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 	if poison > 0:
 		dmg += poison
 		if _has_relic(attacker_player, "t3_hedinghong"):
-			dmg += 2   # 鹤顶红遗物：引爆毒额外 +1.0（2 半点）
+			dmg += HEDINGHONG_DETONATE_BONUS   # 鹤顶红遗物：引爆毒额外 +1.0（2 半点）
 		statuses[target_player][slot].erase("poison")
 		events.append({id = "poison_detonate", player = target_player, layers = poison})
 		_note_combo_proc(attacker_player)   # 鼠潮：毒爆 = 一次 combo proc
@@ -1408,7 +1412,7 @@ func _resolve_deaths(_a: Array[int], events: Array) -> void:
 					item_buffs[p].erase("death_reflect")
 					var ea: int = active_index[1 - p]
 					if hp[1 - p][ea] > 0:
-						hp[1 - p][ea] -= 1
+						hp[1 - p][ea] -= WEIHOUZHEN_STING_DMG
 						events.append({id = "weihouzhen_sting", player = p})
 
 	# 出战位阵亡 → 待玩家选替补（甲死亡换人）
