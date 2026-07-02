@@ -1,5 +1,8 @@
 # BattleCore 行为差异清单
 
+> **📌 2026-07-02 体检 C11 归属核实**：本文档 = 已删除的 v3 战斗实现的行为差异裁决记录（B-001~B-007）；
+> 当前 v4 真相源 = `tests/unit/battle/v4/`。经确认**保留作历史溯源**（非孤儿、非活跃文档）。
+
 本文件记录 **`src/battle/battle_core.gd` 当前实现** 与
 **`design/gdd/game-concept.md` / `design/heroes.md` 设计文档** 之间的不一致点。
 

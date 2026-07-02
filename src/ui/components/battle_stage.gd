@@ -63,8 +63,6 @@ var _focal_target: Vector2 = Vector2.ZERO # 目标对焦点（攻击右 / 防御
 
 func _ready() -> void:
 	_randomize_sky_seed()
-	# 星座连线已停用（生肖座确认不使用·2026-06-29）；函数体留作批次5统一清理。
-	# _spawn_constellations()
 	# 一次性缓存所有带 parallax_factor 的层及其基准位置 + 基准 scale（避免热路径查询/分配）。
 	for child in get_children():
 		if child is Control and child.has_meta("parallax_factor"):
@@ -77,30 +75,17 @@ func _ready() -> void:
 	_focal_target = focus_point
 
 
-## 每次进场景给天空(星/云) shader 随机 seed → 每次打开星图/云形都不同。
+## 每次进场景给星空 shader 随机 seed → 每次打开星图都不同。
 ## Godot 4 启动默认已 randomize，randf() 每次进程不同。
 func _randomize_sky_seed() -> void:
 	var s: float = randf() * 1000.0
 	_apply_seed("Stars", s)
-	_apply_seed("Clouds", s * 1.73)
 
 
 func _apply_seed(node_name: String, s: float) -> void:
 	var node := get_node_or_null(NodePath(node_name))
 	if node is CanvasItem and (node as CanvasItem).material is ShaderMaterial:
 		((node as CanvasItem).material as ShaderMaterial).set_shader_parameter("seed", s)
-
-
-## 程序化创建星座连线层(避免改 scene1.tscn 与编辑器手改冲突)；插在 Stars 之上、前景之下。
-func _spawn_constellations() -> void:
-	if get_node_or_null("Constellations") != null:
-		return
-	var con: Control = preload("res://src/ui/components/constellation_overlay.gd").new()
-	con.name = "Constellations"
-	add_child(con)
-	var stars := get_node_or_null("Stars")
-	if stars != null:
-		move_child(con, (stars as Node).get_index() + 1)
 
 
 ## 触发一次命中抖动；amp 为像素幅度（取较大值，不打断更强的抖动）。

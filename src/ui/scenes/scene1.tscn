@@ -10,11 +10,9 @@
 [ext_resource type="Texture2D" uid="uid://cs6rtnmt7nn3" path="res://assets/scenes/scene1/scene1_mountain.png" id="12_mtntex"]
 [ext_resource type="Texture2D" uid="uid://nb106ifrsave" path="res://assets/scenes/scene1/scene1_frontRooftop1.png" id="13_front1"]
 [ext_resource type="Texture2D" uid="uid://bgybtupsa42ml" path="res://assets/scenes/scene1/Scene1_frontRooftop2.png" id="14_front2"]
-[ext_resource type="Shader" uid="uid://bxudpdq6445n7" path="res://assets/shaders/canvas_env_meteor.gdshader" id="15_meteor"]
 [ext_resource type="Shader" uid="uid://8nr5wbxavv34" path="res://assets/shaders/canvas_fx_edge_soften.gdshader" id="16_edgesoft"]
 [ext_resource type="Shader" uid="uid://u0mpca3l8lig" path="res://assets/shaders/canvas_fx_moonlight.gdshader" id="17_moonlight"]
 [ext_resource type="Shader" uid="uid://ds1lag0nmchpk" path="res://assets/shaders/canvas_fx_box_blur.gdshader" id="20_boxblur"]
-[ext_resource type="Shader" uid="uid://clhfkajcds46m" path="res://assets/shaders/canvas_env_clouds.gdshader" id="21_clouds"]
 
 [sub_resource type="ShaderMaterial" id="SkyMat"]
 shader = ExtResource("3_sky")
@@ -57,21 +55,6 @@ shader_parameter/sky_fade = 0.14
 shader_parameter/top_concentration = 0.5
 shader_parameter/pixel_grid = 800.0
 
-[sub_resource type="ShaderMaterial" id="MeteorMat"]
-shader = ExtResource("15_meteor")
-shader_parameter/period = 7.0
-shader_parameter/duration = 1.1
-shader_parameter/spawn_chance = 0.8
-shader_parameter/travel_dir = Vector2(-0.85, 0.5)
-shader_parameter/travel_len = 0.6
-shader_parameter/trail_len = 0.1
-shader_parameter/thickness = 0.0018
-shader_parameter/meteor_color = Color(0.85, 0.93, 1, 1)
-shader_parameter/brightness = 1.0
-shader_parameter/spawn_top = 0.05
-shader_parameter/spawn_band = 0.45
-shader_parameter/pixel_grid = 800.0
-
 [sub_resource type="ShaderMaterial" id="MoonHaloMat"]
 shader = ExtResource("6_halo")
 shader_parameter/moon_pos = Vector2(0.646, 0.25)
@@ -84,24 +67,6 @@ shader_parameter/glow_intensity = 0.34
 shader_parameter/glow_falloff = 2.0
 shader_parameter/flicker_amount = 0.04
 shader_parameter/flicker_speed = 0.6
-
-[sub_resource type="ShaderMaterial" id="CloudsMat"]
-shader = ExtResource("21_clouds")
-shader_parameter/cloud_color = Color(0.15, 0.2, 0.31, 1)
-shader_parameter/cloud_color_lit = Color(0.5, 0.6, 0.74, 1)
-shader_parameter/coverage = 0.54
-shader_parameter/softness = 0.3
-shader_parameter/opacity = 0.42
-shader_parameter/moon_pos = Vector2(0.646, 0.25)
-shader_parameter/moon_radius = 0.6
-shader_parameter/moon_boost = 1.0
-shader_parameter/cloud_scale = Vector2(2.6, 4)
-shader_parameter/drift_speed = 0.006
-shader_parameter/warp_amount = 0.6
-shader_parameter/top_bias = 0.42
-shader_parameter/fade_span = 0.55
-shader_parameter/seed = 0.0
-shader_parameter/pixel_grid = 240.0
 
 [sub_resource type="ShaderMaterial" id="EdgeSoftenMat"]
 shader = ExtResource("16_edgesoft")

@@ -19,8 +19,6 @@ func on_team_deal_hit(battle: BattleCore, player: int, slot: int, _attacker_slot
 func has_active() -> bool:
 	return true
 
-func active_action_id() -> String:
-	return "bajian"
 
 func active_cost(_battle: BattleCore, _player: int, _slot: int) -> int:
 	return 0

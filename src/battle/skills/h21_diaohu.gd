@@ -21,10 +21,6 @@ func has_active() -> bool:
 	return true
 
 
-func active_action_id() -> String:
-	return "diaohu"
-
-
 func active_cost(_battle: BattleCore, _player: int, _slot: int) -> int:
 	return COST
 

@@ -205,11 +205,6 @@ func has_active() -> bool:
 	return false
 
 
-## 主动技动作 id（字符串，UI 文案由 battle_screen 内联翻译）。仅 has_active() 为 true 时有意义。
-func active_action_id() -> String:
-	return ""
-
-
 ## 主动技能量消耗。可依赖当前状态。
 func active_cost(_battle: BattleCore, _player: int, _slot: int) -> int:
 	return 0

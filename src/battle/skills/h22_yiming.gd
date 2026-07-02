@@ -25,8 +25,6 @@ const CAP := 2     # 每局可用次数（珍贵·何时拔弓的 yomi）
 func has_active() -> bool:
 	return true
 
-func active_action_id() -> String:
-	return "yinfa"
 
 func active_cost(_battle: BattleCore, _player: int, _slot: int) -> int:
 	return COST

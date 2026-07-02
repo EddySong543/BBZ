@@ -34,11 +34,6 @@ Desktop.ini
 # code out of git history. New devs: re-install via Project → AssetLib → search "Gut".
 /addons/gut/
 
-# === Malformed / Quarantine ===
-# Catch any future `cp ... "path"` accidents whose target name contains a stray quote.
-assets/font" *
-**/* && cp *
-
 # === Local sim / tooling scratch outputs (per-run, regenerated; never shipped) ===
 # run_sim.gd 写出的临时平衡/烟雾测试目录（out_btest / out_smoke14 / out_upgrade_ab / out_planab …）。
 /tools/sim/out_*/
@@ -46,9 +41,14 @@ assets/font" *
 # === Claude Code Local ===
 .claude/settings.local.json
 .claude/docs/UPGRADE-PLAN.md
+.claude/projects/
 CLAUDE.local.md
 production/session-logs/
 production/session-state/*.md
+
+# === Editor workspace / 本机元数据（per-machine·不入库·2026-07-02 C9）===
+*.code-workspace
+.ghlp-metadata.json
 
 # === Internal Planning (not for public) ===
 docs/IMPROVEMENTS-PROPOSAL.md
@@ -73,47 +73,6 @@ dist/
 export_presets.cfg
 # Uncomment if using Godot:
 # *.import
-
-# === Engine: Unity ===
-[Ll]ibrary/
-[Tt]emp/
-[Oo]bj/
-[Bb]uild/
-[Bb]uilds/
-[Ll]ogs/
-[Uu]ser[Ss]ettings/
-*.csproj
-*.unityproj
-*.sln
-*.suo
-*.tmp
-*.user
-*.userprefs
-*.pidb
-*.booproj
-*.svd
-*.pdb
-*.mdb
-*.opendb
-*.VC.db
-crashlytics-buildid.txt
-sysinfo.txt
-# Uncomment if using Unity:
-# [Aa]ssets/[Aa]sset[Ss]tore[Tt]ools/
-
-# === Engine: Unreal ===
-Binaries/
-DerivedDataCache/
-Intermediate/
-Saved/
-*.VC.opendb
-*.opensdf
-*.sdf
-*.cachefile
-*.VC.db
-# Uncomment if using Unreal:
-# *.uasset
-# *.umap
 
 # === Compiled Shaders ===
 *.spv

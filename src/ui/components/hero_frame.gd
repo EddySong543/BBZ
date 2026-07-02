@@ -2,7 +2,7 @@ class_name HeroFrame
 extends Panel
 
 ## 竹节像素头像框(甲A + 底色兜底)：满幅头像 + canvas shader 像素边框 + 矢量菱形角饰 + 阵营暗底。
-## profilePics 是带背景方图 → 填满框内(stretch COVERED + clip)；底色层(BgFill)兜底头像没覆盖处(如底部)。
+## 头像立绘(portrait_path·带背景方图) → 填满框内(stretch COVERED + clip)；底色层(BgFill)兜底头像没覆盖处(如底部)。
 ## 节点层级(自下而上)：BgFill → Portrait 头像(像素化+posterize·nearest) → InnerFX 内阴影+扫描线 → Bg 像素边框 → Corners 四角阵营宝石 → NameLabel。
 ## 边框统一「浅锡灰」(简约像素感·中性不偏阵营·出战/替补/敌我同款)；敌我=Corners 四角阵营宝石(我方蓝 / 敌方红)。
 ## 内部FX：Portrait 走 PortraitMat(pixelate/posterize) 统一像素颗粒；InnerFX 走 InnerFXMat(暗角 vignette + 极淡扫描线)。阵亡=灰边/灰宝石+头像灰。
@@ -125,7 +125,7 @@ func _refresh_portrait() -> void:
 	if portrait_path == "" or not ResourceLoader.exists(portrait_path):
 		_portrait.visible = false
 		return
-	# profilePics 是带背景方图(无透明边)，整图填满即可，无需裁切。
+	# 头像立绘(带背景方图·无透明边)，整图填满即可，无需裁切。
 	var tex: Texture2D
 	if _cache.has(portrait_path):
 		tex = _cache[portrait_path]
