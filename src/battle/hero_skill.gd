@@ -226,6 +226,12 @@ func can_use_active(_battle: BattleCore, _player: int, _slot: int) -> bool:
 	return true
 
 
+## 本主动技是否需要玩家指定【敌方替补】目标（枭阳 h21 调虎离山 = true）。
+## true → UI 在选中主动技后点亮敌方存活替补框供点选；玩家未选则引擎按技能默认处理（如枭阳随机揪）。默认 false。
+func active_needs_enemy_target() -> bool:
+	return false
+
+
 ## 执行主动技（即时效果型）。扣能 / cap 计数由引擎处理；此处只写效果。
 ## 注意：攻击型主动技（active_is_attack()=true）不走本方法，改走下方攻击接口。
 func execute_active(_battle: BattleCore, _player: int, _slot: int) -> void:

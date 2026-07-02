@@ -158,7 +158,7 @@ func test_h07_dangxian_chongzhuang_on_switch_in() -> void:
 	assert_eq(b.hp[1][0], 10 - 1, "马登场冲撞 0.5HP = 1 半点 给对手出战(对手 HP5=10半)")
 
 
-# ---- h08 鬼金 牧养（在场时你方替补席存活英雄每回合回 0.5HP·出战不回·2026-06-27 替罪→牧养重设计）----
+# ---- h08 鬼金 牧养（出战时你方替补席存活英雄每回合回 0.5HP·出战不回·2026-07-02 由在场收缩为出战）----
 
 func test_h08_muyang_heals_reserve_each_turn() -> void:
 	# 鬼金出战 + 残血替补(slot1) → 每回合替补回 0.5HP(1 半点)；出战鬼金不回。
@@ -187,16 +187,16 @@ func test_h08_muyang_caps_at_max_and_requires_sheep() -> void:
 	assert_eq(nb.hp[0][1], 4, "无鬼金 → 替补不回血")
 
 
-func test_h08_muyang_works_from_reserve() -> void:
-	# 鬼金在替补、出战 plain → 仍生效（在场含替补）；鬼金自己在替补也回。
+func test_h08_muyang_inactive_from_reserve() -> void:
+	# 鬼金在替补、出战 plain → 不牧养（2026-07-02 出战限定·鬼金须站前线牧养）
 	var b := _battle_team(["test_p0_0", "h08", "test_p0_2"], 6, 8)
 	b.hp[0][1] = 4   # 鬼金(替补)残血
 	b.hp[0][2] = 4   # 另一替补残血
 	b.select_action(0, ActionDef.Action.CHARGE)
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(b.hp[0][1], 5, "鬼金在替补也生效·自身回 0.5HP")
-	assert_eq(b.hp[0][2], 5, "另一替补也回 0.5HP")
+	assert_eq(b.hp[0][1], 4, "鬼金在替补 → 不牧养、自身不回")
+	assert_eq(b.hp[0][2], 4, "另一替补也不回")
 
 
 # ---- h09 紫火 裂爪（命中 → 碎对手等量能量）----

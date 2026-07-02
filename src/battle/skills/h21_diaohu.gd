@@ -8,7 +8,8 @@ extends HeroSkill
 ##   execute_active 在对手身上调 BattleCore.request_forced_pull(敌方, 揪目标槽)；
 ##   resolve Phase 2.7 在切换之后、伤害之前执行 _perform_switch(敌方, 出战→揪目标) →
 ##   被揪英雄成为对手出战(本回合攻击落它身上)、原出战下场触发我方 on_enemy_switch_out(穷追)。
-##   目标默认 = 对手存活替补中血量最低者(脆皮 carry·并列取槽小=确定性)；玩家指定 UI 后续接入。
+##   目标 = 玩家指定的对手存活替补(UI 点选敌方替补框·battle.active_target 读)；
+##   指定目标已死 / 无效 → 作废(不改揪别人)；未指定(AI / 未选) → 随机揪一个存活替补(battle.rng·确定性)。（Eddy 2026-07-02 定）
 ##
 ## 设计依据（design/heroes-dark-h21-h24.md）：维度=干扰·共享原语=目标选择。是暗蛇阴阳对子(蛇锁原地/猴拽出)。
 ##   cap：占动作 + 费 2 能 + 每局 2 次 + 须出战(暴露 HP4 脆皮)。对手出口=摊平血量/速攻点死猴/换回去。
@@ -37,14 +38,20 @@ func can_use_active(battle: BattleCore, player: int, _slot: int) -> bool:
 	return battle.living_reserves(1 - player).size() > 0
 
 
+func active_needs_enemy_target() -> bool:
+	return true   # UI 点选敌方存活替补作揪目标（未选 → execute_active 随机揪）
+
+
 func execute_active(battle: BattleCore, player: int, _slot: int) -> void:
 	var e: int = 1 - player
-	# 默认揪对手存活替补中血量最低者（脆皮 carry）；并列取槽位小者（确定性·联机可复现）。
-	var target := -1
-	var best_hp := 0
-	for s in battle.living_reserves(e):
-		if target < 0 or battle.hp[e][s] < best_hp:
-			best_hp = battle.hp[e][s]
-			target = s
-	if target >= 0:
-		battle.request_forced_pull(e, target)
+	var reserves := battle.living_reserves(e)
+	if reserves.is_empty():
+		return   # 对手无存活替补（can_use_active 已挡·此处防御）
+	var pick: int = battle.active_target(player)   # 玩家指定的敌方替补槽（-1=未指定）
+	if pick >= 0:
+		# 玩家指定：目标须仍是存活替补才揪；已死 / 无效 → 作废（不改揪别人·Eddy 2026-07-02）。
+		if pick in reserves:
+			battle.request_forced_pull(e, pick)
+	else:
+		# 未指定（玩家未选 / AI）→ 随机揪一个存活替补（battle.rng·确定性可复现·Eddy 2026-07-02）。
+		battle.request_forced_pull(e, reserves[battle.rng.randi() % reserves.size()])

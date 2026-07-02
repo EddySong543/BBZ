@@ -129,6 +129,8 @@ var _double_armed: bool = false   # 本回合是否 armed「附加同种动作�
 # ---- 主动换人（任务5）：点替补框→框内显「切换」(armed)→再次点=选择(动画)→「结束」提交 ----
 var _armed_switch_frame: int = -1   # 当前 armed 的替补框索引（1 / 2），-1=无
 var _switch_selected: bool = false  # armed 框是否已进入"选择"态（高亮·待「结束」提交）
+var _enemy_targeting: bool = false  # h21 调虎离山：是否处于"选敌方替补揪目标"态（选中该主动技后）
+var _enemy_target_pick: int = -1    # 已点选的敌方替补槽（-1=未选→提交时引擎随机揪）
 
 # ---- juice ----
 # 受击震屏基幅（实际位移 = 基幅 × 各层 parallax_factor·见 scene1.tscn / battle_stage.gd）。
@@ -335,9 +337,11 @@ func _setup_world_group() -> void:
 
 func _connect_frame_signals() -> void:
 	# 主动换人：点击己方替补头像（索引 1 / 2）→ 头像下浮现「切换」小按钮（见 _on_reserve_frame_input）。
-	# 出战位（索引 0）不可点（不能换成自己）。对手框不连接。
+	# 出战位（索引 0）不可点（不能换成自己）。
+	# 敌方替补框（索引 1 / 2）：平时点击无响应（回调内 gate），仅 h21 调虎离山选目标态可点（见 _on_enemy_frame_input）。
 	for fi in [1, 2]:
 		p1_frames[fi].gui_input.connect(_on_reserve_frame_input.bind(fi))
+		p2_frames[fi].gui_input.connect(_on_enemy_frame_input.bind(fi))
 
 
 # ============================================================
@@ -460,6 +464,8 @@ func _on_circle_pressed(action: int, btn: Button) -> void:
 	selected_btn = btn
 	_set_btn_selected(btn, true)
 	_set_confirm_active(true)
+	if action == ACTIVE:
+		_maybe_arm_enemy_targets()   # 需指定敌方替补的主动技（h21 调虎离山）→ 点亮敌方存活替补框
 	_refresh_jifeng()   # 新选的动作是否可双 → 更新疾风开关
 
 
@@ -470,7 +476,7 @@ func _on_confirm_pressed() -> void:
 
 	# 玩家提交（未选 → 默认攒）
 	if selected_action == ACTIVE:
-		battle.select_active(PLAYER)
+		battle.select_active(PLAYER, _enemy_target_pick)   # 玩家点选的敌方揪目标（-1=未选→引擎随机）
 	elif selected_action == A.SWITCH and selected_switch >= 0:
 		battle.select_switch(PLAYER, selected_switch)
 	elif selected_action >= 0:
@@ -695,6 +701,55 @@ func _clear_action_selection_full() -> void:
 	for btn in action_btn_list:
 		_set_btn_selected(btn, false)
 	_set_confirm_active(false)
+	_clear_enemy_targets()   # 放弃已选动作 → 一并退出 h21 敌方目标选择态
+
+
+# ============================================================
+# h21 枭阳【调虎离山】：选敌方替补揪目标（方案1·敌方替补框亮）
+# ============================================================
+
+## 选中"需指定敌方替补"的主动技（h21）后：点亮敌方存活替补框、进入选目标态。
+func _maybe_arm_enemy_targets() -> void:
+	var sk: HeroSkill = battle.get_skill(PLAYER, battle.active_index[PLAYER])
+	if sk == null or not sk.active_needs_enemy_target():
+		return
+	_enemy_targeting = true
+	_enemy_target_pick = -1
+	for fi in [1, 2]:
+		var slot: int = p2_frame_slots[fi]
+		if slot >= 0 and slot != battle.active_index[AI] and battle.hp[AI][slot] > 0:
+			p2_frames[fi].set_switch_prompt(true, "揪")   # 敌方存活替补：盖「揪」提示（文字/样式待 F6 调）
+
+
+## 敌方替补框点击（仅 h21 选目标态响应；平时 gate 掉 → 无副作用）：点存活敌方替补 → 设/换/取消揪目标。
+func _on_enemy_frame_input(event: InputEvent, frame_idx: int) -> void:
+	if state != State.PLAYER_SELECT or not _enemy_targeting:
+		return
+	var mb := event as InputEventMouseButton
+	if mb == null or not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT:
+		return
+	var slot: int = p2_frame_slots[frame_idx]
+	if slot < 0 or slot == battle.active_index[AI] or battle.hp[AI][slot] <= 0:
+		return   # 出战位 / 空位 / 阵亡 → 不可揪
+	if _enemy_target_pick == slot:
+		_enemy_target_pick = -1                    # 点已选 = 取消（回未选 → 提交走随机）
+		p2_frames[frame_idx].is_selected = false
+	else:
+		for fj in [1, 2]:
+			p2_frames[fj].is_selected = false      # 单选：先清旧选中
+		_enemy_target_pick = slot
+		p2_frames[frame_idx].is_selected = true
+
+
+## 退出敌方目标选择态：清高亮 + 提示 + 记录（幂等·非 h21 态调用是 no-op）。
+func _clear_enemy_targets() -> void:
+	if not _enemy_targeting and _enemy_target_pick < 0:
+		return
+	for fi in [1, 2]:
+		p2_frames[fi].is_selected = false
+		p2_frames[fi].set_switch_prompt(false)
+	_enemy_targeting = false
+	_enemy_target_pick = -1
 
 
 # ============================================================
@@ -709,6 +764,7 @@ func _clear_action_selection_full() -> void:
 func _set_buttons_active(active: bool, dim_inactive: bool = true) -> void:
 	if not active:
 		_disarm_switch()   # 离开选择阶段 → 退出 armed「切换」态
+		_clear_enemy_targets()   # 离开选择阶段 → 退出 h21 敌方目标选择态
 		if btn_jifeng:
 			btn_jifeng.visible = false   # 结算/过场：藏疾风开关
 	# 底部 UI 始终可见。
@@ -753,6 +809,7 @@ func _reset_button_styles() -> void:
 		_set_btn_selected(btn, false)
 	_set_confirm_active(false)
 	_disarm_switch()   # 退出 armed「切换」态（换人选中随之消失）
+	_clear_enemy_targets()   # 退出 h21 敌方目标选择态
 
 
 ## 给按钮挂 ButtonJuice 交互手感组件（幂等：已挂则跳过）。

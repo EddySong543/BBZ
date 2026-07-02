@@ -196,7 +196,7 @@ func set_hp(_hp: int, _max_hp: int) -> void:
 
 ## 主动换人 armed 态（任务5）：on=立绘隐藏、框内居中显示「切换」二字 + 边框高亮放大；
 ## off=恢复立绘、去高亮。点替补框进入此态，再次点击=确认换人。
-func set_switch_prompt(on: bool) -> void:
+func set_switch_prompt(on: bool, label_text: String = "切换") -> void:
 	if _switch_label == null:
 		_switch_label = Label.new()
 		_switch_label.name = "SwitchPrompt"
@@ -204,7 +204,6 @@ func set_switch_prompt(on: bool) -> void:
 		_switch_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_switch_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		_switch_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_switch_label.text = "切换"
 		var fm := get_node_or_null("/root/FontManager")
 		if fm != null:
 			fm.apply(_switch_label, 16)
@@ -212,6 +211,7 @@ func set_switch_prompt(on: bool) -> void:
 		_switch_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
 		_switch_label.add_theme_constant_override("outline_size", 4)
 		add_child(_switch_label)   # 加在最后 → 渲染在边框/立绘之上
+	_switch_label.text = label_text   # 「切换」(己方换人) / 「揪」(h21 敌方揪目标) 复用同一 label
 	_switch_label.visible = on
 	if _portrait:
 		if on:

@@ -43,6 +43,7 @@ var statuses: Array = [[], []]            # statuses[player][slot]: Dictionary�
 var selected_action: Array[int] = [-1, -1]
 var _switch_to: Array[int] = [-1, -1]               # SWITCH 动作的目标槽位
 var _forced_pull: Array[int] = [-1, -1]             # 枭阳 h21【调虎离山】：_forced_pull[受害方]=被强制揪上场的替补槽（execute_active 设·resolve Phase 2.7 执行后清）
+var _active_target: Array[int] = [-1, -1]           # 主动技玩家指定目标槽（枭阳 h21 揪敌方哪个替补·-1=未指定→execute_active 随机选·resolve 末清）
 var pending_death_switch: Array[bool] = [false, false]  # 出战阵亡待玩家选替补上场
 var _death_processed: Array = [[], []]              # 每槽位死亡 hook 是否已触发（防重复）
 var _shuchao_procs: Array[int] = [0, 0]             # 本回合各方已计入的 combo proc 数（鼠潮 h13·仅计数·2026-07-01 去每回合封顶）
@@ -127,6 +128,7 @@ func setup(p1_heroes: Array, p2_heroes: Array, seed_value: int = 0) -> void:
 	selected_action = [-1, -1]
 	_switch_to = [-1, -1]
 	_forced_pull = [-1, -1]
+	_active_target = [-1, -1]
 	pending_death_switch = [false, false]
 	_shuchao_procs = [0, 0]
 	_double = [false, false]
@@ -216,6 +218,10 @@ func credit_kill(attacker_player: int, victim_player: int, victim_slot: int) -> 
 ## 技能组件用：请求在 victim_player 身上强制揪 slot 号替补上场——h21 枭阳【调虎离山】（resolve Phase 2.7 执行）。
 func request_forced_pull(victim_player: int, slot: int) -> void:
 	_forced_pull[victim_player] = slot
+
+## 技能组件用：读 player 本回合为主动技指定的目标槽（-1=未指定）。resolve 末统一清。
+func active_target(player: int) -> int:
+	return _active_target[player]
 
 ## UI 只读：取指定槽位的 HeroSkill（不暴露 _skills 私有容器）。
 func get_skill(player: int, slot: int) -> HeroSkill:
@@ -335,10 +341,12 @@ func can_use_active(player: int) -> bool:
 	return sk.can_use_active(self, player, slot)
 
 
-func select_active(player: int) -> bool:
+## 选择主动技（target = 玩家指定的目标槽，-1=未指定→由技能自行默认，如枭阳随机揪）。
+func select_active(player: int, target: int = -1) -> bool:
 	if not can_use_active(player):
 		return false
 	selected_action[player] = ActionDef.ACTIVE
+	_active_target[player] = target
 	return true
 
 
@@ -375,16 +383,17 @@ func both_ready() -> bool:
 
 # === 广寒 h16【疾风】：附加同种动作（resolve 内按 _double 处理）===
 
-## player 队是否有"疾风"型存活英雄（含替补）且其每局 cap 未满 → 返回该英雄槽，否则 -1。
+## player 队【出战】英雄是否为"疾风"型（存活）且每局 cap 未满 → 返回其槽(=active_index)，否则 -1。
+## （2026-07-02 Eddy：由团队级在场收缩为出战限定——暗兔须亲自出战才能双动作，不再躲替补席给队友加倍。）
 func _double_grantor(player: int) -> int:
-	for s in range(heroes[player].size()):
-		if hp[player][s] <= 0:
-			continue
-		var sk: HeroSkill = _skills[player][s]
-		if sk != null:
-			var cap: int = sk.double_action_cap()
-			if cap > 0 and int(get_status(player, s, "jifeng_uses", 0)) < cap:
-				return s
+	var s: int = active_index[player]
+	if hp[player][s] <= 0:
+		return -1
+	var sk: HeroSkill = _skills[player][s]
+	if sk != null:
+		var cap: int = sk.double_action_cap()
+		if cap > 0 and int(get_status(player, s, "jifeng_uses", 0)) < cap:
+			return s
 	return -1
 
 
@@ -408,16 +417,15 @@ func has_double(player: int) -> bool:
 	return _double_grantor(player) >= 0
 
 
-## 本队"附加"剩余可用次数（UI 标签；= 疾风剩余；无返 0）。
+## 本队"附加"剩余可用次数（UI 标签；= 出战疾风剩余；无返 0）。
 func double_uses_left(player: int) -> int:
-	var best := 0
-	for s in range(heroes[player].size()):
-		if hp[player][s] <= 0:
-			continue
-		var sk: HeroSkill = _skills[player][s]
-		if sk != null and sk.double_action_cap() > 0:
-			best = maxi(best, sk.double_action_cap() - int(get_status(player, s, "jifeng_uses", 0)))
-	return best
+	var s: int = active_index[player]
+	if hp[player][s] <= 0:
+		return 0
+	var sk: HeroSkill = _skills[player][s]
+	if sk != null and sk.double_action_cap() > 0:
+		return sk.double_action_cap() - int(get_status(player, s, "jifeng_uses", 0))
+	return 0
 
 
 ## 切换"附加动作"开关（须先选好可双的主动作）。on=true 时校验 can_double。
@@ -760,6 +768,7 @@ func clone() -> BattleCore:
 	c._double = _double.duplicate()
 	c._switch_to = _switch_to.duplicate()
 	c._forced_pull = _forced_pull.duplicate()
+	c._active_target = _active_target.duplicate()
 	c.pending_death_switch = pending_death_switch.duplicate()
 	c._death_processed = _death_processed.duplicate(true)
 	c._shuchao_procs = _shuchao_procs.duplicate()
@@ -806,7 +815,7 @@ func legal_actions(player: int) -> Array:
 func apply_choice(player: int, choice: Dictionary) -> bool:
 	var a: int = int(choice["action"])
 	if a == ActionDef.ACTIVE:
-		return select_active(player)
+		return select_active(player, int(choice.get("target", -1)))
 	if a == ActionDef.Action.SWITCH:
 		return select_switch(player, int(choice["target"]))
 	var ok: bool = select_action(player, a)
@@ -1015,18 +1024,18 @@ func resolve() -> Dictionary:
 			if sk != null:
 				sk.on_resolve_end(self, p, s)
 
-	# Phase 5.6: 牧养（光版鬼金 h08）——在场有鬼金(含替补·存活) → 你方存活【替补席】英雄每回合回 reserve_heal 半点。
-	#   退下火线休养、出战英雄不回；走 _heal（尊重妖火禁回血、封顶 max_hp）。
+	# Phase 5.6: 牧养（光版鬼金 h08）——鬼金【出战】(存活) → 你方存活【替补席】英雄每回合回 reserve_heal 半点。
+	#   鬼金站前线牧养、出战英雄(含鬼金自己)不回；走 _heal（尊重妖火禁回血、封顶 max_hp）。
+	#   （2026-07-02 Eddy：由在场收缩为出战限定——鬼金须亲自出战才牧养，不再躲替补席续航。）
 	for p in [0, 1]:
+		var act: int = active_index[p]
+		var msk: HeroSkill = _skills[p][act]
 		var rheal := 0
-		for s in range(heroes[p].size()):
-			if hp[p][s] > 0:
-				var msk: HeroSkill = _skills[p][s]
-				if msk != null:
-					rheal = maxi(rheal, msk.reserve_heal_per_turn())
+		if hp[p][act] > 0 and msk != null:
+			rheal = msk.reserve_heal_per_turn()
 		if rheal > 0:
 			for s in range(hp[p].size()):
-				if s != active_index[p] and hp[p][s] > 0:
+				if s != act and hp[p][s] > 0:
 					var got: int = _heal(p, s, rheal)
 					if got > 0:
 						events.append({id = "muyang_heal", player = p, slot = s, amount = got})
@@ -1059,6 +1068,7 @@ func resolve() -> Dictionary:
 	}
 	selected_action = [-1, -1]
 	_switch_to = [-1, -1]
+	_active_target = [-1, -1]
 	_double = [false, false]
 	item_uses = [[], []]
 	return result

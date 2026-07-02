@@ -6,12 +6,12 @@ extends GutTest
 ## h13【鼠潮】= 能量：在场(含替补)时，我方每触发一次 combo 效果 → 团队 +0.5 能（无封顶·2026-07-01 去刹车）。
 ## h14【卸力反震】= 防御：防/大防挡下 → 反弹所挡 50% 真伤给攻击者（机制迁自磐牛·on_block 触发）。
 ## h15【血勇】= 进攻：出战时无法用防/大防（can_afford gate·下场即解）+ 波穿防（attack_penetration）。
-## h16【疾风】= 节奏：在场(含替补)时，己方每局 2 次可把同一动作再做一次（波/大波/攒·技能/切换/防除外）。
+## h16【疾风】= 节奏：出战时，己方每局 2 次可把同一动作再做一次（波/大波/攒·技能/切换/防除外·2026-07-02 由在场收缩为出战）。
 ## h17【镇压】= 干扰·主动技：占动作+费2能+每局2次，沉默对手出战英雄 unique 2 回合（下回合起算）。
 ## h18【缠绕】= 状态：出战时，对手无法主动切换（含星日免费切换）；死亡换人不受影响。
 ## h19【践踏】= 进攻：攻击命中时，这一击超过 1.0HP 的溢出部分碾到敌方随机替补（无封顶）。
 ## h20【罪已昭】= 状态·被动：命中敌方出战附「易伤印」(vuln)，被印英雄受伤 +0.5，直到换下场（换下清）。
-## h21【调虎离山】= 干扰·主动技：占动作+费2能+每局2次+须出战，强制对手换人、揪其存活替补中血量最低者上场。
+## h21【调虎离山】= 干扰·主动技：占动作+费2能+每局2次+须出战，强制对手换人、揪其指定（未指定→随机）存活替补上场。
 ## h23【护主】= 防御：替补席存活时，我方英雄受致命伤害 → 天狗顶替登场承受这一击、原 carry 退替补获救（每局一次·天狗可能吃死）。
 ## h24【饕餮】= 能量：在场(含替补)时，战场任一英雄阵亡(敌我皆可) → 你方团队 +2.0 能（4 半能）。
 ##
@@ -221,16 +221,12 @@ func test_h16_jifeng_apply_choice_double() -> void:
 	assert_eq(int(b.get_status(0, 0, "jifeng_uses", 0)), 1, "消耗 1 次疾风")
 
 
-func test_h16_jifeng_works_from_reserve() -> void:
-	# 暗兔在替补、出战是 plain → 仍可附加（在场含替补·cap 计在暗兔身上）
+func test_h16_jifeng_inactive_from_reserve() -> void:
+	# 暗兔在替补、出战是 plain → 不可附加（2026-07-02 出战限定·不再躲替补给队友加倍）
 	var b := _battle_team(["test_p0_0", "h16", "test_p0_2"], 4, 8)
 	b.select_action(0, ActionDef.Action.ATTACK)
-	assert_true(b.can_double(0), "暗兔在替补 → 出战队友仍可附加")
-	b.select_double(0, true)
-	b.select_action(1, ActionDef.Action.CHARGE)
-	b.resolve()
-	assert_eq(b.hp[1][0], 10 - 4, "双波 4 半点")
-	assert_eq(int(b.get_status(0, 1, "jifeng_uses", 0)), 1, "cap 计在暗兔(替补 slot1)")
+	assert_false(b.can_double(0), "暗兔在替补 → 出战队友不可附加（出战限定）")
+	assert_false(b.has_double(0), "无出战暗兔 → 无双动作")
 
 
 # ---- h17 烛阴【镇压】(主动技·沉默对手出战 unique 2 回合·2026-06-24 重设计) ----
@@ -417,19 +413,40 @@ func test_h20_zuiyizhao_cleared_on_switch_out() -> void:
 	assert_eq(int(b.get_status(1, 0, "vuln", 0)), 0, "换下场 → 易伤印清除")
 
 
-# ---- h21 枭阳 调虎离山（主动技·强制对手换人·揪存活替补血量最低者）----
+# ---- h21 枭阳 调虎离山（主动技·强制对手换人·揪玩家指定/未指定随机的存活替补·2026-07-02 由"血最低默认"改）----
 
-func test_h21_diaohu_pulls_lowest_hp_reserve() -> void:
-	# 暗猴(P0 出战) vs P1 出战 + 2 替补(slot1 残血=揪目标 / slot2 高血)。猴调虎离山 → P1 被强制揪上 slot1。
+func test_h21_diaohu_pulls_specified_target() -> void:
+	# 玩家指定揪敌方 slot2（非血最低）→ 被强制揪上 slot2（验证"指定"生效·非旧"血最低"默认）。
 	var b := _battle_vs(["h21", "test_p0_1", "test_p0_2"], ["test_p1_0", "test_p1_1", "test_p1_2"], 5, 8)
-	b.hp[1][1] = 2   # P1 slot1 残血（脆皮 carry）
-	b.hp[1][2] = 8   # P1 slot2 高血
-	assert_true(b.select_active(0), "暗猴可调虎离山（敌有存活替补）")
+	b.hp[1][1] = 2   # slot1 残血（旧默认会揪这个）
+	b.hp[1][2] = 8   # slot2 高血（玩家偏要揪这个）
+	assert_true(b.select_active(0, 2), "暗猴指定揪敌方 slot2")
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(b.active_index[1], 1, "对手被强制揪上血量最低的替补（slot1）")
+	assert_eq(b.active_index[1], 2, "对手被强制揪上玩家指定的 slot2（非血最低）")
 	assert_eq(b.energy[0], 8 - 4, "调虎离山费 2 能（4 半能）")
 	assert_eq(int(b.get_status(0, 0, "active_uses", 0)), 1, "计 1 次使用")
+
+
+func test_h21_diaohu_dead_target_voided() -> void:
+	# 玩家指定的目标 slot2 已阵亡 → 揪人作废（不改揪存活的 slot1）；仍算发动（扣能计次）。
+	var b := _battle_vs(["h21", "test_p0_1", "test_p0_2"], ["test_p1_0", "test_p1_1", "test_p1_2"], 5, 8)
+	b.hp[1][2] = 0   # slot2 已死（玩家仍指定它）；slot1 存活（"改揪别人"才会揪它）
+	assert_true(b.select_active(0, 2), "可发动（敌尚有存活替补 slot1）")
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(b.active_index[1], 0, "指定目标已死 → 揪人作废，对手出战仍是 slot0")
+	assert_eq(int(b.get_status(0, 0, "active_uses", 0)), 1, "仍计 1 次使用（主动技已发动）")
+
+
+func test_h21_diaohu_unspecified_pulls_random_reserve() -> void:
+	# 未指定目标（select_active 不带 target）→ 随机揪一个存活替补（seed 固定 → 确定性）。
+	var b := _battle_vs(["h21", "test_p0_1", "test_p0_2"], ["test_p1_0", "test_p1_1", "test_p1_2"], 5, 8)
+	assert_true(b.select_active(0), "未指定目标也可发动")
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_true(b.active_index[1] in [1, 2], "未指定 → 随机揪上一个存活替补（slot1 或 slot2）")
+	assert_ne(b.active_index[1], 0, "对手出战已被换走（不再是 slot0）")
 
 
 func test_h21_diaohu_requires_enemy_reserve() -> void:
