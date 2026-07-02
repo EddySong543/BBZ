@@ -45,7 +45,6 @@ var _switch_to: Array[int] = [-1, -1]               # SWITCH 动作的目标槽�
 var _forced_pull: Array[int] = [-1, -1]             # 枭阳 h21【调虎离山】：_forced_pull[受害方]=被强制揪上场的替补槽（execute_active 设·resolve Phase 2.7 执行后清）
 var pending_death_switch: Array[bool] = [false, false]  # 出战阵亡待玩家选替补上场
 var _death_processed: Array = [[], []]              # 每槽位死亡 hook 是否已触发（防重复）
-var _dmg_dealt: Array[int] = [0, 0]                 # 本回合各方造成的实际伤害(半点)·通用记账
 var _shuchao_procs: Array[int] = [0, 0]             # 本回合各方已计入的 combo proc 数（鼠潮 h13·仅计数·2026-07-01 去每回合封顶）
 var _double: Array[bool] = [false, false]           # 本回合各方是否"附加同种动作再做一次"（疾风 h16·选择阶段设·resolve 末重置）
 var _killer: Array = [[], []]                       # _killer[player][slot]=直接攻击致死该英雄的攻击方;-1=非攻击致死。on_kill 只对直接攻击触发(防 splash/AOE 连锁)
@@ -129,7 +128,6 @@ func setup(p1_heroes: Array, p2_heroes: Array, seed_value: int = 0) -> void:
 	_switch_to = [-1, -1]
 	_forced_pull = [-1, -1]
 	pending_death_switch = [false, false]
-	_dmg_dealt = [0, 0]
 	_shuchao_procs = [0, 0]
 	_double = [false, false]
 	_last_action = [-1, -1]
@@ -764,7 +762,6 @@ func clone() -> BattleCore:
 	c._forced_pull = _forced_pull.duplicate()
 	c.pending_death_switch = pending_death_switch.duplicate()
 	c._death_processed = _death_processed.duplicate(true)
-	c._dmg_dealt = _dmg_dealt.duplicate()
 	c._shuchao_procs = _shuchao_procs.duplicate()
 	c._last_action = _last_action.duplicate()
 	c._killer = _killer.duplicate(true)
@@ -851,7 +848,6 @@ func resolve() -> Dictionary:
 			selected_action[p] = ActionDef.Action.CHARGE
 
 	var a: Array[int] = [selected_action[0], selected_action[1]]
-	_dmg_dealt = [0, 0]
 	_shuchao_procs = [0, 0]
 	for p in [0, 1]:
 		for s in range(_killer[p].size()):
@@ -1170,7 +1166,6 @@ func _splash_to_reserve(victim_player: int, dmg: int) -> void:
 	if d <= 0:
 		return
 	hp[victim_player][target] -= d
-	_dmg_dealt[1 - victim_player] += d
 	var sk: HeroSkill = _skills[victim_player][target]
 	if sk != null:
 		sk.on_self_damaged(self, victim_player, target, d, 1 - victim_player)
@@ -1322,7 +1317,6 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 	var dealt: int = 0
 	if dmg > 0:
 		hp[target_player][slot] -= dmg
-		_dmg_dealt[attacker_player] += dmg
 		dealt = dmg
 		events.append({id = "damage_taken", player = target_player, amount = dmg})
 		var dsk2: HeroSkill = _skills[target_player][slot]

@@ -25,6 +25,8 @@ const MATCH_SUB := "1v1 同时盲选对决"
 
 var _match_state: int = MatchState.IDLE
 var _search_elapsed: float = 0.0
+var _last_dots: int = -1     # 匹配中标题省略号点数（变化才拼串 + 赋值·避免每帧 setter 触发重排）
+var _last_secs: int = -1     # 匹配中副标计时秒数（同上）
 var _cancel_btn: Button   # 匹配中才出现的「✕ 取消匹配」（_setup_modes 建·常态隐藏）
 
 ## 小件像素底板（设置/段位徽章用）。
@@ -359,6 +361,8 @@ func _unhandled_input(event: InputEvent) -> void:
 func _start_search() -> void:
 	_match_state = MatchState.SEARCHING
 	_search_elapsed = 0.0
+	_last_dots = -1
+	_last_secs = -1
 	_set_side_cards_enabled(false)
 	_match_card.set_battle_ready(true)
 	_match_card.card_title = "匹配中"
@@ -381,9 +385,13 @@ func _process(delta: float) -> void:
 		return
 	_search_elapsed += delta
 	var dots := int(_search_elapsed * 2.0) % 4
-	_match_card.card_title = "匹配中" + ".".repeat(dots)
+	if dots != _last_dots:
+		_last_dots = dots
+		_match_card.card_title = "匹配中" + ".".repeat(dots)
 	var secs := int(_search_elapsed)
-	_match_card.card_subtitle = "%d:%02d" % [floori(secs / 60.0), secs % 60]
+	if secs != _last_secs:
+		_last_secs = secs
+		_match_card.card_subtitle = "%d:%02d" % [floori(secs / 60.0), secs % 60]
 	if _search_elapsed >= mock_match_seconds:
 		_on_match_found()
 

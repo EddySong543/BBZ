@@ -15,6 +15,7 @@ extends Node2D
 
 var _t: float = 0.0
 var _playing: bool = false
+var _pts: PackedVector2Array = PackedVector2Array()   # 复用弧线顶点缓冲（避免每帧 _draw 分配）
 
 
 func play() -> void:
@@ -44,13 +45,13 @@ func _draw() -> void:
 	var steps: int = 24
 	var r_out: float = radius + thickness * 0.5
 	var r_in: float = radius - thickness * 0.5
-	var pts: PackedVector2Array = PackedVector2Array()
+	_pts.clear()
 	for i in range(steps + 1):
 		var a: float = lerpf(a0, a1, float(i) / float(steps))
-		pts.append(Vector2(cos(a), sin(a)) * r_out)
+		_pts.append(Vector2(cos(a), sin(a)) * r_out)
 	for i in range(steps + 1):
 		var a: float = lerpf(a1, a0, float(i) / float(steps))
-		pts.append(Vector2(cos(a), sin(a)) * r_in)
+		_pts.append(Vector2(cos(a), sin(a)) * r_in)
 	var c: Color = color
 	c.a *= fade
-	draw_colored_polygon(pts, c)
+	draw_colored_polygon(_pts, c)

@@ -72,6 +72,7 @@ extends Control
 var _hovering: bool = false
 var _selected_play: bool = false   # 选中该动作按钮后常播 idle（任务7），运行时切换
 var _last_disabled: bool = false   # 上帧父按钮 disabled，变化即重绘（修按钮不自动亮）
+var _parent_btn: BaseButton = null # 缓存父按钮（生命周期内不重挂）——避免每帧 get_parent 轮询
 var _time: float = 0.0
 var _frame: int = 0
 
@@ -82,7 +83,8 @@ func _ready() -> void:
 	_frame = rest_frame
 	var par := get_parent()
 	if par is BaseButton:
-		_last_disabled = (par as BaseButton).disabled
+		_parent_btn = par as BaseButton
+		_last_disabled = _parent_btn.disabled
 		if not par.mouse_entered.is_connected(_on_parent_enter):
 			par.mouse_entered.connect(_on_parent_enter)
 		if not par.mouse_exited.is_connected(_on_parent_exit):
@@ -138,9 +140,8 @@ func set_selected_play(on: bool) -> void:
 func _process(delta: float) -> void:
 	# 父按钮 disabled 变化 → 立即重绘，使图标亮/暗实时跟随「能不能用」
 	# （修复：攒够能量按钮不自动亮 / 不悬停时持续半透明）。
-	var par := get_parent()
-	if par is BaseButton:
-		var dis: bool = (par as BaseButton).disabled
+	if _parent_btn != null:
+		var dis: bool = _parent_btn.disabled
 		if dis != _last_disabled:
 			_last_disabled = dis
 			queue_redraw()
@@ -194,7 +195,6 @@ func _draw() -> void:
 	var dst := Rect2(size * 0.5 - Vector2(side, side) * 0.5, Vector2(side, side))
 
 	var mod := Color.WHITE
-	var par := get_parent()
-	if par is BaseButton and par.disabled:
+	if _parent_btn != null and _parent_btn.disabled:
 		mod.a = disabled_alpha
 	draw_texture_rect_region(sheet, dst, src, mod)
