@@ -167,3 +167,40 @@ func test_all_relics_run_many_turns() -> void:
 			b.select_action(1, A.DEFEND)
 			b.resolve()
 		assert_true(true, "%s 跑 5 回合不崩" % id)
+
+
+# === 夜明珠：切换登场 → 敌方出战被冲撞（A4 搬入 relic_on_switch_in 后的回归锁定）===
+
+func test_relic_yemingzhu_switch_in_charges_enemy() -> void:
+	# 持夜明珠 + P0 切换登场 → 敌方出战被登场冲撞 0.5（1 半点·真伤）。
+	var b := _battle()
+	b.use_item(0, _give(b, 0, "t3_yemingzhu"))
+	b.select_switch(0, 1)
+	b.select_action(1, A.CHARGE)
+	b.resolve()
+	assert_eq(b.hp[1][0], 19, "夜明珠登场冲撞：敌方出战 20→19（-0.5）")
+	# 对照：无夜明珠切换不冲撞
+	var base := _battle()
+	base.select_switch(0, 1)
+	base.select_action(1, A.CHARGE)
+	base.resolve()
+	assert_eq(base.hp[1][0], 20, "无夜明珠 → 切换不冲撞")
+
+
+# === 鹤顶红：毒爆额外 +1.0（A4 搬入 relic_poison_detonate_bonus 后的回归锁定）===
+
+func test_relic_hedinghong_amplifies_poison_detonate() -> void:
+	# 持鹤顶红 + 敌出战带 1 层毒 → P0 波命中引爆：波2 + 毒爆1 + 鹤顶红2 = 5 半点。
+	var b := _battle()
+	b.use_item(0, _give(b, 0, "t3_hedinghong"))
+	b.set_status(1, 0, "poison", 1)
+	_aa(b, A.ATTACK, A.CHARGE)
+	assert_eq(b.hp[1][0], 15, "鹤顶红：波2 + 毒爆1 + 鹤顶红2 = 5 半点（20→15）")
+	# 对照：无鹤顶红 → 波2 + 毒爆1 = 3 半点
+	var base := _battle()
+	base.set_status(1, 0, "poison", 1)
+	base.select_action(0, A.ATTACK)
+	base.select_action(1, A.CHARGE)
+	base.resolve()
+	assert_eq(base.hp[1][0], 17, "无鹤顶红：波2 + 毒爆1 = 3 半点（20→17）")
+	assert_eq(base.hp[1][0] - b.hp[1][0], 2, "鹤顶红使毒爆多扣 2 半点（+1.0）")

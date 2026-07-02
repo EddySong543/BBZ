@@ -509,12 +509,6 @@ func add_item_rider(player: int, data: ItemData) -> void:
 	_imod[player]["riders"] = r
 
 
-## 某玩家是否持有指定 id 的遗物（鹤顶红毒爆放大 / 夜明珠登场冲撞读此判定）。
-func _has_relic(player: int, item_id: String) -> bool:
-	for rl in relics[player]:
-		if rl["data"].item_id == item_id:
-			return true
-	return false
 
 
 # ===== 道具经济（ADR-003 §2·M1·2026-06-19）=====
@@ -533,10 +527,7 @@ const UPGRADE_COST_T1 := 2             # 升级 1→2 花 1 能（= 2 半能·AD
 const UPGRADE_COST_T2 := 4             # 升级 2→3 花 2 能（= 4 半能·ADR D5）
 const UPGRADE_FAVORED_WEIGHT := 5.0    # 升级 3 选 1 里「预设升级款」(upgrade_to) 的相对权重（>1 → 更易出现·B2）
 # 遗物效果数值（半点·从裸魔数提出集中可调）
-const YEMINGZHU_ATK_BONUS := 1         # 夜明珠：切换登场当回合攻击 +0.5 HP
-const YEMINGZHU_CHARGE_DMG := 1        # 夜明珠：登场冲撞给敌方出战 0.5 HP 真伤
-const HEDINGHONG_DETONATE_BONUS := 2   # 鹤顶红：毒爆额外 +1.0 HP
-const WEIHOUZHEN_STING_DMG := 1        # 尾后针：出战阵亡反击敌方出战 0.5 HP 真伤
+const WEIHOUZHEN_STING_DMG := 1        # 尾后针：出战阵亡反击敌方出战 0.5 HP 真伤（通用 death_reflect 状态机制·见 _resolve_deaths）
 const STARTER_ITEM_IDS := ["t1_feibiao", "t1_jiudun", "t1_lzhi_shengming"]  # 开局带 1 随机池
 ## 开局带件按设计同样走「部署延迟」：turn_number 2（= 显示回合 3）才可用，**非首回合**
 ## （design build-design-framework.md §2 部署时序表：开格①t1→抽①t2→①可用t3）。
@@ -1102,13 +1093,9 @@ func _perform_switch(player: int, from_slot: int, to_slot: int, events: Array) -
 	if entering != null:
 		entering.on_switch_in(self, player, to_slot)
 
-	# 夜明珠遗物：你切换登场 → 本回合攻击 +0.5（_imod）+ 登场冲撞 0.5 给敌方出战（直接真伤·简化版）。
-	if _has_relic(player, "t3_yemingzhu"):
-		add_item_mod(player, "atk_bonus", YEMINGZHU_ATK_BONUS)
-		var oa: int = active_index[opp]
-		if hp[opp][oa] > 0:
-			hp[opp][oa] -= YEMINGZHU_CHARGE_DMG
-			events.append({id = "yemingzhu_charge", player = player})
+	# 遗物·登场 hook：本方遗物在此响应"切换登场"（夜明珠 = 登场者攻击加成 + 登场冲撞）。A4：由 core 硬编码搬入遗物 effect。
+	for relic in relics[player]:
+		relic["data"].effect.relic_on_switch_in(self, player, to_slot, relic["data"], relic["state"], events)
 
 
 ## h07 当先：免费切换（不占动作槽；星日 free_switch_cap 默认 -1 = 不限次）。在【选择阶段】调用：
@@ -1225,12 +1212,6 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		set_status(target_player, slot, "broken_armor", broken - 1)
 		eff_def = ActionDef.Action.DEFEND if def_action == ActionDef.Action.BIG_DEFEND else -1
 		events.append({id = "armor_broken", player = target_player})
-	# 魔笛：施加的"防御失效"——对手下一次防/大防完全失效（消耗一次）
-	var dnull: int = int(get_status(target_player, slot, "defend_null", 0))
-	if dnull > 0 and def_action in ActionDef.DEFEND_ACTIONS:
-		set_status(target_player, slot, "defend_null", dnull - 1)
-		eff_def = -1
-		events.append({id = "defend_nullified", player = target_player})
 	# 噬心钉：持有者无法防御（其防/大防完全失效）
 	if int(item_mod(target_player, "self_no_defend", 0)) > 0 and def_action in ActionDef.DEFEND_ACTIONS:
 		eff_def = -1
@@ -1267,8 +1248,9 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 	var poison: int = int(get_status(target_player, slot, "poison", 0))
 	if poison > 0:
 		dmg += poison
-		if _has_relic(attacker_player, "t3_hedinghong"):
-			dmg += HEDINGHONG_DETONATE_BONUS   # 鹤顶红遗物：引爆毒额外 +1.0（2 半点）
+		# 遗物·毒爆 hook：本方遗物在此追加毒爆伤害（鹤顶红 = +1.0）。A4：由 core 硬编码搬入遗物 effect。
+		for relic in relics[attacker_player]:
+			dmg += relic["data"].effect.relic_poison_detonate_bonus(self, attacker_player, relic["data"], relic["state"])
 		statuses[target_player][slot].erase("poison")
 		events.append({id = "poison_detonate", player = target_player, layers = poison})
 		note_combo_proc(attacker_player)   # 鼠潮：毒爆 = 一次 combo proc
@@ -1318,7 +1300,8 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 			_perform_switch(target_player, slot, guard, events)
 			slot = active_index[target_player]   # 出战改为天狗·本次伤害改落天狗身上
 
-	# 还魂丹：出战将死且持有"还魂"（本局一次）→ 保留 0.5 HP（1 半点）
+	# 濒死保命（通用 huanhun_ready 状态机制·非道具专属硬编码）：出战将死且带该标记 → 保留 0.5 HP（1 半点）·随后清标记。
+	# 当前仅还魂丹 t2_huanhundan 设此标记（apply_pre）。
 	if dmg > 0 and dmg >= hp[target_player][slot] and slot == active_index[target_player] and int(get_status(target_player, slot, "huanhun_ready", 0)) > 0:
 		set_status(target_player, slot, "huanhun_ready", 0)
 		dmg = maxi(0, hp[target_player][slot] - 1)
@@ -1405,7 +1388,8 @@ func _resolve_deaths(_a: Array[int], events: Array) -> void:
 					if feast > 0:
 						_gain_energy(pp, feast)
 						events.append({id = "taotie_feast", player = pp, amount = feast})
-				# 尾后针：你出战阵亡 → 对敌方出战 0.5 真伤（无视防御/护甲），随后消耗标记。
+				# 死亡反击（通用 death_reflect 状态机制·非道具专属硬编码）：出战阵亡且带该标记 →
+				# 对敌方出战真伤（无视防御/护甲）·随后清标记。当前仅尾后针 t1_weihouzhen 设此标记（apply_pre）。
 				if slot == active_index[p] and int(item_buffs[p].get("death_reflect", 0)) > 0:
 					item_buffs[p].erase("death_reflect")
 					var ea: int = active_index[1 - p]

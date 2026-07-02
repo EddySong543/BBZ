@@ -48,3 +48,15 @@ func relic_pre(_battle: BattleCore, _player: int, _data: ItemData, _state: Dicti
 ## 返回 false = 遗物耗尽（碎 / 到期）→ BattleCore 将其移除。默认永久持有（返回 true）。
 func relic_end(_battle: BattleCore, _player: int, _data: ItemData, _state: Dictionary) -> bool:
 	return true
+
+
+## 【遗物·登场】持有本遗物的一方【切换登场】时触发（夜明珠 = 登场者攻击加成 + 登场冲撞）。
+## slot = 登场英雄槽；events 供追加可视事件（如冲撞）。BattleCore._perform_switch 遍历本方遗物调。默认 no-op。
+func relic_on_switch_in(_battle: BattleCore, _player: int, _slot: int, _data: ItemData, _state: Dictionary, _events: Array) -> void:
+	pass
+
+
+## 【遗物·毒爆】持有本遗物的一方【引爆毒】时，返回额外伤害（半点·鹤顶红 = +2）。
+## BattleCore 毒引爆处遍历本方遗物累加。默认 0。
+func relic_poison_detonate_bonus(_battle: BattleCore, _player: int, _data: ItemData, _state: Dictionary) -> int:
+	return 0
