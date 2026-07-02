@@ -37,6 +37,7 @@ const DEFAULT_P1 := ["h02", "h09", "h12"]   # 丑牛 / 申猴 / 亥猪（首发 
 ## 左侧调试测试按钮（满能量/满血/造伤/加盾）。发布或联机前设 false（或删整块）。
 ## 仅本地调试：直接改 BattleCore 状态后刷新，不走战斗结算管线。
 const DEBUG_BUTTONS := true
+const BattleDebugPanel := preload("res://src/ui/debug/battle_debug_panel.gd")   # debug 面板（preload 引用·不靠全局 class_name 注册·headless / CLI 可用）
 
 ## 各动画相位等待（秒），可在 Inspector 调。
 @export var anim_phase_duration: float = 1.0
@@ -1152,119 +1153,29 @@ func _fmt_hp(v: float) -> String:
 # 调试测试按钮（左侧）—— DEBUG_BUTTONS 开关
 # ============================================================
 
-## 左侧竖排测试按钮：满能量 / 满血 / 敌我造伤 / 加盾。直接改 battle 状态 → _update_all() 刷新。
-## ⚠ 不走正常结算管线：debug 致死不会触发强制换人浮窗（要测死亡流程请打真实战斗）。
+## 左侧竖排测试按钮拆入独立组件 BattleDebugPanel（src/ui/debug/·全项目唯一改写引擎状态处·防作弊隔离）。
+## battle_screen 只负责创建 + 接其信号（刷新 / 打击 juice），本身不再直写 battle 状态（见 test 里的 grep 断言）。
 func _build_debug_buttons() -> void:
 	if not DEBUG_BUTTONS:
 		return
-	var vb := VBoxContainer.new()
-	vb.name = "DebugButtons"
-	vb.position = Vector2(12.0, 300.0)
-	vb.add_theme_constant_override("separation", 6)
-	add_child(vb)
-
-	var defs: Array = [
-		["满能量", _dbg_full_energy],
-		["满血", _dbg_full_hp],
-		["敌 -10", _dbg_damage_enemy],
-		["我 -10", _dbg_damage_self],
-		["敌 +盾2", _dbg_shield_enemy],
-		["我 下个英雄", _dbg_next_hero_self],
-		["敌 下个英雄", _dbg_next_hero_enemy],
-	]
-	for d in defs:
-		var b := Button.new()
-		b.text = d[0] as String
-		b.custom_minimum_size = Vector2(92.0, 30.0)
-		b.focus_mode = Control.FOCUS_NONE
-		b.modulate = Color(1, 1, 1, 0.82)
-		FontManager.apply_btn(b, 14)
-		b.pressed.connect(d[1] as Callable)
-		vb.add_child(b)
+	var panel := BattleDebugPanel.new()
+	panel.name = "DebugButtons"
+	add_child(panel)
+	panel.setup(battle)
+	panel.state_changed.connect(_on_debug_state_changed)
+	panel.hit_fx.connect(_on_debug_hit_fx)
 
 
-func _dbg_full_energy() -> void:
-	battle.energy[PLAYER] = ActionDef.MAX_ENERGY
-	battle.energy[AI] = ActionDef.MAX_ENERGY
-	_update_all()
-
-
-func _dbg_full_hp() -> void:
-	for p in [0, 1]:
-		for s in range(battle.hp[p].size()):
-			battle.hp[p][s] = battle.max_hp[p][s]
-			battle.shield[p][s] = 0
-	_update_all()
-
-
-func _dbg_damage_enemy() -> void:
-	_dbg_damage_active(AI, 10)
-
-
-func _dbg_damage_self() -> void:
-	_dbg_damage_active(PLAYER, 10)
-
-
-## 给 player 的出战英雄扣 amount HP（debug，不走结算/不触发死亡换人）。
-## 一并触发命中 juice（飘字+斩击+白闪+心条 flinch+震屏）→ 方便 F6 测试质感。
-func _dbg_damage_active(player: int, amount: int) -> void:
-	var s: int = battle.active_index[player]
-	battle.hp[player][s] = maxi(battle.hp[player][s] - amount * BattleCore.HP_UNIT, 0)
-	_update_all()                              # 含心条 flinch（HP 变化检测）
-	_impact(player, amount * BattleCore.HP_UNIT)   # 飘字 + 斩击 + 白闪
-	stage.shake(SHAKE_HIT)
-
-
-func _dbg_shield_enemy() -> void:
-	var s: int = battle.active_index[AI]
-	battle.shield[AI][s] += 2 * BattleCore.HP_UNIT
-	_update_all()
-
-
-func _dbg_next_hero_self() -> void:
-	_dbg_next_hero(PLAYER)
-
-
-func _dbg_next_hero_enemy() -> void:
-	_dbg_next_hero(AI)
-
-
-## 美术资产巡检池：全英雄池中有 idle 动画资产的（不限本局阵容）。首次点击时构建。
-var _dbg_art_pool: Array[HeroData] = []
-
-
-## 把 player 的出战英雄换成英雄池里的下一个（h01→h02→...→h12→h01，跳过无美术的）。
-## 仅替换 HeroData + 重置该槽位 HP/护盾为新英雄满血 → 立绘/头像/名字/技能卡/爱心数全套联动刷新。
-## ⚠ 纯美术巡检用：不走结算管线，被动/技能状态不迁移。
-func _dbg_next_hero(player: int) -> void:
-	if _dbg_art_pool.is_empty():
-		for h in HeroData.create_pool_heroes():
-			var has_art: bool = h.sprite_frames_path != "" and ResourceLoader.exists(h.sprite_frames_path)
-			if not has_art:
-				has_art = h.spritesheet_path != "" and ResourceLoader.exists(h.spritesheet_path)
-			if has_art:
-				_dbg_art_pool.append(h)
-		if _dbg_art_pool.is_empty():
-			push_warning("debug: 英雄池中没有任何带美术资产的英雄")
-			return
-
-	var slot: int = battle.active_index[player]
-	var cur_id: String = battle.heroes[player][slot].hero_id
-	var idx: int = -1
-	for i in range(_dbg_art_pool.size()):
-		if _dbg_art_pool[i].hero_id == cur_id:
-			idx = i
-			break
-	var next_hero: HeroData = _dbg_art_pool[(idx + 1) % _dbg_art_pool.size()]
-
-	battle.heroes[player][slot] = next_hero
-	battle.max_hp[player][slot] = int(next_hero.max_hp) * BattleCore.HP_UNIT
-	battle.hp[player][slot] = battle.max_hp[player][slot]
-	battle.shield[player][slot] = 0
-
+## debug 面板改了 battle 状态 → 刷新全套显示（含换英雄需刷技能卡·多刷无害）。
+func _on_debug_state_changed() -> void:
 	_update_all()
 	_refresh_skill_card()
-	print("debug: P%d 出战英雄 → %s (%s)" % [player + 1, next_hero.hero_id, next_hero.hero_name])
+
+
+## debug 造伤按钮 → 播打击表现（飘字 / 斩击 / 白闪 / 震屏）。
+func _on_debug_hit_fx(player: int, dmg_half: int) -> void:
+	_impact(player, dmg_half)
+	stage.shake(SHAKE_HIT)
 
 
 # ============================================================
