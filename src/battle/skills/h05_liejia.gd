@@ -6,4 +6,4 @@ extends HeroSkill
 
 func on_deal_hit(battle: BattleCore, player: int, _slot: int, target_player: int, target_slot: int, _dealt: int, _action: int) -> void:
 	battle.set_status(target_player, target_slot, "broken_armor", 1)
-	battle._note_combo_proc(player)   # 鼠潮：破甲附着 = 一次 combo proc
+	battle.note_combo_proc(player)   # 鼠潮：破甲附着 = 一次 combo proc

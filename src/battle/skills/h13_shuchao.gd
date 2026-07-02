@@ -4,7 +4,7 @@ extends HeroSkill
 ## 暗鼠在场（含替补·存活）时，我方【每触发一次 combo 效果】→ 团队能量 +0.5（无封顶·2026-07-01 去回路刹车）。
 ## 战场越乱、鼠群越肥：把"全队 combo 活动"翻译成"全队燃料"，再循环放大更多 combo。
 ##
-## 计入的 combo proc（引擎在各结算点调 BattleCore._note_combo_proc）：
+## 计入的 combo proc（引擎在各结算点调 BattleCore.note_combo_proc）：
 ##   毒爆(蛇) / 易伤 marked(猎物印记) / 破甲(龙) / 碎能(猴) / 剑意(鸡) / 反震(牛) / 冲撞(马) / 溢杀(暗牛)。
 ##   纯白板波（无任何附加效果的普通命中）不计 —— 奖励的是【combo 密度】，不是攻击次数。
 ##   尾火双段 = 自动喂两份（hc=2 让 on-hit 派发翻倍 → 破甲/碎能/剑意 各触发两次）。
@@ -21,7 +21,7 @@ extends HeroSkill
 ##   二元铁则无涉（不碰护甲 / 穿透）；纯被动 0 代价（被动优先·快节奏）。
 ##
 ## 【实现注记】鼠潮 = 团队级在场光环，必须监听【他人】的 combo（不限暗鼠是否出战），
-##   故不走单英雄 per-hit hook，而由 BattleCore._note_combo_proc 在各 combo 结算点统一收口、
+##   故不走单英雄 per-hit hook，而由 BattleCore.note_combo_proc 在各 combo 结算点统一收口、
 ##   扫队伍存活英雄的 combo_proc_energy() 求和（本组件唯一 override 的 hook）。
 
 const PROC_ENERGY := 1   # 每次 combo proc 返还 1 半能 = +0.5 能（2026-07-01 去每回合封顶·无 cap）

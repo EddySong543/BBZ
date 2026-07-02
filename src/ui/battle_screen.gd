@@ -366,7 +366,7 @@ func _refresh_skill_card() -> void:
 	var p: int = int(e[0])
 	var slot: int = int(e[1])
 	var h: HeroData = battle.heroes[p][slot]
-	var sk: HeroSkill = battle._skills[p][slot]
+	var sk: HeroSkill = battle.get_skill(p, slot)
 	var is_active: bool = sk != null and (sk.has_active() or sk.has_free_switch())
 	# 立绘一律朝右；阵营靠底色区分（己方冷蓝 / 对方暖红）。
 	skill_card.populate(h.hero_name, h.skill_description, h.skill_detail, is_active, h.portrait_path, p == PLAYER, h.skill_icon_path)
@@ -633,7 +633,7 @@ func _on_reserve_frame_input(event: InputEvent, frame_idx: int) -> void:
 func _is_switchable_reserve(frame_idx: int) -> bool:
 	if frame_idx < 1 or frame_idx >= p1_frames.size():
 		return false
-	if not battle._can_switch(PLAYER):
+	if not battle.can_switch(PLAYER):
 		return false   # 缠绕：对手出战是黑暗巳蛇 → 锁住主动切换
 	var slot: int = p1_frame_slots[frame_idx]
 	return slot >= 0 and slot != battle.active_index[PLAYER] and battle.hp[PLAYER][slot] > 0
@@ -749,7 +749,7 @@ func _layout_circles() -> void:
 
 ## 出战英雄是否有主动技（访问 _skills，下划线约定但可读）。
 func _player_has_active() -> bool:
-	var sk: HeroSkill = battle._skills[PLAYER][battle.active_index[PLAYER]]
+	var sk: HeroSkill = battle.get_skill(PLAYER, battle.active_index[PLAYER])
 	return sk != null and sk.has_active()
 
 
@@ -819,7 +819,7 @@ func _refresh_action_affordance() -> void:
 			var act: int = _btn_action(btn)
 			btn.disabled = not battle.can_afford(PLAYER, act)
 	# 技能键能量消耗随出战英雄主动技动态变化（0 不显示）。
-	_set_cost_pips(btn_special, battle._get_cost(PLAYER, ACTIVE))
+	_set_cost_pips(btn_special, battle.action_cost(PLAYER, ACTIVE))
 	btn_confirm.disabled = false
 	_refresh_jifeng()
 

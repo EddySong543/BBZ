@@ -5,7 +5,7 @@ extends HeroSkill
 ##   揪到台前 → 作废"出战保护"、使能你方整条进攻线（集火脆皮 carry / 触发光狗穷追 / 配暗蛇钳形）。
 ##
 ## 引擎实现（与打神鞭强制切换同语义·独立计揪）：
-##   execute_active 在对手身上设 BattleCore._forced_pull[敌方] = 揪目标槽；
+##   execute_active 在对手身上调 BattleCore.request_forced_pull(敌方, 揪目标槽)；
 ##   resolve Phase 2.7 在切换之后、伤害之前执行 _perform_switch(敌方, 出战→揪目标) →
 ##   被揪英雄成为对手出战(本回合攻击落它身上)、原出战下场触发我方 on_enemy_switch_out(穷追)。
 ##   目标默认 = 对手存活替补中血量最低者(脆皮 carry·并列取槽小=确定性)；玩家指定 UI 后续接入。
@@ -47,4 +47,4 @@ func execute_active(battle: BattleCore, player: int, _slot: int) -> void:
 			best_hp = battle.hp[e][s]
 			target = s
 	if target >= 0:
-		battle._forced_pull[e] = target
+		battle.request_forced_pull(e, target)

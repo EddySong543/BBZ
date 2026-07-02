@@ -12,4 +12,4 @@ func on_enemy_switch_out(enemy_slot: int, battle: BattleCore, player: int, _slot
 		return
 	battle.hp[opp][enemy_slot] -= ActionDef.HP_UNIT   # 1.0HP = 2 半点，真伤直接扣本体血
 	if battle.hp[opp][enemy_slot] <= 0:
-		battle._killer[opp][enemy_slot] = player
+		battle.credit_kill(player, opp, enemy_slot)

@@ -200,7 +200,7 @@ func _gain_energy(player: int, amount: int) -> void:
 ## 玄冥 h13【鼠潮】：player 队触发一次 combo 效果时，引擎在该结算点调本函数。
 ## 在场（含替补·存活）有鼠潮型英雄 → 团队能量 +其 combo_proc_energy()（走 _gain_energy·享囤鼠叠加）。
 ## 无鼠潮 = no-op。（2026-07-01 Eddy 去每回合封顶·combo→能量回路刹车移除；_shuchao_procs 仅留计数。）
-func _note_combo_proc(player: int) -> void:
+func note_combo_proc(player: int) -> void:
 	var amt := 0
 	for s in range(heroes[player].size()):
 		if hp[player][s] > 0:
@@ -211,6 +211,28 @@ func _note_combo_proc(player: int) -> void:
 		return
 	_shuchao_procs[player] += 1
 	_gain_energy(player, amt)
+
+
+## === 技能组件 / UI 的公共调用接口（B3 私有访问转正·行为不变）===
+## 技能组件用：记账「attacker_player 击杀 victim_player 的 victim_slot」——h11 娄金穷追致死后归因（on_kill 只对直接攻击触发）。
+func credit_kill(attacker_player: int, victim_player: int, victim_slot: int) -> void:
+	_killer[victim_player][victim_slot] = attacker_player
+
+## 技能组件用：请求在 victim_player 身上强制揪 slot 号替补上场——h21 枭阳【调虎离山】（resolve Phase 2.7 执行）。
+func request_forced_pull(victim_player: int, slot: int) -> void:
+	_forced_pull[victim_player] = slot
+
+## UI 只读：取指定槽位的 HeroSkill（不暴露 _skills 私有容器）。
+func get_skill(player: int, slot: int) -> HeroSkill:
+	return _skills[player][slot]
+
+## UI 只读：该玩家当前能否切换（公共包装 _can_switch）。
+func can_switch(player: int) -> bool:
+	return _can_switch(player)
+
+## UI 只读：指定动作的能量成本（半能·公共包装 _get_cost）。
+func action_cost(player: int, action: int) -> int:
+	return _get_cost(player, action)
 
 func get_status(player: int, slot: int, key: String, default: Variant = null) -> Variant:
 	return statuses[player][slot].get(key, default)
@@ -1154,7 +1176,7 @@ func chongzhuang(attacker_player: int) -> void:
 		return
 	var ev: Array = []
 	_apply_damage(opp, CHONGZHUANG_DAMAGE, attacker_player, ActionDef.Action.ATTACK, ActionDef.Pen.PIERCE_BIGDEF, ActionDef.Action.CHARGE, ev)
-	_note_combo_proc(attacker_player)   # 鼠潮：星日登场冲撞 = 一次 combo proc
+	note_combo_proc(attacker_player)   # 鼠潮：星日登场冲撞 = 一次 combo proc
 
 
 ## 把伤害"踏/溅"到 victim_player 随机一名存活替补（乌骓 h19 践踏溢出用·shield 先吸·触发 on_self_damaged·2026-07-01 由"最高血"改随机）。
@@ -1272,14 +1294,14 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 			dmg += HEDINGHONG_DETONATE_BONUS   # 鹤顶红遗物：引爆毒额外 +1.0（2 半点）
 		statuses[target_player][slot].erase("poison")
 		events.append({id = "poison_detonate", player = target_player, layers = poison})
-		_note_combo_proc(attacker_player)   # 鼠潮：毒爆 = 一次 combo proc
+		note_combo_proc(attacker_player)   # 鼠潮：毒爆 = 一次 combo proc
 	# 猎物印记（易伤）：本回合下次受击 +N（消耗）
 	var marked: int = int(get_status(target_player, slot, "marked", 0))
 	if marked > 0:
 		dmg += marked
 		statuses[target_player][slot].erase("marked")
 		events.append({id = "marked_hit", player = target_player, amount = marked})
-		_note_combo_proc(attacker_player)   # 鼠潮：易伤消费 = 一次 combo proc
+		note_combo_proc(attacker_player)   # 鼠潮：易伤消费 = 一次 combo proc
 	# 罪已昭（触邪 h20·持续易伤）：被印敌方出战英雄受到的伤害 +N（不消耗·换下场清；附印那次由触邪 on_deal_hit 记 proc）
 	var vuln: int = int(get_status(target_player, slot, "vuln", 0))
 	if vuln > 0:

@@ -8,4 +8,4 @@ func on_deal_hit(battle: BattleCore, player: int, _slot: int, target_player: int
 	if dealt <= 0:
 		return
 	battle.energy[target_player] = maxi(0, battle.energy[target_player] - dealt)
-	battle._note_combo_proc(player)   # 鼠潮：碎能 = 一次 combo proc
+	battle.note_combo_proc(player)   # 鼠潮：碎能 = 一次 combo proc

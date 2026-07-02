@@ -18,4 +18,4 @@ func on_block(battle: BattleCore, player: int, _slot: int, attacker_player: int,
 		return
 	var aslot: int = battle.active_index[attacker_player]
 	battle.hp[attacker_player][aslot] -= reflect
-	battle._note_combo_proc(player)   # 鼠潮：卸力反震 = 一次 combo proc（归防御方）
+	battle.note_combo_proc(player)   # 鼠潮：卸力反震 = 一次 combo proc（归防御方）

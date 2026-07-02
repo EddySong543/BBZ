@@ -18,4 +18,4 @@ const VULN := 1   # 被印敌人受伤 +0.5HP = 1 半点·易伤放大量（主�
 
 func on_deal_hit(battle: BattleCore, player: int, _slot: int, target_player: int, target_slot: int, _dealt: int, _action: int) -> void:
 	battle.set_status(target_player, target_slot, "vuln", VULN)
-	battle._note_combo_proc(player)   # 罪已昭附着 = 一次 combo proc（喂鼠潮 h13·同龙破甲附着）
+	battle.note_combo_proc(player)   # 罪已昭附着 = 一次 combo proc（喂鼠潮 h13·同龙破甲附着）
