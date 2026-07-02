@@ -32,7 +32,7 @@ var search_depth: int = 2
 var plan_items: bool = true # 搜索推演里是否也跑道具经济（Part 2）：true=AI 规划会考虑未来道具发展；
                             # false=控制组（实战照常用道具、但 lookahead 当道具冻结·= 旧行为）。供 A/B 实测。
 var search_upgrade: bool = false # 升级择时：false=阈值默认(100局A/B价值搜索仅52.2%≈噪声·且贵~10×) / true=价值搜索(plan_economy·一开关可重启)
-var eval_profile: int = 0   # 0=基础评估(v2) / 1=v3 牌感评估(熟练优秀玩家)
+var eval_profile: int = 0   # 0=v1 基础评估(现役默认) / 1=v2 进阶评估(牌感·熟练优秀玩家)
 var weights: Dictionary = {} # 评估权重覆盖（空=用默认常量）；A/B 校准用（T1）
 var rng := RandomNumberGenerator.new()        # 动作抽样
 var _eval_rng := RandomNumberGenerator.new()  # 推演重播种：解除"预知真实 rng 未来"的透视
@@ -213,9 +213,9 @@ func _root_value(b: BattleCore, player: int) -> float:
 
 # === 搜索 ===
 
-## 局面评估分派：profile 1 用 v3 牌感评估，否则基础评估。权重覆盖透传（T1 校准）。
+## 局面评估分派：profile 1 用 v2 进阶(牌感)评估，否则 v1 基础评估。权重覆盖透传（T1 校准）。
 func _eval(b: BattleCore, p: int) -> float:
-	return BattleEvalV3.score(b, p, weights) if eval_profile == 1 else BattleEval.score(b, p, weights)
+	return BattleEvalV2.score(b, p, weights) if eval_profile == 1 else BattleEval.score(b, p, weights)
 
 
 ## 提交 (我=ca, 对手=cb) 结算一回合后，从 player 视角的子局价值（递归 depth 层）。

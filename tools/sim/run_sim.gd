@@ -40,7 +40,7 @@ var max_turns := 120
 var out_dir := "res://tools/sim/out/"
 var use_draft := true   # true=DraftAI 选人 / false=随机阵容
 var depth := 2          # 对战 AI 搜索深度
-var profile := 0        # 对战 AI 评估档：0=基础 / 1=v3 牌感(熟练优秀玩家)
+var profile := 0        # 对战 AI 评估档：0=v1 基础 / 1=v2 进阶(牌感·熟练优秀玩家)
 var ab_variant := ""    # A/B 校准：非空=A(默认权重) vs B(此变体) 头对头（见 AB_VARIANTS）
 var plan_ab := false    # A/B：A(plan_items=true 规划道具) vs B(false 不规划) 头对头（验证 Part 2）
 var upgrade_ab := false  # A/B：A(search_upgrade=true 价值搜索升级) vs B(false 阈值升级) 头对头（验证 B）
@@ -60,7 +60,7 @@ func _initialize() -> void:
 	print("=== AI 自对弈模拟 ===")
 	print("对局=%d  种子=%d  池=h%02d–h%02d(%d)  回合上限=%d  选人=%s  AI深度=%d  评估=%s" % [
 		games, base_seed, pool_first, pool_last, pool.size(), max_turns,
-		("drafter" if use_draft else "随机"), depth, ("v3牌感" if profile == 1 else "基础")])
+		("drafter" if use_draft else "随机"), depth, ("v2进阶" if profile == 1 else "v1基础")])
 
 	# 聚合容器
 	var csv_rows: Array = []
@@ -346,7 +346,7 @@ func _write_outputs(csv_rows: Array, win: Dictionary, turns_list: Array,
 	md.store_line("- 对局数：**%d**" % total)
 	md.store_line("- 基础种子：%d ｜ 英雄池：h%02d–h%02d ｜ 回合上限：%d ｜ 选人：%s ｜ AI深度：%d ｜ 评估：%s\n" % [
 		base_seed, pool_first, pool_last, max_turns, ("drafter" if use_draft else "随机"), depth,
-		("v3牌感" if profile == 1 else "基础")])
+		("v2进阶" if profile == 1 else "v1基础")])
 
 	md.store_line("## 胜负分布")
 	md.store_line("| 结果 | 局数 | 占比 |")

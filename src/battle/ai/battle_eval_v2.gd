@@ -1,9 +1,9 @@
-class_name BattleEvalV3
+class_name BattleEvalV2
 extends RefCounted
 
-## v3「熟练优秀卡牌玩家」评估（2026-05-30）。
+## v2「进阶·熟练优秀卡牌玩家」评估（2026-05-30）。
 ##
-## 在 BattleEval(基础: HP/能量/存活/护盾) 之上叠加「牌感」项：
+## 在 BattleEval(v1 基础: HP/能量/存活/护盾) 之上叠加「牌感」项：
 ##   - 致命威胁压力（对手出战在斩杀线内 → 我占主动）。
 ##   - 延迟伤害（道具妖火/藤蔓挂在对手头上的债·PENDING_W）。
 ##
@@ -21,7 +21,7 @@ const THREAT_HP_LINE := 2 * HP_UNIT  # 斩杀威胁线：守方出战 ≤2HP（�
 const THREAT_MIN_ENERGY := 2         # 攻方至少 1 能（半能·够出一记波）
 
 
-## w（可选）= 权重覆盖，透传给基础评估校准（T1）；v3 自身项首轮暂用默认。
+## w（可选）= 权重覆盖，透传给基础评估校准（T1）；v2 自身项首轮暂用默认。
 static func score(b: BattleCore, player: int, w: Dictionary = {}) -> float:
 	if b.game_over:
 		return BattleEval.score(b, player, w)   # 终局与基础一致

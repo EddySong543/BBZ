@@ -1,4 +1,8 @@
-# Battle AI —— 同时博弈短时最优 AI（v1，2026-05-30）
+# Battle AI —— 同时博弈短时最优 AI（2026-05-30）
+
+> 命名约定：**v1 = 基础评估（`battle_eval.gd` / `BattleEval`，AI 现役默认）**；
+> **v2 = 进阶评估（`battle_eval_v2.gd` / `BattleEvalV2`，叠加牌感项）**。
+> 本文下方「初版 / 深度升级」指的是**搜索层的开发里程碑**（1-ply → depth-2 + 选人 AI），与评估档 v1/v2 是两个维度，勿混。
 
 模拟"后期加入游戏的 AI"，并用 AI 自对弈批量积累平衡测试数据。
 
@@ -18,7 +22,8 @@
 
 | 文件 | 职责 |
 |------|------|
-| `battle_eval.gd` | 启发式局面评估 `score(battle, player) -> float`（己方视角，越大越好）|
+| `battle_eval.gd` | **v1 基础评估** `score(battle, player) -> float`（己方视角，越大越好）|
+| `battle_eval_v2.gd` | **v2 进阶评估**（v1 之上叠加牌感项：斩杀威胁 / 延迟伤害；profile=1 启用）|
 | `battle_ai.gd` | 决策器 `choose_action` / `choose_death_switch`（矩阵 + regret-matching + 抽样）|
 | `battle_core.gd`（引擎）| 提供 `clone()` / `legal_actions()` / `apply_choice()` 三个加法支持方法 |
 | `tools/sim/run_sim.gd` | headless 自对弈批量模拟器 + 数据落盘 |
@@ -38,11 +43,11 @@
 
 > 权重为 v1 经验值，按 batch 平衡数据迭代。能量边际递减是 2026-05-30 为治"AI 屯能僵局"加入。
 
-## v2 升级（2026-05-30）：剪枝 depth-2 + 选人 AI
+## 深度升级（2026-05-30）：剪枝 depth-2 + 选人 AI（搜索层里程碑·非评估档 v2）
 
 - **对战 AI 加深度**（默认 `search_depth=2`）：子局不再静态评估，而是再解一层 1-ply 子博弈取博弈值
   → AI 能看到"铺垫/攒→下回合收益"和"别同归于尽"，从而**会用主动技、减少换死平局、缩短对局**。
-  深层用动作短名单（`_shortlist`）剪枝 + 较少迭代控成本。`depth=1` 退化为 v1 纯 1-ply。
+  深层用动作短名单（`_shortlist`）剪枝 + 较少迭代控成本。`depth=1` 退化为纯 1-ply（初版行为）。
 - **`draft_ai.gd` 选人策略 AI**：对齐 bp 流程（BAN 3 → PICK 3，盲选）。结构化组队（HP 派生角色：
   坦克≥6 / 灵活5 / 脆皮≤4，按曲线均衡 + 温度探索保覆盖），BAN 偏高 HP 威胁。**无 per-hero meta
   偏见**（不硬编 combo 配对），避免污染平衡测量；深层成对协同留作后续。
