@@ -324,3 +324,62 @@ func test_clone_copies_item_state_independently() -> void:
 	assert_eq(c.item_uses[0].size(), 1)
 	c.item_uses[0].clear()
 	assert_eq(b.item_uses[0].size(), 1)   # 改 clone 不动原局
+
+
+# === C10 补测：占卜龟壳 / 随身熔炉 / 尾后针（此前仅冒烟覆盖）===
+
+func test_item_guike_grants_draft_reroll_token() -> void:
+	# Arrange
+	var b := _battle()
+	b.use_item(0, _give(b, 0, "t1_guike"))
+	# Act
+	b.select_action(0, A.CHARGE)
+	b.select_action(1, A.CHARGE)
+	b.resolve()
+	# Assert：给自己挂 1 个重抽令牌（下次 3 选 1 界面消费）
+	assert_eq(int(b.item_buffs[0].get("draft_reroll", 0)), 1)
+
+
+func test_item_ronglu_burns_spare_for_energy() -> void:
+	# Arrange：库存里放一件已就绪·未用的废牌（飞镖）
+	var b := _battle(6)
+	b.slots[0] = [{"item": ItemCatalog.make("t1_feibiao"), "used": false}]
+	b.use_item(0, _give(b, 0, "t1_ronglu"))
+	# Act：双防隔离（防不耗能不产能），只看熔炉给的能量
+	b.select_action(0, A.DEFEND)
+	b.select_action(1, A.DEFEND)
+	b.resolve()
+	# Assert：+0.5 能 = 1 半点；废牌槽被烧空（resolve 末 _econ_after_resolve 清成 EMPTY）
+	assert_eq(b.energy[0], 7)
+	assert_eq(b.slots[0][0]["item"], null)
+
+
+func test_item_ronglu_no_energy_without_spare() -> void:
+	var b := _battle(6)
+	b.slots[0] = []   # 手里没废牌可烧
+	b.use_item(0, _give(b, 0, "t1_ronglu"))
+	b.select_action(0, A.DEFEND)
+	b.select_action(1, A.DEFEND)
+	b.resolve()
+	assert_eq(b.energy[0], 6)   # 不发动 → 不白给能量
+
+
+func test_item_weihouzhen_stings_on_active_death() -> void:
+	var b := _battle()
+	b.hp[0][0] = 2   # 我方出战 1.0 HP·濒死
+	b.use_item(0, _give(b, 0, "t1_weihouzhen"))
+	b.select_action(0, A.CHARGE)
+	b.select_action(1, A.BIG_ATTACK)   # 大波 4 → 打死我方出战
+	b.resolve()
+	assert_true(b.hp[0][0] <= 0)        # 出战阵亡
+	assert_eq(b.hp[1][0], 19)           # 敌方出战吃 0.5 真伤（20 → 19）
+
+
+func test_item_weihouzhen_no_sting_when_survives() -> void:
+	var b := _battle()
+	b.use_item(0, _give(b, 0, "t1_weihouzhen"))
+	b.select_action(0, A.CHARGE)
+	b.select_action(1, A.ATTACK)   # 波 2 → 我方 20→18 存活
+	b.resolve()
+	assert_eq(b.hp[1][0], 20)      # 没死 → 不反咬
+	assert_eq(int(b.item_buffs[0].get("death_reflect", 0)), 1)   # 标记仍挂着

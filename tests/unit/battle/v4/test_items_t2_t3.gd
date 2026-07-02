@@ -307,6 +307,163 @@ func test_t3_tinglong_dumps_energy_as_piercing_damage() -> void:
 	assert_eq(b.energy[0], 0)   # 清零后无被动加成（被动已去除）
 
 
+# === C10 补测：此前仅冒烟覆盖的 T2/T3 件 ===
+
+func test_t2_baolie_discounts_big_attack() -> void:
+	var b := _battle(10)
+	b.use_item(0, _give(b, 0, "t2_baolie"))
+	b.select_action(0, A.BIG_ATTACK)
+	b.select_action(1, A.DEFEND)
+	b.resolve()
+	var got := b.energy[0]
+	var b2 := _battle(10)
+	b2.select_action(0, A.BIG_ATTACK)
+	b2.select_action(1, A.DEFEND)
+	b2.resolve()
+	assert_eq(got - b2.energy[0], 2)   # 大波少耗 1 能 = 2 半能
+
+
+func test_t2_dianjinshi_upgrades_t1_slot() -> void:
+	var b := _battle()
+	b.slots[0] = [{"item": ItemCatalog.make("t1_feibiao"), "used": false}]
+	b.use_item(0, _give(b, 0, "t2_dianjinshi"))
+	_resolve_cc(b)
+	assert_eq(String(b.slots[0][0]["item"].item_id), "t2_feibiao")   # T1 原地升 T2
+
+
+func test_t2_fengyin_locks_one_item_use() -> void:
+	var b := _battle()
+	b.use_item(0, _give(b, 0, "t2_fengyin"))   # p0 封 p1 一个道具槽
+	_resolve_cc(b)
+	assert_eq(int(b.item_buffs[1].get("item_lock", 0)), 1)
+	# 下回合 p1 想用道具 → 首次被封、锁消耗；再用成功
+	var idx := _give(b, 1, "t2_feibiao")
+	assert_false(b.use_item(1, idx))
+	assert_eq(int(b.item_buffs[1].get("item_lock", 0)), 0)
+	assert_true(b.use_item(1, idx))
+
+
+func test_t2_huoshou_energy_on_attack_connect() -> void:
+	var b := _battle(6)
+	b.use_item(0, _give(b, 0, "t2_huoshou"))
+	b.select_action(0, A.ATTACK)
+	b.select_action(1, A.CHARGE)
+	b.resolve()
+	var got := b.energy[0]
+	var b2 := _battle(6)
+	b2.select_action(0, A.ATTACK)
+	b2.select_action(1, A.CHARGE)
+	b2.resolve()
+	assert_eq(got - b2.energy[0], 1)   # 命中 +0.5 能
+
+
+func test_t2_huoshou_no_energy_when_blocked() -> void:
+	var b := _battle(6)
+	b.use_item(0, _give(b, 0, "t2_huoshou"))
+	b.select_action(0, A.ATTACK)
+	b.select_action(1, A.BIG_DEFEND)   # 大防挡下 → 未命中
+	b.resolve()
+	var b2 := _battle(6)
+	b2.select_action(0, A.ATTACK)
+	b2.select_action(1, A.BIG_DEFEND)
+	b2.resolve()
+	assert_eq(b.energy[0], b2.energy[0])   # 未命中 → 不回能
+
+
+func test_t2_mojing_borrows_energy_now_pays_next_turn() -> void:
+	var b := _battle(6)
+	b.use_item(0, _give(b, 0, "t2_mojing"))
+	b.select_action(0, A.DEFEND)
+	b.select_action(1, A.DEFEND)
+	b.resolve()
+	assert_eq(b.energy[0], 8)   # 立即 +1 能（6 → 8）
+	# 下回合开局扣回 1 能
+	b.select_action(0, A.DEFEND)
+	b.select_action(1, A.DEFEND)
+	b.resolve()
+	assert_eq(b.energy[0], 6)   # 8 - 1（借的还了）
+
+
+func test_t2_shaizi_grants_exactly_one_of_three() -> void:
+	var b := _battle(6)
+	b.use_item(0, _give(b, 0, "t2_shaizi"))
+	b.select_action(0, A.CHARGE)
+	b.select_action(1, A.CHARGE)
+	b.resolve()
+	var atk := int(b.item_mod(0, "atk_bonus", 0))
+	var shd: int = b.shield[0][0]
+	var b2 := _battle(6)
+	b2.select_action(0, A.CHARGE)
+	b2.select_action(1, A.CHARGE)
+	b2.resolve()
+	var e_delta := b.energy[0] - b2.energy[0]
+	var faces: Array = [
+		atk == 2 and shd == 0 and e_delta == 0,   # +1.0 伤
+		atk == 0 and shd == 2 and e_delta == 0,   # +1.0 甲
+		atk == 0 and shd == 0 and e_delta == 2,   # +1.0 能
+	]
+	assert_eq(faces.count(true), 1, "骰子应恰好命中一面·实际 atk=%d shd=%d e=%d" % [atk, shd, e_delta])
+
+
+func test_t2_shuangsheng_sets_extra_hit_mod() -> void:
+	var b := _battle()
+	b.use_item(0, _give(b, 0, "t2_shuangsheng"))
+	b.select_action(0, A.ATTACK)
+	b.select_action(1, A.CHARGE)
+	b.resolve()
+	assert_eq(int(b.item_mod(0, "extra_hits", 0)), 1)   # on-hit 多触发 1 次
+	assert_eq(b.hp[1][0], 18)                            # 伤害不变：波 2 落地
+
+
+func test_t3_mengdie_swaps_hp_energy_slots() -> void:
+	var b := _battle()
+	b.hp[0][0] = 10
+	b.hp[1][0] = 16
+	b.energy = [4, 12]
+	b.slots[0] = [{"item": ItemCatalog.make("t1_feibiao"), "used": false}]
+	b.slots[1] = []
+	b.use_item(0, _give(b, 0, "t3_mengdie"))
+	_resolve_cc(b)   # 双攒不掉血，HP 保持对调后的值
+	assert_eq(b.hp[0][0], 16)          # HP 对调
+	assert_eq(b.hp[1][0], 10)
+	assert_eq(b.energy[0], 14)         # 对调得 12·再双攒 +2
+	assert_eq(b.energy[1], 6)          # 对调得 4·再双攒 +2
+	assert_eq(b.slots[0].size(), 0)    # 道具栏对调
+	assert_eq(b.slots[1].size(), 1)
+
+
+func test_t3_morihuozhong_boosts_last_survivor() -> void:
+	var b := _battle()
+	b.hp[0][1] = 0   # 只剩出战 1 名存活
+	b.hp[0][2] = 0
+	b.use_item(0, _give(b, 0, "t3_morihuozhong"))
+	b.select_action(0, A.ATTACK)
+	b.select_action(1, A.CHARGE)
+	b.resolve()
+	assert_eq(b.hp[1][0], 16)      # 波 2 + 火种 2 = 4 落地
+	assert_eq(b.shield[0][0], 2)   # +1.0 甲
+
+
+func test_t3_morihuozhong_inert_with_full_team() -> void:
+	var b := _battle()
+	b.use_item(0, _give(b, 0, "t3_morihuozhong"))   # 3 人存活 → 不触发
+	b.select_action(0, A.ATTACK)
+	b.select_action(1, A.CHARGE)
+	b.resolve()
+	assert_eq(b.hp[1][0], 18)      # 只有普通波 2
+	assert_eq(b.shield[0][0], 0)
+
+
+func test_t3_tianluodiwang_locks_all_slots_and_switch() -> void:
+	var b := _battle()
+	b.use_item(0, _give(b, 0, "t3_tianluodiwang"))
+	b.select_action(0, A.CHARGE)
+	b.select_switch(1, 1)   # p1 想切 → 本回合被禁
+	b.resolve()
+	assert_eq(b.active_index[1], 0)                              # 切换被锁
+	assert_eq(int(b.item_buffs[1].get("item_lock", 0)), 3)      # 封 3 次用道具
+
+
 # === 基建：全件可构造 + 不崩 ===
 
 func test_all_t2_t3_construct_and_run() -> void:
