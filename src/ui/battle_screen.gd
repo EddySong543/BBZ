@@ -519,23 +519,29 @@ func _resolve() -> void:
 	big_turn_label.visible = false   # 收起中间倒计时（顶部回合数保留）
 	status_label.visible = false
 
-	var a0_before: int = battle.active_index[0]
-	var a1_before: int = battle.active_index[1]
+	# 结算前的出战槽（= UI 已知的"谁在场上"·上一帧就渲染着·非引擎完整状态·联机客户端同样持有）。
+	# 仅用它判定"出战英雄本回合是否阵亡"（配 hero_died 事件），不读结算后的 battle.hp。
+	var active_before: Array[int] = [battle.active_index[0], battle.active_index[1]]
 
 	var r: Dictionary = battle.resolve()
 
-	# 死亡判定：结算前的出战槽 HP 归零
-	var p0_dead: bool = battle.hp[0][a0_before] <= 0
-	var p1_dead: bool = battle.hp[1][a1_before] <= 0
-	# 受伤量（半点）从 events 累加，准确（不受甲时机换人影响）
+	# 动画所需信息全部【从事件流派生】——不再 diff 结算后的引擎完整状态，
+	# 联机（服务器权威·客户端只收 events）下同样可行。A3a（2026-07-02）：死亡判定由血量 diff 改吃 hero_died。
+	#   damage_taken 累加受伤量；hero_died（槽 == 结算前出战槽）= 该方出战英雄阵亡。
 	var dmg: Array[int] = [0, 0]
+	var dead: Array[bool] = [false, false]
 	for ev in r.get("events", []):
-		if ev.get("id", "") == "damage_taken":
-			dmg[int(ev.get("player", 0))] += int(ev.get("amount", 0))
+		var p: int = int(ev.get("player", 0))
+		match ev.get("id", ""):
+			"damage_taken":
+				dmg[p] += int(ev.get("amount", 0))
+			"hero_died":
+				if int(ev.get("slot", -1)) == active_before[p]:
+					dead[p] = true
 
 	# 头顶招式圆圈（揭示双方盲选出招）→ 消失 → 再播打斗动画
 	await _show_action_indicators(r.get("p1_action", -1), r.get("p2_action", -1))
-	await _play_battle_anims(r.get("p1_action", -1), r.get("p2_action", -1), dmg, [p0_dead, p1_dead])
+	await _play_battle_anims(r.get("p1_action", -1), r.get("p2_action", -1), dmg, dead)
 	_update_all()
 
 	if r.get("game_over", false):
