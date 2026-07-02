@@ -167,8 +167,8 @@ E_回合结束 = E_回合开始 − C_本回合消耗 + G_本回合获得
 - **BattleSetup** (`src/battle/battle_setup.gd` autoload) — 场景间传递阵容
 - **UI 对战界面** (`src/ui/battle_screen.tscn` + `.gd`) — 同时盲选 vs AI + juice
 - **UI 选人界面** (`src/ui/bp_screen.tscn` + `.gd`) — 2 步同时盲选
-- **UI 标题** (`src/ui/title_screen.tscn` + `.gd`)
-- **UI 组件** (`src/ui/components/` — CharacterDisplay / HeroCard / HeroFrame / EnergyBar / DeathSwitchOverlay / SlashVFX)
+- **UI 启动 / 标题** (`src/ui/boot_screen.tscn` + `.gd`)
+- **UI 组件** (`src/ui/components/` — CharacterDisplay / HeroCard / HeroFrame / DeathSwitchOverlay / SlashVFX)
 - **英雄设计** (`design/heroes.md`) — 24 英雄（h01–h24）已设计实装
 - **美术** (`assets/sprites/heroes/`) — 24 英雄（h01–h24）立绘 / idle / 头像已导入
 
@@ -221,6 +221,6 @@ E_回合结束 = E_回合开始 − C_本回合消耗 + G_本回合获得
 
 ### 工程保护
 
-- [x] GUT v4 测试套件全绿（220 测试 / 474 断言）
+- [x] GUT v4 测试套件全绿（221 测试 / 668 断言）
 - [x] 单一核心 BattleCore（v3 已删除，无双核）
 - [x] HeroSkill 组件机制（每英雄一文件，24 个）

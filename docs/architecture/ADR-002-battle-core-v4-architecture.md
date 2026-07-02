@@ -9,7 +9,7 @@
 | **Date** | 2026-05-25 |
 | **Author** | Eddy + Claude |
 | **Supersedes** | ADR-001 §D4（"HeroSkill 迁移暂停"——重启条件已满足，见 Context） |
-| **Related** | `hero-mechanics-hook-matrix.md`、`tests/BEHAVIOR_NOTES.md`、`battlecore-risk-notes.md`、`design/heroes.md`、`design/heroes-schools.md` |
+| **Related** | `hero-mechanics-hook-matrix.md`（⚠ 链接失效·该文件已删 / 不存在）、`tests/BEHAVIOR_NOTES.md`、`battlecore-risk-notes.md`、`design/heroes.md`、`design/heroes-schools.md` |
 
 ---
 
@@ -28,7 +28,7 @@ ADR-001 §D4（2026-05-18）决定**暂停** HeroSkill 组件化迁移，明确*
 `src/battle/battle_core.gd`（727 行）实现的是**旧 13 英雄 v3 kit + 旧数值**：英雄逻辑 hardcoded 散落在 `resolve()` 6 个 phase（`hero_id==` / `passive_id==` 判断 + 8 个瞬态状态数组 + 每个专属动作一个 enum）。这套模式：
 
 1. 在 13 英雄时已经半脏（ADR-001 自评 god class）。
-2. 新设计需要它**完全没有的能力**（详见 `hero-mechanics-hook-matrix.md §4`）：0.5 半血、随切换保留的状态、变身、延迟/转移伤害、替补参战、全场 AOE、无视防御处决、契约绑定。
+2. 新设计需要它**完全没有的能力**（详见 `hero-mechanics-hook-matrix.md §4` — ⚠ 链接失效·该文件已删 / 不存在）：0.5 半血、随切换保留的状态、变身、延迟/转移伤害、替补参战、全场 AOE、无视防御处决、契约绑定。
 3. 若照此模式硬塞 34→46 英雄 → 必然膨胀为不可维护的 god class。
 
 ### 已验证、必须保留的资产
