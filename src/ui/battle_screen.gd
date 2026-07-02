@@ -12,14 +12,9 @@ const ACTIVE := ActionDef.ACTIVE
 # 动作按钮"能量消耗"金币（1 能量 1 球）= battle_screen.tscn 内每个按钮下的 CostPips 节点，
 # 位置/大小/间距在 Godot 编辑器里可视化调整（可视化设计·任务2）；代码只在运行时填入数量。
 
-const CIRCLE_D := 160.0
-const CIRCLE_GAP := 60.0
-const CIRCLE_Y := 890.0
 const SCREEN_W := 1920.0
 const SCREEN_H := 1080.0
 
-## 待选爱心垂直对齐基线带高度（= 自适应 pip 的上限），不同 maxHP 的爱心在其中居中（任务6）。
-const HEART_BAND := 16.0
 ## 出战血条低血红闪阈值（HP 占比 ≤ 此值）；闪烁在 IconPipRow 内部实现（任务5：红光改到剩余血量爱心上）。
 const LOW_HP_RATIO := 0.5
 
@@ -1094,14 +1089,6 @@ func _fmt_hp(v: float) -> String:
 	if is_equal_approx(v, roundf(v)):
 		return "%d" % int(roundf(v))
 	return "%.1f" % v
-
-
-func _hp_color(ratio: float) -> Color:
-	if ratio > 0.6:
-		return Color("#44cc44")
-	elif ratio > 0.3:
-		return Color("#ffaa00")
-	return Color("#ff4444")
 
 
 # ============================================================

@@ -189,12 +189,6 @@ func double_action_cap() -> int:
 	return 0
 
 
-## 「逼战」型 hook ——⚠ 已弃用（2026-06-24）：原烛阴 h17【逼战】依赖被动能量，去被动后报废，
-## h17 已重设计为【镇压·沉默】（h17_zhenya.gd）。当前无人 override，默认 false（留作扩展接口）。
-func forces_enemy_attack() -> bool:
-	return false
-
-
 ## 「缠绕」型（相柳 h18）：本英雄【出战·存活】时，对手【无法主动切换】（含星日免费切换）。
 ## 死亡换人 / 紫火调虎离山 / 道具强制切换等"被动·触发"切换不受影响。引擎在 can_afford(SWITCH) +
 ## is_free_switch_target 统一 gate（_can_switch）。默认 false。

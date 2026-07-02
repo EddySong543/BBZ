@@ -68,12 +68,6 @@ static func is_attack(action: int) -> bool:
 	return action in ATTACK_ACTIONS
 
 
-static func get_action_id(action: int) -> String:
-	if action in BASE_ACTION_DEF:
-		return BASE_ACTION_DEF[action]["id"]
-	return "unknown"
-
-
 static func get_base_damage(action: int) -> int:
 	if action in BASE_ACTION_DEF:
 		return BASE_ACTION_DEF[action]["damage"]

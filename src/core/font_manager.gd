@@ -35,19 +35,3 @@ func _best_font(px_size: int) -> FontFile:
 	if px_size % 16 == 0:
 		return f16
 	return f12
-
-
-func px_small() -> int:
-	return 12
-
-
-func px_med() -> int:
-	return 16
-
-
-func px_large() -> int:
-	return 24
-
-
-func px_title() -> int:
-	return 48

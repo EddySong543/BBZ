@@ -184,9 +184,6 @@ func _validate_skills() -> void:
 func hp_display(half: int) -> float:
 	return float(half) / float(HP_UNIT)
 
-func energy_display(half: int) -> float:
-	return float(half) / float(ActionDef.ENERGY_UNIT)
-
 ## 统一能量获得入口：应用出战英雄的 energy_gain_bonus（虚日囤鼠 = 每次 +1 能），clamp 到 MAX。
 func _gain_energy(player: int, amount: int) -> void:
 	if amount <= 0:
@@ -262,9 +259,6 @@ func living_reserves(player: int) -> Array[int]:
 		if hp[player][i] > 0 and i != active_index[player]:
 			result.append(i)
 	return result
-
-func get_dmg_dealt(player: int) -> int:
-	return _dmg_dealt[player]
 
 
 # === 动作选择 / 费用 ===
@@ -426,23 +420,6 @@ func double_uses_left(player: int) -> int:
 		if sk != null and sk.double_action_cap() > 0:
 			best = maxi(best, sk.double_action_cap() - int(get_status(player, s, "jifeng_uses", 0)))
 	return best
-
-
-## player 的出战英雄是否"逼战"型（烛阴 h17）且存活 → 对手不攻它就挨饿（UI/AI/resolve 用）。
-func _forces_enemy_attack(player: int) -> bool:
-	var s: int = active_index[player]
-	var sk: HeroSkill = _skills[player][s]
-	return sk != null and hp[player][s] > 0 and sk.forces_enemy_attack()
-
-
-## p 本回合的动作 act 是否"攻击"（波/大波 或 攻击型主动技）——逼战判定 + 通用。
-func _is_attack_action(p: int, act: int) -> bool:
-	if ActionDef.is_attack(act):
-		return true
-	if act == ActionDef.ACTIVE:
-		var sk: HeroSkill = _skills[p][active_index[p]]
-		return sk != null and sk.active_is_attack()
-	return false
 
 
 ## 切换"附加动作"开关（须先选好可双的主动作）。on=true 时校验 can_double。
@@ -1141,11 +1118,6 @@ func _grants_free_switch(player: int, slot: int) -> bool:
 	if cap >= 0 and int(get_status(player, slot, "dangxian_uses", 0)) >= cap:
 		return false
 	return true
-
-
-## 当前出战英雄能否免费重定位（任意存活替补都免费）。保留旧语义供 UI / 测试调用。
-func can_free_switch(player: int) -> bool:
-	return _grants_free_switch(player, active_index[player]) and living_reserves(player).size() > 0
 
 
 ## 切换到 target 是否免动作槽：起点（出战）或终点（target）任一英雄提供免费切换 → true 走 free_switch。
