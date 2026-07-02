@@ -14,7 +14,8 @@ extends HeroSkill
 ##   agency/yomi：每局 2 次珍贵·何时拔弓；对手算你哪回合强弓、备大防(穿防被大防挡)。
 ##   combo：便宜穿防大波 配龙破甲(压穿大防窗)/罪已昭易伤(放大)/清残血替补；早期能量不足也能突袭强击。
 ##   旋钮：COST(现 2 能·仅省大波 1 能) / DMG(现 2.0) / active_attack_kind(现穿防) / cap(现 2)。
-##   ⚠ 旧 STORE 引擎/UI 机制暂休眠(h22 不再 grant_action_store·can_store 恒 false·无害)，死代码清理待跟进。
+##   旧 STORE 引擎/UI 机制已于 2026-07-02 全拆（battle_core stored_action/can_store + ActionDef.STORE +
+##   hero_skill.grants_action_store + battle_screen 蓄势键），此处仅留设计溯源。
 
 const COST := 4    # 4 半能 = 2 能（比大波 3 能省 1·「引而后发·省去大波部分能量」）
 const DMG := 4     # 4 半点 = 2.0HP（大波级）

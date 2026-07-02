@@ -182,14 +182,6 @@ func combo_proc_energy() -> int:
 	return 0
 
 
-## 「一鸣惊人 / 蓄势」型（毕方 h22）：本英雄在场（含替补·存活）时，己方可「空过」一回合
-## （ActionDef.STORE·不行动/不拿能量/无防御）把这次行动【存起来】；之后任意回合连同当回合行动一起打出
-## （= 复用疾风的双动作结算·消耗 1 次存储）。与疾风区别 = 净零（先空过换之后双动作·总数不变·非每局白送）。
-## 默认 false；毕方 override 返回 true。引擎在 can_store/STORE 入账/can_double_action 处理（stored_action[]）。
-func grants_action_store() -> bool:
-	return false
-
-
 ## 「疾风」型（广寒 h16）：本英雄在场（含替补·存活）时，己方每局可 N 次把【同一个动作】
 ## 再做一次（附加动作·波/大波/攒可双·技能/切换/防御除外）。返回每局上限 N（0 = 不提供）。
 ## 引擎在 can_double()/select_double()/resolve() 处理；cap 计在本英雄 slot 的 "jifeng_uses"。

@@ -29,11 +29,6 @@ enum Action {
 ## 取值远离 Action enum，避免与基础动作冲突。
 const ACTIVE := 100
 
-## 蓄势哨兵动作（毕方 h22【一鸣惊人】）：玩家选"空过一回合存行动"。
-## 不行动、不拿能量、无防御（暴露），把这次行动存起来 → 之后某回合连同当回合行动一起打出（双动作）。
-## 仅队中有存活 h22（grants_action_store）时合法。取值远离 Action enum / ACTIVE。
-const STORE := 101
-
 const HP_UNIT := 2       # 1 HP = 2 半点
 const MIN_DAMAGE := 1    # 最小伤害 = 1 半点 = 0.5 HP
 
