@@ -30,7 +30,6 @@ enum Action {
 const ACTIVE := 100
 
 const HP_UNIT := 2       # 1 HP = 2 半点
-const MIN_DAMAGE := 1    # 最小伤害 = 1 半点 = 0.5 HP
 
 const ENERGY_UNIT := 2          # 1 能 = 2 半能（支持 0.5 能）
 const INITIAL_ENERGY := 2       # = 1.0 能
