@@ -116,6 +116,7 @@ var selected_item_slots: Array[int] = []
 var _drafting := false   # draft 弹窗打开中：拦截重入 + 暂停回合计时
 var _ai_rng := RandomNumberGenerator.new()   # 任务 B：AI 道具抽取选择用（与游戏 rng 分离）
 var _ai: BattleAI                             # 试玩对手 = 与 sim 统一的同一套搜索 AI（_ready 实例化）
+var _overtime := false                        # 本局是否加时赛（Q5·白板 1v1·_ready 从 BattleSetup 读）
 
 # ---- 选择 / 样式 ----
 var action_btn_list: Array[Button] = []
@@ -156,11 +157,17 @@ func _ready() -> void:
 	_ai_rng.randomize()   # 任务 B：AI 道具抽取随机种子
 	_ai = BattleAI.new(0, 2, 0, {})   # 与 sim 统一：同一套搜索 AI（随机种子·深度 2·基础评估）
 	battle = BattleCore.new()
+	_overtime = BattleSetup.overtime   # 须在 reset() 前读取
 	var p0: Array = _resolve_team(BattleSetup.p1_heroes, DEFAULT_P0)
 	var p1: Array = _resolve_team(BattleSetup.p2_heroes, DEFAULT_P1)
 	BattleSetup.reset()   # 消费即清空：防止下一局（未经 BP）复用本局阵容
 	battle.setup(p0, p1, randi())
-	battle.econ_init()   # 启用道具经济（开局带 1 + 槽位状态机·M1）
+	if _overtime:
+		# 加时赛（Q5·2026-07-03）：白板满血 1v1——slot0 出战、其余队友 0 血躺板凳（同归余烬·
+		# 引擎/UI 全程正常 3 人局零特判）；无道具经济（不 econ_init）、被动能量照常、不限回合。
+		battle.apply_overtime_bench()
+	else:
+		battle.econ_init()   # 启用道具经济（开局带 1 + 槽位状态机·M1）
 
 	_init_buttons()
 	_connect_frame_signals()
@@ -192,6 +199,12 @@ func _ready() -> void:
 		row.low_hp_ratio = LOW_HP_RATIO
 
 	_build_item_rows()
+	if _overtime:
+		p1_item_row.visible = false   # 加时禁道具 → 道具栏整行隐藏
+		p2_item_row.visible = false
+		status_label.text = "加时赛 · 巅峰 1v1"
+		status_label.add_theme_color_override("font_color", Color("#ffd86a"))
+		status_label.visible = true
 	_enlarge_frames()
 	_update_all()
 	_show_turn_intro()
@@ -505,10 +518,12 @@ func _on_confirm_pressed() -> void:
 
 
 func _ai_pick(side: int) -> void:
-	# 与 sim 统一：同一套 BattleAI 逻辑——价值搜索道具经济(plan_economy·B) + 同时博弈选动作(choose_action)。
+	# 与 sim 统一：同一套 BattleAI 逻辑——价值搜索道具经济(plan_economy·B) + 同时博弈选动作(choose_action)
+	# + 进攻向道具随攻击动作一并甩出(commit_attack_items·2026-07-03)。
 	# 取代旧「随机加权出招」占位 AI；试玩与平衡模拟现共用一套决策。AI 不偷看玩家已锁动作（搜索按博弈枚举）。
 	_ai.plan_economy(battle, side, _ai_rng)
 	var choice: Dictionary = _ai.choose_action(battle, side)
+	BattleAI.commit_attack_items(battle, side, int(choice["action"]))
 	if not battle.apply_choice(side, choice):
 		battle.select_action(side, A.CHARGE)   # 兜底（被禁/付不起→引擎 resolve guard 也兜）
 
@@ -545,8 +560,12 @@ func _resolve() -> void:
 	_update_all()
 
 	if r.get("game_over", false):
-		state = State.GAME_OVER
 		var w: int = r.get("winner", BattleCore.WINNER_UNDECIDED)
+		# 加时赛触发（Q5）：主局双方同归 → 各自 3 选 1 白板满血 1v1；加时局再平 = 真平局（走下方正常结束）。
+		if w == BattleCore.WINNER_DRAW and not _overtime:
+			await _start_overtime()
+			return
+		state = State.GAME_OVER
 		var msg := "平局"
 		var col := Color("#dddddd")
 		if w == BattleCore.WINNER_P1:
@@ -576,6 +595,29 @@ func _resolve() -> void:
 
 	await get_tree().create_timer(maxf(0.1, anim_phase_duration * 0.5)).timeout
 	_show_turn_intro()
+
+
+## 加时赛（Q5·2026-07-03）：主局同归 → 玩家复用换人浮窗从全队 3 人里选 1（含阵亡者·满血复活），
+## AI 选血量上限最大者；组白板 3 人组（板凳 0 血）→ BattleSetup 带旗标整场景重载 = UI 干净重建。
+func _start_overtime() -> void:
+	state = State.HERO_SELECT
+	_set_buttons_active(false)
+	status_label.text = "平局 → 加时赛！"
+	status_label.add_theme_color_override("font_color", Color("#ffd86a"))
+	status_label.visible = true
+
+	var entries: Array = []
+	for s in range(battle.heroes[PLAYER].size()):
+		var h: HeroData = battle.heroes[PLAYER][s]
+		entries.append([s, h, float(h.max_hp)])   # 满血复活展示
+	_death_switch_overlay.show_selection(PLAYER, entries, "加时赛：选一人出战（满血·无技能无道具）")
+	var pick: int = await _death_switch_overlay.selection_made
+	var ai_pick: int = BattleAI.choose_overtime_pick(battle, AI)
+
+	BattleSetup.p1_heroes = BattleCore.overtime_roster(battle.heroes[PLAYER], pick)
+	BattleSetup.p2_heroes = BattleCore.overtime_roster(battle.heroes[AI], ai_pick)
+	BattleSetup.overtime = true
+	get_tree().reload_current_scene()
 
 
 func _show_death_switch_selection(player: int) -> void:
@@ -963,16 +1005,13 @@ func _enlarge_frames() -> void:
 			f.position -= Vector2(d * 0.5, d)
 
 
-## M3：P1 道具槽点击分派（按槽态）。开格/抽/补 = 立即生效（公开电报）；
+## M3：P1 道具槽点击分派（按槽态）。抽/补 = 立即生效（公开电报）；
 ## 使用 = 暂存点选（金边），确认时与动作一起盲选提交。
+## 格解锁自动（第 3/4/5 回合·无开格步骤/费用·2026-07-03）→ SEALED（未到解锁回合）点击无操作。
 func _on_p1_slot_clicked(s: int) -> void:
 	if state != State.PLAYER_SELECT or _drafting:
 		return
 	match battle.slot_state(PLAYER, s):
-		BattleCore.SlotState.SEALED:
-			if battle.can_open_slot(PLAYER, s):
-				battle.open_slot(PLAYER, s)   # 付 1 能·SEALED→OPENED·锁本回合
-				_update_all()
 		BattleCore.SlotState.OPENED:
 			if battle.can_draw_slot(PLAYER, s):
 				var c: int = await _show_draft(s, battle.begin_draft(PLAYER, s))

@@ -4,6 +4,7 @@ extends Node
 
 var p1_heroes: Array[HeroData] = []
 var p2_heroes: Array[HeroData] = []
+var overtime := false   # 加时赛局（Q5·2026-07-03）：白板 1v1（阵容=overtime_roster 组的 3 人·板凳 0 血）·无道具经济
 
 
 ## 清空阵容。被 battle_screen 消费后 / 一局结束 / 返回菜单时调用，
@@ -11,3 +12,4 @@ var p2_heroes: Array[HeroData] = []
 func reset() -> void:
 	p1_heroes = []
 	p2_heroes = []
+	overtime = false

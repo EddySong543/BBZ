@@ -34,8 +34,9 @@ func _ready() -> void:
 
 
 ## 弹出浮窗。reserves 数组每项为 [slot_idx:int, hero:HeroData, hp:float]（多余元素忽略）。
-func show_selection(player: int, reserves: Array) -> void:
-	_prompt.text = "选择出战英雄"
+## title 可覆盖提示文案（加时赛选人复用本浮窗·2026-07-03）。
+func show_selection(player: int, reserves: Array, title: String = "选择出战英雄") -> void:
+	_prompt.text = title
 
 	for child in _card_container.get_children():
 		child.queue_free()

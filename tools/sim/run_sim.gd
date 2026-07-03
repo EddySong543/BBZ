@@ -18,9 +18,13 @@ extends SceneTree
 ##   --out DIR        输出目录（默认 res://tools/sim/out/）
 ##   --plan-ab 1      A/B 验证 Part 2：A(规划道具 plan_items) vs B(不规划) 头对头 → out/ab_result.md
 ##   --upgrade-ab 1   A/B 验证 B：A(价值搜索升级) vs B(阈值升级) 头对头 → out/ab_result.md
+##   --eval-ab 1      A/B 评估档转正：A(v1 基础) vs B(v2 牌感) 交叉头对头 → out/ab_result.md
+##   --w K=V[,K=V]    双方【都】用此权重覆盖（生态观察模式；与 --ab 组合时 = A 侧基线权重）
 
 const HERO_DATA_DIR := "res://assets/data/heroes/"
 const ROSTER_SIZE := 3
+## 加时赛工程安全阀（规则上不限回合；白板 1v1 拖到此数按真平局计·防极端死循环）。
+const OVERTIME_SAFETY_CAP := 300
 
 ## A/B 权重校准变体（B 侧用；A 侧恒为默认权重=空字典）。键 = BattleEval 常量名（T1）。
 const AB_VARIANTS := {
@@ -29,7 +33,8 @@ const AB_VARIANTS := {
 	"alive_up": {"W_ALIVE": 900.0},           # 更重存活（更保守保人）
 	"alive_down": {"W_ALIVE": 400.0},         # 更轻存活（更敢换）
 	"hp_up": {"W_HP": 16.0},                  # 更重血量
-	"flat_energy": {"W_ENERGY_EXTRA": 8.0},   # 屯多能不再廉价（弱化边际递减）
+	"flat_energy": {"W_ENERGY_EXTRA": 8.0},   # 屯多能更不廉价（默认已校准为 6.5·2026-07-03；此变体=再放宽一档）
+	"status_off": {"W_STATUS_SCALE": 0.0},    # 关闭状态资产项（=#7 前旧行为·A/B 对照组）
 }
 
 var games := 200
@@ -42,8 +47,11 @@ var use_draft := true   # true=DraftAI 选人 / false=随机阵容
 var depth := 2          # 对战 AI 搜索深度
 var profile := 0        # 对战 AI 评估档：0=v1 基础 / 1=v2 进阶(牌感·熟练优秀玩家)
 var ab_variant := ""    # A/B 校准：非空=A(默认权重) vs B(此变体) 头对头（见 AB_VARIANTS）
+var both_weights := {}  # --w K=V[,K=V]：双方【都】用此权重覆盖（生态观察模式·区别于 --ab 的混打测强弱）
 var plan_ab := false    # A/B：A(plan_items=true 规划道具) vs B(false 不规划) 头对头（验证 Part 2）
 var upgrade_ab := false  # A/B：A(search_upgrade=true 价值搜索升级) vs B(false 阈值升级) 头对头（验证 B）
+var eval_ab := false     # A/B：A(v1 基础评估) vs B(v2 进阶牌感) 交叉头对头（#4 转正对决·--eval-ab 1）
+var pick_ab := false     # A/B：A(智能选牌 smart_draft) vs B(纯随机) 头对头（#6 验证·--pick-ab 1）
 
 var _hero_data := {}    # hero_id → HeroData（加载一次复用）
 var _pool_hd: Array = []  # Array[HeroData]，与 ids 平行（drafter 用，返回索引）
@@ -70,12 +78,18 @@ func _initialize() -> void:
 	var action_count := {}                  # action int → 次数
 	var hero_present := {}                   # hero_id → 出场局数
 	var hero_win := {}                       # hero_id → 所在队获胜局数
+	# 深层统计（2026-07-03·#1 统计增强）：伤害来源占比 / 大波拦截 / 各英雄主动技
+	var stats := {dmg_action = 0, dmg_item = 0, bigwave_blocked = 0, active_uses = {}}
+	# 加时赛统计（Q5）：主局平局/未决 → 3 选 1 白板 1v1 定胜负
+	var ot := {count = 0, from_draw = 0, from_cap = 0, decided = 0, true_draw = 0, turns = []}
 	var ab_a := 0      # A/B：A(默认权重)胜
 	var ab_b := 0      # A/B：B(变体权重)胜
 	var ab_draw := 0   # A/B：平/未决
 
 	if ab_active():
-		if upgrade_ab:
+		if eval_ab:
+			print("【A/B】A=v1 基础评估 vs B=v2 进阶牌感 交叉头对头（交替先后手·#4 转正对决）")
+		elif upgrade_ab:
 			print("【A/B】A=价值搜索升级(search_upgrade=true) vs B=阈值升级(false) 头对头（交替先后手·验证 B）")
 		elif plan_ab:
 			print("【A/B】A=规划道具(plan_items=true) vs B=不规划(false) 头对头（两方实战都用道具·交替先后手）")
@@ -110,9 +124,10 @@ func _initialize() -> void:
 		var b := BattleCore.new()
 		b.setup(_to_heroes(r0), _to_heroes(r1), seed_g)
 		b.econ_init()   # 启用道具经济（开局带 1 + 槽位状态机）→ AI 每回合走 run_item_economy
-		# A/B 校准：A=默认权重、B=变体；偶数局 A=P0、奇数局 A=P1 → 抵消位置偏差
-		var w0: Dictionary = {}
-		var w1: Dictionary = {}
+		# A/B 校准：A=默认权重、B=变体；偶数局 A=P0、奇数局 A=P1 → 抵消位置偏差。
+		# --w 生态模式：双方同权重（与 --ab 互斥·--ab 优先）。
+		var w0: Dictionary = both_weights.duplicate()
+		var w1: Dictionary = both_weights.duplicate()
 		if use_ab():
 			var wb: Dictionary = AB_VARIANTS.get(ab_variant, {})
 			if g % 2 == 0:
@@ -127,9 +142,36 @@ func _initialize() -> void:
 		if upgrade_ab:
 			ai0.search_upgrade = (g % 2 == 0)   # A(价值搜索升级)=偶数局 P0 / 奇数局 P1
 			ai1.search_upgrade = (g % 2 != 0)
+		if eval_ab:
+			ai0.eval_profile = 0 if g % 2 == 0 else 1   # A(v1 基础)=偶数局 P0 / 奇数局 P1
+			ai1.eval_profile = 1 if g % 2 == 0 else 0   # B(v2 牌感)=对侧
+		if pick_ab:
+			ai0.smart_draft = (g % 2 == 0)   # A(智能选牌)=偶数局 P0 / 奇数局 P1
+			ai1.smart_draft = (g % 2 != 0)
 
-		var res: Dictionary = _play(b, ai0, ai1, action_count, item_stat)
+		var res: Dictionary = _play(b, ai0, ai1, action_count, item_stat, stats)
 		var w: int = res["winner"]
+		# 加时赛（Q5·2026-07-03）：主局平局 / 打满上限 → 各自 3 选 1（AI=最大 HP）白板满血 1v1。
+		# 加时动作/道具不计入主生态统计（传临时容器）→ 主报表口径不被稀释。
+		if w == 0 or w == -1:
+			ot["count"] = int(ot["count"]) + 1
+			ot["from_draw" if w == 0 else "from_cap"] = int(ot["from_draw" if w == 0 else "from_cap"]) + 1
+			var duel: BattleCore = BattleCore.create_overtime(
+				b.heroes[0][BattleAI.choose_overtime_pick(b, 0)],
+				b.heroes[1][BattleAI.choose_overtime_pick(b, 1)], seed_g + 777)
+			var dai0 := BattleAI.new(seed_g + 3, depth, profile, w0)
+			var dai1 := BattleAI.new(seed_g + 4, depth, profile, w1)
+			dai0.eval_profile = ai0.eval_profile   # 加时沿用主局各侧评估档（eval_ab 交叉时一致）
+			dai1.eval_profile = ai1.eval_profile
+			var dres: Dictionary = _play(duel, dai0, dai1, {}, {}, {}, OVERTIME_SAFETY_CAP)
+			(ot["turns"] as Array).append(int(dres["turns"]))
+			var dw: int = int(dres["winner"])
+			if dw == 1 or dw == 2:
+				ot["decided"] = int(ot["decided"]) + 1
+				w = dw
+			else:
+				ot["true_draw"] = int(ot["true_draw"]) + 1
+				w = 0   # 加时再同归（或安全阀）= 真平局
 		win[w] = win.get(w, 0) + 1
 		turns_list.append(res["turns"])
 		if ab_active():
@@ -161,7 +203,7 @@ func _initialize() -> void:
 			print("  ...%d/%d 局完成" % [g + 1, games])
 			_write_progress(g + 1)
 
-	_write_outputs(csv_rows, win, turns_list, action_count, hero_present, hero_win, item_stat)
+	_write_outputs(csv_rows, win, turns_list, action_count, hero_present, hero_win, item_stat, stats, ot)
 	if ab_active():
 		_write_ab(ab_a, ab_b, ab_draw)
 	_write_progress(games)
@@ -173,13 +215,17 @@ func use_ab() -> bool:
 	return ab_variant != ""
 
 
-## A/B 计数 / 输出是否激活（权重变体 或 道具规划头对头）。
+## A/B 计数 / 输出是否激活（权重变体 / 道具规划 / 升级择时 / 评估档 / 选牌 头对头）。
 func ab_active() -> bool:
-	return ab_variant != "" or plan_ab or upgrade_ab
+	return ab_variant != "" or plan_ab or upgrade_ab or eval_ab or pick_ab
 
 
 ## A/B 变体名（用于标签）。
 func _ab_name() -> String:
+	if pick_ab:
+		return "智能选牌(smart_draft)"
+	if eval_ab:
+		return "评估档对决(v1 vs v2)"
 	if upgrade_ab:
 		return "升级价值搜索(search_upgrade)"
 	if plan_ab:
@@ -205,7 +251,19 @@ func _write_ab(a: int, b: int, draw: int) -> void:
 	var desc: String
 	var focus: String
 	var title: String
-	if upgrade_ab:
+	if pick_ab:
+		a_label = "智能选牌"
+		b_label = "随机选牌"
+		desc = "A=智能选牌(smart_draft=true·启发式) ｜ B=纯随机（同权重同评估·仅 3 选 1 选牌不同·#6 验证）"
+		focus = "A(智能选牌)"
+		title = "道具选牌(#6)"
+	elif eval_ab:
+		a_label = "v1基础评估"
+		b_label = "v2进阶牌感"
+		desc = "A=v1 基础评估(profile 0·现役默认) ｜ B=v2 进阶牌感(profile 1)（同权重同搜索·仅评估档不同·#4 转正对决）"
+		focus = "B(v2牌感)"
+		title = "评估档转正(v1 vs v2)"
+	elif upgrade_ab:
 		a_label = "价值搜索升级"
 		b_label = "阈值升级"
 		desc = "A=价值搜索升级(search_upgrade=true·plan_economy) ｜ B=阈值升级(run_item_economy)（两方实战同·仅升级择时不同）"
@@ -239,22 +297,38 @@ func _write_ab(a: int, b: int, draw: int) -> void:
 
 
 ## 跑一局到结束或回合上限。返回 {winner, turns, p0_alive, p1_alive, p0_hp, p1_hp}。
-func _play(b: BattleCore, ai0: BattleAI, ai1: BattleAI, action_count: Dictionary, item_stat: Dictionary) -> Dictionary:
-	while not b.game_over and b.turn_number < max_turns:
-		# 道具经济：选动作【前】双方自动管理道具栏（与实战 _ai_pick 同启发·开格立即扣能 → 动作据剩余能量）。
+## stats（可选）：深层统计累加器 {dmg_action, dmg_item, bigwave_blocked, active_uses:{hero_id:次数}}。
+## cap（可选）：本局回合上限覆盖（加时赛安全阀用）；<=0 = 用全局 max_turns。
+func _play(b: BattleCore, ai0: BattleAI, ai1: BattleAI, action_count: Dictionary, item_stat: Dictionary, stats: Dictionary = {}, cap: int = -1) -> Dictionary:
+	var limit: int = cap if cap > 0 else max_turns
+	while not b.game_over and b.turn_number < limit:
+		# 道具经济：选动作【前】双方自动管理道具栏（与实战 _ai_pick 同启发·补/升扣能 → 动作据剩余能量；
+		# 进攻向道具按兵不动 → 动作定为攻击后 commit_attack_items 一并甩出·2026-07-03）。
 		ai0.plan_economy(b, 0, ai0.rng)
 		ai1.plan_economy(b, 1, ai1.rng)
-		item_stat["used"] = item_stat.get("used", 0) + b.item_uses[0].size() + b.item_uses[1].size()
 		# 双方从同一结算前状态同时盲选
 		var c0: Dictionary = ai0.choose_action(b, 0)
 		var c1: Dictionary = ai1.choose_action(b, 1)
+		BattleAI.commit_attack_items(b, 0, int(c0["action"]))
+		BattleAI.commit_attack_items(b, 1, int(c1["action"]))
+		item_stat["used"] = item_stat.get("used", 0) + b.item_uses[0].size() + b.item_uses[1].size()
 		_tally(action_count, int(c0["action"]))
 		_tally(action_count, int(c1["action"]))
+		# 各英雄主动技使用（选择时点记·出战英雄即释放者）
+		if not stats.is_empty():
+			for pc in [[0, c0], [1, c1]]:
+				var pi: int = int(pc[0])
+				if int((pc[1] as Dictionary)["action"]) == ActionDef.ACTIVE:
+					var hid: String = (b.heroes[pi][b.active_index[pi]] as HeroData).hero_id
+					var au: Dictionary = stats["active_uses"]
+					au[hid] = int(au.get(hid, 0)) + 1
 		if not b.apply_choice(0, c0):
 			b.select_action(0, ActionDef.Action.CHARGE)
 		if not b.apply_choice(1, c1):
 			b.select_action(1, ActionDef.Action.CHARGE)
-		b.resolve()
+		var rr: Dictionary = b.resolve()
+		if not stats.is_empty():
+			_scan_events(rr.get("events", []), stats)
 		# 出战阵亡 → AI 选替补上场
 		for p in [0, 1]:
 			if b.pending_death_switch[p]:
@@ -271,6 +345,25 @@ func _play(b: BattleCore, ai0: BattleAI, ai1: BattleAI, action_count: Dictionary
 		p0_hp = _team_hp(b, 0),
 		p1_hp = _team_hp(b, 1),
 	}
+
+
+## 扫一回合事件流入深层统计：伤害来源占比（动作/技能 vs 道具）+ 大波被大防拦截数。
+## 道具系伤害 = damage_taken(src=item) + 延迟伤害(妖火/藤蔓) + 尾后针反击。
+func _scan_events(events: Array, stats: Dictionary) -> void:
+	for ev in events:
+		match String(ev.get("id", "")):
+			"damage_taken":
+				if String(ev.get("src", "action")) == "item":
+					stats["dmg_item"] = int(stats["dmg_item"]) + int(ev.get("amount", 0))
+				else:
+					stats["dmg_action"] = int(stats["dmg_action"]) + int(ev.get("amount", 0))
+			"deferred_damage":
+				stats["dmg_item"] = int(stats["dmg_item"]) + int(ev.get("amount", 0))
+			"weihouzhen_sting":
+				stats["dmg_item"] = int(stats["dmg_item"]) + BattleCore.WEIHOUZHEN_STING_DMG
+			"big_defend_block":
+				if String(ev.get("src", "action")) == "action" and int(ev.get("kind", -1)) == ActionDef.Action.BIG_ATTACK:
+					stats["bigwave_blocked"] = int(stats["bigwave_blocked"]) + 1
 
 
 func _team_hp(b: BattleCore, p: int) -> float:
@@ -323,7 +416,7 @@ func _load_pool() -> Array:
 
 func _write_outputs(csv_rows: Array, win: Dictionary, turns_list: Array,
 		action_count: Dictionary, hero_present: Dictionary, hero_win: Dictionary,
-		item_stat: Dictionary = {}) -> void:
+		item_stat: Dictionary = {}, stats: Dictionary = {}, ot: Dictionary = {}) -> void:
 	var abs_dir := ProjectSettings.globalize_path(out_dir)
 	DirAccess.make_dir_recursive_absolute(abs_dir)
 
@@ -353,8 +446,16 @@ func _write_outputs(csv_rows: Array, win: Dictionary, turns_list: Array,
 	md.store_line("|------|------|------|")
 	md.store_line("| P1 先手胜 | %d | %s |" % [win.get(1, 0), _pct(win.get(1, 0), total)])
 	md.store_line("| P2 后手胜 | %d | %s |" % [win.get(2, 0), _pct(win.get(2, 0), total)])
-	md.store_line("| 平局 | %d | %s |" % [win.get(0, 0), _pct(win.get(0, 0), total)])
+	md.store_line("| 真平局(含加时再平) | %d | %s |" % [win.get(0, 0), _pct(win.get(0, 0), total)])
 	md.store_line("| 未决(达回合上限) | %d | %s |\n" % [win.get(-1, 0), _pct(win.get(-1, 0), total)])
+
+	# 加时赛（Q5·主局平局/未决 → 3 选 1 白板 1v1）
+	if not ot.is_empty() and int(ot.get("count", 0)) > 0:
+		var ot_turns: Array = ot.get("turns", [])
+		md.store_line("## 加时赛（主局平局/未决 → 3 选 1 白板 1v1·无技能无道具）")
+		md.store_line("- 触发 **%d** 局（主局平局 %d / 打满上限 %d）｜加时分出胜负 **%d** ｜ 加时再平 %d ｜ 加时均值 %.1f 回合\n" % [
+			int(ot["count"]), int(ot["from_draw"]), int(ot["from_cap"]),
+			int(ot["decided"]), int(ot["true_draw"]), _avg(ot_turns)])
 
 	# 回合分布
 	turns_list.sort()
@@ -381,16 +482,32 @@ func _write_outputs(csv_rows: Array, win: Dictionary, turns_list: Array,
 	md.store_line("- 总提交道具次数：**%d** ｜ 局均：%.2f 次/局\n" % [
 		items_used, (float(items_used) / float(total) if total > 0 else 0.0)])
 
-	# 各英雄胜率（present 降序里按胜率排）
-	md.store_line("## 各英雄胜率（出场 ≥1 局）")
-	md.store_line("| 英雄 | 出场 | 胜 | 胜率 |")
-	md.store_line("|------|------|----|------|")
+	# 深层统计（2026-07-03·#1 统计增强）：伤害来源占比 + 大波拦截率
+	if not stats.is_empty():
+		var da: int = int(stats.get("dmg_action", 0))
+		var di: int = int(stats.get("dmg_item", 0))
+		md.store_line("## 伤害来源占比（落 HP 的半点）")
+		md.store_line("- 动作/技能伤害：**%d** ｜ 道具系伤害：**%d** ｜ 道具占比：**%s**\n" % [
+			da, di, _pct(di, da + di)])
+		var bw_total: int = int(action_count.get(ActionDef.Action.BIG_ATTACK, 0))
+		var bw_blocked: int = int(stats.get("bigwave_blocked", 0))
+		md.store_line("## 大波拦截")
+		md.store_line("- 大波总数：**%d** ｜ 被大防挡下：**%d**（拦截率 %s）\n" % [
+			bw_total, bw_blocked, _pct(bw_blocked, bw_total)])
+
+	# 各英雄胜率 + 主动技使用（present 降序里按胜率排）
+	var active_uses: Dictionary = stats.get("active_uses", {})
+	md.store_line("## 各英雄胜率 / 主动技（出场 ≥1 局）")
+	md.store_line("| 英雄 | 出场 | 胜 | 胜率 | 主动技次数 | 次/出场局 |")
+	md.store_line("|------|------|----|------|-----------|----------|")
 	var ids: Array = hero_present.keys()
 	ids.sort_custom(func(a, b): return _wr(hero_win, hero_present, a) > _wr(hero_win, hero_present, b))
 	for id in ids:
 		var pre: int = hero_present[id]
 		var wn: int = hero_win.get(id, 0)
-		md.store_line("| %s | %d | %d | %s |" % [id, pre, wn, _pct(wn, pre)])
+		var act: int = int(active_uses.get(id, 0))
+		md.store_line("| %s | %d | %d | %s | %d | %.2f |" % [
+			id, pre, wn, _pct(wn, pre), act, (float(act) / float(pre) if pre > 0 else 0.0)])
 	md.close()
 	print("写出 %ssim_summary.md" % out_dir)
 
@@ -446,8 +563,15 @@ func _parse_args() -> void:
 			"--profile": profile = int(val)
 			"--draft": use_draft = int(val) != 0
 			"--ab": ab_variant = val
+			"--w":
+				for pair in val.split(","):
+					var kv := (pair as String).split("=")
+					if kv.size() == 2:
+						both_weights[kv[0]] = float(kv[1])
 			"--plan-ab": plan_ab = int(val) != 0
 			"--upgrade-ab": upgrade_ab = int(val) != 0
+			"--eval-ab": eval_ab = int(val) != 0
+			"--pick-ab": pick_ab = int(val) != 0
 			"--out": out_dir = val
 			"--pool":
 				var parts := val.split("-")
