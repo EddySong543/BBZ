@@ -20,6 +20,9 @@ extends SceneTree
 ##   --upgrade-ab 1   A/B 验证 B：A(价值搜索升级) vs B(阈值升级) 头对头 → out/ab_result.md
 ##   --eval-ab 1      A/B 评估档转正：A(v1 基础) vs B(v2 牌感) 交叉头对头 → out/ab_result.md
 ##   --w K=V[,K=V]    双方【都】用此权重覆盖（生态观察模式；与 --ab 组合时 = A 侧基线权重）
+##   --panel NAME     T1 测量面板：v1 内战(50) / v2 内战(50) / v1×v2 交叉(60) 三连跑
+##                    → panel_NAME/{v1_eco,v2_eco,cross}/ 各完整报表 + panel_summary.md 对照表
+##                    （--games N 可统一覆盖三份局数·冒烟用；推荐 --seed 42 保持面板间可比）
 
 const HERO_DATA_DIR := "res://assets/data/heroes/"
 const ROSTER_SIZE := 3
@@ -52,6 +55,8 @@ var plan_ab := false    # A/B：A(plan_items=true 规划道具) vs B(false 不�
 var upgrade_ab := false  # A/B：A(search_upgrade=true 价值搜索升级) vs B(false 阈值升级) 头对头（验证 B）
 var eval_ab := false     # A/B：A(v1 基础评估) vs B(v2 进阶牌感) 交叉头对头（#4 转正对决·--eval-ab 1）
 var pick_ab := false     # A/B：A(智能选牌 smart_draft) vs B(纯随机) 头对头（#6 验证·--pick-ab 1）
+var panel_name := ""     # --panel NAME：T1 测量面板（v1 内战/v2 内战/v1×v2 交叉 三连跑 + 汇总对照表）
+var games_set := false   # --games 是否显式给出（panel 默认 50/50/60；显式则三份同 N·冒烟用）
 
 var _hero_data := {}    # hero_id → HeroData（加载一次复用）
 var _pool_hd: Array = []  # Array[HeroData]，与 ids 平行（drafter 用，返回索引）
@@ -64,8 +69,17 @@ func _initialize() -> void:
 		push_error("英雄池不足 %d（实得 %d）" % [ROSTER_SIZE, pool.size()])
 		quit(1)
 		return
+	if panel_name != "":
+		_run_panel(pool)
+	else:
+		_run_batch(pool)
+	print("=== 完成 ===")
+	quit()
 
-	print("=== AI 自对弈模拟 ===")
+
+## 跑一批对局（按当前实例参数），完整报表写入 out_dir；返回关键指标字典（panel 汇总对照用）。
+func _run_batch(pool: Array, label: String = "") -> Dictionary:
+	print("=== AI 自对弈模拟 %s ===" % label)
 	print("对局=%d  种子=%d  池=h%02d–h%02d(%d)  回合上限=%d  选人=%s  AI深度=%d  评估=%s" % [
 		games, base_seed, pool_first, pool_last, pool.size(), max_turns,
 		("drafter" if use_draft else "随机"), depth, ("v2进阶" if profile == 1 else "v1基础")])
@@ -207,8 +221,123 @@ func _initialize() -> void:
 	if ab_active():
 		_write_ab(ab_a, ab_b, ab_draw)
 	_write_progress(games)
-	print("=== 完成 ===")
-	quit()
+	turns_list.sort()
+	return {
+		label = label, total = games, win = win,
+		turns_med = (turns_list[turns_list.size() / 2] if not turns_list.is_empty() else 0),
+		turns_avg = _avg(turns_list),
+		actions = action_count, items_used = int(item_stat.get("used", 0)),
+		stats = stats, ot = ot,
+		ab = ({a = ab_a, b = ab_b, draw = ab_draw} if ab_active() else {}),
+	}
+
+
+const PANEL_ECO_GAMES := 50     # 面板生态份局数（Eddy 硬规：AI 优化期全小轮）
+const PANEL_CROSS_GAMES := 60   # 面板交叉份局数
+
+
+## T1 测量面板（2026-07-03 惯例）：每次平衡相关改动跑三份小轮——
+##   ① v1 内战（大众生态）② v2 内战（高端局生态）③ v1×v2 交叉（强度追踪）。
+## 输出：panel_<名>/ 下三份完整报表 + panel_summary.md 对照表。
+## 判读：两份生态结论一致才采纳；不一致的行 = 对玩家水平敏感的设计（单独标记）；
+##       交叉 decisive 大幅偏离 50% = 评估档强度漂移（复查最近改动）。
+func _run_panel(pool: Array) -> void:
+	var root := "res://tools/sim/panel_%s/" % panel_name
+	print("=== T1 测量面板「%s」：v1 内战 / v2 内战 / v1×v2 交叉 ===" % panel_name)
+	var eco_games: int = games if games_set else PANEL_ECO_GAMES
+	var cross_games: int = games if games_set else PANEL_CROSS_GAMES
+	var results: Array = []
+	games = eco_games
+	profile = 0
+	eval_ab = false
+	out_dir = root + "v1_eco/"
+	results.append(_run_batch(pool, "[v1 内战]"))
+	profile = 1
+	out_dir = root + "v2_eco/"
+	results.append(_run_batch(pool, "[v2 内战]"))
+	games = cross_games
+	profile = 0
+	eval_ab = true
+	out_dir = root + "cross/"
+	results.append(_run_batch(pool, "[v1×v2 交叉]"))
+	_write_panel_summary(root, results)
+
+
+## 面板汇总对照表：生态两列（v1/v2 内战）+ 交叉强度一节 + 判读指引。
+func _write_panel_summary(root: String, results: Array) -> void:
+	var v1: Dictionary = results[0]
+	var v2: Dictionary = results[1]
+	var cx: Dictionary = results[2]
+	var f := FileAccess.open(root + "panel_summary.md", FileAccess.WRITE)
+	if f == null:
+		push_error("无法写 panel_summary.md")
+		return
+	f.store_line("# 测量面板「%s」汇总（T1 惯例）\n" % panel_name)
+	f.store_line("- 生成：%s ｜ 种子：%d ｜ 池：h%02d–h%02d ｜ 深度：%d ｜ 局数：生态各 %d / 交叉 %d\n" % [
+		Time.get_datetime_string_from_system(), base_seed, pool_first, pool_last, depth,
+		int(v1["total"]), int(cx["total"])])
+	f.store_line("## 生态对照（同种子·仅评估档不同）")
+	f.store_line("| 指标 | v1 内战(大众) | v2 内战(高端) |")
+	f.store_line("|------|------|------|")
+	f.store_line(_prow("分出胜负", _decisive_pct(v1), _decisive_pct(v2)))
+	f.store_line(_prow("真平局(含加时再平)", _win_pct(v1, 0), _win_pct(v2, 0)))
+	f.store_line(_prow("回合 均值(中位)", "%.1f (%d)" % [float(v1["turns_avg"]), int(v1["turns_med"])],
+		"%.1f (%d)" % [float(v2["turns_avg"]), int(v2["turns_med"])]))
+	for a in _action_order():
+		f.store_line(_prow(_action_label(a), _act_pct(v1, a), _act_pct(v2, a)))
+	f.store_line(_prow("道具局均", "%.1f" % (float(v1["items_used"]) / maxf(1.0, float(v1["total"]))),
+		"%.1f" % (float(v2["items_used"]) / maxf(1.0, float(v2["total"])))))
+	f.store_line(_prow("道具伤害占比", _item_dmg_pct(v1), _item_dmg_pct(v2)))
+	f.store_line(_prow("大波拦截率", _bw_block_pct(v1), _bw_block_pct(v2)))
+	f.store_line(_prow("加时 触发/分出/再平", _ot_line(v1), _ot_line(v2)))
+	var ab: Dictionary = cx.get("ab", {})
+	var a_w: int = int(ab.get("a", 0))
+	var b_w: int = int(ab.get("b", 0))
+	f.store_line("\n## 强度追踪（v1×v2 交叉 %d 局·交替先后手）" % int(cx["total"]))
+	f.store_line("- v1 胜 %d ｜ v2 胜 %d ｜ 平 %d → v1 decisive 占比 **%s**（基线 ≈50%%）\n" % [
+		a_w, b_w, int(ab.get("draw", 0)), _pct(a_w, a_w + b_w)])
+	f.store_line("## 判读指引")
+	f.store_line("- 生态两列结论**一致** → 采纳该平衡判断；**不一致的行** = 对玩家水平敏感的设计（单独标记复查）。")
+	f.store_line("- 交叉 decisive 大幅偏离 50% → 评估档强度漂移，复查最近对共享层/评估的改动。")
+	f.store_line("- 局数为小轮（Eddy 硬规）：单行 ±5-8% 属噪声，只对大差距（≥10%）下结论。")
+	f.close()
+	print("写出 %spanel_summary.md" % root)
+
+
+func _prow(name: String, a: String, b: String) -> String:
+	return "| %s | %s | %s |" % [name, a, b]
+
+
+func _decisive_pct(r: Dictionary) -> String:
+	var w: Dictionary = r["win"]
+	return _pct(int(w.get(1, 0)) + int(w.get(2, 0)), int(r["total"]))
+
+
+func _win_pct(r: Dictionary, key: int) -> String:
+	return _pct(int((r["win"] as Dictionary).get(key, 0)), int(r["total"]))
+
+
+func _act_pct(r: Dictionary, action: int) -> String:
+	var ac: Dictionary = r["actions"]
+	var total := 0
+	for k in ac:
+		total += int(ac[k])
+	return _pct(int(ac.get(action, 0)), total)
+
+
+func _item_dmg_pct(r: Dictionary) -> String:
+	var st: Dictionary = r["stats"]
+	return _pct(int(st.get("dmg_item", 0)), int(st.get("dmg_item", 0)) + int(st.get("dmg_action", 0)))
+
+
+func _bw_block_pct(r: Dictionary) -> String:
+	var st: Dictionary = r["stats"]
+	return _pct(int(st.get("bigwave_blocked", 0)), int((r["actions"] as Dictionary).get(ActionDef.Action.BIG_ATTACK, 0)))
+
+
+func _ot_line(r: Dictionary) -> String:
+	var ot: Dictionary = r["ot"]
+	return "%d / %d / %d" % [int(ot.get("count", 0)), int(ot.get("decided", 0)), int(ot.get("true_draw", 0))]
 
 
 func use_ab() -> bool:
@@ -556,7 +685,10 @@ func _parse_args() -> void:
 		var key: String = args[i]
 		var val: String = args[i + 1] if i + 1 < args.size() else ""
 		match key:
-			"--games": games = int(val)
+			"--games":
+				games = int(val)
+				games_set = true
+			"--panel": panel_name = val
 			"--seed": base_seed = int(val)
 			"--max-turns": max_turns = int(val)
 			"--depth": depth = int(val)
