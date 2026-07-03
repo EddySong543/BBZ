@@ -21,8 +21,9 @@ extends SceneTree
 ##   --eval-ab 1      A/B 评估档转正：A(v1 基础) vs B(v2 牌感) 交叉头对头 → out/ab_result.md
 ##   --w K=V[,K=V]    双方【都】用此权重覆盖（生态观察模式；与 --ab 组合时 = A 侧基线权重）
 ##   --panel NAME     T1 测量面板：v1 内战(50) / v2 内战(50) / v1×v2 交叉(60) 三连跑
-##                    → panel_NAME/{v1_eco,v2_eco,cross}/ 各完整报表 + panel_summary.md 对照表
-##                    （--games N 可统一覆盖三份局数·冒烟用；推荐 --seed 42 保持面板间可比）
+##                    → out_panel_NAME/{v1_eco,v2_eco,cross}/ 各完整报表 + panel_summary.md 对照表
+##                    （--games N 可统一覆盖三份局数·冒烟用；推荐 --seed 42 保持面板间可比；
+##                     并行版 = bash tools/sim/run_panel_parallel.sh·配 --panel-part / --panel-merge）
 
 const HERO_DATA_DIR := "res://assets/data/heroes/"
 const ROSTER_SIZE := 3
@@ -254,7 +255,7 @@ func _run_panel(pool: Array) -> void:
 	for part in _PANEL_PARTS:
 		_apply_panel_part(String(part[0]))
 		results.append(_run_batch(pool, String(part[1])))
-	_write_panel_summary("res://tools/sim/panel_%s/" % panel_name, results)
+	_write_panel_summary("res://tools/sim/out_panel_%s/" % panel_name, results)
 
 
 ## 面板分部定义：[part 名, 报表标签, 子目录]。
@@ -267,7 +268,7 @@ const _PANEL_PARTS := [
 
 ## 按分部名设置实例参数（串行 _run_panel 与并行 _run_panel_part 共用）。
 func _apply_panel_part(part: String) -> void:
-	var root := "res://tools/sim/panel_%s/" % panel_name
+	var root := "res://tools/sim/out_panel_%s/" % panel_name
 	match part:
 		"v1eco":
 			profile = 0
@@ -306,7 +307,7 @@ func _run_panel_part(pool: Array) -> void:
 
 ## 并行版·合并（A 档）：读三份 part_metrics.json → panel_summary.md（JSON 数字键还原为 int）。
 func _panel_merge() -> void:
-	var root := "res://tools/sim/panel_%s/" % panel_name
+	var root := "res://tools/sim/out_panel_%s/" % panel_name
 	var results: Array = []
 	for p in _PANEL_PARTS:
 		var path: String = root + String(p[2]) + "part_metrics.json"

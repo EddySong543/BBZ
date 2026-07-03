@@ -11,6 +11,9 @@
 *.json  text eol=lf
 *.cfg   text eol=lf
 
+# Shell scripts — LF 强制（CRLF 会破坏 shebang / git bash 解析·2026-07-03）。
+*.sh    text eol=lf
+
 # Binary assets — never normalize.
 *.png   binary
 *.jpg   binary

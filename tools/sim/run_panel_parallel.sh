@@ -5,7 +5,7 @@
 #
 # 用法（git bash·项目根或任意处）：
 #   bash tools/sim/run_panel_parallel.sh <改动名> [seed=42] [depth=2] [games(冒烟用·默认 50/50/60)]
-# 输出：tools/sim/panel_<改动名>/panel_summary.md + 三份完整报表
+# 输出：tools/sim/out_panel_<改动名>/panel_summary.md + 三份完整报表（out_* 已被 gitignore 挡住）
 set -e
 NAME="${1:?用法: run_panel_parallel.sh <改动名> [seed] [depth] [games]}"
 SEED="${2:-42}"
@@ -17,10 +17,13 @@ PROJ="$(cd "$(dirname "$0")/../.." && pwd)"
 GAMES_ARG=()
 [ -n "$GAMES" ] && GAMES_ARG=(--games "$GAMES")
 
+OUT="$PROJ/tools/sim/out_panel_$NAME"
+mkdir -p "$OUT"
+
 run_part() {
 	"$GODOT" --headless --path "$PROJ" --script res://tools/sim/run_sim.gd -- \
 		--panel "$NAME" --panel-part "$1" --seed "$SEED" --depth "$DEPTH" "${GAMES_ARG[@]}" \
-		> "$PROJ/tools/sim/panel_${NAME}_part_$1.log" 2>&1
+		> "$OUT/part_$1.log" 2>&1
 }
 
 echo "面板「$NAME」三份并行启动（seed=$SEED depth=$DEPTH）..."
@@ -31,5 +34,4 @@ wait
 
 "$GODOT" --headless --path "$PROJ" --script res://tools/sim/run_sim.gd -- \
 	--panel "$NAME" --panel-merge 1 2>&1 | tail -2
-rm -f "$PROJ"/tools/sim/panel_"${NAME}"_part_*.log
-echo "完成：tools/sim/panel_$NAME/panel_summary.md"
+echo "完成：tools/sim/out_panel_$NAME/panel_summary.md"
