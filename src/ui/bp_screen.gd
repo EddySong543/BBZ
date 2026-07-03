@@ -75,6 +75,7 @@ const TIER_GOLD := {
 }
 
 var all_heroes: Array[HeroData] = []
+var _draft_ai := DraftAI.new()       # 对手选人 AI（任务#5·2026-07-03 接入·随机种子）
 var step: int = Step.BAN
 var my_sel: Array[int] = []          # 手牌（顺序=槽位）
 var my_bans: Array[int] = []
@@ -504,14 +505,21 @@ func _auto_fill() -> void:
 		_on_confirm()
 
 
-## AI 盲选：从合法池随机 n 个不同（PICK 不排除我方 → 允许镜像）。
+## AI 盲选（2026-07-03·任务#5 接入 DraftAI·取代纯随机）：
+## BAN=偏高血耐久威胁（带温度）；PICK=按坦克/灵活/脆皮血量曲线组均衡队（排除 banned·允许镜像·温度保覆盖）。
+## 与 sim（run_sim --draft 1）同一套选人 AI → 试玩对手与平衡数据同源。
 func _ai_choose(n: int, exclude: Array[int]) -> Array[int]:
-	var pool: Array[int] = []
-	for i in all_heroes.size():
-		if not i in exclude:
-			pool.append(i)
-	pool.shuffle()
-	return pool.slice(0, mini(n, pool.size()))
+	var picks: Array = _draft_ai.choose_bans(all_heroes, n) if step == Step.BAN \
+			else _draft_ai.choose_picks(all_heroes, exclude, n)
+	var out: Array[int] = []
+	for i in picks:
+		out.append(int(i))
+	# 兜底（池异常小等极端情况凑不满 n）：随机补足，保证下游 3 张牌背演出不缺位。
+	while out.size() < n and out.size() < all_heroes.size():
+		var r := randi() % all_heroes.size()
+		if not r in out and not r in exclude:
+			out.append(r)
+	return out
 
 
 # ============================================================
