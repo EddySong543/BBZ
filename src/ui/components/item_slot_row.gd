@@ -239,19 +239,15 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 		var has_item := false              # 该槽是否装着道具（有→框走稀有度色·不被经济金边覆盖）
 		match st:
 			BattleCore.SlotState.SEALED:
-				if battle.turn_number >= int(BattleCore.SLOT_UNLOCK_TURN[i]):
-					lbl.text = "可开"
-					ready = battle.can_open_slot(player, i)
-					ft = NEU_FT; fb = NEU_FB; ei = EMPTY_EDGE
-				else:
-					lbl.text = "—"   # 仍是 SEAL 灰（未到解锁回合）
+				# 未到解锁回合（格自动解锁·无开格操作）→ 显示解锁回合数电报。
+				lbl.text = "回合%d\n解锁" % (int(BattleCore.SLOT_UNLOCK_TURN[i]) + 1)
 			BattleCore.SlotState.OPENED:
 				ft = NEU_FT; fb = NEU_FB; ei = EMPTY_EDGE
 				if battle.can_draw_slot(player, i):
 					lbl.text = "可抽"
 					ready = true
 				else:
-					lbl.text = "开格\n(锁)"
+					lbl.text = "待抽"
 			BattleCore.SlotState.CHARGING:
 				var item: ItemData = battle.slot_item(player, i)
 				has_item = item != null                     # 有道具 → 框走稀有度色（不被经济金边覆盖）

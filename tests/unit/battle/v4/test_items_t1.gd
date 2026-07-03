@@ -349,8 +349,8 @@ func test_item_ronglu_burns_spare_for_energy() -> void:
 	b.select_action(0, A.DEFEND)
 	b.select_action(1, A.DEFEND)
 	b.resolve()
-	# Assert：+0.5 能 = 1 半点；废牌槽被烧空（resolve 末 _econ_after_resolve 清成 EMPTY）
-	assert_eq(b.energy[0], 7)
+	# Assert：+0.5 能 = 1 半点 + 被动 +2；废牌槽被烧空（resolve 末 _econ_after_resolve 清成 EMPTY）
+	assert_eq(b.energy[0], 7 + 2)
 	assert_eq(b.slots[0][0]["item"], null)
 
 
@@ -361,7 +361,7 @@ func test_item_ronglu_no_energy_without_spare() -> void:
 	b.select_action(0, A.DEFEND)
 	b.select_action(1, A.DEFEND)
 	b.resolve()
-	assert_eq(b.energy[0], 6)   # 不发动 → 不白给能量
+	assert_eq(b.energy[0], 6 + 2)   # 不发动 → 不白给能量（仅被动 +1 能）
 
 
 func test_item_weihouzhen_stings_on_active_death() -> void:

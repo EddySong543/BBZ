@@ -304,7 +304,7 @@ func test_t3_tinglong_dumps_energy_as_piercing_damage() -> void:
 	b.select_action(1, A.BIG_DEFEND)   # 穿大防 → 砸穿
 	b.resolve()
 	assert_eq(b.hp[1][0], 15)   # 5.0 能 → 2.5 HP = 5 半点
-	assert_eq(b.energy[0], 0)   # 清零后无被动加成（被动已去除）
+	assert_eq(b.energy[0], 2)   # 清零 → 回合末被动 +1 能（2 半能）
 
 
 # === C10 补测：此前仅冒烟覆盖的 T2/T3 件 ===
@@ -376,12 +376,12 @@ func test_t2_mojing_borrows_energy_now_pays_next_turn() -> void:
 	b.select_action(0, A.DEFEND)
 	b.select_action(1, A.DEFEND)
 	b.resolve()
-	assert_eq(b.energy[0], 8)   # 立即 +1 能（6 → 8）
+	assert_eq(b.energy[0], 8 + 2)   # 立即 +1 能（6 → 8）+ 被动 +2
 	# 下回合开局扣回 1 能
 	b.select_action(0, A.DEFEND)
 	b.select_action(1, A.DEFEND)
 	b.resolve()
-	assert_eq(b.energy[0], 6)   # 8 - 1（借的还了）
+	assert_eq(b.energy[0], 10)   # 10 - 2（借的还了）+ 被动 +2
 
 
 func test_t2_shaizi_grants_exactly_one_of_three() -> void:
@@ -426,8 +426,8 @@ func test_t3_mengdie_swaps_hp_energy_slots() -> void:
 	_resolve_cc(b)   # 双攒不掉血，HP 保持对调后的值
 	assert_eq(b.hp[0][0], 16)          # HP 对调
 	assert_eq(b.hp[1][0], 10)
-	assert_eq(b.energy[0], 14)         # 对调得 12·再双攒 +2
-	assert_eq(b.energy[1], 6)          # 对调得 4·再双攒 +2
+	assert_eq(b.energy[0], 16)         # 对调得 12·攒 +2·被动 +2
+	assert_eq(b.energy[1], 8)          # 对调得 4·攒 +2·被动 +2
 	assert_eq(b.slots[0].size(), 0)    # 道具栏对调
 	assert_eq(b.slots[1].size(), 1)
 

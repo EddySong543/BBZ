@@ -177,7 +177,7 @@ func test_h16_jifeng_double_charge_doubles_gain() -> void:
 	b.select_double(0, true)
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(b.energy[0], 12, "双攒：+2 +2 = +4 半能·被动已去除(8→12)")
+	assert_eq(b.energy[0], 14, "双攒：+2 +2 + 被动 +2 = +6 半能(8→14·被动不随双动作翻倍)")
 
 
 func test_h16_jifeng_cap_two_per_game() -> void:
@@ -253,20 +253,21 @@ func test_h17_zhenya_silences_enemy_passive() -> void:
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
 	assert_eq(int(b.get_status(1, 0, "silenced", 0)), 2, "P1 虚日被烙沉默=2 回合")
-	assert_eq(b.energy[0], 8 - 4, "镇压费 2 能(4 半能)")
+	assert_eq(b.energy[0], 8 - 4 + 2, "镇压费 2 能(4 半能) + 被动 +2")
 	assert_eq(int(b.get_status(0, 0, "active_uses", 0)), 1, "镇压计 1 次使用")
-	assert_eq(b.energy[1], 8 + 3, "cast 当回合虚日仍生效：攒+2 +囤鼠+1 = +3")
-	# 回合2：双攒 → 虚日已沉默 → P1 只 +2(囤鼠失效)
+	assert_eq(b.energy[1], 8 + 6, "cast 当回合虚日仍生效：攒(2+囤鼠1) + 被动(2+囤鼠1) = +6")
+	# 回合2：双攒 → 虚日已沉默 → P1 只 +4(攒2+被动2·囤鼠失效)
 	b.select_action(0, ActionDef.Action.CHARGE)
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(b.energy[1], 11 + 2, "虚日被沉默：攒只 +2、囤鼠加成失效")
+	assert_eq(b.energy[1], 14 + 4, "虚日被沉默：攒+2 +被动+2、囤鼠加成失效")
 	assert_eq(int(b.get_status(1, 0, "silenced", 0)), 1, "沉默递减 → 剩 1 回合")
 
 
 func test_h17_zhenya_silence_expires_after_two_turns() -> void:
-	# 沉默恰好 2 个完整回合(回合2、3)，回合4 囤鼠恢复。起手 4 能(避开 MAX_ENERGY=20 截顶)。
+	# 沉默恰好 2 个完整回合(回合2、3)，回合4 囤鼠恢复。P1 起手 0 能(被动恢复后增量更大·压低起点避开 MAX_ENERGY=20 截顶)。
 	var b := _battle_vs(["h17", "test_p0_1", "test_p0_2"], ["h01", "test_p1_1", "test_p1_2"], 6, 4)
+	b.energy[1] = 0
 	b.select_active(0)
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()                                   # 回合1：cast(虚日仍生效 +3)
@@ -279,7 +280,7 @@ func test_h17_zhenya_silence_expires_after_two_turns() -> void:
 	b.select_action(0, ActionDef.Action.CHARGE)
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()                                   # 回合4：虚日恢复 → +3
-	assert_eq(b.energy[1] - before, 3, "沉默到期 → 囤鼠恢复，攒 +3")
+	assert_eq(b.energy[1] - before, 6, "沉默到期 → 囤鼠恢复：攒(2+1) + 被动(2+1) = +6")
 
 
 func test_h17_zhenya_disables_enemy_active_and_caps() -> void:
@@ -424,7 +425,7 @@ func test_h21_diaohu_pulls_specified_target() -> void:
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
 	assert_eq(b.active_index[1], 2, "对手被强制揪上玩家指定的 slot2（非血最低）")
-	assert_eq(b.energy[0], 8 - 4, "调虎离山费 2 能（4 半能）")
+	assert_eq(b.energy[0], 8 - 4 + 2, "调虎离山费 2 能（4 半能）+ 被动回 +1 能")
 	assert_eq(int(b.get_status(0, 0, "active_uses", 0)), 1, "计 1 次使用")
 
 
@@ -562,7 +563,7 @@ func test_h22_yinfa_active_fires_piercing_bigwave() -> void:
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
 	assert_eq(b.hp[1][0], 10 - 4, "引而后发打出 2.0(4 半点)")
-	assert_eq(e0 - b.energy[0], 4, "费 2 能(4 半能)")
+	assert_eq(e0 - b.energy[0], 4 - 2, "费 2 能(4 半能)·被动回 +1 能")
 
 
 func test_h22_yinfa_pierces_defend_blocked_by_big_defend() -> void:

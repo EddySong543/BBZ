@@ -1,8 +1,9 @@
 extends GutTest
 
-## 道具经济状态机（M1·ADR-003 §2）行为锁定测试。
-## 开局带1走部署延迟(slot0·turn2才可用·非首回合) / 三步部署锁(开格→抽→可用) / 一次性用后 EMPTY / refill / 解锁回合门 / 能量成本。
-## 注：「测机制」用例走 _battle_ready()(开局件已就绪夹具)，「测时序」用例走 _battle()(真实态·开局件锁住)。
+## 道具经济状态机（M1·ADR-003 §2；2026-07-03 经济重做=免入场税）行为锁定测试。
+## 三格第 3/4/5 回合(显示)自动解锁免费 / slot0 自带随机 T1 / slot1/2 解锁当回合 T1 池 3 选 1 /
+## 统一锁定(新道具出现回合锁·下回合可用) / 一次性用后 EMPTY / 补充 1 能 / 升级统一 1 能。
+## 注：「测机制」用例走 _battle_ready()(自带件已就绪夹具)，「测时序」用例走 _battle()(真实态·自带件锁住)。
 
 const A := ActionDef.Action
 const SEED := 777
@@ -41,47 +42,47 @@ func _advance(b: BattleCore, n: int = 1) -> void:
 		b.resolve()
 
 
-# === 开局带 1 ===
+# === slot0 自带件 ===
 
-func test_starter_deploys_with_delay_not_first_turn() -> void:
-	# 设计 §2 部署时序：开局带件也走部署延迟 → turn_number 2（显示回合 3）才可用，前两回合锁住（公开电报）。
+func test_starter_locked_until_turn_after_unlock() -> void:
+	# 统一锁定规则：自带件开局公开亮相，第 3 回合(turn 2)解锁当回合仍锁，turn 3（显示回合 4）才可用。
 	var b := _battle()
-	assert_eq(b.slot_state(0, 0), SS.CHARGING, "slot0 开局带件（CHARGING·公开）")
+	assert_eq(b.slot_state(0, 0), SS.CHARGING, "slot0 自带件（CHARGING·公开电报）")
 	assert_not_null(b.slot_item(0, 0))
-	assert_false(b.slot_ready(0, 0), "turn0（显示回合1）锁住·不可用")
-	_advance(b, 1)
-	assert_false(b.slot_ready(0, 0), "turn1（显示回合2）仍锁")
-	_advance(b, 1)
-	assert_true(b.slot_ready(0, 0), "turn2（显示回合3）开局件可用（设计时序）")
+	assert_eq(b.slot_item(0, 0).tier, 1, "自带件 = T1")
+	for t in range(3):
+		assert_false(b.slot_ready(0, 0), "turn%d（显示回合%d）锁住·不可用" % [t, t + 1])
+		_advance(b, 1)
+	assert_true(b.slot_ready(0, 0), "turn3（显示回合4）自带件可用（解锁+1 回合）")
 
 
 func test_other_slots_sealed_and_locked_early() -> void:
 	var b := _battle()
 	assert_eq(b.slot_state(0, 1), SS.SEALED)
-	assert_false(b.can_open_slot(0, 1), "第 3 回合前 slot1 不可开格")
+	assert_false(b.can_draw_slot(0, 1), "未到解锁回合 slot1 不可抽")
 
 
-# === 三步部署锁：开格 → 抽 → 可用 ===
+# === 自动解锁（免费）→ 3 选 1 → 锁 1 回合 → 可用 ===
 
-func test_open_costs_energy_and_locks() -> void:
-	var b := _battle_ready(20)
-	_advance(b, 2)                       # → turn_number = 2（第 3 回合）
-	assert_true(b.can_open_slot(0, 1), "第 3 回合 slot1 可开格")
+func test_slot_auto_opens_free_at_unlock_turn() -> void:
+	var b := _battle_ready(10)           # 低于能量上限 → 攒的增量可观测
+	_advance(b, 2)                       # → turn_number = 2（显示回合 3）
+	assert_eq(b.slot_state(0, 1), SS.SEALED, "slot1 显示回合 3 仍未解锁（解锁=回合4）")
 	var e0 := b.energy[0]
-	assert_true(b.open_slot(0, 1))
-	assert_eq(e0 - b.energy[0], 2, "开格花 1 能")
-	assert_eq(b.slot_state(0, 1), SS.OPENED)
-	assert_false(b.can_draw_slot(0, 1), "开格当回合不能抽（锁）")
+	_advance(b, 1)                       # → turn_number = 3（显示回合 4）
+	assert_eq(b.slot_state(0, 1), SS.OPENED, "slot1 显示回合 4 自动解锁")
+	assert_true(b.can_draw_slot(0, 1), "解锁当回合即可 3 选 1")
+	assert_eq(b.slot_state(0, 2), SS.SEALED, "slot2 要到显示回合 5（错峰）")
+	assert_eq(b.energy[0] - e0, 2, "解锁免费（本回合只有攒 +1 能·无开格扣费）")
 
 
-func test_draw_next_turn_then_charging() -> void:
+func test_draw_at_unlock_turn_then_charging() -> void:
 	var b := _battle_ready(20)
-	_advance(b, 2)
-	b.open_slot(0, 1)
-	_advance(b, 1)                       # 下一回合
-	assert_true(b.can_draw_slot(0, 1), "下回合可抽")
+	_advance(b, 3)                       # slot1 已自动解锁
 	var opts: Array = b.begin_draft(0, 1)
 	assert_eq(opts.size(), 3, "3 选 1")
+	for o in opts:
+		assert_eq((o as ItemData).tier, 1, "解锁抽卡池 = T1 only（T2/T3 走升级线）")
 	assert_true(b.pick_draft(0, 1, 0))
 	assert_eq(b.slot_state(0, 1), SS.CHARGING)
 	assert_false(b.slot_ready(0, 1), "抽道具当回合仍锁（电报）")
@@ -89,12 +90,10 @@ func test_draw_next_turn_then_charging() -> void:
 
 func test_usable_turn_after_draw() -> void:
 	var b := _battle_ready(20)
-	_advance(b, 2)
-	b.open_slot(0, 1)
-	_advance(b, 1)
+	_advance(b, 3)
 	b.pick_draft(0, 1, 0)
 	_advance(b, 1)                       # 抽后下回合
-	assert_true(b.slot_ready(0, 1), "抽道具下回合可用")
+	assert_true(b.slot_ready(0, 1), "抽道具下回合可用（显示回合 5）")
 
 
 # === 一次性用后 EMPTY + refill ===
@@ -158,17 +157,15 @@ func test_item_slot_row_refreshes() -> void:
 	# t1_feibiao（生锈的暗器）已有图标 → 走图标路径：图标层显示、文字位让给图标（见 item_slot_row 220-234）。
 	assert_true(row._icons[0].visible, "带图标道具 → 显示图标层")
 	assert_eq(row._labels[0].text, "", "有图标 → 文字位空出给图标（无图才回退显示名）")
-	assert_eq(row._labels[1].text, "—", "未到解锁回合显示锁占位")
+	assert_eq(row._labels[1].text, "回合4\n解锁", "未到解锁回合显示解锁回合电报")
 
 
 # === M3：道具栏交互层 ===
 
-func test_full_deploy_cycle_open_draw_use_empty() -> void:
-	# 全周期：封印 → 开格 → 抽 → 可用 → 使用 → 置空（M3 点击分派依次驱动的 M1 路径）。
+func test_full_deploy_cycle_unlock_draw_use_empty() -> void:
+	# 全周期：封印 → 自动解锁 → 抽 → 可用 → 使用 → 置空（M3 点击分派依次驱动的 M1 路径）。
 	var b := _battle_ready(40)
-	_advance(b, 2)                       # 第 3 回合，slot1 可开
-	assert_true(b.open_slot(0, 1))
-	_advance(b, 1)
+	_advance(b, 3)                       # 显示回合 4，slot1 自动解锁
 	b.pick_draft(0, 1, 0)                # OPENED→CHARGING
 	_advance(b, 1)
 	assert_true(b.slot_ready(0, 1), "部署完成本回合可用")
@@ -176,7 +173,7 @@ func test_full_deploy_cycle_open_draw_use_empty() -> void:
 	b.select_action(0, A.CHARGE)
 	b.select_action(1, A.CHARGE)
 	b.resolve()
-	assert_eq(b.slot_state(0, 1), SS.EMPTY, "用后置空，可走 refill")
+	assert_eq(b.slot_state(0, 1), SS.EMPTY, "用后置空，可走补充")
 
 
 func test_slot_row_interactive_gates_click_signal() -> void:
@@ -258,14 +255,14 @@ func test_upgrade_draft_3_from_next_tier_then_swap_and_relock() -> void:
 		assert_eq((o as ItemData).tier, 2, "候选全部来自下一级（T2）池")
 	var e0 := b.energy[0]
 	assert_true(b.pick_upgrade(0, 0, 0))
-	assert_eq(e0 - b.energy[0], BattleCore.UPGRADE_COST_T1, "1→2 花 1 能")
+	assert_eq(e0 - b.energy[0], BattleCore.UPGRADE_COST, "1→2 花 1 能")
 	assert_eq(b.slot_item(0, 0).tier, 2, "换成下一级件")
 	assert_false(b.slot_ready(0, 0), "升级后重新锁本回合（电报）")
 	_advance(b, 1)
 	assert_true(b.slot_ready(0, 0), "下回合可用")
 
 
-func test_upgrade_tier2_to_3_costs_more() -> void:
+func test_upgrade_tier2_to_3_costs_same_flat() -> void:
 	var b := _battle_ready(20)
 	b.slots[0][0]["item"] = ItemCatalog.make("t2_shengming")
 	assert_true(b.can_upgrade(0, 0))
@@ -274,7 +271,7 @@ func test_upgrade_tier2_to_3_costs_more() -> void:
 		assert_eq((o as ItemData).tier, 3, "候选全部来自 T3 池")
 	var e0 := b.energy[0]
 	b.pick_upgrade(0, 0, 0)
-	assert_eq(e0 - b.energy[0], BattleCore.UPGRADE_COST_T2, "2→3 花 2 能")
+	assert_eq(e0 - b.energy[0], BattleCore.UPGRADE_COST, "2→3 同价 1 能（统一升级费·2026-07-03）")
 	assert_eq(b.slot_item(0, 0).tier, 3)
 
 
@@ -329,7 +326,7 @@ func test_cannot_upgrade_top_tier_but_can_upgrade_non_family() -> void:
 func test_cannot_upgrade_without_energy() -> void:
 	var b := _battle_ready(20)
 	b.slots[0][0]["item"] = ItemCatalog.make("t1_feibiao")
-	b.energy[0] = BattleCore.UPGRADE_COST_T1 - 1
+	b.energy[0] = BattleCore.UPGRADE_COST - 1
 	assert_false(b.can_upgrade(0, 0), "能量不足不可升")
 	assert_false(b.pick_upgrade(0, 0, 0))
 	assert_eq(b.slot_item(0, 0).item_id, "t1_feibiao", "失败不换件")

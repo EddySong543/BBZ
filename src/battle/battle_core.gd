@@ -438,7 +438,7 @@ func select_double(player: int, on: bool) -> bool:
 
 # === 道具（ADR-003）===
 #
-# 经济状态机（开槽/draft/refill·D5）已实装（见 open_slot / use_slot / can_refill / begin_upgrade_draft 等）；give_item = 测试 / 直接给的旁路。
+# 经济状态机（自动解锁/draft/补充·D5·2026-07-03 免入场税）已实装（见 _econ_unlock / use_slot / can_refill / begin_upgrade_draft 等）；give_item = 测试 / 直接给的旁路。
 # 道具不占动作槽：use_item 与 select_action 正交，可在同一回合都提交。
 
 ## 给玩家一件道具（持有/可用池）。返回其在 items[player] 的索引。
@@ -511,40 +511,48 @@ func add_item_rider(player: int, data: ItemData) -> void:
 
 
 
-# ===== 道具经济（ADR-003 §2·M1·2026-06-19）=====
+# ===== 道具经济（ADR-003 §2·M1·2026-06-19；2026-07-03 经济重做=免入场税）=====
 # 槽位状态机，与底层 items[]/use_item 并存（单元测试走 give_item 绕过经济）。
-# 开局带 1（slot0·随机基础件·即用·降记忆成本）；slot1/2 第 3/4 回合解锁。
-# 三步部署锁（电报）：开格(1能·锁本回合) → 抽道具(3选1·锁本回合) → 下回合可用；
-#   一次性用后 EMPTY，refill(1能·重抽)。升级 = 就绪件花能量从「下一级池」3 选 1·重新锁本回合。
+# 三格第 3/4/5 回合（显示回合）自动解锁，无开格步骤/费用：
+#   slot0 解锁时自带随机 T1（后期改玩家自选 T1/T2 携带·PvE）；slot1/2 解锁当回合 T1 池 3 选 1。
+# 统一锁定规则（明牌电报）：格里出现新道具（自带/抽/补/升级）的当回合锁定，下回合才可用。
+# 使用免费一次性，用后 EMPTY；补充(1能·T1 池 3 选 1)；升级 = 就绪件花 1 能从「下一级池」3 选 1。
 # 槽 dict：{state:int, item:ItemData|null, since:int(进入该态的回合), used:bool, draft:Array, upg_draft:Array}
 
-enum SlotState { SEALED, OPENED, CHARGING, EMPTY }
+enum SlotState { SEALED, OPENED, CHARGING, EMPTY }   # SEALED = 未到解锁回合（到点自动 → OPENED）
 const SLOT_COUNT := 3
-const SLOT_UNLOCK_TURN := [0, 2, 3]    # 0-indexed turn_number（= 第 1/3/4 回合）
-const ITEM_OPEN_COST := 2              # 开格 1 能（= 2 半能）
-const ITEM_REFILL_COST := 2            # refill 1 能
-const UPGRADE_COST_T1 := 2             # 升级 1→2 花 1 能（= 2 半能·ADR D5）
-const UPGRADE_COST_T2 := 4             # 升级 2→3 花 2 能（= 4 半能·ADR D5）
+const SLOT_UNLOCK_TURN := [2, 3, 4]    # 0-indexed turn_number（= 显示回合 3/4/5·到点自动解锁）
+const ITEM_REFILL_COST := 2            # 补充 1 能（= 2 半能·T1 池 3 选 1）
+const UPGRADE_COST := 2                # 升级统一 1 能（T1→2 / T2→3 同价·2026-07-03；T3 泛滥再回调）
 const UPGRADE_FAVORED_WEIGHT := 5.0    # 升级 3 选 1 里「预设升级款」(upgrade_to) 的相对权重（>1 → 更易出现·B2）
 # 遗物效果数值（半点·从裸魔数提出集中可调）
 const WEIHOUZHEN_STING_DMG := 1        # 尾后针：出战阵亡反击敌方出战 0.5 HP 真伤（通用 death_reflect 状态机制·见 _resolve_deaths）
-const STARTER_ITEM_IDS := ["t1_feibiao", "t1_jiudun", "t1_lzhi_shengming"]  # 开局带 1 随机池
-## 开局带件按设计同样走「部署延迟」：turn_number 2（= 显示回合 3）才可用，**非首回合**
-## （design build-design-framework.md §2 部署时序表：开格①t1→抽①t2→①可用t3）。
-## 自动部署（"带入道具"·玩家不需点开格/抽，降记忆成本）→ CHARGING + since 使其 turn 2 就绪。
-const STARTER_READY_TURN := 2
+const STARTER_ITEM_IDS := ["t1_feibiao", "t1_jiudun", "t1_lzhi_shengming"]  # slot0 自带随机池（后期改玩家自选 T1/T2 携带·PvE）
 
 
 ## 启用经济并初始化槽位（实战由 battle_screen 调；单元测试不调 → 槽空、不影响既有行为）。
 func econ_init() -> void:
 	slots = [[], []]
 	for p in [0, 1]:
-		# slot0 = 开局带 1：随机基础件，CHARGING 但走部署延迟 → since=STARTER_READY_TURN-1，
-		# turn_number 2(显示回合3)才 slot_ready；前两回合显示「(锁)」公开电报，非首回合即用（design §2）。
+		# slot0 = 自带随机 T1：开局即公开亮相（明牌电报），since=解锁回合 → 解锁当回合仍锁、
+		# turn_number 3(显示回合4)才 slot_ready（统一锁定规则：新道具出现回合锁定、下回合可用）。
 		var sid: String = STARTER_ITEM_IDS[rng.randi() % STARTER_ITEM_IDS.size()]
-		slots[p].append({state = SlotState.CHARGING, item = ItemCatalog.make(sid), since = STARTER_READY_TURN - 1, used = false, draft = [], upg_draft = []})
+		slots[p].append({state = SlotState.CHARGING, item = ItemCatalog.make(sid), since = int(SLOT_UNLOCK_TURN[0]), used = false, draft = [], upg_draft = []})
 		for _s in range(SLOT_COUNT - 1):
 			slots[p].append({state = SlotState.SEALED, item = null, since = -1, used = false, draft = [], upg_draft = []})
+	_econ_unlock()
+
+
+## 到点自动解锁道具格（无开格步骤/费用·2026-07-03）：SEALED + 到解锁回合 → OPENED，
+## since = turn_number-1 使解锁当回合即可 3 选 1（抽后 CHARGING 锁 1 回合 → 下回合可用）。
+## econ_init 与每次 resolve 末（turn_number 递增后）各调一次；econ 未启用时槽空 = no-op。
+## 防御式读 state（get 缺省 CHARGING≠SEALED → 跳过）：道具测试会注入只含 item/used 的精简槽字典。
+func _econ_unlock() -> void:
+	for p in range(slots.size()):
+		for s in range(mini(slots[p].size(), SLOT_UNLOCK_TURN.size())):
+			if int(slots[p][s].get("state", SlotState.CHARGING)) == SlotState.SEALED and turn_number >= int(SLOT_UNLOCK_TURN[s]):
+				slots[p][s]["state"] = SlotState.OPENED
+				slots[p][s]["since"] = turn_number - 1
 
 
 func slot_state(player: int, s: int) -> int:
@@ -561,23 +569,7 @@ func slot_ready(player: int, s: int) -> bool:
 	return int(sl["state"]) == SlotState.CHARGING and not bool(sl["used"]) and turn_number > int(sl["since"])
 
 
-## 能否开格（SEALED + 到解锁回合 + 能量够）。
-func can_open_slot(player: int, s: int) -> bool:
-	return int(slots[player][s]["state"]) == SlotState.SEALED \
-		and turn_number >= int(SLOT_UNLOCK_TURN[s]) and usable_energy(player) >= ITEM_OPEN_COST
-
-
-## 开格：付 1 能，SEALED→OPENED（锁本回合，下回合才能抽）。
-func open_slot(player: int, s: int) -> bool:
-	if not can_open_slot(player, s):
-		return false
-	energy[player] -= ITEM_OPEN_COST
-	slots[player][s]["state"] = SlotState.OPENED
-	slots[player][s]["since"] = turn_number
-	return true
-
-
-## 能否抽道具（OPENED + 已过开格当回合）。
+## 能否抽道具（OPENED·自动解锁当回合即可抽）。
 func can_draw_slot(player: int, s: int) -> bool:
 	return int(slots[player][s]["state"]) == SlotState.OPENED and turn_number > int(slots[player][s]["since"])
 
@@ -630,12 +622,12 @@ func use_slot(player: int, s: int, target_override: int = -1) -> bool:
 	return true
 
 
-## 升级线下一级的能量成本（半能）：tier1→2 = 1 能 / tier2→3 = 2 能（ADR D5）。
+## 升级到下一级的能量成本（半能）：统一 1 能（T1→2 / T2→3 同价·2026-07-03 经济重做）。
 func upgrade_cost(player: int, s: int) -> int:
 	var item: ItemData = slots[player][s]["item"]
 	if item == null:
 		return 0
-	return UPGRADE_COST_T2 if item.tier >= 2 else UPGRADE_COST_T1
+	return UPGRADE_COST
 
 
 ## 能否升级（就绪 + 有更高 tier 可升 + 能量够）：就绪槽的「用 or 升」二选一决策点。
@@ -704,7 +696,7 @@ func can_refill(player: int, s: int) -> bool:
 	return int(slots[player][s]["state"]) == SlotState.EMPTY and usable_energy(player) >= ITEM_REFILL_COST
 
 
-## refill：付 1 能，EMPTY→可抽（格已在，故立即 3 选 1；返回选项供 UI；随后 pick_draft）。
+## 补充：付 1 能，EMPTY→可抽（格已在，故立即 3 选 1；返回选项供 UI；随后 pick_draft）。
 func start_refill(player: int, s: int) -> Array:
 	if not can_refill(player, s):
 		return []
@@ -718,12 +710,9 @@ func start_refill(player: int, s: int) -> Array:
 	return begin_draft(player, s)
 
 
-## 抽卡池（占位：T1 地板 + T2 连携；T3/遗物留升级线·待升级系统接入）。
+## 抽卡池 = T1 池（解锁 3 选 1 / 补充 3 选 1 均只出 T1；T2/T3 只走升级线·2026-07-03）。
 func _draft_pool() -> Array:
-	var pool: Array = []
-	pool.append_array(ItemCatalog.all_tier1())
-	pool.append_array(ItemCatalog.all_tier2())
-	return pool
+	return ItemCatalog.all_tier1()
 
 
 ## 结算末：本回合用掉的槽置 EMPTY（一次性消耗）。在 resolve Phase 6 调。
@@ -735,6 +724,57 @@ func _econ_after_resolve() -> void:
 				sl["item"] = null
 				sl["used"] = false
 				sl["upg_draft"] = []
+
+
+# === 加时赛（2026-07-03 Eddy 定·Q5）===
+#
+# 触发（由调用方 battle_screen / run_sim 判定）：正常局平局（双方同时死光）或打满回合上限。
+# 规则：双方各从队伍 3 选 1（盲选）→ 满血白板 1v1 —— 禁道具（不 econ_init）、禁英雄技能
+#   （英雄数据剥离为白板克隆·纯波波攒）、被动能量与正常局一致（+1 能/回合）、不限回合、
+#   加时再同归 = 真平局。
+
+## 组一场加时赛战局（白板 1v1·满血）。选人与触发由调用方负责。
+static func create_overtime(hero_a: HeroData, hero_b: HeroData, seed_value: int = 0) -> BattleCore:
+	var b := BattleCore.new()
+	b.setup([_vanilla_copy(hero_a)], [_vanilla_copy(hero_b)], seed_value)
+	return b
+
+
+## 组加时赛 3 人组（UI 场景重载用·battle_screen）：选中者白板化放 slot0（出战），其余队友白板化跟随
+## ——调用方随后把 slot1/2 置 0 血躺板凳（同归余烬）→ 引擎/UI 全程走正常 3 人局、零特判。
+static func overtime_roster(team: Array, pick: int) -> Array[HeroData]:
+	var out: Array[HeroData] = [_vanilla_copy(team[pick])]
+	for i in range(team.size()):
+		if i != pick:
+			out.append(_vanilla_copy(team[i]))
+	return out
+
+
+## 加时赛开局整备（与 overtime_roster 配套·UI 场景重载后调）：slot0 之外的白板队友置 0 血躺板凳
+## （同归余烬·唯一存活=出战位）→ 引擎/UI 全程正常 3 人局零特判。状态写入收口在引擎（UI 只读铁律）。
+func apply_overtime_bench() -> void:
+	for p in [0, 1]:
+		for s in range(1, hp[p].size()):
+			hp[p][s] = 0
+
+
+## 白板克隆：保留名字/血量/美术路径（UI 复用），剥离 hero_id 与技能描述 → 不注册技能组件、不触发校验警告。
+static func _vanilla_copy(h: HeroData) -> HeroData:
+	var c := HeroData.new()
+	c.hero_id = ""
+	c.hero_name = h.hero_name
+	c.max_hp = h.max_hp
+	c.skill_description = ""
+	c.skill_detail = ""
+	c.portrait_path = h.portrait_path
+	c.skill_icon_path = ""
+	c.spritesheet_path = h.spritesheet_path
+	c.sprite_frames_path = h.sprite_frames_path
+	c.attack_spritesheet_path = h.attack_spritesheet_path
+	c.hit_spritesheet_path = h.hit_spritesheet_path
+	c.defend_spritesheet_path = h.defend_spritesheet_path
+	c.defeat_spritesheet_path = h.defeat_spritesheet_path
+	return c
 
 
 # === AI / 模拟支持（纯加法，不改任何结算行为）===
@@ -998,7 +1038,8 @@ func resolve() -> Dictionary:
 	for p in [0, 1]:
 		for h in hitlists[p]:
 			var riders: Array = h.get("riders", [])
-			var dealt: int = _apply_damage(1 - p, int(h["damage"]), p, int(h["kind"]), int(h["pen"]), a[1 - p], events, riders)
+			var hsrc: String = "action" if bool(h.get("action", false)) else "item"
+			var dealt: int = _apply_damage(1 - p, int(h["damage"]), p, int(h["kind"]), int(h["pen"]), a[1 - p], events, riders, hsrc)
 			if bool(h.get("active", false)):
 				var sk2: HeroSkill = _skills[p][active_index[p]]
 				if sk2 != null and sk2.active_is_attack():
@@ -1040,7 +1081,7 @@ func resolve() -> Dictionary:
 			if bool(relic["data"].effect.relic_end(self, p, relic["data"], relic["state"])):
 				kept_relics.append(relic)
 		relics[p] = kept_relics
-	# 被动能量入口（A2 引入·2026-06-24 去除 → PASSIVE_ENERGY_GAIN=0·当前 no-op；保留入口便于将来重调）。
+	# 被动能量 +1/回合（A2 引入·2026-06-24 去除·2026-07-03 恢复——sim 实锤攒-only 下最优解=互龟死锁）。
 	for p in [0, 1]:
 		_gain_energy(p, ActionDef.PASSIVE_ENERGY_GAIN)
 	# 沉默还原 + 递减时长（烛阴 h17【镇压】；只递减本回合生效过的，见 Phase 0.3）。
@@ -1050,6 +1091,7 @@ func resolve() -> Dictionary:
 	_econ_after_resolve()
 	_last_action = [a[0], a[1]]
 	turn_number += 1
+	_econ_unlock()   # 到点自动解锁道具格（新回合的选择阶段即可 3 选 1）
 	var result := {
 		p1_hp = current_hp(0), p2_hp = current_hp(1),
 		p1_energy = energy[0], p2_energy = energy[1],
@@ -1202,7 +1244,8 @@ func _apply_team_outgoing(dmg: int, action: int, player: int, attacker_slot: int
 
 ## 伤害管线 (§D4)：防御门 → 中毒引爆 → 受伤 hook(平减) → 护盾 → 落 HP → on-hit 触发。
 ## 返回实际落在 HP 上的伤害（半点），供攻击型主动技回调使用。
-func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_action: int, pen: int, def_action: int, events: Array, item_riders: Array = []) -> int:
+## src = 本次 hit 的来源标签（"action"=动作攻击/技能·"item"=道具 hit）——只写进事件供统计（sim 道具伤害占比），不影响结算。
+func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_action: int, pen: int, def_action: int, events: Array, item_riders: Array = [], src: String = "action") -> int:
 	var slot: int = active_index[target_player]
 
 	# Stage B4: 防御动作门（大防挡全部；防挡波，不挡大波/穿防攻击）
@@ -1227,7 +1270,7 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 	else:
 		blocked = eff_def == ActionDef.Action.BIG_DEFEND or eff_def == ActionDef.Action.DEFEND
 	if blocked:
-		events.append({id = ("big_defend_block" if eff_def == ActionDef.Action.BIG_DEFEND else "defend_block"), player = target_player})
+		events.append({id = ("big_defend_block" if eff_def == ActionDef.Action.BIG_DEFEND else "defend_block"), player = target_player, kind = atk_action, src = src})
 		# 魔力源泉：防御成功 → +能量（每回合一次）
 		var be: int = int(item_mod(target_player, "block_energy", 0))
 		if be > 0:
@@ -1311,7 +1354,7 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 	if dmg > 0:
 		hp[target_player][slot] -= dmg
 		dealt = dmg
-		events.append({id = "damage_taken", player = target_player, amount = dmg})
+		events.append({id = "damage_taken", player = target_player, amount = dmg, src = src})
 		var dsk2: HeroSkill = _skills[target_player][slot]
 		if dsk2 != null:
 			dsk2.on_self_damaged(self, target_player, slot, dealt, attacker_player)
