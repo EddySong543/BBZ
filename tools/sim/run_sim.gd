@@ -55,7 +55,9 @@ var plan_ab := false    # A/B：A(plan_items=true 规划道具) vs B(false 不�
 var upgrade_ab := false  # A/B：A(search_upgrade=true 价值搜索升级) vs B(false 阈值升级) 头对头（验证 B）
 var eval_ab := false     # A/B：A(v1 基础评估) vs B(v2 进阶牌感) 交叉头对头（#4 转正对决·--eval-ab 1）
 var pick_ab := false     # A/B：A(智能选牌 smart_draft) vs B(纯随机) 头对头（#6 验证·--pick-ab 1）
-var panel_name := ""     # --panel NAME：T1 测量面板（v1 内战/v2 内战/v1×v2 交叉 三连跑 + 汇总对照表）
+var panel_name := ""     # --panel NAME：T1 测量面板（v1 内战/v2 内战/v1×v2 交叉 + 汇总对照表）
+var panel_part := ""     # --panel-part v1eco|v2eco|cross：只跑面板的一份（并行版·A 档·配 run_panel_parallel.sh）
+var panel_merge := false # --panel-merge 1：读三份 part_metrics.json 合并出 panel_summary.md（并行版收尾）
 var games_set := false   # --games 是否显式给出（panel 默认 50/50/60；显式则三份同 N·冒烟用）
 
 var _hero_data := {}    # hero_id → HeroData（加载一次复用）
@@ -70,7 +72,12 @@ func _initialize() -> void:
 		quit(1)
 		return
 	if panel_name != "":
-		_run_panel(pool)
+		if panel_merge:
+			_panel_merge()
+		elif panel_part != "":
+			_run_panel_part(pool)
+		else:
+			_run_panel(pool)   # 串行后备（并行版见 tools/sim/run_panel_parallel.sh）
 	else:
 		_run_batch(pool)
 	print("=== 完成 ===")
@@ -242,25 +249,89 @@ const PANEL_CROSS_GAMES := 60   # 面板交叉份局数
 ## 判读：两份生态结论一致才采纳；不一致的行 = 对玩家水平敏感的设计（单独标记）；
 ##       交叉 decisive 大幅偏离 50% = 评估档强度漂移（复查最近改动）。
 func _run_panel(pool: Array) -> void:
-	var root := "res://tools/sim/panel_%s/" % panel_name
-	print("=== T1 测量面板「%s」：v1 内战 / v2 内战 / v1×v2 交叉 ===" % panel_name)
-	var eco_games: int = games if games_set else PANEL_ECO_GAMES
-	var cross_games: int = games if games_set else PANEL_CROSS_GAMES
+	print("=== T1 测量面板「%s」：v1 内战 / v2 内战 / v1×v2 交叉（串行） ===" % panel_name)
 	var results: Array = []
-	games = eco_games
-	profile = 0
-	eval_ab = false
-	out_dir = root + "v1_eco/"
-	results.append(_run_batch(pool, "[v1 内战]"))
-	profile = 1
-	out_dir = root + "v2_eco/"
-	results.append(_run_batch(pool, "[v2 内战]"))
-	games = cross_games
-	profile = 0
-	eval_ab = true
-	out_dir = root + "cross/"
-	results.append(_run_batch(pool, "[v1×v2 交叉]"))
+	for part in _PANEL_PARTS:
+		_apply_panel_part(String(part[0]))
+		results.append(_run_batch(pool, String(part[1])))
+	_write_panel_summary("res://tools/sim/panel_%s/" % panel_name, results)
+
+
+## 面板分部定义：[part 名, 报表标签, 子目录]。
+const _PANEL_PARTS := [
+	["v1eco", "[v1 内战]", "v1_eco/"],
+	["v2eco", "[v2 内战]", "v2_eco/"],
+	["cross", "[v1×v2 交叉]", "cross/"],
+]
+
+
+## 按分部名设置实例参数（串行 _run_panel 与并行 _run_panel_part 共用）。
+func _apply_panel_part(part: String) -> void:
+	var root := "res://tools/sim/panel_%s/" % panel_name
+	match part:
+		"v1eco":
+			profile = 0
+			eval_ab = false
+			games = games if games_set else PANEL_ECO_GAMES
+			out_dir = root + "v1_eco/"
+		"v2eco":
+			profile = 1
+			eval_ab = false
+			games = games if games_set else PANEL_ECO_GAMES
+			out_dir = root + "v2_eco/"
+		"cross":
+			profile = 0
+			eval_ab = true
+			games = games if games_set else PANEL_CROSS_GAMES
+			out_dir = root + "cross/"
+		_:
+			push_error("未知 --panel-part：%s（可选 v1eco / v2eco / cross）" % part)
+
+
+## 并行版·跑单份（A 档·2026-07-03）：跑完把指标存 part_metrics.json 供 --panel-merge 合并。
+func _run_panel_part(pool: Array) -> void:
+	var label := ""
+	for p in _PANEL_PARTS:
+		if String(p[0]) == panel_part:
+			label = String(p[1])
+	_apply_panel_part(panel_part)
+	var r: Dictionary = _run_batch(pool, label)
+	var f := FileAccess.open(out_dir + "part_metrics.json", FileAccess.WRITE)
+	if f != null:
+		# 头部字段随份存档 → merge 时以份内记录为准（不依赖 merge 调用方传对 --seed/--depth）
+		f.store_string(JSON.stringify({seed = base_seed, depth = depth,
+			pf = pool_first, pl = pool_last, m = r}))
+		f.close()
+
+
+## 并行版·合并（A 档）：读三份 part_metrics.json → panel_summary.md（JSON 数字键还原为 int）。
+func _panel_merge() -> void:
+	var root := "res://tools/sim/panel_%s/" % panel_name
+	var results: Array = []
+	for p in _PANEL_PARTS:
+		var path: String = root + String(p[2]) + "part_metrics.json"
+		var txt := FileAccess.get_file_as_string(path)
+		if txt.is_empty():
+			push_error("缺分部数据 %s——三份 --panel-part 都跑完了？" % path)
+			return
+		var wrap: Dictionary = JSON.parse_string(txt)
+		base_seed = int(wrap.get("seed", base_seed))
+		depth = int(wrap.get("depth", depth))
+		pool_first = int(wrap.get("pf", pool_first))
+		pool_last = int(wrap.get("pl", pool_last))
+		var m: Dictionary = wrap.get("m", {})
+		m["win"] = _intkeys(m.get("win", {}))
+		m["actions"] = _intkeys(m.get("actions", {}))
+		results.append(m)
 	_write_panel_summary(root, results)
+
+
+## JSON 往返后把字符串数字键还原为 int（win/actions 以 Action enum int 为键）。
+func _intkeys(src: Dictionary) -> Dictionary:
+	var out := {}
+	for k in src:
+		out[int(String(k))] = src[k]
+	return out
 
 
 ## 面板汇总对照表：生态两列（v1/v2 内战）+ 交叉强度一节 + 判读指引。
@@ -689,6 +760,8 @@ func _parse_args() -> void:
 				games = int(val)
 				games_set = true
 			"--panel": panel_name = val
+			"--panel-part": panel_part = val
+			"--panel-merge": panel_merge = int(val) != 0
 			"--seed": base_seed = int(val)
 			"--max-turns": max_turns = int(val)
 			"--depth": depth = int(val)

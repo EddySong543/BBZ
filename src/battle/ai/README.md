@@ -89,13 +89,14 @@ godot --headless --path <proj> --script res://tools/sim/run_sim.gd -- --games 10
 
 ## 测量惯例：双轨 + 交叉面板（T1·2026-07-03 Eddy 立）
 
-**每次平衡相关改动**（数值 / 道具 / 英雄 / AI 共享层）跑一次面板：
+**每次平衡相关改动**（数值 / 道具 / 英雄 / AI 共享层）跑一次面板（并行版·约 20 分钟）：
 
 ```bash
-godot --headless --path <proj> --script res://tools/sim/run_sim.gd -- --panel <改动名> --seed 42 --depth 2
+bash tools/sim/run_panel_parallel.sh <改动名>          # 默认 seed 42 / depth 2 / 50-50-60 局
+# 串行后备：godot ... --script res://tools/sim/run_sim.gd -- --panel <改动名> --seed 42（~50 分钟·结果一致）
 ```
 
-一条命令三份小轮：**v1 内战 50 局**（大众生态）/ **v2 内战 50 局**（高端局生态）/ **v1×v2 交叉 60 局**（强度追踪），
+三份小轮：**v1 内战 50 局**（大众生态）/ **v2 内战 50 局**（高端局生态）/ **v1×v2 交叉 60 局**（强度追踪），
 产出 `tools/sim/panel_<改动名>/panel_summary.md` 对照表。判读三条：
 1. 生态两列结论**一致** → 采纳该平衡判断；**不一致的行 = 对玩家水平敏感的设计**（新手陷阱 / 高手专属强度·单独标记）。
 2. 交叉 decisive 大幅偏离 50% → 评估档强度漂移，复查最近改动。
