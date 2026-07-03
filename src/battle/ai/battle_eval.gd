@@ -17,7 +17,15 @@ const W_ACTIVE_HP := 4.0     # 出战位 HP 差额外加权（前线存活更重
 ## 能量边际递减：前 ENERGY_FULL_CAP 能（够一记大波）满价 W_ENERGY，
 ## 之后每点仅 W_ENERGY_EXTRA → 抑制 1-ply 短视下的"无意义屯能不出手"。
 const W_ENERGY := 12.0       # 前 2 能每点价值
-const W_ENERGY_EXTRA := 3.0  # 超过 2 能后每点价值（边际递减）
+
+## 状态资产项总开关/缩放（任务#7·2026-07-03）：铺垫型主动技/技能挂出的状态（沉默/毒/易伤/破甲/剑气…）
+## 此前评估恒 0 分 → AI 视铺垫为纯亏能量、几乎不用铺垫型主动技（主动技率 0.7%·仅攻击型在用）。
+## 本项给这些"未来会兑现的资产"记账。0.0 = 关闭（旧行为·A/B 对照 --ab status_off）。
+const W_STATUS_SCALE := 1.0
+## 2026-07-03 校准（#3·被动能量恢复 + 道具经济免费化后旧值 3.0 过时——压死囤能 → 大波近绝迹、防 37% 龟态）：
+## 3.0→6.5。A/B 实测（60 局小轮·交替先后手）：6.5/8.0 对旧值 3.0 均 ~63% 碾压；6.5 vs 8.0 五五开，
+## 取生态更贴目标带的 6.5（攒 18.2%/波 31.7%/均 53 回合·数据=tools/sim/out_w_extra65_eco）。
+const W_ENERGY_EXTRA := 6.5  # 超过 2 能后每点价值（边际递减·2026-07-03 校准 3.0→6.5）
 const ENERGY_FULL_CAP := 2   # 满价能量上限（= 大波费用）
 
 
@@ -46,8 +54,31 @@ static func score(b: BattleCore, player: int, w: Dictionary = {}) -> float:
 	s += _energy_value(b.energy[player], w_en, w_en_x) - _energy_value(b.energy[opp], w_en, w_en_x)
 	s += w_shield * float(_shield_sum(b, player) - _shield_sum(b, opp))
 	s += w_active * float(_active_hp(b, player) - _active_hp(b, opp))
+	var w_status: float = w.get("W_STATUS_SCALE", W_STATUS_SCALE)
+	if w_status != 0.0:
+		s += w_status * (_status_assets(b, player) - _status_assets(b, opp))
 
 	return s
+
+
+## player 的"状态资产"（半点量纲·≈10 分/半点）：己方增益层 + 挂在敌方身上的债/破绽。
+## 权重按"预期兑现的半点当量"手拍：毒层命中即爆(8)>易伤持续(6)>破甲/印记一次性(5/4)；
+## 剑气=己方攒的穿透资源(6/层)；沉默=对手 unique 停摆(10/回合·封顶 2)。
+static func _status_assets(b: BattleCore, p: int) -> float:
+	var t := 0.0
+	for s in range(b.heroes[p].size()):
+		if b.hp[p][s] > 0:
+			t += 6.0 * float(b.get_status(p, s, "jianqi", 0))          # 剑气层（昴日线团队资源）
+	var e: int = 1 - p
+	for s2 in range(b.heroes[e].size()):
+		if b.hp[e][s2] <= 0:
+			continue
+		t += 8.0 * float(b.get_status(e, s2, "poison", 0))             # 毒层（命中引爆）
+		t += 6.0 * float(b.get_status(e, s2, "vuln", 0))               # 罪已昭易伤（持续·换下场才清）
+		t += 4.0 * float(b.get_status(e, s2, "marked", 0))             # 猎物印记（一次性易伤）
+		t += 5.0 * float(b.get_status(e, s2, "broken_armor", 0))       # 破甲（下次防御失效）
+		t += 10.0 * minf(float(b.get_status(e, s2, "silenced", 0)), 2.0)  # 沉默（unique 停摆/回合）
+	return t
 
 
 ## 能量的边际递减价值：前 2 能满价，之后廉价（权重可由 w 覆盖）。

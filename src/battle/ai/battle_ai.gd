@@ -21,7 +21,7 @@ const STOCHASTIC_SAMPLES := 3 # 随机道具（赌徒硬币/锦囊/命运骰子/
 ## 仅作用于 ±W_WIN 终局值（远大于任何启发评估），故胜局恒压一切、只在"同为胜"时偏好更快那手；
 ## 非终局启发评估【不贴现】→ 不动已校准的局面权重。
 const WIN_DISCOUNT := 0.95
-## AI 道具经济（run_item_economy）开格/refill 后想保留的最低能量（半能）：留一手攒/防/小波，
+## AI 道具经济（run_item_economy）补充/升级后想保留的最低能量（半能）：留一手攒/防/小波，
 ## 不被发展道具饿死动作。2 = 1.0 能（≥ 一次小波 cost）。
 const AI_ITEM_ENERGY_RESERVE := 2
 ## 升级是「投资」（费能 + 锁 1 回合不能用）：AI 仅在能量【明显富余】（升级成本 + reserve 之上再留此 buffer）
@@ -31,6 +31,8 @@ const AI_ITEM_UPGRADE_BUFFER := 2
 var search_depth: int = 2
 var plan_items: bool = true # 搜索推演里是否也跑道具经济（Part 2）：true=AI 规划会考虑未来道具发展；
                             # false=控制组（实战照常用道具、但 lookahead 当道具冻结·= 旧行为）。供 A/B 实测。
+var smart_draft: bool = true # 道具 3 选 1 智能选牌（任务#6·2026-07-03）：true=启发式按局面挑 /
+                             # false=纯随机（旧行为·A/B 对照组）。
 var search_upgrade: bool = false # 升级择时：false=阈值默认(100局A/B价值搜索仅52.2%≈噪声·且贵~10×) / true=价值搜索(plan_economy·一开关可重启)
 var eval_profile: int = 0   # 0=v1 基础评估(现役默认) / 1=v2 进阶评估(牌感·熟练优秀玩家)
 var weights: Dictionary = {} # 评估权重覆盖（空=用默认常量）；A/B 校准用（T1）
@@ -101,16 +103,16 @@ func choose_death_switch(b: BattleCore, player: int) -> int:
 # === 道具经济启发（v1·非搜索）===
 
 ## 让 AI 像玩家一样操作道具栏，使试玩两边对等（sim / 测试 / 深层 lookahead 通用·纯函数·阈值升级择时）。
-## 选动作【之前】调用：开格立即扣能 → 动作据剩余能量决策（与玩家手动点击同语义）。
-## 策略（保守·不饿死动作·能量富余才发展）：
+## 选动作【之前】调用：补充/升级立即扣能 → 动作据剩余能量决策（与玩家手动点击同语义）。
+## 策略（2026-07-03 经济重做后·格自动解锁/抽免费）：
 ##   1. 就绪槽：能量【明显富余】(≥升级成本+reserve+buffer)→ 升级 1 个（投资·锁1回合·电报）；其余用掉。
-##   2. 抽所有【可抽】已开槽（免费）。3. 富余能量开 1 槽 + refill 1 空槽（每回合各 ≤1）。
+##   2. 抽所有【可抽】已解锁槽（免费）。3. 富余能量补充 1 个空槽（每回合 ≤1）。
 ## ⚠ 阈值择时 = 仅靠「能量富余」近似「局面安全可投资」；**价值搜索版见 `plan_economy`（B）**。
 static func run_item_economy(b: BattleCore, side: int, rng: RandomNumberGenerator,
-		reserve: int = AI_ITEM_ENERGY_RESERVE) -> void:
+		reserve: int = AI_ITEM_ENERGY_RESERVE, smart: bool = true) -> void:
 	if side < 0 or side >= b.slots.size() or b.slots[side].size() < BattleCore.SLOT_COUNT:
 		return
-	_apply_economy(b, side, rng, reserve, _threshold_upgrade_slot(b, side, reserve))
+	_apply_economy(b, side, rng, reserve, _threshold_upgrade_slot(b, side, reserve), smart)
 
 
 ## 阈值升级择时：返回第一个「就绪 + 可升 + 能量明显富余(成本+reserve+buffer)」的槽；无则 -1。
@@ -124,38 +126,128 @@ static func _threshold_upgrade_slot(b: BattleCore, side: int, reserve: int) -> i
 
 ## 应用一回合道具经济（机械执行·升级目标由调用方给）：
 ##   ① 就绪槽——upgrade_slot 那个升级、其余用掉（upgrade_slot=-1 → 全用不升）；
-##   ② 抽所有可抽；③ 富余开 1 格；④ 富余 refill 1 空槽。
-static func _apply_economy(b: BattleCore, side: int, rng: RandomNumberGenerator, reserve: int, upgrade_slot: int) -> void:
+##   ② 抽所有可抽（免费·含到点自动解锁的格）；③ 富余能量补充 1 个空槽。
+## smart=true → 3 选 1 走启发式选牌（_best_draft_choice）；false=纯随机（旧行为·A/B 对照）。
+static func _apply_economy(b: BattleCore, side: int, rng: RandomNumberGenerator, reserve: int, upgrade_slot: int, smart: bool = true) -> void:
 	if side < 0 or side >= b.slots.size() or b.slots[side].size() < BattleCore.SLOT_COUNT:
 		return
-	# 1. 就绪槽
+	# 1. 就绪槽（进攻向道具按兵不动 → 攻击回合由 commit_attack_items 一并甩出）
 	for s in range(BattleCore.SLOT_COUNT):
 		if not b.slot_ready(side, s):
 			continue
 		if s == upgrade_slot and b.can_upgrade(side, s):
 			var uopts: Array = b.begin_upgrade_draft(side, s)
 			if not uopts.is_empty():
-				b.pick_upgrade(side, s, rng.randi() % uopts.size())
+				b.pick_upgrade(side, s, _pick_choice(b, side, uopts, rng, smart))
 				continue
+		if _is_attack_item(b.slot_item(side, s)):
+			continue
 		b.use_slot(side, s)
-	# 2. 抽可抽的槽
+	# 2. 抽可抽的槽（免费）
 	for s in range(BattleCore.SLOT_COUNT):
 		if b.can_draw_slot(side, s):
 			var opts: Array = b.begin_draft(side, s)
 			if not opts.is_empty():
-				b.pick_draft(side, s, rng.randi() % opts.size())
-	# 3. 富余能量开 1 个槽（电报）
-	for s in range(BattleCore.SLOT_COUNT):
-		if b.can_open_slot(side, s) and b.energy[side] >= BattleCore.ITEM_OPEN_COST + reserve:
-			b.open_slot(side, s)
-			break
-	# 4. 富余能量 refill 1 个空槽
+				b.pick_draft(side, s, _pick_choice(b, side, opts, rng, smart))
+	# 3. 富余能量补充 1 个空槽
 	for s in range(BattleCore.SLOT_COUNT):
 		if b.can_refill(side, s) and b.energy[side] >= BattleCore.ITEM_REFILL_COST + reserve:
 			var opts2: Array = b.start_refill(side, s)
 			if not opts2.is_empty():
-				b.pick_draft(side, s, rng.randi() % opts2.size())
+				b.pick_draft(side, s, _pick_choice(b, side, opts2, rng, smart))
 			break
+
+
+## 3 选 1 出牌口：smart → 启发式最优（并列随机）；否则纯随机（旧行为）。
+static func _pick_choice(b: BattleCore, side: int, opts: Array, rng: RandomNumberGenerator, smart: bool) -> int:
+	if not smart:
+		return rng.randi() % opts.size()
+	return _best_draft_choice(b, side, opts, rng)
+
+
+## 3 选 1 智能选牌（任务#6·2026-07-03·首版启发式·⚠非终态，见 [[item-system-skeleton]] 进阶加权待办）：
+## 设计 EV 打底 + 局面修正。并列随机 → 保持全池覆盖、不固化套路。
+static func _best_draft_choice(b: BattleCore, side: int, opts: Array, rng: RandomNumberGenerator) -> int:
+	var best: Array[int] = [0]
+	var best_s := -INF
+	for i in range(opts.size()):
+		var sc: float = score_item_option(b, side, opts[i])
+		if sc > best_s + 0.001:
+			best_s = sc
+			best = [i]
+		elif absf(sc - best_s) <= 0.001:
+			best.append(i)
+	return best[rng.randi() % best.size()]
+
+
+## 单件道具在当前局面下的价值分（量纲对齐 BattleEval 半点 ≈10 分）。
+## ⚠ 校准记录（2026-07-03）：首版"满血治疗倒扣 −8 + 强情境分"在 A/B 中输给随机（43.9%·60 局）——
+##   选牌在部署锁之前、使用在 1+ 回合之后，按"当下局面"打重分 = 时机错配；
+##   前期人人满血 → 系统性拒收治疗件 → 全局丢续航。v2 修正：去倒扣、情境分减半（只当轻推）。
+static func score_item_option(b: BattleCore, side: int, data: ItemData) -> float:
+	var s: float = float(data.ev_half) * 10.0
+	var opp: int = 1 - side
+	var aslot: int = b.active_index[side]
+	var my_hp: int = b.hp[side][aslot]
+	var opp_hp: int = b.hp[opp][b.active_index[opp]]
+	match data.dimension:
+		"进攻":
+			if opp_hp > 0 and opp_hp <= 2 * BattleCore.HP_UNIT:
+				s += 6.0    # 斩杀圈：进攻件是收割票（轻推）
+		"防御":
+			if data.params.has("heal"):
+				if b.max_hp[side][aslot] - my_hp >= 2:
+					s += 6.0   # 已掉血 → 治疗增值；满血不倒扣（用的时候多半已掉血）
+			elif my_hp <= 2 * BattleCore.HP_UNIT:
+				s += 6.0    # 自己进斩杀圈：护盾/挡件保命（轻推）
+		"能量":
+			if b.energy[side] <= 2:
+				s += 4.0    # 缺能（≤1.0 能）：能量件回血线（轻推）
+	if data.upgrade_to != "":
+		s += 3.0            # 预设升级线 → 养成潜力
+	return s
+
+
+## 进攻向道具（chip 伤害 / 攻击增伤 / 命中骑乘）只在攻击回合甩出才有价值。
+## 经济阶段按兵不动（见 _apply_economy），动作定为攻击后调本函数一并提交（与波/大波同吃对方防御门）。
+## 修复 2026-07-03 死龟锁：免费道具流下若"每回合白扔 chip"，对手每回合都有已提交伤害 →
+## 「防」恒有免费价值 → 双方全场防（冒烟 sim 防占 79%、90% 打满回合上限）。
+static func commit_attack_items(b: BattleCore, side: int, action: int) -> void:
+	if side < 0 or side >= b.slots.size() or b.slots[side].size() < BattleCore.SLOT_COUNT:
+		return
+	if not _is_attack_turn(b, side, action):
+		return
+	for s in range(BattleCore.SLOT_COUNT):
+		if b.slot_ready(side, s) and _is_attack_item(b.slot_item(side, s)):
+			b.use_slot(side, s)
+
+
+## 本回合动作是否"攻击"（波/大波/攻击型主动技）——进攻向道具的甩出门。
+static func _is_attack_turn(b: BattleCore, side: int, action: int) -> bool:
+	if ActionDef.is_attack(action):
+		return true
+	if action == ActionDef.ACTIVE:
+		var sk: HeroSkill = b.get_skill(side, b.active_index[side])
+		return sk != null and sk.active_is_attack()
+	return false
+
+
+## 进攻向道具判定：维度=进攻（chip/增伤）或角色以「进攻」开头（进攻→X 导出骑乘，如血魔的獠牙）。
+static func _is_attack_item(data: ItemData) -> bool:
+	return data != null and (data.dimension == "进攻" or data.role.begins_with("进攻"))
+
+
+## 加时赛选人（Q5·白板 1v1 禁技能 → 英雄差异只剩 max_hp）：选血量上限最高者（满血复活，平手取前）。
+## 技能若将来在加时解禁，此处升级为逐候选 clone+_state_value 深比（同 choose_death_switch 机器）。
+static func choose_overtime_pick(b: BattleCore, side: int) -> int:
+	var best := 0
+	var best_hp := -1
+	for s in range(b.heroes[side].size()):
+		var mh: int = int((b.heroes[side][s] as HeroData).max_hp)
+		if mh > best_hp:
+			best_hp = mh
+			best = s
+	return best
 
 
 ## 升级择时【进阶·价值搜索】（B·root-only）：把"就绪件 用 vs 升"交给搜索而非阈值。
@@ -166,7 +258,7 @@ func plan_economy(b: BattleCore, side: int, rng: RandomNumberGenerator) -> void:
 	if side < 0 or side >= b.slots.size() or b.slots[side].size() < BattleCore.SLOT_COUNT:
 		return
 	if not search_upgrade:
-		run_item_economy(b, side, rng)
+		run_item_economy(b, side, rng, AI_ITEM_ENERGY_RESERVE, smart_draft)
 		return
 	# 候选升级目标 = -1(不升·全用) + 每个「就绪+可升+付得起(成本+reserve)」槽；是否值得交给搜索定。
 	var candidates: Array[int] = [-1]
@@ -175,18 +267,18 @@ func plan_economy(b: BattleCore, side: int, rng: RandomNumberGenerator) -> void:
 				and b.energy[side] >= b.upgrade_cost(side, s) + AI_ITEM_ENERGY_RESERVE:
 			candidates.append(s)
 	if candidates.size() == 1:
-		_apply_economy(b, side, rng, AI_ITEM_ENERGY_RESERVE, -1)   # 无升级抉择 → 直接全用 + 推进
+		_apply_economy(b, side, rng, AI_ITEM_ENERGY_RESERVE, -1, smart_draft)   # 无升级抉择 → 直接全用 + 推进
 		return
 	var best := -1
 	var best_val := -INF
 	for up in candidates:
 		var sim: BattleCore = b.clone()
-		_apply_economy(sim, side, _eval_rng, AI_ITEM_ENERGY_RESERVE, up)
+		_apply_economy(sim, side, _eval_rng, AI_ITEM_ENERGY_RESERVE, up, smart_draft)
 		var v: float = _root_value(sim, side)
 		if v > best_val:
 			best_val = v
 			best = up
-	_apply_economy(b, side, rng, AI_ITEM_ENERGY_RESERVE, best)
+	_apply_economy(b, side, rng, AI_ITEM_ENERGY_RESERVE, best, smart_draft)
 
 
 ## 根局面博弈值：对剪枝动作集解一层根矩阵取安全值，供 plan_economy 比较经济变体（不再二次推进经济）。
@@ -242,6 +334,9 @@ func _rollout_once(b: BattleCore, player: int, opp: int, ca: Dictionary, cb: Dic
 	sim.apply_choice(opp, cb)
 	if not sim.both_ready():
 		return {value = _eval(b, player), stochastic = false}
+	# 进攻向道具随攻击动作一并甩出（镜像实战 commit 时机）→ 矩阵格能算到"攻击带骑乘"的价值。
+	commit_attack_items(sim, player, int(ca["action"]))
+	commit_attack_items(sim, opp, int(cb["action"]))
 	sim.resolve()
 	_auto_death_switch(sim)            # 自动补位 → 子局是干净的决策态
 	var stochastic: bool = sim.rng.state != rng_before
@@ -255,12 +350,12 @@ func _state_value(b: BattleCore, perspective: int, depth: int) -> float:
 		return _eval(b, perspective) * pow(WIN_DISCOUNT, float(search_depth - depth))
 	if depth <= 0:
 		return _eval(b, perspective)
-	# 道具经济（Part 2）：模拟的未来回合，双方也按实战同款启发自动管理道具栏（开格/抽/用/升），
+	# 道具经济（Part 2）：模拟的未来回合，双方也按实战同款启发自动管理道具栏（抽/用/补/升），
 	# 在枚举动作【前】跑 → AI 规划会考虑「道具就绪可收割 / 对手有道具威胁 / 该攒能升级」。
 	# 槽未初始化（无经济战局 / 单元测试）时 run_item_economy 守卫早退 = 行为不变（测试安全）。
 	if plan_items:
-		run_item_economy(b, perspective, _eval_rng)
-		run_item_economy(b, 1 - perspective, _eval_rng)
+		run_item_economy(b, perspective, _eval_rng, AI_ITEM_ENERGY_RESERVE, smart_draft)
+		run_item_economy(b, 1 - perspective, _eval_rng, AI_ITEM_ENERGY_RESERVE, smart_draft)
 	var opp: int = 1 - perspective
 	var my: Array = _shortlist(b, perspective)
 	var opp_acts: Array = _shortlist(b, opp)

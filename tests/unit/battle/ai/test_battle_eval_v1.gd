@@ -65,6 +65,40 @@ func test_v1_shield_diff_weighted_by_w_shield() -> void:
 	assert_almost_eq(BattleEval.score(b, 0), BattleEval.W_SHIELD * 3.0, 0.001)
 
 
+# ---- 状态资产项（任务#7·2026-07-03：铺垫型技能挂出的状态计分）----
+
+func test_v1_status_assets_enemy_debuffs_score_positive() -> void:
+	# 挂在敌方身上的毒/易伤/沉默 = 我方资产（此前恒 0 分 → 铺垫型主动技被 AI 视为纯亏）。
+	var b := _neutral()
+	b.set_status(1, 0, "poison", 2)     # 敌出战 2 层毒 → +8×2
+	b.set_status(1, 0, "silenced", 2)   # 敌被沉默 2 回合 → +10×2
+	assert_almost_eq(BattleEval.score(b, 0), 8.0 * 2.0 + 10.0 * 2.0, 0.001,
+		"敌方债/破绽按半点当量计入我方资产")
+
+
+func test_v1_status_assets_own_jianqi_scores() -> void:
+	var b := _neutral()
+	b.set_status(0, 0, "jianqi", 3)     # 我方 3 层剑气 → +6×3
+	assert_almost_eq(BattleEval.score(b, 0), 6.0 * 3.0, 0.001, "剑气层 = 己方攒的穿透资源")
+
+
+func test_v1_status_assets_antisymmetric_and_switchable() -> void:
+	var b := _neutral()
+	b.set_status(0, 0, "poison", 2)     # 反向：毒挂在我方头上
+	assert_almost_eq(BattleEval.score(b, 0), -16.0, 0.001, "自家挂债 = 负资产（反对称）")
+	assert_almost_eq(BattleEval.score(b, 0, {"W_STATUS_SCALE": 0.0}), 0.0, 0.001,
+		"W_STATUS_SCALE=0 → 关闭回旧行为（A/B 对照）")
+
+
+func test_v1_status_assets_dead_holder_scores_zero() -> void:
+	var b := _neutral()
+	b.set_status(1, 1, "poison", 3)
+	b.hp[1][1] = 0                       # 带毒者已阵亡 → 债随人消
+	# 阵亡的 5HP 替补同时触发 存活差 + HP 差；只验状态项不再另计：
+	var expect: float = BattleEval.W_ALIVE + BattleEval.W_HP * 10.0
+	assert_almost_eq(BattleEval.score(b, 0), expect, 0.001, "死者身上的状态不计分")
+
+
 # ---- 存活数领先（W_ALIVE·与被杀英雄的残血耦合）----
 
 func test_v1_alive_lead_adds_w_alive() -> void:
