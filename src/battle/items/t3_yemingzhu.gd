@@ -10,6 +10,6 @@ func relic_on_switch_in(battle: BattleCore, player: int, _slot: int, _data: Item
 	battle.add_item_mod(player, "atk_bonus", ATK_BONUS)
 	var opp: int = 1 - player
 	var oa: int = battle.active_index[opp]
-	if battle.hp[opp][oa] > 0:
+	if battle.hp[opp][oa] > 0 and not battle.damage_immune(opp):   # 周天罡气：冲撞也免
 		battle.hp[opp][oa] -= CHARGE_DMG
 		events.append({id = "yemingzhu_charge", player = player})

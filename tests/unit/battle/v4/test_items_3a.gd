@@ -1,6 +1,6 @@
 extends GutTest
 
-## Phase 3A 纯逻辑件（替身草人 / 打神鞭 / 一气）行为锁定测试。
+## Phase 3A 纯逻辑件（替身草人 / 打神鞭 / 周天罡气）行为锁定测试。
 ## 无技能 test_* 英雄隔离。半点制：1HP=2 半点。基线出战 HP=20。
 
 const A := ActionDef.Action
@@ -58,28 +58,35 @@ func test_control_switch_without_caoren_takes_hit() -> void:
 	assert_eq(b.hp[0][1], 18, "对照：切换无草人 → 新出战挨波")
 
 
-# === 一气：信息博弈，2/3 概率落空（概率性·跨种子） ===
+# === 周天罡气：本回合无敌·不受任何敌源伤害（2026-07-04 重做·旧「气·2/3 概率落空」已废） ===
 
-func test_yiqi_dodges_some_attacks() -> void:
-	var hits := 0
-	for i in range(30):
-		var b := _battle()
-		b.rng.seed = i * 101 + 13   # 每次不同种子 → 制造方差
-		b.use_item(0, _give(b, 0, "t3_yiqi"))
-		b.select_action(0, A.CHARGE)
-		b.select_action(1, A.ATTACK)
-		b.resolve()
-		if b.hp[0][0] < 20:
-			hits += 1
-	# 真身 1/3 命中：应既有命中（真身被打中）也有落空（替身挡下），不全 0、不全 30。
-	assert_gt(hits, 0, "一气：真身有时被命中")
-	assert_lt(hits, 30, "一气：替身有时让攻击落空")
-
-
-func test_yiqi_inert_when_opp_not_attacking() -> void:
+func test_gangqi_immune_to_big_attack() -> void:
 	var b := _battle()
 	b.use_item(0, _give(b, 0, "t3_yiqi"))
 	b.select_action(0, A.CHARGE)
-	b.select_action(1, A.CHARGE)   # 对手不攻击 → 一气不触发
+	b.select_action(1, A.BIG_ATTACK)   # 穿防大波也整发落空
 	b.resolve()
-	assert_eq(b.hp[0][0], 20)
+	assert_eq(b.hp[0][0], 20, "周天罡气：大波整发落空·无伤")
+
+
+func test_gangqi_immune_to_pending_burn() -> void:
+	var b := _battle()
+	b.pending_damage[0][0] = 2   # 妖火式延迟伤害·本回合到期
+	b.use_item(0, _give(b, 0, "t3_yiqi"))
+	b.select_action(0, A.CHARGE)
+	b.select_action(1, A.CHARGE)
+	b.resolve()
+	assert_eq(b.hp[0][0], 20, "周天罡气：延迟灼烧被免掉")
+	assert_eq(b.pending_damage[0][0], 0, "灼烧当回合清零·不顺延")
+
+
+func test_gangqi_lasts_one_turn_only() -> void:
+	var b := _battle()
+	b.use_item(0, _give(b, 0, "t3_yiqi"))
+	b.select_action(0, A.CHARGE)
+	b.select_action(1, A.CHARGE)
+	b.resolve()
+	b.select_action(0, A.CHARGE)
+	b.select_action(1, A.ATTACK)   # 次回合无敌已过期
+	b.resolve()
+	assert_eq(b.hp[0][0], 20 - 2, "无敌只持续使用当回合·次回合照常挨波")

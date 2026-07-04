@@ -945,13 +945,15 @@ func resolve() -> Dictionary:
 		for s in range(_killer[p].size()):
 			_killer[p][s] = -1
 
-	# Phase 0: 结算上回合延迟伤害（道具妖火/藤蔓挂的债；直接扣）
+	# Phase 0: 取出【本回合到期】的延迟伤害账目并清零（妖火/藤蔓上回合挂的债）。
+	#   ⚠ 2026-07-04 拆两步：此处只记账、结算延后到 Phase IS.5（道具相位之后）——
+	#   让当回合道具修正（周天罡气免疫）能作用于它；本回合道具新挂的债不在账上（保持"下回合生效"语义）。
+	#   旧单步版在 _imod 重置前结算、读的是上一回合残留修正器（隐患一并修掉）。
+	var due_damage: Array = [[], []]
 	for p in [0, 1]:
 		for s in range(hp[p].size()):
-			if pending_damage[p][s] > 0:
-				hp[p][s] -= pending_damage[p][s]
-				events.append({id = "deferred_damage", player = p, slot = s, amount = pending_damage[p][s]})
-				pending_damage[p][s] = 0
+			due_damage[p].append(pending_damage[p][s])
+			pending_damage[p][s] = 0
 
 	# Phase IS: 道具 S 相位（ADR-003 D3）。重置本回合修正器 → 注入跨回合 buff →
 	#   用道具者先清旧信息扭曲 → setup_pre(免疫/信息·先于 debuff) → apply_pre(自身向/对敌/动作修正器)。
@@ -979,6 +981,16 @@ func resolve() -> Dictionary:
 	for p in [0, 1]:
 		for relic in relics[p]:
 			relic["data"].effect.relic_pre(self, p, relic["data"], relic["state"])
+
+	# Phase IS.5: 结算 Phase 0 记下的到期延迟伤害（本回合道具新挂的债不在账上·下回合才生效）。
+	for p in [0, 1]:
+		for s in range(due_damage[p].size()):
+			var owed: int = int(due_damage[p][s])
+			if owed > 0:
+				if damage_immune(p):   # 周天罡气：本回合到期的延迟伤害被免掉（不顺延）
+					continue
+				hp[p][s] -= owed
+				events.append({id = "deferred_damage", player = p, slot = s, amount = owed})
 
 	# Phase 2: 扣能量 / 攒能量 / 主动技执行（道具：省力咒省能 / 分神铃铛削攒）
 	for p in [0, 1]:
@@ -1256,7 +1268,7 @@ func chongzhuang(attacker_player: int) -> void:
 
 ## 把伤害"踏/溅"到 victim_player 随机一名存活替补（乌骓 h19 践踏溢出用·shield 先吸·触发 on_self_damaged·2026-07-01 由"最高血"改随机）。
 func _splash_to_reserve(victim_player: int, dmg: int) -> void:
-	if dmg <= 0:
+	if dmg <= 0 or damage_immune(victim_player):   # 周天罡气：溅射也免
 		return
 	var candidates: Array[int] = []
 	for s in range(hp[victim_player].size()):
@@ -1313,8 +1325,19 @@ func _apply_team_outgoing(dmg: int, action: int, player: int, attacker_slot: int
 ## 伤害管线 (§D4)：防御门 → 中毒引爆 → 受伤 hook(平减) → 护盾 → 落 HP → on-hit 触发。
 ## 返回实际落在 HP 上的伤害（半点），供攻击型主动技回调使用。
 ## src = 本次 hit 的来源标签（"action"=动作攻击/技能·"item"=道具 hit）——只写进事件供统计（sim 道具伤害占比），不影响结算。
+## 周天罡气（t3_yiqi·2026-07-04 重做）：该方本回合是否"无敌"——免疫一切【敌源】伤害
+## （动作攻击/道具直伤/延迟灼烧/溅射/穷追/反震/冲撞/死亡反击）。自付代价（凶药）不算"受到伤害"、不拦。
+func damage_immune(player: int) -> bool:
+	return int(item_mod(player, "damage_immune", 0)) > 0
+
+
 func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_action: int, pen: int, def_action: int, events: Array, item_riders: Array = [], src: String = "action") -> int:
 	var slot: int = active_index[target_player]
+
+	# 周天罡气：无敌方本回合所有指向性伤害事件整个不发生（含附带 on-hit·同"落空"语义）
+	if damage_immune(target_player):
+		events.append({id = "damage_immune", player = target_player})
+		return 0
 
 	# Stage B4: 防御动作门（大防挡全部；防挡波，不挡大波/穿防攻击）
 	var eff_def: int = def_action
@@ -1511,7 +1534,7 @@ func _resolve_deaths(_a: Array[int], events: Array) -> void:
 				if slot == active_index[p] and int(item_buffs[p].get("death_reflect", 0)) > 0:
 					item_buffs[p].erase("death_reflect")
 					var ea: int = active_index[1 - p]
-					if hp[1 - p][ea] > 0:
+					if hp[1 - p][ea] > 0 and not damage_immune(1 - p):   # 周天罡气：死亡反击也免
 						hp[1 - p][ea] -= WEIHOUZHEN_STING_DMG
 						events.append({id = "weihouzhen_sting", player = p})
 

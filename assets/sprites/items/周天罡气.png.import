@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bfh5ndq7i2m3n"
-path="res://.godot/imported/气.png-194d758e1f25d3d76fef6eaee02cb1a9.ctex"
+uid="uid://c33kgow60j8ad"
+path="res://.godot/imported/周天罡气.png-ddb1877139bbe1e0e314915a2ccf48a7.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/items/气.png"
-dest_files=["res://.godot/imported/气.png-194d758e1f25d3d76fef6eaee02cb1a9.ctex"]
+source_file="res://assets/sprites/items/周天罡气.png"
+dest_files=["res://.godot/imported/周天罡气.png-ddb1877139bbe1e0e314915a2ccf48a7.ctex"]
 
 [params]
 

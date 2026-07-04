@@ -241,8 +241,8 @@ const _DEF := {
 		desc = "我方「切换」时留下一个稻草替身，敌方本回合对我方的攻击落空。", params = {},
 		script = preload("res://src/battle/items/t2_caoren.gd")},
 	"t3_yiqi": {
-		tier = 3, ev = 4, name = "气", dim = "博弈", role = "信息", seq = _S_ANY, target = _T_SELF,
-		desc = "立起 2 个纸扎替身，敌方这次攻击有 2/3 概率落空。", params = {decoys = 2},
+		tier = 3, ev = 5, name = "周天罡气", dim = "博弈", role = "信息", seq = _S_ANY, target = _T_SELF,
+		desc = "我方本回合无敌，不受到任何伤害。", params = {},
 		script = preload("res://src/battle/items/t3_yiqi.gd")},
 
 	# ========== 首发补全：节奏/状态/干扰 capstone + 中立/趣味/meta 留种（2026-06-24·items-firstrelease）==========
@@ -298,6 +298,7 @@ const _DEF := {
 ## 名唯一（name_to_id 防重），故可作键；若改道具显示名须同步此处键。
 const _FLAVOR := {
 	# 进攻
+	"周天罡气": "无敌是多么寂寞",
 	"生锈的暗器": "虚日【鼠】会祈祷战斗时别摸到这个",
 	"先手": "先手！在波波攒里！",
 	"最后一箭": "向这黑暗世界输送一丝光明！",

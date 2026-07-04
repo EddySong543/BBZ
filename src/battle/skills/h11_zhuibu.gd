@@ -10,6 +10,8 @@ func on_enemy_switch_out(enemy_slot: int, battle: BattleCore, player: int, _slot
 		return
 	if battle.hp[opp][enemy_slot] <= 0:
 		return
+	if battle.damage_immune(opp):   # 周天罡气：穷追真伤也免
+		return
 	battle.hp[opp][enemy_slot] -= ActionDef.HP_UNIT   # 1.0HP = 2 半点，真伤直接扣本体血
 	if battle.hp[opp][enemy_slot] <= 0:
 		battle.credit_kill(player, opp, enemy_slot)

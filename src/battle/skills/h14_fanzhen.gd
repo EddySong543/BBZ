@@ -16,6 +16,8 @@ func on_block(battle: BattleCore, player: int, _slot: int, attacker_player: int,
 	var reflect: int = roundi(raw * 0.5)   # 半点：挡波 raw=2→反1(0.5HP)、挡大波 raw=4→反2(1.0HP)
 	if reflect <= 0:
 		return
+	if battle.damage_immune(attacker_player):   # 周天罡气：反震也免
+		return
 	var aslot: int = battle.active_index[attacker_player]
 	battle.hp[attacker_player][aslot] -= reflect
 	battle.note_combo_proc(player)   # 鼠潮：卸力反震 = 一次 combo proc（归防御方）
