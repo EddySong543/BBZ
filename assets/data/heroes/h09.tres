@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1_uo01y")
 hero_id = "h09"
+dimension = "干扰"
 hero_name = "紫火【猴】"
 max_hp = 4
 skill_description = "攫灵裂空"

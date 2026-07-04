@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1_3ccig")
 hero_id = "h10"
+dimension = "状态"
 hero_name = "昴日【鸡】"
 max_hp = 5
 skill_type = 1

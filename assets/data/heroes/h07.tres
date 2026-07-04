@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1_mh0ti")
 hero_id = "h07"
+dimension = "节奏"
 hero_name = "星日【马】"
 max_hp = 5
 skill_description = "一骑当先"

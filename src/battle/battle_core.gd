@@ -525,6 +525,7 @@ const SLOT_UNLOCK_TURN := [2, 3, 4]    # 0-indexed turn_number（= 显示回合 
 const ITEM_REFILL_COST := 2            # 补充 1 能（= 2 半能·T1 池 3 选 1）
 const UPGRADE_COST := 2                # 升级统一 1 能（T1→2 / T2→3 同价·2026-07-03；T3 泛滥再回调）
 const UPGRADE_FAVORED_WEIGHT := 5.0    # 升级 3 选 1 里「预设升级款」(upgrade_to) 的相对权重（>1 → 更易出现·B2）
+const DRAFT_DIM_WEIGHT := 2.0          # 抽卡 3 选 1 里维度命中我方阵容的道具相对权重（2× 封顶不叠加·T2·2026-07-04）
 # 遗物效果数值（半点·从裸魔数提出集中可调）
 const WEIHOUZHEN_STING_DMG := 1        # 尾后针：出战阵亡反击敌方出战 0.5 HP 真伤（通用 death_reflect 状态机制·见 _resolve_deaths）
 const STARTER_ITEM_IDS := ["t1_feibiao", "t1_jiudun", "t1_lzhi_shengming"]  # slot0 自带随机池（后期改玩家自选 T1/T2 携带·PvE）
@@ -575,15 +576,12 @@ func can_draw_slot(player: int, s: int) -> bool:
 
 
 ## 生成并返回 3 选 1 选项（存入槽供 UI 展示；同回合重复调用沿用已生成结果）。
+## T2 加权抽卡池（2026-07-04）：① 3 候选互不重复 ② 维度命中我方阵容 → DRAFT_DIM_WEIGHT× 加权
+## ③ 小保底：3 候选至少跨 2 个维度（全同维度时末位换抽其他维度）。
 func begin_draft(player: int, s: int) -> Array:
 	var sl: Dictionary = slots[player][s]
 	if (sl["draft"] as Array).is_empty():
-		var pool: Array = _draft_pool()
-		var opts: Array = []
-		var n: int = mini(3, pool.size())
-		for _i in range(n):
-			opts.append(pool[rng.randi() % pool.size()])
-		sl["draft"] = opts
+		sl["draft"] = _lineup_weighted_draft(player, _draft_pool(), 3)
 	return sl["draft"]
 
 
@@ -713,6 +711,60 @@ func start_refill(player: int, s: int) -> Array:
 ## 抽卡池 = T1 池（解锁 3 选 1 / 补充 3 选 1 均只出 T1；T2/T3 只走升级线·2026-07-03）。
 func _draft_pool() -> Array:
 	return ItemCatalog.all_tier1()
+
+
+## 我方阵容维度集合（keys=维度名）。只认阵容标签、不认战况——每局静态，
+## 杜绝「顺风加权滚雪球」（反杰弗里斯护栏·T2）。空 dimension 的英雄不计入。
+func _lineup_dims(player: int) -> Dictionary:
+	var dims: Dictionary = {}
+	for h in heroes[player]:
+		var d: String = (h as HeroData).dimension
+		if d != "":
+			dims[d] = true
+	return dims
+
+
+## 阵容加权、不重复抽 n 件（T2）。命中阵容维度的道具权重 DRAFT_DIM_WEIGHT（封顶·多英雄同维不叠加），
+## 其余 1。小保底：候选全同维度时，末位换成其余维度里的加权抽（池里没有其他维度则保持原样）。
+func _lineup_weighted_draft(player: int, pool: Array, n: int) -> Array:
+	var dims: Dictionary = _lineup_dims(player)
+	var remaining: Array = pool.duplicate()
+	var picks: Array = []
+	var count: int = mini(n, remaining.size())
+	for _k in range(count):
+		var idx: int = _weighted_dim_pick_index(remaining, dims)
+		picks.append(remaining[idx])
+		remaining.remove_at(idx)
+	if picks.size() >= 2:
+		var first_dim: String = (picks[0] as ItemData).dimension
+		var all_same: bool = true
+		for it in picks:
+			if (it as ItemData).dimension != first_dim:
+				all_same = false
+				break
+		if all_same:
+			var alt: Array = []
+			for it in remaining:
+				if (it as ItemData).dimension != first_dim:
+					alt.append(it)
+			if not alt.is_empty():
+				picks[picks.size() - 1] = alt[_weighted_dim_pick_index(alt, dims)]
+	return picks
+
+
+## 按维度权重从 pool 抽 1 个下标（命中 dims = DRAFT_DIM_WEIGHT·否则 1）。pool 不得为空。
+func _weighted_dim_pick_index(pool: Array, dims: Dictionary) -> int:
+	var total: float = 0.0
+	for it in pool:
+		total += DRAFT_DIM_WEIGHT if dims.has((it as ItemData).dimension) else 1.0
+	var r: float = rng.randf() * total
+	var idx: int = pool.size() - 1   # 浮点兜底（落最后一个）
+	for j in range(pool.size()):
+		r -= DRAFT_DIM_WEIGHT if dims.has((pool[j] as ItemData).dimension) else 1.0
+		if r <= 0.0:
+			idx = j
+			break
+	return idx
 
 
 ## 结算末：本回合用掉的槽置 EMPTY（一次性消耗）。在 resolve Phase 6 调。

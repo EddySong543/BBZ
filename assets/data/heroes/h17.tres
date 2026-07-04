@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1_h17")
 hero_id = "h17"
+dimension = "干扰"
 hero_name = "烛阴【龙】"
 max_hp = 6
 skill_type = 1

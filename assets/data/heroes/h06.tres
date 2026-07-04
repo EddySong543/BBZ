@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1_t15sl")
 hero_id = "h06"
+dimension = "状态"
 hero_name = "翼火【蛇】"
 max_hp = 4
 skill_description = "灵蚀噬魂"

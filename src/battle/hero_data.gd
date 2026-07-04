@@ -9,6 +9,7 @@ enum SkillType { PASSIVE, EXTRA_ACTION, ENHANCED_ACTION }
 @export var hero_id: String = ""
 @export var hero_name: String = ""
 @export var max_hp: int = 10
+@export var dimension: String = ""  ## 6 维之一（进攻/防御/能量/节奏/状态/干扰）；抽卡池阵容加权用（T2）。真相源=heroes-schools.md §3.1。
 @export var skill_type: int = SkillType.PASSIVE
 @export var skill_description: String = ""  ## 技能名（短，如「渴血」）；展示格标题用。
 @export var skill_detail: String = ""       ## 技能完整说明（展示格正文用）；为空则回退 skill_description。
