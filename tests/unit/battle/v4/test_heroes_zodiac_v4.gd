@@ -51,13 +51,13 @@ func _resolve(b: BattleCore, a0: int, a1: int) -> void:
 	b.resolve()
 
 
-# ---- h01 虚日 囤鼠（出战时己方每次得能 +0.5 能 = +1 半能·2026-06-21 由 +1 能调为 +0.5）----
+# ---- h01 虚日 囤鼠（出战时己方主动来源得能 +0.5 能=+1 半能·2026-07-04 起被动收入不吃加成）----
 
 func test_h01_dunshu_adds_half_to_every_energy_gain() -> void:
 	var b := _battle("h01", 5, 8)
 	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.CHARGE)
-	# 虚日：攒(2+囤鼠1) + 被动(2+囤鼠1) = +6 半能（每次获得能量事件都吃囤鼠加成）
-	assert_eq(b.energy[0], 8 + 6, "虚日囤鼠：攒 +3 + 被动 +3 = +6 半能")
+	# 虚日：攒(2+囤鼠1) + 被动(2·白给收入不加成·2026-07-04) = +5 半能
+	assert_eq(b.energy[0], 8 + 5, "虚日囤鼠：攒 +3 + 被动 +2（被动不加成）= +5 半能")
 	# 对照 plain：攒2 + 被动2 = +4
 	assert_eq(b.energy[1], 8 + 4, "plain 对照：攒 +2 + 被动 +2 = +4 半能")
 
@@ -250,16 +250,17 @@ func test_h10_jianyi_bajian_pierces_def_with_two_jianqi() -> void:
 	b.resolve()
 	assert_eq(b.hp[1][0], 10 - 4, "剑气2 → 穿防，防挡不住，受 波2+剑气2 = 4 半点(对手 HP5=10半)")
 	assert_eq(int(b.get_status(0, 0, "jianqi", 0)), 0, "一闪消耗全部剑气")
+	assert_eq(b.energy[0], 8 - 2 + 2, "一闪费 1 能(2026-07-04 由 0 能调升)·被动 +1 回填")
 
 
-# ---- h11 娄金 穷追（对手切换下场 → 被换下者 1.0 真伤）----
+# ---- h11 娄金 穷追（对手切换下场 → 被换下者 2.0 真伤·2026-07-04 由 1.0 调升）----
 
 func test_h11_zhuibu_true_damage_on_enemy_switch_out() -> void:
 	var b := _battle("h11", 5, 8)
 	b.select_action(0, ActionDef.Action.CHARGE)
 	b.select_switch(1, 1)                       # 对手切换 slot0→slot1
 	b.resolve()
-	assert_eq(b.hp[1][0], 10 - 2, "被换下者(slot0)受 1.0 真伤(2 半点·对手 HP5=10半)")
+	assert_eq(b.hp[1][0], 10 - 4, "被换下者(slot0)受 2.0 真伤(4 半点·2026-07-04 平衡调升)")
 
 
 # ---- h12 室火 纳福（受伤 → 己方 +等量能量）----

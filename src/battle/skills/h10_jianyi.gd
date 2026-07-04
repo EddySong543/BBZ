@@ -3,10 +3,12 @@ extends HeroSkill
 ## h10 昴日【金乌淬锋】· 状态（主动技：拔剑一闪）
 ## 己方任一攻击命中敌方 → 鸡 +1 层剑气（公开、跨回合、cap 4；存 鸡 自己 slot 的 "jianqi"）。
 ##   （on_team_deal_hit 对全队触发，但只有鸡 override → 只有鸡 slot 累积；虎双段 → +2。）
-## 拔剑一闪 = 出战时攻击型主动技（0 能）：伤害 = 波 + 剑气×0.5；
-##   剑气 ≥2 → 穿防、满 4 → 穿大防；命中后清空剑气（一闪那击不自累积）。
+## 拔剑一闪 = 出战时攻击型主动技（费 1 能·2026-07-04 平衡：原 0 能免费·510 局大测试 68.6% 全场唯一
+##   离群值·免费+无次数上限=零代价输出引擎 → 加 1 能税·保引擎身份·"何时兑现"添真实代价）：
+##   伤害 = 波 + 剑气×0.5；剑气 ≥2 → 穿防、满 4 → 穿大防；命中后清空剑气（一闪那击不自累积）。
 
 const CAP := 4
+const ACTIVE_COST := 2   # 2 半能 = 1 能（2026-07-04 由 0 调升·Eddy 批）
 
 func on_team_deal_hit(battle: BattleCore, player: int, slot: int, _attacker_slot: int, _target_player: int, _target_slot: int, _dealt: int) -> void:
 	var j: int = int(battle.get_status(player, slot, "jianqi", 0))
@@ -21,7 +23,7 @@ func has_active() -> bool:
 
 
 func active_cost(_battle: BattleCore, _player: int, _slot: int) -> int:
-	return 0
+	return ACTIVE_COST
 
 func active_is_attack() -> bool:
 	return true

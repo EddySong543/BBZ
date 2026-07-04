@@ -7,13 +7,13 @@ extends GutTest
 ## h14【卸力反震】= 防御：防/大防挡下 → 反弹所挡 50% 真伤给攻击者（机制迁自磐牛·on_block 触发）。
 ## h15【血勇】= 进攻：出战时无法用防/大防（can_afford gate·下场即解）+ 波穿防（attack_penetration）。
 ## h16【疾风】= 节奏：出战时，己方每局 2 次可把同一动作再做一次（波/大波/攒·技能/切换/防除外·2026-07-02 由在场收缩为出战）。
-## h17【镇压】= 干扰·主动技：占动作+费2能+每局2次，沉默对手出战英雄 unique 2 回合（下回合起算）。
+## h17【镇压】= 干扰·主动技：占动作+费1能(2026-07-04 由2能降价)+每局2次，沉默对手出战英雄 unique 2 回合（下回合起算）。
 ## h18【缠绕】= 状态：出战时，对手无法主动切换（含星日免费切换）；死亡换人不受影响。
 ## h19【践踏】= 进攻：攻击命中时，这一击超过 1.0HP 的溢出部分碾到敌方随机替补（无封顶）。
 ## h20【罪已昭】= 状态·被动：命中敌方出战附「易伤印」(vuln)，被印英雄受伤 +0.5，直到换下场（换下清）。
 ## h21【调虎离山】= 干扰·主动技：占动作+费2能+每局2次+须出战，强制对手换人、揪其指定（未指定→随机）存活替补上场。
 ## h22【焚天火兆】= 节奏·主动技：占动作+费1能+每局2次，蓄力（当拍无伤）→ 下回合毕方本人的攻击穿大防（窗口恰1回合·2026-07-04 重做）。
-## h23【护主】= 防御：替补席存活时，我方英雄受致命伤害 → 天狗顶替登场承受这一击、原 carry 退替补获救（每局一次·天狗可能吃死）。
+## h23【护主】= 防御：替补席存活时，我方英雄受致命伤害 → 天狗顶替登场+1.0 护盾垫伤(2026-07-04)、承受这一击、原 carry 退替补获救（每局一次·天狗可能吃死）。
 ## h24【饕餮】= 能量：在场(含替补)时，战场任一英雄阵亡(敌我皆可) → 你方团队 +2.0 能（4 半能）+ 并封自己回 1.0 生命（2026-07-04 双头分食·封顶 max_hp）。
 ##
 ## 经济基线（半能制）：1 能=2 半能；波 2 半能 / 大波 6 半能 / 大防 4 半能；HP 半点制(1.0=2 半点)。
@@ -255,19 +255,19 @@ func _battle_vs(p0_ids: Array, p1_ids: Array, hp: int = 6, e: int = 8) -> Battle
 func test_h17_zhenya_silences_enemy_passive() -> void:
 	# 暗龙(P0)镇压 → 沉默 P1 出战的虚日。cast 当回合虚日仍生效，【下回合起】囤鼠加成失效。
 	var b := _battle_vs(["h17", "test_p0_1", "test_p0_2"], ["h01", "test_p1_1", "test_p1_2"], 6, 8)
-	# 回合1：P0 镇压(费2能=4半能)、P1 攒(虚日未沉默 → +3：攒2+囤鼠1)
+	# 回合1：P0 镇压(费1能=2半能·2026-07-04 降价)、P1 攒(虚日未沉默 → +3：攒2+囤鼠1)
 	assert_true(b.select_active(0), "暗龙可发动镇压(敌出战存活)")
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
 	assert_eq(int(b.get_status(1, 0, "silenced", 0)), 2, "P1 虚日被烙沉默=2 回合")
-	assert_eq(b.energy[0], 8 - 4 + 2, "镇压费 2 能(4 半能) + 被动 +2")
+	assert_eq(b.energy[0], 8 - 2 + 2, "镇压费 1 能(2 半能·2026-07-04 降价) + 被动 +2")
 	assert_eq(int(b.get_status(0, 0, "active_uses", 0)), 1, "镇压计 1 次使用")
-	assert_eq(b.energy[1], 8 + 6, "cast 当回合虚日仍生效：攒(2+囤鼠1) + 被动(2+囤鼠1) = +6")
+	assert_eq(b.energy[1], 8 + 5, "cast 当回合虚日仍生效：攒(2+囤鼠1) + 被动(2·不加成·2026-07-04) = +5")
 	# 回合2：双攒 → 虚日已沉默 → P1 只 +4(攒2+被动2·囤鼠失效)
 	b.select_action(0, ActionDef.Action.CHARGE)
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(b.energy[1], 14 + 4, "虚日被沉默：攒+2 +被动+2、囤鼠加成失效")
+	assert_eq(b.energy[1], 13 + 4, "虚日被沉默：攒+2 +被动+2、囤鼠加成失效")
 	assert_eq(int(b.get_status(1, 0, "silenced", 0)), 1, "沉默递减 → 剩 1 回合")
 
 
@@ -287,7 +287,7 @@ func test_h17_zhenya_silence_expires_after_two_turns() -> void:
 	b.select_action(0, ActionDef.Action.CHARGE)
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()                                   # 回合4：虚日恢复 → +3
-	assert_eq(b.energy[1] - before, 6, "沉默到期 → 囤鼠恢复：攒(2+1) + 被动(2+1) = +6")
+	assert_eq(b.energy[1] - before, 5, "沉默到期 → 囤鼠恢复：攒(2+1) + 被动(2·不加成) = +5")
 
 
 func test_h17_zhenya_disables_enemy_active_and_caps() -> void:
@@ -488,7 +488,8 @@ func test_h23_huzhu_protects_carry_by_swapping_in() -> void:
 	b.resolve()
 	assert_eq(b.hp[0][0], 2, "carry 获救·退居替补·血量不变")
 	assert_eq(b.active_index[0], 1, "天狗顶替登场为出战")
-	assert_eq(b.hp[0][1], 10 - 4, "这一击改落天狗(10-4=6·天狗吃住没死)")
+	assert_eq(b.hp[0][1], 10 - 2, "登场护盾 1.0 垫掉 2 半点(2026-07-04)·天狗只落血 2 半点(10-2=8)")
+	assert_eq(b.shield[0][1], 0, "护盾被这一击耗尽")
 	assert_eq(int(b.get_status(0, 1, "huzhu_uses", 0)), 1, "护主计 1 次")
 
 
@@ -501,7 +502,7 @@ func test_h23_huzhu_once_per_game() -> void:
 	b.resolve()   # 首次：天狗顶替登场·carry 获救
 	assert_eq(b.active_index[0], 1, "首次：天狗顶替登场")
 	assert_eq(b.hp[0][0], 2, "首次：carry 获救退替补")
-	assert_eq(b.hp[0][1], 10 - 4, "首次：天狗吃这下(6)")
+	assert_eq(b.hp[0][1], 10 - 2, "首次：登场护盾垫 2 半点·天狗吃这下落血 2(=8·2026-07-04)")
 	# 再连打天狗至致死 → 护主已用尽·无人顶替 → 天狗死、carry 始终安全
 	b.select_action(0, ActionDef.Action.CHARGE)
 	b.select_action(1, ActionDef.Action.BIG_ATTACK)

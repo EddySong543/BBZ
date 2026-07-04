@@ -21,6 +21,7 @@ const HP_UNIT := 2  # 必须与 ActionDef.HP_UNIT 一致
 
 ## 英雄机制数值（从引擎逻辑里的裸魔数提出来，集中可调）
 const HUZHU_CAP := 1             # 天狗 h23【护主·顶替承伤】每局上限（次）
+const HUZHU_SHIELD := 2          # 天狗御凶登场护盾（2 半点=1.0·2026-07-04 Eddy 批·垫着承伤更可能活下来）
 const CHONGZHUANG_DAMAGE := 1    # 星日登场冲撞 = 0.5 HP（半点）
 const DOUBLEABLE_ACTIONS := [ActionDef.Action.ATTACK, ActionDef.Action.BIG_ATTACK, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND, ActionDef.Action.BIG_DEFEND]  # 广寒 h16【疾风】可"附加同种再做一次"的动作（仅技能/切换除外·防/大防可选但二元整体挡=无额外效果）
 
@@ -184,13 +185,16 @@ func _validate_skills() -> void:
 func hp_display(half: int) -> float:
 	return float(half) / float(HP_UNIT)
 
-## 统一能量获得入口：应用出战英雄的 energy_gain_bonus（虚日囤鼠 = 每次 +1 能），clamp 到 MAX。
-func _gain_energy(player: int, amount: int) -> void:
+## 统一能量获得入口：应用出战英雄的 energy_gain_bonus（虚日囤鼠 = 每次 +0.5 能），clamp 到 MAX。
+## boostable=false 的来源不吃加成（2026-07-04 Eddy 批：被动 +1 能/回合 = 白给收入不加成——
+##   虚日站场挂机躺赚 0.5/回合的通胀漏洞；只有主动来源（攒/转化/combo/道具）吃加成）。
+func _gain_energy(player: int, amount: int, boostable: bool = true) -> void:
 	if amount <= 0:
 		return
-	var sk: HeroSkill = _skills[player][active_index[player]]
-	if sk != null:
-		amount += sk.energy_gain_bonus(self, player, active_index[player])
+	if boostable:
+		var sk: HeroSkill = _skills[player][active_index[player]]
+		if sk != null:
+			amount += sk.energy_gain_bonus(self, player, active_index[player])
 	energy[player] = mini(energy[player] + amount, ActionDef.MAX_ENERGY)
 
 
@@ -1163,7 +1167,7 @@ func resolve() -> Dictionary:
 		relics[p] = kept_relics
 	# 被动能量 +1/回合（A2 引入·2026-06-24 去除·2026-07-03 恢复——sim 实锤攒-only 下最优解=互龟死锁）。
 	for p in [0, 1]:
-		_gain_energy(p, ActionDef.PASSIVE_ENERGY_GAIN)
+		_gain_energy(p, ActionDef.PASSIVE_ENERGY_GAIN, false)   # 被动收入不吃囤鼠加成（2026-07-04）
 	# 沉默还原 + 递减时长（烛阴 h17【镇压】；只递减本回合生效过的，见 Phase 0.3）。
 	for sw in _silenced_swap:
 		_skills[sw[0]][sw[1]] = sw[2]
@@ -1433,6 +1437,15 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 			events.append({id = "lethal_rescue", player = target_player, guardian = guard})
 			_perform_switch(target_player, slot, guard, events)
 			slot = active_index[target_player]   # 出战改为天狗·本次伤害改落天狗身上
+			# 2026-07-04 Eddy 批③①：御凶登场带 1.0 护盾且【垫住当下这一击】——主护盾段(B6)已跑过、
+			# 此处按同套规则（真伤/穿甲不吸）手动结算这次吸收；天狗替补席攒的旧护盾一并参与。
+			shield[target_player][slot] += HUZHU_SHIELD
+			events.append({id = "huzhu_shield", player = target_player, amount = HUZHU_SHIELD})
+			if dmg > 0 and pen != ActionDef.Pen.TRUE_DMG and not bool(item_mod(attacker_player, "pierce_armor", false)) and shield[target_player][slot] > 0:
+				var gabsorb: int = mini(shield[target_player][slot], dmg)
+				shield[target_player][slot] -= gabsorb
+				dmg -= gabsorb
+				events.append({id = "shield_absorb", player = target_player, amount = gabsorb})
 
 	# 濒死保命（通用 huanhun_ready 状态机制·非道具专属硬编码）：出战将死且带该标记 → 保留 0.5 HP（1 半点）·随后清标记。
 	# 当前仅还魂丹 t2_huanhundan 设此标记（apply_pre）。

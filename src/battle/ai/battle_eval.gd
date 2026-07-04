@@ -78,6 +78,13 @@ static func _status_assets(b: BattleCore, p: int) -> float:
 		t += 4.0 * float(b.get_status(e, s2, "marked", 0))             # 猎物印记（一次性易伤）
 		t += 5.0 * float(b.get_status(e, s2, "broken_armor", 0))       # 破甲（下次防御失效）
 		t += 10.0 * minf(float(b.get_status(e, s2, "silenced", 0)), 2.0)  # 沉默（unique 停摆/回合）
+	# 护主可用（天狗 h23·2026-07-04 Eddy 批③②）：替补席存活 + 御凶未用 = 一次"免死保险"资产（40 分）。
+	#   只在【替补席】计分 → 搜索自然学会把天狗留板凳待命（此前 DraftAI 按 HP6 当坦克顶前排=被动作废·26.8% 病因之一）。
+	for s3 in range(b.heroes[p].size()):
+		if s3 != b.active_index[p] and b.hp[p][s3] > 0:
+			var gsk: HeroSkill = b.get_skill(p, s3)
+			if gsk != null and gsk.is_lethal_guardian() and int(b.get_status(p, s3, "huzhu_uses", 0)) < BattleCore.HUZHU_CAP:
+				t += 40.0
 	return t
 
 
