@@ -92,30 +92,56 @@ func test_h03_lianpu_double_hit_feeds_two_jianqi() -> void:
 	assert_eq(int(b.get_status(0, 1, "jianqi", 0)), 2, "虎双段 → 鸡(替补)攒 2 层剑气")
 
 
-# ---- h04 房日 狡兔（上场 +0.5 护甲层）----
+# ---- h04 房日（重做 2026-07-04：出战时敌方每重复一次上回合动作 → 我方 +0.5 能·技能名待定）----
+# 旧机制（登场护甲保底 + 道具锁 −1）已移除；HP 4→5。
 
-func test_h04_jiaotu_gains_shield_on_switch_in() -> void:
-	var b := _battle_team(["test_p1_0", "h04", "test_p1_2"], 5, 8)
-	b.select_switch(0, 1)                       # 切到兔
-	b.select_action(1, ActionDef.Action.CHARGE)
-	b.resolve()
-	assert_eq(b.active_index[0], 1, "已切到兔")
-	assert_eq(b.shield[0][1], 1, "兔上场 +0.5 护甲 = 1 半点额外血量层")
+func test_h04_repeat_energy_first_turn_no_trigger() -> void:
+	var b := _battle("h04", 5, 8)
+	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND)
+	# 第 1 回合无上回合可比对 → 只有 攒2 + 被动2
+	assert_eq(b.energy[0], 8 + 4, "第 1 回合不触发（无上回合）")
 
-func test_h04_jiaotu_reduces_item_lock_on_switch_in() -> void:
-	var b := _battle_team(["test_p1_0", "h04", "test_p1_2"], 5, 8)
-	b.item_buffs[0]["item_lock"] = 2            # 被封印/天罗地网锁住 2 层
-	b.select_switch(0, 1)                       # 切到兔
-	b.select_action(1, ActionDef.Action.CHARGE)
-	b.resolve()
-	assert_eq(int(b.item_buffs[0].get("item_lock", 0)), 1, "兔上场 → 道具锁 2 减到 1")
+func test_h04_repeat_energy_gains_when_enemy_repeats() -> void:
+	var b := _battle("h04", 5, 8)
+	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND)
+	var e1: int = b.energy[0]
+	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND)   # 敌方重复「防」
+	assert_eq(b.energy[0], e1 + 5, "敌方重复上回合动作 → 攒2+被动2+重复产能1 = +5 半能")
 
-func test_h04_jiaotu_item_lock_floors_at_zero() -> void:
+func test_h04_repeat_energy_stops_when_enemy_varies() -> void:
+	var b := _battle("h04", 5, 8)
+	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND)
+	var e1: int = b.energy[0]
+	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.CHARGE)   # 敌方换动作 → 断供
+	assert_eq(b.energy[0], e1 + 4, "敌方换动作 → 只有攒2+被动2、无产能")
+
+func test_h04_repeat_energy_pays_each_consecutive_repeat() -> void:
+	var b := _battle("h04", 5, 0)   # 低起手能量·避免三回合累积撞 MAX_ENERGY=20 半能上限
+	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND)
+	var e1: int = b.energy[0]
+	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND)   # 重复 1 → +1
+	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND)   # 重复 2 → +1
+	assert_eq(b.energy[0], e1 + 10, "连防三回合 → 第 2/3 回合各产能 1（逐回合判定）")
+
+func test_h04_repeat_energy_inactive_from_reserve() -> void:
+	# 房日在替补席 → 光环不生效（出战限定）
 	var b := _battle_team(["test_p1_0", "h04", "test_p1_2"], 5, 8)
-	b.select_switch(0, 1)                       # 无锁时切到兔（item_lock 缺省 0）
-	b.select_action(1, ActionDef.Action.CHARGE)
+	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND)
+	var e1: int = b.energy[0]
+	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND)   # 敌方重复但房日未出战
+	assert_eq(b.energy[0], e1 + 4, "房日在替补席 → 敌方重复不产能")
+
+func test_h04_repeat_energy_counts_switch_as_action() -> void:
+	# 「动作」含切换：敌方连续两回合切换 = 重复
+	var b := _battle("h04", 5, 8)
+	b.select_action(0, ActionDef.Action.CHARGE)
+	b.select_switch(1, 1)
 	b.resolve()
-	assert_eq(int(b.item_buffs[0].get("item_lock", 0)), 0, "无锁时上场 → 道具锁保持 0、不变负")
+	var e1: int = b.energy[0]
+	b.select_action(0, ActionDef.Action.CHARGE)
+	b.select_switch(1, 0)
+	b.resolve()
+	assert_eq(b.energy[0], e1 + 5, "敌方连续切换（同为切换动作）→ 视为重复、产能 1")
 
 
 # ---- h05 亢金 裂甲（命中 → 给目标破甲）----

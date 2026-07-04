@@ -1,11 +1,17 @@
 extends HeroSkill
 
-## h04 房日【灵跃藏锋】被动 · 节奏 · 脆皮
-## 上场时：① 道具锁 −1（少挡一次封印/天罗地网的封锁、机灵挣脱）；② 获得 +0.5 护甲（=额外血量层、生存地板）。
-## 可反复上场反复触发；护甲取地板（≥1 半点 = 0.5HP，不无限叠加）；道具锁取地板 0（无锁时不变负）。
+## h04 房日【技能名待定·重做 2026-07-04】被动 · 节奏 · HP5
+## 「敌方重复动作产能」：房日【出战】(存活·未沉默) 时，敌方本回合动作与其上回合相同
+## → 我方团队能量 +0.5（1 半能）。
+## 逐回合判定：敌方换动作立即断供；第 1 回合无上回合不触发；
+## 被迫动作（力竭强制攒 / 被锁切换后连防等）也算重复；道具不是动作、不参与比对。
+## 引擎挂点：battle_core resolve Phase 5.7 比对 _last_action → enemy_repeat_energy()。
+## 设计：原语=连击奖励反向装到敌方（heroes-schools §5.8 空槽）·反龟生态杠杆
+##   （防/攒连按=喂能；对手反制=换动作，而"被迫换动作"正是本技能的塑形收益）。
+## 旧机制【灵跃藏锋·登场道具锁−1 + 0.5 护甲保底】已于 2026-07-04 重做移除
+##   （2026-07-03 道具经济重做后统一锁仅 1 回合·旧机制价值归零）；HP 4→5 补偿脆皮白板站场。
 
-func on_switch_in(battle: BattleCore, player: int, slot: int) -> void:
-	battle.shield[player][slot] = maxi(battle.shield[player][slot], 1)   # 0.5HP = 1 半点
-	var lock: int = int(battle.item_buffs[player].get("item_lock", 0))   # 道具锁 −1：上场挣脱一层封锁
-	if lock > 0:
-		battle.item_buffs[player]["item_lock"] = lock - 1
+const REPEAT_ENERGY := 1   # 半能 = 每次敌方重复 +0.5 能
+
+func enemy_repeat_energy() -> int:
+	return REPEAT_ENERGY

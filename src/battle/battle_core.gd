@@ -49,7 +49,7 @@ var _death_processed: Array = [[], []]              # 每槽位死亡 hook 是�
 var _shuchao_procs: Array[int] = [0, 0]             # 本回合各方已计入的 combo proc 数（鼠潮 h13·仅计数·2026-07-01 去每回合封顶）
 var _double: Array[bool] = [false, false]           # 本回合各方是否"附加同种动作再做一次"（疾风 h16·选择阶段设·resolve 末重置）
 var _killer: Array = [[], []]                       # _killer[player][slot]=直接攻击致死该英雄的攻击方;-1=非攻击致死。on_kill 只对直接攻击触发(防 splash/AOE 连锁)
-var _last_action: Array[int] = [-1, -1]             # 上回合双方动作（传说级雪球·惯性件读取）
+var _last_action: Array[int] = [-1, -1]             # 上回合双方动作（传说级雪球·惯性件读取；h04 敌方重复动作产能比对·Phase 5.7）
 
 # === 道具状态（ADR-003）===
 var items: Array = [[], []]                  # items[player] = Array[ItemData]：持有/可用的道具（经济系统前由 give_item 直接给）
@@ -1123,6 +1123,22 @@ func resolve() -> Dictionary:
 					var got: int = _heal(p, s, rheal)
 					if got > 0:
 						events.append({id = "muyang_heal", player = p, slot = s, amount = got})
+
+	# Phase 5.7: 敌方重复动作产能（房日 h04·重做 2026-07-04·技能名待定）——房日【出战】(存活) 且
+	#   敌方本回合动作与其上回合相同 → 己方团队能量 +enemy_repeat_energy 半能。
+	#   逐回合判定（敌方换动作即断供）；第 1 回合无上回合(_last_action=-1)不触发；
+	#   被迫动作（力竭强制攒 / 被锁切换后连防等）也算重复；道具不是动作、不参与比对。
+	#   沉默自动失效（Phase 0.3 已把 _skills 置 null、Phase 6 末才还原）。
+	for p in [0, 1]:
+		var foe: int = 1 - p
+		if _last_action[foe] >= 0 and a[foe] == _last_action[foe]:
+			var ract: int = active_index[p]
+			var rsk: HeroSkill = _skills[p][ract]
+			if hp[p][ract] > 0 and rsk != null:
+				var rgain: int = rsk.enemy_repeat_energy()
+				if rgain > 0:
+					_gain_energy(p, rgain)
+					events.append({id = "repeat_energy", player = p, amount = rgain})
 
 	# Phase 6: cleanup
 	# 遗物·Phase 6：每回合末 tick（产出/计数/充能；读 selected_action 判断本回合是否攻击）。

@@ -80,7 +80,7 @@ func on_before_death(_battle: BattleCore, _player: int, _slot: int) -> bool:
 	return false
 
 
-## 本英雄登场（开局首发 + 每次切换上场）。房日 h04(登场 + 护甲) / 星日 h07(登场冲撞)。
+## 本英雄登场（开局首发 + 每次切换上场）。星日 h07(登场冲撞)。（房日 h04 旧登场机制已于 2026-07-04 重做移除。）
 func on_switch_in(_battle: BattleCore, _player: int, _slot: int) -> void:
 	pass
 
@@ -146,6 +146,14 @@ func energy_gain_bonus(_battle: BattleCore, _player: int, _slot: int) -> int:
 ## 默认 false；天狗 override。
 func is_lethal_guardian() -> bool:
 	return false
+
+
+## 「敌方重复动作产能」型（房日 h04·重做 2026-07-04·技能名待定）：本英雄【出战】(存活·未沉默) 时，
+## 敌方本回合动作与其上回合相同 → 己方【团队】能量 +本值（半能）。逐回合判定：敌方换动作立即断供；
+## 第 1 回合无上回合不触发；被迫动作也算重复。引擎在 resolve Phase 5.7 比对 _last_action 入账。
+## 默认 0（不产出）；房日 override 返回 1（= +0.5 能/次）。设计=连击奖励原语反向装到敌方（反龟杠杆）。
+func enemy_repeat_energy() -> int:
+	return 0
 
 
 ## 「牧养 / 休养生息」型（光版鬼金 h08）：本英雄在场（含替补·存活）时，你方退到【替补席】的存活英雄
