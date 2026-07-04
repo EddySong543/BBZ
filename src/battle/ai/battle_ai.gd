@@ -33,7 +33,9 @@ var plan_items: bool = true # 搜索推演里是否也跑道具经济（Part 2�
                             # false=控制组（实战照常用道具、但 lookahead 当道具冻结·= 旧行为）。供 A/B 实测。
 var smart_draft: bool = true # 道具 3 选 1 智能选牌（任务#6·2026-07-03）：true=启发式按局面挑 /
                              # false=纯随机（旧行为·A/B 对照组）。
-var search_upgrade: bool = false # 升级择时：false=阈值默认(100局A/B价值搜索仅52.2%≈噪声·且贵~10×) / true=价值搜索(plan_economy·一开关可重启)
+var search_upgrade: bool = true # 升级择时：true=价值搜索默认(2026-07-04 T3 转正：新经济 100 局 A/B decisive 64.0%·
+                                # 大波 3.6%→5.0%·数据 out_upgrade_ab_t3) / false=阈值(旧默认·"52.2%≈噪声不值 10×"
+                                # 是死龟经济时代的结论·经济重做后已翻案·留作 A/B 对照开关)
 var eval_profile: int = 0   # 0=v1 基础评估(现役默认) / 1=v2 进阶评估(牌感·熟练优秀玩家)
 var weights: Dictionary = {} # 评估权重覆盖（空=用默认常量）；A/B 校准用（T1）
 var rng := RandomNumberGenerator.new()        # 动作抽样

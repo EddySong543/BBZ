@@ -186,3 +186,17 @@ func test_depth_variants_return_legal() -> void:
 				break
 		assert_true(found, "depth=%d 应返回合法动作" % d)
 		assert_eq(ai.search_depth, d, "深度参数应被记录")
+
+
+# ---- AI 配置默认档锁定（转正决策的回归锁·改默认必须走数据验证再来改这里）----
+
+func test_ai_default_profile_locked() -> void:
+	# Arrange/Act：默认构造
+	var ai := BattleAI.new(1)
+
+	# Assert：现役默认档（2026-07-04 状态：T3 转正 search_upgrade=true·
+	# 依据 out_upgrade_ab_t3 新经济 100 局 decisive 64.0%）
+	assert_true(ai.search_upgrade, "升级择时默认=价值搜索（T3 转正 2026-07-04）")
+	assert_true(ai.smart_draft, "抽卡默认=智能选牌（任务#6 转正）")
+	assert_true(ai.plan_items, "搜索推演默认带道具经济")
+	assert_eq(ai.eval_profile, 0, "评估默认=v1 基础档")
