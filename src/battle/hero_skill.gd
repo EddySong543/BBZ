@@ -170,6 +170,14 @@ func death_energy_bonus() -> int:
 	return 0
 
 
+## 「饕餮食肉」型（并封 h24·2026-07-04 双头分食优化）：与 death_energy_bonus 同触发面——
+## 战场任一英雄阵亡 → 【本英雄自己】回复本值（半点）生命（一头吞魂产能·一头食肉回血）。
+## 走 _heal（尊重禁回血·封顶 max_hp）；替补席也回（在场光环同 death_energy_bonus）。
+## 默认 0（不回复）；并封 override 返回 2（= +1.0 生命/死）。
+func death_heal_self() -> int:
+	return 0
+
+
 ## 免费切换次数上限（仅 has_free_switch()=true 时有意义）；-1 = 无限。星日当先 = -1（不限次）。
 func free_switch_cap() -> int:
 	return -1

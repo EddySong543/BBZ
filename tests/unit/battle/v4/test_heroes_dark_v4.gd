@@ -14,7 +14,7 @@ extends GutTest
 ## h21【调虎离山】= 干扰·主动技：占动作+费2能+每局2次+须出战，强制对手换人、揪其指定（未指定→随机）存活替补上场。
 ## h22【焚天火兆】= 节奏·主动技：占动作+费1能+每局2次，蓄力（当拍无伤）→ 下回合毕方本人的攻击穿大防（窗口恰1回合·2026-07-04 重做）。
 ## h23【护主】= 防御：替补席存活时，我方英雄受致命伤害 → 天狗顶替登场承受这一击、原 carry 退替补获救（每局一次·天狗可能吃死）。
-## h24【饕餮】= 能量：在场(含替补)时，战场任一英雄阵亡(敌我皆可) → 你方团队 +2.0 能（4 半能）。
+## h24【饕餮】= 能量：在场(含替补)时，战场任一英雄阵亡(敌我皆可) → 你方团队 +2.0 能（4 半能）+ 并封自己回 1.0 生命（2026-07-04 双头分食·封顶 max_hp）。
 ##
 ## 经济基线（半能制）：1 能=2 半能；波 2 半能 / 大波 6 半能 / 大防 4 半能；HP 半点制(1.0=2 半点)。
 ## ============================================================================
@@ -526,7 +526,45 @@ func test_h23_huzhu_not_lethal_no_trigger() -> void:
 	assert_eq(int(b.get_status(0, 1, "huzhu_uses", 0)), 0, "护主未计数")
 
 
-# ---- h24 并封 饕餮（任一英雄阵亡敌我皆可 → 团队 +2.0 能）----
+# ---- h24 并封 饕餮（任一英雄阵亡敌我皆可 → 团队 +2.0 能 + 并封自己回 1.0 生命·2026-07-04 双头分食）----
+
+func test_h24_taotie_heals_self_on_death() -> void:
+	# 双头分食：敌方阵亡 → 除 +2.0 能外，残血并封自己回 1.0 生命（2 半点）
+	var b := _battle_vs(["h24", "test_p0_1", "test_p0_2"], ["test_p1_0", "test_p1_1", "test_p1_2"], 5, 8)
+	b.hp[0][0] = 6                        # 并封残血（3.0/5.0）
+	b.hp[1][0] = 2                        # 敌出战残血待收割
+	b.select_action(0, ActionDef.Action.ATTACK)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_true(b.hp[1][0] <= 0, "敌出战被波打死")
+	assert_eq(b.hp[0][0], 6 + 2, "并封食肉：死亡 → 自己回 1.0 生命（2 半点）")
+
+func test_h24_taotie_heal_caps_at_max_hp() -> void:
+	# 满血并封：食肉封顶 max_hp 不溢出（能量那份照拿）
+	var b := _battle_vs(["h24", "test_p0_1", "test_p0_2"], ["test_p1_0", "test_p1_1", "test_p1_2"], 5, 8)
+	b.hp[1][0] = 2
+	var ctrl := _battle_vs(["test_p0_0", "test_p0_1", "test_p0_2"], ["test_p1_0", "test_p1_1", "test_p1_2"], 5, 8)
+	ctrl.hp[1][0] = 2
+	b.select_action(0, ActionDef.Action.ATTACK)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	ctrl.select_action(0, ActionDef.Action.ATTACK)
+	ctrl.select_action(1, ActionDef.Action.CHARGE)
+	ctrl.resolve()
+	assert_eq(b.hp[0][0], 10, "满血并封 → 食肉封顶不超 max_hp")
+	assert_eq(b.energy[0] - ctrl.energy[0], 4, "能量那份不受回血封顶影响·照拿 +2.0 能")
+
+func test_h24_taotie_heals_from_reserve() -> void:
+	# 在场光环含替补：并封躺替补席、残血 → 队友阵亡也回肉
+	var b := _battle_team(["test_p0_0", "h24", "test_p0_2"], 5, 8)
+	b.hp[0][0] = 2                        # 出战 carry 残血待死
+	b.hp[0][1] = 6                        # 替补并封残血
+	b.select_action(0, ActionDef.Action.CHARGE)
+	b.select_action(1, ActionDef.Action.BIG_ATTACK)
+	b.resolve()
+	assert_true(b.hp[0][0] <= 0, "carry 被大波致死")
+	assert_eq(b.hp[0][1], 6 + 2, "替补席并封也食肉 +1.0 生命（在场光环）")
+
 
 func test_h24_taotie_feasts_on_ally_death() -> void:
 	# P0 出战 carry 残血 + 替补暗猪。对手致死 carry → P0 团队 +2.0 能（对照无猪）。

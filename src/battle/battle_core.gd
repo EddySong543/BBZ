@@ -1487,8 +1487,10 @@ func _resolve_deaths(_a: Array[int], events: Array) -> void:
 						if ally_skill != null:
 							ally_skill.on_ally_death(slot, self, p, ally)
 				events.append({id = "hero_died", player = p, slot = slot})
-				# 饕餮（并封 h24）：任一英雄阵亡(敌我皆可) → 在场(含替补·存活)的室火 → 其【团队】+能。
-				#   扫双方存活英雄(死者已 hp≤0 自动不计=尸不自食)；走 _gain_energy 享囤鼠叠加。
+				# 饕餮（并封 h24）：任一英雄阵亡(敌我皆可) → 在场(含替补·存活)的并封 → 其【团队】+能，
+				#   且并封【自己】回血（2026-07-04 双头分食优化：一头吞魂产能·一头食肉回血）。
+				#   扫双方存活英雄(死者已 hp≤0 自动不计=尸不自食)；能量走 _gain_energy 享囤鼠叠加、
+				#   回血走 _heal（尊重禁回血·封顶 max_hp·替补席也回）。
 				for pp in [0, 1]:
 					var feast: int = 0
 					for hs in range(hp[pp].size()):
@@ -1496,6 +1498,11 @@ func _resolve_deaths(_a: Array[int], events: Array) -> void:
 							var hsk: HeroSkill = _skills[pp][hs]
 							if hsk != null:
 								feast += hsk.death_energy_bonus()
+								var dheal: int = hsk.death_heal_self()
+								if dheal > 0:
+									var flesh: int = _heal(pp, hs, dheal)
+									if flesh > 0:
+										events.append({id = "taotie_flesh", player = pp, slot = hs, amount = flesh})
 					if feast > 0:
 						_gain_energy(pp, feast)
 						events.append({id = "taotie_feast", player = pp, amount = feast})
