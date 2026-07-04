@@ -12,6 +12,7 @@ extends GutTest
 ## h19【践踏】= 进攻：攻击命中时，这一击超过 1.0HP 的溢出部分碾到敌方随机替补（无封顶）。
 ## h20【罪已昭】= 状态·被动：命中敌方出战附「易伤印」(vuln)，被印英雄受伤 +0.5，直到换下场（换下清）。
 ## h21【调虎离山】= 干扰·主动技：占动作+费2能+每局2次+须出战，强制对手换人、揪其指定（未指定→随机）存活替补上场。
+## h22【焚天火兆】= 节奏·主动技：占动作+费1能+每局2次，蓄力（当拍无伤）→ 下回合毕方本人的攻击穿大防（窗口恰1回合·2026-07-04 重做）。
 ## h23【护主】= 防御：替补席存活时，我方英雄受致命伤害 → 天狗顶替登场承受这一击、原 carry 退替补获救（每局一次·天狗可能吃死）。
 ## h24【饕餮】= 能量：在场(含替补)时，战场任一英雄阵亡(敌我皆可) → 你方团队 +2.0 能（4 半能）。
 ##
@@ -39,6 +40,12 @@ func _battle(hero_id: String, hp: int = 5, e: int = 8) -> BattleCore:
 
 
 ## 自定义 P0 队伍（被测英雄在指定槽，便于测出战 / 替补差异）。
+func _resolve(b: BattleCore, a0: int, a1: int) -> void:
+	b.select_action(0, a0)
+	b.select_action(1, a1)
+	b.resolve()
+
+
 func _battle_team(p0_ids: Array, hp: int = 5, e: int = 8) -> BattleCore:
 	var p1: Array = []
 	for id in p0_ids:
@@ -553,46 +560,69 @@ func test_h24_taotie_feasts_on_enemy_death() -> void:
 	assert_eq(b.energy[0] - ctrl.energy[0], 4, "敌方阵亡也喂暗猪 +2.0 能（4 半能）")
 
 
-# ---- h22 毕方 引而后发（主动技·打出穿防大波·每局 2 次·费 2 能）----
+# ---- h22 毕方 焚天火兆（2026-07-04 重做：主动技「蓄力」·费 1 能·每局 2 次·下回合毕方的攻击穿大防）----
+# 旧版（2 能直接打出穿防大波）已废；HP 4→5；窗口=次回合恰一回合·只属毕方本人。
 
-func test_h22_yinfa_active_fires_piercing_bigwave() -> void:
-	# 毕方引而后发主动技 → 打出大波级穿防强击(4 半点=2.0HP)；费 2 能
-	var b := _battle("h22", 4, 8)
-	var e0: int = b.energy[0]
-	assert_true(b.select_active(0), "引而后发主动技可用")
+func test_h22_xuli_charge_turn_deals_no_damage() -> void:
+	# 蓄力拍：不造成伤害·费 1 能(2 半能)
+	var b := _battle("h22", 5, 8)
+	assert_true(b.select_active(0), "蓄力可用")
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(b.hp[1][0], 10 - 4, "引而后发打出 2.0(4 半点)")
-	assert_eq(e0 - b.energy[0], 4 - 2, "费 2 能(4 半能)·被动回 +1 能")
+	assert_eq(b.hp[1][0], 10, "蓄力拍不造成伤害")
+	assert_eq(b.energy[0], 8 - 2 + 2, "费 1 能(2 半能) + 被动 +1 能 → 净持平")
 
-
-func test_h22_yinfa_pierces_defend_blocked_by_big_defend() -> void:
-	# 穿防：敌「防」挡不住、敌「大防」挡下
-	var b := _battle("h22", 4, 8)
+func test_h22_xuli_next_turn_attack_pierces_big_defend() -> void:
+	# 蓄力次回合：波升为穿大防·大防挡不住
+	var b := _battle("h22", 5, 8)
 	b.select_active(0)
-	b.select_action(1, ActionDef.Action.DEFEND)
-	b.resolve()
-	assert_eq(b.hp[1][0], 10 - 4, "穿防 → 敌「防」挡不住·吃 4 半点")
-	var b2 := _battle("h22", 4, 8)
-	b2.select_active(0)
-	b2.select_action(1, ActionDef.Action.BIG_DEFEND)
-	b2.resolve()
-	assert_eq(b2.hp[1][0], 10, "敌「大防」挡下引而后发·无伤")
-
-
-func test_h22_yinfa_cap_two_per_game() -> void:
-	# 每局上限 2 次
-	var b := _battle("h22", 4, 20)
-	assert_true(b.select_active(0))
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_true(b.select_active(0))
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.BIG_DEFEND)
+	assert_eq(b.hp[1][0], 10 - 2, "蓄力次回合：波穿大防·2 半点落地")
+
+func test_h22_xuli_big_attack_also_pierces() -> void:
+	# 双档 agency：大波同样吃穿大防升级
+	var b := _battle("h22", 5, 12)
+	b.select_active(0)
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_false(b.can_use_active(0), "引而后发每局上限 2 → 第 3 次不可用")
+	_resolve(b, ActionDef.Action.BIG_ATTACK, ActionDef.Action.BIG_DEFEND)
+	assert_eq(b.hp[1][0], 10 - 4, "蓄力次回合：大波穿大防·4 半点落地")
 
+func test_h22_xuli_window_expires_after_one_turn() -> void:
+	# 窗口只保鲜一回合：空过即失效
+	var b := _battle("h22", 5, 8)
+	b.select_active(0)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.CHARGE)   # 窗口拍空过
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.DEFEND)
+	assert_eq(b.hp[1][0], 10, "窗口过期 → 波被「防」正常挡下")
 
-func test_h22_yinfa_requires_active_bifang() -> void:
-	# 主动技 = 出战英雄的技能：毕方在替补、出战 plain → 无引而后发可放
-	var b := _battle_team(["test_p0_0", "h22", "test_p0_2"], 4, 8)
-	assert_false(b.can_use_active(0), "毕方在替补·出战无引而后发 → 主动技不可用")
+func test_h22_xuli_no_rearm_during_window() -> void:
+	# 窗口激活期间禁止再次蓄力（防误耗次数）
+	var b := _battle("h22", 5, 8)
+	b.select_active(0)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_false(b.can_use_active(0), "窗口激活中 → 不可再蓄力")
+
+func test_h22_xuli_cap_two_per_game() -> void:
+	# 每局上限 2 次（蓄→发→蓄→发 → 第 3 次蓄不可用）
+	var b := _battle("h22", 5, 20)
+	b.select_active(0)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.CHARGE)
+	assert_true(b.can_use_active(0), "窗口已过·还剩 1 次 → 可再蓄")
+	b.select_active(0)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.CHARGE)
+	assert_false(b.can_use_active(0), "每局上限 2 → 第 3 次不可用")
+
+func test_h22_xuli_requires_active_bifang() -> void:
+	# 主动技 = 出战英雄的技能：毕方在替补、出战 plain → 无蓄力可按
+	var b := _battle_team(["test_p0_0", "h22", "test_p0_2"], 5, 8)
+	assert_false(b.can_use_active(0), "毕方在替补·出战无主动技 → 不可用")
