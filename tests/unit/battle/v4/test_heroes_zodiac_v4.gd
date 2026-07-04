@@ -92,7 +92,7 @@ func test_h03_lianpu_double_hit_feeds_two_jianqi() -> void:
 	assert_eq(int(b.get_status(0, 1, "jianqi", 0)), 2, "虎双段 → 鸡(替补)攒 2 层剑气")
 
 
-# ---- h04 房日（重做 2026-07-04：出战时敌方每重复一次上回合动作 → 我方 +0.5 能·技能名待定）----
+# ---- h04 房日（重做 2026-07-04：出战时敌方每重复一次上回合动作 → 我方 +0.5 能）----
 # 旧机制（登场护甲保底 + 道具锁 −1）已移除；HP 4→5。
 
 func test_h04_repeat_energy_first_turn_no_trigger() -> void:

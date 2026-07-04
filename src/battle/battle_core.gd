@@ -1124,7 +1124,7 @@ func resolve() -> Dictionary:
 					if got > 0:
 						events.append({id = "muyang_heal", player = p, slot = s, amount = got})
 
-	# Phase 5.7: 敌方重复动作产能（房日 h04·重做 2026-07-04·技能名待定）——房日【出战】(存活) 且
+	# Phase 5.7: 敌方重复动作产能（房日 h04【玉魄乘隙】·重做 2026-07-04）——房日【出战】(存活) 且
 	#   敌方本回合动作与其上回合相同 → 己方团队能量 +enemy_repeat_energy 半能。
 	#   逐回合判定（敌方换动作即断供）；第 1 回合无上回合(_last_action=-1)不触发；
 	#   被迫动作（力竭强制攒 / 被锁切换后连防等）也算重复；道具不是动作、不参与比对。
