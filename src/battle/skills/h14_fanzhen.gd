@@ -2,7 +2,11 @@ extends HeroSkill
 
 ## h14 蚩尤【玄铁映锋】被动 · 防御 · HP6
 ## 防/大防成功挡下时，向攻击者反弹被挡伤害的 50%（挡波反 0.5、挡大波反 1.0）。
-## 反弹 = 纯结算真伤、不触发 on-hit（不喂毒/剑气）；引擎 on_block 在防御门挡下时调用。
+## 反弹 = 真伤（穿盾）；2026-07-05 批③（Eddy 批 B 案）起【走完整管线打击】（battle.strike）——
+##   反震视作我方攻击命中：喂剑气（配 h10）/ 引爆对手毒层（配 h06）/ 触发对方受伤被动，combo 引擎化。
+## 批③诊断（验收卷 32.1%）：旧"纯结算不触发 on-hit"让反弹是孤立数值、对手绕开即空转；
+##   接入原语链后蚩尤 = 防御反打的 combo 节点（数值 50% 不动·纯机制刀）。递归安全：反弹按
+##   def_action=CHARGE 结算（攻击者非防御态·不会再触发 on_block 链）。引擎 on_block 在防御门挡下时调用。
 ##
 ## 设计依据（heroes-redesign / build-design-framework）：
 ##   机制【迁自原牛金·磐牛卸力反震】（2026-06-22 Eddy 拍板）——维度修正：暗牛继承牛金的【防御】维度，
@@ -18,6 +22,5 @@ func on_block(battle: BattleCore, player: int, _slot: int, attacker_player: int,
 		return
 	if battle.damage_immune(attacker_player):   # 周天罡气：反震也免
 		return
-	var aslot: int = battle.active_index[attacker_player]
-	battle.hp[attacker_player][aslot] -= reflect
+	battle.strike(attacker_player, reflect, player, ActionDef.Pen.TRUE_DMG)   # 管线打击（批③·喂原语）
 	battle.note_combo_proc(player)   # 鼠潮：卸力反震 = 一次 combo proc（归防御方）

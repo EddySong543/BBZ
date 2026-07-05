@@ -4,16 +4,16 @@ extends GutTest
 ## 黑暗面英雄（h13 玄冥 / h14 蚩尤 / h15 穷奇）技能测试 —— 锁定【当前代码行为】。
 ##
 ## h13【鼠潮】= 能量：在场(含替补)时，我方每触发一次 combo 效果 → 团队 +0.5 能（无封顶·2026-07-01 去刹车）。
-## h14【卸力反震】= 防御：防/大防挡下 → 反弹所挡 50% 真伤给攻击者（机制迁自磐牛·on_block 触发）。
+## h14【卸力反震】= 防御：防/大防挡下 → 反弹所挡 50% 真伤给攻击者（批③起走管线打击=喂剑气/引爆毒·on_block 触发）。
 ## h15【血勇】= 进攻：出战时无法用防/大防（can_afford gate·下场即解）+ 波穿防（attack_penetration）。
 ## h16【疾风】= 节奏：出战时，己方每局 2 次可把同一动作再做一次（波/大波/攒·技能/切换/防除外·2026-07-02 由在场收缩为出战）。
 ## h17【阖眸成夜】= 干扰·主动技：占动作+费1能+每局2次，下回合敌方能量冻结（usable_energy=0·只锁花不锁收·2026-07-05 重设计 B 案·沉默两连败弃）。
-## h18【缠绕】= 状态：出战时，对手无法主动切换（含星日免费切换）；死亡换人不受影响。
+## h18【缠绕】= 状态：出战时，对手无法主动切换（含星日免费切换）+ 对手防不再免费(+1 能·批③ J 案)；死亡换人不受影响。HP 4→5(批③ A 案)。
 ## h19【践踏】= 进攻：攻击命中时，这一击超过 1.0HP 的溢出部分碾到敌方随机替补（无封顶）。
 ## h20【罪已昭】= 状态·被动：命中敌方出战附「易伤印」(vuln)，被印英雄受伤 +0.5，直到换下场（换下清）。
 ## h21【调虎离山】= 干扰·主动技：占动作+费2能+每局2次+须出战，强制对手换人、揪其指定（未指定→随机）存活替补上场。
 ## h22【焚天火兆】= 节奏·主动技：占动作+免费(批③由1能降)+每局2次，蓄力（当拍无伤·+1.0 护盾）→ 下回合毕方本人的攻击穿大防（窗口恰1回合·2026-07-04 重做）。
-## h23【护主】= 防御：替补席存活时，我方英雄受致命伤害 → 天狗顶替登场+1.0 护盾垫伤(2026-07-04)、承受这一击、原 carry 退替补获救（每局一次·天狗可能吃死）。
+## h23【护主】= 防御：替补席存活时，我方英雄受致命伤害 → 天狗顶替登场+1.0 护盾垫伤、承受这一击+反击攻击者 1.0 真伤(批③)、原 carry 退替补获救（每局两次·批③ 1→2·天狗可能吃死）。
 ## h24【饕餮】= 能量：在场(含替补)时，战场任一英雄阵亡(敌我皆可) → 你方团队 +2.0 能（4 半能）+ 并封自己回 1.0 生命（2026-07-04 双头分食·封顶 max_hp）。
 ##
 ## 经济基线（半能制）：1 能=2 半能；波 2 半能 / 大波 6 半能 / 大防 4 半能；HP 半点制(1.0=2 半点)。
@@ -100,7 +100,17 @@ func test_h13_shuchao_no_cap_per_turn() -> void:
 	assert_eq(b._shuchao_procs[0], 4, "4 个 proc 事件(毒爆/易伤/鸡剑意×2) → 无封顶·全计 4 次(旧封顶 3)")
 
 
-# ---- h14 蚩尤 卸力反震（防/大防挡下 → 反弹所挡 50% 真伤给攻击者·迁自磐牛）----
+# ---- h14 蚩尤 卸力反震（防/大防挡下 → 反弹所挡 50% 真伤·批③起走管线打击喂原语）----
+
+func test_h14_fanzhen_reflect_feeds_onhit_primitives() -> void:
+	# 批③(Eddy 批 B 案)：反弹走完整 on-hit 管线——反震命中=我方攻击命中 → 替补鸡攒剑气。
+	var b := _battle_team(["h14", "h10", "test_p0_2"], 6, 8)
+	b.select_action(0, ActionDef.Action.DEFEND)
+	b.select_action(1, ActionDef.Action.ATTACK)
+	b.resolve()
+	assert_eq(b.hp[1][0], 10 - 1, "反震 1 半点真伤落地(plain HP5=10半)")
+	assert_eq(int(b.get_status(0, 1, "jianqi", 0)), 1, "反震喂原语：鸡(替补)攒 1 层剑气(批③)")
+
 
 func test_h14_fanzhen_reflects_half_blocked_wave() -> void:
 	# 暗牛(P0 HP6=12 半点)防住对手波 → 反弹 50%(挡波 raw=2 → 反 1 半点)给攻击者
@@ -321,6 +331,22 @@ func test_silence_status_disables_unique_and_decrements() -> void:
 
 # ---- h18 相柳 缠绕（出战时对手无法主动切换；死亡换人不受影响）----
 
+func test_h18_zeguo_defend_tax_and_release() -> void:
+	# 批③ J 案：相柳出战 → 敌方防不再免费(+1 能=2 半能)；相柳阵亡即解税。
+	var b := _battle("h18", 5, 8)
+	b.energy[1] = 0
+	assert_false(b.can_afford(1, ActionDef.Action.DEFEND), "泽国防御税：0 能付不起防(1 能)")
+	b.energy[1] = 2
+	assert_true(b.can_afford(1, ActionDef.Action.DEFEND), "有 1 能可付税防御")
+	b.select_action(0, ActionDef.Action.CHARGE)
+	b.select_action(1, ActionDef.Action.DEFEND)
+	b.resolve()
+	assert_eq(b.energy[1], 2 - 2 + 2, "防被收 1 能税 + 被动 +1 能 → 净持平")
+	b.hp[0][0] = 0                                     # 相柳阵亡
+	b.energy[1] = 0
+	assert_true(b.can_afford(1, ActionDef.Action.DEFEND), "相柳阵亡 → 防恢复免费")
+
+
 func test_h18_chanrao_locks_enemy_switch() -> void:
 	# 暗蛇(P0 出战) → P1 无法主动切换；暗蛇自己一方不受影响
 	var b := _battle("h18", 4, 8)
@@ -490,11 +516,11 @@ func test_h21_diaohu_caps_two_per_game() -> void:
 	assert_false(b.can_use_active(0), "每局上限 2 → 第 3 次不可用")
 
 
-# ---- h23 天狗 护主（替补狗替死·完全免除·carry 留前线·每局一次）----
+# ---- h23 天狗 护主（替补狗顶替承伤·批③：每局两次+登场反击 1.0 真伤）----
 
 func test_h23_huzhu_protects_carry_by_swapping_in() -> void:
 	# P0 出战 carry 残血(1.0HP=2半) + 替补天狗(slot1 满血10半)。对手大波致死 →
-	#   天狗立刻登场顶替、carry 退居替补获救、这一击改落天狗(10-4=6·天狗吃住没死)。
+	#   天狗立刻登场顶替、carry 退居替补获救、这一击改落天狗 + 反击咬攻击者 1.0 真伤(批③)。
 	var b := _battle_team(["test_p0_0", "h23", "test_p0_2"], 5, 12)
 	b.hp[0][0] = 2
 	b.select_action(0, ActionDef.Action.CHARGE)
@@ -504,28 +530,38 @@ func test_h23_huzhu_protects_carry_by_swapping_in() -> void:
 	assert_eq(b.active_index[0], 1, "天狗顶替登场为出战")
 	assert_eq(b.hp[0][1], 10 - 2, "登场护盾 1.0 垫掉 2 半点(2026-07-04)·天狗只落血 2 半点(10-2=8)")
 	assert_eq(b.shield[0][1], 0, "护盾被这一击耗尽")
+	assert_eq(b.hp[1][0], 10 - 2, "御凶反击：天狗扑咬攻击者 1.0 真伤(批③·2026-07-05)")
 	assert_eq(int(b.get_status(0, 1, "huzhu_uses", 0)), 1, "护主计 1 次")
 
 
-func test_h23_huzhu_once_per_game() -> void:
-	# 天狗只顶替一次：首次致死 → 天狗登场救 carry；此后天狗已在场·护主用尽 → 天狗自己被打死无人再救
+func test_h23_huzhu_twice_per_game_then_exhausted() -> void:
+	# 批③：每局两次（1→2）。天狗轮换回替补可再救；第三次致死无人顶替。
 	var b := _battle_team(["test_p0_0", "h23", "test_p0_2"], 5, 20)
 	b.hp[0][0] = 2
 	b.select_action(0, ActionDef.Action.CHARGE)
 	b.select_action(1, ActionDef.Action.BIG_ATTACK)
-	b.resolve()   # 首次：天狗顶替登场·carry 获救
-	assert_eq(b.active_index[0], 1, "首次：天狗顶替登场")
-	assert_eq(b.hp[0][0], 2, "首次：carry 获救退替补")
-	assert_eq(b.hp[0][1], 10 - 2, "首次：登场护盾垫 2 半点·天狗吃这下落血 2(=8·2026-07-04)")
-	# 再连打天狗至致死 → 护主已用尽·无人顶替 → 天狗死、carry 始终安全
+	b.resolve()   # 第一次：天狗登场救 slot0
+	assert_eq(int(b.get_status(0, 1, "huzhu_uses", 0)), 1, "第一次御凶")
+	assert_eq(b.hp[1][0], 10 - 2, "第一次反击 1.0 真伤")
+	b.select_switch(0, 2)                              # 天狗退替补·slot2 上
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(b.active_index[0], 2, "天狗回替补席（可再救）")
+	b.hp[0][2] = 2                                     # 摆第二个致死靶
 	b.select_action(0, ActionDef.Action.CHARGE)
 	b.select_action(1, ActionDef.Action.BIG_ATTACK)
-	b.resolve()   # 天狗 6-4=2
+	b.resolve()   # 第二次：天狗再登场救 slot2
+	assert_eq(int(b.get_status(0, 1, "huzhu_uses", 0)), 2, "第二次御凶（批③上限 2）")
+	assert_eq(b.active_index[0], 1, "天狗再度顶替登场")
+	assert_eq(b.hp[1][0], 10 - 4, "两次反击累计 2.0 真伤")
+	b.select_switch(0, 0)                              # 天狗再退替补·残血 carry 上
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
 	b.select_action(0, ActionDef.Action.CHARGE)
 	b.select_action(1, ActionDef.Action.BIG_ATTACK)
-	b.resolve()   # 天狗 2-4 → 死·无二次顶替
-	assert_true(b.hp[0][1] <= 0, "护主只一次 → 天狗自己被致死不再有人顶替")
-	assert_eq(b.hp[0][0], 2, "carry 始终安全在替补")
+	b.resolve()   # 第三次致死 → 御凶用尽·无人顶替 → carry 阵亡
+	assert_true(b.hp[0][0] <= 0, "上限 2 用尽 → 第三次无人顶替")
+	assert_eq(int(b.get_status(0, 1, "huzhu_uses", 0)), 2, "次数停在 2")
 
 
 func test_h23_huzhu_not_lethal_no_trigger() -> void:

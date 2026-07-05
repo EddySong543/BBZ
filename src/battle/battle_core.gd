@@ -20,7 +20,8 @@ extends RefCounted
 const HP_UNIT := 2  # 必须与 ActionDef.HP_UNIT 一致
 
 ## 英雄机制数值（从引擎逻辑里的裸魔数提出来，集中可调）
-const HUZHU_CAP := 1             # 天狗 h23【护主·顶替承伤】每局上限（次）
+const HUZHU_CAP := 2             # 天狗 h23【护主·顶替承伤】每局上限（次·2026-07-05 批③ 1→2·Eddy 批 C 案）
+const HUZHU_COUNTER_DMG := 2     # 御凶登场反击（半点=1.0 真伤·批③新增·天狗扑咬攻击者）
 const HUZHU_SHIELD := 2          # 天狗御凶登场护盾（2 半点=1.0·2026-07-04 Eddy 批·垫着承伤更可能活下来）
 const CHONGZHUANG_DAMAGE := 1    # 星日登场冲撞 = 0.5 HP（半点）
 const DOUBLEABLE_ACTIONS := [ActionDef.Action.ATTACK, ActionDef.Action.BIG_ATTACK, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND, ActionDef.Action.BIG_DEFEND]  # 广寒 h16【疾风】可"附加同种再做一次"的动作（仅技能/切换除外·防/大防可选但二元整体挡=无额外效果）
@@ -282,7 +283,15 @@ func _get_cost(player: int, action: int) -> int:
 		var sk: HeroSkill = _skills[player][active_index[player]]
 		return sk.active_cost(self, player, active_index[player]) if sk != null and sk.has_active() else 0
 	if action in ActionDef.BASE_ACTION_DEF:
-		return ActionDef.BASE_ACTION_DEF[action]["cost"]
+		var c: int = ActionDef.BASE_ACTION_DEF[action]["cost"]
+		# 泽国防御税（相柳 h18·2026-07-05 批③ J 案）：敌方出战是相柳(存活·未被沉默) → 你的防不再免费(+1 能)。
+		#   本函数是费用唯一出口（can_afford/疾风双动作/resolve 扣费全走此）→ 单点收口；大防不加税（已 2 能）。
+		if action == ActionDef.Action.DEFEND:
+			var e: int = 1 - player
+			var esk: HeroSkill = _eff_skill(e, active_index[e])
+			if esk != null and hp[e][active_index[e]] > 0:
+				c += esk.enemy_defend_cost_add()
+		return c
 	return 0
 
 
@@ -1367,6 +1376,12 @@ func _apply_team_outgoing(dmg: int, action: int, player: int, attacker_slot: int
 	return dmg
 
 
+## 技能/反击类「管线打击」公共入口（h14 反震·h23 御凶反击等）：走完整 _apply_damage——
+## def_action=CHARGE 视作不可挡（反击语义），毒引爆/护盾/护主/on-hit 原语链全生效。返回实际落 HP 半点。
+func strike(target_player: int, raw: int, attacker_player: int, pen: int, events: Array = []) -> int:
+	return _apply_damage(target_player, raw, attacker_player, ActionDef.Action.ATTACK, pen, ActionDef.Action.CHARGE, events)
+
+
 ## 伤害管线 (§D4)：防御门 → 中毒引爆 → 受伤 hook(平减) → 护盾 → 落 HP → on-hit 触发。
 ## 返回实际落在 HP 上的伤害（半点），供攻击型主动技回调使用。
 ## src = 本次 hit 的来源标签（"action"=动作攻击/技能·"item"=道具 hit）——只写进事件供统计（sim 道具伤害占比），不影响结算。
@@ -1487,6 +1502,11 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 				shield[target_player][slot] -= gabsorb
 				dmg -= gabsorb
 				events.append({id = "shield_absorb", player = target_player, amount = gabsorb})
+			# 御凶登场反击（2026-07-05 批③·Eddy 批 C 案）：天狗扑咬攻击者 1.0 真伤——走管线打击
+			#   （可喂剑气/引爆毒·真伤穿盾）；救场变"救场+复仇"，骗御凶不再是零代价。
+			if not damage_immune(attacker_player):
+				strike(attacker_player, HUZHU_COUNTER_DMG, target_player, ActionDef.Pen.TRUE_DMG, events)
+				events.append({id = "huzhu_counter", player = target_player, guardian = slot})
 
 	# 濒死保命（通用 huanhun_ready 状态机制·非道具专属硬编码）：出战将死且带该标记 → 保留 0.5 HP（1 半点）·随后清标记。
 	# 当前仅还魂丹 t2_huanhundan 设此标记（apply_pre）。
