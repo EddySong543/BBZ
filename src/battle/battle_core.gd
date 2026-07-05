@@ -909,7 +909,8 @@ func clone() -> BattleCore:
 
 
 ## 枚举该玩家当前所有合法动作。返回 Array[{action:int, target:int}]，
-## target 仅 SWITCH 有效（替补槽位），其余 -1。CHARGE 恒合法 → 列表非空。
+## target 于 SWITCH=己方替补槽、于带敌方目标的 ACTIVE（枭阳 h21）=敌方替补槽，其余 -1。
+## CHARGE 恒合法 → 列表非空。
 func legal_actions(player: int) -> Array:
 	var out: Array = []
 	for a in [ActionDef.Action.CHARGE, ActionDef.Action.ATTACK, ActionDef.Action.DEFEND,
@@ -920,7 +921,15 @@ func legal_actions(player: int) -> Array:
 		for t in living_reserves(player):
 			out.append({action = ActionDef.Action.SWITCH, target = t})
 	if can_use_active(player):
-		out.append({action = ActionDef.ACTIVE, target = -1})
+		var ask: HeroSkill = _skills[player][active_index[player]]
+		if ask != null and ask.active_needs_enemy_target():
+			# 带敌方目标的主动技（枭阳 h21 调虎离山）：逐个敌方存活替补枚举成独立选项 →
+			# AI 搜索自己挑最优揪谁（2026-07-05 批③④：旧枚举只有 target=-1=随机揪，
+			# 随机可能拽出满血坦克帮倒忙 → 搜索学会不按 = 用后率 0.27 的病根）。
+			for et in living_reserves(1 - player):
+				out.append({action = ActionDef.ACTIVE, target = et})
+		else:
+			out.append({action = ActionDef.ACTIVE, target = -1})
 	return out
 
 

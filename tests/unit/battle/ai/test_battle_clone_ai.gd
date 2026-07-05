@@ -151,6 +151,20 @@ func test_legal_actions_includes_available_active() -> void:
 	assert_false(ACTIVE in _actions_of(b2.legal_actions(0)), "纯被动英雄无主动技选项")
 
 
+func test_legal_actions_enumerates_pull_targets() -> void:
+	# 批③④(2026-07-05)：带敌方目标的主动技（h21 调虎离山）→ 每个敌方存活替补一个独立选项，
+	# 搜索自己挑最优揪谁（旧枚举只有 target=-1=随机揪·用后率 0.27 的病根）。
+	var b := _battle2([["h21", 8], ["t01", 10], ["t02", 10]], [["t10", 10], ["t11", 6], ["t12", 4]])
+	var targets: Array = []
+	for c in b.legal_actions(0):
+		if int(c["action"]) == ACTIVE:
+			targets.append(int(c["target"]))
+	assert_eq(targets.size(), 2, "敌方 2 个存活替补 → 2 个揪选项（无 -1 随机项）")
+	assert_true(1 in targets and 2 in targets, "目标 = 敌方替补槽 1 / 2")
+	assert_true(b.apply_choice(0, {action = ACTIVE, target = 2}), "带目标主动 choice 合法")
+	assert_eq(b.active_target(0), 2, "揪目标已登记（execute_active 将定向揪槽 2）")
+
+
 # ---- apply_choice：分派正确 ----
 
 func test_apply_choice_dispatches_switch_and_active() -> void:

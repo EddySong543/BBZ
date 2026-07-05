@@ -386,7 +386,19 @@ func _shortlist(b: BattleCore, player: int) -> Array:
 		if b.can_afford(player, a):
 			out.append({action = a, target = -1})
 	if b.can_use_active(player):
-		out.append({action = ActionDef.ACTIVE, target = -1})
+		var ask: HeroSkill = b.get_skill(player, b.active_index[player])
+		if ask != null and ask.active_needs_enemy_target():
+			# 带敌方目标的主动技（h21）：深层剪枝只带一个代表目标=敌方最低血替补
+			# （揪软柿子启发·2026-07-05 批③④；顶层矩阵走 legal_actions 全目标枚举）。
+			var pull := -1
+			var pull_hp := 9999
+			for es in b.living_reserves(1 - player):
+				if b.hp[1 - player][es] < pull_hp:
+					pull_hp = b.hp[1 - player][es]
+					pull = es
+			out.append({action = ActionDef.ACTIVE, target = pull})
+		else:
+			out.append({action = ActionDef.ACTIVE, target = -1})
 	# 最优切换（换到血最高替补）
 	var best_sw := -1
 	var best_hp := -1
