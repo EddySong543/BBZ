@@ -39,8 +39,8 @@ extends ColorRect
 @export var pale_blue: Color = Color("a6bcd0")
 ## 红胜方舒适淡锚色（哑光赤陶玫瑰）。
 @export var pale_red: Color = Color("dbb0a0")
-## 静息饱和度（0 = 全淡锚色 / 1 = 满饱和）。亮主调恒定：撤掉重度降饱和(原 0.25=洗白/平)。
-@export_range(0.0, 1.0, 0.01) var sat_rest: float = 0.6
+## 静息饱和度（0 = 全淡锚色 / 1 = 满饱和）。2026-07-05 Eddy：menu 与 boot 亮度断层（0.6 仍洗白发灰）→ 0.9 回归 boot 色彩家族（历史：0.25→0.6→0.9）。
+@export_range(0.0, 1.0, 0.01) var sat_rest: float = 0.9
 ## 揭幕初始饱和度：入菜单先满饱和胜方波，再平息回淡（接揭幕一波闪）。
 @export_range(0.0, 1.0, 0.01) var sat_intro: float = 1.0
 ## 平息时长（秒·从 sat_intro 缓到 sat_rest）。
