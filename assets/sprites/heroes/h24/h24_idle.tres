@@ -20,7 +20,7 @@ region = Rect2(768, 0, 256, 256)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_v0qhx"]
 atlas = ExtResource("1_fb25r")
-region = Rect2(0, 256, 256, 256)
+region = Rect2(1024, 0, 256, 256)
 
 [resource]
 animations = [{
