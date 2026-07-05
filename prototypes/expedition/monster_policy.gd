@@ -105,11 +105,12 @@ func _pick_cycle(b: BattleCore, player: int, d: Dictionary) -> Dictionary:
 	var seq: Array = d["cycle"]
 	var key: String = String(seq[_cycle_pos % seq.size()])
 	_cycle_pos += 1
+	var next_key: String = String(seq[_cycle_pos % seq.size()])   # 循环可预读下一拍（人类学会后的信息量）
 	var act: int = int(ACTIONS[key])
 	if not b.can_afford(player, act):
 		fallback_count += 1
-		return {action = ActionDef.Action.CHARGE, tableId = "cycle!fallback", odds = {}}
-	return {action = act, tableId = "cycle", odds = {}}
+		return {action = ActionDef.Action.CHARGE, tableId = "cycle!fallback", odds = {}, next = next_key}
+	return {action = act, tableId = "cycle", odds = {}, next = next_key}
 
 
 # ---- turtleRule：铁壳龟 ----

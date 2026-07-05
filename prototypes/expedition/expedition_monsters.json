@@ -15,7 +15,7 @@
     ]
   },
   "b3_maskFox": {
-    "name": "变脸狐", "series": "gamble", "tier": 2, "hp": 6,
+    "name": "变脸狐", "series": "gamble", "tier": 2, "hp": 10,
     "kind": "odds",
     "tables": [
       { "id": "berserk", "trigger": { "type": "hpLe", "value": 3 }, "odds": { "attack": 50, "bigAttack": 30, "charge": 20 } },
@@ -23,7 +23,7 @@
     ]
   },
   "b4_thousandFace": {
-    "name": "千面傀", "series": "gamble", "tier": 3, "hp": 10,
+    "name": "千面傀", "series": "gamble", "tier": 3, "hp": 18,
     "kind": "multiTable",
     "enrageHpLe": 5,
     "tables": [
@@ -38,11 +38,11 @@
     ]
   },
   "k1_twinCrab": {
-    "name": "双管蟹", "series": "exam", "tier": 1, "hp": 3,
+    "name": "双管蟹", "series": "exam", "tier": 1, "hp": 5,
     "kind": "cycle", "cycle": ["attack"]
   },
   "k2_galeSnake": {
-    "name": "疾风蛇", "series": "exam", "tier": 1, "hp": 3,
+    "name": "疾风蛇", "series": "exam", "tier": 1, "hp": 5,
     "kind": "cycle", "cycle": ["attack", "attack", "charge"]
   },
   "k3_ironTurtle": {
@@ -50,16 +50,16 @@
     "kind": "turtleRule"
   },
   "k4_chargeEagle": {
-    "name": "蓄力雕", "series": "exam", "tier": 2, "hp": 6,
+    "name": "蓄力雕", "series": "exam", "tier": 2, "hp": 8,
     "kind": "cycle", "cycle": ["charge", "charge", "bigAttack"]
   },
   "k5_bindVine": {
-    "name": "缠杀藤", "series": "exam", "tier": 2, "hp": 6,
+    "name": "缠杀藤", "series": "exam", "tier": 2, "hp": 8,
     "kind": "cycle", "cycle": ["attack"],
     "deferred": "被动(同目标连击+1伤)需引擎hook+多英雄队伍·本轮校准跳过被动只跑本体"
   },
   "k6_sixArtsMaster": {
-    "name": "六艺宗师", "series": "exam", "tier": 3, "hp": 12,
+    "name": "六艺宗师", "series": "exam", "tier": 3, "hp": 20,
     "kind": "phased",
     "phases": [
       { "id": "p1", "kind": "cycle", "cycle": ["attack", "defend", "charge"] },
