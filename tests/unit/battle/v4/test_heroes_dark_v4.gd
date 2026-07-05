@@ -13,7 +13,7 @@ extends GutTest
 ## h20【罪已昭】= 状态·被动：命中敌方出战附「易伤印」(vuln)，被印英雄受伤 +0.5，直到换下场（换下清）。
 ## h21【调虎离山】= 干扰·主动技：占动作+费2能+每局2次+须出战，强制对手换人、揪其指定（未指定→随机）存活替补上场。
 ## h22【焚天火兆】= 节奏·主动技：占动作+免费(批③由1能降)+每局2次，蓄力（当拍无伤·+1.0 护盾）→ 下回合毕方本人的攻击穿大防（窗口恰1回合·2026-07-04 重做）。
-## h23【护主】= 防御：替补席存活时，我方英雄受致命伤害 → 天狗顶替登场+1.0 护盾垫伤、承受这一击+反击攻击者 1.0 真伤(批③)、原 carry 退替补获救（每局两次·批③ 1→2·天狗可能吃死）。
+## h23【护主】= 防御：替补席存活时，我方英雄受致命伤害 → 天狗顶替登场+1.0 护盾垫伤、承受这一击+反击攻击者 1.0 伤害(批③·普通档)、原 carry 退替补获救（每局两次·批③ 1→2·天狗可能吃死）。
 ## h24【饕餮】= 能量：在场(含替补)时，战场任一英雄阵亡(敌我皆可) → 你方团队 +2.0 能（4 半能）+ 并封自己回 1.0 生命（2026-07-04 双头分食·封顶 max_hp）。
 ##
 ## 经济基线（半能制）：1 能=2 半能；波 2 半能 / 大波 6 半能 / 大防 4 半能；HP 半点制(1.0=2 半点)。
@@ -530,7 +530,7 @@ func test_h23_huzhu_protects_carry_by_swapping_in() -> void:
 	assert_eq(b.active_index[0], 1, "天狗顶替登场为出战")
 	assert_eq(b.hp[0][1], 10 - 2, "登场护盾 1.0 垫掉 2 半点(2026-07-04)·天狗只落血 2 半点(10-2=8)")
 	assert_eq(b.shield[0][1], 0, "护盾被这一击耗尽")
-	assert_eq(b.hp[1][0], 10 - 2, "御凶反击：天狗扑咬攻击者 1.0 真伤(批③·2026-07-05)")
+	assert_eq(b.hp[1][0], 10 - 2, "御凶反击：天狗扑咬攻击者 1.0 伤害(批③·普通档·2026-07-05)")
 	assert_eq(int(b.get_status(0, 1, "huzhu_uses", 0)), 1, "护主计 1 次")
 
 
@@ -542,7 +542,7 @@ func test_h23_huzhu_twice_per_game_then_exhausted() -> void:
 	b.select_action(1, ActionDef.Action.BIG_ATTACK)
 	b.resolve()   # 第一次：天狗登场救 slot0
 	assert_eq(int(b.get_status(0, 1, "huzhu_uses", 0)), 1, "第一次御凶")
-	assert_eq(b.hp[1][0], 10 - 2, "第一次反击 1.0 真伤")
+	assert_eq(b.hp[1][0], 10 - 2, "第一次反击 1.0 伤害")
 	b.select_switch(0, 2)                              # 天狗退替补·slot2 上
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
@@ -553,7 +553,7 @@ func test_h23_huzhu_twice_per_game_then_exhausted() -> void:
 	b.resolve()   # 第二次：天狗再登场救 slot2
 	assert_eq(int(b.get_status(0, 1, "huzhu_uses", 0)), 2, "第二次御凶（批③上限 2）")
 	assert_eq(b.active_index[0], 1, "天狗再度顶替登场")
-	assert_eq(b.hp[1][0], 10 - 4, "两次反击累计 2.0 真伤")
+	assert_eq(b.hp[1][0], 10 - 4, "两次反击累计 2.0 伤害")
 	b.select_switch(0, 0)                              # 天狗再退替补·残血 carry 上
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()

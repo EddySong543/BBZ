@@ -21,7 +21,7 @@ const HP_UNIT := 2  # 必须与 ActionDef.HP_UNIT 一致
 
 ## 英雄机制数值（从引擎逻辑里的裸魔数提出来，集中可调）
 const HUZHU_CAP := 2             # 天狗 h23【护主·顶替承伤】每局上限（次·2026-07-05 批③ 1→2·Eddy 批 C 案）
-const HUZHU_COUNTER_DMG := 2     # 御凶登场反击（半点=1.0 真伤·批③新增·天狗扑咬攻击者）
+const HUZHU_COUNTER_DMG := 2     # 御凶登场反击（半点=1.0 普通伤害·批③新增·Eddy 定去真伤·天狗扑咬攻击者）
 const HUZHU_SHIELD := 2          # 天狗御凶登场护盾（2 半点=1.0·2026-07-04 Eddy 批·垫着承伤更可能活下来）
 const CHONGZHUANG_DAMAGE := 1    # 星日登场冲撞 = 0.5 HP（半点）
 const DOUBLEABLE_ACTIONS := [ActionDef.Action.ATTACK, ActionDef.Action.BIG_ATTACK, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND, ActionDef.Action.BIG_DEFEND]  # 广寒 h16【疾风】可"附加同种再做一次"的动作（仅技能/切换除外·防/大防可选但二元整体挡=无额外效果）
@@ -1502,10 +1502,10 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 				shield[target_player][slot] -= gabsorb
 				dmg -= gabsorb
 				events.append({id = "shield_absorb", player = target_player, amount = gabsorb})
-			# 御凶登场反击（2026-07-05 批③·Eddy 批 C 案）：天狗扑咬攻击者 1.0 真伤——走管线打击
-			#   （可喂剑气/引爆毒·真伤穿盾）；救场变"救场+复仇"，骗御凶不再是零代价。
+			# 御凶登场反击（2026-07-05 批③·Eddy 批 C 案·同日定普通伤害非真伤）：天狗扑咬攻击者 1.0——
+			#   走管线打击（可喂剑气/引爆毒·普通档=对方护盾可吸收）；救场变"救场+复仇"。
 			if not damage_immune(attacker_player):
-				strike(attacker_player, HUZHU_COUNTER_DMG, target_player, ActionDef.Pen.TRUE_DMG, events)
+				strike(attacker_player, HUZHU_COUNTER_DMG, target_player, ActionDef.Pen.NORMAL, events)
 				events.append({id = "huzhu_counter", player = target_player, guardian = slot})
 
 	# 濒死保命（通用 huanhun_ready 状态机制·非道具专属硬编码）：出战将死且带该标记 → 保留 0.5 HP（1 半点）·随后清标记。

@@ -108,7 +108,7 @@ const _DEF := {
 		script = preload("res://src/battle/items/t2_shuangsheng.gd")},
 	"t2_shitiechong": {
 		tier = 2, ev = 2, name = "噬铁虫", dim = "进攻", role = "破防", seq = _S_PRE, target = _T_ENEMY,
-		desc = "使敌方出战英雄的防御降低一级，持续 1 回合（大防→防、防→无）。", params = {},
+		desc = "使敌方出战英雄的防御降低一级，持续 1 回合（「大防」→「防」、「防」→无）。", params = {},
 		script = preload("res://src/battle/items/t2_shitiechong.gd")},
 	"t2_pomoshi": {
 		tier = 2, ev = 2, name = "破魔矢", dim = "进攻", role = "穿透", seq = _S_PRE, target = _T_SELF,
