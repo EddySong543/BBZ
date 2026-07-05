@@ -27,7 +27,7 @@ extends SceneTree
 
 const HERO_DATA_DIR := "res://assets/data/heroes/"
 const ROSTER_SIZE := 3
-## 加时赛工程安全阀（规则上不限回合；白板 1v1 拖到此数按真平局计·防极端死循环）。
+## 加时赛工程安全阀（2026-07-05 起引擎在 30 回合骤死裁决·本阀理论上不再触发，留作双保险）。
 const OVERTIME_SAFETY_CAP := 300
 
 ## A/B 权重校准变体（B 侧用；A 侧恒为默认权重=空字典）。键 = BattleEval 常量名（T1）。

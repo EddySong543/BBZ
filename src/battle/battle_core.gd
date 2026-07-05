@@ -31,6 +31,10 @@ const WINNER_DRAW := 0
 const WINNER_P1 := 1
 const WINNER_P2 := 2
 
+# 加时赛回合上限（2026-07-05 Eddy 定·任务5 平局调查产物）：打满 → 双方出战同时扣血裁决。
+# 旧规则"不限回合"废（sim 实锤：同 HP 白板镜像互龟 → 加时再平率 52%·安全阀 300 回合形同虚设）。
+const OVERTIME_TURN_CAP := 30
+
 # === 核心状态（全部可序列化）===
 var heroes: Array = [[], []]              # heroes[player] = Array[HeroData]
 var active_index: Array[int] = [0, 0]
@@ -64,6 +68,7 @@ var slots: Array = [[], []]                  # slots[player] = Array[Dictionary]
 var turn_number: int = 0
 var game_over: bool = false
 var winner: int = WINNER_UNDECIDED
+var overtime_mode: bool = false           # 加时赛局（create_overtime / apply_overtime_bench 置位·启用骤死裁决）
 
 var rng := RandomNumberGenerator.new()    # 可 seed (§D7)：联机/录像/测试可复现
 var _skills: Array = [[], []]             # _skills[player][slot]: HeroSkill 或 null
@@ -782,17 +787,19 @@ func _econ_after_resolve() -> void:
 				sl["upg_draft"] = []
 
 
-# === 加时赛（2026-07-03 Eddy 定·Q5）===
+# === 加时赛（2026-07-03 Eddy 定·Q5；2026-07-05 修订：不限回合 → 30 回合骤死裁决）===
 #
 # 触发（由调用方 battle_screen / run_sim 判定）：正常局平局（双方同时死光）或打满回合上限。
 # 规则：双方各从队伍 3 选 1（盲选）→ 满血白板 1v1 —— 禁道具（不 econ_init）、禁英雄技能
-#   （英雄数据剥离为白板克隆·纯波波攒）、被动能量与正常局一致（+1 能/回合）、不限回合、
-#   加时再同归 = 真平局。
+#   （英雄数据剥离为白板克隆·纯波波攒）、被动能量与正常局一致（+1 能/回合）、
+#   上限 OVERTIME_TURN_CAP=30 回合：打满 → 双方出战【同时扣血】等量（=较低者当前 HP）
+#   → 低血者归零判负、等血同归 = 真平局（2026-07-05 Eddy 定·治加时再平率 52%）。
 
 ## 组一场加时赛战局（白板 1v1·满血）。选人与触发由调用方负责。
 static func create_overtime(hero_a: HeroData, hero_b: HeroData, seed_value: int = 0) -> BattleCore:
 	var b := BattleCore.new()
 	b.setup([_vanilla_copy(hero_a)], [_vanilla_copy(hero_b)], seed_value)
+	b.overtime_mode = true
 	return b
 
 
@@ -809,6 +816,7 @@ static func overtime_roster(team: Array, pick: int) -> Array[HeroData]:
 ## 加时赛开局整备（与 overtime_roster 配套·UI 场景重载后调）：slot0 之外的白板队友置 0 血躺板凳
 ## （同归余烬·唯一存活=出战位）→ 引擎/UI 全程正常 3 人局零特判。状态写入收口在引擎（UI 只读铁律）。
 func apply_overtime_bench() -> void:
+	overtime_mode = true
 	for p in [0, 1]:
 		for s in range(1, hp[p].size()):
 			hp[p][s] = 0
@@ -871,6 +879,7 @@ func clone() -> BattleCore:
 	c.turn_number = turn_number
 	c.game_over = game_over
 	c.winner = winner
+	c.overtime_mode = overtime_mode
 	c.rng = RandomNumberGenerator.new()
 	c.rng.seed = rng.seed
 	c.rng.state = rng.state
@@ -1176,6 +1185,30 @@ func resolve() -> Dictionary:
 	_last_action = [a[0], a[1]]
 	turn_number += 1
 	_econ_unlock()   # 到点自动解锁道具格（新回合的选择阶段即可 3 选 1）
+	# 加时骤死裁决（2026-07-05 Eddy 定·任务5）：打满 OVERTIME_TURN_CAP 回合仍未分出 →
+	#   双方出战英雄【同时扣血】等量（=较低者当前 HP）：低血者归零判负、等血同归 = 真平。
+	#   等价于"比剩余 HP、相等真平"；以同时扣血落账 → UI 沿用正常掉血/死亡演出、零特判。
+	if overtime_mode and not game_over and turn_number >= OVERTIME_TURN_CAP:
+		var oa: int = active_index[0]
+		var ob: int = active_index[1]
+		var drain: int = mini(hp[0][oa], hp[1][ob])
+		hp[0][oa] -= drain
+		hp[1][ob] -= drain
+		events.append({id = "overtime_sudden_death", drain = drain})
+		var od0 := alive_count(0) == 0
+		var od1 := alive_count(1) == 0
+		if od0 and od1:
+			game_over = true
+			winner = WINNER_DRAW
+			events.append({id = "draw"})
+		elif od1:
+			game_over = true
+			winner = WINNER_P1
+			events.append({id = "victory", winner = WINNER_P1})
+		elif od0:
+			game_over = true
+			winner = WINNER_P2
+			events.append({id = "victory", winner = WINNER_P2})
 	var result := {
 		p1_hp = current_hp(0), p2_hp = current_hp(1),
 		p1_energy = energy[0], p2_energy = energy[1],

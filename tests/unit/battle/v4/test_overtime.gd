@@ -1,8 +1,9 @@
 extends GutTest
 
-## 加时赛（Q5·2026-07-03 Eddy 定）行为锁定测试。
+## 加时赛（Q5·2026-07-03 Eddy 定；2026-07-05 修订：不限回合 → 30 回合骤死）行为锁定测试。
 ## 规则：主局平局/打满上限 → 各自队伍 3 选 1 → 满血白板 1v1（禁技能·禁道具）·
-##   被动能量与正常局一致·不限回合·加时再同归 = 真平局。
+##   被动能量与正常局一致·上限 OVERTIME_TURN_CAP=30 回合：打满 → 双方出战同时扣血等量
+##   （=较低者当前 HP）→ 低血者归零判负、等血同归 = 真平局。
 ## 触发与选人流程在调用方（run_sim / battle_screen）；本文件锁 create_overtime 战局本体 + AI 选人。
 
 const A := ActionDef.Action
@@ -78,6 +79,49 @@ func test_overtime_roster_and_bench() -> void:
 	assert_eq(b.hp[0][1], 0, "板凳 0 血（同归余烬）")
 	assert_eq(b.hp[0][2], 0)
 	assert_eq(b.alive_count(0), 1, "唯一存活 = 出战位")
+
+
+func test_overtime_sudden_death_higher_hp_wins() -> void:
+	# 骤死裁决（2026-07-05）：打满 30 回合 → 同时扣血 → 高血者胜。
+	var d := BattleCore.create_overtime(_hero("a", 5), _hero("x", 5), 42)
+	d.hp[1][0] = 6   # P1 先失 2.0 血（10 → 6 半点）
+	for _t in range(BattleCore.OVERTIME_TURN_CAP):
+		d.select_action(0, A.CHARGE)
+		d.select_action(1, A.CHARGE)
+		d.resolve()
+		if d.game_over:
+			break
+	assert_true(d.game_over, "打满 30 回合 → 骤死裁决终局")
+	assert_eq(d.winner, BattleCore.WINNER_P1, "高血者胜")
+	assert_eq(d.hp[0][0], 10 - 6, "P0 同时扣血 6 半点后余 4")
+	assert_eq(d.hp[1][0], 0, "P1 扣至归零")
+
+
+func test_overtime_sudden_death_equal_hp_true_draw() -> void:
+	# 骤死裁决：等血同归 = 真平局。
+	var d := BattleCore.create_overtime(_hero("a", 5), _hero("x", 5), 42)
+	for _t in range(BattleCore.OVERTIME_TURN_CAP):
+		d.select_action(0, A.CHARGE)
+		d.select_action(1, A.CHARGE)
+		d.resolve()
+		if d.game_over:
+			break
+	assert_true(d.game_over, "打满 30 回合 → 骤死裁决终局")
+	assert_eq(d.winner, BattleCore.WINNER_DRAW, "等血同归 = 真平")
+	assert_eq(d.hp[0][0], 0)
+	assert_eq(d.hp[1][0], 0)
+
+
+func test_normal_battle_has_no_sudden_death() -> void:
+	# 正常局（非加时）不触发骤死：龟 30+ 回合照常继续。
+	var b := BattleCore.new()
+	b.setup([_hero("a", 5)], [_hero("x", 5)], 42)
+	for _t in range(BattleCore.OVERTIME_TURN_CAP + 2):
+		b.select_action(0, A.CHARGE)
+		b.select_action(1, A.CHARGE)
+		b.resolve()
+	assert_false(b.game_over, "非加时局无骤死裁决")
+	assert_eq(b.hp[0][0], 10, "血量原封不动")
 
 
 func test_choose_overtime_pick_takes_max_hp() -> void:

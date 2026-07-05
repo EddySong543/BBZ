@@ -163,8 +163,9 @@ func _ready() -> void:
 	BattleSetup.reset()   # 消费即清空：防止下一局（未经 BP）复用本局阵容
 	battle.setup(p0, p1, randi())
 	if _overtime:
-		# 加时赛（Q5·2026-07-03）：白板满血 1v1——slot0 出战、其余队友 0 血躺板凳（同归余烬·
-		# 引擎/UI 全程正常 3 人局零特判）；无道具经济（不 econ_init）、被动能量照常、不限回合。
+		# 加时赛（Q5·2026-07-03；2026-07-05 修订）：白板满血 1v1——slot0 出战、其余队友 0 血躺板凳
+		# （同归余烬·引擎/UI 全程正常 3 人局零特判）；无道具经济（不 econ_init）、被动能量照常、
+		# 上限 30 回合：打满 → 引擎骤死裁决（双方同时扣血·UI 走正常掉血/死亡演出零特判）。
 		battle.apply_overtime_bench()
 	else:
 		battle.econ_init()   # 启用道具经济（开局带 1 + 槽位状态机·M1）
