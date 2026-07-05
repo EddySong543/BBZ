@@ -7,12 +7,12 @@ extends GutTest
 ## h14【卸力反震】= 防御：防/大防挡下 → 反弹所挡 50% 真伤给攻击者（机制迁自磐牛·on_block 触发）。
 ## h15【血勇】= 进攻：出战时无法用防/大防（can_afford gate·下场即解）+ 波穿防（attack_penetration）。
 ## h16【疾风】= 节奏：出战时，己方每局 2 次可把同一动作再做一次（波/大波/攒·技能/切换/防除外·2026-07-02 由在场收缩为出战）。
-## h17【镇压】= 干扰·主动技：占动作+费1能(2026-07-04 由2能降价)+每局2次，沉默对手出战英雄 unique 2 回合（下回合起算）。
+## h17【镇压】= 干扰·主动技：占动作+费1能+每局2次，沉默对手【全队】unique 2 回合（下回合起算·2026-07-05 由出战单体扩为全队）。
 ## h18【缠绕】= 状态：出战时，对手无法主动切换（含星日免费切换）；死亡换人不受影响。
 ## h19【践踏】= 进攻：攻击命中时，这一击超过 1.0HP 的溢出部分碾到敌方随机替补（无封顶）。
 ## h20【罪已昭】= 状态·被动：命中敌方出战附「易伤印」(vuln)，被印英雄受伤 +0.5，直到换下场（换下清）。
 ## h21【调虎离山】= 干扰·主动技：占动作+费2能+每局2次+须出战，强制对手换人、揪其指定（未指定→随机）存活替补上场。
-## h22【焚天火兆】= 节奏·主动技：占动作+费1能+每局2次，蓄力（当拍无伤）→ 下回合毕方本人的攻击穿大防（窗口恰1回合·2026-07-04 重做）。
+## h22【焚天火兆】= 节奏·主动技：占动作+费1能+每局2次，蓄力（当拍无伤·+1.0 护盾·2026-07-05）→ 下回合毕方本人的攻击穿大防（窗口恰1回合·2026-07-04 重做）。
 ## h23【护主】= 防御：替补席存活时，我方英雄受致命伤害 → 天狗顶替登场+1.0 护盾垫伤(2026-07-04)、承受这一击、原 carry 退替补获救（每局一次·天狗可能吃死）。
 ## h24【饕餮】= 能量：在场(含替补)时，战场任一英雄阵亡(敌我皆可) → 你方团队 +2.0 能（4 半能）+ 并封自己回 1.0 生命（2026-07-04 双头分食·封顶 max_hp）。
 ##
@@ -236,7 +236,7 @@ func test_h16_jifeng_inactive_from_reserve() -> void:
 	assert_false(b.has_double(0), "无出战暗兔 → 无双动作")
 
 
-# ---- h17 烛阴【镇压】(主动技·沉默对手出战 unique 2 回合·2026-06-24 重设计) ----
+# ---- h17 烛阴【镇压】(主动技·沉默对手全队 unique 2 回合·2026-07-05 由出战单体扩为全队) ----
 
 ## 自定义双队对局（P0 队 + P1 队），便于测"沉默对手指定英雄"。
 func _battle_vs(p0_ids: Array, p1_ids: Array, hp: int = 6, e: int = 8) -> BattleCore:
@@ -260,6 +260,8 @@ func test_h17_zhenya_silences_enemy_passive() -> void:
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
 	assert_eq(int(b.get_status(1, 0, "silenced", 0)), 2, "P1 虚日被烙沉默=2 回合")
+	assert_eq(int(b.get_status(1, 1, "silenced", 0)), 2, "P1 替补 1 同被沉默(全队·2026-07-05 起)")
+	assert_eq(int(b.get_status(1, 2, "silenced", 0)), 2, "P1 替补 2 同被沉默(全队·2026-07-05 起)")
 	assert_eq(b.energy[0], 8 - 2 + 2, "镇压费 1 能(2 半能·2026-07-04 降价) + 被动 +2")
 	assert_eq(int(b.get_status(0, 0, "active_uses", 0)), 1, "镇压计 1 次使用")
 	assert_eq(b.energy[1], 8 + 5, "cast 当回合虚日仍生效：攒(2+囤鼠1) + 被动(2·不加成·2026-07-04) = +5")
@@ -601,15 +603,26 @@ func test_h24_taotie_feasts_on_enemy_death() -> void:
 
 # ---- h22 毕方 焚天火兆（2026-07-04 重做：主动技「蓄力」·费 1 能·每局 2 次·下回合毕方的攻击穿大防）----
 # 旧版（2 能直接打出穿防大波）已废；HP 4→5；窗口=次回合恰一回合·只属毕方本人。
+# 2026-07-05 平衡批②：蓄力拍 +1.0 护盾（火光护体·付掉"白站一拍"的税）。
 
 func test_h22_xuli_charge_turn_deals_no_damage() -> void:
-	# 蓄力拍：不造成伤害·费 1 能(2 半能)
+	# 蓄力拍：不造成伤害·费 1 能(2 半能)·获得 1.0 护盾
 	var b := _battle("h22", 5, 8)
 	assert_true(b.select_active(0), "蓄力可用")
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
 	assert_eq(b.hp[1][0], 10, "蓄力拍不造成伤害")
 	assert_eq(b.energy[0], 8 - 2 + 2, "费 1 能(2 半能) + 被动 +1 能 → 净持平")
+	assert_eq(b.shield[0][0], 2, "蓄力拍获得 1.0 护盾(2 半点·2026-07-05 平衡批②)")
+
+func test_h22_xuli_shield_absorbs_charge_turn_attack() -> void:
+	# 火光护体：蓄力拍挨的波被护盾吸收·本体不掉血
+	var b := _battle("h22", 5, 8)
+	b.select_active(0)
+	b.select_action(1, ActionDef.Action.ATTACK)   # 对手趁蓄力拍抢攻
+	b.resolve()
+	assert_eq(b.hp[0][0], 10, "波 2 半点被护盾吸收 → 毕方本体不掉血")
+	assert_eq(b.shield[0][0], 0, "护盾被消耗殆尽")
 
 func test_h22_xuli_next_turn_attack_pierces_big_defend() -> void:
 	# 蓄力次回合：波升为穿大防·大防挡不住

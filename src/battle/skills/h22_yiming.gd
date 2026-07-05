@@ -1,8 +1,11 @@
 extends HeroSkill
 
 ## h22 毕方【焚天火兆】主动技 · 节奏 · HP5（2026-07-04 重做·两拍预告打击「蓄力」·名=第一拍点火兆、第二拍焚天）
-## 主动技（占动作·费 1 能·每局 2 次）：蓄力（本回合不造成伤害）；
+## 主动技（占动作·费 1 能·每局 2 次）：蓄力（本回合不造成伤害）并获得 1.0 护盾（火光护体）；
 ## 【下回合】毕方本人的攻击（波 / 大波）升为【穿大防】（护盾仍吸收·非真伤）。
+## 2026-07-05 平衡批②（Eddy 批 A 案）：蓄力拍 +1.0 护盾。验收卷 32.2%+用后率 0.71 双不及格——
+##   两拍结构最大成本项 = 蓄力拍白站挨打；护盾用现成原语（牛金先例·shield[][] 半点直加）把这拍的
+##   税付掉，预告博弈保留（对面仍可垫刀/集火/沉默）。窗口仍 1 回合不动（B 案未采）。
 ##
 ## 规则边界（测试锁定）：
 ##   窗口 = 蓄力的次回合恰一回合（turn_number == xuli_turn+1）·不用即失效；
@@ -50,6 +53,7 @@ func can_use_active(battle: BattleCore, player: int, slot: int) -> bool:
 
 func execute_active(battle: BattleCore, player: int, slot: int) -> void:
 	battle.set_status(player, slot, "xuli_turn", battle.turn_number)
+	battle.shield[player][slot] += 2   # 火光护体：蓄力拍 +1.0 护盾（2 半点·2026-07-05 平衡批②）
 
 
 func attack_penetration(base_pen: int, _action: int, battle: BattleCore, player: int, slot: int) -> int:
