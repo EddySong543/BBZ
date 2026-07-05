@@ -131,7 +131,7 @@ func on_block(_battle: BattleCore, _player: int, _slot: int, _attacker_player: i
 
 
 ## 本英雄受到伤害落 HP 后触发（dealt = 实际掉的半点血）。
-## 室火（纳福：受伤 → 己方能量 += 等量）。
+## 室火（纳福：受伤 → 己方能量 += 一半·1:2·2026-07-05 起）。
 func on_self_damaged(_battle: BattleCore, _player: int, _slot: int, _dealt: int, _attacker_player: int) -> void:
 	pass
 

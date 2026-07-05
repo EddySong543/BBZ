@@ -250,7 +250,7 @@ func test_h10_jianyi_bajian_pierces_def_with_two_jianqi() -> void:
 	b.resolve()
 	assert_eq(b.hp[1][0], 10 - 4, "剑气2 → 穿防，防挡不住，受 波2+剑气2 = 4 半点(对手 HP5=10半)")
 	assert_eq(int(b.get_status(0, 0, "jianqi", 0)), 0, "一闪消耗全部剑气")
-	assert_eq(b.energy[0], 8 - 2 + 2, "一闪费 1 能(2026-07-04 由 0 能调升)·被动 +1 回填")
+	assert_eq(b.energy[0], 8 - 4 + 2, "一闪费 2 能(2026-07-05 由 1 能调升)·被动 +1 回填")
 
 
 # ---- h11 娄金 穷追（对手切换下场 → 被换下者 2.0 真伤·2026-07-04 由 1.0 调升）----
@@ -263,7 +263,7 @@ func test_h11_zhuibu_true_damage_on_enemy_switch_out() -> void:
 	assert_eq(b.hp[1][0], 10 - 4, "被换下者(slot0)受 2.0 真伤(4 半点·2026-07-04 平衡调升)")
 
 
-# ---- h12 室火 纳福（受伤 → 己方 +等量能量）----
+# ---- h12 室火 纳福（受伤 → 己方 +一半能量·1:2·2026-07-05 折半）----
 
 func test_h12_nafu_gains_energy_when_damaged() -> void:
 	var b := _battle("h12", 7, 8)               # 猪 HP7 = 14 半点
@@ -271,4 +271,12 @@ func test_h12_nafu_gains_energy_when_damaged() -> void:
 	b.select_action(1, ActionDef.Action.ATTACK)   # 对手波 → 猪受 2 半点
 	b.resolve()
 	assert_eq(b.hp[0][0], 14 - 2, "猪受 1.0 伤")
-	assert_eq(b.energy[0], 8 + 6, "纳福：受伤 +2 + 攒 +2 + 被动 +2 = +6 半能")
+	assert_eq(b.energy[0], 8 + 5, "纳福：受伤 2 半点 +1(1:2 折半) + 攒 +2 + 被动 +2 = +5 半能")
+
+func test_h12_nafu_big_attack_converts_half() -> void:
+	var b := _battle("h12", 7, 8)
+	b.select_action(0, ActionDef.Action.CHARGE)
+	b.select_action(1, ActionDef.Action.BIG_ATTACK)   # 大波 → 猪受 4 半点（穿防）
+	b.resolve()
+	assert_eq(b.hp[0][0], 14 - 4, "猪受 2.0 伤")
+	assert_eq(b.energy[0], 8 + 6, "纳福：受伤 4 半点 +2(1:2) + 攒 +2 + 被动 +2 = +6 半能")
