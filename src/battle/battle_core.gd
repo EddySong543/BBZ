@@ -69,6 +69,7 @@ var turn_number: int = 0
 var game_over: bool = false
 var winner: int = WINNER_UNDECIDED
 var overtime_mode: bool = false           # 加时赛局（create_overtime / apply_overtime_bench 置位·启用骤死裁决）
+var energy_frozen_turn: Array[int] = [-1, -1]   # 烛阴 h17：该回合号时此玩家能量冻结（usable_energy=0·-1=无）
 
 var rng := RandomNumberGenerator.new()    # 可 seed (§D7)：联机/录像/测试可复现
 var _skills: Array = [[], []]             # _skills[player][slot]: HeroSkill 或 null
@@ -285,13 +286,19 @@ func _get_cost(player: int, action: int) -> int:
 	return 0
 
 
-## 本方【可用】能量（半能）= 能量池（最低 0）。
+## 本方【可用】能量（半能）= 能量池（最低 0）；能量冻结拍恒为 0（烛阴 h17【阖眸成夜】·2026-07-05 重设计）。
+## 本函数是全引擎唯一能量闸口（can_afford/主动技/疾风双动作/道具补·升全走此）→ 冻结在此单点收口。
+## 冻结只锁【花】不锁【收】：被动/攒/技能产能照常入池，解冻即可用。
 func usable_energy(player: int) -> int:
+	if turn_number == energy_frozen_turn[player]:
+		return 0
 	return maxi(0, energy[player])
 
 
-## 沉默感知技能取用（烛阴 h17【镇压】）：被沉默英雄(silenced>0) 视作"无 unique"(返回 null)。
+## 沉默感知技能取用：被沉默英雄(silenced>0) 视作"无 unique"(返回 null)。
 ## resolve 期间另有「置 null 换位」统一收口所有 hook；本 helper 供 resolve 外的选择门(防/切换/主动技)用。
+## ⚠ 2026-07-05：原使用者烛阴 h17 已重设计为能量冻结（沉默两次加强无效·机制价值不足）——
+##   沉默现无英雄使用者，保留为通用 status 基建（远征怪物/道具候选·由 test_silence_status 直测锁行为）。
 func _eff_skill(player: int, slot: int) -> HeroSkill:
 	if int(get_status(player, slot, "silenced", 0)) > 0:
 		return null
@@ -880,6 +887,7 @@ func clone() -> BattleCore:
 	c.game_over = game_over
 	c.winner = winner
 	c.overtime_mode = overtime_mode
+	c.energy_frozen_turn = energy_frozen_turn.duplicate()
 	c.rng = RandomNumberGenerator.new()
 	c.rng.seed = rng.seed
 	c.rng.state = rng.state

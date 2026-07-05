@@ -7,7 +7,7 @@ extends GutTest
 ## h14【卸力反震】= 防御：防/大防挡下 → 反弹所挡 50% 真伤给攻击者（机制迁自磐牛·on_block 触发）。
 ## h15【血勇】= 进攻：出战时无法用防/大防（can_afford gate·下场即解）+ 波穿防（attack_penetration）。
 ## h16【疾风】= 节奏：出战时，己方每局 2 次可把同一动作再做一次（波/大波/攒·技能/切换/防除外·2026-07-02 由在场收缩为出战）。
-## h17【镇压】= 干扰·主动技：占动作+费1能+每局2次，沉默对手【全队】unique 2 回合（下回合起算·2026-07-05 由出战单体扩为全队）。
+## h17【阖眸成夜】= 干扰·主动技：占动作+费1能+每局2次，下回合敌方能量冻结（usable_energy=0·只锁花不锁收·2026-07-05 重设计 B 案·沉默两连败弃）。
 ## h18【缠绕】= 状态：出战时，对手无法主动切换（含星日免费切换）；死亡换人不受影响。
 ## h19【践踏】= 进攻：攻击命中时，这一击超过 1.0HP 的溢出部分碾到敌方随机替补（无封顶）。
 ## h20【罪已昭】= 状态·被动：命中敌方出战附「易伤印」(vuln)，被印英雄受伤 +0.5，直到换下场（换下清）。
@@ -236,9 +236,9 @@ func test_h16_jifeng_inactive_from_reserve() -> void:
 	assert_false(b.has_double(0), "无出战暗兔 → 无双动作")
 
 
-# ---- h17 烛阴【镇压】(主动技·沉默对手全队 unique 2 回合·2026-07-05 由出战单体扩为全队) ----
+# ---- h17 烛阴【阖眸成夜】(主动技·下回合敌方能量冻结·2026-07-05 重设计 B 案·弃沉默) ----
 
-## 自定义双队对局（P0 队 + P1 队），便于测"沉默对手指定英雄"。
+## 自定义双队对局（P0 队 + P1 队）。
 func _battle_vs(p0_ids: Array, p1_ids: Array, hp: int = 6, e: int = 8) -> BattleCore:
 	var t0: Array = []
 	for id in p0_ids:
@@ -252,59 +252,71 @@ func _battle_vs(p0_ids: Array, p1_ids: Array, hp: int = 6, e: int = 8) -> Battle
 	return b
 
 
-func test_h17_zhenya_silences_enemy_passive() -> void:
-	# 暗龙(P0)镇压 → 沉默 P1 出战的虚日。cast 当回合虚日仍生效，【下回合起】囤鼠加成失效。
-	var b := _battle_vs(["h17", "test_p0_1", "test_p0_2"], ["h01", "test_p1_1", "test_p1_2"], 6, 8)
-	# 回合1：P0 镇压(费1能=2半能·2026-07-04 降价)、P1 攒(虚日未沉默 → +3：攒2+囤鼠1)
-	assert_true(b.select_active(0), "暗龙可发动镇压(敌出战存活)")
+func test_h17_freeze_blocks_energy_spend_next_turn_only() -> void:
+	# 回合1 施放 → 回合2 敌方能量冻结（付费动作全不可选·免费照常）→ 回合3 解冻。
+	var b := _battle_vs(["h17", "test_p0_1", "test_p0_2"], ["test_p1_0", "test_p1_1", "test_p1_2"], 6, 8)
+	assert_true(b.select_active(0), "阖眸成夜可发动(敌出战存活)")
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(int(b.get_status(1, 0, "silenced", 0)), 2, "P1 虚日被烙沉默=2 回合")
-	assert_eq(int(b.get_status(1, 1, "silenced", 0)), 2, "P1 替补 1 同被沉默(全队·2026-07-05 起)")
-	assert_eq(int(b.get_status(1, 2, "silenced", 0)), 2, "P1 替补 2 同被沉默(全队·2026-07-05 起)")
-	assert_eq(b.energy[0], 8 - 2 + 2, "镇压费 1 能(2 半能·2026-07-04 降价) + 被动 +2")
-	assert_eq(int(b.get_status(0, 0, "active_uses", 0)), 1, "镇压计 1 次使用")
-	assert_eq(b.energy[1], 8 + 5, "cast 当回合虚日仍生效：攒(2+囤鼠1) + 被动(2·不加成·2026-07-04) = +5")
-	# 回合2：双攒 → 虚日已沉默 → P1 只 +4(攒2+被动2·囤鼠失效)
+	assert_eq(b.energy[0], 8 - 2 + 2, "费 1 能(2 半能) + 被动 +1 能 → 净持平")
+	assert_eq(b.energy_frozen_turn[1], 1, "冻结登记在回合 1（下一拍）")
+	# 回合2：P1 冻结拍——能量池有钱但可用为 0
+	assert_true(b.energy[1] > 0, "能量池存量未被删除（冻结≠碎能）")
+	assert_eq(b.usable_energy(1), 0, "冻结拍可用能量 = 0")
+	assert_false(b.can_afford(1, ActionDef.Action.ATTACK), "波(1 能)被冻不可选")
+	assert_false(b.can_afford(1, ActionDef.Action.BIG_DEFEND), "大防(2 能)被冻不可选")
+	assert_true(b.can_afford(1, ActionDef.Action.DEFEND), "防(免费)照常")
+	assert_true(b.can_afford(1, ActionDef.Action.CHARGE), "攒(免费)照常")
+	var e1_before: int = b.energy[1]
 	b.select_action(0, ActionDef.Action.CHARGE)
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(b.energy[1], 13 + 4, "虚日被沉默：攒+2 +被动+2、囤鼠加成失效")
-	assert_eq(int(b.get_status(1, 0, "silenced", 0)), 1, "沉默递减 → 剩 1 回合")
+	assert_eq(b.energy[1], e1_before + 4, "冻结只锁花不锁收：攒 +2 + 被动 +2 照常入池")
+	# 回合3：解冻
+	assert_true(b.can_afford(1, ActionDef.Action.ATTACK), "次回合解冻 → 波恢复可选")
 
 
-func test_h17_zhenya_silence_expires_after_two_turns() -> void:
-	# 沉默恰好 2 个完整回合(回合2、3)，回合4 囤鼠恢复。P1 起手 0 能(被动恢复后增量更大·压低起点避开 MAX_ENERGY=20 截顶)。
-	var b := _battle_vs(["h17", "test_p0_1", "test_p0_2"], ["h01", "test_p1_1", "test_p1_2"], 6, 4)
-	b.energy[1] = 0
+func test_h17_freeze_uses_capped_at_two() -> void:
+	# 每局上限 2 次；两次可贴着连放（链冻 2 拍·合法）。
+	var b := _battle_vs(["h17", "test_p0_1", "test_p0_2"], ["test_p1_0", "test_p1_1", "test_p1_2"], 6, 20)
 	b.select_active(0)
 	b.select_action(1, ActionDef.Action.CHARGE)
-	b.resolve()                                   # 回合1：cast(虚日仍生效 +3)
-	for _t in range(2):                           # 回合2、3：沉默中，各 +2
-		b.select_action(0, ActionDef.Action.CHARGE)
-		b.select_action(1, ActionDef.Action.CHARGE)
-		b.resolve()
-	assert_eq(int(b.get_status(1, 0, "silenced", 0)), 0, "2 回合后沉默到期")
+	b.resolve()
+	assert_true(b.can_use_active(0), "还剩 1 次 → 可再放")
+	b.select_active(0)
+	b.select_action(1, ActionDef.Action.DEFEND)
+	b.resolve()
+	assert_eq(int(b.get_status(0, 0, "active_uses", 0)), 2, "已用 2 次")
+	assert_false(b.can_use_active(0), "每局上限 2 → 第 3 次不可用")
+	assert_eq(b.energy_frozen_turn[1], 2, "链冻：第二次登记在回合 2")
+
+
+func test_h17_frozen_side_active_skill_unaffordable() -> void:
+	# 冻结拍敌方主动技（费能）同样不可支付——h21 调虎离山(有费)在冻结拍不可用。
+	var b := _battle_vs(["h17", "test_p0_1", "test_p0_2"], ["h21", "test_p1_1", "test_p1_2"], 6, 20)
+	assert_true(b.can_use_active(1), "冻结前：暗猴主动技可用")
+	b.select_active(0)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_false(b.can_use_active(1), "冻结拍：暗猴主动技费能不可支付")
+
+
+# ---- 沉默 status 基建直测（原 h17 机制已弃·基建保留=远征怪/道具候选·锁 Phase 0.3 行为）----
+
+func test_silence_status_disables_unique_and_decrements() -> void:
+	# 直接写 silenced status（无施加者）：unique 全 hook 失效 + 逐回合递减到期恢复。
+	var b := _battle_vs(["test_p0_0", "test_p0_1", "test_p0_2"], ["h01", "test_p1_1", "test_p1_2"], 6, 8)
+	b.set_status(1, 0, "silenced", 1)
+	b.select_action(0, ActionDef.Action.CHARGE)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(b.energy[1], 8 + 4, "沉默中：攒+2 +被动+2（囤鼠加成失效）")
+	assert_eq(int(b.get_status(1, 0, "silenced", 0)), 0, "沉默递减到期")
 	var before: int = b.energy[1]
 	b.select_action(0, ActionDef.Action.CHARGE)
 	b.select_action(1, ActionDef.Action.CHARGE)
-	b.resolve()                                   # 回合4：虚日恢复 → +3
-	assert_eq(b.energy[1] - before, 5, "沉默到期 → 囤鼠恢复：攒(2+1) + 被动(2·不加成) = +5")
-
-
-func test_h17_zhenya_disables_enemy_active_and_caps() -> void:
-	# ① 被沉默英雄的主动技不可用 ② 镇压每局上限 2 次。
-	var b := _battle_vs(["h17", "test_p0_1", "test_p0_2"], ["h21", "test_p1_1", "test_p1_2"], 6, 20)
-	b.select_active(0)                            # 回合1：镇压沉默 P1 暗猴(h21 调虎离山)
-	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_false(b.can_use_active(1), "被沉默的暗猴：调虎离山主动技不可用")
-	# 上限：回合2 再镇压 → 第3次应被拒(cap=2)
-	b.select_active(0)
-	b.select_action(1, ActionDef.Action.CHARGE)
-	b.resolve()
-	assert_eq(int(b.get_status(0, 0, "active_uses", 0)), 2, "镇压已用 2 次")
-	assert_false(b.can_use_active(0), "镇压每局上限 2 → 第 3 次不可用")
+	assert_eq(b.energy[1] - before, 5, "到期恢复：攒(2+囤鼠1) + 被动 2 = +5")
 
 
 # ---- h18 相柳 缠绕（出战时对手无法主动切换；死亡换人不受影响）----
