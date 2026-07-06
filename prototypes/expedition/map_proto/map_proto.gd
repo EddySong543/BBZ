@@ -381,7 +381,9 @@ func _show_settlement() -> void:
 # ---------- 通用选择弹窗 ----------
 
 func _show_choice(text: String, options: Array, cb: Callable) -> void:
+	# 必须立刻 remove_child（queue_free 帧尾才移除·连环弹窗会残留旧按钮=点了卡死）
 	for child: Node in dialog_box.get_children():
+		dialog_box.remove_child(child)
 		child.queue_free()
 	var lbl := Label.new()
 	lbl.text = text

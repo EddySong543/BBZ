@@ -169,12 +169,19 @@ func _open_settings() -> void:
 	add_child(panel)
 
 
-## 三牌阵：匹配对战接真实流程，故事/爬塔占位。悬停金框+放大在 ModeCard 内。
+## 三牌阵：匹配对战接真实流程，远征接先行版，故事占位。悬停金框+放大在 ModeCard 内。
 func _setup_modes() -> void:
 	($UI/ModeMatch as Button).pressed.connect(_on_match_pressed)
 	($UI/ModeStory as Button).pressed.connect(_on_placeholder_pressed.bind("故事模式"))
-	($UI/ModeTower as Button).pressed.connect(_on_placeholder_pressed.bind("远征"))   # 原爬塔模式·2026-06-12 改名
+	($UI/ModeTower as Button).pressed.connect(_on_expedition_pressed)   # 原爬塔·2026-07-06 接远征先行版
 	_build_cancel_button()
+
+
+## 远征模式入口：波幕转场（先行版·占位战斗）。匹配中不离队。
+func _on_expedition_pressed() -> void:
+	if _match_state != MatchState.IDLE:
+		return
+	TransitionManager.transition_to("res://src/expedition/expedition_screen.tscn")
 
 
 ## 「✕ 取消匹配」独立小钮（匹配中才出现·中牌正下方居中）——取消把手必须可见可点，
