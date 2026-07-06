@@ -207,7 +207,7 @@ func open_chest(c: Vector2i) -> Array:
 	var egg: bool = bool(chests[c].get("egg", false))
 	var loot: Array = Loot.roll_drop(rng, "chest")
 	if egg:
-		loot.append({"id": "egg", "name": "宠物蛋", "cat": "rare", "tier": 0, "shape": Loot.SHAPE_2X2, "gold": 0, "note": "兽踪"})
+		loot.append({"id": "egg", "name": "宠物蛋", "cat": "rare", "tier": 0, "shape": Loot.SHAPE_2X2, "gold": 0, "note": "兽踪", "icon": "egg"})
 	chests.erase(c)
 	grid[c.y][c.x] = Tile.FLOOR
 	return loot

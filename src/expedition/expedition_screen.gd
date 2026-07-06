@@ -10,6 +10,8 @@ extends Control
 const MapState := preload("res://src/expedition/expedition_map_state.gd")
 const Backpack := preload("res://src/expedition/expedition_backpack_state.gd")
 const Loot := preload("res://src/expedition/expedition_loot.gd")
+const PixelArt := preload("res://src/expedition/expedition_pixel_art.gd")
+const ItemCatalog := preload("res://src/battle/item_catalog.gd")
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")
 
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
@@ -230,6 +232,10 @@ func _refresh() -> void:
 		var sz: Vector2i = Loot.shape_size(it["shape"])
 		b.text = "%s [%d×%d] %s" % [String(it["name"]), sz.x, sz.y, String(it.get("note", ""))]
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.icon = _item_texture(it)
+		b.expand_icon = true
+		b.custom_minimum_size = Vector2(0, 40)
+		b.add_theme_constant_override("icon_max_width", 32)
 		FontManager.apply_btn(b, 16)
 		var idx: int = i
 		b.pressed.connect(func() -> void: _pick_from_pending(idx))
@@ -239,8 +245,12 @@ func _refresh() -> void:
 	for i: int in bp.equipment.size():
 		var it: Dictionary = bp.equipment[i]
 		var b := Button.new()
-		b.text = "⚔ %s（点击卸下）" % String(it["name"])
+		b.text = "%s（点击卸下）" % String(it["name"])
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.icon = _item_texture(it)
+		b.expand_icon = true
+		b.custom_minimum_size = Vector2(0, 40)
+		b.add_theme_constant_override("icon_max_width", 32)
 		FontManager.apply_btn(b, 16)
 		var idx: int = i
 		b.pressed.connect(func() -> void: _unequip(idx))
@@ -283,7 +293,7 @@ func _draw_canvas() -> void:
 		return
 	var f16: Font = FontManager.f16
 	var f12: Font = FontManager.f12
-	# —— 地图 ——
+	# —— 地图（任务 E：像素图签+程序化地形·占位字符已换）——
 	for y: int in MapState.SIZE:
 		for x: int in MapState.SIZE:
 			var c := Vector2i(x, y)
@@ -292,39 +302,38 @@ func _draw_canvas() -> void:
 				canvas.draw_rect(rect, COL_FOG)
 				continue
 			var tile: int = map.grid[y][x]
-			var col := COL_FLOOR
-			var glyph: String = ""
-			var gcol := COL_TEXT
+			var icon_rect := Rect2(rect.position + Vector2(7, 7), Vector2(40, 40))
+			if tile == MapState.Tile.WALL:
+				PixelArt.draw_wall(canvas, rect, COL_WALL)
+				continue
+			PixelArt.draw_floor(canvas, rect, PixelArt.cell_hash(c, map.seed_value), COL_FLOOR)
 			match tile:
-				MapState.Tile.WALL:
-					col = COL_WALL
 				MapState.Tile.START:
-					glyph = "起"
-					gcol = COL_BONE
+					PixelArt.draw_icon(canvas, "tent", icon_rect, COL_BONE)
 				MapState.Tile.MONSTER:
 					var m: Dictionary = map.monsters.get(c, {})
-					glyph = "怪%d" % int(m.get("tier", 0))
+					var tier: int = int(m.get("tier", 1))
+					var micon: String = "paw" if tier == 1 else ("fang" if tier == 2 else "horns")
+					PixelArt.draw_icon(canvas, micon, icon_rect, COL_MONSTER)
 					if bool(m.get("resolved", false)):
-						glyph += "†"
-					gcol = COL_MONSTER
+						canvas.draw_string(f12, rect.position + Vector2(rect.size.x - 14, 16), "†", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_TEXT)
 				MapState.Tile.EVENT:
-					glyph = "？"
-					gcol = COL_EVENT
+					canvas.draw_string(f12, rect.position + Vector2(16, 38), "？", HORIZONTAL_ALIGNMENT_LEFT, -1, 24, COL_EVENT)
 				MapState.Tile.CHEST:
-					glyph = "蛋" if bool(map.chests.get(c, {}).get("egg", false)) else "宝"
-					gcol = COL_CHEST
+					if bool(map.chests.get(c, {}).get("egg", false)):
+						PixelArt.draw_icon(canvas, "egg", icon_rect, COL_PLAYER)
+					else:
+						PixelArt.draw_icon(canvas, "chest", icon_rect, COL_CHEST)
 				MapState.Tile.EXT1, MapState.Tile.EXT2, MapState.Tile.EXT3:
-					glyph = "撤%d" % (tile - MapState.Tile.EXT1 + 1)
-					gcol = COL_EXT_OPEN if map.ext_open(tile) else COL_EXT_CLOSED
-			canvas.draw_rect(rect, col)
-			if glyph != "":
-				canvas.draw_string(f12, rect.position + Vector2(6, 36), glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, gcol)
+					var ecol: Color = COL_EXT_OPEN if map.ext_open(tile) else COL_EXT_CLOSED
+					PixelArt.draw_icon(canvas, "arch", icon_rect, ecol)
+					canvas.draw_string(f12, rect.position + Vector2(rect.size.x - 14, rect.size.y - 6), str(tile - MapState.Tile.EXT1 + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, ecol)
 	if map.wanderer != Vector2i(-1, -1) and map.revealed.has(map.wanderer):
 		var wr := MAP_ORIGIN + Vector2(map.wanderer.x * MAP_CELL, map.wanderer.y * MAP_CELL)
-		canvas.draw_string(f12, wr + Vector2(6, 36), "游", HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color("ff6a5c"))
+		PixelArt.draw_icon(canvas, "eye", Rect2(wr + Vector2(7, 7), Vector2(40, 40)), Color("ff6a5c"))
 	var pr := Rect2(MAP_ORIGIN + Vector2(map.player.x * MAP_CELL, map.player.y * MAP_CELL), Vector2(MAP_CELL - 2, MAP_CELL - 2))
+	PixelArt.draw_icon(canvas, "flag", Rect2(pr.position + Vector2(11, 7), Vector2(40, 40)), COL_PLAYER)
 	canvas.draw_rect(pr, COL_PLAYER, false, 3.0)
-	canvas.draw_string(f12, pr.position + Vector2(16, 36), "队", HORIZONTAL_ALIGNMENT_LEFT, -1, 24, COL_PLAYER)
 	# —— 背包 ——
 	for y: int in bp.rows:
 		for x: int in bp.cols:
@@ -336,9 +345,11 @@ func _draw_canvas() -> void:
 		var col: Color = _cat_color(String(it["cat"]))
 		for off: Vector2i in p["shape"]:
 			var c: Vector2i = Vector2i(p["anchor"]) + off
-			canvas.draw_rect(Rect2(BP_ORIGIN + Vector2(c.x * BP_CELL, c.y * BP_CELL), Vector2(BP_CELL - 3, BP_CELL - 3)), col)
+			var cell_rect := Rect2(BP_ORIGIN + Vector2(c.x * BP_CELL, c.y * BP_CELL), Vector2(BP_CELL - 3, BP_CELL - 3))
+			canvas.draw_rect(cell_rect, col.darkened(0.35))
+			canvas.draw_rect(cell_rect, col, false, 1.0)
 		var a: Vector2i = p["anchor"]
-		canvas.draw_string(f16, BP_ORIGIN + Vector2(a.x * BP_CELL + 3, a.y * BP_CELL + 20), String(it["name"]).left(3), HORIZONTAL_ALIGNMENT_LEFT, BP_CELL * 2, 16, COL_TEXT)
+		canvas.draw_texture_rect(_item_texture(it), Rect2(BP_ORIGIN + Vector2(a.x * BP_CELL + 4, a.y * BP_CELL + 4), Vector2(BP_CELL - 11, BP_CELL - 11)), false)
 	# —— 手上幽灵 ——
 	if not held.is_empty():
 		var cell: Vector2i = _bp_cell_at(mouse_pos)
@@ -351,7 +362,17 @@ func _draw_canvas() -> void:
 		else:
 			for off: Vector2i in shape:
 				canvas.draw_rect(Rect2(mouse_pos + Vector2(off.x, off.y) * BP_CELL * 0.6, Vector2(BP_CELL, BP_CELL) * 0.55), Color(_cat_color(String(held["item"]["cat"])), 0.7))
+			canvas.draw_texture_rect(_item_texture(held["item"]), Rect2(mouse_pos + Vector2(2, 2), Vector2(BP_CELL, BP_CELL) * 0.5), false)
 		canvas.draw_string(f16, mouse_pos + Vector2(20, -12), String(held["item"]["name"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, COL_TEXT)
+
+
+## 物品图标：战斗道具优先用真 PvP 图标（ItemCatalog·61 张现役素材），缺图/其余回退像素图签。
+func _item_texture(it: Dictionary) -> Texture2D:
+	if String(it.get("combat_id", "")) != "":
+		var t: Texture2D = ItemCatalog.load_icon(String(it["combat_id"]))
+		if t != null:
+			return t
+	return PixelArt.get_texture(String(it.get("icon", "sword")), _cat_color(String(it.get("cat", ""))))
 
 
 func _cat_color(cat: String) -> Color:
@@ -670,12 +691,12 @@ func _run_event(c: Vector2i) -> void:
 						_log("行商：你没有金币物件可换。")
 					else:
 						if idx == 0:
-							var r1: Dictionary = {"id": "ration", "name": "干粮", "cat": "consumable", "tier": 0, "shape": Loot.SHAPE_1X1, "gold": 0, "note": "+10 补给"}
+							var r1: Dictionary = {"id": "ration", "name": "干粮", "cat": "consumable", "tier": 0, "shape": Loot.SHAPE_1X1, "gold": 0, "note": "+10 补给", "icon": "ration"}
 							pending.append(r1)
 							pending.append(r1.duplicate(true))
 							_log("行商：%s 换了干粮×2 → 拾取区。" % String(pay["name"]))
 						else:
-							pending.append({"id": "potion", "name": "药瓶", "cat": "consumable", "tier": 0, "shape": Loot.SHAPE_1X1, "gold": 0, "note": "单英雄 +1 HP"})
+							pending.append({"id": "potion", "name": "药瓶", "cat": "consumable", "tier": 0, "shape": Loot.SHAPE_1X1, "gold": 0, "note": "单英雄 +1 HP", "icon": "potion"})
 							_log("行商：%s 换了药瓶 → 拾取区。" % String(pay["name"]))
 				_refresh())
 		"巢穴":
@@ -696,8 +717,8 @@ func _run_event(c: Vector2i) -> void:
 			_show_choice("修补匠：背包扩容", ["+1 行", "+1 列"], func(idx: int) -> void:
 				var ok: bool = bp.expand_row() if idx == 0 else bp.expand_col()
 				if not ok:
-					pending.append({"id": "ration", "name": "干粮", "cat": "consumable", "tier": 0, "shape": Loot.SHAPE_1X1, "gold": 0, "note": "+10 补给"})
-					pending.append({"id": "ration", "name": "干粮", "cat": "consumable", "tier": 0, "shape": Loot.SHAPE_1X1, "gold": 0, "note": "+10 补给"})
+					pending.append({"id": "ration", "name": "干粮", "cat": "consumable", "tier": 0, "shape": Loot.SHAPE_1X1, "gold": 0, "note": "+10 补给", "icon": "ration"})
+					pending.append({"id": "ration", "name": "干粮", "cat": "consumable", "tier": 0, "shape": Loot.SHAPE_1X1, "gold": 0, "note": "+10 补给", "icon": "ration"})
 					_log("修补匠：已到 6×6 上限，改给干粮×2 → 拾取区。")
 				else:
 					_log("修补匠：背包扩容！")
