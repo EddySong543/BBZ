@@ -11,7 +11,7 @@ extends GutTest
 ## h18【缠绕】= 状态：出战时，对手无法主动切换（含星日免费切换）+ 对手防不再免费(+1 能·批③ J 案)；死亡换人不受影响。HP 4→5(批③ A 案)。
 ## h19【践踏】= 进攻：攻击命中时，这一击超过 1.0HP 的溢出部分碾到敌方随机替补（无封顶）。
 ## h20【罪已昭】= 状态·被动：命中敌方出战附「易伤印」(vuln)，被印英雄受伤 +0.5，直到换下场（换下清）。
-## h21【调虎离山】= 干扰·主动技：占动作+费2能+每局2次+须出战，强制对手换人、揪其指定（未指定→随机）存活替补上场。
+## h21【调虎离山】= 干扰·主动技：占动作+费1能（批④降费·原2能）+每局2次+须出战，强制对手换人、揪其指定（未指定→随机）存活替补上场。
 ## h22【焚天火兆】= 节奏·主动技：占动作+免费(批③由1能降)+每局2次，蓄力（当拍无伤·+1.0 护盾）→ 下回合毕方本人的攻击穿大防（窗口恰1回合·2026-07-04 重做）。
 ## h23【护主】= 防御：替补席存活时，我方英雄受致命伤害 → 天狗顶替登场+1.0 护盾垫伤、承受这一击+反击攻击者 1.0 伤害(批③·普通档)、原 carry 退替补获救（每局两次·批③ 1→2·天狗可能吃死）。
 ## h24【饕餮】= 能量：在场(含替补)时，战场任一英雄阵亡(敌我皆可) → 你方团队 +2.0 能（4 半能）+ 并封自己回 1.0 生命（2026-07-04 双头分食·封顶 max_hp）。
@@ -246,7 +246,7 @@ func test_h16_jifeng_inactive_from_reserve() -> void:
 	assert_false(b.has_double(0), "无出战暗兔 → 无双动作")
 
 
-# ---- h17 烛阴【阖眸成夜】(主动技·下回合敌方能量冻结·2026-07-05 重设计 B 案·弃沉默) ----
+# ---- h17 烛阴【阖眸成夜】(主动技·下回合敌方不能重复本回合动作·2026-07-06 四改 B 案·弃冻结) ----
 
 ## 自定义双队对局（P0 队 + P1 队）。
 func _battle_vs(p0_ids: Array, p1_ids: Array, hp: int = 6, e: int = 8) -> BattleCore:
@@ -262,53 +262,58 @@ func _battle_vs(p0_ids: Array, p1_ids: Array, hp: int = 6, e: int = 8) -> Battle
 	return b
 
 
-func test_h17_freeze_blocks_energy_spend_next_turn_only() -> void:
-	# 回合1 施放 → 回合2 敌方能量冻结（付费动作全不可选·免费照常）→ 回合3 解冻。
+func test_h17_ban_blocks_repeated_action_next_turn_only() -> void:
+	# 回合1 施放(敌按防) → 回合2 敌方「防」被禁（其余动作照常·能量语义不受影响）→ 回合3 解禁。
 	var b := _battle_vs(["h17", "test_p0_1", "test_p0_2"], ["test_p1_0", "test_p1_1", "test_p1_2"], 6, 8)
 	assert_true(b.select_active(0), "阖眸成夜可发动(敌出战存活)")
-	b.select_action(1, ActionDef.Action.CHARGE)
+	b.select_action(1, ActionDef.Action.DEFEND)
 	b.resolve()
 	assert_eq(b.energy[0], 8 - 2 + 2, "费 1 能(2 半能) + 被动 +1 能 → 净持平")
-	assert_eq(b.energy_frozen_turn[1], 1, "冻结登记在回合 1（下一拍）")
-	# 回合2：P1 冻结拍——能量池有钱但可用为 0
-	assert_true(b.energy[1] > 0, "能量池存量未被删除（冻结≠碎能）")
-	assert_eq(b.usable_energy(1), 0, "冻结拍可用能量 = 0")
-	assert_false(b.can_afford(1, ActionDef.Action.ATTACK), "波(1 能)被冻不可选")
-	assert_false(b.can_afford(1, ActionDef.Action.BIG_DEFEND), "大防(2 能)被冻不可选")
-	assert_true(b.can_afford(1, ActionDef.Action.DEFEND), "防(免费)照常")
-	assert_true(b.can_afford(1, ActionDef.Action.CHARGE), "攒(免费)照常")
-	var e1_before: int = b.energy[1]
+	assert_eq(b.action_ban_turn[1], 1, "禁用登记在回合 1（下一拍）")
+	assert_eq(b.action_banned[1], ActionDef.Action.DEFEND, "被禁动作 = 敌方施放拍所用的「防」")
+	# 回合2：P1 的「防」不可选·其余全部照常（含能量语义）
+	assert_false(b.can_afford(1, ActionDef.Action.DEFEND), "「防」被禁不可选")
+	assert_true(b.can_afford(1, ActionDef.Action.ATTACK), "波照常")
+	assert_true(b.can_afford(1, ActionDef.Action.CHARGE), "攒照常")
+	assert_true(b.can_afford(1, ActionDef.Action.BIG_DEFEND), "大防照常（禁的是动作不是能量）")
+	assert_true(b.usable_energy(1) > 0, "能量语义不受影响（≠旧冻结）")
+	var acts: Array = b.legal_actions(1)
+	for entry: Dictionary in acts:
+		assert_ne(int(entry["action"]), int(ActionDef.Action.DEFEND), "legal_actions 不含被禁动作")
 	b.select_action(0, ActionDef.Action.CHARGE)
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(b.energy[1], e1_before + 4, "冻结只锁花不锁收：攒 +2 + 被动 +2 照常入池")
-	# 回合3：解冻
-	assert_true(b.can_afford(1, ActionDef.Action.ATTACK), "次回合解冻 → 波恢复可选")
+	# 回合3：解禁
+	assert_true(b.can_afford(1, ActionDef.Action.DEFEND), "次回合解禁 → 防恢复可选")
 
 
-func test_h17_freeze_uses_capped_at_two() -> void:
-	# 每局上限 2 次；两次可贴着连放（链冻 2 拍·合法）。
+func test_h17_ban_uses_capped_at_two_and_chains() -> void:
+	# 每局上限 2 次；两次可贴着连放（连禁两拍·合法）。
 	var b := _battle_vs(["h17", "test_p0_1", "test_p0_2"], ["test_p1_0", "test_p1_1", "test_p1_2"], 6, 20)
 	b.select_active(0)
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
+	assert_eq(b.action_banned[1], ActionDef.Action.CHARGE, "第一发禁「攒」")
 	assert_true(b.can_use_active(0), "还剩 1 次 → 可再放")
 	b.select_active(0)
 	b.select_action(1, ActionDef.Action.DEFEND)
 	b.resolve()
 	assert_eq(int(b.get_status(0, 0, "active_uses", 0)), 2, "已用 2 次")
 	assert_false(b.can_use_active(0), "每局上限 2 → 第 3 次不可用")
-	assert_eq(b.energy_frozen_turn[1], 2, "链冻：第二次登记在回合 2")
+	assert_eq(b.action_ban_turn[1], 2, "连放：第二发登记在回合 2")
+	assert_eq(b.action_banned[1], ActionDef.Action.DEFEND, "第二发禁「防」")
 
 
-func test_h17_frozen_side_active_skill_unaffordable() -> void:
-	# 冻结拍敌方主动技（费能）同样不可支付——h21 调虎离山(有费)在冻结拍不可用。
+func test_h17_ban_blocks_enemy_active_skill_when_repeated() -> void:
+	# 施放拍敌方用了主动技 → 下拍其主动技被禁（can_use_active 收口）。
 	var b := _battle_vs(["h17", "test_p0_1", "test_p0_2"], ["h21", "test_p1_1", "test_p1_2"], 6, 20)
-	assert_true(b.can_use_active(1), "冻结前：暗猴主动技可用")
+	assert_true(b.can_use_active(1), "施放前：暗猴主动技可用")
 	b.select_active(0)
-	b.select_action(1, ActionDef.Action.CHARGE)
+	b.select_active(1)   # 敌方同拍也放主动技（调虎离山）
 	b.resolve()
-	assert_false(b.can_use_active(1), "冻结拍：暗猴主动技费能不可支付")
+	assert_eq(b.action_banned[1], ActionDef.ACTIVE, "被禁动作 = ACTIVE")
+	assert_false(b.can_use_active(1), "下拍：敌方主动技被禁")
+	assert_true(b.can_afford(1, ActionDef.Action.ATTACK), "基础动作不受影响")
 
 
 # ---- 沉默 status 基建直测（原 h17 机制已弃·基建保留=远征怪/道具候选·锁 Phase 0.3 行为）----
@@ -472,7 +477,7 @@ func test_h21_diaohu_pulls_specified_target() -> void:
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
 	assert_eq(b.active_index[1], 2, "对手被强制揪上玩家指定的 slot2（非血最低）")
-	assert_eq(b.energy[0], 8 - 4 + 2, "调虎离山费 2 能（4 半能）+ 被动回 +1 能")
+	assert_eq(b.energy[0], 8 - 2 + 2, "调虎离山费 1 能（2 半能·批④降费）+ 被动回 +1 能")
 	assert_eq(int(b.get_status(0, 0, "active_uses", 0)), 1, "计 1 次使用")
 
 
@@ -649,9 +654,9 @@ func test_h24_taotie_feasts_on_enemy_death() -> void:
 	assert_eq(b.energy[0] - ctrl.energy[0], 4, "敌方阵亡也喂暗猪 +2.0 能（4 半能）")
 
 
-# ---- h22 毕方 焚天火兆（2026-07-04 重做：主动技「蓄力」·免费(批③)·每局 2 次·下回合毕方的攻击穿大防）----
-# 旧版（2 能直接打出穿防大波）已废；HP 4→5；窗口=次回合恰一回合·只属毕方本人。
-# 2026-07-05 批②：蓄力拍 +1.0 护盾；批③：蓄力 1 能→免费（Eddy 批 B 案·真代价=一拍 tempo+明牌）。
+# ---- h22 毕方 焚天火兆 v3（2026-07-06 批④ Eddy 批 A 案：蓄力免费·每局 2 次·我方下一次攻击穿大防）----
+# 火兆=全队资源·不过期·兑现/落空即消（引擎态 pierce_next_attack）；v2"下回合仅毕方"窗口已废。
+# 2026-07-05 批②：蓄力拍 +1.0 护盾；批③：蓄力 1 能→免费。
 
 func test_h22_xuli_charge_turn_deals_no_damage() -> void:
 	# 蓄力拍：不造成伤害·免费·获得 1.0 护盾
@@ -690,15 +695,43 @@ func test_h22_xuli_big_attack_also_pierces() -> void:
 	_resolve(b, ActionDef.Action.BIG_ATTACK, ActionDef.Action.BIG_DEFEND)
 	assert_eq(b.hp[1][0], 10 - 4, "蓄力次回合：大波穿大防·4 半点落地")
 
-func test_h22_xuli_window_expires_after_one_turn() -> void:
-	# 窗口只保鲜一回合：空过即失效
-	var b := _battle("h22", 5, 8)
+func test_h22_omen_persists_until_used() -> void:
+	# v3 核心：火兆不过期——空过数拍后兑现照样穿大防
+	var b := _battle("h22", 5, 12)
 	b.select_active(0)
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.CHARGE)   # 窗口拍空过
+	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.CHARGE)   # 悬着不兑现
+	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.CHARGE)   # 再悬一拍
+	assert_true(b.pierce_next_attack[0], "火兆仍在（不过期）")
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.BIG_DEFEND)
+	assert_eq(b.hp[1][0], 10 - 2, "隔多拍兑现：波穿大防·2 半点落地")
+
+
+func test_h22_omen_consumed_after_first_attack() -> void:
+	# 兑现即消：第一次攻击交掉火兆·后续攻击恢复普通穿透
+	var b := _battle("h22", 5, 12)
+	b.select_active(0)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.BIG_DEFEND)
+	assert_false(b.pierce_next_attack[0], "火兆已消耗")
 	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.DEFEND)
-	assert_eq(b.hp[1][0], 10, "窗口过期 → 波被「防」正常挡下")
+	assert_eq(b.hp[1][0], 10 - 2, "火兆用完 → 第二发波被「防」正常挡下（伤害没再涨）")
+
+
+func test_h22_omen_teammate_can_cash() -> void:
+	# v3 全队共享：毕方点火 → 换队友上 → 队友的攻击兑现穿大防
+	var b := _battle_team(["h22", "test_p0_1", "test_p0_2"], 5, 12)
+	b.select_active(0)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	b.select_switch(0, 1)   # 换队友上场（火兆与毕方解绑·团队资源）
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_true(b.pierce_next_attack[0], "切换不熄灭火兆")
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.BIG_DEFEND)
+	assert_eq(b.hp[1][0], 10 - 2, "队友的波兑现火兆·穿大防落地")
 
 func test_h22_xuli_no_rearm_during_window() -> void:
 	# 窗口激活期间禁止再次蓄力（防误耗次数）

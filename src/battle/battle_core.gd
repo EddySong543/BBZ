@@ -70,7 +70,9 @@ var turn_number: int = 0
 var game_over: bool = false
 var winner: int = WINNER_UNDECIDED
 var overtime_mode: bool = false           # 加时赛局（create_overtime / apply_overtime_bench 置位·启用骤死裁决）
-var energy_frozen_turn: Array[int] = [-1, -1]   # 烛阴 h17：该回合号时此玩家能量冻结（usable_energy=0·-1=无）
+var action_ban_turn: Array[int] = [-1, -1]      # 烛阴 h17【阖眸成夜】v4：该回合号时此玩家的 action_banned 不可用（-1=无）
+var action_banned: Array[int] = [-1, -1]        # 被禁动作（ActionDef.Action 或 ActionDef.ACTIVE·=施放拍对手用过的动作）
+var pierce_next_attack: Array[bool] = [false, false]   # 毕方 h22【焚天火兆】v3：该方下一次动作攻击穿大防（全队资源·不过期·兑现/落空即消·2026-07-06 批④）
 
 var rng := RandomNumberGenerator.new()    # 可 seed (§D7)：联机/录像/测试可复现
 var _skills: Array = [[], []]             # _skills[player][slot]: HeroSkill 或 null
@@ -295,12 +297,11 @@ func _get_cost(player: int, action: int) -> int:
 	return 0
 
 
-## 本方【可用】能量（半能）= 能量池（最低 0）；能量冻结拍恒为 0（烛阴 h17【阖眸成夜】·2026-07-05 重设计）。
-## 本函数是全引擎唯一能量闸口（can_afford/主动技/疾风双动作/道具补·升全走此）→ 冻结在此单点收口。
-## 冻结只锁【花】不锁【收】：被动/攒/技能产能照常入池，解冻即可用。
+## 本方【可用】能量（半能）= 能量池（最低 0）。
+## 本函数是全引擎唯一能量闸口（can_afford/主动技/疾风双动作/道具补·升全走此）。
+## ⚠ 2026-07-06：烛阴 h17 能量冻结已弃（大轮 29.5% 三连败=锁钱锁不住免费「防」）→
+##   四改为动作禁用（action_ban_*·can_afford/can_use_active 收口），本函数恢复纯能量语义。
 func usable_energy(player: int) -> int:
-	if turn_number == energy_frozen_turn[player]:
-		return 0
 	return maxi(0, energy[player])
 
 
@@ -329,6 +330,8 @@ func _can_switch(player: int) -> bool:
 
 
 func can_afford(player: int, action: int) -> bool:
+	if turn_number == action_ban_turn[player] and action == action_banned[player]:
+		return false   # 阖眸成夜 h17 v4：被禁动作本拍不合法（单一收口，legal_actions/UI/AI 全走此）
 	if action in ActionDef.DEFEND_ACTIONS and not _can_defend(player):
 		return false   # 血勇：嗜杀红温·防/大防不合法（单一收口，legal_actions/UI/AI 全走此）
 	if action == ActionDef.Action.SWITCH and not _can_switch(player):
@@ -354,6 +357,8 @@ func _heal(player: int, slot: int, amount: int) -> int:
 
 ## 当前出战英雄的主动技是否可用（has_active + cap 未满 + 能量够 + 组件自定前置）。
 func can_use_active(player: int) -> bool:
+	if turn_number == action_ban_turn[player] and action_banned[player] == ActionDef.ACTIVE:
+		return false   # 阖眸成夜 h17 v4：施放拍对手用了主动技 → 下拍其主动技被禁
 	var slot: int = active_index[player]
 	var sk: HeroSkill = _eff_skill(player, slot)   # 沉默 → null → 主动技不可用
 	if sk == null or not sk.has_active():
@@ -896,7 +901,9 @@ func clone() -> BattleCore:
 	c.game_over = game_over
 	c.winner = winner
 	c.overtime_mode = overtime_mode
-	c.energy_frozen_turn = energy_frozen_turn.duplicate()
+	c.action_ban_turn = action_ban_turn.duplicate()
+	c.action_banned = action_banned.duplicate()
+	c.pierce_next_attack = pierce_next_attack.duplicate()
 	c.rng = RandomNumberGenerator.new()
 	c.rng.seed = rng.seed
 	c.rng.state = rng.state
@@ -1103,6 +1110,9 @@ func resolve() -> Dictionary:
 					hitlists[p].append(ih)
 		# 2) 动作攻击（基础 / 攻击型主动技）+ 道具修正器（先手·赌徒+ / 香蕉皮- / 破盾咒穿透 / 赌徒落空）
 		var nullified: bool = bool(item_mod(p, "atk_nullify", false))
+		# 焚天火兆 h22 v3：攻击落空（草人 atk_nullify）也交掉火兆——反制链保留（2026-07-06 批④）。
+		if nullified and (ActionDef.is_attack(a[p]) or a[p] == ActionDef.ACTIVE) and pierce_next_attack[p]:
+			pierce_next_attack[p] = false
 		if not nullified and ActionDef.is_attack(a[p]):
 			var dmg: int = maxi(_calc_outgoing(p, a[p]) + int(item_mod(p, "atk_bonus", 0)) - int(item_mod(p, "atk_penalty", 0)), 0)
 			dmg *= maxi(1, int(item_mod(p, "atk_mult", 1)))
@@ -1115,6 +1125,9 @@ func resolve() -> Dictionary:
 			var ipen: int = int(item_mod(p, "atk_pen", -1))
 			if ipen >= 0:
 				pen = ipen
+			if pierce_next_attack[p]:
+				pen = maxi(pen, ActionDef.Pen.PIERCE_BIGDEF)   # 火兆兑现（Pen 枚举有序·真伤不降档）
+				pierce_next_attack[p] = false                  # 兑现即消（疾风双发复制 hit=两段同穿）
 			if dmg > 0:
 				var hit := {damage = dmg, kind = kind, pen = pen, riders = item_mod(p, "riders", []), action = true, active = false}
 				hitlists[p].append(hit)
@@ -1130,6 +1143,9 @@ func resolve() -> Dictionary:
 				var ipen2: int = int(item_mod(p, "atk_pen", -1))
 				if ipen2 >= 0:
 					apen = ipen2
+				if pierce_next_attack[p]:
+					apen = maxi(apen, ActionDef.Pen.PIERCE_BIGDEF)   # 火兆兑现（攻击型主动技同属"我方下一次攻击"）
+					pierce_next_attack[p] = false
 				if admg > 0:
 					hitlists[p].append({damage = admg, kind = akind, pen = apen, riders = item_mod(p, "riders", []), action = true, active = true})
 		# 3) 动作【后】道具自身伤害 hit（T1 暂无）

@@ -1,38 +1,34 @@
 extends HeroSkill
 
-## h22 毕方【焚天火兆】主动技 · 节奏 · HP5（2026-07-04 重做·两拍预告打击「蓄力」·名=第一拍点火兆、第二拍焚天）
+## h22 毕方【焚天火兆】主动技 · 节奏 · HP5（v3 火兆共享·2026-07-06 批④ Eddy 批 A 案·技能名沿用）
 ## 主动技（占动作·免费·每局 2 次）：蓄力（本回合不造成伤害）并获得 1.0 护盾（火光护体）；
-## 【下回合】毕方本人的攻击（波 / 大波）升为【穿大防】（护盾仍吸收·非真伤）。
-## 2026-07-05 平衡批②（Eddy 批 A 案）：蓄力拍 +1.0 护盾。验收卷 32.2%+用后率 0.71 双不及格——
-##   两拍结构最大成本项 = 蓄力拍白站挨打；护盾用现成原语（牛金先例·shield[][] 半点直加）把这拍的
-##   税付掉，预告博弈保留（对面仍可垫刀/集火/沉默）。
-## 2026-07-05 批③第二刀（Eddy 选 B 案·蓄力免费 1 能→0 能）：大轮 35.6%+用后率 1.83=半及格·
-##   还差 ~6pp 到中轴——再砍成本端（真代价仍在：一整拍 tempo+明牌）。窗口延长案被 Eddy 否
-##   （窗口跟人=毕方被迫站桩 2 拍/绑 h07 专线=僵化）；加伤案（A）留作下一刀备选。
+## 【我方下一次攻击】升为【穿大防】（全队资源·不过期·兑现即消·护盾仍吸收·非真伤）。
+##
+## v3 改版依据（大轮 34.6%+用后率 1.93=会用不赢·加伤备刀弃）：
+##   v2 病根不是收益小，是【对手能精确走位】——蓄力明牌+穿透只在"下回合"+过期作废
+##   → 对手躲那一拍（垫刀换人/抢攻）就一切照旧。v3 动的是时限与归属：
+##   ① 不过期：威胁悬着·对手从"躲一拍"变成"永远不知道哪拍落火"→ 大防对我方持续贬值；
+##   ② 全队共享：任意我方英雄的下一次攻击兑现（切大波手收割=combo 引擎·授权穿透窗共享原语）。
+##   ⚠ 推翻两项旧裁定（Eddy 2026-07-06 批 A 案明示）：2026-07-04"蓄力只属毕方本人保留主语"废；
+##     "换下场/阵亡熄灭"废（火兆=团队资源·点燃后与毕方本人解绑，同剑气 team 资源语义）。
+##   撞检查：h10 昴日剑气=on-hit 攒层·昴日本人消费强击 vs 火兆=主动免费蓄·全队下一击自动带穿
+##     ——触发面/消费面都不同（Eddy 直觉关已过）。穿大防仍走二元铁则授权通道（公开慢蓄 payoff）。
 ##
 ## 规则边界（测试锁定）：
-##   窗口 = 蓄力的次回合恰一回合（turn_number == xuli_turn+1）·不用即失效；
-##   蓄力只属毕方本人（2026-07-04 Eddy 裁定保留主语·A 案）：换下场 / 阵亡即熄灭
-##     （status 挂槽上·窗口按回合号过期·不转移不继承——反制链完整性优先）；
-##   窗口激活期间禁止再次蓄力（can_use_active gate·防误耗次数）；
-##   被沉默 → resolve 期间 _skills 置 null → attack_penetration 不调用（烛阴 h17 是硬克）；
-##   广寒疾风双发 = 两段都穿大防（hit 复制含 pen·与疾风既有语义一致）；
-##   道具攻击（飞镖等）不吃本 buff（只改毕方本人动作攻击的穿透档）。
+##   火兆未兑现时禁止再蓄（can_use_active gate·防误耗次数）；cap 2；
+##   兑现=我方下一次【动作攻击】（波/大波/攻击型主动技）——道具攻击（飞镖等）不吃也不消耗；
+##   攻击落空（草人 atk_nullify）同样交掉火兆（反制链保留）；
+##   广寒疾风双发=两段都穿（火兆在 hit 复制前兑现·两段同 pen·消耗一次）；
+##   毕方被沉默只挡"再蓄"（execute_active 不可用）·已点燃的火兆是引擎态·不受沉默扑灭。
 ##
-## 引擎接线：execute_active 写 statuses["xuli_turn"]=当前回合号（Phase 2.6）；
-##   attack_penetration 在次回合 hitlist 构建时比对窗口 → PIERCE_BIGDEF。零新引擎字段。
+## 引擎接线：execute_active 置 battle.pierce_next_attack[player]=true（Phase 2.6）；
+##   hitlist 构建时兑现（动作攻击/攻击型主动技两分支·maxi 升档·真伤不降·clone 已同步）。
 ##
-## 设计依据（heroes-dark-h21-h24.md §h22·2026-07-04 重做）：
-##   两拍结构 = 节奏维度本体（第一拍全场看见蓄力 = 明牌电报、第二拍火落）；
-##   穿大防走二元铁则授权通道（「只授予公开慢蓄 / 需铺垫的 payoff」·同 h10 满 4 层剑气）；
-##   生态 = 预告拍使对手防 / 大防按钮失效一拍（防 32.1% 超带的英雄层解药）；
-##   反制链：垫刀切换吃掉 / 蓄力拍集火打死毕方 / h21 拽下场 / h17 沉默 / 草人落空 / 趁机抢攻。
-##   波（1 能·1.0 不可挡）或大波（3 能·2.0 不可挡）由玩家挑 = 双档 agency。
-##   旧版【引而后发·2 能打出穿防大波】（2026-07-01~07-04）数值健康（≈48%·1.15 次/局）
-##     但"打折大波"单薄无故事 → 重做为两拍蓄力；更旧 STORE 蓄势机制溯源见 git（be38899 拆除）。
-##   旋钮：COST(现 1 能) / CAP(现 2) / 窗口长度(现 1 回合)。
+## 历史：v1【2 能穿防大波】（≈48% 健康但"单薄无故事"废）→ v2【两拍预告打击】（批② +1.0 盾·
+##   批③ 免费·窗口延长案否=站桩僵化·加伤案 2026-07-06 弃）→ v3 火兆共享。
+##   旋钮：COST(现 0) / CAP(现 2) / 护盾(现 1.0) / 归属(现全队)。
 
-const COST := 0    # 免费（2026-07-05 批③由 1 能降·Eddy 批 B 案）·真代价 = 整整一拍 tempo + 明牌
+const COST := 0    # 免费（2026-07-05 批③）·真代价 = 整整一拍 tempo + 明牌
 const CAP := 2     # 每局 2 次
 
 
@@ -48,18 +44,11 @@ func active_per_game_cap() -> int:
 	return CAP
 
 
-## 窗口激活期间禁止再次蓄力（此时该开火而非再蓄·防误耗次数）。
-## 默认 -99：防 -1+1==回合0 的假窗口。
-func can_use_active(battle: BattleCore, player: int, slot: int) -> bool:
-	return int(battle.get_status(player, slot, "xuli_turn", -99)) != battle.turn_number - 1
+## 火兆未兑现时禁止再蓄（该开火而非再蓄·防误耗次数）。
+func can_use_active(battle: BattleCore, player: int, _slot: int) -> bool:
+	return not battle.pierce_next_attack[player]
 
 
 func execute_active(battle: BattleCore, player: int, slot: int) -> void:
-	battle.set_status(player, slot, "xuli_turn", battle.turn_number)
-	battle.shield[player][slot] += 2   # 火光护体：蓄力拍 +1.0 护盾（2 半点·2026-07-05 平衡批②）
-
-
-func attack_penetration(base_pen: int, _action: int, battle: BattleCore, player: int, slot: int) -> int:
-	if battle.turn_number == int(battle.get_status(player, slot, "xuli_turn", -99)) + 1:
-		return ActionDef.Pen.PIERCE_BIGDEF
-	return base_pen
+	battle.pierce_next_attack[player] = true   # 点燃火兆：我方下一次攻击穿大防（全队·不过期）
+	battle.shield[player][slot] += 2           # 火光护体：蓄力拍 +1.0 护盾（2 半点·2026-07-05 批②）
