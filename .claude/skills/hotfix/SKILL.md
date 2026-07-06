@@ -1,4 +1,3 @@
-```markdown
 ---
 name: hotfix
 description: "绕过正常 Sprint 流程的紧急修复工作流，附带完整的审计追踪。创建热修复分支、跟踪审批，并确保修复正确回移植。"
@@ -69,4 +68,3 @@ allowed-tools: Read, Glob, Grep, Write, Edit, Bash
 - 热修复分支必须同时合并到发布分支和开发分支
 - 所有热修复必须在 48 小时内完成事后复盘
 - 如果修复复杂到需要超过 4 小时，上报至 technical-director 进行范围决策
-```

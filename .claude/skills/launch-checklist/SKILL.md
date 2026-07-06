@@ -1,4 +1,3 @@
-```markdown
 ---
 name: launch-checklist
 description: "全面的发布就绪验证，涵盖所有部门：代码、内容、商店、市场、社区、基础设施、法务，以及上线/不上线决策签字。"
@@ -217,6 +216,3 @@ allowed-tools: Read, Glob, Grep, Write
 5. **保存清单**到 `production/releases/launch-checklist-[date].md`，按需创建目录。
 
 6. **输出摘要**给用户：总项目数、阻塞项数量、有条件项数量、有未完成章节的部门，以及文件路径。
-```
-
-可以将此翻译写入 `.claude/skills/launch-checklist/SKILL.md` 吗？

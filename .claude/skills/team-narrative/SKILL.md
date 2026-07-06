@@ -1,4 +1,3 @@
-```markdown
 ---
 name: team-narrative
 description: "编排叙事团队：协调 narrative-director、writer、world-builder 和 level-designer，打造连贯的故事内容、世界传说（Lore）和叙事驱动的关卡设计。"
@@ -63,4 +62,3 @@ allowed-tools: Read, Glob, Grep, Write, Edit, Task, AskUserQuestion, TodoWrite
 
 ## 输出
 一份总结报告，涵盖：叙事简报状态、已创建/更新的传说条目、已编写的对话行、关卡叙事整合点、一致性审查结果，以及任何未解决的矛盾。
-```

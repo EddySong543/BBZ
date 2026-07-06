@@ -1,4 +1,3 @@
-```markdown
 ---
 name: team-ui
 description: "编排 UI 团队：协调 ux-designer、ui-programmer 和 art-director，从线框图到最终交付，完成用户界面功能的设计、实现与打磨。"
@@ -66,4 +65,3 @@ allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Task, AskUserQuestion, TodoW
 
 ## 输出
 一份总结报告，涵盖：UX 规格状态、视觉设计状态、实现状态、无障碍合规性、输入方式支持情况，以及任何未解决的问题。
-```

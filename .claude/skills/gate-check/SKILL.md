@@ -1,8 +1,3 @@
-可以将翻译结果写入 `.claude/skills/gate-check/SKILL.md` 吗？
-
----
-
-```markdown
 ---
 name: gate-check
 description: "验证项目是否准备好进入下一个开发阶段。产出 PASS/CONCERNS/FAIL 判定结果，附带具体的阻碍项和所需工件。"
@@ -255,4 +250,3 @@ echo -n "Production" > production/stage.txt
 
 **绝不**阻止用户推进 — 判定仅为建议性意见。记录风险，
 让用户自行决定是否在有顾虑的情况下继续推进。
-```
