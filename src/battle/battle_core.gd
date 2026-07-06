@@ -574,6 +574,32 @@ func econ_init() -> void:
 	_econ_unlock()
 
 
+## 远征 PvE（任务 D·2026-07-06）：带入跨战 HP（玩家按存活序·怪物单体·余槽 0 血板凳）。
+## setup 后调用（UI 只读铁律：battle_screen 不直写 hp·统一走此入口）。
+func pve_apply_hp(team_hp: Array, monster_hp: int) -> void:
+	for i in range(hp[0].size()):
+		hp[0][i] = int(team_hp[i]) if i < team_hp.size() else 0
+	hp[1][0] = maxi(1, monster_hp)
+	for s in range(1, hp[1].size()):
+		hp[1][s] = 0
+
+
+var pve_no_econ: bool = false   # 远征 PvE：锁死局内道具经济（补充/升级/抽卡全禁·装备件只用不换）
+
+## 远征 PvE（任务 D·2026-07-06）：装备栏道具直接入槽·不走经济状态机。
+## 玩家(P0)前 N 槽 = 装备道具（CHARGING·since=-1 开局即就绪）；其余与怪物(P1)全 EMPTY
+## （⚠ 用 EMPTY 非 SEALED——SEALED 会被 _econ_unlock 到点解锁触发 3 选 1 draft·PvE 无局内经济）；
+## 同时置 pve_no_econ：EMPTY 槽在 PvP 语义下可花能补充 → PvE 一并锁死（can_refill/can_upgrade 收口）。
+func pve_equip_init(equipped_ids: Array) -> void:
+	pve_no_econ = true
+	slots = [[], []]
+	for p in [0, 1]:
+		for _s in range(SLOT_COUNT):
+			slots[p].append({state = SlotState.EMPTY, item = null, since = -1, used = false, draft = [], upg_draft = []})
+	for i in range(mini(equipped_ids.size(), SLOT_COUNT)):
+		slots[0][i] = {state = SlotState.CHARGING, item = ItemCatalog.make(String(equipped_ids[i])), since = -1, used = false, draft = [], upg_draft = []}
+
+
 ## 到点自动解锁道具格（无开格步骤/费用·2026-07-03）：SEALED + 到解锁回合 → OPENED，
 ## since = turn_number-1 使解锁当回合即可 3 选 1（抽后 CHARGING 锁 1 回合 → 下回合可用）。
 ## econ_init 与每次 resolve 末（turn_number 递增后）各调一次；econ 未启用时槽空 = no-op。
@@ -662,6 +688,8 @@ func upgrade_cost(player: int, s: int) -> int:
 ## 升级 = 花能量从「下一级 tier 池」3 选 1（不再要求预设 upgrade_to —— 多数道具没有升级款；
 ## 预设款只是「以后加权让它更易出现」的偏好·B2）。故 T1/T2 件均可升、T3 封顶。
 func can_upgrade(player: int, s: int) -> bool:
+	if pve_no_econ:
+		return false   # 远征 PvE：装备件只用不升（无局内经济）
 	if not slot_ready(player, s):
 		return false
 	var item: ItemData = slots[player][s]["item"]
@@ -721,6 +749,8 @@ func pick_upgrade(player: int, s: int, choice: int) -> bool:
 
 
 func can_refill(player: int, s: int) -> bool:
+	if pve_no_econ:
+		return false   # 远征 PvE：空槽不可花能补充（无局内经济）
 	return int(slots[player][s]["state"]) == SlotState.EMPTY and usable_energy(player) >= ITEM_REFILL_COST
 
 
@@ -904,6 +934,7 @@ func clone() -> BattleCore:
 	c.action_ban_turn = action_ban_turn.duplicate()
 	c.action_banned = action_banned.duplicate()
 	c.pierce_next_attack = pierce_next_attack.duplicate()
+	c.pve_no_econ = pve_no_econ
 	c.rng = RandomNumberGenerator.new()
 	c.rng.seed = rng.seed
 	c.rng.state = rng.state

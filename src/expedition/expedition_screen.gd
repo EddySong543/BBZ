@@ -76,7 +76,41 @@ var canvas: Control   # 顶层绘制画布（地图/背包格·必须压在面�
 func _ready() -> void:
 	seed_value = randi() % 1000000
 	_build_ui()
-	_new_run(seed_value)
+	if not BattleSetup.expedition_state.is_empty():
+		_resume_from_battle()   # 真战斗打完回图（任务 D）
+	else:
+		_new_run(seed_value)
+
+
+## 真战斗回图（任务 D·2026-07-06）：恢复跨场景寄存的跑动状态 + 消费战斗结果回写地图。
+func _resume_from_battle() -> void:
+	var st: Dictionary = BattleSetup.expedition_state
+	BattleSetup.expedition_state = {}
+	map = st["map"]
+	bp = st["bp"]
+	pending = st["pending"]
+	log_lines = st["log"]
+	seed_value = int(st["seed"])
+	held = {}
+	var r: Dictionary = BattleSetup.pve_result
+	BattleSetup.pve_result = {}
+	if r.is_empty():
+		_log("战斗结果缺失——本次遭遇作废（防御兜底）。")
+		_refresh()
+		return
+	var res: Dictionary = map.apply_battle_result(Vector2i(st["tile"]), bool(st["wanderer"]),
+		String(r["outcome"]), int(r["beats"]), r["team_hp"], int(r["monster_hp"]), Vector2i(st["flee_from"]))
+	match String(r["outcome"]):
+		"win":
+			pending.append_array(res["loot"])
+			_log("战斗胜利（%d 拍·+%.1f 刻）！掉落 → 拾取区：%s" % [int(r["beats"]), float(int(r["beats"])) * 0.5, _loot_text(res["loot"])])
+		"flee":
+			_log("脱离战斗（挨了一拍），怪物驻留原格（血量保留）。")
+		"lose":
+			_log("队伍在战斗中全灭……")
+	if map.over:
+		_show_settlement()
+	_refresh()
 
 
 # ============================================================
@@ -470,7 +504,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			pending_flee_from = prev
 			_prompt_monster(map.player)
 		"wanderer":
-			_after_battle(map.fight_wanderer(_eff_bonus()))
+			pending_flee_from = prev
+			_enter_real_battle(Vector2i(-1, -1), true)   # 游荡怪强制遭遇=真战斗（可战中脱离）
 		"event":
 			_run_event(map.player)
 		"chest":
@@ -593,17 +628,46 @@ func _consume_item(id: String) -> bool:
 func _prompt_monster(c: Vector2i) -> void:
 	var m: Dictionary = map.resolve_encounter(c)
 	_show_choice("遭遇 %s（T%d·HP %.0f）— 明牌可读" % [String(m["name"]), int(m["tier"]), float(m["hp"])], [
-		"进战（自动结算·占位）",
-		"逃跑（挨一拍 %.1f HP·退回）" % (0.5 * float(m["tier"])),
+		"进战（真实战斗）",
+		"避战（挨一拍 %.1f HP·退回）" % (0.5 * float(m["tier"])),
 	], func(idx: int) -> void:
 		if idx == 0:
-			_after_battle(map.fight(c, _eff_bonus()))
+			_enter_real_battle(c, false)
 		else:
 			var report: Dictionary = map.flee(c, pending_flee_from)
-			_log("逃跑：挨 %s 一拍（-%.1f HP），怪驻留原格。" % [String(report["name"]), float(report["dmg"])])
+			_log("避战：挨 %s 一拍（-%.1f HP），怪驻留原格。" % [String(report["name"]), float(report["dmg"])])
 			if bool(report.get("death", false)):
 				_show_settlement()
 		_refresh())
+
+
+## 进真战斗（任务 D）：跑动状态寄存 BattleSetup → 波幕转场 battle_screen（怪物驾驶员对手·明牌）。
+## 无完整策略定义的占位实体（巢穴怪）回退占位自动结算。
+func _enter_real_battle(c: Vector2i, is_wanderer: bool) -> void:
+	var m: Dictionary = map.wanderer_encounter() if is_wanderer else map.resolve_encounter(c)
+	if (m.get("def", {}) as Dictionary).is_empty():
+		_after_battle(map.fight(c, _eff_bonus()))
+		_refresh()
+		return
+	if not held.is_empty():
+		pending.append(held["item"])   # 手上物品放回拾取区（不跨场景带手）
+		held = {}
+	BattleSetup.pve_mode = true
+	BattleSetup.pve_monster = m["def"]
+	BattleSetup.pve_monster_hp = int(round(float(m["hp"]) * 2.0))
+	var team_snapshot: Array = []
+	for h: Dictionary in map.team:
+		if float(h["hp"]) > 0.0:
+			team_snapshot.append({"name": String(h["name"]), "hp": int(round(float(h["hp"]) * 2.0)), "hp_max": int(round(float(h["hp_max"]) * 2.0))})
+	BattleSetup.pve_team = team_snapshot
+	var eq: Array = []
+	for it: Dictionary in bp.equipment:
+		if String(it.get("combat_id", "")) != "":
+			eq.append(String(it["combat_id"]))
+	BattleSetup.pve_equipment = eq
+	BattleSetup.expedition_state = {"map": map, "bp": bp, "pending": pending, "log": log_lines,
+		"seed": seed_value, "tile": c, "wanderer": is_wanderer, "flee_from": pending_flee_from}
+	TransitionManager.transition_to("res://src/ui/battle_screen.tscn")
 
 
 func _after_battle(report: Dictionary) -> void:

@@ -118,6 +118,15 @@ var _ai_rng := RandomNumberGenerator.new()   # 任务 B：AI 道具抽取选择�
 var _ai: BattleAI                             # 试玩对手 = 与 sim 统一的同一套搜索 AI（_ready 实例化）
 var _overtime := false                        # 本局是否加时赛（Q5·白板 1v1·_ready 从 BattleSetup 读）
 
+# ── 远征 PvE（任务 D·2026-07-06）：对手=怪物驾驶员（明牌概率表）·可脱离·无 PvP 道具经济 ──
+const ExpeditionPolicy := preload("res://src/expedition/expedition_monster_policy.gd")
+var _pve := false                             # 本局=远征 PvE（BattleSetup.pve_mode·须在 reset() 前读）
+var _pve_policy: ExpeditionPolicy             # 怪物驾驶员（五策略·可支付归一化）
+var _pve_choice: Dictionary = {}              # 本拍怪物已定招（回合开始抽样·明牌显示分布·确认时提交）
+var _pve_odds_label: Label                    # 明牌概率表（博弈系）/ 循环提示（考官系）
+var _pve_flee_btn: Button                     # 脱离按钮（挨一拍·退回地图）
+var _pve_ending := false                      # 防重复回程结算
+
 # ---- 选择 / 样式 ----
 var action_btn_list: Array[Button] = []
 var selected_action: int = -1
@@ -158,8 +167,20 @@ func _ready() -> void:
 	_ai = BattleAI.new(0, 2, 0, {})   # 与 sim 统一：同一套搜索 AI（随机种子·深度 2·基础评估）
 	battle = BattleCore.new()
 	_overtime = BattleSetup.overtime   # 须在 reset() 前读取
-	var p0: Array = _resolve_team(BattleSetup.p1_heroes, DEFAULT_P0)
-	var p1: Array = _resolve_team(BattleSetup.p2_heroes, DEFAULT_P1)
+	_pve = BattleSetup.pve_mode        # 远征 PvE（任务 D）·同样须在 reset() 前读取
+	var pve_monster: Dictionary = BattleSetup.pve_monster
+	var pve_monster_hp: int = BattleSetup.pve_monster_hp
+	var pve_team: Array = BattleSetup.pve_team.duplicate(true)
+	var pve_equipment: Array = BattleSetup.pve_equipment.duplicate()
+	var p0: Array
+	var p1: Array
+	if _pve:
+		# 远征队伍（1-3 人·存活者在前）与单怪都补足 3 槽白板（板凳 0 血·同加时赛零特判）
+		p0 = _pve_build_team(pve_team)
+		p1 = _pve_build_monster(pve_monster, pve_monster_hp)
+	else:
+		p0 = _resolve_team(BattleSetup.p1_heroes, DEFAULT_P0)
+		p1 = _resolve_team(BattleSetup.p2_heroes, DEFAULT_P1)
 	BattleSetup.reset()   # 消费即清空：防止下一局（未经 BP）复用本局阵容
 	battle.setup(p0, p1, randi())
 	if _overtime:
@@ -167,6 +188,17 @@ func _ready() -> void:
 		# （同归余烬·引擎/UI 全程正常 3 人局零特判）；无道具经济（不 econ_init）、被动能量照常、
 		# 上限 30 回合：打满 → 引擎骤死裁决（双方同时扣血·UI 走正常掉血/死亡演出零特判）。
 		battle.apply_overtime_bench()
+	elif _pve:
+		# 远征 PvE：HP 带入（跨战不回满·GDD）·能量每战重置（=setup 默认）·装备直入槽·
+		# 无 PvP 道具经济（不 econ_init·pve_equip_init 用 EMPTY 槽防 draft）·怪物无替补。
+		# UI 只读铁律：HP 带入走引擎入口 pve_apply_hp（不直写 battle.hp）。
+		var team_hp_in: Array = []
+		for m in pve_team:
+			team_hp_in.append(int(m["hp"]))
+		battle.pve_apply_hp(team_hp_in, pve_monster_hp)
+		battle.pve_equip_init(pve_equipment)
+		_pve_policy = ExpeditionPolicy.new(pve_monster, randi())
+		_pve_build_ui()
 	else:
 		battle.econ_init()   # 启用道具经济（开局带 1 + 槽位状态机·M1）
 
@@ -411,6 +443,8 @@ func _show_turn_intro() -> void:
 	_set_buttons_active(false, true)   # 回合介绍：动作栏整体压暗 + 禁用（灰色·防误触；进入选择阶段再亮）
 	status_label.visible = false
 	event_label.visible = false
+	if _pve:
+		_pve_pick_turn()   # 远征：怪物回合开始即定招·明牌概率表先于玩家选择亮出（GDD 明牌博弈系）
 
 	# 顶部中间：持续显示回合数（每回合更新，整局常驻）。「回合」与数字间留一空格，避免拥挤。
 	timer_label.text = "回合 %d" % (battle.turn_number + 1)
@@ -506,8 +540,12 @@ func _on_confirm_pressed() -> void:
 		battle.use_slot(PLAYER, s)
 	selected_item_slots.clear()
 
-	# AI 选择
-	_ai_pick(AI)
+	# AI 选择（远征 PvE：怪物驾驶员已在回合开始定招·明牌承诺=所见即所打）
+	if _pve:
+		if _pve_choice.is_empty() or not battle.select_action(AI, int(_pve_choice["action"])):
+			battle.select_action(AI, A.CHARGE)
+	else:
+		_ai_pick(AI)
 
 	selected_action = -1
 	selected_switch = -1
@@ -516,6 +554,102 @@ func _on_confirm_pressed() -> void:
 	_reset_button_styles()
 	_set_confirm_active(false)   # 停止呼吸：已确认提交
 	await _resolve()
+
+
+# ============================================================
+# 远征 PvE（任务 D·2026-07-06）
+# ============================================================
+
+## 远征队伍 → 3 槽白板 HeroData（存活者在前·不足补 0 血板凳·同加时赛零特判）。
+func _pve_build_team(team: Array) -> Array:
+	var out: Array = []
+	for m in team:
+		out.append(_pve_vanilla(String(m["name"]), maxi(1, int(m["hp_max"]) / 2)))
+	while out.size() < 3:
+		out.append(_pve_vanilla("——", 1))
+	return out
+
+
+func _pve_build_monster(def: Dictionary, hp_half: int) -> Array:
+	var out: Array = [_pve_vanilla(String(def.get("name", "怪物")), maxi(1, (hp_half + 1) / 2))]
+	while out.size() < 3:
+		out.append(_pve_vanilla("——", 1))
+	return out
+
+
+func _pve_vanilla(display_name: String, hp_points: int) -> HeroData:
+	var h := HeroData.new()
+	h.hero_id = ""      # 空 id = 白板（无技能组件·与校准 sim 同法）
+	h.hero_name = display_name
+	h.max_hp = hp_points
+	return h
+
+
+## PvE 专属 UI：明牌概率表（敌方区下缘）+ 脱离按钮（左下）。运行时代码建·不动 PvP .tscn。
+func _pve_build_ui() -> void:
+	_pve_odds_label = Label.new()
+	_pve_odds_label.position = Vector2(660, 168)
+	_pve_odds_label.size = Vector2(600, 36)
+	_pve_odds_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_pve_odds_label.modulate = Color(0.95, 0.91, 0.80)
+	FontManager.apply(_pve_odds_label, 16)
+	add_child(_pve_odds_label)
+	_pve_flee_btn = Button.new()
+	_pve_flee_btn.text = "脱离战斗（挨一拍·退回）"
+	_pve_flee_btn.position = Vector2(56, 700)
+	_pve_flee_btn.size = Vector2(250, 44)
+	FontManager.apply_btn(_pve_flee_btn, 16)
+	_pve_flee_btn.pressed.connect(_on_pve_flee)
+	add_child(_pve_flee_btn)
+
+
+## 回合开始：怪物定招（引擎从显示表直接采样=明牌诚实性结构保证）+ 更新明牌面板。
+func _pve_pick_turn() -> void:
+	_pve_choice = _pve_policy.pick(battle, AI)
+	var odds: Dictionary = _pve_choice.get("odds", {})
+	if odds.is_empty():
+		_pve_odds_label.text = "明牌：无（此怪出招有循环·可观察学习）"
+	else:
+		var names := {"attack": "波", "defend": "防", "charge": "攒", "bigAttack": "大波", "bigDefend": "大防"}
+		var parts: Array = []
+		for k in odds:
+			parts.append("%s %.0f%%" % [String(names.get(k, k)), float(odds[k])])
+		_pve_odds_label.text = "明牌 ｜ " + "  ·  ".join(parts)
+
+
+## 脱离战斗（子文档 B §5）：占当拍·敌方本拍动作免费命中一次（无防御结算）·退回进入前格子。
+func _on_pve_flee() -> void:
+	if state != State.PLAYER_SELECT or battle.game_over or _pve_ending:
+		return
+	var act: int = int(_pve_choice.get("action", A.CHARGE))
+	var dmg: int = 0
+	if act == A.ATTACK:
+		dmg = 2
+	elif act == A.BIG_ATTACK:
+		dmg = 4
+	if dmg > 0:
+		battle.strike(PLAYER, dmg, AI, ActionDef.Pen.NORMAL)   # 无防御动作在场=直落（护盾仍吸收）
+	await _pve_finish("flee", 1)
+
+
+## 回程结算：写 BattleSetup.pve_result → 波幕转场回远征地图（expedition_screen 消费并回写地图状态）。
+func _pve_finish(outcome: String, extra_beats: int = 0) -> void:
+	if _pve_ending:
+		return
+	_pve_ending = true
+	state = State.GAME_OVER
+	_set_buttons_active(false)
+	var team_hp: Array = []
+	for i in range(battle.hp[PLAYER].size()):
+		team_hp.append(maxi(0, battle.hp[PLAYER][i]))
+	BattleSetup.pve_result = {outcome = outcome, beats = battle.turn_number + extra_beats,
+		team_hp = team_hp, monster_hp = maxi(0, battle.hp[AI][0])}
+	var texts := {"win": "怪物被击败！", "lose": "全灭……", "flee": "脱离战斗"}
+	status_label.text = String(texts[outcome])
+	status_label.add_theme_color_override("font_color", Color("#5fd86b") if outcome == "win" else Color("#dddddd"))
+	status_label.visible = true
+	await get_tree().create_timer(1.0).timeout
+	TransitionManager.transition_to("res://src/expedition/expedition_screen.tscn")
 
 
 func _ai_pick(side: int) -> void:
@@ -562,6 +696,10 @@ func _resolve() -> void:
 
 	if r.get("game_over", false):
 		var w: int = r.get("winner", BattleCore.WINNER_UNDECIDED)
+		# 远征 PvE：胜=怪死·其余（含同拍双死）=全灭 → 回地图结算·不走加时赛。
+		if _pve:
+			await _pve_finish("win" if w == BattleCore.WINNER_P1 else "lose")
+			return
 		# 加时赛触发（Q5）：主局双方同归 → 各自 3 选 1 白板满血 1v1；加时局再平 = 真平局（走下方正常结束）。
 		if w == BattleCore.WINNER_DRAW and not _overtime:
 			await _start_overtime()

@@ -136,6 +136,7 @@ func resolve_encounter(c: Vector2i) -> Dictionary:
 			m["tier"] = 2
 			m["hp"] = float(up["hp"])
 			m["hp_max"] = float(up["hp"])
+			m["def"] = up.get("def", {})
 		var scaled: float = ceilf(float(m["hp_max"]) * (1.0 + HP_SCALE_PER_D * float(d)))
 		m["hp"] = scaled
 		m["hp_max"] = scaled
@@ -268,6 +269,59 @@ func mark_egg_chest() -> Vector2i:
 	return best
 
 
+# ── 真战斗交接（任务 D·2026-07-06·战斗结算在 battle_screen·此处只管状态回写）──
+
+var wanderer_monster: Dictionary = {}   # 游荡怪遭遇实体（首遇生成·被打跑保留血量·击杀清空）
+
+
+## 游荡怪遭遇实体（真战斗用）：首遇按当时 D 强化生成 T2·驻留至被击杀。
+func wanderer_encounter() -> Dictionary:
+	if wanderer_monster.is_empty():
+		var def: Dictionary = _pick_monster(2)
+		var hp_scaled: float = ceilf(float(def["hp"]) * (1.0 + HP_SCALE_PER_D * float(danger())))
+		wanderer_monster = {"key": def["key"], "name": "游荡·" + String(def["name"]), "tier": 2,
+			"hp": hp_scaled, "hp_max": hp_scaled, "resolved": true, "def": def.get("def", {})}
+	return wanderer_monster
+
+
+## 真战斗结果回写（battle_screen 打完回来调）。
+## outcome: win|lose|flee；beats=战斗拍数（刻=×0.5 由 ticks() 统一算）；team_hp=半点数组（按出战顺序）；
+## monster_hp=怪物剩余半点。返回 {loot:Array}（win 时按 tier 掉落·其余空）。
+func apply_battle_result(c: Vector2i, is_wanderer: bool, outcome: String, beats: int, team_hp: Array, monster_hp: int, back_to: Vector2i) -> Dictionary:
+	battle_beats += float(beats)
+	# 回写对位：进战快照只含【存活者】（前排先死=死者是队列前缀）→ 按存活顺序回写。
+	var idx: int = 0
+	for h: Dictionary in team:
+		if float(h["hp"]) > 0.0:
+			if idx < team_hp.size():
+				h["hp"] = float(int(team_hp[idx])) / 2.0
+			idx += 1
+	var out := {"loot": []}
+	var m: Dictionary = wanderer_monster if is_wanderer else monsters.get(c, {})
+	if m.is_empty():
+		return out
+	match outcome:
+		"win":
+			battles_won += 1
+			out["loot"] = Loot.roll_drop(rng, "t%d" % int(m["tier"]))
+			if is_wanderer:
+				wanderer_monster = {}
+				wanderer = Vector2i(-1, -1)
+			else:
+				monsters.erase(c)
+				grid[c.y][c.x] = Tile.FLOOR
+				if wanderer == c:
+					wanderer = Vector2i(-1, -1)
+		"flee":
+			m["hp"] = maxf(0.5, float(monster_hp) / 2.0)   # 怪物驻留血量（至少半点·防 0 血活怪）
+			player = back_to                               # 退回进入前的格子
+		"lose":
+			pass   # 死亡结算由调用方走 _team_dead 判定
+	if _team_dead():
+		_die("战死于 %s" % String(m["name"]))
+	return out
+
+
 ## 撤离结算：终局并写 result（金币/货品由背包层负责·此处只记时钟战报）。
 func extract() -> void:
 	over = true
@@ -284,7 +338,8 @@ func _load_monster_defs() -> void:
 	if data is Dictionary:
 		for key: String in data:
 			var m: Dictionary = data[key]
-			monster_defs.append({"key": key, "name": String(m["name"]), "tier": int(m["tier"]), "hp": int(m["hp"])})
+			# def = 完整 JSON 定义（真战斗的怪物驾驶员要读策略表·任务 D）
+			monster_defs.append({"key": key, "name": String(m["name"]), "tier": int(m["tier"]), "hp": int(m["hp"]), "def": m})
 
 
 func _pick_monster(tier: int) -> Dictionary:
@@ -336,7 +391,7 @@ func _generate() -> void:
 			tier = 2 if rng.randf() < 0.5 else 1
 		var def: Dictionary = _pick_monster(tier)
 		grid[c.y][c.x] = Tile.MONSTER
-		monsters[c] = {"key": def["key"], "name": def["name"], "tier": tier, "hp": float(def["hp"]), "hp_max": float(def["hp"]), "resolved": false}
+		monsters[c] = {"key": def["key"], "name": def["name"], "tier": tier, "hp": float(def["hp"]), "hp_max": float(def["hp"]), "resolved": false, "def": def.get("def", {})}
 	for i: int in EVENT_COUNT:
 		if free.is_empty():
 			break
