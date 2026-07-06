@@ -11,6 +11,10 @@
 | `monster_policy.gd` | 怪物驾驶员：odds/cycle/turtleRule/multiTable/phased 五种策略·含可支付归一化（§5.1） |
 | `run_expedition_sim.gd` | headless 校准：明牌真实性 ≤2pp / 遭遇拍数带 / 玩家胜率 / fallback 计数 |
 | `out_calibration.md` | 校准报告（跑一次刷新一次） |
+| `loot_gen.gd` | 共享掉落生成器（形状库+掉落表·子文档 C §7 草稿） |
+| `map_proto/` | **任务 A：地图探索原型**（12×12 搜打撤·F6 `MapProto.tscn`·详见其 README） |
+| `backpack_proto/` | **任务 B：背包拼图原型**（形状拼放+双结算·F6 `BackpackProto.tscn`·详见其 README） |
+| `proto_shot.gd` | 原型截图跑器（带窗口·可选 walk 自动走动） |
 
 ## 跑校准
 
