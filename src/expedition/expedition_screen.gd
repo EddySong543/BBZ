@@ -90,6 +90,7 @@ var player_token: TextureRect      # 英雄头像 token（摇摆动画在 _proce
 var canvas: Control                # 顶层绘制画布（地图图签/背包格·必须压在面板填充之上）
 
 # ── 地形层（数据纹理驱动·地表/迷雾/揭示全在 shader）──
+var fx_layer: Control              # 地图动效层（飘字/格闪·压 token 之上·G 任务）
 var terrain_mat: ShaderMaterial
 var _terrain_img: Image            # 12×12 RGBAF（R=地形类 G=已探明 B=探明时刻·预分配复用）
 var _terrain_tex: ImageTexture
@@ -136,8 +137,10 @@ func _resume_from_battle() -> void:
 		"win":
 			pending.append_array(res["loot"])
 			_log("战斗胜利（%d 拍·+%.1f 刻）！掉落 → 拾取区：%s" % [int(r["beats"]), float(int(r["beats"])) * 0.5, _loot_text(res["loot"])])
+			_float_text(map.player, "胜利！战利品 ×%d" % (res["loot"] as Array).size(), COL_CHEST)
 		"flee":
 			_log("脱离战斗（挨了一拍），怪物驻留原格（血量保留）。")
+			_float_text(map.player, "脱离（挨了一拍）", Color("ff9442"))
 		"lose":
 			_log("队伍在战斗中全灭……")
 	if map.over:
@@ -212,6 +215,12 @@ func _build_ui() -> void:
 	player_token.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	player_token.visible = false   # 进图（_new_run）才现身
 	add_child(player_token)
+	# 地图动效层（G 任务）：飘字/格闪都挂这里·IGNORE 不吞点击·清场随 _new_run
+	fx_layer = Control.new()
+	fx_layer.name = "MapFxLayer"
+	fx_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	fx_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(fx_layer)
 	_build_select_overlay()   # 选英雄浮层压最上（含按钮·必须在 canvas 之上可点）
 	dialog = PopupPanel.new()
 	dialog.exclusive = true   # 点外部不可关——防"死亡结算被点掉→movement 封锁看似卡死"
@@ -350,6 +359,49 @@ func _apply_token_portrait() -> void:
 		player_token.texture = load(hero_portrait_path)
 	else:
 		player_token.texture = PixelArt.get_texture("flag", COL_PLAYER, 64)
+
+
+# ============================================================
+# 地图动效（G 任务·复用战斗屏飘字/pop 手法·UI 面板永不动）
+# ============================================================
+
+## 地图格上方飘字：上浮 44px + 淡出 0.9s 自毁。挂 fx_layer（不进面板·不吞点击）。
+func _float_text(cell: Vector2i, text: String, color: Color) -> void:
+	var l := Label.new()
+	l.text = text
+	FontManager.apply(l, 16)
+	l.modulate = color
+	l.z_index = 5
+	l.position = MAP_ORIGIN + Vector2(cell.x * MAP_CELL - 20, cell.y * MAP_CELL - 8)
+	l.size = Vector2(MAP_CELL + 40, 24)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fx_layer.add_child(l)
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(l, "position:y", l.position.y - 44.0, 0.9).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.tween_property(l, "modulate:a", 0.0, 0.9).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.chain().tween_callback(l.queue_free)
+
+
+## 遇敌格闪：所在格红色蒙层 0.35s 淡出（弹窗弹出前的"撞上了"反馈）。
+func _flash_cell(cell: Vector2i, color: Color) -> void:
+	var r := ColorRect.new()
+	r.color = Color(color, 0.45)
+	r.position = MAP_ORIGIN + Vector2(cell.x * MAP_CELL, cell.y * MAP_CELL)
+	r.size = Vector2(MAP_CELL - 2, MAP_CELL - 2)
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fx_layer.add_child(r)
+	var tw := create_tween()
+	tw.tween_property(r, "modulate:a", 0.0, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(r.queue_free)
+
+
+## token 惊跳（遇敌"!"）：脚底为轴快速弹一下（scale punch·卡通感）。
+func _token_bump() -> void:
+	var tw := create_tween()
+	tw.tween_property(player_token, "scale", Vector2(1.22, 1.22), 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(player_token, "scale", Vector2.ONE, 0.14).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 ## 按钮果冻底（D 任务·与战斗动作钮/道具弹窗同款 canvas_button_jelly 语言）。
@@ -513,6 +565,8 @@ func _new_run(p_seed: int, leader_name: String = "") -> void:
 	held = {}
 	log_lines = []
 	_reveal_time.clear()   # 开局已探明格在首次 _refresh 盖当前钟 → 起手播一段翻显（地图"浮现"）
+	for child: Node in fx_layer.get_children():   # 清掉上一局残留的飘字/格闪
+		child.queue_free()
 	terrain_mat.set_shader_parameter("seed_f", float(p_seed % 977))
 	player_token.visible = true
 	_log("踏入迷雾（种子 %d）。补给 %d·撤1 已开。" % [p_seed, map.supplies])
@@ -635,6 +689,8 @@ func _process(delta: float) -> void:
 		var amp: float = 0.16 if moving else 0.05
 		var freq: float = 10.0 if moving else 2.2
 		player_token.rotation = sin(_anim_time * freq) * amp
+	if map != null and not select_overlay.visible:
+		canvas.queue_redraw()   # 每帧重绘=驱动游荡怪呼吸/撤离点脉动（144 格 immediate 绘制·开销可忽略）
 
 
 func _ext_text(tile: int) -> String:
@@ -695,12 +751,17 @@ func _draw_canvas() -> void:
 					else:
 						PixelArt.draw_icon(canvas, "chest", icon_rect, COL_CHEST)
 				MapState.Tile.EXT1, MapState.Tile.EXT2, MapState.Tile.EXT3:
-					var ecol: Color = COL_EXT_OPEN if map.ext_open(tile) else COL_EXT_CLOSED
+					var is_open: bool = map.ext_open(tile)
+					var ecol: Color = COL_EXT_OPEN if is_open else COL_EXT_CLOSED
+					if is_open:
+						ecol = ecol.lightened(0.10 + 0.12 * sin(_anim_time * 2.4))   # 开放撤离点脉动（活着的出口）
 					PixelArt.draw_icon(canvas, "arch", icon_rect, ecol)
 					canvas.draw_string(f12, rect.position + Vector2(rect.size.x - 18, rect.size.y - 8), str(tile - MapState.Tile.EXT1 + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, ecol)
 	if map.wanderer != Vector2i(-1, -1) and map.revealed.has(map.wanderer):
+		# 游荡怪呼吸（G 任务·明牌威胁提示）：alpha 慢脉动·靠 _process 每帧 queue_redraw 驱动
 		var wr := MAP_ORIGIN + Vector2(map.wanderer.x * MAP_CELL, map.wanderer.y * MAP_CELL)
-		PixelArt.draw_icon(canvas, "eye", Rect2(wr + Vector2(11, 11), icon_sz), Color("ff6a5c"))
+		var breath: float = 0.65 + 0.35 * sin(_anim_time * 3.0)
+		PixelArt.draw_icon(canvas, "eye", Rect2(wr + Vector2(11, 11), icon_sz), Color(1.0, 0.42, 0.36, breath))
 	# 当前格亮金描边（token 之下的落脚提示）
 	var pr := Rect2(MAP_ORIGIN + Vector2(map.player.x * MAP_CELL, map.player.y * MAP_CELL), Vector2(MAP_CELL - 2, MAP_CELL - 2))
 	canvas.draw_rect(pr, COL_PLAYER, false, 3.0)
@@ -854,14 +915,20 @@ func _unhandled_input(event: InputEvent) -> void:
 	var res: Dictionary = map.try_move(dir)
 	for m: String in res.get("msgs", []):
 		_log(m)
+	if not (res.get("msgs", []) as Array).is_empty():
+		_float_text(map.player, "饥饿 -%.1f HP" % MapState.HUNGER_DMG, Color("ff6a5c"))
 	match String(res["kind"]):
 		"death":
 			_show_settlement()
 		"monster":
 			pending_flee_from = prev
+			_flash_cell(map.player, COL_MONSTER)
+			_token_bump()
 			_prompt_monster(map.player)
 		"wanderer":
 			pending_flee_from = prev
+			_flash_cell(map.player, Color("ff6a5c"))
+			_token_bump()
 			_enter_real_battle(Vector2i(-1, -1), true)   # 游荡怪强制遭遇=真战斗（可战中脱离）
 		"event":
 			_run_event(map.player)
@@ -869,6 +936,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			var loot: Array = map.open_chest(map.player)
 			pending.append_array(loot)
 			_log("开箱：%s → 拾取区。" % _loot_text(loot))
+			_float_text(map.player, "战利品 ×%d" % loot.size(), COL_CHEST)
 		"ext":
 			_prompt_extract(map.grid[map.player.y][map.player.x])
 	_refresh()
@@ -883,12 +951,15 @@ func _use_held() -> void:
 		"ration":
 			map.add_supplies(10)
 			_log("吃掉干粮：补给 +10。")
+			_float_text(map.player, "补给 +10", COL_CONSUM_ITEM)
 		"potion":
 			map.heal_front(1.0)
 			_log("药瓶：前排 +1 HP。")
+			_float_text(map.player, "+1.0 HP", COL_CONSUM_ITEM)
 		"soup":
 			map.heal_all(0.5)
 			_log("大补汤：全队 +0.5 HP。")
+			_float_text(map.player, "全队 +0.5 HP", COL_CONSUM_ITEM)
 	held = {}
 	_refresh()
 
@@ -993,6 +1064,7 @@ func _prompt_monster(c: Vector2i) -> void:
 		else:
 			var report: Dictionary = map.flee(c, pending_flee_from)
 			_log("避战：挨 %s 一拍（-%.1f HP），怪驻留原格。" % [String(report["name"]), float(report["dmg"])])
+			_float_text(map.player, "-%.1f HP" % float(report["dmg"]), Color("ff6a5c"))
 			if bool(report.get("death", false)):
 				_show_settlement()
 		_refresh())
@@ -1035,6 +1107,7 @@ func _after_battle(report: Dictionary) -> void:
 		return
 	pending.append_array(report["loot"])
 	_log("击败 %s：%d 拍·受伤 %.1f。掉落 → 拾取区：%s" % [String(report["name"]), int(report["beats"]), float(report["dmg"]), _loot_text(report["loot"])])
+	_float_text(map.player, "胜利！战利品 ×%d" % (report["loot"] as Array).size(), COL_CHEST)
 
 
 func _loot_text(loot: Array) -> String:
@@ -1054,9 +1127,11 @@ func _run_event(c: Vector2i) -> void:
 			var hero_name: String = map.recruit()
 			if hero_name != "":
 				_log("篝火·招募：%s 加入！" % hero_name)
+				_float_text(map.player, "伙伴 +1", COL_PLAYER)
 			else:
 				map.heal_all(0.5)
 				_log("篝火·休整：队伍已满，全队 +0.5 HP。")
+				_float_text(map.player, "全队 +0.5 HP", COL_CONSUM_ITEM)
 			consume.call()
 		"清泉":
 			_show_choice("清泉：选一种饮法", ["单英雄 +1 HP（前排）", "全队 +0.5 HP"], func(idx: int) -> void:
@@ -1065,6 +1140,7 @@ func _run_event(c: Vector2i) -> void:
 				else:
 					map.heal_all(0.5)
 				_log("清泉：恢复完成。")
+				_float_text(map.player, "+1.0 HP" if idx == 0 else "全队 +0.5 HP", COL_CONSUM_ITEM)
 				consume.call()
 				_refresh())
 		"陷阱":
@@ -1081,6 +1157,7 @@ func _run_event(c: Vector2i) -> void:
 			else:
 				map.supplies = maxi(0, map.supplies - 5)
 				_log("陷阱：补给 -5（无干粮可抵）。")
+				_float_text(map.player, "补给 -5", Color("ff6a5c"))
 				consume.call()
 		"神龛":
 			var it: Dictionary = Loot.make_combat(map.rng, 1)
@@ -1101,8 +1178,10 @@ func _run_event(c: Vector2i) -> void:
 						pending.append(stake)
 						pending.append(stake.duplicate(true))
 						_log("赌局：赢！%s ×2 → 拾取区。" % String(stake["name"]))
+						_float_text(map.player, "赢！×2", COL_CHEST)
 					else:
 						_log("赌局：输了，%s 被没收。" % String(stake["name"]))
+						_float_text(map.player, "被没收…", Color("ff6a5c"))
 				consume.call()
 				_refresh())
 		"行商":
