@@ -110,13 +110,13 @@ func _run_batch(pool: Array, label: String = "") -> Dictionary:
 
 	if ab_active():
 		if eval_ab:
-			print("【A/B】A=v1 基础评估 vs B=v2 进阶牌感 交叉头对头（交替先后手·#4 转正对决）")
+			print("【A/B】A=v1 基础评估 vs B=v2 进阶牌感 交叉头对头（交替P1/P2位·#4 转正对决）")
 		elif upgrade_ab:
-			print("【A/B】A=价值搜索升级(search_upgrade=true) vs B=阈值升级(false) 头对头（交替先后手·验证 B）")
+			print("【A/B】A=价值搜索升级(search_upgrade=true) vs B=阈值升级(false) 头对头（交替P1/P2位·验证 B）")
 		elif plan_ab:
-			print("【A/B】A=规划道具(plan_items=true) vs B=不规划(false) 头对头（两方实战都用道具·交替先后手）")
+			print("【A/B】A=规划道具(plan_items=true) vs B=不规划(false) 头对头（两方实战都用道具·交替P1/P2位）")
 		else:
-			print("【A/B 校准】A=默认权重  vs  B=变体「%s」=%s （交替先后手）" % [
+			print("【A/B 校准】A=默认权重  vs  B=变体「%s」=%s （交替P1/P2位）" % [
 				ab_variant, str(AB_VARIANTS.get(ab_variant, {}))])
 
 	var setup_rng := RandomNumberGenerator.new()
@@ -159,7 +159,7 @@ func _run_batch(pool: Array, label: String = "") -> Dictionary:
 		var ai0 := BattleAI.new(seed_g + 1, depth, profile, w0)
 		var ai1 := BattleAI.new(seed_g + 2, depth, profile, w1)
 		if plan_ab:
-			ai0.plan_items = (g % 2 == 0)   # A(规划道具)=偶数局 P0 / 奇数局 P1（抵消先后手偏差）
+			ai0.plan_items = (g % 2 == 0)   # A(规划道具)=偶数局 P0 / 奇数局 P1（抵消座位偏差）
 			ai1.plan_items = (g % 2 != 0)
 		if upgrade_ab:
 			ai0.search_upgrade = (g % 2 == 0)   # A(价值搜索升级)=偶数局 P0 / 奇数局 P1
@@ -365,7 +365,7 @@ func _write_panel_summary(root: String, results: Array) -> void:
 	var ab: Dictionary = cx.get("ab", {})
 	var a_w: int = int(ab.get("a", 0))
 	var b_w: int = int(ab.get("b", 0))
-	f.store_line("\n## 强度追踪（v1×v2 交叉 %d 局·交替先后手）" % int(cx["total"]))
+	f.store_line("\n## 强度追踪（v1×v2 交叉 %d 局·交替P1/P2位）" % int(cx["total"]))
 	f.store_line("- v1 胜 %d ｜ v2 胜 %d ｜ 平 %d → v1 decisive 占比 **%s**（基线 ≈50%%）\n" % [
 		a_w, b_w, int(ab.get("draw", 0)), _pct(a_w, a_w + b_w)])
 	f.store_line("## 判读指引")
@@ -486,7 +486,7 @@ func _write_ab(a: int, b: int, draw: int) -> void:
 	if f != null:
 		f.store_line("# A/B %s 结果\n" % title)
 		f.store_line("- %s" % desc)
-		f.store_line("- 对局=%d（交替先后手抵消位置偏差）\n" % total)
+		f.store_line("- 对局=%d（交替P1/P2位抵消位置偏差）\n" % total)
 		f.store_line("| 侧 | 胜 | 总占比 | decisive 占比 |")
 		f.store_line("|----|----|------|------|")
 		f.store_line("| A(%s) | %d | %s | %s |" % [a_label, a, _pct(a, total), _pct(a, decisive)])
@@ -645,8 +645,8 @@ func _write_outputs(csv_rows: Array, win: Dictionary, turns_list: Array,
 	md.store_line("## 胜负分布")
 	md.store_line("| 结果 | 局数 | 占比 |")
 	md.store_line("|------|------|------|")
-	md.store_line("| P1 先手胜 | %d | %s |" % [win.get(1, 0), _pct(win.get(1, 0), total)])
-	md.store_line("| P2 后手胜 | %d | %s |" % [win.get(2, 0), _pct(win.get(2, 0), total)])
+	md.store_line("| P1位胜 | %d | %s |" % [win.get(1, 0), _pct(win.get(1, 0), total)])
+	md.store_line("| P2位胜 | %d | %s |" % [win.get(2, 0), _pct(win.get(2, 0), total)])
 	md.store_line("| 真平局(含加时再平) | %d | %s |" % [win.get(0, 0), _pct(win.get(0, 0), total)])
 	md.store_line("| 未决(达回合上限) | %d | %s |\n" % [win.get(-1, 0), _pct(win.get(-1, 0), total)])
 
