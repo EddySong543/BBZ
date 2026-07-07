@@ -120,6 +120,10 @@ var _overtime := false                        # 本局是否加时赛（Q5·白�
 
 # ── 远征 PvE（任务 D·2026-07-06）：对手=怪物驾驶员（明牌概率表）·可脱离·无 PvP 道具经济 ──
 const ExpeditionPolicy := preload("res://src/expedition/expedition_monster_policy.gd")
+const ExpeditionPixelArt := preload("res://src/expedition/expedition_pixel_art.gd")
+const PVE_JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")
+## 怪物系列色（monsters.json "series"·任务 I）：博弈=金 / 考官=靛蓝 / 未知回退暖骨。
+const PVE_SERIES_COLORS: Dictionary = {"gamble": Color("e0b54a"), "exam": Color("3f6fb0")}
 var _pve := false                             # 本局=远征 PvE（BattleSetup.pve_mode·须在 reset() 前读）
 var _pve_policy: ExpeditionPolicy             # 怪物驾驶员（五策略·可支付归一化）
 var _pve_choice: Dictionary = {}              # 本拍怪物已定招（回合开始抽样·明牌显示分布·确认时提交）
@@ -199,6 +203,7 @@ func _ready() -> void:
 		battle.pve_equip_init(pve_equipment)
 		_pve_policy = ExpeditionPolicy.new(pve_monster, randi())
 		_pve_build_ui()
+		p2_char_display.sprite_frames = _pve_monster_frames(pve_monster)   # 任务 I：白板→像素图签占位/MJ art 字段
 	else:
 		battle.econ_init()   # 启用道具经济（开局带 1 + 槽位状态机·M1）
 
@@ -585,13 +590,45 @@ func _pve_vanilla(display_name: String, hp_points: int) -> HeroData:
 	return h
 
 
-## PvE 专属 UI：明牌概率表（敌方区下缘）+ 脱离按钮（左下）。运行时代码建·不动 PvP .tscn。
+## PvE 怪物立绘（任务 I·白板→程序化像素图签占位）。
+## 🎨 美术挂点：MJ 素材到位后在 monsters.json 该怪条目加可选字段 "art": "res://...（SpriteFrames .tres 或单图）"
+## 即自动替换·零改码（字段缺省=程序占位·见 design/expedition-monsters.md）。
+func _pve_monster_frames(def: Dictionary) -> SpriteFrames:
+	var art_path: String = String(def.get("art", ""))
+	if art_path != "" and ResourceLoader.exists(art_path):
+		var res: Resource = load(art_path)
+		if res is SpriteFrames:
+			return res
+		if res is Texture2D:
+			var sf_art := SpriteFrames.new()
+			sf_art.add_animation("idle")
+			sf_art.add_frame("idle", res)
+			return sf_art
+	var tier: int = int(def.get("tier", 1))
+	var icon: String = "paw" if tier == 1 else ("fang" if tier == 2 else "horns")
+	var col: Color = PVE_SERIES_COLORS.get(String(def.get("series", "")), Color("b3a386"))
+	var sf := SpriteFrames.new()
+	sf.add_animation("idle")
+	sf.add_frame("idle", ExpeditionPixelArt.get_texture(icon, col, 256))
+	return sf
+
+
+## PvE 专属 UI：明牌概率表（敌方区下缘·暖底芯片）+ 脱离按钮（左下·jelly 节奏橙）。运行时代码建·不动 PvP .tscn。
 func _pve_build_ui() -> void:
 	_pve_odds_label = Label.new()
 	_pve_odds_label.position = Vector2(660, 168)
 	_pve_odds_label.size = Vector2(600, 36)
 	_pve_odds_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_pve_odds_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_pve_odds_label.modulate = Color(0.95, 0.91, 0.80)
+	_pve_odds_label.pivot_offset = Vector2(300, 18)   # 中心轴=明牌亮出 pop 用
+	var chip := StyleBoxFlat.new()   # 暖色深底芯片（J 任务·对齐远征弹窗语言）
+	chip.bg_color = Color(0.14, 0.11, 0.07, 0.85)
+	chip.border_color = Color("b3a386")
+	chip.set_border_width_all(1)
+	chip.set_corner_radius_all(6)
+	chip.set_content_margin_all(6)
+	_pve_odds_label.add_theme_stylebox_override("normal", chip)
 	FontManager.apply(_pve_odds_label, 16)
 	add_child(_pve_odds_label)
 	_pve_flee_btn = Button.new()
@@ -599,6 +636,32 @@ func _pve_build_ui() -> void:
 	_pve_flee_btn.position = Vector2(56, 700)
 	_pve_flee_btn.size = Vector2(250, 44)
 	FontManager.apply_btn(_pve_flee_btn, 16)
+	for st: String in ["normal", "hover", "pressed", "focus"]:
+		_pve_flee_btn.add_theme_stylebox_override(st, StyleBoxEmpty.new())
+	_pve_flee_btn.add_theme_color_override("font_color", Color(0.98, 0.95, 0.88))
+	_pve_flee_btn.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.03, 0.9))
+	_pve_flee_btn.add_theme_constant_override("outline_size", 4)
+	var jelly := ColorRect.new()   # 果冻底（节奏橙=撤退语义·show_behind_parent 垫在文字下）
+	jelly.color = Color.WHITE
+	jelly.set_anchors_preset(Control.PRESET_FULL_RECT)
+	jelly.show_behind_parent = true
+	jelly.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var m := ShaderMaterial.new()
+	m.shader = PVE_JELLY_SHADER
+	var base := Color("c47f33")
+	m.set_shader_parameter("fill_top", base.lightened(0.12))
+	m.set_shader_parameter("fill_bottom", base.darkened(0.32))
+	m.set_shader_parameter("edge_inner", base.lightened(0.38))
+	m.set_shader_parameter("edge_outer", Color(0.05, 0.045, 0.04))
+	m.set_shader_parameter("fill_alpha", 1.0)
+	m.set_shader_parameter("pixel_grid", 44.0)
+	m.set_shader_parameter("corner", 0.16)
+	m.set_shader_parameter("edge_px", 2.0)
+	m.set_shader_parameter("aspect", 250.0 / 44.0)
+	m.set_shader_parameter("noise_amt", 0.06)
+	m.set_shader_parameter("wear", 0.18)
+	jelly.material = m
+	_pve_flee_btn.add_child(jelly)
 	_pve_flee_btn.pressed.connect(_on_pve_flee)
 	add_child(_pve_flee_btn)
 
@@ -615,6 +678,10 @@ func _pve_pick_turn() -> void:
 		for k in odds:
 			parts.append("%s %.0f%%" % [String(names.get(k, k)), float(odds[k])])
 		_pve_odds_label.text = "明牌 ｜ " + "  ·  ".join(parts)
+	# 明牌亮出 pop（J 任务·中心轴回弹·提示"新一拍的牌翻开了"）
+	_pve_odds_label.scale = Vector2(1.14, 1.14)
+	var tw := create_tween()
+	tw.tween_property(_pve_odds_label, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 ## 脱离战斗（子文档 B §5）：占当拍·敌方本拍动作免费命中一次（无防御结算）·退回进入前格子。

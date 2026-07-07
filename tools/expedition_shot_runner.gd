@@ -2,9 +2,9 @@ extends Node
 
 ## 远征模式界面截图 runner（实装自检用·完整引擎模式跑→autoload 可用）：
 ##   godot --path . res://tools/expedition_shot_runner.tscn
-## 覆盖（2026-07-07 全屏地图形态）：选英雄浮层 → 进图 idle → 走动（迷雾扩张）→ B 背包浮层（含注入物品）。
-## ⚠ 死亡链路回归检查已下线（真战斗接入后"进战"=转场 battle_screen·不再出结算弹窗）——
-##   战斗路径回归走 tools/pve_battle_shot_runner；地图内死亡弹窗回归待 L 任务重建（饥饿死链路）。
+## 覆盖（2026-07-07 全屏地图形态）：选英雄浮层 → 进图 idle → 走动（迷雾扩张）→ B 背包浮层（含注入物品）
+## → 弹窗样式 → 死亡链路回归（L 任务重建·走【饥饿死】路径：不碰"进战"真战斗转场·途中弹窗直接 hide 跳过）。
+## 战斗路径回归另走 tools/pve_battle_shot_runner。
 
 const HeroDataScript := preload("res://src/battle/hero_data.gd")
 
@@ -13,6 +13,7 @@ const OUT_IDLE := "D:/Game/BoBoZan/exped_idle.png"
 const OUT_WALK := "D:/Game/BoBoZan/exped_walk.png"
 const OUT_BACKPACK := "D:/Game/BoBoZan/exped_backpack.png"
 const OUT_DIALOG := "D:/Game/BoBoZan/exped_dialog.png"
+const OUT_DEATH := "D:/Game/BoBoZan/exped_death.png"
 
 const WALK_KEYS: Array = [KEY_D, KEY_D, KEY_S, KEY_D, KEY_D, KEY_S, KEY_D, KEY_W, KEY_D, KEY_D]
 
@@ -59,6 +60,28 @@ func _ready() -> void:
 		screen._prompt_leave()
 	await get_tree().create_timer(0.4).timeout
 	await _shot(OUT_DIALOG)
+	# —— 死亡链路回归（Eddy 踩坑双病根的守门员·L 任务重建）：饥饿死 → 结算弹窗必须弹出且无旧按钮残留 ——
+	screen.dialog.hide()                # 关掉当前任意弹窗（直接 hide 不触发回调·安全）
+	screen.map.supplies = 0
+	for h: Dictionary in screen.map.team:
+		h["hp"] = 0.5                   # 残血：下一次饥饿行军（-0.5）即全灭
+	for i: int in 30:
+		if screen.map.over:
+			break
+		if screen.dialog.visible:
+			screen.dialog.hide()        # 途中遭遇/撤离弹窗一律跳过继续走
+			await get_tree().create_timer(0.05).timeout
+		var ev2 := InputEventKey.new()
+		ev2.keycode = [KEY_D, KEY_S, KEY_A, KEY_W][i % 4]
+		ev2.physical_keycode = ev2.keycode
+		ev2.pressed = true
+		Input.parse_input_event(ev2)
+		await get_tree().create_timer(0.08).timeout
+	await get_tree().create_timer(0.5).timeout
+	var kids: int = screen.dialog_box.get_child_count()
+	print("死亡回归：局已结束=", screen.map.over, "  结算弹窗可见=", screen.dialog.visible,
+		"  弹窗子节点=", kids, "（应为 3：文案+2按钮·>3=旧按钮残留 bug 复发）")
+	await _shot(OUT_DEATH)
 	get_tree().quit()
 
 
