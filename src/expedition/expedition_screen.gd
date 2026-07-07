@@ -1,10 +1,13 @@
-## 远征模式主界面（先行版）——地图探索 + 形状背包一体屏。
+## 远征模式主界面 —— 全屏大地图探索（2026-07-07 Eddy 定形态重构）。
 ##
-## 设计规范：design/ui-design-system.md（暖色深底 + 暖骨像素框 + Ark Pixel + 暖米白字·⛔夜色衬底已去=Eddy 2026-07-06 定）。
+## 流程：进入 → 选初始英雄（浮层）→ 进图（选地图步骤=待世界观拍板后加）。
+## 形态：全屏=地图本身（⛔背景/衬底），HUD=两侧竖带信息条（不遮地图），
+## 背包=按 B 唤出的整理浮层（背包格+拾取区+装备栏+保险槽同屏整理），
+## 玩家=所选英雄的像素头像 token 在图上探索（移动左右摇摆·卡通感）。
+## 设计规范：design/ui-design-system.md（全暖色系·暖骨框·Ark Pixel·⛔夜色衬底）。
 ## 规则源：design/expedition-map.md / expedition-backpack.md。逻辑层 = expedition_map_state / expedition_backpack_state。
-## ⚠ 战斗 = 占位自动结算（先知效率带·装备每件 +0.05 效率占位钩子）——真战斗接入 = 后续任务。
 ##
-## 操作：WASD/方向键移动 ｜ 左键拾/放 ｜ R 旋转 ｜ 右键放回拾取区 ｜ U 用手上消耗品 ｜ X 丢弃 ｜ ESC 返回。
+## 操作：WASD/方向键移动 ｜ B 背包浮层 ｜ 浮层内：左键拾/放·R 旋转·右键放回·U 用消耗品·X 丢弃 ｜ ESC 关浮层/返回。
 extends Control
 
 const MapState := preload("res://src/expedition/expedition_map_state.gd")
@@ -12,31 +15,32 @@ const Backpack := preload("res://src/expedition/expedition_backpack_state.gd")
 const Loot := preload("res://src/expedition/expedition_loot.gd")
 const PixelArt := preload("res://src/expedition/expedition_pixel_art.gd")
 const ItemCatalog := preload("res://src/battle/item_catalog.gd")
+const HeroDataScript := preload("res://src/battle/hero_data.gd")   # class_name 在 headless 可能未注册→走 preload
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")
+const TERRAIN_SHADER := preload("res://assets/shaders/canvas_ui_expedition_terrain.gdshader")
 
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
 
-# ── 布局（1920×1080）──
-const MAP_PANEL := Rect2(64, 110, 700, 700)
-const MAP_ORIGIN := Vector2(78, 124)
-const MAP_CELL: int = 56
-const LOG_PANEL := Rect2(64, 830, 700, 210)
-const HUD_PANEL := Rect2(796, 110, 350, 400)
-const BP_PANEL := Rect2(796, 530, 350, 510)
-const BP_ORIGIN := Vector2(824, 596)
-const BP_CELL: int = 44
-const PEND_PANEL := Rect2(1166, 110, 350, 560)
-const EQUIP_PANEL := Rect2(1166, 690, 350, 350)
-const INFO_PANEL := Rect2(1536, 110, 320, 930)
+# ── 布局（1920×1080·地图居中全高·HUD 走两侧竖带·背包/选英雄=居中浮层）──
+const MAP_CELL: int = 88
+const MAP_ORIGIN := Vector2(432, 12)            # (1920 - 12*88)/2 = 432
+const HUD_PANEL := Rect2(16, 16, 400, 330)      # 左上：行军
+const LOG_PANEL := Rect2(16, 780, 400, 284)     # 左下：手记流水
+const TEAM_PANEL := Rect2(1504, 16, 400, 220)   # 右上：队伍
+const INFO_PANEL := Rect2(1504, 252, 400, 460)  # 右中：行囊状态 + 操作提示
+# 背包浮层（居中·B 唤出）
+const OV_PANEL := Rect2(340, 110, 1240, 860)
+const BP_ORIGIN := Vector2(400, 240)
+const BP_CELL: int = 52
+# 选英雄浮层
+const SEL_PANEL := Rect2(440, 140, 1040, 800)
 
-# ── 色板（§2 令牌：暖骨框 / 暖米白字 / 语义色·全暖色系=Eddy 定·⛔不用夜色衬底）──
-const COL_BG := Color("17110a")            # 暖色深底衬底（比面板更沉一档）
+# ── 色板（§2 令牌：暖骨框 / 暖米白字 / 语义色·全暖色系=Eddy 定·⛔夜色衬底）──
+const COL_BG := Color("17110a")            # 全屏底（地图外两侧竖带）
 const COL_PANEL := Color("241c12")         # 暖色深底面板
 const COL_TEXT := Color(0.95, 0.91, 0.80)  # 暖米白（禁纯白）
 const COL_TEXT_DIM := Color(0.72, 0.68, 0.58)
-const COL_FLOOR := Color("2e2417")
-const COL_WALL := Color("15100a")
-const COL_FOG := Color("0d0a06")           # 迷雾=近黑暖调（随全暖色系·⛔冷靛已去）
+const COL_FLOOR := Color("2e2417")         # 地表/迷雾全色板已入 terrain shader uniform 默认值
 const COL_MONSTER := Color("d24a44")       # 阵营红系（角宝石红）
 const COL_EVENT := Color("9b86d8")         # 干扰紫提亮档
 const COL_CHEST := Color("dca12e")         # 传说金
@@ -61,8 +65,10 @@ var log_lines: Array = []
 var seed_value: int = 0
 var mouse_pos: Vector2
 var pending_flee_from: Vector2i
+var hero_portrait_path: String = ""   # 初始英雄头像（token 用·跨战斗寄存恢复）
 
 var hud_label: Label
+var team_label: Label
 var log_label: Label
 var info_label: Label
 var pend_box: VBoxContainer
@@ -70,7 +76,18 @@ var equip_box: VBoxContainer
 var insure_btn: Button
 var dialog: PopupPanel
 var dialog_box: VBoxContainer
-var canvas: Control   # 顶层绘制画布（地图/背包格·必须压在面板填充之上）
+var bp_overlay: Control            # 背包整理浮层（B 唤出）
+var select_overlay: Control        # 选初始英雄浮层（进图前）
+var player_token: TextureRect      # 英雄头像 token（摇摆动画在 _process）
+var canvas: Control                # 顶层绘制画布（地图图签/背包格·必须压在面板填充之上）
+
+# ── 地形层（数据纹理驱动·地表/迷雾/揭示全在 shader）──
+var terrain_mat: ShaderMaterial
+var _terrain_img: Image            # 12×12 RGBAF（R=地形类 G=已探明 B=探明时刻·预分配复用）
+var _terrain_tex: ImageTexture
+var _reveal_time: Dictionary = {}  # Vector2i -> float 探明时刻（负值=开局已探明不放动画）
+var _anim_time: float = 0.0        # shader/token 统一时钟
+var _token_tween: Tween            # token 移动补间（活跃时摇摆加大）
 
 
 func _ready() -> void:
@@ -79,7 +96,7 @@ func _ready() -> void:
 	if not BattleSetup.expedition_state.is_empty():
 		_resume_from_battle()   # 真战斗打完回图（任务 D）
 	else:
-		_new_run(seed_value)
+		select_overlay.visible = true   # 正常入口：先选初始英雄
 
 
 ## 真战斗回图（任务 D·2026-07-06）：恢复跨场景寄存的跑动状态 + 消费战斗结果回写地图。
@@ -91,7 +108,14 @@ func _resume_from_battle() -> void:
 	pending = st["pending"]
 	log_lines = st["log"]
 	seed_value = int(st["seed"])
+	hero_portrait_path = String(st.get("hero_portrait", ""))
 	held = {}
+	_reveal_time.clear()   # 战斗回图：已探明格全盖负值 = 不重播翻显动画
+	for c: Vector2i in map.revealed:
+		_reveal_time[c] = -10.0
+	terrain_mat.set_shader_parameter("seed_f", float(seed_value % 977))
+	_apply_token_portrait()
+	player_token.visible = true
 	var r: Dictionary = BattleSetup.pve_result
 	BattleSetup.pve_result = {}
 	if r.is_empty():
@@ -114,23 +138,94 @@ func _resume_from_battle() -> void:
 
 
 # ============================================================
-# UI 构建（暖骨框面板 + Ark Pixel）
+# UI 构建（全屏地图 + 两侧 HUD 竖带 + 背包/选英雄浮层）
 # ============================================================
 
 func _build_ui() -> void:
-	for r: Rect2 in [MAP_PANEL, LOG_PANEL, HUD_PANEL, BP_PANEL, PEND_PANEL, EQUIP_PANEL, INFO_PANEL]:
-		_make_panel(r)
-	var title := _label(Vector2(64, 40), 32, "远征 · 先行版")
-	title.modulate = COL_PLAYER
-	_label(Vector2(360, 52), 16, "搜打撤：找到战利品·拼进背包·活着撤离").modulate = COL_TEXT_DIM
-	_label(HUD_PANEL.position + Vector2(20, 14), 16, "―― 行军 ――").modulate = COL_BONE
-	hud_label = _label(HUD_PANEL.position + Vector2(20, 44), 16, "")
+	_make_terrain_layer()
+	for r: Rect2 in [HUD_PANEL, LOG_PANEL, TEAM_PANEL, INFO_PANEL]:
+		_make_panel(r, self)
+	_label(HUD_PANEL.position + Vector2(20, 14), 16, "―― 行军 ――", self).modulate = COL_BONE
+	hud_label = _label(HUD_PANEL.position + Vector2(20, 44), 16, "", self)
 	hud_label.size = Vector2(HUD_PANEL.size.x - 40, HUD_PANEL.size.y - 60)
-	_label(BP_PANEL.position + Vector2(20, 14), 16, "―― 背包（撤离只带走包里的）――").modulate = COL_BONE
-	insure_btn = _button(BP_PANEL.position + Vector2(20, BP_PANEL.size.y - 130), Vector2(BP_PANEL.size.x - 40, 36), "", _on_insure_clicked)
+	_label(TEAM_PANEL.position + Vector2(20, 14), 16, "―― 队伍 ――", self).modulate = COL_BONE
+	team_label = _label(TEAM_PANEL.position + Vector2(20, 44), 16, "", self)
+	team_label.size = Vector2(TEAM_PANEL.size.x - 40, TEAM_PANEL.size.y - 60)
+	_label(INFO_PANEL.position + Vector2(20, 14), 16, "―― 行囊手记 ――", self).modulate = COL_BONE
+	info_label = _label(INFO_PANEL.position + Vector2(20, 44), 16, "", self)
+	info_label.size = Vector2(INFO_PANEL.size.x - 40, INFO_PANEL.size.y - 60)
+	info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	log_label = _label(LOG_PANEL.position + Vector2(20, 14), 16, "", self)
+	log_label.size = LOG_PANEL.size - Vector2(40, 28)
+	log_label.modulate = COL_TEXT_DIM
+	_build_backpack_overlay()
+	# 绘制画布压在面板/浮层之上（IGNORE 不吞点击·根 _gui_input 收背包点击）
+	canvas = Control.new()
+	canvas.name = "DrawCanvas"
+	canvas.set_anchors_preset(Control.PRESET_FULL_RECT)
+	canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.draw.connect(_draw_canvas)
+	add_child(canvas)
+	# 英雄头像 token（摇摆动画）：pivot 设脚底中心 = 不倒翁式左右摇。
+	# 必须压在 canvas 图签之上（否则起点帐篷等同格图签会盖住头像）；浮层/选人期间隐藏。
+	player_token = TextureRect.new()
+	player_token.name = "PlayerToken"
+	player_token.size = Vector2(64, 64)
+	player_token.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	player_token.stretch_mode = TextureRect.STRETCH_SCALE
+	player_token.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST   # 像素头像放大保硬边
+	player_token.pivot_offset = Vector2(32, 64)
+	player_token.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	player_token.visible = false   # 进图（_new_run）才现身
+	add_child(player_token)
+	_build_select_overlay()   # 选英雄浮层压最上（含按钮·必须在 canvas 之上可点）
+	dialog = PopupPanel.new()
+	dialog.exclusive = true   # 点外部不可关——防"死亡结算被点掉→movement 封锁看似卡死"
+	dialog_box = VBoxContainer.new()
+	dialog_box.custom_minimum_size = Vector2(560, 0)
+	dialog.add_child(dialog_box)
+	add_child(dialog)
+
+
+## 地形+迷雾程序母题层（数据纹理驱动·单节点渲染 12×12）：地板三味/墙斜面/迷雾缓流/揭示翻显。
+## 图签仍走 canvas 顶层绘制（本层只管地表）。美术期换地形贴图 = 换本节点渲染方式，数据接口可续用。
+func _make_terrain_layer() -> void:
+	var t := ColorRect.new()
+	t.name = "TerrainLayer"
+	t.position = MAP_ORIGIN
+	t.size = Vector2(MapState.SIZE * MAP_CELL, MapState.SIZE * MAP_CELL)
+	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_terrain_img = Image.create(MapState.SIZE, MapState.SIZE, false, Image.FORMAT_RGBAF)
+	_terrain_tex = ImageTexture.create_from_image(_terrain_img)
+	terrain_mat = ShaderMaterial.new()
+	terrain_mat.shader = TERRAIN_SHADER
+	terrain_mat.set_shader_parameter("map_data", _terrain_tex)
+	terrain_mat.set_shader_parameter("grid_n", float(MapState.SIZE))
+	terrain_mat.set_shader_parameter("cell_px", float(MAP_CELL))
+	t.material = terrain_mat
+	add_child(t)
+
+
+## 背包整理浮层（B 唤出）：背包格 + 拾取区 + 装备栏 + 保险槽/扩容 同屏整理。默认隐藏。
+func _build_backpack_overlay() -> void:
+	bp_overlay = Control.new()
+	bp_overlay.name = "BackpackOverlay"
+	bp_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bp_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bp_overlay.visible = false
+	add_child(bp_overlay)
+	var dim := ColorRect.new()   # 半透暗幕（IGNORE·遮地图不吞点击——格子点击走根 _gui_input）
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.color = Color(0.05, 0.03, 0.01, 0.55)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bp_overlay.add_child(dim)
+	_make_panel(OV_PANEL, bp_overlay)
+	_label(OV_PANEL.position + Vector2(24, 16), 24, "整理行囊（B 关闭）", bp_overlay).modulate = COL_PLAYER
+	_label(Vector2(BP_ORIGIN.x, OV_PANEL.position.y + 66), 16, "―― 背包（撤离只带走包里的）――", bp_overlay).modulate = COL_BONE
+	insure_btn = _button(Vector2(BP_ORIGIN.x, 620), Vector2(320, 36), "", _on_insure_clicked, bp_overlay)
 	var grow_row := HBoxContainer.new()
-	grow_row.position = BP_PANEL.position + Vector2(20, BP_PANEL.size.y - 84)
-	add_child(grow_row)
+	grow_row.position = Vector2(BP_ORIGIN.x, 668)
+	bp_overlay.add_child(grow_row)
 	for cfg: Array in [["扩容+1行", true], ["扩容+1列", false]]:
 		var b := Button.new()
 		b.text = String(cfg[0])
@@ -141,49 +236,80 @@ func _build_ui() -> void:
 			_log("修补匠：扩容成功。" if ok else "背包已到 6×6 上限。")
 			_refresh())
 		grow_row.add_child(b)
-	_label(PEND_PANEL.position + Vector2(20, 14), 16, "―― 拾取区（点击拾起·不拼进包=带不走）――").modulate = COL_BONE
+	_label(Vector2(790, OV_PANEL.position.y + 66), 16, "―― 拾取区（点击拾起·不拼进包=带不走）――", bp_overlay).modulate = COL_BONE
 	var scroll := ScrollContainer.new()
-	scroll.position = PEND_PANEL.position + Vector2(16, 46)
-	scroll.size = PEND_PANEL.size - Vector2(32, 62)
-	add_child(scroll)
+	scroll.position = Vector2(790, OV_PANEL.position.y + 100)
+	scroll.size = Vector2(380, OV_PANEL.size.y - 140)
+	bp_overlay.add_child(scroll)
 	pend_box = VBoxContainer.new()
-	pend_box.custom_minimum_size = Vector2(PEND_PANEL.size.x - 56, 0)
+	pend_box.custom_minimum_size = Vector2(356, 0)
 	scroll.add_child(pend_box)
-	_label(EQUIP_PANEL.position + Vector2(20, 14), 16, "―― 装备栏（战斗+效率·撤离不带出）――").modulate = COL_BONE
-	_button(EQUIP_PANEL.position + Vector2(20, 44), Vector2(EQUIP_PANEL.size.x - 40, 36), "把手上的战斗道具装上", _on_equip_clicked)
+	_label(Vector2(1200, OV_PANEL.position.y + 66), 16, "―― 装备栏（战斗+效率·撤离不带出）――", bp_overlay).modulate = COL_BONE
+	_button(Vector2(1200, OV_PANEL.position.y + 100), Vector2(350, 36), "把手上的战斗道具装上", _on_equip_clicked, bp_overlay)
 	equip_box = VBoxContainer.new()
-	equip_box.position = EQUIP_PANEL.position + Vector2(20, 92)
-	equip_box.custom_minimum_size = Vector2(EQUIP_PANEL.size.x - 40, 0)
-	add_child(equip_box)
-	_label(INFO_PANEL.position + Vector2(20, 14), 16, "―― 行囊手记 ――").modulate = COL_BONE
-	info_label = _label(INFO_PANEL.position + Vector2(20, 44), 16, "")
-	info_label.size = Vector2(INFO_PANEL.size.x - 40, INFO_PANEL.size.y - 60)
-	info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	log_label = _label(LOG_PANEL.position + Vector2(20, 14), 16, "")
-	log_label.size = LOG_PANEL.size - Vector2(40, 28)
-	log_label.modulate = COL_TEXT_DIM
-	# 绘制画布最后加 = 压在所有面板填充之上（IGNORE 不吞点击·根 _gui_input 收背包点击）
-	canvas = Control.new()
-	canvas.set_anchors_preset(Control.PRESET_FULL_RECT)
-	canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	canvas.draw.connect(_draw_canvas)
-	add_child(canvas)
-	dialog = PopupPanel.new()
-	dialog.exclusive = true   # 点外部不可关——防"死亡结算被点掉→movement 封锁看似卡死"
-	dialog_box = VBoxContainer.new()
-	dialog_box.custom_minimum_size = Vector2(560, 0)
-	dialog.add_child(dialog_box)
-	add_child(dialog)
+	equip_box.position = Vector2(1200, OV_PANEL.position.y + 148)
+	equip_box.custom_minimum_size = Vector2(350, 0)
+	bp_overlay.add_child(equip_box)
+
+
+## 选初始英雄浮层（进图前·地图选择步骤=世界观拍板后加）。
+func _build_select_overlay() -> void:
+	select_overlay = Control.new()
+	select_overlay.name = "HeroSelectOverlay"
+	select_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	select_overlay.visible = false
+	add_child(select_overlay)
+	var dim := ColorRect.new()   # 全遮幕（STOP·选人前不许操作地图）
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.color = Color(0.06, 0.04, 0.02, 0.92)
+	select_overlay.add_child(dim)
+	_make_panel(SEL_PANEL, select_overlay)
+	_label(SEL_PANEL.position + Vector2(32, 24), 24, "选择初始英雄", select_overlay).modulate = COL_PLAYER
+	_label(SEL_PANEL.position + Vector2(280, 34), 16, "它将带队踏入迷雾（篝火可再招募 2 名）", select_overlay).modulate = COL_TEXT_DIM
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.position = SEL_PANEL.position + Vector2(32, 84)
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 10)
+	select_overlay.add_child(grid)
+	for h: HeroData in HeroDataScript.create_launch_pool():
+		var b := Button.new()
+		b.text = h.hero_name
+		b.custom_minimum_size = Vector2(232, 100)
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		if h.portrait_path != "" and ResourceLoader.exists(h.portrait_path):
+			b.icon = load(h.portrait_path)
+			b.expand_icon = true
+			b.add_theme_constant_override("icon_max_width", 72)
+		FontManager.apply_btn(b, 16)
+		var hero: HeroData = h
+		b.pressed.connect(func() -> void: _on_hero_selected(hero))
+		grid.add_child(b)
+
+
+## 选定初始英雄 → 开局。头像成为地图 token；队首名字用真英雄名。
+func _on_hero_selected(h: HeroData) -> void:
+	hero_portrait_path = h.portrait_path
+	select_overlay.visible = false
+	_new_run(seed_value, h.hero_name)
+	_apply_token_portrait()
+
+
+func _apply_token_portrait() -> void:
+	if hero_portrait_path != "" and ResourceLoader.exists(hero_portrait_path):
+		player_token.texture = load(hero_portrait_path)
+	else:
+		player_token.texture = PixelArt.get_texture("flag", COL_PLAYER, 64)
 
 
 ## 暖骨框面板 = 暖色深底填充 + 像素框（§2.1 配方·装饰节点必 IGNORE 防吞点击）。
-func _make_panel(r: Rect2) -> void:
+func _make_panel(r: Rect2, parent: Control) -> void:
 	var fill := ColorRect.new()
 	fill.position = r.position
 	fill.size = r.size
 	fill.color = COL_PANEL
 	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(fill)
+	parent.add_child(fill)
 	var frame := ColorRect.new()
 	frame.position = r.position
 	frame.size = r.size
@@ -200,27 +326,27 @@ func _make_panel(r: Rect2) -> void:
 	mat.set_shader_parameter("noise_amt", 0.035)
 	mat.set_shader_parameter("aspect", r.size.x / r.size.y)
 	frame.material = mat
-	add_child(frame)
+	parent.add_child(frame)
 
 
-func _label(pos: Vector2, px: int, text: String) -> Label:
+func _label(pos: Vector2, px: int, text: String, parent: Control) -> Label:
 	var l := Label.new()
 	l.position = pos
 	l.text = text
 	l.modulate = COL_TEXT
 	FontManager.apply(l, px)
-	add_child(l)
+	parent.add_child(l)
 	return l
 
 
-func _button(pos: Vector2, sz: Vector2, text: String, cb: Callable) -> Button:
+func _button(pos: Vector2, sz: Vector2, text: String, cb: Callable, parent: Control) -> Button:
 	var b := Button.new()
 	b.position = pos
 	b.size = sz
 	b.text = text
 	FontManager.apply_btn(b, 16)
 	b.pressed.connect(cb)
-	add_child(b)
+	parent.add_child(b)
 	return b
 
 
@@ -228,14 +354,19 @@ func _button(pos: Vector2, sz: Vector2, text: String, cb: Callable) -> Button:
 # 一局流程
 # ============================================================
 
-func _new_run(p_seed: int) -> void:
+func _new_run(p_seed: int, leader_name: String = "") -> void:
 	seed_value = p_seed
 	map = MapState.new()
 	map.setup(p_seed)
+	if leader_name != "":
+		map.team[0]["name"] = leader_name   # 初始英雄=队首（HP 骨架不变·数值待 H 拍板）
 	bp = Backpack.new()
 	pending = []
 	held = {}
 	log_lines = []
+	_reveal_time.clear()   # 开局已探明格在首次 _refresh 盖当前钟 → 起手播一段翻显（地图"浮现"）
+	terrain_mat.set_shader_parameter("seed_f", float(p_seed % 977))
+	player_token.visible = true
 	_log("踏入迷雾（种子 %d）。补给 %d·撤1 已开。" % [p_seed, map.supplies])
 	_refresh()
 
@@ -251,13 +382,17 @@ func _eff_bonus() -> float:
 
 
 func _refresh() -> void:
+	if map == null:
+		return
 	var s: String = "补给 %d%s\n" % [map.supplies, "（饥饿！）" if map.supplies <= 0 else ""]
 	s += "刻 %.1f    危险度 D%d/%d%s\n" % [map.ticks(), map.danger(), MapState.D_CAP, "·游荡怪！" if map.wanderer != Vector2i(-1, -1) else ""]
-	s += "\n撤1（近）%s\n撤2（中）%s\n撤3（深）永不关闭\n\n" % [_ext_text(MapState.Tile.EXT1), _ext_text(MapState.Tile.EXT2)]
+	s += "\n撤1（近）%s\n撤2（中）%s\n撤3（深）永不关闭" % [_ext_text(MapState.Tile.EXT1), _ext_text(MapState.Tile.EXT2)]
+	hud_label.text = s
+	var ts: String = ""
 	for h: Dictionary in map.team:
 		var hp: float = float(h["hp"])
-		s += "%s  HP %.1f/%.1f%s\n" % [String(h["name"]), maxf(0.0, hp), float(h["hp_max"]), "（倒下）" if hp <= 0.0 else ""]
-	hud_label.text = s
+		ts += "%s\nHP %.1f/%.1f%s\n" % [String(h["name"]), maxf(0.0, hp), float(h["hp_max"]), "（倒下）" if hp <= 0.0 else ""]
+	team_label.text = ts
 	for child: Node in pend_box.get_children():
 		child.queue_free()
 	for i: int in pending.size():
@@ -293,12 +428,55 @@ func _refresh() -> void:
 	var used: int = 0
 	for p: Dictionary in bp.placements:
 		used += (p["shape"] as Array).size()
-	info_label.text = "手上：%s\n\n背包 %d×%d·占用 %d/%d\n包内金币 %d\n装备 %d 件（效率 +%.2f）\n战斗 %d 胜·步数 %d\n\n移动 WASD/方向键\n拾起/放下 左键\n旋转 R·放回 右键\n用消耗品 U·丢弃 X\n返回 ESC\n\n⚠ 拾取区的东西\n不拼进背包=带不走" % [
-		String(held["item"]["name"]) if not held.is_empty() else "空",
+	info_label.text = "手上：%s\n拾取区待整理 %d 件\n\n背包 %d×%d·占用 %d/%d\n包内金币 %d\n装备 %d 件（效率 +%.2f）\n战斗 %d 胜·步数 %d\n\n移动 WASD/方向键\n背包 B（拾/放·旋转·装备）\n返回 ESC\n\n⚠ 拾取区的东西\n不拼进背包=带不走" % [
+		String(held["item"]["name"]) if not held.is_empty() else "空", pending.size(),
 		bp.cols, bp.rows, used, bp.rows * bp.cols, bp.gold_total(),
 		bp.equipment.size(), _eff_bonus(), map.battles_won, map.steps]
 	log_label.text = "\n".join(log_lines)
+	_update_terrain_data()
+	_update_token_position()
 	canvas.queue_redraw()
+
+
+## 把地图状态写进数据纹理（R=地形类 0地板/1墙 · G=已探明 · B=探明时刻）——shader 据此渲染。
+## 新探明格在此处盖时间戳（与 _anim_time 同钟）→ shader 播逐块翻显。
+func _update_terrain_data() -> void:
+	if map == null or _terrain_img == null:
+		return
+	for y: int in MapState.SIZE:
+		for x: int in MapState.SIZE:
+			var c := Vector2i(x, y)
+			var rev: bool = map.revealed.has(c)
+			if rev and not _reveal_time.has(c):
+				_reveal_time[c] = _anim_time
+			var tile_v: float = 1.0 if map.grid[y][x] == MapState.Tile.WALL else 0.0
+			_terrain_img.set_pixel(x, y, Color(tile_v, 1.0 if rev else 0.0, float(_reveal_time.get(c, 0.0)), 1.0))
+	_terrain_tex.update(_terrain_img)
+
+
+## token 跟随玩家格（补间移动·摇摆在 _process）。
+func _update_token_position() -> void:
+	if map == null:
+		return
+	var target: Vector2 = MAP_ORIGIN + Vector2(map.player.x * MAP_CELL, map.player.y * MAP_CELL) + Vector2(11.0, 8.0)
+	if player_token.position == target:
+		return
+	if _token_tween != null and _token_tween.is_valid():
+		_token_tween.kill()
+	_token_tween = create_tween()
+	_token_tween.tween_property(player_token, "position", target, 0.14).set_trans(Tween.TRANS_SINE)
+
+
+func _process(delta: float) -> void:
+	_anim_time += delta
+	if terrain_mat != null:
+		terrain_mat.set_shader_parameter("anim_time", _anim_time)
+	if player_token != null and player_token.texture != null:
+		# 卡通摇摆：移动中大摆（前进的左右晃）·驻足小摆（idle 呼吸）
+		var moving: bool = _token_tween != null and _token_tween.is_valid() and _token_tween.is_running()
+		var amp: float = 0.16 if moving else 0.05
+		var freq: float = 10.0 if moving else 2.2
+		player_token.rotation = sin(_anim_time * freq) * amp
 
 
 func _ext_text(tile: int) -> String:
@@ -314,33 +492,33 @@ func _ext_text(tile: int) -> String:
 
 
 # ============================================================
-# 绘制（地图 + 背包 + 手上幽灵）
+# 绘制（地图图签 + 背包浮层格子 + 手上幽灵）
 # ============================================================
 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), COL_BG)
 
 
-## 顶层画布绘制（canvas.draw 信号）：地图 + 背包 + 手上幽灵。
+## 顶层画布绘制（canvas.draw 信号）：地图图签 + 浮层背包格 + 手上幽灵（地表/迷雾=TerrainLayer shader）。
 func _draw_canvas() -> void:
 	if map == null:
 		return
 	var f16: Font = FontManager.f16
 	var f12: Font = FontManager.f12
-	# —— 地图（任务 E：像素图签+程序化地形·占位字符已换）——
+	var icon_sz := Vector2(64, 64)
+	if bp_overlay.visible:
+		_draw_backpack_layer(f16)   # 浮层开着只画背包（地图图签停画·防穿透浮层面板）
+		return
 	for y: int in MapState.SIZE:
 		for x: int in MapState.SIZE:
 			var c := Vector2i(x, y)
-			var rect := Rect2(MAP_ORIGIN + Vector2(x * MAP_CELL, y * MAP_CELL), Vector2(MAP_CELL - 2, MAP_CELL - 2))
 			if not map.revealed.has(c):
-				canvas.draw_rect(rect, COL_FOG)
 				continue
 			var tile: int = map.grid[y][x]
-			var icon_rect := Rect2(rect.position + Vector2(7, 7), Vector2(40, 40))
 			if tile == MapState.Tile.WALL:
-				PixelArt.draw_wall(canvas, rect, COL_WALL)
 				continue
-			PixelArt.draw_floor(canvas, rect, PixelArt.cell_hash(c, map.seed_value), COL_FLOOR)
+			var rect := Rect2(MAP_ORIGIN + Vector2(x * MAP_CELL, y * MAP_CELL), Vector2(MAP_CELL - 2, MAP_CELL - 2))
+			var icon_rect := Rect2(rect.position + Vector2(11, 11), icon_sz)
 			match tile:
 				MapState.Tile.START:
 					PixelArt.draw_icon(canvas, "tent", icon_rect, COL_BONE)
@@ -350,9 +528,9 @@ func _draw_canvas() -> void:
 					var micon: String = "paw" if tier == 1 else ("fang" if tier == 2 else "horns")
 					PixelArt.draw_icon(canvas, micon, icon_rect, COL_MONSTER)
 					if bool(m.get("resolved", false)):
-						canvas.draw_string(f12, rect.position + Vector2(rect.size.x - 14, 16), "†", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_TEXT)
+						canvas.draw_string(f12, rect.position + Vector2(rect.size.x - 18, 20), "†", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COL_TEXT)
 				MapState.Tile.EVENT:
-					canvas.draw_string(f12, rect.position + Vector2(16, 38), "？", HORIZONTAL_ALIGNMENT_LEFT, -1, 24, COL_EVENT)
+					canvas.draw_string(f16, rect.position + Vector2(rect.size.x * 0.5 - 16, rect.size.y * 0.5 + 12), "？", HORIZONTAL_ALIGNMENT_LEFT, -1, 32, COL_EVENT)
 				MapState.Tile.CHEST:
 					if bool(map.chests.get(c, {}).get("egg", false)):
 						PixelArt.draw_icon(canvas, "egg", icon_rect, COL_PLAYER)
@@ -361,14 +539,17 @@ func _draw_canvas() -> void:
 				MapState.Tile.EXT1, MapState.Tile.EXT2, MapState.Tile.EXT3:
 					var ecol: Color = COL_EXT_OPEN if map.ext_open(tile) else COL_EXT_CLOSED
 					PixelArt.draw_icon(canvas, "arch", icon_rect, ecol)
-					canvas.draw_string(f12, rect.position + Vector2(rect.size.x - 14, rect.size.y - 6), str(tile - MapState.Tile.EXT1 + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, ecol)
+					canvas.draw_string(f12, rect.position + Vector2(rect.size.x - 18, rect.size.y - 8), str(tile - MapState.Tile.EXT1 + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, ecol)
 	if map.wanderer != Vector2i(-1, -1) and map.revealed.has(map.wanderer):
 		var wr := MAP_ORIGIN + Vector2(map.wanderer.x * MAP_CELL, map.wanderer.y * MAP_CELL)
-		PixelArt.draw_icon(canvas, "eye", Rect2(wr + Vector2(7, 7), Vector2(40, 40)), Color("ff6a5c"))
+		PixelArt.draw_icon(canvas, "eye", Rect2(wr + Vector2(11, 11), icon_sz), Color("ff6a5c"))
+	# 当前格亮金描边（token 之下的落脚提示）
 	var pr := Rect2(MAP_ORIGIN + Vector2(map.player.x * MAP_CELL, map.player.y * MAP_CELL), Vector2(MAP_CELL - 2, MAP_CELL - 2))
-	PixelArt.draw_icon(canvas, "flag", Rect2(pr.position + Vector2(11, 7), Vector2(40, 40)), COL_PLAYER)
 	canvas.draw_rect(pr, COL_PLAYER, false, 3.0)
-	# —— 背包 ——
+
+
+## 背包浮层绘制（格子/放置/手上幽灵）——仅浮层可见时由 _draw_canvas 调用。
+func _draw_backpack_layer(f16: Font) -> void:
 	for y: int in bp.rows:
 		for x: int in bp.cols:
 			var rect := Rect2(BP_ORIGIN + Vector2(x * BP_CELL, y * BP_CELL), Vector2(BP_CELL - 3, BP_CELL - 3))
@@ -384,7 +565,6 @@ func _draw_canvas() -> void:
 			canvas.draw_rect(cell_rect, col, false, 1.0)
 		var a: Vector2i = p["anchor"]
 		canvas.draw_texture_rect(_item_texture(it), Rect2(BP_ORIGIN + Vector2(a.x * BP_CELL + 4, a.y * BP_CELL + 4), Vector2(BP_CELL - 11, BP_CELL - 11)), false)
-	# —— 手上幽灵 ——
 	if not held.is_empty():
 		var cell: Vector2i = _bp_cell_at(mouse_pos)
 		var shape: Array = held["shape"]
@@ -432,7 +612,21 @@ func _bp_cell_at(pos: Vector2) -> Vector2i:
 	return c
 
 
+## 背包浮层开关。关闭时手上物品自动放回拾取区（不许"隔屏拿东西"）。
+func _toggle_backpack(show_it: bool) -> void:
+	if show_it == bp_overlay.visible:
+		return
+	if not show_it and not held.is_empty():
+		pending.append(held["item"])
+		held = {}
+	bp_overlay.visible = show_it
+	player_token.visible = not show_it and map != null   # 浮层期间藏 token（否则浮在暗幕上）
+	_refresh()
+
+
 func _gui_input(event: InputEvent) -> void:
+	if not bp_overlay.visible or map == null:
+		return
 	if event is InputEventMouseMotion:
 		mouse_pos = (event as InputEventMouseMotion).position
 		if not held.is_empty():
@@ -465,24 +659,33 @@ func _gui_input(event: InputEvent) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey) or not event.pressed:
 		return
-	if dialog.visible:
-		return
 	var key: int = (event as InputEventKey).keycode
+	if select_overlay.visible:
+		if key == KEY_ESCAPE:
+			TransitionManager.transition_to(MENU_SCENE)   # 选人阶段 ESC=回主菜单
+		return
+	if dialog.visible or map == null:
+		return
+	if key == KEY_B:
+		_toggle_backpack(not bp_overlay.visible)
+		return
 	if key == KEY_ESCAPE:
-		_prompt_leave()
+		if bp_overlay.visible:
+			_toggle_backpack(false)
+		else:
+			_prompt_leave()
 		return
-	if key == KEY_R and not held.is_empty():
-		held["shape"] = Loot.rotate_shape(held["shape"])
-		canvas.queue_redraw()
-		return
-	if key == KEY_X and not held.is_empty():
-		_log("丢弃了 %s。" % String(held["item"]["name"]))
-		held = {}
-		_refresh()
-		return
-	if key == KEY_U and not held.is_empty():
-		_use_held()
-		return
+	if bp_overlay.visible:
+		if key == KEY_R and not held.is_empty():
+			held["shape"] = Loot.rotate_shape(held["shape"])
+			canvas.queue_redraw()
+		elif key == KEY_X and not held.is_empty():
+			_log("丢弃了 %s。" % String(held["item"]["name"]))
+			held = {}
+			_refresh()
+		elif key == KEY_U and not held.is_empty():
+			_use_held()
+		return   # 浮层开着不移动
 	if map.over:
 		return
 	var dir := Vector2i.ZERO
@@ -666,7 +869,8 @@ func _enter_real_battle(c: Vector2i, is_wanderer: bool) -> void:
 			eq.append(String(it["combat_id"]))
 	BattleSetup.pve_equipment = eq
 	BattleSetup.expedition_state = {"map": map, "bp": bp, "pending": pending, "log": log_lines,
-		"seed": seed_value, "tile": c, "wanderer": is_wanderer, "flee_from": pending_flee_from}
+		"seed": seed_value, "tile": c, "wanderer": is_wanderer, "flee_from": pending_flee_from,
+		"hero_portrait": hero_portrait_path}
 	TransitionManager.transition_to("res://src/ui/battle_screen.tscn")
 
 
@@ -843,7 +1047,10 @@ func _show_settlement() -> void:
 			int(s2["lost_count"]) + pending.size(), float(r["ticks"]), int(r["battles"])]
 	_show_choice(text, ["再来一局", "返回主菜单"], func(idx: int) -> void:
 		if idx == 0:
-			_new_run(randi() % 1000000)
+			seed_value = randi() % 1000000
+			_toggle_backpack(false)
+			player_token.visible = false
+			select_overlay.visible = true   # 再来一局=重选初始英雄
 		else:
 			TransitionManager.transition_to(MENU_SCENE))
 

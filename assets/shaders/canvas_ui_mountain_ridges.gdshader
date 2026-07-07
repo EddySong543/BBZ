@@ -78,22 +78,26 @@ void fragment() {
 	// ⚠ 位置 snap 到像素格中心 → 每颗恒为 1 像素、大小绝对一致；不 snap 时星 <1 像素，
 	//   落点相对格的偏差会让它忽大忽小（Eddy 看到的「一颗星大小改变」根因）。
 	float stars = 0.0;
-	for (int k = 0; k < 18; k++) {
-		float fk = float(k);
-		float period = 16.0 + hash11(fk * 1.7) * 16.0;           // 每颗周期 16~32s（大幅放慢生成）
-		float cyc = anim_time / period + hash11(fk * 3.1) * 10.0;
-		float seg = floor(cyc);                                  // 第几次出现（变→换位置）
-		float t = fract(cyc);                                    // 本周期进度 0..1
-		vec2 pos = vec2(0.06 + hash11(seg * 1.7 + fk * 13.0) * 0.88,
-						0.04 + hash11(seg * 2.3 + fk * 5.0) * 0.34);
-		vec2 pos_snapped = (floor(pos * grid) + 0.5) / grid;     // 对齐像素格中心 → 大小恒定
-		// 可见窗口仅占周期 ~18%（亮起→峰→淡出，之后长时间空窗）→ 同时在场仅 ~3 颗
-		float life = smoothstep(0.0, 0.04, t) * (1.0 - smoothstep(0.10, 0.18, t));
-		life *= 0.82 + 0.18 * sin(anim_time * 0.8 + fk * 7.0);   // 大幅放缓微颤（2.5→0.8）
-		vec2 sd = vec2((cuv.x - pos_snapped.x) * aspect, cuv.y - pos_snapped.y);
-		stars += exp(-dot(sd, sd) * 40000.0) * life;             // snap + 大系数 = 锐利单格星
+	// ⚠ 省流分支（2026-07-07·远征屏全屏衬底复用）：暖日版星贡献恒为 0（尾乘 1-warm）→ 跳过 18 次 hash+exp。
+	// warm 是离散 uniform（mode_card 只设 0/1·无补间）→ 分支全片元一致、无发散成本，冷夜版行为不变。
+	if (warm < 0.5) {
+		for (int k = 0; k < 18; k++) {
+			float fk = float(k);
+			float period = 16.0 + hash11(fk * 1.7) * 16.0;           // 每颗周期 16~32s（大幅放慢生成）
+			float cyc = anim_time / period + hash11(fk * 3.1) * 10.0;
+			float seg = floor(cyc);                                  // 第几次出现（变→换位置）
+			float t = fract(cyc);                                    // 本周期进度 0..1
+			vec2 pos = vec2(0.06 + hash11(seg * 1.7 + fk * 13.0) * 0.88,
+							0.04 + hash11(seg * 2.3 + fk * 5.0) * 0.34);
+			vec2 pos_snapped = (floor(pos * grid) + 0.5) / grid;     // 对齐像素格中心 → 大小恒定
+			// 可见窗口仅占周期 ~18%（亮起→峰→淡出，之后长时间空窗）→ 同时在场仅 ~3 颗
+			float life = smoothstep(0.0, 0.04, t) * (1.0 - smoothstep(0.10, 0.18, t));
+			life *= 0.82 + 0.18 * sin(anim_time * 0.8 + fk * 7.0);   // 大幅放缓微颤（2.5→0.8）
+			vec2 sd = vec2((cuv.x - pos_snapped.x) * aspect, cuv.y - pos_snapped.y);
+			stars += exp(-dot(sd, sd) * 40000.0) * life;             // snap + 大系数 = 锐利单格星
+		}
+		col += vec3(0.85, 0.90, 1.00) * clamp(stars, 0.0, 1.0) * (1.0 - warm);
 	}
-	col += vec3(0.85, 0.90, 1.00) * clamp(stars, 0.0, 1.0) * (1.0 - warm);
 
 	// 4 层山脊：i 越大越近（更暗、更靠下、更崎岖、视差更快）。后画近层覆盖前层。
 	for (int i = 0; i < 4; i++) {

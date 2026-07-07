@@ -252,31 +252,5 @@ static func get_texture(icon_id: String, base: Color, px: int = 32) -> Texture2D
 	return tex
 
 
-## 地板格：主色随格哈希做三档明度变化 + 少量暗斑（碎石感·确定性）。
-static func draw_floor(ci: CanvasItem, rect: Rect2, h: int, base: Color) -> void:
-	var shade: int = h % 3
-	var col: Color = base
-	if shade == 1:
-		col = base.darkened(0.10)
-	elif shade == 2:
-		col = base.lightened(0.06)
-	ci.draw_rect(rect, col)
-	# 2 粒暗斑（位置由哈希定·4×4 子格）
-	var bs: Vector2 = rect.size / 4.0
-	var spot: Color = col.darkened(0.25)
-	ci.draw_rect(Rect2(rect.position + Vector2(float((h >> 2) % 4), float((h >> 4) % 4)) * bs, bs), spot)
-	ci.draw_rect(Rect2(rect.position + Vector2(float((h >> 6) % 4), float((h >> 8) % 4)) * bs, bs), spot)
-
-
-## 墙格：深底 + 顶缘受光条 + 底缘阴影条（斜面感）。
-static func draw_wall(ci: CanvasItem, rect: Rect2, base: Color) -> void:
-	ci.draw_rect(rect, base)
-	var strip: float = maxf(3.0, rect.size.y / 8.0)
-	ci.draw_rect(Rect2(rect.position, Vector2(rect.size.x, strip)), base.lightened(0.22))
-	ci.draw_rect(Rect2(rect.position + Vector2(0, rect.size.y - strip), Vector2(rect.size.x, strip)), base.darkened(0.35))
-
-
-## 格坐标确定性哈希（同种子同图同斑点）。
-static func cell_hash(c: Vector2i, seed_v: int) -> int:
-	var h: int = c.x * 73856093 ^ c.y * 19349663 ^ seed_v * 83492791
-	return absi(h)
+## 地板/墙/迷雾绘制已移交 canvas_ui_expedition_terrain.gdshader（2026-07-07 精细化批）——
+## 本库只留图签（draw_icon / get_texture）。旧 draw_floor/draw_wall/cell_hash 随之移除。
