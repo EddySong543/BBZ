@@ -18,6 +18,8 @@ const ItemCatalog := preload("res://src/battle/item_catalog.gd")
 const HeroDataScript := preload("res://src/battle/hero_data.gd")   # class_name 在 headless 可能未注册→走 preload
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")
 const TERRAIN_SHADER := preload("res://assets/shaders/canvas_ui_expedition_terrain.gdshader")
+const JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")           # 按钮果冻底（与战斗/道具弹窗同语言）
+const ITEM_CELL_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")    # 道具格底（与 PvP 道具格同源·圆角径向渐变）
 
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
 
@@ -67,8 +69,12 @@ var mouse_pos: Vector2
 var pending_flee_from: Vector2i
 var hero_portrait_path: String = ""   # 初始英雄头像（token 用·跨战斗寄存恢复）
 
-var hud_label: Label
-var team_label: Label
+var supplies_label: Label
+var clock_label: Label
+var wanderer_label: Label
+var ext_labels: Array = []         # 撤1/2/3 三行（按开关状态换色）
+var team_rows: Control             # 队伍行容器（头像+名+HP·每次刷新重建）
+var carry_label: Label             # 手上/拾取区提醒（有待整理=金色）
 var log_label: Label
 var info_label: Label
 var pend_box: VBoxContainer
@@ -77,6 +83,8 @@ var insure_btn: Button
 var dialog: PopupPanel
 var dialog_box: VBoxContainer
 var bp_overlay: Control            # 背包整理浮层（B 唤出）
+var bp_cells: Control              # 背包格底容器（PvP 道具格同源 shader·扩容时重建）
+var _cell_mat: ShaderMaterial      # 格底共享材质（全格同参·一份即可）
 var select_overlay: Control        # 选初始英雄浮层（进图前）
 var player_token: TextureRect      # 英雄头像 token（摇摆动画在 _process）
 var canvas: Control                # 顶层绘制画布（地图图签/背包格·必须压在面板填充之上）
@@ -145,16 +153,42 @@ func _build_ui() -> void:
 	_make_terrain_layer()
 	for r: Rect2 in [HUD_PANEL, LOG_PANEL, TEAM_PANEL, INFO_PANEL]:
 		_make_panel(r, self)
-	_label(HUD_PANEL.position + Vector2(20, 14), 16, "―― 行军 ――", self).modulate = COL_BONE
-	hud_label = _label(HUD_PANEL.position + Vector2(20, 44), 16, "", self)
-	hud_label.size = Vector2(HUD_PANEL.size.x - 40, HUD_PANEL.size.y - 60)
+	# —— 左上：行军（图标行 + 语义色状态·F 任务精修）——
+	var hp0: Vector2 = HUD_PANEL.position
+	_label(hp0 + Vector2(20, 14), 16, "―― 行军 ――", self).modulate = COL_BONE
+	var sup_icon := TextureRect.new()
+	sup_icon.texture = PixelArt.get_texture("ration", COL_CONSUM_ITEM, 24)
+	sup_icon.position = hp0 + Vector2(20, 48)
+	sup_icon.size = Vector2(24, 24)
+	sup_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	sup_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(sup_icon)
+	supplies_label = _label(hp0 + Vector2(54, 50), 16, "", self)
+	clock_label = _label(hp0 + Vector2(20, 86), 16, "", self)
+	wanderer_label = _label(hp0 + Vector2(20, 118), 16, "⚠ 游荡怪在图上狩猎！", self)
+	wanderer_label.modulate = Color("ff6a5c")
+	wanderer_label.visible = false
+	_label(hp0 + Vector2(20, 158), 16, "―― 撤离窗 ――", self).modulate = COL_BONE
+	ext_labels = []
+	for i: int in 3:
+		var el := _label(hp0 + Vector2(20, 190 + i * 30), 16, "", self)
+		ext_labels.append(el)
+	# —— 右上：队伍（头像 + 名 + HP·行容器每次刷新重建）——
 	_label(TEAM_PANEL.position + Vector2(20, 14), 16, "―― 队伍 ――", self).modulate = COL_BONE
-	team_label = _label(TEAM_PANEL.position + Vector2(20, 44), 16, "", self)
-	team_label.size = Vector2(TEAM_PANEL.size.x - 40, TEAM_PANEL.size.y - 60)
+	team_rows = Control.new()
+	team_rows.position = TEAM_PANEL.position + Vector2(20, 44)
+	team_rows.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(team_rows)
+	# —— 右中：行囊手记（动态状态 + 静态操作提示分层）——
 	_label(INFO_PANEL.position + Vector2(20, 14), 16, "―― 行囊手记 ――", self).modulate = COL_BONE
-	info_label = _label(INFO_PANEL.position + Vector2(20, 44), 16, "", self)
-	info_label.size = Vector2(INFO_PANEL.size.x - 40, INFO_PANEL.size.y - 60)
+	carry_label = _label(INFO_PANEL.position + Vector2(20, 44), 16, "", self)
+	carry_label.size = Vector2(INFO_PANEL.size.x - 40, 56)
+	info_label = _label(INFO_PANEL.position + Vector2(20, 112), 16, "", self)
+	info_label.size = Vector2(INFO_PANEL.size.x - 40, 200)
 	info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var hint := _label(INFO_PANEL.position + Vector2(20, 320), 16,
+		"移动 WASD/方向键\n背包 B（拾/放·旋转·装备）\n返回 ESC\n\n⚠ 拾取区的东西\n不拼进背包=带不走", self)
+	hint.modulate = COL_TEXT_DIM
 	log_label = _label(LOG_PANEL.position + Vector2(20, 14), 16, "", self)
 	log_label.size = LOG_PANEL.size - Vector2(40, 28)
 	log_label.modulate = COL_TEXT_DIM
@@ -181,8 +215,16 @@ func _build_ui() -> void:
 	_build_select_overlay()   # 选英雄浮层压最上（含按钮·必须在 canvas 之上可点）
 	dialog = PopupPanel.new()
 	dialog.exclusive = true   # 点外部不可关——防"死亡结算被点掉→movement 封锁看似卡死"
+	var sb := StyleBoxFlat.new()   # 弹窗底=暖色深底+暖骨描边（D 任务·对齐 §2.1 语言）
+	sb.bg_color = COL_PANEL
+	sb.border_color = COL_BONE
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(6)
+	sb.set_content_margin_all(20)
+	dialog.add_theme_stylebox_override("panel", sb)
 	dialog_box = VBoxContainer.new()
 	dialog_box.custom_minimum_size = Vector2(560, 0)
+	dialog_box.add_theme_constant_override("separation", 10)
 	dialog.add_child(dialog_box)
 	add_child(dialog)
 
@@ -222,14 +264,21 @@ func _build_backpack_overlay() -> void:
 	_make_panel(OV_PANEL, bp_overlay)
 	_label(OV_PANEL.position + Vector2(24, 16), 24, "整理行囊（B 关闭）", bp_overlay).modulate = COL_PLAYER
 	_label(Vector2(BP_ORIGIN.x, OV_PANEL.position.y + 66), 16, "―― 背包（撤离只带走包里的）――", bp_overlay).modulate = COL_BONE
+	bp_cells = Control.new()   # 格底容器（PvP 道具格同源 shader·_sync_bp_cells 填充）
+	bp_cells.name = "BackpackCells"
+	bp_cells.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bp_overlay.add_child(bp_cells)
 	insure_btn = _button(Vector2(BP_ORIGIN.x, 620), Vector2(320, 36), "", _on_insure_clicked, bp_overlay)
+	_jelly_button(insure_btn, Color("6b5c43"))
 	var grow_row := HBoxContainer.new()
 	grow_row.position = Vector2(BP_ORIGIN.x, 668)
 	bp_overlay.add_child(grow_row)
 	for cfg: Array in [["扩容+1行", true], ["扩容+1列", false]]:
 		var b := Button.new()
 		b.text = String(cfg[0])
+		b.custom_minimum_size = Vector2(150, 36)
 		FontManager.apply_btn(b, 16)
+		_jelly_button(b, Color("6b5c43"))
 		var is_row: bool = bool(cfg[1])
 		b.pressed.connect(func() -> void:
 			var ok: bool = bp.expand_row() if is_row else bp.expand_col()
@@ -245,7 +294,8 @@ func _build_backpack_overlay() -> void:
 	pend_box.custom_minimum_size = Vector2(356, 0)
 	scroll.add_child(pend_box)
 	_label(Vector2(1200, OV_PANEL.position.y + 66), 16, "―― 装备栏（战斗+效率·撤离不带出）――", bp_overlay).modulate = COL_BONE
-	_button(Vector2(1200, OV_PANEL.position.y + 100), Vector2(350, 36), "把手上的战斗道具装上", _on_equip_clicked, bp_overlay)
+	var equip_btn := _button(Vector2(1200, OV_PANEL.position.y + 100), Vector2(350, 36), "把手上的战斗道具装上", _on_equip_clicked, bp_overlay)
+	_jelly_button(equip_btn, Color("3f6fb0"))   # 防御蓝=战斗道具语义
 	equip_box = VBoxContainer.new()
 	equip_box.position = Vector2(1200, OV_PANEL.position.y + 148)
 	equip_box.custom_minimum_size = Vector2(350, 0)
@@ -291,8 +341,8 @@ func _build_select_overlay() -> void:
 func _on_hero_selected(h: HeroData) -> void:
 	hero_portrait_path = h.portrait_path
 	select_overlay.visible = false
+	_apply_token_portrait()   # 必须先设头像再开局——_new_run 的首刷会拿 token 贴图建队伍行
 	_new_run(seed_value, h.hero_name)
-	_apply_token_portrait()
 
 
 func _apply_token_portrait() -> void:
@@ -300,6 +350,104 @@ func _apply_token_portrait() -> void:
 		player_token.texture = load(hero_portrait_path)
 	else:
 		player_token.texture = PixelArt.get_texture("flag", COL_PLAYER, 64)
+
+
+## 按钮果冻底（D 任务·与战斗动作钮/道具弹窗同款 canvas_button_jelly 语言）。
+## show_behind_parent 让果冻垫在按钮文字之下；按钮本体样式清空露出果冻。
+func _jelly_button(b: Button, base: Color) -> void:
+	b.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
+	b.add_theme_stylebox_override("hover", StyleBoxEmpty.new())
+	b.add_theme_stylebox_override("pressed", StyleBoxEmpty.new())
+	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	b.add_theme_color_override("font_color", Color(0.98, 0.95, 0.88))
+	b.add_theme_color_override("font_hover_color", Color(1.0, 0.99, 0.94))
+	b.add_theme_color_override("font_pressed_color", Color(0.92, 0.88, 0.78))
+	b.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.03, 0.9))
+	b.add_theme_constant_override("outline_size", 4)
+	var jelly := ColorRect.new()
+	jelly.color = Color.WHITE   # jelly shader 乘 COLOR，须白
+	jelly.set_anchors_preset(Control.PRESET_FULL_RECT)
+	jelly.show_behind_parent = true
+	jelly.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var m := ShaderMaterial.new()
+	m.shader = JELLY_SHADER
+	m.set_shader_parameter("fill_top", base.lightened(0.12))
+	m.set_shader_parameter("fill_bottom", base.darkened(0.32))
+	m.set_shader_parameter("edge_inner", base.lightened(0.38))
+	m.set_shader_parameter("edge_outer", Color(0.05, 0.045, 0.04))
+	m.set_shader_parameter("fill_alpha", 1.0)
+	m.set_shader_parameter("pixel_grid", 44.0)
+	m.set_shader_parameter("corner", 0.16)
+	m.set_shader_parameter("edge_px", 2.0)
+	m.set_shader_parameter("aspect", maxf(b.custom_minimum_size.x, b.size.x) / maxf(36.0, maxf(b.custom_minimum_size.y, b.size.y)))
+	m.set_shader_parameter("noise_amt", 0.06)
+	m.set_shader_parameter("wear", 0.18)
+	jelly.material = m
+	b.add_child(jelly)
+
+
+## 背包格底同步（E 任务·PvP 道具格同源 shader）：格数变化（扩容）时重建节点。
+func _sync_bp_cells() -> void:
+	if bp == null or bp_cells == null:
+		return
+	var want: int = bp.rows * bp.cols
+	if bp_cells.get_child_count() == want:
+		return
+	for child: Node in bp_cells.get_children():
+		bp_cells.remove_child(child)
+		child.queue_free()
+	if _cell_mat == null:
+		_cell_mat = ShaderMaterial.new()
+		_cell_mat.shader = ITEM_CELL_SHADER
+		_cell_mat.set_shader_parameter("fill_color", Color("1c1509"))
+		_cell_mat.set_shader_parameter("inner_color", Color("2e2414"))
+		_cell_mat.set_shader_parameter("center_glow", 0.45)
+		_cell_mat.set_shader_parameter("corner_radius", 0.16)
+		_cell_mat.set_shader_parameter("pixel_grid", 10.0)
+		_cell_mat.set_shader_parameter("cloud_on", 0.0)
+		_cell_mat.set_shader_parameter("use_tex", 0.0)
+		_cell_mat.set_shader_parameter("fill_opaque", 1.0)
+	for y: int in bp.rows:
+		for x: int in bp.cols:
+			var cell := ColorRect.new()
+			cell.color = Color.WHITE
+			cell.position = BP_ORIGIN + Vector2(x * BP_CELL, y * BP_CELL)
+			cell.size = Vector2(BP_CELL - 3, BP_CELL - 3)
+			cell.material = _cell_mat
+			cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			bp_cells.add_child(cell)
+
+
+## 队伍行重建（F 任务）：头像（队首=所选英雄·招募=占位图签）+ 名 + HP（低血警示橘/倒下灰）。
+func _rebuild_team_rows() -> void:
+	for child: Node in team_rows.get_children():
+		team_rows.remove_child(child)
+		child.queue_free()
+	for i: int in map.team.size():
+		var h: Dictionary = map.team[i]
+		var y: float = float(i) * 54.0
+		var face := TextureRect.new()
+		face.texture = player_token.texture if i == 0 else PixelArt.get_texture("flag", COL_BONE, 36)
+		face.position = Vector2(0, y)
+		face.size = Vector2(40, 40)
+		face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		face.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		team_rows.add_child(face)
+		var hp: float = float(h["hp"])
+		var hp_max: float = float(h["hp_max"])
+		var name_l := Label.new()
+		name_l.text = String(h["name"])
+		name_l.position = Vector2(52, y)
+		FontManager.apply(name_l, 16)
+		name_l.modulate = COL_TEXT if hp > 0.0 else Color("8a8f98")
+		team_rows.add_child(name_l)
+		var hp_l := Label.new()
+		hp_l.text = "HP %.1f/%.1f" % [maxf(0.0, hp), hp_max] if hp > 0.0 else "（倒下）"
+		hp_l.position = Vector2(52, y + 22)
+		FontManager.apply(hp_l, 16)
+		hp_l.modulate = Color("8a8f98") if hp <= 0.0 else (Color("ff9442") if hp / hp_max <= 0.4 else COL_TEXT_DIM)
+		team_rows.add_child(hp_l)
 
 
 ## 暖骨框面板 = 暖色深底填充 + 像素框（§2.1 配方·装饰节点必 IGNORE 防吞点击）。
@@ -384,15 +532,21 @@ func _eff_bonus() -> float:
 func _refresh() -> void:
 	if map == null:
 		return
-	var s: String = "补给 %d%s\n" % [map.supplies, "（饥饿！）" if map.supplies <= 0 else ""]
-	s += "刻 %.1f    危险度 D%d/%d%s\n" % [map.ticks(), map.danger(), MapState.D_CAP, "·游荡怪！" if map.wanderer != Vector2i(-1, -1) else ""]
-	s += "\n撤1（近）%s\n撤2（中）%s\n撤3（深）永不关闭" % [_ext_text(MapState.Tile.EXT1), _ext_text(MapState.Tile.EXT2)]
-	hud_label.text = s
-	var ts: String = ""
-	for h: Dictionary in map.team:
-		var hp: float = float(h["hp"])
-		ts += "%s\nHP %.1f/%.1f%s\n" % [String(h["name"]), maxf(0.0, hp), float(h["hp_max"]), "（倒下）" if hp <= 0.0 else ""]
-	team_label.text = ts
+	supplies_label.text = "补给 %d%s" % [map.supplies, "（饥饿！全队掉血）" if map.supplies <= 0 else ""]
+	supplies_label.modulate = Color("ff9442") if map.supplies <= 5 else COL_TEXT
+	clock_label.text = "刻 %.1f    危险度 D%d/%d" % [map.ticks(), map.danger(), MapState.D_CAP]
+	clock_label.modulate = [COL_TEXT, COL_TEXT, COL_TEXT, Color("e0b54a"), Color("ff9442"), Color("ff6a5c")][map.danger()]
+	wanderer_label.visible = map.wanderer != Vector2i(-1, -1)
+	var ext_defs: Array = [["撤1（近）", MapState.Tile.EXT1, _ext_text(MapState.Tile.EXT1)],
+		["撤2（中）", MapState.Tile.EXT2, _ext_text(MapState.Tile.EXT2)],
+		["撤3（深）", MapState.Tile.EXT3, "永不关闭"]]
+	for i: int in 3:
+		var d: Array = ext_defs[i]
+		var el: Label = ext_labels[i]
+		el.text = "%s%s" % [String(d[0]), String(d[2])]
+		var open_now: bool = map.ext_open(int(d[1]))
+		el.modulate = COL_EXT_OPEN if open_now else (COL_EXT_CLOSED if String(d[2]) == "已关闭" else COL_BONE)
+	_rebuild_team_rows()
 	for child: Node in pend_box.get_children():
 		child.queue_free()
 	for i: int in pending.size():
@@ -428,11 +582,15 @@ func _refresh() -> void:
 	var used: int = 0
 	for p: Dictionary in bp.placements:
 		used += (p["shape"] as Array).size()
-	info_label.text = "手上：%s\n拾取区待整理 %d 件\n\n背包 %d×%d·占用 %d/%d\n包内金币 %d\n装备 %d 件（效率 +%.2f）\n战斗 %d 胜·步数 %d\n\n移动 WASD/方向键\n背包 B（拾/放·旋转·装备）\n返回 ESC\n\n⚠ 拾取区的东西\n不拼进背包=带不走" % [
+	carry_label.text = "手上：%s\n拾取区待整理 %d 件%s" % [
 		String(held["item"]["name"]) if not held.is_empty() else "空", pending.size(),
+		"（按 B 整理）" if pending.size() > 0 else ""]
+	carry_label.modulate = Color("e0b54a") if (pending.size() > 0 or not held.is_empty()) else COL_TEXT_DIM
+	info_label.text = "背包 %d×%d·占用 %d/%d\n包内金币 %d\n装备 %d 件（效率 +%.2f）\n战斗 %d 胜·步数 %d" % [
 		bp.cols, bp.rows, used, bp.rows * bp.cols, bp.gold_total(),
 		bp.equipment.size(), _eff_bonus(), map.battles_won, map.steps]
 	log_label.text = "\n".join(log_lines)
+	_sync_bp_cells()
 	_update_terrain_data()
 	_update_token_position()
 	canvas.queue_redraw()
@@ -548,19 +706,15 @@ func _draw_canvas() -> void:
 	canvas.draw_rect(pr, COL_PLAYER, false, 3.0)
 
 
-## 背包浮层绘制（格子/放置/手上幽灵）——仅浮层可见时由 _draw_canvas 调用。
+## 背包浮层绘制（放置块/手上幽灵）——仅浮层可见时由 _draw_canvas 调用。
+## 空格底=bp_cells 节点（PvP 道具格同源 shader）；放置块内缩 3px 避开格底圆角。
 func _draw_backpack_layer(f16: Font) -> void:
-	for y: int in bp.rows:
-		for x: int in bp.cols:
-			var rect := Rect2(BP_ORIGIN + Vector2(x * BP_CELL, y * BP_CELL), Vector2(BP_CELL - 3, BP_CELL - 3))
-			canvas.draw_rect(rect, Color("1a1409"))
-			canvas.draw_rect(rect, Color("3a3226"), false, 1.0)
 	for p: Dictionary in bp.placements:
 		var it: Dictionary = p["item"]
 		var col: Color = _cat_color(String(it["cat"]))
 		for off: Vector2i in p["shape"]:
 			var c: Vector2i = Vector2i(p["anchor"]) + off
-			var cell_rect := Rect2(BP_ORIGIN + Vector2(c.x * BP_CELL, c.y * BP_CELL), Vector2(BP_CELL - 3, BP_CELL - 3))
+			var cell_rect := Rect2(BP_ORIGIN + Vector2(c.x * BP_CELL + 3, c.y * BP_CELL + 3), Vector2(BP_CELL - 9, BP_CELL - 9))
 			canvas.draw_rect(cell_rect, col.darkened(0.35))
 			canvas.draw_rect(cell_rect, col, false, 1.0)
 		var a: Vector2i = p["anchor"]
@@ -1079,7 +1233,9 @@ func _show_choice(text: String, options: Array, cb: Callable) -> void:
 	for i: int in options.size():
 		var btn := Button.new()
 		btn.text = String(options[i])
+		btn.custom_minimum_size = Vector2(560, 44)
 		FontManager.apply_btn(btn, 16)
+		_jelly_button(btn, COL_EXT_OPEN.darkened(0.15) if i == 0 else Color("6b5c43"))   # 首选=确认绿·其余暖中性
 		var idx: int = i
 		btn.pressed.connect(func() -> void:
 			dialog.hide()
