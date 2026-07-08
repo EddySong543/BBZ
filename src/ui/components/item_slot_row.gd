@@ -49,6 +49,10 @@ const EMP_FB := Color(0.21, 0.19, 0.15)
 const EMP_EI := Color(0.44, 0.40, 0.32)
 # 无道具态（空/未解锁/不可操作）框色：去饱和中性灰（2026-06-28 Eddy：去掉"木色"边框；有道具一律走稀有度色）。
 const EMPTY_EDGE := Color(0.43, 0.42, 0.41)
+# 文字层级（2026-07-08 优化点②）：静默态文字退后、可操作态文字响——「框安静、内容响」延伸到字。
+const TXT_BRIGHT := Color(0.98, 0.96, 0.9)      # 可抽/可补/就绪/✓用（可操作·亮米白）
+const TXT_DIM := Color(0.78, 0.74, 0.66)        # 锁/待抽/锁中（静默电报·暖灰退后）
+const TXT_FAINT := Color(0.62, 0.58, 0.50)      # 空格（最弱）
 
 ## interactive：本地玩家行可点击。setter 立即把按钮 mouse_filter 设为 STOP；P2（false）→ IGNORE。
 var interactive := false:
@@ -140,7 +144,7 @@ func _ready() -> void:
 		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		lbl.clip_text = true   # 长道具名（占位文字）夹在芯片内·勿溢出（待换图标）
 		lbl.add_theme_font_size_override("font_size", 12)
-		lbl.add_theme_color_override("font_color", Color(0.98, 0.96, 0.9))
+		lbl.add_theme_color_override("font_color", TXT_BRIGHT)
 		lbl.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.03, 0.85))
 		lbl.add_theme_constant_override("outline_size", 4)
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -237,10 +241,12 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 		var cell_inner := Color.WHITE      # 格底中心亮色（有道具时=稀有度亮调）
 		var legend := false                # 传说→格底用 gold_bottom 美术图
 		var has_item := false              # 该槽是否装着道具（有→框走稀有度色·不被经济金边覆盖）
+		var tcol := TXT_BRIGHT             # 文字层级：静默态在下方 match 内改暗（优化点②）
 		match st:
 			BattleCore.SlotState.SEALED:
-				# 未到解锁回合（格自动解锁·无开格操作）→ 显示解锁回合数电报。
+				# 未到解锁回合（格自动解锁·无开格操作）→ 显示解锁回合数电报（静默·文字退后）。
 				lbl.text = "回合%d\n解锁" % (int(BattleCore.SLOT_UNLOCK_TURN[i]) + 1)
+				tcol = TXT_DIM
 			BattleCore.SlotState.OPENED:
 				ft = NEU_FT; fb = NEU_FB; ei = EMPTY_EDGE
 				if battle.can_draw_slot(player, i):
@@ -248,6 +254,7 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 					ready = true
 				else:
 					lbl.text = "待抽"
+					tcol = TXT_DIM
 			BattleCore.SlotState.CHARGING:
 				var item: ItemData = battle.slot_item(player, i)
 				has_item = item != null                     # 有道具 → 框走稀有度色（不被经济金边覆盖）
@@ -282,6 +289,7 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 					ei = dim.darkened(0.35)
 					icon.modulate = Color(0.62, 0.62, 0.66)   # 图标压暗 = 读作锁中
 					lbl.text = "(锁)" if tex != null else nm + "\n(锁)"
+					tcol = TXT_DIM
 			BattleCore.SlotState.EMPTY:
 				if battle.can_refill(player, i):
 					lbl.text = "可补"
@@ -290,7 +298,14 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 				else:
 					lbl.text = "空"
 					ft = EMP_FT; fb = EMP_FB; ei = EMPTY_EDGE
+					tcol = TXT_FAINT
 		lbl.modulate = Color.WHITE
+		lbl.add_theme_color_override("font_color", tcol)
+		# 无道具格（锁/待抽/空/可抽）：连续内渐变代替死平底（craft 原则·§6「连续内阴影/渐变」·与图鉴格同手法）。
+		# 中心以 ft（各态浅调常量）微亮、四角 fb——幅度克制，框仍安静。
+		if not has_item:
+			glow = 0.45
+			cell_inner = ft
 		# 金边只给「选中使用」和「经济可操作(可开/可抽/可补)」；有道具的框一律保持稀有度色（不被金边覆盖）。
 		if staged.has(i):
 			ei = GOLD_STAGED
