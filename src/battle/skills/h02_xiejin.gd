@@ -19,20 +19,28 @@ extends HeroSkill
 ##   维度修正史（2026-06-22 Eddy）：原牛金【卸力反震·反伤】机制【迁给暗牛 h14】；牛金改本设计。
 ##   不撞：与娄金（护主·替死碎掉）机制不同（这是给护盾层·非替死）；与室火（受击→能量）
 ##     同母题但输出不同维度（护盾 vs 能量）、角色不同（诱饵肉墙 vs 能量电池）。
-##   旋钮：层值(1 半) / 发放面(批⑤起=血量最低单人·后手可回"每名"或收"随机一名") / 触发(现 on_self_damaged 实际挨打)。
+##   旋钮：层值(1 半) / 发放面(批⑥起=随机一名·⛔最低血定向=智能瞄准已证不轻·可回"每名") / 触发(现 on_self_damaged 实际挨打)。
 
 const SHIELD_LAYER := 1   # 每次卸给队友 1 半点 = 0.5HP 护盾
 
 
-## 批⑤轻刀 A（2026-07-09·Eddy 批）：盾改发一人——只给【血量最低】的存活队友（原=每名队友各一层）。
-## 刀理：HP 刀双重收敛砸过头（60.7→35.3）→ 改砍产出端转化率（每次挨打全队总盾 1.0→0.5HP）·身板/触发口径不动。
-## 「血量最低」比裸 HP（不含护盾·=玩家可见血量）·平手取前位（确定性·无随机）。
+## 批⑥刀（2026-07-09·Eddy 批·同日二刀）：发放面「血量最低」→「随机一名」。
+## 刀理：批⑤大轮 57.9%（n=107）实锤"最低血定向"是智能瞄准——盾全落在最需要的人身上，
+## 效率补偿掉了总量减半（教训：给产出端减半时若附带智能定向=白砍）。随机=斩断定向、真减半。
+## 随机源=battle.rng（§D7 可 seed·sim/录像/测试可复现）·零分配。
+## 批⑤轻刀溯源：HP 刀双重收敛砸过头（60.7→35.3）→ 改砍产出端（全队总盾 1.0→0.5HP/打）·身板/触发口径不动。
 func on_self_damaged(battle: BattleCore, player: int, slot: int, _dealt: int, _attacker_player: int) -> void:
-	var lowest := -1
+	var count := 0
+	for s in range(battle.hp[player].size()):
+		if s != slot and battle.hp[player][s] > 0:
+			count += 1
+	if count == 0:
+		return
+	var pick: int = battle.rng.randi_range(0, count - 1)
 	for s in range(battle.hp[player].size()):
 		if s == slot or battle.hp[player][s] <= 0:
 			continue
-		if lowest == -1 or battle.hp[player][s] < battle.hp[player][lowest]:
-			lowest = s
-	if lowest >= 0:
-		battle.shield[player][lowest] += SHIELD_LAYER
+		if pick == 0:
+			battle.shield[player][s] += SHIELD_LAYER
+			return
+		pick -= 1

@@ -62,35 +62,34 @@ func test_h01_dunshu_adds_half_to_every_energy_gain() -> void:
 	assert_eq(b.energy[1], 8 + 4, "plain 对照：攒 +2 + 被动 +2 = +4 半能")
 
 
-# ---- h02 牛金 卸劲（挨打 → 血量最低的存活队友 +0.5HP 护盾·批⑤轻刀 A 单人发放·无封顶·自己不获）----
+# ---- h02 牛金 卸劲（挨打 → 随机一名存活队友 +0.5HP 护盾·批⑥随机发放·无封顶·自己不获）----
 
-func test_h02_xiejin_shields_lowest_ally_when_damaged() -> void:
-	# 牛金(出战 HP7)攒(不防)挨对手波 → 仅一名队友获盾(两替补同血=平手取前位)；牛金自己不获
+func test_h02_xiejin_shields_exactly_one_ally_when_damaged() -> void:
+	# 牛金(出战 HP7)攒(不防)挨对手波 → 恰好一名队友获 1 层盾(随机挑·battle.rng 可复现)；牛金自己不获
 	var b := _battle_team(["h02", "test_p1_1", "test_p1_2"], 7, 8)
 	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.ATTACK)
 	assert_eq(b.hp[0][0], 14 - 2, "牛金挨波 2 半点(没防=诱饵盾)")
-	assert_eq(b.shield[0][1], 1, "替补1 获 1 层护盾(同血平手取前位)")
-	assert_eq(b.shield[0][2], 0, "替补2 不获盾(批⑤单人发放)")
+	assert_eq(b.shield[0][1] + b.shield[0][2], 1, "两替补合计恰好 1 层盾(随机单人发放)")
 	assert_eq(b.shield[0][0], 0, "牛金自己不获盾(卸给队友)")
 
 
-func test_h02_xiejin_shield_targets_lowest_hp_ally() -> void:
-	# 批⑤回归：替补2 血更低 → 盾发给替补2 而非前位替补1（按裸 HP 比·不含护盾）
+func test_h02_xiejin_shield_goes_to_sole_living_ally() -> void:
+	# 批⑥回归：只剩一名存活队友 → 随机域=1·盾必发给它（死队友不占随机位）
 	var b := _battle_team(["h02", "test_p1_1", "test_p1_2"], 7, 8)
-	b.hp[0][2] = 6   # Arrange：替补2 压到 3HP(6 半点) < 替补1 满血
+	b.hp[0][2] = 0   # Arrange：替补2 阵亡
 	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.ATTACK)
-	assert_eq(b.shield[0][2], 1, "血量最低的替补2 获盾")
-	assert_eq(b.shield[0][1], 0, "替补1 血更高不获盾")
+	assert_eq(b.shield[0][1], 1, "唯一存活替补必获盾")
+	assert_eq(b.shield[0][2], 0, "阵亡替补不获盾")
 
 
 func test_h02_xiejin_shield_accumulates_uncapped() -> void:
-	# 连续三回合挨打 → 同一最低血队友护盾无封顶累积(3 半点=1.5HP)·2026-07-01 废除封顶
+	# 连续三回合挨打 → 全队护盾总量无封顶累积(3 半点=1.5HP·分布随机)·2026-07-01 废除封顶
 	var b := _battle_team(["h02", "test_p1_1", "test_p1_2"], 7, 12)
 	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.ATTACK)
 	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.ATTACK)
 	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.ATTACK)
-	assert_eq(b.shield[0][1], 3, "三次挨打→前位替补护盾无封顶累积 3 半点(1.5HP)")
-	assert_eq(b.shield[0][2], 0, "另一替补始终不获盾(单人发放)")
+	assert_eq(b.shield[0][1] + b.shield[0][2], 3, "三次挨打→全队护盾合计 3 半点(1.5HP·无封顶)")
+	assert_eq(b.shield[0][0], 0, "牛金自己始终不获盾")
 
 
 # ---- h03 尾火 连扑（hit_count=2 → 队友 on-hit 翻倍：喂鸡剑气 ×2）----
