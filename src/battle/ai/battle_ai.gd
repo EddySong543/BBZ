@@ -257,11 +257,20 @@ static func choose_overtime_pick(b: BattleCore, side: int) -> int:
 ## search_upgrade=false → 退回阈值 run_item_economy。仅用于 AI 真实根决策（实战 _ai_pick / sim）；
 ## 深层 lookahead 仍走便宜的 run_item_economy（见 _state_value）→ 无递归、性能可控。
 func plan_economy(b: BattleCore, side: int, rng: RandomNumberGenerator) -> void:
+	var up: int = plan_economy_decide(b, side)
+	plan_economy_apply(b, side, rng, up)
+
+
+## 任务G 拆分（2026-07-09·战斗内异步预想）：决策（贵·候选变体搜索·只在克隆上推演）与
+## 应用（廉·真局落子）分离——后台线程在克隆上 decide、玩家确认时在真局上 apply；
+## 同一 rng 起点 → 落子逐位一致。plan_economy 语义零变化（= decide + apply·sim/测试路径不动）。
+## 返回：-3=守卫不通过(apply 无操作)；-2=非搜索模式(apply 走 run_item_economy)；
+##       -1=不升级全用；≥0=升级该槽。
+func plan_economy_decide(b: BattleCore, side: int) -> int:
 	if side < 0 or side >= b.slots.size() or b.slots[side].size() < BattleCore.SLOT_COUNT:
-		return
+		return -3
 	if not search_upgrade:
-		run_item_economy(b, side, rng, AI_ITEM_ENERGY_RESERVE, smart_draft)
-		return
+		return -2
 	# 候选升级目标 = -1(不升·全用) + 每个「就绪+可升+付得起(成本+reserve)」槽；是否值得交给搜索定。
 	var candidates: Array[int] = [-1]
 	for s in range(BattleCore.SLOT_COUNT):
@@ -269,8 +278,7 @@ func plan_economy(b: BattleCore, side: int, rng: RandomNumberGenerator) -> void:
 				and b.energy[side] >= b.upgrade_cost(side, s) + AI_ITEM_ENERGY_RESERVE:
 			candidates.append(s)
 	if candidates.size() == 1:
-		_apply_economy(b, side, rng, AI_ITEM_ENERGY_RESERVE, -1, smart_draft)   # 无升级抉择 → 直接全用 + 推进
-		return
+		return -1   # 无升级抉择 → 直接全用 + 推进
 	var best := -1
 	var best_val := -INF
 	for up in candidates:
@@ -280,7 +288,28 @@ func plan_economy(b: BattleCore, side: int, rng: RandomNumberGenerator) -> void:
 		if v > best_val:
 			best_val = v
 			best = up
-	_apply_economy(b, side, rng, AI_ITEM_ENERGY_RESERVE, best, smart_draft)
+	return best
+
+
+## 经济落子（廉·决策结果应用到 b）。rng 起点相同 → 结果确定（异步重放与同步直算逐位一致的根基）。
+func plan_economy_apply(b: BattleCore, side: int, rng: RandomNumberGenerator, up: int) -> void:
+	if up == -3:
+		return
+	if up == -2:
+		run_item_economy(b, side, rng, AI_ITEM_ENERGY_RESERVE, smart_draft)
+		return
+	_apply_economy(b, side, rng, AI_ITEM_ENERGY_RESERVE, up, smart_draft)
+
+
+## 任务G：rng 状态快照/采纳——预想线程用副本推演，确认命中后真 AI 采纳终态，
+## 使整局随机流与"当场同步跑一遍"完全一致（预想被弃/重跑不污染真 AI 的流）。
+func rng_snapshot() -> Dictionary:
+	return {"rng": rng.state, "eval": _eval_rng.state}
+
+
+func rng_restore(s: Dictionary) -> void:
+	rng.state = int(s["rng"])
+	_eval_rng.state = int(s["eval"])
 
 
 ## 根局面博弈值：对剪枝动作集解一层根矩阵取安全值，供 plan_economy 比较经济变体（不再二次推进经济）。

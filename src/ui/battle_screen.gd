@@ -115,6 +115,18 @@ var p2_item_row: ItemSlotRow
 var selected_item_slots: Array[int] = []
 var _drafting := false   # draft 弹窗打开中：拦截重入 + 暂停回合计时
 var _ai_rng := RandomNumberGenerator.new()   # 任务 B：AI 道具抽取选择用（与游戏 rng 分离）
+
+# ── 任务G（2026-07-09）：AI 异步预想——选招期间后台线程替对手想招·点确认零等待 ──
+# 依据：同时盲选 = AI 决策不依赖玩家按了什么 → 回合开始即可在【克隆棋盘】上预想（探针实锤
+# 同步想招中期 0.9-1.5s 全压在确认点击上）。玩家中途改状态（道具点选/抽补/升级/调试面板）→
+# 作废重想；确认时校验（回合号+道具点选集）不符或没来得及想 → 同步兜底（原路径原样保留）。
+# 等价性：决策在克隆+rng 快照副本上跑（与同步完全同序）·命中后真局重放落子+采纳 rng 终态
+# → 整局与"当场同步跑一遍"逐位一致（GUT test_ai_async_equivalence 锁此契约）。
+var _think_ai: BattleAI                 # 预想专用 AI 实例（配置须与 _ai 一致·rng 每次从 _ai 快照）
+var _think_task: int = -1               # WorkerThreadPool 任务 id（-1=无任务在跑）
+var _think_mutex := Mutex.new()         # 保护 _think_out（工作线程写·主线程读）
+var _think_out: Dictionary = {}         # 预想结果 {turn, items_key, econ_up, choice, rng_end}
+var _think_restart: bool = false        # 任务跑着时状态又变了 → 完成回调里重拉（不并行堆积）
 var _ai: BattleAI                             # 试玩对手 = 与 sim 统一的同一套搜索 AI（_ready 实例化）
 var _overtime := false                        # 本局是否加时赛（Q5·白板 1v1·_ready 从 BattleSetup 读）
 
@@ -169,6 +181,7 @@ var _world: Control = null    # P2b：立绘+阴影的 dolly 组（运行期归�
 func _ready() -> void:
 	_ai_rng.randomize()   # 任务 B：AI 道具抽取随机种子
 	_ai = BattleAI.new(0, 2, 0, {})   # 与 sim 统一：同一套搜索 AI（随机种子·深度 2·基础评估）
+	_think_ai = BattleAI.new(0, 2, 0, {})   # 任务G：异步预想副本（配置同 _ai·rng 每次快照覆盖）
 	battle = BattleCore.new()
 	_overtime = BattleSetup.overtime   # 须在 reset() 前读取
 	_pve = BattleSetup.pve_mode        # 远征 PvE（任务 D）·同样须在 reset() 前读取
@@ -252,6 +265,9 @@ func _ready() -> void:
 ## 离场恢复 time_scale=1：hitstop(c) 用全局 Engine.time_scale，若在定格瞬间切场景须复位，防下个场景慢动作。
 func _exit_tree() -> void:
 	Engine.time_scale = 1.0
+	if _think_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_think_task)   # 任务G：离场前回收预想线程（防悬垂引用）
+		_think_task = -1
 
 
 ## 顶部 UI 整组下移 TOP_UI_DROP 像素（避免太贴屏幕顶端）。
@@ -475,6 +491,7 @@ func _start_player_select() -> void:
 	_set_buttons_active(true)
 	_update_all()
 	_start_timer()
+	_start_ai_think()   # 任务G：选招一开始就让对手在后台想（确认时零等待）
 
 
 func _start_timer() -> void:
@@ -550,8 +567,8 @@ func _on_confirm_pressed() -> void:
 	if _pve:
 		if _pve_choice.is_empty() or not battle.select_action(AI, int(_pve_choice["action"])):
 			battle.select_action(AI, A.CHARGE)
-	else:
-		_ai_pick(AI)
+	elif not _ai_pick_precomputed():
+		_ai_pick(AI)   # 任务G 兜底：预想未命中（状态变过/没来得及想）→ 原同步路径
 
 	selected_action = -1
 	selected_switch = -1
@@ -718,6 +735,84 @@ func _pve_finish(outcome: String, extra_beats: int = 0) -> void:
 	status_label.visible = true
 	await get_tree().create_timer(1.0).timeout
 	TransitionManager.transition_to("res://src/expedition/expedition_screen.tscn")
+
+
+# ============================================================
+# 任务G：AI 异步预想（选招期后台想·确认时重放·详见 _think_* 变量注释）
+# ============================================================
+
+## 玩家本回合点选道具集的指纹（排序后字符串·预想结果的有效性校验键之一）。
+func _items_key() -> String:
+	var a: Array[int] = selected_item_slots.duplicate()
+	a.sort()
+	return str(a)
+
+
+## 拉起/重启后台预想。仅 PvP 选招阶段（PvE 怪物驾驶员回合开始已定招·不经此路径）。
+func _start_ai_think() -> void:
+	if _pve or state != State.PLAYER_SELECT or battle == null or battle.game_over:
+		return
+	if _think_task >= 0:
+		_think_restart = true   # 正在想：标记重拉（旧结果会因 items_key/turn 校验不符被弃）
+		return
+	_think_restart = false
+	_think_mutex.lock()
+	_think_out = {}
+	_think_mutex.unlock()
+	var clone: BattleCore = battle.clone()
+	for s in selected_item_slots:
+		clone.use_slot(PLAYER, s)   # 纳入玩家已点选道具（同步路径确认时同序提交·输入才逐位一致）
+	_think_task = WorkerThreadPool.add_task(
+		_think_job.bind(clone, battle.turn_number, _items_key(), _ai.rng_snapshot(), _ai_rng.state))
+
+
+## 工作线程：在克隆上跑与同步 _ai_pick 完全相同的决策序列。只碰克隆与 _think_ai（rng=快照副本）
+## → 真局/真 AI/场景树零接触（线程安全）。结果经 mutex 交回。
+func _think_job(clone: BattleCore, turn: int, items_key: String, rng_snap: Dictionary, econ_state: int) -> void:
+	_think_ai.rng_restore(rng_snap)
+	var econ_rng := RandomNumberGenerator.new()
+	econ_rng.state = econ_state
+	var up: int = _think_ai.plan_economy_decide(clone, AI)
+	_think_ai.plan_economy_apply(clone, AI, econ_rng, up)
+	var choice: Dictionary = _think_ai.choose_action(clone, AI)
+	_think_mutex.lock()
+	_think_out = {"turn": turn, "items_key": items_key, "econ_up": up,
+			"choice": choice, "rng_end": _think_ai.rng_snapshot()}
+	_think_mutex.unlock()
+	call_deferred("_on_think_done")
+
+
+## 主线程回调：回收任务位；期间被要求重想（玩家改了道具/调试改了状态）→ 立即重拉。
+func _on_think_done() -> void:
+	if _think_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_think_task)   # 任务已结束·立即返回（回收句柄）
+		_think_task = -1
+	if _think_restart:
+		_think_restart = false
+		_start_ai_think()
+
+
+## 确认时消费预想。命中 → 真局重放（经济落子同 rng 起点=逐位一致·选招直接采用·_ai 采纳
+## 预想 rng 终态=后续随机流与同步世界一致）并返回 true；未命中/校验不符 → false（调用方走同步兜底）。
+func _ai_pick_precomputed() -> bool:
+	if _think_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_think_task)   # 还在想 → 等剩余部分（远短于全量）
+		_think_task = -1
+	_think_mutex.lock()
+	var out: Dictionary = _think_out
+	_think_out = {}
+	_think_mutex.unlock()
+	if out.is_empty() or _think_restart:
+		return false
+	if int(out["turn"]) != battle.turn_number or String(out["items_key"]) != _items_key():
+		return false   # 预想期间状态变过（保护网·正常应已被重想覆盖）
+	_ai.rng_restore(out["rng_end"])
+	_ai.plan_economy_apply(battle, AI, _ai_rng, int(out["econ_up"]))
+	var choice: Dictionary = out["choice"]
+	BattleAI.commit_attack_items(battle, AI, int(choice["action"]))
+	if not battle.apply_choice(AI, choice):
+		battle.select_action(AI, A.CHARGE)   # 兜底（与同步路径同款保险）
+	return true
 
 
 func _ai_pick(side: int) -> void:
@@ -1240,6 +1335,7 @@ func _on_p1_slot_clicked(s: int) -> void:
 				if c2 >= 0:                                        # 取消则留 OPENED·本回合可再抽（draft 已缓存）
 					battle.pick_draft(PLAYER, s, c2)
 				_update_all()
+	_start_ai_think()   # 任务G：道具点选/抽/补都改变 AI 该看到的棋盘 → 重想
 
 
 ## C：升级就绪槽内道具（花能量 → 下一级池 3 选 1 → 换件并重新锁 1 回合·公开电报）。
@@ -1252,6 +1348,7 @@ func _on_p1_slot_upgrade(s: int) -> void:
 			battle.pick_upgrade(PLAYER, s, c)   # 付能量 → 换升级件 → 锁本回合
 			selected_item_slots.erase(s)        # 升级后该槽不再就绪 → 撤销本回合「使用」点选
 		_update_all()
+		_start_ai_think()   # 任务G：升级改变棋盘 → 重想
 
 
 ## 弹出 3 选 1 抽取弹窗，await 返回选中 index（-1 = 取消）。抽取期间暂停回合计时 + 拦重入。
@@ -1465,6 +1562,7 @@ func _build_debug_buttons() -> void:
 func _on_debug_state_changed() -> void:
 	_update_all()
 	_refresh_skill_card()
+	_start_ai_think()   # 任务G：调试面板直改引擎状态 → 预想作废重想
 
 
 ## debug 造伤按钮 → 播打击表现（飘字 / 斩击 / 白闪 / 震屏）。
