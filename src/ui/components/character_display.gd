@@ -152,6 +152,16 @@ extends SubViewportContainer
 	set(v):
 		warmth_amount = v
 		_apply_light()
+## 月光补光色（与月光同源冷蓝；加法托亮暗色立绘）。
+@export var fill_color: Color = Color(0.62, 0.78, 1.0, 1.0):
+	set(v):
+		fill_color = v
+		_apply_light()
+## 月光补光强度（0=关闭；暗色立绘融进夜色时抬 0.15~0.3）。
+@export_range(0.0, 1.0) var fill_amount: float = 0.0:
+	set(v):
+		fill_amount = v
+		_apply_light()
 
 var _sprite: AnimatedSprite2D
 var _return_to_idle: bool = false
@@ -366,5 +376,7 @@ func _apply_light() -> void:
 	mat.set_shader_parameter("shadow_tint", shadow_tint)
 	mat.set_shader_parameter("skin_warmth", skin_warmth)
 	mat.set_shader_parameter("warmth_amount", warmth_amount)
+	mat.set_shader_parameter("fill_color", fill_color)
+	mat.set_shader_parameter("fill_amount", fill_amount)
 	var ldx: float = -light_dir.x if flip_h else light_dir.x
 	mat.set_shader_parameter("light_dir", Vector2(ldx, light_dir.y))

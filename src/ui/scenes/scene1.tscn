@@ -94,6 +94,12 @@ shader_parameter/highlight_threshold = 0.0
 shader_parameter/highlight_softness = 0.4
 shader_parameter/moon_tint = Color(0.78, 0.88, 1, 1)
 shader_parameter/tint_strength = 0.6
+shader_parameter/patch_center = Vector2(0.33, 0.3)
+shader_parameter/patch_radius = Vector2(0.23, 0.16)
+shader_parameter/patch_angle = 0.0
+shader_parameter/patch_gain = 3.4
+shader_parameter/patch_tint = Color(0.62, 0.78, 1, 1)
+shader_parameter/patch_tint_strength = 0.3
 
 [sub_resource type="ShaderMaterial" id="RfMat1"]
 shader = ExtResource("20_boxblur")

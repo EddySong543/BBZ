@@ -34,6 +34,11 @@ uniform float rim_strength : hint_range(0.0, 2.0) = 0.5;
 uniform float rim_width : hint_range(1.0, 8.0) = 3.0;               // 边缘检测宽度(纹理像素)
 group_uniforms;
 
+group_uniforms fill;  // 月光补光：加法托亮整体（暗色立绘融进夜色的解药），默认 0 = 行为不变
+uniform vec4 fill_color : source_color = vec4(0.62, 0.78, 1.0, 1.0); // 补光色(与月光同源冷蓝)
+uniform float fill_amount : hint_range(0.0, 1.0) = 0.0;             // 补光强度(0=关闭)
+group_uniforms;
+
 void fragment() {
 	vec4 tex = texture(TEXTURE, UV);
 	vec3 col = tex.rgb;
@@ -49,6 +54,12 @@ void fragment() {
 
 	// 1.5) 暖补偿：抵消全屏冷滤镜，让皮肤回正（在 rim 之前，不影响月光边）
 	col = mix(col, col * skin_warmth.rgb, warmth_amount);
+
+	// 1.6) 月光补光：加法托亮(乘法对近黑像素无力)。朝月侧略强，且按亮度反削
+	//     (1-lum×0.7) 保护脸部等亮部不过曝——只把暗部从背景里托出来。
+	float fill_w = 0.65 + 0.35 * shade;
+	float lum = dot(col, vec3(0.299, 0.587, 0.114));
+	col += fill_color.rgb * fill_amount * fill_w * (1.0 - lum * 0.7);
 
 	// 2) 月光边缘光 rim：朝月外移一截若已透明 → 当前像素是"朝月的轮廓"
 	vec2 px = TEXTURE_PIXEL_SIZE * rim_width;

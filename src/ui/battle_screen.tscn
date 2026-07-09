@@ -234,6 +234,7 @@ rim_width = 4.5
 backlight = 0.05
 light_dir = Vector2(1, -0.5)
 warmth_amount = 0.2
+fill_amount = 0.3
 
 [node name="P2CharDisplay" parent="." unique_id=915119977 instance=ExtResource("2_char_display")]
 layout_mode = 0
@@ -247,6 +248,7 @@ rim_strength = 0.72
 backlight = 0.125
 light_dir = Vector2(1.6, -1.6)
 warmth_amount = 0.12
+fill_amount = 0.08
 
 [node name="ForeDust" parent="." unique_id=844619574 instance=ExtResource("12_foredust")]
 
