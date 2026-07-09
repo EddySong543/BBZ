@@ -377,15 +377,13 @@ func _init_buttons() -> void:
 	# 代码只负责把角色名文本随出战英雄更新（见 _update_hero_frames）。
 
 
-## 执行动作时的镜头偏焦方向：波/大波→+1(右·聚敌) / 防/大防→−1(左·聚己) / 其余→0(不偏·回正)。
-func _focus_dir_for(action: int) -> float:
-	match action:
-		A.ATTACK, A.BIG_ATTACK:
-			return 1.0
-		A.DEFEND, A.BIG_DEFEND:
-			return -1.0
-		_:
-			return 0.0
+## 结算"进攻方"判定（镜头冲突落点用·Eddy 2026-07-09 镜头规格）：
+## 波/大波恒算进攻（被挡也算——冲突落点仍在受击侧）；主动技按"是否实际造成伤害/击杀"归类
+## （无伤主动技=未进攻）；攒/防/大防/切换=未进攻。dmg_to_foe/foe_dead=本次结算对方承受的伤害/死亡。
+func _is_offense(action: int, dmg_to_foe: int, foe_dead: bool) -> bool:
+	if action == A.ATTACK or action == A.BIG_ATTACK:
+		return true
+	return action == ActionDef.ACTIVE and (dmg_to_foe > 0 or foe_dead)
 
 
 ## P2b：把双方立绘 + 阴影归入一个"世界组"容器，整体随镜头推近（与背景舞台同对焦点 → 统一移动）。
@@ -1578,9 +1576,14 @@ func _on_debug_hit_fx(player: int, dmg_half: int) -> void:
 ## A 方案 juice：出招（攻击前冲 / 防御蓝闪沉身 / 攒上浮黄闪）→ 命中（白闪 + 斩击光
 ## + 伤害数字 + 震屏）。dmg/dead 为 [p0, p1]。无逐帧 attack/hit 动画，全靠代码表现。
 func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array) -> void:
-	# 执行动作 → 镜头按玩家(P1)动作偏焦：波/大波 右聚敌、防/大防 左聚己、其余回正（取代旧 hover 触发）。
-	var fdir: float = _focus_dir_for(a0)
-	stage.set_focus(fdir != 0.0, fdir)
+	# 执行动作 → 镜头聚焦"冲突落点"（Eddy 2026-07-09 镜头规格）：双方都进攻=居中放大对撞（配震屏）；
+	# 仅对方进攻=偏左聚受击的己方；仅己方进攻=偏右聚受击的敌方；双方都未进攻=不推近。
+	var p1_off := _is_offense(a0, int(dmg[1]), bool(dead[1]))
+	var p2_off := _is_offense(a1, int(dmg[0]), bool(dead[0]))
+	var fdir := 0.0
+	if p1_off != p2_off:
+		fdir = 1.0 if p1_off else -1.0
+	stage.set_focus(p1_off or p2_off, fdir)
 	_act_juice(0, a0)
 	_act_juice(1, a1)
 	# P3：仅"大波且确实打中（伤害/击杀）"时镜头前推蓄势，峰值正好落在 0.45*phase 后的命中瞬间，
@@ -1630,6 +1633,9 @@ func _act_juice(player: int, action: int) -> void:
 	var dir := 1.0 if player == 0 else -1.0
 	match action:
 		A.ATTACK, A.BIG_ATTACK:
+			# 攻击帧动画（实验·目前仅 h01 有 "attack"；无此动画的英雄 play_animation 内部静默跳过，
+			# 与前冲 juice 叠加播放·播完自动回 idle）。
+			cd.play_animation("attack")
 			var reach := 190.0 if action == A.BIG_ATTACK else 140.0
 			var tw := create_tween()
 			tw.tween_property(cd, "position", home + Vector2(-28.0 * dir, 0), 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)

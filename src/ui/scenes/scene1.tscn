@@ -14,6 +14,7 @@
 [ext_resource type="Shader" uid="uid://u0mpca3l8lig" path="res://assets/shaders/canvas_fx_moonlight.gdshader" id="17_moonlight"]
 [ext_resource type="Shader" uid="uid://ds1lag0nmchpk" path="res://assets/shaders/canvas_fx_box_blur.gdshader" id="20_boxblur"]
 [ext_resource type="Shader" path="res://assets/shaders/canvas_env_fog_band.gdshader" id="22_fogband"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_env_light_shaft.gdshader" id="23_shaft"]
 
 [sub_resource type="ShaderMaterial" id="SkyMat"]
 shader = ExtResource("3_sky")
@@ -108,6 +109,11 @@ shader_parameter/fog_color = Color(0.55, 0.65, 0.8, 1)
 shader_parameter/alpha_max = 0.1
 shader_parameter/drift_speed = 0.01
 shader_parameter/scale_x = 2.0
+
+[sub_resource type="ShaderMaterial" id="LightShaftMat"]
+shader = ExtResource("23_shaft")
+shader_parameter/intensity = 0.13
+shader_parameter/fade_tail = 110.0
 
 [sub_resource type="ShaderMaterial" id="RfMat1"]
 shader = ExtResource("20_boxblur")
@@ -320,6 +326,17 @@ offset_bottom = 1319.9995
 texture = ExtResource("2_roof")
 expand_mode = 1
 metadata/parallax_factor = 1.0
+
+[node name="LightShaft" type="ColorRect" parent="."]
+material = SubResource("LightShaftMat")
+layout_mode = 0
+offset_left = 560.0
+offset_top = 340.0
+offset_right = 1420.0
+offset_bottom = 880.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+metadata/parallax_factor = 0.6
 
 [node name="closeRf1" type="TextureRect" parent="." unique_id=1278310740]
 self_modulate = Color(0.34, 0.4, 0.52, 1)
