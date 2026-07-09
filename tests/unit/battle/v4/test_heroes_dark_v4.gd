@@ -262,58 +262,72 @@ func _battle_vs(p0_ids: Array, p1_ids: Array, hp: int = 6, e: int = 8) -> Battle
 	return b
 
 
-func test_h17_ban_blocks_repeated_action_next_turn_only() -> void:
-	# 回合1 施放(敌按防) → 回合2 敌方「防」被禁（其余动作照常·能量语义不受影响）→ 回合3 解禁。
+func test_h17_lock_forces_repeated_action_next_turn_only() -> void:
+	# 批⑤五改「锁招」：回合1 施放(敌按防) → 回合2 敌方只能「防」（其余全不可选·能量语义不受影响）→ 回合3 解锁。
 	var b := _battle_vs(["h17", "test_p0_1", "test_p0_2"], ["test_p1_0", "test_p1_1", "test_p1_2"], 6, 8)
 	assert_true(b.select_active(0), "阖眸成夜可发动(敌出战存活)")
 	b.select_action(1, ActionDef.Action.DEFEND)
 	b.resolve()
 	assert_eq(b.energy[0], 8 - 2 + 2, "费 1 能(2 半能) + 被动 +1 能 → 净持平")
-	assert_eq(b.action_ban_turn[1], 1, "禁用登记在回合 1（下一拍）")
-	assert_eq(b.action_banned[1], ActionDef.Action.DEFEND, "被禁动作 = 敌方施放拍所用的「防」")
-	# 回合2：P1 的「防」不可选·其余全部照常（含能量语义）
-	assert_false(b.can_afford(1, ActionDef.Action.DEFEND), "「防」被禁不可选")
-	assert_true(b.can_afford(1, ActionDef.Action.ATTACK), "波照常")
-	assert_true(b.can_afford(1, ActionDef.Action.CHARGE), "攒照常")
-	assert_true(b.can_afford(1, ActionDef.Action.BIG_DEFEND), "大防照常（禁的是动作不是能量）")
+	assert_eq(b.action_lock_turn[1], 1, "锁定登记在回合 1（下一拍）")
+	assert_eq(b.action_locked[1], ActionDef.Action.DEFEND, "锁定动作 = 敌方施放拍所用的「防」")
+	# 回合2：P1 只能「防」·其余全不可选（能量语义不受影响）
+	assert_true(b.can_afford(1, ActionDef.Action.DEFEND), "锁定的「防」可选（唯一合法）")
+	assert_false(b.can_afford(1, ActionDef.Action.ATTACK), "波不可选")
+	assert_false(b.can_afford(1, ActionDef.Action.CHARGE), "攒不可选（锁定动作可执行时无兜底）")
+	assert_false(b.can_afford(1, ActionDef.Action.BIG_DEFEND), "大防不可选")
 	assert_true(b.usable_energy(1) > 0, "能量语义不受影响（≠旧冻结）")
 	var acts: Array = b.legal_actions(1)
-	for entry: Dictionary in acts:
-		assert_ne(int(entry["action"]), int(ActionDef.Action.DEFEND), "legal_actions 不含被禁动作")
+	assert_eq(acts.size(), 1, "legal_actions 只剩锁定动作一项")
+	assert_eq(int(acts[0]["action"]), int(ActionDef.Action.DEFEND), "唯一合法动作 = 被锁的「防」")
 	b.select_action(0, ActionDef.Action.CHARGE)
-	b.select_action(1, ActionDef.Action.CHARGE)
+	b.select_action(1, ActionDef.Action.DEFEND)
 	b.resolve()
-	# 回合3：解禁
-	assert_true(b.can_afford(1, ActionDef.Action.DEFEND), "次回合解禁 → 防恢复可选")
+	# 回合3：解锁
+	assert_true(b.can_afford(1, ActionDef.Action.ATTACK), "次回合解锁 → 波恢复可选")
 
 
-func test_h17_ban_uses_capped_at_two_and_chains() -> void:
-	# 每局上限 2 次；两次可贴着连放（连禁两拍·合法）。
+func test_h17_lock_unaffordable_action_falls_back_to_charge() -> void:
+	# 批⑤回归（兜底无死锁）：锁定「大波」(3 能)但敌方下拍付不起 → 只能「攒」。
+	var b := _battle_vs(["h17", "test_p0_1", "test_p0_2"], ["test_p1_0", "test_p1_1", "test_p1_2"], 6, 8)
+	b.energy[1] = 6   # 敌方 3 能：本拍付得起大波(6 半能)·打完归零下拍付不起
+	b.select_active(0)
+	b.select_action(1, ActionDef.Action.BIG_ATTACK)
+	b.resolve()
+	assert_eq(b.action_locked[1], ActionDef.Action.BIG_ATTACK, "锁定动作 = 大波")
+	assert_false(b.can_afford(1, ActionDef.Action.BIG_ATTACK), "大波付不起(能量不足)")
+	assert_true(b.can_afford(1, ActionDef.Action.CHARGE), "兜底：只能攒")
+	assert_false(b.can_afford(1, ActionDef.Action.DEFEND), "兜底拍其他动作仍不可选")
+	assert_true(b.legal_actions(1).size() >= 1, "合法动作集非空（无死锁）")
+
+
+func test_h17_lock_uses_capped_at_two_and_chains() -> void:
+	# 每局上限 2 次；两次可贴着连放（连锁两拍·合法）。锁「攒」拍敌方只能攒（最小收益面）。
 	var b := _battle_vs(["h17", "test_p0_1", "test_p0_2"], ["test_p1_0", "test_p1_1", "test_p1_2"], 6, 20)
 	b.select_active(0)
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(b.action_banned[1], ActionDef.Action.CHARGE, "第一发禁「攒」")
+	assert_eq(b.action_locked[1], ActionDef.Action.CHARGE, "第一发锁「攒」")
+	assert_false(b.can_afford(1, ActionDef.Action.DEFEND), "被锁攒拍：防不可选")
 	assert_true(b.can_use_active(0), "还剩 1 次 → 可再放")
 	b.select_active(0)
-	b.select_action(1, ActionDef.Action.DEFEND)
+	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
 	assert_eq(int(b.get_status(0, 0, "active_uses", 0)), 2, "已用 2 次")
 	assert_false(b.can_use_active(0), "每局上限 2 → 第 3 次不可用")
-	assert_eq(b.action_ban_turn[1], 2, "连放：第二发登记在回合 2")
-	assert_eq(b.action_banned[1], ActionDef.Action.DEFEND, "第二发禁「防」")
+	assert_eq(b.action_lock_turn[1], 2, "连放：第二发登记在回合 2")
 
 
-func test_h17_ban_blocks_enemy_active_skill_when_repeated() -> void:
-	# 施放拍敌方用了主动技 → 下拍其主动技被禁（can_use_active 收口）。
+func test_h17_lock_forces_enemy_active_skill_when_repeated() -> void:
+	# 施放拍敌方用了主动技 → 下拍其只能再放主动技（ACTIVE 同轨·基础动作全不可选）。
 	var b := _battle_vs(["h17", "test_p0_1", "test_p0_2"], ["h21", "test_p1_1", "test_p1_2"], 6, 20)
 	assert_true(b.can_use_active(1), "施放前：暗猴主动技可用")
 	b.select_active(0)
 	b.select_active(1)   # 敌方同拍也放主动技（调虎离山）
 	b.resolve()
-	assert_eq(b.action_banned[1], ActionDef.ACTIVE, "被禁动作 = ACTIVE")
-	assert_false(b.can_use_active(1), "下拍：敌方主动技被禁")
-	assert_true(b.can_afford(1, ActionDef.Action.ATTACK), "基础动作不受影响")
+	assert_eq(b.action_locked[1], ActionDef.ACTIVE, "锁定动作 = ACTIVE")
+	assert_true(b.can_use_active(1), "下拍：敌方只能再放主动技（cap 未满可执行）")
+	assert_false(b.can_afford(1, ActionDef.Action.ATTACK), "基础动作全不可选")
 
 
 # ---- 沉默 status 基建直测（原 h17 机制已弃·基建保留=远征怪/道具候选·锁 Phase 0.3 行为）----

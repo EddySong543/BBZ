@@ -70,8 +70,8 @@ var turn_number: int = 0
 var game_over: bool = false
 var winner: int = WINNER_UNDECIDED
 var overtime_mode: bool = false           # 加时赛局（create_overtime / apply_overtime_bench 置位·启用骤死裁决）
-var action_ban_turn: Array[int] = [-1, -1]      # 烛阴 h17【阖眸成夜】v4：该回合号时此玩家的 action_banned 不可用（-1=无）
-var action_banned: Array[int] = [-1, -1]        # 被禁动作（ActionDef.Action 或 ActionDef.ACTIVE·=施放拍对手用过的动作）
+var action_lock_turn: Array[int] = [-1, -1]     # 烛阴 h17【阖眸成夜】v5（锁招）：该回合号时此玩家只能使用 action_locked（-1=无锁）
+var action_locked: Array[int] = [-1, -1]        # 被锁定动作（ActionDef.Action 或 ActionDef.ACTIVE·=施放拍对手用过的动作·不可执行时兜底只能攒）
 var pierce_next_attack: Array[bool] = [false, false]   # 毕方 h22【焚天火兆】v3：该方下一次动作攻击穿大防（全队资源·不过期·兑现/落空即消·2026-07-06 批④）
 
 var rng := RandomNumberGenerator.new()    # 可 seed (§D7)：联机/录像/测试可复现
@@ -300,7 +300,7 @@ func _get_cost(player: int, action: int) -> int:
 ## 本方【可用】能量（半能）= 能量池（最低 0）。
 ## 本函数是全引擎唯一能量闸口（can_afford/主动技/疾风双动作/道具补·升全走此）。
 ## ⚠ 2026-07-06：烛阴 h17 能量冻结已弃（大轮 29.5% 三连败=锁钱锁不住免费「防」）→
-##   四改为动作禁用（action_ban_*·can_afford/can_use_active 收口），本函数恢复纯能量语义。
+##   四改动作禁用→批⑤五改锁招（action_lock_*·can_afford/can_use_active 收口），本函数保持纯能量语义。
 func usable_energy(player: int) -> int:
 	return maxi(0, energy[player])
 
@@ -330,13 +330,41 @@ func _can_switch(player: int) -> bool:
 
 
 func can_afford(player: int, action: int) -> bool:
-	if turn_number == action_ban_turn[player] and action == action_banned[player]:
-		return false   # 阖眸成夜 h17 v4：被禁动作本拍不合法（单一收口，legal_actions/UI/AI 全走此）
+	if turn_number == action_lock_turn[player]:
+		# 阖眸成夜 h17 v5（锁招）：锁定动作可执行 → 本拍仅它合法；不可执行（付不起 /
+		# 被其他规则禁 / 切换无活替补 / 主动技 cap 满）→ 兜底只能「攒」（无死锁保证）。
+		if _locked_action_doable(player):
+			if action != action_locked[player]:
+				return false
+		elif action != ActionDef.Action.CHARGE:
+			return false
 	if action in ActionDef.DEFEND_ACTIONS and not _can_defend(player):
 		return false   # 血勇：嗜杀红温·防/大防不合法（单一收口，legal_actions/UI/AI 全走此）
 	if action == ActionDef.Action.SWITCH and not _can_switch(player):
 		return false   # 缠绕：对手出战是暗蛇 → 切换不合法（legal_actions/select_switch/UI 全走此）
 	return usable_energy(player) >= _get_cost(player, action)
+
+
+## 锁定动作当前是否可执行（不含锁定规则自身·防递归）——付得起且未被其他规则禁；
+## 锁「切换」需有存活替补（否则合法集为空=死锁）；锁主动技走 _can_use_active_raw（cap/费用/前置）。
+## 仅在锁定生效拍被调用（非常态热路径）·零分配。
+func _locked_action_doable(player: int) -> bool:
+	var a: int = action_locked[player]
+	if a == ActionDef.ACTIVE:
+		return _can_use_active_raw(player)
+	if a in ActionDef.DEFEND_ACTIONS and not _can_defend(player):
+		return false
+	if a == ActionDef.Action.SWITCH:
+		if not _can_switch(player):
+			return false
+		var has_bench := false
+		for s in range(hp[player].size()):
+			if s != active_index[player] and hp[player][s] > 0:
+				has_bench = true
+				break
+		if not has_bench:
+			return false
+	return usable_energy(player) >= _get_cost(player, a)
 
 
 func select_action(player: int, action: int) -> bool:
@@ -355,10 +383,15 @@ func _heal(player: int, slot: int, amount: int) -> int:
 	return hp[player][slot] - before
 
 
-## 当前出战英雄的主动技是否可用（has_active + cap 未满 + 能量够 + 组件自定前置）。
+## 当前出战英雄的主动技是否可用（has_active + cap 未满 + 能量够 + 组件自定前置 + 锁招收口）。
 func can_use_active(player: int) -> bool:
-	if turn_number == action_ban_turn[player] and action_banned[player] == ActionDef.ACTIVE:
-		return false   # 阖眸成夜 h17 v4：施放拍对手用了主动技 → 下拍其主动技被禁
+	if turn_number == action_lock_turn[player] and action_locked[player] != ActionDef.ACTIVE:
+		return false   # 阖眸成夜 h17 v5：本拍被锁定在非主动技动作 → 主动技不可用（兜底攒不经此口）
+	return _can_use_active_raw(player)
+
+
+## 主动技可用性（不含锁招规则·供 can_use_active 与 _locked_action_doable 复用防递归）。
+func _can_use_active_raw(player: int) -> bool:
 	var slot: int = active_index[player]
 	var sk: HeroSkill = _eff_skill(player, slot)   # 沉默 → null → 主动技不可用
 	if sk == null or not sk.has_active():
@@ -931,8 +964,8 @@ func clone() -> BattleCore:
 	c.game_over = game_over
 	c.winner = winner
 	c.overtime_mode = overtime_mode
-	c.action_ban_turn = action_ban_turn.duplicate()
-	c.action_banned = action_banned.duplicate()
+	c.action_lock_turn = action_lock_turn.duplicate()
+	c.action_locked = action_locked.duplicate()
 	c.pierce_next_attack = pierce_next_attack.duplicate()
 	c.pve_no_econ = pve_no_econ
 	c.rng = RandomNumberGenerator.new()
