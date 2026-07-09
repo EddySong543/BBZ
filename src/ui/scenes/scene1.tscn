@@ -13,6 +13,7 @@
 [ext_resource type="Shader" uid="uid://8nr5wbxavv34" path="res://assets/shaders/canvas_fx_edge_soften.gdshader" id="16_edgesoft"]
 [ext_resource type="Shader" uid="uid://u0mpca3l8lig" path="res://assets/shaders/canvas_fx_moonlight.gdshader" id="17_moonlight"]
 [ext_resource type="Shader" uid="uid://ds1lag0nmchpk" path="res://assets/shaders/canvas_fx_box_blur.gdshader" id="20_boxblur"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_env_fog_band.gdshader" id="22_fogband"]
 
 [sub_resource type="ShaderMaterial" id="SkyMat"]
 shader = ExtResource("3_sky")
@@ -100,6 +101,13 @@ shader_parameter/patch_angle = 0.0
 shader_parameter/patch_gain = 3.4
 shader_parameter/patch_tint = Color(0.62, 0.78, 1, 1)
 shader_parameter/patch_tint_strength = 0.3
+
+[sub_resource type="ShaderMaterial" id="FogBandMat"]
+shader = ExtResource("22_fogband")
+shader_parameter/fog_color = Color(0.55, 0.65, 0.8, 1)
+shader_parameter/alpha_max = 0.1
+shader_parameter/drift_speed = 0.01
+shader_parameter/scale_x = 2.0
 
 [sub_resource type="ShaderMaterial" id="RfMat1"]
 shader = ExtResource("20_boxblur")
@@ -359,6 +367,17 @@ texture = ExtResource("2_roof")
 expand_mode = 1
 flip_h = true
 metadata/parallax_factor = 1.4
+
+[node name="FogBand" type="ColorRect" parent="."]
+material = SubResource("FogBandMat")
+layout_mode = 0
+offset_left = -383.0
+offset_top = 790.0
+offset_right = 2317.0
+offset_bottom = 960.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+metadata/parallax_factor = 1.55
 
 [node name="MoonDust" type="GPUParticles2D" parent="." unique_id=171542226]
 position = Vector2(1240, 330)
