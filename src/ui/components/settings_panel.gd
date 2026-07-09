@@ -14,9 +14,18 @@ const INK_SOFT := Color(0.42, 0.34, 0.24)    # 淡墨（次级字）
 const PANEL_BACKING := Color(0.16, 0.11, 0.07, 0.99)  # 墨色书脊衬底
 const PANEL_FILL := Color(0.88, 0.82, 0.68, 0.99)     # 羊皮页填充
 const SEP_COLOR := Color(0.45, 0.36, 0.24, 0.5)       # 暖墨分隔线
-const CARD_SIZE := Vector2(580.0, 660.0)
+const CARD_SIZE := Vector2(580.0, 700.0)
+
+## 显示模式选项（键=GameSettings 值·序=循环切换顺序）。
+const WINDOW_MODES: Array[String] = ["windowed", "borderless", "fullscreen"]
+const WINDOW_MODE_NAMES := {
+	"windowed": "窗口化",
+	"borderless": "全屏窗口化",
+	"fullscreen": "全屏(独占)",
+}
 
 var _color_swatch: ColorRect
+var _res_button: Button
 
 
 func _ready() -> void:
@@ -84,8 +93,10 @@ func _build() -> void:
 
 	# —— 界面主色 翻转（必做项）——
 	vbox.add_child(_color_row())
-	# —— 显示 ——
-	vbox.add_child(_toggle_row("全屏显示", "fullscreen"))
+	# —— 显示（模式循环切换 + 窗口化分辨率·2026-07-09 取代旧全屏开关）——
+	vbox.add_child(_window_mode_row())
+	vbox.add_child(_resolution_row())
+	_refresh_res_enabled()
 	# —— 音量 ——
 	vbox.add_child(_slider_row("总音量", "master_volume"))
 	vbox.add_child(_slider_row("音乐", "music_volume"))
@@ -138,16 +149,58 @@ func _make_button(text: String) -> Button:
 	return b
 
 
-## 开关行（全屏）：标签 + CheckButton，即时写设置。
-func _toggle_row(label_text: String, key: String) -> HBoxContainer:
+## 显示模式行：标签 + 循环切换钮（窗口化 → 全屏窗口化 → 全屏独占 → 循环）。
+func _window_mode_row() -> HBoxContainer:
 	var row := HBoxContainer.new()
-	row.add_child(_row_label(label_text))
-	var cb := CheckButton.new()
-	cb.button_pressed = bool(GameSettings.get_value(key))
-	cb.add_theme_color_override("font_color", INK)
-	cb.toggled.connect(func(on: bool) -> void: GameSettings.set_value(key, on))
-	row.add_child(cb)
+	row.add_child(_row_label("显示模式"))
+	var btn := _make_button(String(WINDOW_MODE_NAMES.get(String(GameSettings.get_value("window_mode")), "窗口化")))
+	btn.custom_minimum_size = Vector2(210.0, 50.0)
+	btn.pressed.connect(func() -> void:
+		var cur: int = WINDOW_MODES.find(String(GameSettings.get_value("window_mode")))
+		var next: String = WINDOW_MODES[(cur + 1) % WINDOW_MODES.size()]
+		GameSettings.set_value("window_mode", next)
+		btn.text = String(WINDOW_MODE_NAMES[next])
+		_refresh_res_enabled())
+	row.add_child(btn)
 	return row
+
+
+## 分辨率行（仅窗口化模式可用）：标签 + 循环切换钮（预设按屏幕大小过滤）。
+func _resolution_row() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_child(_row_label("分辨率"))
+	_res_button = _make_button(String(GameSettings.get_value("resolution")))
+	_res_button.custom_minimum_size = Vector2(210.0, 50.0)
+	_res_button.pressed.connect(func() -> void:
+		var opts: Array[String] = _available_resolutions()
+		var cur: int = opts.find(String(GameSettings.get_value("resolution")))
+		var next: String = opts[(cur + 1) % opts.size()]
+		GameSettings.set_value("resolution", next)
+		_res_button.text = next)
+	row.add_child(_res_button)
+	return row
+
+
+## 预设分辨率按当前屏幕过滤（不给出比屏幕还大的选项）；全被滤掉时保底设计画布档。
+func _available_resolutions() -> Array[String]:
+	var scr := DisplayServer.screen_get_size()
+	var out: Array[String] = []
+	for r in GameSettings.RESOLUTION_PRESETS:
+		var sz := GameSettings.parse_resolution(r)
+		if sz.x <= scr.x and sz.y <= scr.y:
+			out.append(r)
+	if out.is_empty():
+		out.append("1920x1080")
+	return out
+
+
+## 分辨率行仅窗口化模式可点（全屏两档尺寸由系统接管）。
+func _refresh_res_enabled() -> void:
+	if _res_button == null:
+		return
+	var windowed: bool = String(GameSettings.get_value("window_mode")) == "windowed"
+	_res_button.disabled = not windowed
+	_res_button.modulate.a = 1.0 if windowed else 0.45
 
 
 ## 滑块行（音量）：标签 + HSlider(0~1) + 百分比，即时写设置。

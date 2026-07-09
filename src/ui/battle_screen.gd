@@ -21,8 +21,8 @@ const LOW_HP_RATIO := 0.5
 ## 顶部 UI 整体下移量(px)：原布局太贴屏幕顶端 → 下沉一点留呼吸。改这一个数即可整组调整。
 ## 注：当前为运行时代码统一微调(编辑器里仍是基准位)；下移量定稿后可烘焙进 .tscn 使"所见=所得"。
 const TOP_UI_DROP := 26.0   # 顶部 UI 整体下移量（2026-06-28 Eddy：44太多→回调到26）；0=复原原位
-const BUBBLE_HEAD_RISE := 112.0  # 出招气泡锚点：角色显示容器「中心」上移此值（越大气泡越高·够高才不压角色）
-const BUBBLE_SIDE_X := 100.0     # 出招气泡水平偏移：己方(P0)放头「右上」/ 敌方(P1)镜像「左上」（越大越往外侧·够大才不和角色重合）
+const BUBBLE_HEAD_RISE := 127.0  # 出招气泡锚点：角色显示容器「中心」上移此值（越大气泡越高·够高才不压角色·随立绘 2.5x 同步 2026-07-09）
+const BUBBLE_SIDE_X := 114.0     # 出招气泡水平偏移：己方(P0)放头「右上」/ 敌方(P1)镜像「左上」（越大越往外侧·够大才不和角色重合·随立绘 2.5x 同步）
 
 ## 顶部头像框尺寸（Eddy 要求整体放大一档·2026-06-20）。出战 / 替补；放大走「底固定向上长」
 ## （见 _enlarge_frames），不压下方血行/名字。原基准 72 / 68。
@@ -225,6 +225,7 @@ func _ready() -> void:
 
 	_nudge_top_ui_down()
 	_build_debug_buttons()
+	_build_settings_button()   # 战斗内设置入口（右上角小钮 + ESC·2026-07-09）
 
 	_build_skill_entries()
 	skill_card.advance_requested.connect(_on_skill_card_advance)
@@ -1398,6 +1399,49 @@ func _fmt_hp(v: float) -> String:
 	if is_equal_approx(v, roundf(v)):
 		return "%d" % int(roundf(v))
 	return "%.1f" % v
+
+
+# ============================================================
+# 战斗内设置入口（右上角小钮 + ESC）
+# ============================================================
+
+## 右上角"设置"小钮（P2 道具槽行下方空区·暗色低调工具件·不与战斗 UI 抢眼）。
+func _build_settings_button() -> void:
+	var b := Button.new()
+	b.name = "SettingsButton"
+	b.text = "设置"
+	FontManager.apply_btn(b, 16)
+	b.add_theme_color_override("font_color", Color(0.70, 0.64, 0.53))       # 暖骨降级字色（工具件·非主操作）
+	b.add_theme_color_override("font_hover_color", Color(0.95, 0.91, 0.8))  # hover 暖米白
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.08, 0.07, 0.06, 0.72)
+	sb.border_color = Color(0.42, 0.36, 0.26, 0.8)
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(3)
+	for st in ["normal", "hover", "pressed", "focus"]:
+		b.add_theme_stylebox_override(st, sb)
+	b.position = Vector2(1826.0, 254.0)   # P2 道具槽行正下方右缘（空天区·不压任何 HUD）
+	b.size = Vector2(64.0, 30.0)
+	b.pressed.connect(_open_settings)
+	add_child(b)
+
+
+## 打开设置浮层（复用主菜单 SettingsPanel·加为末子节点=盖住全部战斗 UI）。
+## 打开期间暂停出招倒计时（防止面板里改设置时被自动确认），关闭恢复。
+func _open_settings() -> void:
+	if has_node("SettingsPanel"):
+		return
+	var panel := SettingsPanel.new()
+	panel.name = "SettingsPanel"
+	add_child(panel)
+	game_timer.paused = true
+	panel.closed.connect(func() -> void: game_timer.paused = false)
+
+
+## ESC 打开设置（面板开着时其自身 _input 先拦下 ESC 用于关闭，不会走到这里）。
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel") and not has_node("SettingsPanel"):
+		_open_settings()
 
 
 # ============================================================

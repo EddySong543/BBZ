@@ -10,18 +10,28 @@ extends RefCounted
 ## 覆盖的游戏相关设置：
 ##   - master_volume / music_volume / sfx_volume：音量（接 AudioServer 总线，
 ##     Music/SFX 总线尚未建[无音频内容期]→值仍持久化、等音频接入即生效）。
-##   - fullscreen：全屏 / 窗口。
+##   - window_mode：显示模式 windowed(窗口化) / borderless(全屏窗口化) / fullscreen(独占全屏)。
+##     （2026-07-09 取代旧 fullscreen 布尔键·旧 cfg 自动迁移）
+##   - resolution："宽x高" 字符串，仅窗口化模式生效（全屏两档跟随屏幕）。
+##     设计画布恒 1920×1080，窗口尺寸变化由 content_scale 等比缩放（工程未配 stretch·运行时接管）。
 ##   - invert_colors：界面主色 红↔蓝 翻转（写入 BootResult，过场幕 + 菜单/BP 波流背景全链路生效）。
 
 const _PATH := "user://bobozan_settings.cfg"
 const _SECTION := "game"
+
+## 设计画布（所有 UI 按此布局·窗口另有尺寸时 content_scale 等比缩放）。
+const DESIGN_SIZE := Vector2i(1920, 1080)
+
+## 窗口化模式可选分辨率（16:9·设置面板按屏幕大小过滤展示）。
+const RESOLUTION_PRESETS: Array[String] = ["1280x720", "1600x900", "1920x1080", "2560x1440"]
 
 ## 默认值（同时也是合法键的白名单）。
 const DEFAULTS := {
 	"master_volume": 1.0,
 	"music_volume": 1.0,
 	"sfx_volume": 1.0,
-	"fullscreen": false,
+	"window_mode": "windowed",
+	"resolution": "1920x1080",
 	"invert_colors": false,
 }
 
@@ -69,6 +79,9 @@ static func load_from_disk() -> void:
 		for k: String in DEFAULTS.keys():
 			if cfg.has_section_key(_SECTION, k):
 				_data[k] = cfg.get_value(_SECTION, k, DEFAULTS[k])
+		# 旧键迁移：fullscreen(bool) → window_mode（2026-07-09 显示设置改版）
+		if cfg.has_section_key(_SECTION, "fullscreen") and not cfg.has_section_key(_SECTION, "window_mode"):
+			_data["window_mode"] = "borderless" if bool(cfg.get_value(_SECTION, "fullscreen", false)) else "windowed"
 	_loaded = true
 
 
@@ -102,8 +115,8 @@ static func _apply_one(key: String) -> void:
 			_apply_bus_volume("Music", float(get_value("music_volume")))
 		"sfx_volume":
 			_apply_bus_volume("SFX", float(get_value("sfx_volume")))
-		"fullscreen":
-			_apply_fullscreen(bool(get_value("fullscreen")))
+		"window_mode", "resolution":
+			_apply_display()
 		"invert_colors":
 			BootResult.invert_colors = bool(get_value("invert_colors"))
 
@@ -118,7 +131,40 @@ static func _apply_bus_volume(bus_name: String, v: float) -> void:
 		AudioServer.set_bus_volume_db(idx, linear_to_db(clampf(v, 0.0001, 1.0)))
 
 
-static func _apply_fullscreen(on: bool) -> void:
-	var mode := DisplayServer.WINDOW_MODE_FULLSCREEN if on else DisplayServer.WINDOW_MODE_WINDOWED
-	if DisplayServer.window_get_mode() != mode:
-		DisplayServer.window_set_mode(mode)
+## 应用显示模式 + 分辨率（window_mode / resolution 任一变动都整体重应用）。
+## 设计画布恒 1920×1080：先确保 content_scale 等比缩放接管（工程未配 stretch），
+## 再按模式切窗口——窗口化时用 resolution 设尺寸并居中；全屏两档由系统接管尺寸。
+static func _apply_display() -> void:
+	if DisplayServer.get_name() == "headless":
+		return   # GUT / CLI 截图等无窗环境跳过
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree != null:
+		var win := tree.root
+		win.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+		win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
+		win.content_scale_size = DESIGN_SIZE
+	match String(get_value("window_mode")):
+		"fullscreen":
+			if DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN:
+				DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)
+		"borderless":
+			if DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_FULLSCREEN:
+				DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+		_:
+			if DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_WINDOWED:
+				DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+			var sz := parse_resolution(String(get_value("resolution")))
+			if DisplayServer.window_get_size() != sz:
+				DisplayServer.window_set_size(sz)
+				# 居中到当前屏幕
+				var scr_pos := DisplayServer.screen_get_position()
+				var scr_sz := DisplayServer.screen_get_size()
+				DisplayServer.window_set_position(scr_pos + (scr_sz - sz) / 2)
+
+
+## "1920x1080" → Vector2i；非法值回退设计画布。
+static func parse_resolution(s: String) -> Vector2i:
+	var parts := s.split("x")
+	if parts.size() == 2 and int(parts[0]) > 0 and int(parts[1]) > 0:
+		return Vector2i(int(parts[0]), int(parts[1]))
+	return DESIGN_SIZE
