@@ -1779,7 +1779,8 @@ func _process(_delta: float) -> void:
 	if _world:
 		var gd: float = stage.ground_dolly()
 		_world.scale = Vector2.ONE * gd
-		_world.position = stage.focal() * (1.0 - gd)
+		# 鼠标视差：角色组加上地面层同款平移（stage.pointer_ground_offset）→ 与脚下屋脊零滑动。
+		_world.position = stage.focal() * (1.0 - gd) + stage.pointer_ground_offset()
 
 
 ## A3：阴影随角色动作变形。

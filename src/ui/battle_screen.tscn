@@ -193,6 +193,7 @@ script = ExtResource("1_battle_gd")
 [node name="Stage" parent="." unique_id=924300025 instance=ExtResource("7_stage")]
 layout_mode = 1
 mouse_filter = 2
+pointer_parallax = true
 demo_click_shake = false
 
 [node name="P1Shadow" type="TextureRect" parent="." unique_id=329774492]

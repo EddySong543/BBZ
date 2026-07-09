@@ -255,6 +255,7 @@ offset_bottom = 885.01
 mouse_filter = 2
 texture = ExtResource("12_mtntex")
 expand_mode = 1
+metadata/parallax_factor = 0.35
 
 [node name="Mountain_right" type="TextureRect" parent="." unique_id=2101690780]
 self_modulate = Color(0.58, 0.65, 0.88, 1)
@@ -268,6 +269,7 @@ offset_bottom = 836.6752
 mouse_filter = 2
 texture = ExtResource("12_mtntex")
 expand_mode = 1
+metadata/parallax_factor = 0.28
 
 [node name="HorizonHaze" type="ColorRect" parent="." unique_id=1841776131]
 material = SubResource("HazeMat")
@@ -279,6 +281,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 color = Color(0, 0, 0, 0)
+metadata/parallax_factor = 0.5
 
 [node name="RooftopL" type="TextureRect" parent="." unique_id=111504973]
 self_modulate = Color(0.4, 0.46, 0.6, 1)
@@ -384,7 +387,9 @@ position = Vector2(1240, 330)
 texture = SubResource("DustTex")
 lifetime = 9.0
 preprocess = 6.0
+local_coords = true
 process_material = SubResource("MoonDustMat")
+metadata/parallax_factor = 1.2
 
 [node name="GroundEmber" type="GPUParticles2D" parent="." unique_id=171542227]
 material = SubResource("EmberBlend")
@@ -393,4 +398,6 @@ amount = 45
 texture = SubResource("DustTex")
 lifetime = 7.0
 preprocess = 5.0
+local_coords = true
 process_material = SubResource("EmberMat")
+metadata/parallax_factor = 1.1
