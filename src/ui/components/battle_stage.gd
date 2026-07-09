@@ -48,8 +48,11 @@ extends Control
 @export var focus_point: Vector2 = Vector2(960, 600)
 ## 对焦最大额外缩放，× 各层 parallax_factor → 近景缩放多、远景少 = 多图层 dolly（克制·~2-3%）。
 @export var focus_zoom: float = 0.025
-## 对焦推近 / 回正的缓动速度（越大越快跟上 hover）。
+## 对焦推近的缓动速度（越大越快跟上出招）。
 @export var focus_speed: float = 9.0
+## 对焦回正（缩小）的缓动速度——独立于推近：动作结束后场上没有别的运动掩护，
+## 单独的缩小很显眼，放慢 ~3× 让镜头"缓缓退出"与推近一样丝滑（Eddy 2026-07-09）。
+@export var focus_release_speed: float = 3.2
 ## 大波命中"前推顿帧"的额外缩放峰值，× parallax_factor（payoff·比 hover 略强·与 hover 叠加）。
 @export var punch_zoom: float = 0.04
 ## 对焦点水平偏置（像素）× dir：攻击 dir+1 焦点右移=聚焦敌人 / 防御 dir-1 左移=聚焦自身 / 技能 0 居中。
@@ -143,7 +146,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
-	var k_ease: float = 1.0 - exp(-focus_speed * delta)
+	# 推近快（跟上出招）、回正慢（结束时无其他运动掩护·缓退才丝滑）——非对称缓动。
+	var fspd: float = focus_speed if _focus_target > _focus else focus_release_speed
+	var k_ease: float = 1.0 - exp(-fspd * delta)
 	_focus = lerpf(_focus, _focus_target, k_ease)
 	_focal = _focal.lerp(_focal_target, k_ease)
 	if _shake_amp > 0.0:
@@ -159,8 +164,9 @@ func _process(delta: float) -> void:
 			target_nx = clampf((get_local_mouse_position().x / vp.x - 0.5) * 2.0, -1.0, 1.0)
 	_pnx = lerpf(_pnx, target_nx, 1.0 - exp(-pointer_smooth * delta))
 
+	# idle 漂移仅水平——垂直起伏会让檐角/屋顶"呼吸"（建筑不该呼吸·Eddy 2026-07-09 去除）；
+	# 雾带的纵向生命感由其 shader 内部流动负责，不靠节点位移。
 	var drift_x: float = (sin(_time * idle_speed) * idle_amplitude) if idle_drift else 0.0
-	var drift_y: float = (cos(_time * idle_speed * 0.7) * idle_amplitude * 0.5) if idle_drift else 0.0
 	var shake_x: float = sin(_time * 57.0) * _shake_amp
 	var shake_y: float = cos(_time * 43.0) * _shake_amp
 
@@ -177,7 +183,7 @@ func _process(delta: float) -> void:
 		var idle_w: float = maxf(f - ground_parallax, IDLE_FAR_CAP)
 		var off := Vector2(
 			drift_x * idle_w + (shake_x - _pnx * pointer_strength) * f,
-			drift_y * idle_w + shake_y * f)
+			shake_y * f)
 		# 镜头推近：绕动态对焦点 _focal 缩放（显式 position 数学·焦点随动作左右偏置=聚焦敌/我）。
 		# k=1（静止）时退化为 position=base+off、scale=base → 与原始画面一像素不差。
 		var k: float = 1.0 + (_focus * focus_zoom + _punch * punch_zoom) * f

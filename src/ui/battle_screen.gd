@@ -1633,14 +1633,20 @@ func _act_juice(player: int, action: int) -> void:
 	var dir := 1.0 if player == 0 else -1.0
 	match action:
 		A.ATTACK, A.BIG_ATTACK:
-			# 攻击帧动画（实验·目前仅 h01 有 "attack"；无此动画的英雄 play_animation 内部静默跳过，
-			# 与前冲 juice 叠加播放·播完自动回 idle）。
-			cd.play_animation("attack")
 			var reach := 190.0 if action == A.BIG_ATTACK else 140.0
 			var tw := create_tween()
-			tw.tween_property(cd, "position", home + Vector2(-28.0 * dir, 0), 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-			tw.tween_property(cd, "position", home + Vector2(reach * dir, 0), 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-			tw.tween_property(cd, "position", home, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			if cd.has_action_anim("attack"):
+				# 帧动画英雄（h01 起）：挥刀帧信息量大会盖掉常规前冲——省去容器后撤
+				# （动画自带蓄势）、前冲加大 1.3× 并顶在前段贯穿命中拍（0.27s），平移才读得出来。
+				cd.play_animation("attack")
+				tw.tween_property(cd, "position", home + Vector2(reach * 1.3 * dir, 0), 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+				tw.tween_interval(0.14)
+				tw.tween_property(cd, "position", home, 0.26).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			else:
+				# 静态图英雄：后撤蓄势 → 前冲 → 回位（平移=唯一攻击运动信号·原配方不动）。
+				tw.tween_property(cd, "position", home + Vector2(-28.0 * dir, 0), 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+				tw.tween_property(cd, "position", home + Vector2(reach * dir, 0), 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+				tw.tween_property(cd, "position", home, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 			# A3：出招瞬间被自己的招式照亮（月光描边增强）。
 			cd.pulse_rim(1.4 if action == A.BIG_ATTACK else 0.9, 0.3)
 		A.DEFEND, A.BIG_DEFEND:

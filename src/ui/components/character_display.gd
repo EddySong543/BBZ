@@ -298,6 +298,12 @@ func _ensure_animation(anim_name: String, path: String) -> void:
 			sf.add_frame(anim_name, atlas)
 
 
+## 当前帧资源是否带指定动画（battle_screen 据此为帧动画英雄换用专属前冲 juice）。
+func has_action_anim(anim_name: String) -> bool:
+	return _sprite != null and _sprite.sprite_frames != null \
+		and _sprite.sprite_frames.has_animation(anim_name)
+
+
 ## Play a one-shot animation, then return to idle.
 func play_animation(anim_name: String, return_to_idle: bool = true) -> void:
 	if not _sprite or not _sprite.sprite_frames:
