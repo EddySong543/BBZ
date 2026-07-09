@@ -22,6 +22,10 @@
 [ext_resource type="FontFile" uid="uid://crf26hvhxwgim" path="res://assets/font/ark-pixel-16px-proportional-zh_cn.ttf" id="23_pixelfont"]
 [ext_resource type="Script" uid="uid://cjou81ur7el87" path="res://src/ui/components/reserve_hp_row.gd" id="24_reservehp"]
 [ext_resource type="Script" uid="uid://dvdbihej8rx16" path="res://src/ui/components/icon_badge.gd" id="25_iconbadge"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_fx_finisher_veil.gdshader" id="26_finveil"]
+
+[sub_resource type="ShaderMaterial" id="FinisherVeilMat"]
+shader = ExtResource("26_finveil")
 
 [sub_resource type="Gradient" id="ShadowGradient"]
 offsets = PackedFloat32Array(0, 0.55, 1)
@@ -195,6 +199,21 @@ layout_mode = 1
 mouse_filter = 2
 pointer_parallax = true
 demo_click_shake = false
+
+[node name="FinisherGrab" type="BackBufferCopy" parent="."]
+copy_mode = 0
+
+[node name="FinisherVeil" type="ColorRect" parent="."]
+visible = false
+material = SubResource("FinisherVeilMat")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
 
 [node name="P1Shadow" type="TextureRect" parent="." unique_id=329774492]
 texture_filter = 2

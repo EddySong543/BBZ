@@ -91,6 +91,10 @@ var _skill_index: int = 0
 @onready var _death_switch_overlay: DeathSwitchOverlay = $DeathSwitchOverlay
 @onready var game_timer: Timer = $GameTimer
 @onready var stage: BattleStage = $Stage   # 多层视差舞台：受击震屏走 stage.shake 按 parallax_factor 分层（见 battle_stage.gd）
+# 终结演出背景虚化幕（Stage 之后·WorldGroup 之前 → 只糊背景不糊双雄）。平时 veil 隐藏 +
+# grab DISABLED = 零成本；仅 _play_finisher 期间开启。
+@onready var finisher_grab: BackBufferCopy = $FinisherGrab
+@onready var finisher_veil: ColorRect = $FinisherVeil
 
 @onready var btn_charge: Button = $Buttons/BtnCharge
 @onready var btn_attack: Button = $Buttons/BtnAttack
@@ -165,11 +169,21 @@ var _enemy_target_pick: int = -1    # 已点选的敌方替补槽（-1=未选→
 const SHAKE_BIG := 12.0     # 大波命中
 const SHAKE_HIT := 7.0      # 普通命中
 const PUNCH_RELEASE := 0.35   # P3：大波前推命中后的回弹时长（落在 settle 内）
+
+# ── 终结演出旋钮（Eddy 2026-07-09·Q1A 仅动作直接击杀 / Q2B 压暗+真模糊 / Q3A 全场慢放）──
+const FINISHER_SLOW := 0.45          # 慢放倍率（全场 time_scale·参考暗黑地牢判定演出）
+const FINISHER_SCALE := 1.35         # 双雄拉出放大倍率（绕脚底锚点）
+const FINISHER_SHIFT_KILLER := 90.0  # 击杀方向中错位（px·向前压）
+const FINISHER_SHIFT_VICTIM := 34.0  # 受击方退让错位（px·向后让）
+const FINISHER_VEIL_IN := 0.18       # 虚化幕淡入时长（s）
+const FINISHER_VEIL_OUT := 0.22      # 虚化幕淡出时长（s）
 var _confirm_pulse: Tween   # 「结束」按钮的呼吸金光（有待确认动作时召唤点击）
 var _cd_home: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]  # 立绘原位（前冲 juice 复位用）
 var _shadow_home: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]  # 阴影原位（跟随角色水平位移用）
 var _prev_hp_disp: Array[float] = [-1.0, -1.0]   # 上次显示的出战 HP（检测变化 → 心条 flinch 脉冲）
 var _hitstop_token: int = 0   # hitstop(c) 防重叠：仅最后一次定格负责恢复 Engine.time_scale
+var _time_scale_base: float = 1.0   # hitstop 恢复的目标速度（终结演出慢放期间 = FINISHER_SLOW·平时 1.0）
+var _fin_impact_tweens: Array[Tween] = []   # 终结命中的 punch/下沉 tween（慢放中跑不完·归位前必须 kill 防写回放大值）
 var _act_focus_active: bool = false   # 执行动作期间镜头是否在偏焦（保留位·当前由 set_focus 直接驱动）
 var _world: Control = null    # P2b：立绘+阴影的 dolly 组（运行期归组·与背景同对焦点统一推近）
 
@@ -397,7 +411,8 @@ func _setup_world_group() -> void:
 	_world.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	# 显式 position 数学绕 stage.focal() 缩放（与背景同一动态对焦点·焦点随动作偏置）→ pivot 留 0。
 	add_child(_world)
-	move_child(_world, stage.get_index() + 1)   # 紧跟 Stage、在 dust/后处理/UI 之前
+	# 紧跟 FinisherVeil（终结演出虚化幕只糊 Stage 背景、不糊双雄）、在 dust/后处理/UI 之前。
+	move_child(_world, finisher_veil.get_index() + 1)
 	for n in [p1_shadow, p2_shadow, p1_char_display, p2_char_display]:
 		n.reparent(_world, true)   # keep_global_transform → 静止画面一像素不变
 
@@ -1580,6 +1595,14 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array) -> void:
 	# 仅对方进攻=偏左聚受击的己方；仅己方进攻=偏右聚受击的敌方；双方都未进攻=不推近。
 	var p1_off := _is_offense(a0, int(dmg[1]), bool(dead[1]))
 	var p2_off := _is_offense(a1, int(dmg[0]), bool(dead[0]))
+	# 终结演出（Q1A）：本拍"动作直接击杀出战英雄"→ 专用慢放演出取代普通结算演出。
+	# 毒引爆随攻击结算=攻击致死会触发；反弹死/纯道具死（击杀侧非进攻动作）不触发；
+	# 天狗御凶拦下致命伤=没死=自然不触发。
+	var fin_kill_p2 := bool(dead[1]) and p1_off
+	var fin_kill_p1 := bool(dead[0]) and p2_off
+	if fin_kill_p1 or fin_kill_p2:
+		await _play_finisher(dmg, fin_kill_p2, fin_kill_p1)
+		return
 	var fdir := 0.0
 	if p1_off != p2_off:
 		fdir = 1.0 if p1_off else -1.0
@@ -1620,6 +1643,97 @@ func _big_attack_punch() -> void:
 	var tw := create_tween()
 	tw.tween_method(stage.set_punch, 0.0, 1.0, rise).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
 	tw.tween_method(stage.set_punch, 1.0, 0.0, PUNCH_RELEASE).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
+## 终结演出（Eddy 2026-07-09 批·参考暗黑地牢判定演出）：斩杀拍的专用结算演出，取代普通路径。
+## 流程=背景虚化退场（FinisherVeil 压暗+模糊·只糊背景不糊双雄）→ 双雄放大错位拉出（击杀方
+## 向前压/受击方向后让·绕脚底锚缩放）→ 全场慢放出招（帧动画英雄播 attack）→ 强化命中
+## （白闪/弧光/火花/飘字慢速展开+强震+强顿帧）→ 恢复。总时长 ≈1.9s（普通结算 ≈0.9s·延长约 1s）。
+## 双死=居中对撞构图。后置条件与普通路径一致（阵亡变灰·镜头回正·time_scale=1）→ 换人流程照旧。
+## 编排时钟全用 ignore_time_scale 真实时长（慢放期间 await 不被拉长）；视觉 tween 随 time_scale
+## 自然慢放=演出本体。
+func _play_finisher(dmg: Array, kill_p2: bool, kill_p1: bool) -> void:
+	var killer := 0 if kill_p2 else 1
+	var both := kill_p2 and kill_p1
+	var fdir := 0.0 if both else (1.0 if killer == 0 else -1.0)
+	# ── 拉出（正常速度·0.22s）：虚化幕淡入 + 双雄放大错位 + 镜头推近受击侧 ──
+	finisher_grab.copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT
+	finisher_veil.visible = true
+	var vmat := finisher_veil.material as ShaderMaterial
+	vmat.set_shader_parameter("strength", 0.0)
+	var vt := create_tween()
+	vt.tween_method(func(v: float) -> void: vmat.set_shader_parameter("strength", v),
+			0.0, 1.0, FINISHER_VEIL_IN)
+	stage.set_focus(true, fdir)
+	for p in 2:
+		var cd := _cd(p)
+		cd.pivot_offset = Vector2(cd.size.x * 0.5, cd.size.y * 0.67)   # 脚底锚：放大不离地
+		var toward := 1.0 if p == 0 else -1.0   # 朝对方方向
+		var shift := FINISHER_SHIFT_KILLER if (both or p == killer) else -FINISHER_SHIFT_VICTIM
+		var tw := create_tween().set_parallel(true)
+		tw.tween_property(cd, "scale", Vector2.ONE * FINISHER_SCALE, 0.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_property(cd, "position", _cd_home[p] + Vector2(shift * toward, 0), 0.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	await get_tree().create_timer(0.22, true, false, true).timeout
+	# ── 慢放出招（全场 0.45×·帧动画约 0.6s 真实展开·同步小前刺）──
+	_time_scale_base = FINISHER_SLOW
+	Engine.time_scale = FINISHER_SLOW
+	for p in 2:
+		if both or p == killer:
+			var cd := _cd(p)
+			cd.play_animation("attack")
+			var dirn := 1.0 if p == 0 else -1.0
+			var tw := create_tween()
+			tw.tween_property(cd, "position", _cd_home[p] + Vector2((FINISHER_SHIFT_KILLER + 120.0) * dirn, 0), 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	await get_tree().create_timer(0.65, true, false, true).timeout
+	# ── 命中（慢放中·特效慢速展开）──
+	if kill_p2:
+		_finisher_impact(1, int(dmg[1]))
+	if kill_p1:
+		_finisher_impact(0, int(dmg[0]))
+	stage.shake(SHAKE_BIG * 1.3)
+	_hitstop(0.1)
+	await get_tree().create_timer(0.45, true, false, true).timeout
+	# ── 恢复：时间回正 → 杀掉命中残留 tween（慢放里跑不完·晚于归位结束会把 scale 写回放大值）
+	#    → 幕淡出关停 → 双雄归位（阵亡者保持灰·换人流程接手）──
+	_time_scale_base = 1.0
+	Engine.time_scale = 1.0
+	for ft in _fin_impact_tweens:
+		if ft.is_valid():
+			ft.kill()
+	_fin_impact_tweens.clear()
+	var vt2 := create_tween()
+	vt2.tween_method(func(v: float) -> void: vmat.set_shader_parameter("strength", v),
+			1.0, 0.0, FINISHER_VEIL_OUT)
+	vt2.tween_callback(func() -> void:
+		finisher_veil.visible = false
+		finisher_grab.copy_mode = BackBufferCopy.COPY_MODE_DISABLED)
+	for p in 2:
+		var cd := _cd(p)
+		var tw := create_tween().set_parallel(true)
+		tw.tween_property(cd, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_SINE)
+		tw.tween_property(cd, "position", _cd_home[p], 0.22).set_trans(Tween.TRANS_SINE)
+	stage.set_focus(false)
+	await get_tree().create_timer(0.3, true, false, true).timeout
+
+
+## 终结版命中表现：不用 _impact——其 _char_pop 会把拉出的 1.35 放大拽回 1.0、自带顿帧也与
+## 终结统一顿帧冲突。改为放大基础上的小 punch + 阵亡变灰下沉。
+func _finisher_impact(target_player: int, dmg_half: int) -> void:
+	var cd := _cd(target_player)
+	cd.flash_white(0.3)
+	cd.pulse_rim(1.0, 0.3)
+	_spawn_slash(target_player)
+	_spawn_spark(target_player, true)
+	if dmg_half > 0:
+		_pop_damage(target_player, float(dmg_half) / 2.0)
+	var tw := create_tween()
+	tw.tween_property(cd, "scale", Vector2.ONE * (FINISHER_SCALE * 1.08), 0.06).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.tween_property(cd, "scale", Vector2.ONE * FINISHER_SCALE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	cd.modulate = Color(0.35, 0.35, 0.35)   # 阵亡变灰（与普通路径一致）
+	var tw2 := create_tween()
+	tw2.tween_property(cd, "position:y", cd.position.y + 14.0, 0.3).set_trans(Tween.TRANS_SINE)
+	_fin_impact_tweens.append(tw)
+	_fin_impact_tweens.append(tw2)
 
 
 func _cd(player: int) -> CharacterDisplay:
@@ -1698,7 +1812,7 @@ func _hitstop(real_dur: float, ts: float = 0.04) -> void:
 	Engine.time_scale = ts
 	await get_tree().create_timer(real_dur, true, false, true).timeout
 	if my == _hitstop_token:
-		Engine.time_scale = 1.0
+		Engine.time_scale = _time_scale_base   # 恢复到基准（终结演出慢放期间=FINISHER_SLOW）
 
 
 ## 命中火花(c)：受击点爆一簇短命粒子（径向飞溅 + 重力下坠），重击更多更快。

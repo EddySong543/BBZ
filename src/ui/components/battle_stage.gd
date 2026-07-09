@@ -188,8 +188,10 @@ func _process(delta: float) -> void:
 		# k=1（静止）时退化为 position=base+off、scale=base → 与原始画面一像素不差。
 		var k: float = 1.0 + (_focus * focus_zoom + _punch * punch_zoom) * f
 		# 鼠标缩放偏置只给比地面更近的层（地面/远景 km=1 → 角色零缩放；近景微放大出「凑近看」）。
+		# ⚠只做横向：均匀缩放的纵向分量会让底部檐角随鼠标上下起伏 1-2px（"建筑呼吸"·
+		# Eddy 2026-07-09 否）——横向 0.3~0.8% 拉伸像素上不可见，纵向不缩不挪。
 		# _pnx=0（鼠标居中/关闭）时 km=1 → 与原始画面一像素不差。
 		var km: float = 1.0 + zoom_m * maxf(f - ground_parallax, 0.0)
 		var p: Vector2 = _focal + (_bases[i] - _focal) * k + off
-		_layers[i].set(&"position", pivot_m + (p - pivot_m) * km)
-		_layers[i].set(&"scale", _base_scales[i] * (k * km))
+		_layers[i].set(&"position", Vector2(pivot_m.x + (p.x - pivot_m.x) * km, p.y))
+		_layers[i].set(&"scale", Vector2(_base_scales[i].x * k * km, _base_scales[i].y * k))
