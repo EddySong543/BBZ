@@ -179,8 +179,10 @@ const FINISHER_SHIFT_KILLER := 90.0  # 击杀方向中错位（px·向前压）
 const FINISHER_SHIFT_VICTIM := 34.0  # 受击方退让错位（px·向后让）
 const FINISHER_VEIL_IN := 0.18       # 虚化幕淡入时长（s）
 const FINISHER_VEIL_OUT := 0.22      # 虚化幕淡出时长（s）
-# ── 黑白闪（Eddy 2026-07-10·默认=终结命中拍专属·⚠待 F6；边缘速度线已试装后删除=方向否）──
-const FINISHER_BW_HOLD := 0.09       # 黑白闪持续（真实秒·硬切进硬切出=动漫 impact frame 一瞬·Eddy 2026-07-10 调）
+# ── 冲击帧（Eddy 2026-07-10 定 A/A/A：二值化+受击点锯齿炸开+正负反转·终结命中拍专属·⚠待 F6；
+#    边缘速度线已试装后删除=方向否；纯降饱和灰度版=方向否"只是变灰没有黑白暴力感"）──
+const FINISHER_BW_POS := 0.08        # 正片段时长（真实秒·墨黑纸白）
+const FINISHER_BW_NEG := 0.055       # 负片段时长（真实秒·黑白互换一闪·0.07→0.055 压刺眼）·形态旋钮在 PostFX 材质 impact_* 组
 var _confirm_pulse: Tween   # 「结束」按钮的呼吸金光（有待确认动作时召唤点击）
 var _cd_home: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]  # 立绘原位（前冲 juice 复位用）
 var _shadow_home: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]  # 阴影原位（跟随角色水平位移用）
@@ -190,7 +192,6 @@ var _time_scale_base: float = 1.0   # hitstop 恢复的目标速度（终结演�
 var _fin_impact_tweens: Array[Tween] = []   # 终结命中的 punch/下沉 tween（慢放中跑不完·归位前必须 kill 防写回放大值）
 var _act_focus_active: bool = false   # 执行动作期间镜头是否在偏焦（保留位·当前由 set_focus 直接驱动）
 var _world: Control = null    # P2b：立绘+阴影的 dolly 组（运行期归组·与背景同对焦点统一推近）
-var _postfx_sat_base: float = 1.0   # PostFX 饱和度基准（_ready 捕获·黑白闪恢复目标·⚠材质资源跨局共享须离场兜底还原）
 
 # ---- 命中特效对象池（飘字/火花/斩击/能量粒子·连打与调试连点不再运行期 new()·热路径零分配纪律）----
 # 环形复用：取下一格前先 kill 该节点在飞 tween（防残留动画把属性写回旧值·同终结演出教训）。
@@ -289,7 +290,6 @@ func _ready() -> void:
 	_build_debug_buttons()
 	_build_settings_button()   # 战斗内设置入口（右上角小钮 + ESC·2026-07-09）
 	_setup_fx_pools()          # 命中特效对象池预分配（飘字/火花/斩击/尘土/能量粒）
-	_postfx_sat_base = float((post_fx.material as ShaderMaterial).get_shader_parameter("saturation"))
 
 	_build_skill_entries()
 	skill_card.advance_requested.connect(_on_skill_card_advance)
@@ -314,10 +314,10 @@ func _ready() -> void:
 
 
 ## 离场恢复 time_scale=1：hitstop(c) 用全局 Engine.time_scale，若在定格瞬间切场景须复位，防下个场景慢动作。
-## PostFX 饱和度同理兜底还原——材质是跨实例共享资源，终结演出中途切场景会把黑白带进下一局。
+## 冲击帧同理兜底关闭——PostFX 材质是跨实例共享资源，闪的瞬间切场景会把黑白带进下一局。
 func _exit_tree() -> void:
 	Engine.time_scale = 1.0
-	_postfx_set_sat(_postfx_sat_base)
+	(post_fx.material as ShaderMaterial).set_shader_parameter("impact_strength", 0.0)
 	if _think_task >= 0:
 		WorkerThreadPool.wait_for_task_completion(_think_task)   # 任务G：离场前回收预想线程（防悬垂引用）
 		_think_task = -1
@@ -1783,8 +1783,12 @@ func _play_finisher(dmg: Array, kill_p2: bool, kill_p1: bool) -> void:
 		_finisher_impact(0, int(dmg[0]))
 	# ⑤ 方向性后坐：朝倒下一方踢（双杀=对撞不偏向）
 	stage.shake(SHAKE_BIG * 1.3, (1.0 if kill_p2 else 0.0) - (1.0 if kill_p1 else 0.0))
-	# 黑白闪（默认 A=终结命中拍专属）：硬切黑白一瞬（真实 0.09s）即恢复——不走 tween 不受慢放拖拽
-	_bw_flash()
+	# 冲击帧（终结命中拍专属）：硬切三段（正片→负片→恢复·真实计时不受慢放拖拽）·炸开中心=受击者
+	var bw_center := Vector2(0.5, 0.58)   # 双杀=对撞中点
+	if not (kill_p1 and kill_p2):
+		var vcd := _cd(1 if kill_p2 else 0)
+		bw_center = (vcd.global_position + vcd.size * 0.5) / get_viewport_rect().size
+	_bw_flash(bw_center)
 	_hitstop(0.1)
 	await get_tree().create_timer(0.45, true, false, true).timeout
 	# ── 恢复：时间回正 → 杀掉命中残留 tween（慢放里跑不完·晚于归位结束会把 scale 写回放大值）
@@ -1938,18 +1942,21 @@ func _make_spark(amount: int, vel_max: float, scale_max: float) -> CPUParticles2
 	return p
 
 
-## 黑白闪：PostFX 饱和度单点写入口（0=全黑白·基准=_postfx_sat_base）。UI 在 PostFX 之上不受染。
-func _postfx_set_sat(v: float) -> void:
-	(post_fx.material as ShaderMaterial).set_shader_parameter("saturation", v)
-
-
-## 黑白闪（一瞬间）：硬切进黑白 → 真实 FINISHER_BW_HOLD 秒 → 硬切恢复（无渐变=动漫 impact frame）。
-## 计时 ignore_time_scale 不被慢放拖长；切场景时 await 后节点可能已离树 → 先查再写（_exit_tree 已兜底还原）。
-func _bw_flash() -> void:
-	_postfx_set_sat(0.0)
-	await get_tree().create_timer(FINISHER_BW_HOLD, true, false, true).timeout
+## 冲击帧（动画 impact frame·A/A/A）：硬切三段——正片（墨黑纸白+受击点锯齿白炸开）→ 负片一闪
+## （黑白互换=PV 张力核心）→ 恢复。全程无渐变；计时 ignore_time_scale 不被慢放拖长；
+## 切场景时 await 后节点可能已离树 → 先查再写（_exit_tree 已兜底关闭）。UI 在 PostFX 之上不受染。
+func _bw_flash(center_uv: Vector2) -> void:
+	var mat := post_fx.material as ShaderMaterial
+	mat.set_shader_parameter("impact_center", center_uv)
+	mat.set_shader_parameter("impact_invert", 0.0)
+	mat.set_shader_parameter("impact_strength", 1.0)
+	await get_tree().create_timer(FINISHER_BW_POS, true, false, true).timeout
+	if not is_inside_tree():
+		return
+	mat.set_shader_parameter("impact_invert", 1.0)
+	await get_tree().create_timer(FINISHER_BW_NEG, true, false, true).timeout
 	if is_inside_tree():
-		_postfx_set_sat(_postfx_sat_base)
+		mat.set_shader_parameter("impact_strength", 0.0)
 
 
 ## ⑦ 尘土粒子工厂：脚下一小撮灰瓦色尘（前冲起步/回位落定的接地感·Dead Cells 式廉价质感件）。

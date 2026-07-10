@@ -15,6 +15,7 @@
 [ext_resource type="Shader" uid="uid://ds1lag0nmchpk" path="res://assets/shaders/canvas_fx_box_blur.gdshader" id="20_boxblur"]
 [ext_resource type="Shader" path="res://assets/shaders/canvas_env_fog_band.gdshader" id="22_fogband"]
 [ext_resource type="Shader" path="res://assets/shaders/canvas_env_light_shaft.gdshader" id="23_shaft"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_env_dark_smoke.gdshader" id="24_darksmoke"]
 
 [sub_resource type="ShaderMaterial" id="SkyMat"]
 shader = ExtResource("3_sky")
@@ -114,6 +115,28 @@ shader_parameter/scale_x = 2.0
 shader = ExtResource("23_shaft")
 shader_parameter/intensity = 0.13
 shader_parameter/fade_tail = 110.0
+
+[sub_resource type="ShaderMaterial" id="SmokeRoofMat"]
+shader = ExtResource("24_darksmoke")
+shader_parameter/puff_isolation = 1.0
+shader_parameter/alpha_max = 0.42
+shader_parameter/flow_speed = 0.045
+shader_parameter/noise_scale = Vector2(22, 2.2)
+shader_parameter/puff_cells = 7.0
+shader_parameter/puff_keep = 0.62
+shader_parameter/pixel_grid = Vector2(900, 47)
+
+[sub_resource type="ShaderMaterial" id="SmokeFrontMat"]
+shader = ExtResource("24_darksmoke")
+shader_parameter/puff_isolation = 0.0
+shader_parameter/alpha_max = 0.5
+shader_parameter/flow_speed = 0.05
+shader_parameter/noise_scale = Vector2(17, 2.8)
+shader_parameter/wave_base = 0.15
+shader_parameter/wave_amp = 0.22
+shader_parameter/wave_freq = 3.0
+shader_parameter/edge_soft = 0.35
+shader_parameter/pixel_grid = Vector2(906, 140)
 
 [sub_resource type="ShaderMaterial" id="RfMat1"]
 shader = ExtResource("20_boxblur")
@@ -327,6 +350,15 @@ texture = ExtResource("2_roof")
 expand_mode = 1
 metadata/parallax_factor = 1.0
 
+[node name="SmokeRoof" type="ColorRect" parent="."]
+material = SubResource("SmokeRoofMat")
+offset_left = -383.0
+offset_top = 690.0
+offset_right = 2317.0
+offset_bottom = 830.0
+mouse_filter = 2
+metadata/parallax_factor = 1.0
+
 [node name="LightShaft" type="ColorRect" parent="."]
 material = SubResource("LightShaftMat")
 layout_mode = 0
@@ -418,3 +450,12 @@ preprocess = 5.0
 local_coords = true
 process_material = SubResource("EmberMat")
 metadata/parallax_factor = 1.1
+
+[node name="SmokeFront" type="ColorRect" parent="."]
+material = SubResource("SmokeFrontMat")
+offset_left = -400.0
+offset_top = 760.0
+offset_right = 2320.0
+offset_bottom = 1180.0
+mouse_filter = 2
+metadata/parallax_factor = 1.65

@@ -44,6 +44,19 @@ uniform float grain_amount : hint_range(0.0, 0.15) = 0.02;
 uniform float grain_scale  : hint_range(0.5, 4.0) = 1.6;
 group_uniforms;
 
+group_uniforms impact_frame;  // 冲击帧（动画 impact frame·终结命中拍·battle_screen._bw_flash 硬切驱动）
+uniform float impact_strength : hint_range(0.0, 1.0) = 0.0;   // 0=关闭（mix 归零·零影响）1=全开
+uniform float impact_invert : hint_range(0.0, 1.0) = 0.0;     // 0=正片 1=负片（黑白互换·闪烁张力）
+uniform vec2  impact_center = vec2(0.5, 0.55);                // 炸开中心（SCREEN_UV·受击者位置）
+uniform float impact_burst_radius : hint_range(0.05, 0.8) = 0.26;  // 炸开白域基础半径（UV·纵向尺度）
+uniform float impact_jag : hint_range(0.0, 0.3) = 0.11;       // 毛边锯齿幅度（角度噪声抖动半径·炸开撕裂感）
+uniform float impact_jag_freq = 7.0;                          // 锯齿角频率（越大齿越碎）
+uniform float impact_th_out : hint_range(0.0, 1.0) = 0.52;    // 炸开区外二值化阈（高=大片墨黑只留高光）
+uniform float impact_th_in : hint_range(0.0, 1.0) = 0.13;     // 炸开区内二值化阈（低=大片纸白·角色成黑剪影）
+uniform float impact_white : hint_range(0.5, 1.0) = 0.86;     // 纸白亮度上限（<1 压刺眼·Eddy 2026-07-10"闪到我了"调）
+uniform float impact_px = 3.0;                                // 毛边像素粗格（贴全局像素风）
+group_uniforms;
+
 float hash(vec2 p) {
 	p = fract(p * vec2(123.34, 345.45));
 	p += dot(p, p + 34.345);
@@ -93,6 +106,23 @@ void fragment() {
 	// 6) 统一低频颗粒
 	float g = hash(SCREEN_UV / max(SCREEN_PIXEL_SIZE.y, 1e-5) * 0.01 * grain_scale) - 0.5;
 	col += g * grain_amount;
+
+	// 7) 冲击帧（impact frame·Eddy 2026-07-10 定 A/A/A：二值化墨黑纸白 + 受击点锯齿炸开 + 正负反转）
+	//    结构：受击点周围一团锯齿毛边"白炸开"（区内低阈→大片纸白·角色成黑剪影），
+	//    区外高阈→大片墨黑只留高光 → 黑场中央一记白炸，剪影分明。无动态分支（step/mix）。
+	vec2 iuv = floor(SCREEN_UV / (SCREEN_PIXEL_SIZE * impact_px)) * SCREEN_PIXEL_SIZE * impact_px;  // 毛边走粗像素格
+	vec2 idv = iuv - impact_center;
+	idv.x *= SCREEN_PIXEL_SIZE.y / max(SCREEN_PIXEL_SIZE.x, 1e-6);   // 宽高比校正 → 等距圆
+	float iang = atan(idv.y, idv.x);
+	// 毛边：粗齿 + 碎齿两层角度噪声抖动炸开半径 → 手绘撕裂边
+	float jag = hash(vec2(floor(iang * impact_jag_freq), 7.31)) * 0.7
+			+ hash(vec2(floor(iang * impact_jag_freq * 3.0), 3.17)) * 0.3;
+	float irad = impact_burst_radius + (jag - 0.5) * 2.0 * impact_jag;
+	float burst = 1.0 - step(irad, length(idv));                     // 1=炸开区内
+	float ilum = dot(col, vec3(0.299, 0.587, 0.114));
+	float ibw = step(mix(impact_th_out, impact_th_in, burst), ilum); // 区内低阈纸白 / 区外高阈墨黑
+	ibw = mix(ibw, 1.0 - ibw, impact_invert);                        // 负片一闪（PV 张力）
+	col = mix(col, vec3(ibw * impact_white), impact_strength);       // 纸白压亮度上限（不刺眼·黑不受影响）
 
 	COLOR = vec4(col, 1.0);
 }
