@@ -95,7 +95,6 @@ var _skill_index: int = 0
 # grab DISABLED = 零成本；仅 _play_finisher 期间开启。
 @onready var finisher_grab: BackBufferCopy = $FinisherGrab
 @onready var finisher_veil: ColorRect = $FinisherVeil
-@onready var speed_lines: ColorRect = $SpeedLines   # 边缘速度线（终结慢放专属·平时 visible=false 零开销）
 @onready var post_fx: ColorRect = $PostFX           # 全屏调色（黑白闪借它的 saturation 参数·零新 pass）
 
 @onready var btn_charge: Button = $Buttons/BtnCharge
@@ -180,10 +179,8 @@ const FINISHER_SHIFT_KILLER := 90.0  # 击杀方向中错位（px·向前压）
 const FINISHER_SHIFT_VICTIM := 34.0  # 受击方退让错位（px·向后让）
 const FINISHER_VEIL_IN := 0.18       # 虚化幕淡入时长（s）
 const FINISHER_VEIL_OUT := 0.22      # 虚化幕淡出时长（s）
-# ── 黑白闪 + 边缘速度线（Eddy 2026-07-10·默认=终结演出专属·⚠待 F6）──
-const FINISHER_BW_OUT := 0.12        # 黑白闪恢复拉回时长（命中→恢复 0.45s 真实 + 拉回 ≈ 半秒黑白）
-const FINISHER_LINES_STRENGTH := 0.8 # 边缘速度线强度（0=整体关闭）
-const FINISHER_LINES_OUT := 0.15     # 速度线淡出时长（s）
+# ── 黑白闪（Eddy 2026-07-10·默认=终结命中拍专属·⚠待 F6；边缘速度线已试装后删除=方向否）──
+const FINISHER_BW_HOLD := 0.09       # 黑白闪持续（真实秒·硬切进硬切出=动漫 impact frame 一瞬·Eddy 2026-07-10 调）
 var _confirm_pulse: Tween   # 「结束」按钮的呼吸金光（有待确认动作时召唤点击）
 var _cd_home: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]  # 立绘原位（前冲 juice 复位用）
 var _shadow_home: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]  # 阴影原位（跟随角色水平位移用）
@@ -1771,9 +1768,6 @@ func _play_finisher(dmg: Array, kill_p2: bool, kill_p1: bool) -> void:
 	# ── 慢放出招（全场 0.45×·帧动画约 0.6s 真实展开·同步小前刺）──
 	_time_scale_base = FINISHER_SLOW
 	Engine.time_scale = FINISHER_SLOW
-	# 边缘速度线（默认 A=慢放期间专属）：直设强度·shader TIME 随 time_scale 变慢 → 抽帧闪烁更像手绘慢镜
-	speed_lines.visible = true
-	(speed_lines.material as ShaderMaterial).set_shader_parameter("strength", FINISHER_LINES_STRENGTH)
 	for p in 2:
 		if both or p == killer:
 			var cd := _cd(p)
@@ -1789,8 +1783,8 @@ func _play_finisher(dmg: Array, kill_p2: bool, kill_p1: bool) -> void:
 		_finisher_impact(0, int(dmg[0]))
 	# ⑤ 方向性后坐：朝倒下一方踢（双杀=对撞不偏向）
 	stage.shake(SHAKE_BIG * 1.3, (1.0 if kill_p2 else 0.0) - (1.0 if kill_p1 else 0.0))
-	# 黑白闪（默认 A=终结命中拍专属）：饱和度瞬降 0·恢复段拉回 → 全程 ≈0.5s 真实时长黑白
-	_postfx_set_sat(0.0)
+	# 黑白闪（默认 A=终结命中拍专属）：硬切黑白一瞬（真实 0.09s）即恢复——不走 tween 不受慢放拖拽
+	_bw_flash()
 	_hitstop(0.1)
 	await get_tree().create_timer(0.45, true, false, true).timeout
 	# ── 恢复：时间回正 → 杀掉命中残留 tween（慢放里跑不完·晚于归位结束会把 scale 写回放大值）
@@ -1807,14 +1801,6 @@ func _play_finisher(dmg: Array, kill_p2: bool, kill_p1: bool) -> void:
 	vt2.tween_callback(func() -> void:
 		finisher_veil.visible = false
 		finisher_grab.copy_mode = BackBufferCopy.COPY_MODE_DISABLED)
-	# 黑白闪拉回 + 速度线淡出（时间已回正·普通 tween 无慢放残留风险）
-	var bt := create_tween()
-	bt.tween_method(_postfx_set_sat, 0.0, _postfx_sat_base, FINISHER_BW_OUT)
-	var lmat := speed_lines.material as ShaderMaterial
-	var lt := create_tween()
-	lt.tween_method(func(v: float) -> void: lmat.set_shader_parameter("strength", v),
-			FINISHER_LINES_STRENGTH, 0.0, FINISHER_LINES_OUT)
-	lt.tween_callback(func() -> void: speed_lines.visible = false)
 	for p in 2:
 		var cd := _cd(p)
 		var tw := create_tween().set_parallel(true)
@@ -1955,6 +1941,15 @@ func _make_spark(amount: int, vel_max: float, scale_max: float) -> CPUParticles2
 ## 黑白闪：PostFX 饱和度单点写入口（0=全黑白·基准=_postfx_sat_base）。UI 在 PostFX 之上不受染。
 func _postfx_set_sat(v: float) -> void:
 	(post_fx.material as ShaderMaterial).set_shader_parameter("saturation", v)
+
+
+## 黑白闪（一瞬间）：硬切进黑白 → 真实 FINISHER_BW_HOLD 秒 → 硬切恢复（无渐变=动漫 impact frame）。
+## 计时 ignore_time_scale 不被慢放拖长；切场景时 await 后节点可能已离树 → 先查再写（_exit_tree 已兜底还原）。
+func _bw_flash() -> void:
+	_postfx_set_sat(0.0)
+	await get_tree().create_timer(FINISHER_BW_HOLD, true, false, true).timeout
+	if is_inside_tree():
+		_postfx_set_sat(_postfx_sat_base)
 
 
 ## ⑦ 尘土粒子工厂：脚下一小撮灰瓦色尘（前冲起步/回位落定的接地感·Dead Cells 式廉价质感件）。
@@ -2165,12 +2160,13 @@ func _fly_energy_motes(player: int, egain_half: int) -> void:
 		m.global_position = from - m.size * 0.5
 		var burst := from + Vector2(randf_range(-52.0, 52.0), randf_range(-70.0, -20.0)) - m.size * 0.5
 		var tw := create_tween()
-		var delay := i * 0.07
+		var delay := i * 0.11
+		# 节奏放慢（Eddy 2026-07-10）：浮出 0.16→0.34（SINE 缓浮）·飞行 0.34→0.5 → 单粒全程 ≈0.94s
 		tw.tween_interval(maxf(delay, 0.001))
-		tw.tween_property(m, "modulate:a", 1.0, 0.06)
-		tw.parallel().tween_property(m, "global_position", burst, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		tw.tween_property(m, "global_position", to - m.size * 0.5, 0.34).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		tw.parallel().tween_property(m, "scale", Vector2(0.55, 0.55), 0.34)
+		tw.tween_property(m, "modulate:a", 1.0, 0.1)
+		tw.parallel().tween_property(m, "global_position", burst, 0.34).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		tw.tween_property(m, "global_position", to - m.size * 0.5, 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tw.parallel().tween_property(m, "scale", Vector2(0.55, 0.55), 0.5)
 		tw.tween_callback(m.hide)
 		if i == count - 1:
 			tw.tween_callback(_pulse_pip_row.bind(row, Color(1.8, 1.6, 1.0)))   # 末粒到位=金币行收能脉冲

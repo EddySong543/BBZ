@@ -22,13 +22,9 @@
 [ext_resource type="Script" uid="uid://cjou81ur7el87" path="res://src/ui/components/reserve_hp_row.gd" id="24_reservehp"]
 [ext_resource type="Script" uid="uid://dvdbihej8rx16" path="res://src/ui/components/icon_badge.gd" id="25_iconbadge"]
 [ext_resource type="Shader" path="res://assets/shaders/canvas_fx_finisher_veil.gdshader" id="26_finveil"]
-[ext_resource type="Shader" path="res://assets/shaders/canvas_fx_speed_lines.gdshader" id="27_speedlines"]
 
 [sub_resource type="ShaderMaterial" id="FinisherVeilMat"]
 shader = ExtResource("26_finveil")
-
-[sub_resource type="ShaderMaterial" id="SpeedLinesMat"]
-shader = ExtResource("27_speedlines")
 
 [sub_resource type="Gradient" id="ShadowGradient"]
 offsets = PackedFloat32Array(0, 0.55, 1)
@@ -270,18 +266,6 @@ fill_amount = 0.08
 [node name="LowerDust" parent="." unique_id=802756316 instance=ExtResource("12_foredust")]
 position = Vector2(960, 900)
 amount = 60
-
-[node name="SpeedLines" type="ColorRect" parent="."]
-visible = false
-material = SubResource("SpeedLinesMat")
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-color = Color(1, 1, 1, 1)
 
 [node name="WorldGrab" type="BackBufferCopy" parent="." unique_id=2030681149]
 copy_mode = 2
