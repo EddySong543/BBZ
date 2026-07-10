@@ -7,7 +7,6 @@
 [ext_resource type="PackedScene" path="res://src/ui/components/death_switch_overlay.tscn" id="6_death"]
 [ext_resource type="PackedScene" uid="uid://cscn1rftp00a" path="res://src/ui/scenes/scene1.tscn" id="7_stage"]
 [ext_resource type="Shader" uid="uid://dnycv6j3wn0ot" path="res://assets/shaders/post_fx_color_grade.gdshader" id="8_postfx"]
-[ext_resource type="Shader" uid="uid://cldul26ik2rgm" path="res://assets/shaders/canvas_post_godray.gdshader" id="9_godray"]
 [ext_resource type="PackedScene" uid="uid://bforedustcmp" path="res://src/ui/components/fore_dust.tscn" id="12_foredust"]
 [ext_resource type="Texture2D" uid="uid://cq7w4kpww2rkq" path="res://assets/ui/icons/heart_idle.png" id="13_heart"]
 [ext_resource type="Texture2D" uid="uid://dmk21cawlx7uf" path="res://assets/ui/icons/energy_idle.png" id="14_coin"]
@@ -36,16 +35,6 @@ gradient = SubResource("ShadowGradient")
 fill = 1
 fill_from = Vector2(0.5, 0.5)
 fill_to = Vector2(1, 0.5)
-
-[sub_resource type="ShaderMaterial" id="GodRayMat"]
-shader = ExtResource("9_godray")
-shader_parameter/light_pos = Vector2(0.646, 0.25)
-shader_parameter/density = 1.00000004424012
-shader_parameter/decay = 0.8880000161009299
-shader_parameter/weight = 0.4
-shader_parameter/exposure = 0.0230000010925
-shader_parameter/threshold = 0.9250000439375
-shader_parameter/ray_tint = Color(0.6, 0.78, 1, 1)
 
 [sub_resource type="ShaderMaterial" id="PostFXMat"]
 shader = ExtResource("8_postfx")
@@ -277,25 +266,6 @@ fill_amount = 0.08
 [node name="LowerDust" parent="." unique_id=802756316 instance=ExtResource("12_foredust")]
 position = Vector2(960, 900)
 amount = 60
-
-[node name="GodRayGrab" type="BackBufferCopy" parent="." unique_id=2107110591]
-copy_mode = 0
-
-[node name="GodRay" type="ColorRect" parent="." unique_id=1709473458]
-visible = false
-material = SubResource("GodRayMat")
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -48.0
-offset_top = -48.0
-offset_right = 48.0
-offset_bottom = 48.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-color = Color(0, 0, 0, 1)
 
 [node name="WorldGrab" type="BackBufferCopy" parent="." unique_id=2030681149]
 copy_mode = 2

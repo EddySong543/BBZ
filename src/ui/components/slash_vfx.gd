@@ -12,6 +12,7 @@ extends Node2D
 @export var base_rotation_deg: float = -120.0  # 起始角（朝左下扫向右上）
 @export var duration: float = 0.18      # 生命周期（秒）
 @export var color: Color = Color(1, 1, 1, 1)
+@export var pooled: bool = false        # true=池化复用：播完隐藏停 _process 而非自毁（battle_screen 命中池用）
 
 var _t: float = 0.0
 var _playing: bool = false
@@ -21,6 +22,8 @@ var _pts: PackedVector2Array = PackedVector2Array()   # 复用弧线顶点缓冲
 func play() -> void:
 	_t = 0.0
 	_playing = true
+	visible = true
+	set_process(true)
 	queue_redraw()
 
 
@@ -30,7 +33,11 @@ func _process(delta: float) -> void:
 	_t += delta / maxf(duration, 0.001)
 	if _t >= 1.0:
 		_playing = false
-		queue_free()
+		if pooled:
+			visible = false
+			set_process(false)   # 归池待复用：不自毁、也不再每帧空转
+		else:
+			queue_free()
 		return
 	queue_redraw()
 

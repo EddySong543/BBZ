@@ -187,6 +187,19 @@ var _fin_impact_tweens: Array[Tween] = []   # 终结命中的 punch/下沉 tween
 var _act_focus_active: bool = false   # 执行动作期间镜头是否在偏焦（保留位·当前由 set_focus 直接驱动）
 var _world: Control = null    # P2b：立绘+阴影的 dolly 组（运行期归组·与背景同对焦点统一推近）
 
+# ---- 命中特效对象池（飘字/火花/斩击·连打与调试连点不再运行期 new()·热路径零分配纪律）----
+# 环形复用：取下一格前先 kill 该节点在飞 tween（防残留动画把属性写回旧值·同终结演出教训）。
+# 并发超过池容量时回收最旧一个 = 视觉可接受（单次结算最多双方各 1 发）。
+const FX_POOL_SIZE := 4                       # 飘字/斩击每类并发上限
+var _dmg_pool: Array[Label] = []              # 伤害飘字池
+var _dmg_pool_idx: int = 0
+var _slash_pool: Array[SlashVFX] = []         # 斩击弧光池（pooled 模式·播完隐藏不自毁）
+var _slash_pool_idx: int = 0
+var _spark_pool_big: Array[CPUParticles2D] = []    # 重击火花池（amount 等参数固定=避免改 amount 重分配缓冲）
+var _spark_pool_small: Array[CPUParticles2D] = []  # 轻击火花池
+var _spark_idx_big: int = 0
+var _spark_idx_small: int = 0
+
 
 # ============================================================
 # 生命周期
@@ -253,6 +266,7 @@ func _ready() -> void:
 	_nudge_top_ui_down()
 	_build_debug_buttons()
 	_build_settings_button()   # 战斗内设置入口（右上角小钮 + ESC·2026-07-09）
+	_setup_fx_pools()          # 命中特效对象池预分配（飘字/火花/斩击）
 
 	_build_skill_entries()
 	skill_card.advance_requested.connect(_on_skill_card_advance)
@@ -402,7 +416,7 @@ func _is_offense(action: int, dmg_to_foe: int, foe_dead: bool) -> bool:
 
 ## P2b：把双方立绘 + 阴影归入一个"世界组"容器，整体随镜头推近（与背景舞台同对焦点 → 统一移动）。
 ## 运行期归组、不改 .tscn（Eddy 编辑器里仍是根节点下的 4 个子节点）；容器置于 Stage 之后、
-## dust/后处理/UI 之前 → GodRay/PostFX 仍抓得到角色，UI 仍在最上层不动。
+## dust/后处理/UI 之前 → PostFX 仍抓得到角色，UI 仍在最上层不动。
 ## 容器缩放与角色自身 pop/前冲 juice 在场景图里相乘合成、互不打架（受击 pop 不会被 dolly 吃掉）。
 func _setup_world_group() -> void:
 	_world = Control.new()
@@ -1781,6 +1795,57 @@ func _act_juice(player: int, action: int) -> void:
 
 
 ## 命中表现：白闪 + 斩击弧光 + 伤害数字。
+## 命中特效池预分配（_ready 一次）：飘字 Label / 斩击 SlashVFX / 火花 CPUParticles2D。
+## 火花按重击/轻击分两池、参数在此钉死 —— 复用时只挪位置 + restart()，不改 amount（改 amount 会重分配粒子缓冲）。
+func _setup_fx_pools() -> void:
+	for i in FX_POOL_SIZE:
+		var lbl := Label.new()
+		lbl.visible = false
+		lbl.z_index = 100
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(lbl)
+		_dmg_pool.append(lbl)
+		var slash := SlashVFX.new()
+		slash.pooled = true
+		slash.visible = false
+		slash.z_index = 60
+		slash.set_process(false)
+		add_child(slash)
+		_slash_pool.append(slash)
+	for i in 2:
+		_spark_pool_big.append(_make_spark(16, 460.0, 4.5))
+		_spark_pool_small.append(_make_spark(10, 300.0, 3.0))
+
+
+## 火花粒子工厂：径向飞溅 + 重力下坠的一次性 explosive 爆发（参数见 _spawn_spark 原配方）。
+func _make_spark(amount: int, vel_max: float, scale_max: float) -> CPUParticles2D:
+	var p := CPUParticles2D.new()
+	p.emitting = false
+	p.one_shot = true
+	p.explosiveness = 1.0
+	p.amount = amount
+	p.lifetime = 0.38
+	p.spread = 180.0
+	p.initial_velocity_min = 160.0
+	p.initial_velocity_max = vel_max
+	p.gravity = Vector2(0, 700)
+	p.scale_amount_min = 2.0
+	p.scale_amount_max = scale_max
+	p.color = Color(1.0, 0.92, 0.62)   # 暖白火星
+	p.z_index = 95
+	add_child(p)
+	return p
+
+
+## 复用池节点前必调：kill 其在飞 tween（复用旧节点=先终止残留动画，防把属性写回旧值）。
+func _fx_kill_tweens(n: CanvasItem) -> void:
+	if n.has_meta(&"fx_tweens"):
+		for tw in n.get_meta(&"fx_tweens"):
+			if tw is Tween and tw.is_valid():
+				tw.kill()
+		n.remove_meta(&"fx_tweens")
+
+
 func _impact(target_player: int, dmg_half: int) -> void:
 	var cd := _cd(target_player)
 	var big := dmg_half >= 4   # ≥2HP=重击：更强退弹/火花/定格
@@ -1817,35 +1882,27 @@ func _hitstop(real_dur: float, ts: float = 0.04) -> void:
 
 ## 命中火花(c)：受击点爆一簇短命粒子（径向飞溅 + 重力下坠），重击更多更快。
 ## 一次性 explosive 爆发 → "一帧火花"的脆感。无贴图=小方块火星，足够。
+## 池化：重/轻两池各 2 发环形复用（参数在 _make_spark 钉死），复用只挪位置 + restart()。
 func _spawn_spark(target_player: int, big: bool) -> void:
 	var cd := _cd(target_player)
-	var p := CPUParticles2D.new()
+	var p: CPUParticles2D
+	if big:
+		p = _spark_pool_big[_spark_idx_big]
+		_spark_idx_big = (_spark_idx_big + 1) % _spark_pool_big.size()
+	else:
+		p = _spark_pool_small[_spark_idx_small]
+		_spark_idx_small = (_spark_idx_small + 1) % _spark_pool_small.size()
 	p.global_position = cd.global_position + cd.size * Vector2(0.5, 0.42)
-	p.z_index = 95
-	p.one_shot = true
-	p.explosiveness = 1.0
-	p.amount = 16 if big else 10
-	p.lifetime = 0.38
-	p.spread = 180.0                       # 径向全向飞溅
-	p.initial_velocity_min = 160.0
-	p.initial_velocity_max = 460.0 if big else 300.0
-	p.gravity = Vector2(0, 700)
-	p.scale_amount_min = 2.0
-	p.scale_amount_max = 4.5 if big else 3.0
-	p.color = Color(1.0, 0.92, 0.62)       # 暖白火星
-	add_child(p)
-	p.emitting = true
-	get_tree().create_timer(0.9).timeout.connect(p.queue_free)
+	p.restart()
 
 
 func _spawn_slash(target_player: int) -> void:
+	var slash := _slash_pool[_slash_pool_idx]
+	_slash_pool_idx = (_slash_pool_idx + 1) % FX_POOL_SIZE
 	var cd := _cd(target_player)
-	var slash := SlashVFX.new()
 	var s := 2.0
 	slash.scale = Vector2(-s, s) if target_player == 0 else Vector2(s, s)  # 打左侧的镜像
 	slash.global_position = cd.global_position + cd.size * 0.5
-	slash.z_index = 60
-	add_child(slash)
 	slash.play()
 
 
@@ -1854,16 +1911,18 @@ func _spawn_slash(target_player: int) -> void:
 func _pop_damage(player: int, amount: float) -> void:
 	var cd: CharacterDisplay = p1_char_display if player == 0 else p2_char_display
 	var big := amount >= 2.0
-	var lbl := Label.new()
+	# 池化取号：先 kill 该格在飞 tween，再重置全部会被动画改写的属性（透明度/缩放）。
+	var lbl := _dmg_pool[_dmg_pool_idx]
+	_dmg_pool_idx = (_dmg_pool_idx + 1) % FX_POOL_SIZE
+	_fx_kill_tweens(lbl)
 	lbl.text = "-%s" % _fmt_hp(amount)
 	FontManager.apply(lbl, 60 if big else 44)
 	# 重击=炽黄白更醒目 / 轻击=橙红；粗黑描边 = 投影/重量。
 	lbl.add_theme_color_override("font_color", Color(1.0, 0.82, 0.5) if big else Color(1.0, 0.55, 0.42))
 	lbl.add_theme_color_override("font_outline_color", Color(0.12, 0.02, 0.02, 0.95))
 	lbl.add_theme_constant_override("outline_size", 9 if big else 6)
-	lbl.z_index = 100
-	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(lbl)
+	lbl.visible = true
+	lbl.modulate.a = 1.0
 	lbl.reset_size()
 	lbl.pivot_offset = lbl.size * 0.5   # 绕中心缩放
 	var dir := 1.0 if player == 0 else -1.0   # 击退方向（P0 打右侧敌→数字往右）
@@ -1876,13 +1935,14 @@ func _pop_damage(player: int, amount: float) -> void:
 	var st := create_tween()
 	st.tween_property(lbl, "scale", Vector2(peak, peak), 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	st.tween_property(lbl, "scale", Vector2(peak, peak) * 0.86, 0.10).set_trans(Tween.TRANS_SINE)
-	# 抛物上浮（横向带一点击退漂移）+ 末段淡出
+	# 抛物上浮（横向带一点击退漂移）+ 末段淡出，收尾隐藏归池（取代原 create_timer+queue_free）
 	var rise := 104.0 if big else 78.0
 	var tw := create_tween()
 	tw.set_parallel(true)
 	tw.tween_property(lbl, "global_position", start + Vector2(dir * 26.0, -rise), 0.66).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tw.tween_property(lbl, "modulate:a", 0.0, 0.40).set_delay(0.52)
-	get_tree().create_timer(1.05).timeout.connect(lbl.queue_free)
+	tw.chain().tween_callback(lbl.hide)
+	lbl.set_meta(&"fx_tweens", [st, tw])
 
 
 ## 数字重量(b)：HP 变化时给出战心条一个 modulate flinch（掉血偏红 / 回血偏绿），
