@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://cj8uvstbmx8gl"]
+
+[ext_resource type="Script" path="res://tools/moon_eclipse_preview_root.gd" id="1_probe"]
+
+[node name="MoonEclipsePreview" type="Node"]
+script = ExtResource("1_probe")
