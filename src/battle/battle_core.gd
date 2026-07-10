@@ -1608,7 +1608,8 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 	if dmg > 0:
 		hp[target_player][slot] -= dmg
 		dealt = dmg
-		events.append({id = "damage_taken", player = target_player, amount = dmg, src = src})
+		# pen 档位随事件外发（Pen 枚举有序）：UI 按档位给伤害飘字分级配色（普通/穿透/真伤）·纯增量字段不影响旧读者。
+		events.append({id = "damage_taken", player = target_player, amount = dmg, src = src, pen = pen})
 		var dsk2: HeroSkill = _skills[target_player][slot]
 		if dsk2 != null:
 			dsk2.on_self_damaged(self, target_player, slot, dealt, attacker_player)

@@ -95,6 +95,8 @@ var _skill_index: int = 0
 # grab DISABLED = 零成本；仅 _play_finisher 期间开启。
 @onready var finisher_grab: BackBufferCopy = $FinisherGrab
 @onready var finisher_veil: ColorRect = $FinisherVeil
+@onready var speed_lines: ColorRect = $SpeedLines   # 边缘速度线（终结慢放专属·平时 visible=false 零开销）
+@onready var post_fx: ColorRect = $PostFX           # 全屏调色（黑白闪借它的 saturation 参数·零新 pass）
 
 @onready var btn_charge: Button = $Buttons/BtnCharge
 @onready var btn_attack: Button = $Buttons/BtnAttack
@@ -168,6 +170,7 @@ var _enemy_target_pick: int = -1    # 已点选的敌方替补槽（-1=未选→
 # 只在受击触发、克制；建筑无 idle 漂移（_ready 关 idle_drift），仅震时才动。F6 调幅在此。
 const SHAKE_BIG := 12.0     # 大波命中
 const SHAKE_HIT := 7.0      # 普通命中
+const SHAKE_BLOCK := 3.5    # ② 被挡（无命中时的接触感·比普通命中轻一半以上）
 const PUNCH_RELEASE := 0.35   # P3：大波前推命中后的回弹时长（落在 settle 内）
 
 # ── 终结演出旋钮（Eddy 2026-07-09·Q1A 仅动作直接击杀 / Q2B 压暗+真模糊 / Q3A 全场慢放）──
@@ -177,6 +180,10 @@ const FINISHER_SHIFT_KILLER := 90.0  # 击杀方向中错位（px·向前压）
 const FINISHER_SHIFT_VICTIM := 34.0  # 受击方退让错位（px·向后让）
 const FINISHER_VEIL_IN := 0.18       # 虚化幕淡入时长（s）
 const FINISHER_VEIL_OUT := 0.22      # 虚化幕淡出时长（s）
+# ── 黑白闪 + 边缘速度线（Eddy 2026-07-10·默认=终结演出专属·⚠待 F6）──
+const FINISHER_BW_OUT := 0.12        # 黑白闪恢复拉回时长（命中→恢复 0.45s 真实 + 拉回 ≈ 半秒黑白）
+const FINISHER_LINES_STRENGTH := 0.8 # 边缘速度线强度（0=整体关闭）
+const FINISHER_LINES_OUT := 0.15     # 速度线淡出时长（s）
 var _confirm_pulse: Tween   # 「结束」按钮的呼吸金光（有待确认动作时召唤点击）
 var _cd_home: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]  # 立绘原位（前冲 juice 复位用）
 var _shadow_home: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]  # 阴影原位（跟随角色水平位移用）
@@ -186,12 +193,15 @@ var _time_scale_base: float = 1.0   # hitstop 恢复的目标速度（终结演�
 var _fin_impact_tweens: Array[Tween] = []   # 终结命中的 punch/下沉 tween（慢放中跑不完·归位前必须 kill 防写回放大值）
 var _act_focus_active: bool = false   # 执行动作期间镜头是否在偏焦（保留位·当前由 set_focus 直接驱动）
 var _world: Control = null    # P2b：立绘+阴影的 dolly 组（运行期归组·与背景同对焦点统一推近）
+var _postfx_sat_base: float = 1.0   # PostFX 饱和度基准（_ready 捕获·黑白闪恢复目标·⚠材质资源跨局共享须离场兜底还原）
 
-# ---- 命中特效对象池（飘字/火花/斩击·连打与调试连点不再运行期 new()·热路径零分配纪律）----
+# ---- 命中特效对象池（飘字/火花/斩击/能量粒子·连打与调试连点不再运行期 new()·热路径零分配纪律）----
 # 环形复用：取下一格前先 kill 该节点在飞 tween（防残留动画把属性写回旧值·同终结演出教训）。
-# 并发超过池容量时回收最旧一个 = 视觉可接受（单次结算最多双方各 1 发）。
-const FX_POOL_SIZE := 4                       # 飘字/斩击每类并发上限
-var _dmg_pool: Array[Label] = []              # 伤害飘字池
+# 并发超过池容量时回收最旧一个 = 视觉可接受。
+const FX_POOL_SIZE := 4                       # 斩击并发上限
+const FLOAT_POOL_SIZE := 6                    # 飘字并发上限（伤害×2+治疗+被挡 同拍可共存）
+const MOTE_POOL_SIZE := 8                     # 能量飞粒并发上限（双方同拍攒也够用）
+var _dmg_pool: Array[Label] = []              # 飘字池（伤害/治疗/被挡 共用·_pop_float 单一出口）
 var _dmg_pool_idx: int = 0
 var _slash_pool: Array[SlashVFX] = []         # 斩击弧光池（pooled 模式·播完隐藏不自毁）
 var _slash_pool_idx: int = 0
@@ -199,6 +209,21 @@ var _spark_pool_big: Array[CPUParticles2D] = []    # 重击火花池（amount �
 var _spark_pool_small: Array[CPUParticles2D] = []  # 轻击火花池
 var _spark_idx_big: int = 0
 var _spark_idx_small: int = 0
+var _mote_pool: Array[TextureRect] = []       # ③ 能量飞粒池（攒→金币飞向 HUD 金币行）
+var _mote_idx: int = 0
+const DUST_POOL_SIZE := 4                     # ⑦ 尘土并发上限（双方同拍前冲=起步+落定×2 刚好）
+var _dust_pool: Array[CPUParticles2D] = []    # ⑦ 脚下尘土池（前冲起步/回位落定·屋脊灰瓦色）
+var _dust_idx: int = 0
+
+# ---- 反馈飘字/火花配色（②被挡 ③治疗 ⑧伤害阶梯分级·色彩不是唯一信号：文本 +/-/被挡 本身可区分）----
+const COL_DMG_BIG := Color(1.0, 0.82, 0.5)        # 重击（≥2HP）炽黄白
+const COL_DMG_SMALL := Color(1.0, 0.55, 0.42)     # 轻击橙红
+const COL_DMG_PIERCE := Color(0.8, 0.62, 1.0)     # ⑧ 穿防/穿大防伤害=靛紫（阶梯可读）
+const COL_DMG_TRUE := Color(1.0, 0.96, 0.88)      # ⑧ 真伤=白热字（配绯红描边·最凶一档）
+const COL_HEAL := Color(0.62, 0.92, 0.55)         # ③ 治疗绿
+const COL_BLOCK_TEXT := Color(0.78, 0.82, 0.88)   # ② 被挡=银灰（"没打进"的冷反馈）
+const COL_BLOCK_SPARK := Color(0.62, 0.78, 1.0)   # ② 格挡火花=钢蓝（与命中暖白火星区分）
+const COL_SPARK_WARM := Color(1.0, 0.92, 0.62)    # 命中火花默认暖白（原配方）
 
 
 # ============================================================
@@ -266,7 +291,8 @@ func _ready() -> void:
 	_nudge_top_ui_down()
 	_build_debug_buttons()
 	_build_settings_button()   # 战斗内设置入口（右上角小钮 + ESC·2026-07-09）
-	_setup_fx_pools()          # 命中特效对象池预分配（飘字/火花/斩击）
+	_setup_fx_pools()          # 命中特效对象池预分配（飘字/火花/斩击/尘土/能量粒）
+	_postfx_sat_base = float((post_fx.material as ShaderMaterial).get_shader_parameter("saturation"))
 
 	_build_skill_entries()
 	skill_card.advance_requested.connect(_on_skill_card_advance)
@@ -291,8 +317,10 @@ func _ready() -> void:
 
 
 ## 离场恢复 time_scale=1：hitstop(c) 用全局 Engine.time_scale，若在定格瞬间切场景须复位，防下个场景慢动作。
+## PostFX 饱和度同理兜底还原——材质是跨实例共享资源，终结演出中途切场景会把黑白带进下一局。
 func _exit_tree() -> void:
 	Engine.time_scale = 1.0
+	_postfx_set_sat(_postfx_sat_base)
 	if _think_task >= 0:
 		WorkerThreadPool.wait_for_task_completion(_think_task)   # 任务G：离场前回收预想线程（防悬垂引用）
 		_think_task = -1
@@ -862,6 +890,12 @@ func _resolve() -> void:
 	# 结算前的出战槽（= UI 已知的"谁在场上"·上一帧就渲染着·非引擎完整状态·联机客户端同样持有）。
 	# 仅用它判定"出战英雄本回合是否阵亡"（配 hero_died 事件），不读结算后的 battle.hp。
 	var active_before: Array[int] = [battle.active_index[0], battle.active_index[1]]
+	# ③ 治疗检测基线：结算前出战英雄的显示 HP（=屏幕上正渲染着的值·联机客户端同样持有）。
+	# 结算后同槽位 HP 上升 = 本拍被治疗 → 绿 +N 飘字。走前后快照对比而非枚举治疗事件 id：
+	# 引擎零改动、未来新增治疗来源（道具/技能）自动覆盖；槽位变了（切换/换人）不算治疗。
+	var hp_before: Array[float] = [
+		battle.hp_display(battle.hp[0][active_before[0]]),
+		battle.hp_display(battle.hp[1][active_before[1]])]
 
 	var r: Dictionary = battle.resolve()
 
@@ -870,18 +904,37 @@ func _resolve() -> void:
 	#   damage_taken 累加受伤量；hero_died（槽 == 结算前出战槽）= 该方出战英雄阵亡。
 	var dmg: Array[int] = [0, 0]
 	var dead: Array[bool] = [false, false]
+	var pen_max: Array[int] = [0, 0]        # ⑧ 本拍最高穿透档（damage_taken.pen·Pen 枚举有序 → 取最高档配色）
+	var blocked: Array[bool] = [false, false]     # ② 该方本拍挡下过攻击（player=防守方）
+	var block_big_atk: Array[bool] = [false, false]  # ② 挡下的是不是大波（演出隆重度）
+	var egain: Array[int] = [0, 0]          # ③ 本拍能量获得（半能单位·charge_gain 事件累加）
 	for ev in r.get("events", []):
 		var p: int = int(ev.get("player", 0))
 		match ev.get("id", ""):
 			"damage_taken":
 				dmg[p] += int(ev.get("amount", 0))
+				pen_max[p] = maxi(pen_max[p], int(ev.get("pen", 0)))
 			"hero_died":
 				if int(ev.get("slot", -1)) == active_before[p]:
 					dead[p] = true
+			"defend_block", "big_defend_block":
+				blocked[p] = true
+				if int(ev.get("kind", -1)) == A.BIG_ATTACK:
+					block_big_atk[p] = true
+			"charge_gain":
+				egain[p] += int(ev.get("amount", 0))
+	# ③ 治疗量：同槽位显示 HP 前后差（阵亡/换槽不算）
+	var healed: Array[float] = [0.0, 0.0]
+	for p in 2:
+		if not dead[p] and battle.active_index[p] == active_before[p]:
+			var hp_now := battle.hp_display(battle.hp[p][active_before[p]])
+			if hp_now > hp_before[p]:
+				healed[p] = hp_now - hp_before[p]
 
 	# 头顶招式圆圈（揭示双方盲选出招）→ 消失 → 再播打斗动画
 	await _show_action_indicators(r.get("p1_action", -1), r.get("p2_action", -1))
-	await _play_battle_anims(r.get("p1_action", -1), r.get("p2_action", -1), dmg, dead)
+	await _play_battle_anims(r.get("p1_action", -1), r.get("p2_action", -1), dmg, dead,
+		{pen = pen_max, blocked = blocked, block_big = block_big_atk, egain = egain, healed = healed})
 	_update_all()
 
 	if r.get("game_over", false):
@@ -1604,7 +1657,7 @@ func _on_debug_hit_fx(player: int, dmg_half: int) -> void:
 
 ## A 方案 juice：出招（攻击前冲 / 防御蓝闪沉身 / 攒上浮黄闪）→ 命中（白闪 + 斩击光
 ## + 伤害数字 + 震屏）。dmg/dead 为 [p0, p1]。无逐帧 attack/hit 动画，全靠代码表现。
-func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array) -> void:
+func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionary = {}) -> void:
 	# 执行动作 → 镜头聚焦"冲突落点"（Eddy 2026-07-09 镜头规格）：双方都进攻=居中放大对撞（配震屏）；
 	# 仅对方进攻=偏左聚受击的己方；仅己方进攻=偏右聚受击的敌方；双方都未进攻=不推近。
 	var p1_off := _is_offense(a0, int(dmg[1]), bool(dead[1]))
@@ -1623,6 +1676,11 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array) -> void:
 	stage.set_focus(p1_off or p2_off, fdir)
 	_act_juice(0, a0)
 	_act_juice(1, a1)
+	# ③ 能量获得反馈：金币粒子从角色飞向 HUD 金币行（到位时金币行金色脉冲）。
+	var egain: Array = fx.get("egain", [0, 0])
+	for p in 2:
+		if int(egain[p]) > 0:
+			_fly_energy_motes(p, int(egain[p]))
 	# P3：仅"大波且确实打中（伤害/击杀）"时镜头前推蓄势，峰值正好落在 0.45*phase 后的命中瞬间，
 	# 与 stage.shake() + _hitstop 合拍（被挡的大波无 impact → 不触发，避免推近落空）。
 	var big_lands := (a0 == A.BIG_ATTACK and (int(dmg[1]) > 0 or bool(dead[1]))) \
@@ -1631,15 +1689,37 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array) -> void:
 		_big_attack_punch()
 	await get_tree().create_timer(action_phase_duration * 0.45).timeout
 
+	var pen: Array = fx.get("pen", [0, 0])
 	var any := false
 	if int(dmg[1]) > 0 or bool(dead[1]):
-		_impact(1, int(dmg[1]))
+		_impact(1, int(dmg[1]), int(pen[1]))
 		any = true
 	if int(dmg[0]) > 0 or bool(dead[0]):
-		_impact(0, int(dmg[0]))
+		_impact(0, int(dmg[0]), int(pen[0]))
 		any = true
+	# ② 被挡拍（与命中同拍）：防守方盾感反馈——钢蓝火花+「被挡」飘字；大防挡大波更隆重。
+	var blocked: Array = fx.get("blocked", [false, false])
+	var block_big: Array = fx.get("block_big", [false, false])
+	var any_block := false
+	for p in 2:
+		if bool(blocked[p]):
+			_block_fx(p, bool(block_big[p]))
+			any_block = true
+	# ③ 治疗飘字（命中拍后微错开·避免与 -N 叠死）
+	var healed: Array = fx.get("healed", [0.0, 0.0])
+	for p in 2:
+		if float(healed[p]) > 0.0:
+			_pop_heal(p, float(healed[p]))
+	# ⑤ 方向性后坐：单侧受击=镜头朝受击方踢一脚（P0 左=-1/P1 右=+1）；双方同拍受击=对撞抵消不偏向。
+	var hit0 := int(dmg[0]) > 0 or bool(dead[0])
+	var hit1 := int(dmg[1]) > 0 or bool(dead[1])
 	if any:
-		stage.shake(SHAKE_BIG if (a0 == A.BIG_ATTACK or a1 == A.BIG_ATTACK) else SHAKE_HIT)
+		var kick := (1.0 if hit1 else 0.0) - (1.0 if hit0 else 0.0)
+		stage.shake(SHAKE_BIG if (a0 == A.BIG_ATTACK or a1 == A.BIG_ATTACK) else SHAKE_HIT, kick)
+	elif any_block:
+		# 没打进也有"接触感"：轻震朝防守方踢（力被盾接住的方向感）
+		var bkick := (1.0 if bool(blocked[1]) else 0.0) - (1.0 if bool(blocked[0]) else 0.0)
+		stage.shake(SHAKE_BLOCK, bkick)
 	if bool(dead[0]):
 		p1_char_display.modulate = Color(0.35, 0.35, 0.35)
 	if bool(dead[1]):
@@ -1691,6 +1771,9 @@ func _play_finisher(dmg: Array, kill_p2: bool, kill_p1: bool) -> void:
 	# ── 慢放出招（全场 0.45×·帧动画约 0.6s 真实展开·同步小前刺）──
 	_time_scale_base = FINISHER_SLOW
 	Engine.time_scale = FINISHER_SLOW
+	# 边缘速度线（默认 A=慢放期间专属）：直设强度·shader TIME 随 time_scale 变慢 → 抽帧闪烁更像手绘慢镜
+	speed_lines.visible = true
+	(speed_lines.material as ShaderMaterial).set_shader_parameter("strength", FINISHER_LINES_STRENGTH)
 	for p in 2:
 		if both or p == killer:
 			var cd := _cd(p)
@@ -1704,7 +1787,10 @@ func _play_finisher(dmg: Array, kill_p2: bool, kill_p1: bool) -> void:
 		_finisher_impact(1, int(dmg[1]))
 	if kill_p1:
 		_finisher_impact(0, int(dmg[0]))
-	stage.shake(SHAKE_BIG * 1.3)
+	# ⑤ 方向性后坐：朝倒下一方踢（双杀=对撞不偏向）
+	stage.shake(SHAKE_BIG * 1.3, (1.0 if kill_p2 else 0.0) - (1.0 if kill_p1 else 0.0))
+	# 黑白闪（默认 A=终结命中拍专属）：饱和度瞬降 0·恢复段拉回 → 全程 ≈0.5s 真实时长黑白
+	_postfx_set_sat(0.0)
 	_hitstop(0.1)
 	await get_tree().create_timer(0.45, true, false, true).timeout
 	# ── 恢复：时间回正 → 杀掉命中残留 tween（慢放里跑不完·晚于归位结束会把 scale 写回放大值）
@@ -1721,6 +1807,14 @@ func _play_finisher(dmg: Array, kill_p2: bool, kill_p1: bool) -> void:
 	vt2.tween_callback(func() -> void:
 		finisher_veil.visible = false
 		finisher_grab.copy_mode = BackBufferCopy.COPY_MODE_DISABLED)
+	# 黑白闪拉回 + 速度线淡出（时间已回正·普通 tween 无慢放残留风险）
+	var bt := create_tween()
+	bt.tween_method(_postfx_set_sat, 0.0, _postfx_sat_base, FINISHER_BW_OUT)
+	var lmat := speed_lines.material as ShaderMaterial
+	var lt := create_tween()
+	lt.tween_method(func(v: float) -> void: lmat.set_shader_parameter("strength", v),
+			FINISHER_LINES_STRENGTH, 0.0, FINISHER_LINES_OUT)
+	lt.tween_callback(func() -> void: speed_lines.visible = false)
 	for p in 2:
 		var cd := _cd(p)
 		var tw := create_tween().set_parallel(true)
@@ -1767,14 +1861,18 @@ func _act_juice(player: int, action: int) -> void:
 				# 帧动画英雄（h01 起）：挥刀帧信息量大会盖掉常规前冲——省去容器后撤
 				# （动画自带蓄势）、前冲加大 1.3× 并顶在前段贯穿命中拍（0.27s），平移才读得出来。
 				cd.play_animation("attack")
+				_spawn_dust(player)   # ⑦ 起步蹬地尘
 				tw.tween_property(cd, "position", home + Vector2(reach * 1.3 * dir, 0), 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 				tw.tween_interval(0.14)
 				tw.tween_property(cd, "position", home, 0.26).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+				tw.tween_callback(_spawn_dust.bind(player))   # ⑦ 回位落定尘
 			else:
 				# 静态图英雄：后撤蓄势 → 前冲 → 回位（平移=唯一攻击运动信号·原配方不动）。
 				tw.tween_property(cd, "position", home + Vector2(-28.0 * dir, 0), 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+				tw.tween_callback(_spawn_dust.bind(player))   # ⑦ 蓄势转前冲的蹬地尘
 				tw.tween_property(cd, "position", home + Vector2(reach * dir, 0), 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 				tw.tween_property(cd, "position", home, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+				tw.tween_callback(_spawn_dust.bind(player))   # ⑦ 回位落定尘
 			# A3：出招瞬间被自己的招式照亮（月光描边增强）。
 			cd.pulse_rim(1.4 if action == A.BIG_ATTACK else 0.9, 0.3)
 		A.DEFEND, A.BIG_DEFEND:
@@ -1798,13 +1896,14 @@ func _act_juice(player: int, action: int) -> void:
 ## 命中特效池预分配（_ready 一次）：飘字 Label / 斩击 SlashVFX / 火花 CPUParticles2D。
 ## 火花按重击/轻击分两池、参数在此钉死 —— 复用时只挪位置 + restart()，不改 amount（改 amount 会重分配粒子缓冲）。
 func _setup_fx_pools() -> void:
-	for i in FX_POOL_SIZE:
+	for i in FLOAT_POOL_SIZE:
 		var lbl := Label.new()
 		lbl.visible = false
 		lbl.z_index = 100
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(lbl)
 		_dmg_pool.append(lbl)
+	for i in FX_POOL_SIZE:
 		var slash := SlashVFX.new()
 		slash.pooled = true
 		slash.visible = false
@@ -1815,6 +1914,22 @@ func _setup_fx_pools() -> void:
 	for i in 2:
 		_spark_pool_big.append(_make_spark(16, 460.0, 4.5))
 		_spark_pool_small.append(_make_spark(10, 300.0, 3.0))
+	for i in DUST_POOL_SIZE:
+		_dust_pool.append(_make_dust())
+	# ③ 能量飞粒：专属能量珠资产（Eddy 2026-07-10 出图）·小尺寸 TextureRect 必须 IGNORE_SIZE（godot-ui-render-quirks）
+	var coin_tex: Texture2D = load("res://assets/ui/icons/energy_mote.png")
+	for i in MOTE_POOL_SIZE:
+		var m := TextureRect.new()
+		m.texture = coin_tex
+		m.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		m.stretch_mode = TextureRect.STRETCH_SCALE
+		m.size = Vector2(20, 20)
+		m.pivot_offset = Vector2(10, 10)
+		m.visible = false
+		m.z_index = 90
+		m.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(m)
+		_mote_pool.append(m)
 
 
 ## 火花粒子工厂：径向飞溅 + 重力下坠的一次性 explosive 爆发（参数见 _spawn_spark 原配方）。
@@ -1837,6 +1952,43 @@ func _make_spark(amount: int, vel_max: float, scale_max: float) -> CPUParticles2
 	return p
 
 
+## 黑白闪：PostFX 饱和度单点写入口（0=全黑白·基准=_postfx_sat_base）。UI 在 PostFX 之上不受染。
+func _postfx_set_sat(v: float) -> void:
+	(post_fx.material as ShaderMaterial).set_shader_parameter("saturation", v)
+
+
+## ⑦ 尘土粒子工厂：脚下一小撮灰瓦色尘（前冲起步/回位落定的接地感·Dead Cells 式廉价质感件）。
+func _make_dust() -> CPUParticles2D:
+	var p := CPUParticles2D.new()
+	p.emitting = false
+	p.one_shot = true
+	p.explosiveness = 1.0
+	p.amount = 7
+	p.lifetime = 0.34
+	p.direction = Vector2(0, -1)
+	p.spread = 75.0
+	p.initial_velocity_min = 36.0
+	p.initial_velocity_max = 110.0
+	p.gravity = Vector2(0, 180)
+	p.damping_min = 60.0
+	p.damping_max = 120.0
+	p.scale_amount_min = 2.0
+	p.scale_amount_max = 3.4
+	p.color = Color(0.56, 0.62, 0.72, 0.5)   # 屋脊灰瓦色·半透（尘非火花）
+	p.z_index = 55                            # 立绘（60 斩击）之下贴地
+	add_child(p)
+	return p
+
+
+## ⑦ 脚下起尘（池化）：player 脚底位置一撮（脚底锚=size.y×0.67·与终结演出同一锚点）。
+func _spawn_dust(player: int) -> void:
+	var p := _dust_pool[_dust_idx]
+	_dust_idx = (_dust_idx + 1) % DUST_POOL_SIZE
+	var cd := _cd(player)
+	p.global_position = cd.global_position + cd.size * Vector2(0.5, 0.67)
+	p.restart()
+
+
 ## 复用池节点前必调：kill 其在飞 tween（复用旧节点=先终止残留动画，防把属性写回旧值）。
 func _fx_kill_tweens(n: CanvasItem) -> void:
 	if n.has_meta(&"fx_tweens"):
@@ -1846,7 +1998,7 @@ func _fx_kill_tweens(n: CanvasItem) -> void:
 		n.remove_meta(&"fx_tweens")
 
 
-func _impact(target_player: int, dmg_half: int) -> void:
+func _impact(target_player: int, dmg_half: int, pen: int = 0) -> void:
 	var cd := _cd(target_player)
 	var big := dmg_half >= 4   # ≥2HP=重击：更强退弹/火花/定格
 	cd.flash_white(0.18)
@@ -1855,7 +2007,7 @@ func _impact(target_player: int, dmg_half: int) -> void:
 	_spawn_slash(target_player)
 	_spawn_spark(target_player, big)                  # c：命中火花
 	if dmg_half > 0:
-		_pop_damage(target_player, float(dmg_half) / 2.0)
+		_pop_damage(target_player, float(dmg_half) / 2.0, pen)
 	_hitstop(0.075 if big else 0.045)                 # c：命中定格（不 await，自管恢复）
 
 
@@ -1882,8 +2034,9 @@ func _hitstop(real_dur: float, ts: float = 0.04) -> void:
 
 ## 命中火花(c)：受击点爆一簇短命粒子（径向飞溅 + 重力下坠），重击更多更快。
 ## 一次性 explosive 爆发 → "一帧火花"的脆感。无贴图=小方块火星，足够。
-## 池化：重/轻两池各 2 发环形复用（参数在 _make_spark 钉死），复用只挪位置 + restart()。
-func _spawn_spark(target_player: int, big: bool) -> void:
+## 池化：重/轻两池各 2 发环形复用（参数在 _make_spark 钉死），复用只挪位置/着色 + restart()。
+## tint：命中=暖白火星（默认）/ ② 格挡=钢蓝（改 color 属性不触发缓冲重分配）。
+func _spawn_spark(target_player: int, big: bool, tint: Color = COL_SPARK_WARM) -> void:
 	var cd := _cd(target_player)
 	var p: CPUParticles2D
 	if big:
@@ -1892,6 +2045,7 @@ func _spawn_spark(target_player: int, big: bool) -> void:
 	else:
 		p = _spark_pool_small[_spark_idx_small]
 		_spark_idx_small = (_spark_idx_small + 1) % _spark_pool_small.size()
+	p.color = tint
 	p.global_position = cd.global_position + cd.size * Vector2(0.5, 0.42)
 	p.restart()
 
@@ -1908,35 +2062,70 @@ func _spawn_slash(target_player: int) -> void:
 
 ## 伤害飘字（数字重量 b）：受击处弹 -N，按伤害量缩放大小/配色 → punch-in 过冲 → 抛物上浮淡出。
 ## 大伤(≥2HP)更大更炽、描边更粗；起点偏击退方向 + 小随机，防多发叠死。
-func _pop_damage(player: int, amount: float) -> void:
-	var cd: CharacterDisplay = p1_char_display if player == 0 else p2_char_display
+func _pop_damage(player: int, amount: float, pen: int = 0) -> void:
 	var big := amount >= 2.0
+	# ⑧ 伤害阶梯分级配色（Pen 枚举有序）：真伤=白热字+绯红描边（最凶·强制大字）/穿透=靛紫/普通=原两档。
+	var col := COL_DMG_BIG if big else COL_DMG_SMALL
+	var outline := Color(0.12, 0.02, 0.02, 0.95)
+	var outline_px := 9 if big else 6
+	match pen:
+		ActionDef.Pen.TRUE_DMG:
+			col = COL_DMG_TRUE
+			outline = Color(0.55, 0.05, 0.08, 0.98)
+			outline_px = 11
+			big = true
+		ActionDef.Pen.PIERCE_DEF, ActionDef.Pen.PIERCE_BIGDEF:
+			col = COL_DMG_PIERCE
+			outline = Color(0.16, 0.06, 0.28, 0.95)
+	_pop_float(player, "-%s" % _fmt_hp(amount), 60 if big else 44, col, outline, outline_px,
+		1.28 if big else 1.12, 104.0 if big else 78.0)
+
+
+## ③ 治疗飘字：绿 +N。生成点比伤害字高一档且反向漂（同拍受伤+回血时两字不叠死）。
+func _pop_heal(player: int, amount: float) -> void:
+	_pop_float(player, "+%s" % _fmt_hp(amount), 44, COL_HEAL, Color(0.03, 0.14, 0.05, 0.95), 6,
+		1.12, 88.0, 0.18, -34.0)
+
+
+## ② 被挡演出：防守方钢蓝格挡火花 + 银灰「被挡」飘字 + 盾感 rim；大防挡大波=重火花+短顿帧更隆重。
+func _block_fx(player: int, big_atk: bool) -> void:
+	var cd := _cd(player)
+	cd.pulse_rim(1.3 if big_atk else 0.8, 0.28)
+	_spawn_spark(player, big_atk, COL_BLOCK_SPARK)
+	_pop_float(player, "被挡", 36, COL_BLOCK_TEXT, Color(0.06, 0.08, 0.12, 0.95), 5,
+		1.1, 62.0, 0.38)
+	if big_atk:
+		_hitstop(0.04)   # 挡下大波值得一拍定格（比命中定格 0.075 轻）
+
+
+## 通用飘字（伤害/治疗/被挡 单一出口·池化）：punch-in 过冲 → 抛物上浮淡出 → 隐藏归池。
+## y_frac=生成高度（角色身位比例·0.30=胸口）；x_off=额外横移（错开同拍多字）。
+func _pop_float(player: int, text: String, font_size: int, col: Color, outline: Color,
+		outline_px: int, peak: float, rise: float, y_frac: float = 0.30, x_off: float = 0.0) -> void:
+	var cd: CharacterDisplay = p1_char_display if player == 0 else p2_char_display
 	# 池化取号：先 kill 该格在飞 tween，再重置全部会被动画改写的属性（透明度/缩放）。
 	var lbl := _dmg_pool[_dmg_pool_idx]
-	_dmg_pool_idx = (_dmg_pool_idx + 1) % FX_POOL_SIZE
+	_dmg_pool_idx = (_dmg_pool_idx + 1) % FLOAT_POOL_SIZE
 	_fx_kill_tweens(lbl)
-	lbl.text = "-%s" % _fmt_hp(amount)
-	FontManager.apply(lbl, 60 if big else 44)
-	# 重击=炽黄白更醒目 / 轻击=橙红；粗黑描边 = 投影/重量。
-	lbl.add_theme_color_override("font_color", Color(1.0, 0.82, 0.5) if big else Color(1.0, 0.55, 0.42))
-	lbl.add_theme_color_override("font_outline_color", Color(0.12, 0.02, 0.02, 0.95))
-	lbl.add_theme_constant_override("outline_size", 9 if big else 6)
+	lbl.text = text
+	FontManager.apply(lbl, font_size)
+	lbl.add_theme_color_override("font_color", col)
+	lbl.add_theme_color_override("font_outline_color", outline)
+	lbl.add_theme_constant_override("outline_size", outline_px)
 	lbl.visible = true
 	lbl.modulate.a = 1.0
 	lbl.reset_size()
 	lbl.pivot_offset = lbl.size * 0.5   # 绕中心缩放
 	var dir := 1.0 if player == 0 else -1.0   # 击退方向（P0 打右侧敌→数字往右）
-	var start: Vector2 = cd.global_position + cd.size * Vector2(0.5, 0.30) - lbl.size * 0.5 \
-		+ Vector2(dir * 16.0 + randf_range(-10.0, 10.0), randf_range(-6.0, 6.0))
+	var start: Vector2 = cd.global_position + cd.size * Vector2(0.5, y_frac) - lbl.size * 0.5 \
+		+ Vector2(dir * (16.0 + x_off) + randf_range(-10.0, 10.0), randf_range(-6.0, 6.0))
 	lbl.global_position = start
 	# punch-in：0.45 → 过冲 → 落定
-	var peak := 1.28 if big else 1.12
 	lbl.scale = Vector2(0.45, 0.45)
 	var st := create_tween()
 	st.tween_property(lbl, "scale", Vector2(peak, peak), 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	st.tween_property(lbl, "scale", Vector2(peak, peak) * 0.86, 0.10).set_trans(Tween.TRANS_SINE)
 	# 抛物上浮（横向带一点击退漂移）+ 末段淡出，收尾隐藏归池（取代原 create_timer+queue_free）
-	var rise := 104.0 if big else 78.0
 	var tw := create_tween()
 	tw.set_parallel(true)
 	tw.tween_property(lbl, "global_position", start + Vector2(dir * 26.0, -rise), 0.66).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
@@ -1948,10 +2137,44 @@ func _pop_damage(player: int, amount: float) -> void:
 ## 数字重量(b)：HP 变化时给出战心条一个 modulate flinch（掉血偏红 / 回血偏绿），
 ## 用 modulate 而非 scale → 不受 RTL 心条(右起左排)的布局影响、稳健。
 func _flinch_heart_row(row: IconPipRow, is_loss: bool) -> void:
-	var peak := Color(1.7, 1.35, 1.35) if is_loss else Color(1.35, 1.7, 1.4)
+	_pulse_pip_row(row, Color(1.7, 1.35, 1.35) if is_loss else Color(1.35, 1.7, 1.4))
+
+
+## pip 行 modulate 脉冲（心条 flinch / ③ 金币行收能）单一出口。
+func _pulse_pip_row(row: IconPipRow, peak: Color) -> void:
 	var tw := create_tween()
 	tw.tween_property(row, "modulate", peak, 0.06).set_trans(Tween.TRANS_SINE)
 	tw.tween_property(row, "modulate", Color.WHITE, 0.30).set_trans(Tween.TRANS_SINE)
+
+
+## ③ 能量获得反馈：金币小粒从角色胸口散开 → 弧线飞进 HUD 金币行 → 末粒到位时金币行金色脉冲。
+## 粒数随获得量（半能→整能换算）2~5 粒；池化环形复用（复用前 kill 在飞 tween）。
+func _fly_energy_motes(player: int, egain_half: int) -> void:
+	var cd := _cd(player)
+	var row: IconPipRow = p1_coin_row if player == 0 else p2_coin_row
+	var from: Vector2 = cd.global_position + cd.size * Vector2(0.5, 0.35)
+	var to: Vector2 = row.global_position + row.size * 0.5
+	var count := clampi(1 + egain_half / 2, 2, 5)
+	for i in count:
+		var m := _mote_pool[_mote_idx]
+		_mote_idx = (_mote_idx + 1) % MOTE_POOL_SIZE
+		_fx_kill_tweens(m)
+		m.visible = true
+		m.scale = Vector2.ONE
+		m.modulate = Color(1, 1, 1, 0)
+		m.global_position = from - m.size * 0.5
+		var burst := from + Vector2(randf_range(-52.0, 52.0), randf_range(-70.0, -20.0)) - m.size * 0.5
+		var tw := create_tween()
+		var delay := i * 0.07
+		tw.tween_interval(maxf(delay, 0.001))
+		tw.tween_property(m, "modulate:a", 1.0, 0.06)
+		tw.parallel().tween_property(m, "global_position", burst, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_property(m, "global_position", to - m.size * 0.5, 0.34).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tw.parallel().tween_property(m, "scale", Vector2(0.55, 0.55), 0.34)
+		tw.tween_callback(m.hide)
+		if i == count - 1:
+			tw.tween_callback(_pulse_pip_row.bind(row, Color(1.8, 1.6, 1.0)))   # 末粒到位=金币行收能脉冲
+		m.set_meta(&"fx_tweens", [tw])
 
 
 func _process(_delta: float) -> void:

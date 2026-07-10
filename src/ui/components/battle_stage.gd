@@ -40,6 +40,9 @@ extends Control
 @export var pointer_pivot_reach: float = 480.0
 ## 命中抖动衰减速度（越大停得越快）。
 @export var shake_decay: float = 6.0
+## 方向性后坐踢幅（× shake amp）：受击瞬间镜头朝受击方向"踢一脚"再弹回（Vlambeer 式镜头语言），
+## 只做水平（纵向踢会让建筑上下跳=呼吸禁令）；0 = 退化为纯随机抖。
+@export var shake_kick_scale: float = 1.1
 ## 在 standalone 预览中点击鼠标触发一次抖动演示（集成进战斗后可关）。
 @export var demo_click_shake: bool = true
 
@@ -68,6 +71,7 @@ var _factors: PackedFloat32Array = PackedFloat32Array()
 var _base_scales: PackedVector2Array = PackedVector2Array()   # 各层基准 scale（保留 .tscn 预设）
 var _time: float = 0.0
 var _shake_amp: float = 0.0
+var _shake_kick: float = 0.0      # 当前水平后坐量（正=向右·比随机抖衰减稍快·静止=0 零像素差）
 var _pnx: float = 0.0             # 平滑后的鼠标水平偏移（-1..1·0=屏幕中心·驱动视差偏移+缩放偏置）
 var _focus: float = 0.0           # 当前对焦量（0=静止·1=推近·_process 缓动）
 var _focus_target: float = 0.0    # 目标（hover 底部按钮=1·离开=0）
@@ -106,8 +110,11 @@ func _apply_seed(node_name: String, s: float) -> void:
 
 
 ## 触发一次命中抖动；amp 为像素幅度（取较大值，不打断更强的抖动）。
-func shake(amp: float) -> void:
+## kick_dir_x：受击方向（-1=向左踢/+1=向右踢/0=无方向纯抖·双方同拍受击=对撞不偏向）。
+func shake(amp: float, kick_dir_x: float = 0.0) -> void:
 	_shake_amp = maxf(_shake_amp, amp)
+	if kick_dir_x != 0.0:
+		_shake_kick = clampf(kick_dir_x, -1.0, 1.0) * amp * shake_kick_scale
 
 
 ## 设置镜头对焦（on=推近；dir 水平偏置：+1 攻击=焦点右移聚焦敌人 / -1 防御=左移聚焦自身 / 0 技能居中）。
@@ -155,6 +162,10 @@ func _process(delta: float) -> void:
 		_shake_amp = maxf(0.0, _shake_amp - shake_decay * delta * _shake_amp)
 		if _shake_amp < 0.05:
 			_shake_amp = 0.0
+	if _shake_kick != 0.0:
+		_shake_kick *= exp(-shake_decay * 1.5 * delta)   # 后坐比随机抖收得更快：一脚踢出即弹回
+		if absf(_shake_kick) < 0.05:
+			_shake_kick = 0.0
 
 	# 鼠标视差目标值（关闭或鼠标回中时缓动归零，不跳变）。
 	var target_nx: float = 0.0
@@ -182,7 +193,7 @@ func _process(delta: float) -> void:
 		var f: float = _factors[i]
 		var idle_w: float = maxf(f - ground_parallax, IDLE_FAR_CAP)
 		var off := Vector2(
-			drift_x * idle_w + (shake_x - _pnx * pointer_strength) * f,
+			drift_x * idle_w + (shake_x + _shake_kick - _pnx * pointer_strength) * f,
 			shake_y * f)
 		# 镜头推近：绕动态对焦点 _focal 缩放（显式 position 数学·焦点随动作左右偏置=聚焦敌/我）。
 		# k=1（静止）时退化为 position=base+off、scale=base → 与原始画面一像素不差。

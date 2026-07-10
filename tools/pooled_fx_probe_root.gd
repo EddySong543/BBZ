@@ -16,8 +16,8 @@ func _ready() -> void:
 	await _rt(2.2)   # 等进入选择态
 	var fails: Array[String] = []
 
-	# ① 池已预分配且全部待机
-	if s._dmg_pool.size() != 4:
+	# ① 池已预分配且全部待机（飘字池=FLOAT_POOL_SIZE 6·②③⑧ 反馈批扩容）
+	if s._dmg_pool.size() != 6:
 		fails.append("dmg_pool size=%d" % s._dmg_pool.size())
 	if s._slash_pool.size() != 4:
 		fails.append("slash_pool size=%d" % s._slash_pool.size())
