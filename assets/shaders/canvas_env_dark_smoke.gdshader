@@ -1,30 +1,35 @@
 shader_type canvas_item;
 
 // =============================================================
-// canvas_env_dark_smoke.gdshader — 前/中景流动黑烟（Eddy 2026-07-10 新场景元素）
-// 作者: Claude (Game Studios) ｜ 用途: scene1 战斗舞台氛围层（⚠非天上云/云海——那两个方向已否）
-// 两种形态一份 shader（uniform 切换·mix 无动态分支）：
-//   puff_isolation=0 连续带：波形上缘的流动黑烟（前景持续存在·整体呈波形）
-//   puff_isolation=1 孤立片：x 向分格·一小片一小片独立缓漂的波形烟团（角色站立的房檐面）
-// 局部 quad 非全屏；2 octave 值噪声零纹理采样；粗像素格 + 透明度色阶化贴像素风。
-// 目标平台: PC (Windows D3D12 / Forward+)。复杂度: 低（纯数学·限高条带）。
+// canvas_env_dark_smoke.gdshader v3 — 前/中景像素烟云（参照 ref/ref20.png·Eddy 2026-07-10 二次纠偏）
+// 作者: Claude (Game Studios) ｜ 用途: scene1 战斗舞台氛围层
+// v3 像素块派（v1 噪声雾/v2 圆瓣拼形均被否）：
+//   mode_isolated=1 孤立云：一朵朵=长方形逐层堆砌（底层最宽·逐层收窄·每层横向错位=阶梯边·
+//     底部完全平整·明显像素感）·各朵独立缓漂 + 整体缓慢流动
+//   mode_isolated=0 前景带：一整条连续循环的阶梯波形烟墙·贴屏幕底边=画框（压底边强化画面中心）·
+//     波形上缘按列阶梯量化·无限循环滚动
+// 局部条带非全屏；纯矩形拼合 + 轻噪声·循环内零纹理采样。复杂度：低。
+// 坐标系：x 单位=格宽（cells 均分 rect 宽）·y 经 aspect 归一到同单位。
 // =============================================================
 
-uniform vec4 smoke_color : source_color = vec4(0.028, 0.036, 0.06, 1.0);  // 近黑带一点夜蓝（融夜色不发灰）
-uniform float alpha_max : hint_range(0.0, 1.0) = 0.3;    // 烟最实处透明度
-uniform float flow_speed = 0.045;      // 流速（负值反向流）
-uniform vec2 noise_scale = vec2(18.0, 2.6);   // 烟体噪声尺度 XY 分开（长条 rect 必须做宽高比校正·否则烟块被横向拉成脏方块）
-uniform float wave_base : hint_range(0.0, 1.0) = 0.42;   // 连续带：上缘基准高度（rect UV）
-uniform float wave_amp : hint_range(0.0, 0.6) = 0.2;     // 连续带：上缘波形幅度
-uniform float wave_freq = 3.0;         // 连续带：上缘低频波数（整条 rect 内周期数）
-uniform float edge_soft : hint_range(0.02, 0.6) = 0.32;  // 上缘→烟体的过渡宽度
-uniform float puff_isolation : hint_range(0.0, 1.0) = 0.0;  // 0=连续带 1=孤立片
-uniform float puff_cells = 7.0;        // 孤立片：x 向格数（每格至多一片）
-uniform float puff_keep : hint_range(0.0, 1.0) = 0.62;   // 孤立片：出片比例（其余格留空=孤立感）
-uniform float alpha_steps = 4.0;       // 透明度色阶化级数（手绘烟感·防平滑渐变出戏）
-uniform vec2 pixel_grid = vec2(680.0, 90.0);   // 粗像素格（按实例 rect 尺寸/3px 配）
-uniform vec4 rim_color : source_color = vec4(0.62, 0.78, 1.0, 1.0);  // 月光缘色（冷蓝·同场景 rim 语言）
-uniform float rim_alpha : hint_range(0.0, 0.6) = 0.16;  // 月光缘强度——暗底上烟的可读性全靠这条薄边（云海纪律：只一条亮缘）
+uniform vec4 fill_color : source_color = vec4(0.14, 0.16, 0.21, 1.0);  // 烟体色
+uniform vec4 lit_color : source_color = vec4(0.42, 0.5, 0.66, 1.0);    // 受月光顶层色
+uniform float lit_strength : hint_range(0.0, 1.0) = 0.55;  // 顶层亮色混入比例（0=纯单色）
+uniform float alpha_max : hint_range(0.0, 1.0) = 0.75;
+uniform float flow_speed = 0.012;     // 整体流速（格/秒·循环滚动）
+uniform float sway_speed = 0.4;       // 孤立云：单朵缓漂相位速度
+uniform float mode_isolated : hint_range(0.0, 1.0) = 1.0;  // 1=孤立云 0=前景带
+uniform float cells = 7.0;            // x 向格数（孤立云=每格至多一朵）
+uniform float keep : hint_range(0.0, 1.0) = 0.6;    // 孤立云：出云比例
+uniform float cloud_size : hint_range(0.4, 2.0) = 1.0;
+uniform float base_frac : hint_range(0.0, 1.0) = 0.8;   // 孤立云：平底基线（rect 高度比例）
+uniform float row_h = 0.055;          // 堆砌层高（格宽单位·两模式共用=像素层厚）
+uniform float band_h_frac : hint_range(0.0, 1.0) = 0.45;   // 带：基础高度（rect 高度比例·自底向上）
+uniform float band_wave_frac : hint_range(0.0, 0.6) = 0.28; // 带：波峰额外起伏（rect 高度比例）
+uniform float band_col = 0.05;        // 带：阶梯列宽（格宽单位·列内同高=像素阶梯）
+uniform float frame_lift : hint_range(0.0, 0.6) = 0.18;    // 带：画框提升——越靠屏幕两侧越高·中心最低
+uniform float aspect = 19.3;          // rect 宽高比 W/H（按实例配）
+uniform vec2 pixel_grid = vec2(900.0, 47.0);   // 粗像素格（rect 尺寸/3px）
 
 
 float hash(vec2 p) {
@@ -32,46 +37,57 @@ float hash(vec2 p) {
 }
 
 
-// 值噪声 + 两倍频 fbm：烟体的翻卷纹理（零纹理采样）
-float vnoise(vec2 p) {
-	vec2 i = floor(p);
-	vec2 f = fract(p);
-	vec2 u = f * f * (3.0 - 2.0 * f);
-	return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
-			mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
-}
-
-
-float fbm(vec2 p) {
-	return vnoise(p) * 0.65 + vnoise(p * 2.3 + vec2(7.7, 1.3)) * 0.35;
-}
-
-
 void fragment() {
-	vec2 uv = floor(UV * pixel_grid) / pixel_grid;   // 粗像素格量化
-	float t = TIME * flow_speed;
-	// 烟体：横向主流 + 纵向微对流 → 翻卷感；smoothstep 重映射拉开对比（防成均匀薄雾·暗底上要能读出团块）
-	float body = smoothstep(0.22, 0.78,
-			fbm(vec2(uv.x * noise_scale.x - t * 3.0, uv.y * noise_scale.y + t * 0.8)));
-	// 连续带：波形上缘 = 低频 sin + 高频噪声起伏·越往下越实（噪声项跟随 x 尺度防被拉平）
-	float top = wave_base + sin(uv.x * wave_freq * 6.2832 + t * 2.5) * wave_amp * 0.4
-			+ (fbm(vec2(uv.x * noise_scale.x * 0.35 + t * 1.6, 3.3)) - 0.5) * wave_amp;
-	float band = smoothstep(top, top + edge_soft, uv.y);
-	// 孤立片：x 分格·部分格留空·片内横椭圆衰减（扁片=波形云）+ 每片独立相位缓漂
-	float cx = uv.x * puff_cells;
-	float cell = floor(cx);
-	float keep = step(hash(vec2(cell, 5.13)), puff_keep);
-	vec2 pc = vec2(fract(cx) - 0.5 + sin(t * 4.0 + cell * 2.17) * 0.07,
-			(uv.y - 0.5 - (hash(vec2(cell, 9.7)) - 0.5) * 0.3) * 0.9);
-	// 边界距离叠噪声扰动 → 烟片轮廓成波形碎缘（防干净椭圆读作"泡泡"）
-	float pshape = length(pc) + (body - 0.5) * 0.24;
-	float puff = keep * (1.0 - smoothstep(0.1, 0.38 + hash(vec2(cell, 2.2)) * 0.12, pshape));
-	float cover = mix(band, puff, puff_isolation);
-	// 暗体 + 形体薄边一线月光缘（cover 低值区=烟形边缘）：暗底之夜烟的形全靠这条缘读出
-	float fill_a = cover * body * alpha_max;
-	float rim_w = (smoothstep(0.03, 0.16, cover) - smoothstep(0.16, 0.5, cover)) * body * rim_alpha;
-	float a = max(fill_a, rim_w) * smoke_color.a;
-	vec3 rgb = mix(smoke_color.rgb, rim_color.rgb, clamp(rim_w / max(a, 1e-4), 0.0, 1.0));
-	a = floor(a * alpha_steps + 0.5) / alpha_steps;   // 色阶化（像素风的烟不做平滑渐变）
+	vec2 uvq = floor(UV * pixel_grid) / pixel_grid;
+	float t = TIME;
+	float cu = uvq.x * cells + t * flow_speed * cells;   // 流动坐标（单位=格宽）
+	float cv = uvq.y * cells / aspect;
+	float h_units = cells / aspect;
+
+	// —— 孤立云：长方形逐层堆砌（底平·逐层收窄·每层错位）——
+	float cloud_cover = 0.0;
+	float cloud_lit = 0.0;
+	for (int i = -1; i <= 1; i++) {
+		float id = floor(cu) + float(i);
+		float on = step(hash(vec2(id, 5.13)), keep);
+		float sz = cloud_size * (0.75 + 0.5 * hash(vec2(id, 2.2))) * on;
+		float cx = id + 0.5 + (hash(vec2(id, 9.7)) - 0.5) * 0.24
+				+ sin(t * sway_speed + id * 2.17) * 0.015;   // 缓漂极小幅=地面烟尘感
+		// 平底钉基线（Eddy：与房檐精准重合——底线不加随机抖·下沿略漫过地面线=贴地）
+		float base_v = h_units * base_frac;
+		float nrows = 1.0 + step(0.35, hash(vec2(id, 11.1)));   // 1~2 层（ref21 地烟·总高远低于膝盖）
+		for (int k = 0; k < 2; k++) {
+			float fk = float(k);
+			float row_on = step(fk, nrows - 1.0);
+			// 贴地横条：底层宽扁·顶层短小且大错位（ref21 深紫地烟的碎片感）
+			float w = sz * mix(0.85, 0.32, fk) * (0.75 + 0.5 * hash(vec2(id, 20.0 + fk))) * row_on;
+			float ox = (hash(vec2(id, 30.0 + fk)) - 0.5) * (0.12 + 0.3 * fk) * sz;
+			float in_x = step(abs(cu - (cx + ox)), w * 0.5);
+			float y_bot = base_v - row_h * fk;
+			float in_y = step(y_bot - row_h, cv) * step(cv, y_bot);
+			float c = in_x * in_y;
+			cloud_cover = max(cloud_cover, c);
+			cloud_lit = max(cloud_lit, c * fk);   // 仅顶层微光
+		}
+	}
+
+	// —— 前景带：连续循环阶梯波形烟墙（画框·贴底）——
+	float colc = (floor(cu / band_col) + 0.5) * band_col;   // 列中心（列内同高=阶梯）
+	float wave = sin(colc * 0.85 + t * 0.3) * 0.5
+			+ sin(colc * 2.3 - t * 0.22) * 0.3
+			+ (hash(vec2(floor(cu / band_col), 7.7)) - 0.5) * 0.5;
+	// 画框提升：越靠屏幕两侧越高（uvq.x 是 rect 本地坐标·不随流动滚·框感钉住）
+	float lift = pow(abs(uvq.x - 0.5) * 2.0, 2.0) * frame_lift;
+	float bh = h_units * (band_h_frac + band_wave_frac * (wave * 0.5 + 0.5) + lift);
+	bh = floor(bh / row_h) * row_h;                          // 高度量化到层高=阶梯边
+	float band_cover = step(h_units - bh, cv);
+	float band_lit = band_cover * step(cv, h_units - bh + row_h);   // 顶层一阶受月光
+
+	// —— 模式混合 + 上色（体内轻噪声防死平）——
+	float cover = mix(band_cover, cloud_cover, mode_isolated);
+	float lit = mix(band_lit, cloud_lit, mode_isolated);
+	float n = hash(vec2(floor(cu / band_col), floor(cv / row_h)));   // 块级噪声（不破坏像素块感）
+	float a = cover * alpha_max * (0.92 + 0.08 * n) * fill_color.a;
+	vec3 rgb = mix(fill_color.rgb, lit_color.rgb, lit * lit_strength);
 	COLOR = vec4(rgb, a);
 }

@@ -118,25 +118,54 @@ shader_parameter/fade_tail = 110.0
 
 [sub_resource type="ShaderMaterial" id="SmokeRoofMat"]
 shader = ExtResource("24_darksmoke")
-shader_parameter/puff_isolation = 1.0
-shader_parameter/alpha_max = 0.42
-shader_parameter/flow_speed = 0.045
-shader_parameter/noise_scale = Vector2(22, 2.2)
-shader_parameter/puff_cells = 7.0
-shader_parameter/puff_keep = 0.62
+shader_parameter/mode_isolated = 1.0
+shader_parameter/alpha_max = 0.8
+shader_parameter/flow_speed = 0.004
+shader_parameter/sway_speed = 0.18
+shader_parameter/cells = 10.0
+shader_parameter/keep = 0.7
+shader_parameter/cloud_size = 1.0
+shader_parameter/base_frac = 0.45
+shader_parameter/row_h = 0.041
+shader_parameter/fill_color = Color(0.06, 0.075, 0.11, 1)
+shader_parameter/lit_color = Color(0.28, 0.36, 0.5, 1)
+shader_parameter/lit_strength = 0.25
+shader_parameter/aspect = 19.3
+shader_parameter/pixel_grid = Vector2(900, 47)
+
+[sub_resource type="ShaderMaterial" id="SmokeRoofNearMat"]
+shader = ExtResource("24_darksmoke")
+shader_parameter/mode_isolated = 1.0
+shader_parameter/alpha_max = 0.85
+shader_parameter/flow_speed = 0.007
+shader_parameter/sway_speed = 0.13
+shader_parameter/cells = 8.0
+shader_parameter/keep = 0.66
+shader_parameter/cloud_size = 1.15
+shader_parameter/base_frac = 0.58
+shader_parameter/row_h = 0.038
+shader_parameter/fill_color = Color(0.05, 0.06, 0.095, 1)
+shader_parameter/lit_color = Color(0.24, 0.3, 0.44, 1)
+shader_parameter/lit_strength = 0.2
+shader_parameter/aspect = 19.3
 shader_parameter/pixel_grid = Vector2(900, 47)
 
 [sub_resource type="ShaderMaterial" id="SmokeFrontMat"]
 shader = ExtResource("24_darksmoke")
-shader_parameter/puff_isolation = 0.0
-shader_parameter/alpha_max = 0.5
-shader_parameter/flow_speed = 0.05
-shader_parameter/noise_scale = Vector2(17, 2.8)
-shader_parameter/wave_base = 0.15
-shader_parameter/wave_amp = 0.22
-shader_parameter/wave_freq = 3.0
-shader_parameter/edge_soft = 0.35
-shader_parameter/pixel_grid = Vector2(906, 140)
+shader_parameter/mode_isolated = 1.0
+shader_parameter/alpha_max = 0.95
+shader_parameter/flow_speed = 0.014
+shader_parameter/sway_speed = 0.1
+shader_parameter/cells = 8.0
+shader_parameter/keep = 1.0
+shader_parameter/cloud_size = 1.8
+shader_parameter/base_frac = 0.654
+shader_parameter/row_h = 0.1
+shader_parameter/fill_color = Color(0.03, 0.038, 0.06, 1)
+shader_parameter/lit_color = Color(0.22, 0.28, 0.4, 1)
+shader_parameter/lit_strength = 0.15
+shader_parameter/aspect = 10.46
+shader_parameter/pixel_grid = Vector2(906, 87)
 
 [sub_resource type="ShaderMaterial" id="RfMat1"]
 shader = ExtResource("20_boxblur")
@@ -359,6 +388,15 @@ offset_bottom = 830.0
 mouse_filter = 2
 metadata/parallax_factor = 1.0
 
+[node name="SmokeRoofNear" type="ColorRect" parent="."]
+material = SubResource("SmokeRoofNearMat")
+offset_left = -383.0
+offset_top = 730.0
+offset_right = 2317.0
+offset_bottom = 870.0
+mouse_filter = 2
+metadata/parallax_factor = 1.06
+
 [node name="LightShaft" type="ColorRect" parent="."]
 material = SubResource("LightShaftMat")
 layout_mode = 0
@@ -454,7 +492,7 @@ metadata/parallax_factor = 1.1
 [node name="SmokeFront" type="ColorRect" parent="."]
 material = SubResource("SmokeFrontMat")
 offset_left = -400.0
-offset_top = 760.0
+offset_top = 920.0
 offset_right = 2320.0
 offset_bottom = 1180.0
 mouse_filter = 2
