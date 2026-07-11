@@ -311,6 +311,8 @@ func _ready() -> void:
 	_enlarge_frames()
 	_update_all()
 	_show_turn_intro()
+	if _overtime:
+		_play_eclipse_intro()   # 「烛阴之眼」开场演出（非阻塞·与选招并行）
 
 
 ## 离场恢复 time_scale=1：hitstop(c) 用全局 Engine.time_scale，若在定格瞬间切场景须复位，防下个场景慢动作。
@@ -1005,6 +1007,70 @@ func _start_overtime() -> void:
 	get_tree().reload_current_scene()
 
 
+# 加时日食「烛阴之眼」演出旋钮（2026-07-11 五版·Eddy 定形：裂缝闪现+小震 → 挂住 → 咔嚓吞尽接大震）
+const ECLIPSE_EAT_DELAY := 0.3       # 开场静置(s)
+const ECLIPSE_CRACK_TIME := 0.22     # 裂缝自缘向心伸展时长(s·"一下")
+const ECLIPSE_CRACK_SHAKE := 2.5     # 裂缝瞬间小震幅度
+const ECLIPSE_CRACK_HOLD := 0.55     # 裂缝挂住时长(s·裂纹微微蠕动)
+const ECLIPSE_SNAP_TIME := 0.2       # 咔嚓吞尽时长(s·黑暗一口盖满)
+const ECLIPSE_COMMIT_SHAKE := 5.0    # 成相震屏幅度
+const ECLIPSE_RIM_BURST := 2.4       # 环光小炸峰值(rim_intensity 短冲)
+const ECLIPSE_RIM_SETTLE := 0.45     # 小炸回落时长(s)
+const ECLIPSE_HALO_CORE := Color(0.85, 0.7, 1.0)   # 日食态月晕芯色(紫白)
+const ECLIPSE_HALO_GLOW := Color(0.5, 0.32, 0.9)   # 日食态月晕外晕(紫)
+
+
+## 加时赛开场演出「烛阴之眼」（2026-07-11 五版·Eddy 定形·⛔眼球晃动已去/⛔白闪已否）：
+## 巨月原地不动 → 黑色裂纹自月缘向心一下伸展（小震）→ 挂住微微蠕动 → 咔嚓：黑暗一口吞尽
+## （指状前沿·⛔正圆收缩环）→ 紧接成相大震+环光小炸 → 紫日食+月晕转紫定格。
+## 非阻塞：与选招流程并行·不碰 UI/不锁输入。日食本体=程序化 shader（scene1 Eclipse 节点）。
+## ⚠ Eclipse/MoonHalo 材质均先 duplicate 再改（.tscn 子资源跨场景实例共享·防污染下一局）。
+func _play_eclipse_intro() -> void:
+	var moon := stage.get_node_or_null("Moon") as CanvasItem
+	var eclipse := stage.get_node_or_null("Eclipse") as CanvasItem
+	if moon == null or eclipse == null:
+		return
+	eclipse.material = eclipse.material.duplicate()
+	var emat := eclipse.material as ShaderMaterial
+	var halo_mat: ShaderMaterial = null
+	var halo := stage.get_node_or_null("MoonHalo") as CanvasItem
+	if halo != null and halo.material is ShaderMaterial:
+		halo.material = halo.material.duplicate()
+		halo_mat = halo.material as ShaderMaterial
+	emat.set_shader_parameter("crack", 0.0)
+	emat.set_shader_parameter("eat", 0.0)
+	emat.set_shader_parameter("final_mix", 0.0)
+	eclipse.modulate = Color.WHITE
+	eclipse.visible = true
+	var tw := create_tween()
+	tw.tween_interval(ECLIPSE_EAT_DELAY)
+	tw.tween_callback(stage.shake.bind(ECLIPSE_CRACK_SHAKE, 0.0))
+	tw.tween_property(emat, "shader_parameter/crack", 1.0, ECLIPSE_CRACK_TIME) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(ECLIPSE_CRACK_HOLD)
+	tw.tween_property(emat, "shader_parameter/eat", 1.0, ECLIPSE_SNAP_TIME) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_callback(_eclipse_commit.bind(moon, emat, halo_mat))
+
+
+## 成相瞬间（⛔白闪已否·Eddy 2026-07-11）：月面隐藏、环+冕点亮并小炸回落、震屏、月晕转紫。
+func _eclipse_commit(moon: CanvasItem, emat: ShaderMaterial, halo_mat: ShaderMaterial) -> void:
+	moon.visible = false
+	emat.set_shader_parameter("final_mix", 1.0)
+	emat.set_shader_parameter("rim_intensity", ECLIPSE_RIM_BURST)
+	emat.set_shader_parameter("corona_intensity", 0.9)
+	stage.shake(ECLIPSE_COMMIT_SHAKE)
+	var tw := create_tween()
+	tw.tween_property(emat, "shader_parameter/rim_intensity", 1.0, ECLIPSE_RIM_SETTLE) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(emat, "shader_parameter/corona_intensity", 0.5, ECLIPSE_RIM_SETTLE)
+	if halo_mat != null:
+		halo_mat.set_shader_parameter("core_color", ECLIPSE_HALO_CORE)
+		halo_mat.set_shader_parameter("glow_color", ECLIPSE_HALO_GLOW)
+		halo_mat.set_shader_parameter("core_intensity", 0.35)
+		halo_mat.set_shader_parameter("glow_intensity", 0.16)
+
+
 func _show_death_switch_selection(player: int) -> void:
 	state = State.HERO_SELECT
 	_set_buttons_active(false)
@@ -1639,6 +1705,7 @@ func _build_debug_buttons() -> void:
 	panel.setup(battle)
 	panel.state_changed.connect(_on_debug_state_changed)
 	panel.hit_fx.connect(_on_debug_hit_fx)
+	panel.overtime_requested.connect(_on_debug_overtime)
 
 
 ## debug 面板改了 battle 状态 → 刷新全套显示（含换英雄需刷技能卡·多刷无害）。
@@ -1646,6 +1713,15 @@ func _on_debug_state_changed() -> void:
 	_update_all()
 	_refresh_skill_card()
 	_start_ai_think()   # 任务G：调试面板直改引擎状态 → 预想作废重想
+
+
+## debug 一键进加时赛：跳过平局判定与选人浮窗，双方各用当前出战英雄组白板 1v1
+## （BattleSetup 带旗标整场景重载 = 与真实加时同一条路·测加时规则+日食演出用）。
+func _on_debug_overtime() -> void:
+	BattleSetup.p1_heroes = BattleCore.overtime_roster(battle.heroes[PLAYER], battle.active_index[PLAYER])
+	BattleSetup.p2_heroes = BattleCore.overtime_roster(battle.heroes[AI], battle.active_index[AI])
+	BattleSetup.overtime = true
+	get_tree().reload_current_scene()
 
 
 ## debug 造伤按钮 → 播打击表现（飘字 / 斩击 / 白闪 / 震屏）。

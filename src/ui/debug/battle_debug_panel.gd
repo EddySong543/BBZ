@@ -9,6 +9,7 @@ extends VBoxContainer
 
 signal state_changed                        # 改了 battle 状态 → 请 battle_screen 刷新
 signal hit_fx(player: int, dmg_half: int)   # 造伤按钮 → 请 battle_screen 播打击表现（飘字/斩击/震屏）
+signal overtime_requested                   # 一键进加时赛 → 请 battle_screen 组白板 1v1 并重载场景
 
 const PLAYER := 0
 const AI := 1
@@ -30,6 +31,7 @@ func setup(battle_ref: BattleCore) -> void:
 		["敌 +盾2", _dbg_shield_enemy],
 		["我 下个英雄", _dbg_next_hero_self],
 		["敌 下个英雄", _dbg_next_hero_enemy],
+		["进加时赛", _dbg_enter_overtime],
 	]
 	for d in defs:
 		var b := Button.new()
@@ -40,6 +42,12 @@ func setup(battle_ref: BattleCore) -> void:
 		FontManager.apply_btn(b, 14)
 		b.pressed.connect(d[1] as Callable)
 		add_child(b)
+
+
+## 一键进加时赛（测加时规则+日食演出用）：跳过平局判定与选人浮窗，
+## 场景重载等跨界操作归 battle_screen（面板只发信号·保持职责单一）。
+func _dbg_enter_overtime() -> void:
+	overtime_requested.emit()
 
 
 func _dbg_full_energy() -> void:
