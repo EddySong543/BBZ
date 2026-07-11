@@ -13,12 +13,12 @@
 [ext_resource type="Shader" uid="uid://8nr5wbxavv34" path="res://assets/shaders/canvas_fx_edge_soften.gdshader" id="16_edgesoft"]
 [ext_resource type="Shader" uid="uid://u0mpca3l8lig" path="res://assets/shaders/canvas_fx_moonlight.gdshader" id="17_moonlight"]
 [ext_resource type="Shader" uid="uid://ds1lag0nmchpk" path="res://assets/shaders/canvas_fx_box_blur.gdshader" id="20_boxblur"]
-[ext_resource type="Shader" path="res://assets/shaders/canvas_env_fog_band.gdshader" id="22_fogband"]
-[ext_resource type="Shader" path="res://assets/shaders/canvas_env_light_shaft.gdshader" id="23_shaft"]
-[ext_resource type="Shader" path="res://assets/shaders/canvas_env_dark_smoke.gdshader" id="24_darksmoke"]
-[ext_resource type="Texture2D" path="res://assets/scenes/scene1/scene1_cloud_bank.png" id="25_cloudbank"]
-[ext_resource type="Texture2D" path="res://assets/scenes/scene1/scene1_cloud_puff_a.png" id="26_cloudpuffa"]
-[ext_resource type="Texture2D" path="res://assets/scenes/scene1/scene1_cloud_puff_b.png" id="27_cloudpuffb"]
+[ext_resource type="Shader" uid="uid://c5j24min87cl7" path="res://assets/shaders/canvas_env_fog_band.gdshader" id="22_fogband"]
+[ext_resource type="Shader" uid="uid://cetrmwusffdry" path="res://assets/shaders/canvas_env_light_shaft.gdshader" id="23_shaft"]
+[ext_resource type="Shader" uid="uid://bqm6bapmhmg0k" path="res://assets/shaders/canvas_env_dark_smoke.gdshader" id="24_darksmoke"]
+[ext_resource type="Texture2D" uid="uid://cfg0t5cp3j4un" path="res://assets/scenes/scene1/scene1_cloud_bank.png" id="25_cloudbank"]
+[ext_resource type="Texture2D" uid="uid://b4k1jnims1r4g" path="res://assets/scenes/scene1/scene1_cloud2.png" id="28_cloud2"]
+[ext_resource type="Shader" uid="uid://bqm3unqvn44w4" path="res://assets/shaders/canvas_fx_cloud_night.gdshader" id="32_cloudnight"]
 
 [sub_resource type="ShaderMaterial" id="SkyMat"]
 shader = ExtResource("3_sky")
@@ -53,8 +53,8 @@ shader_parameter/twinkle_speed = 0.7
 shader_parameter/twinkle_depth = 0.3
 shader_parameter/bright_ratio = 0.03
 shader_parameter/spike_strength = 0.0
-shader_parameter/moon_pos = Vector2(0.84375, 0.2963)
-shader_parameter/moon_clear = 0.26
+shader_parameter/moon_pos = Vector2(0.776, 0.2269)
+shader_parameter/moon_clear = 0.22
 shader_parameter/edge_margin = 0.14
 shader_parameter/sky_bottom = 0.5
 shader_parameter/sky_fade = 0.14
@@ -63,16 +63,34 @@ shader_parameter/pixel_grid = 800.0
 
 [sub_resource type="ShaderMaterial" id="MoonHaloMat"]
 shader = ExtResource("6_halo")
-shader_parameter/moon_pos = Vector2(0.84375, 0.2963)
+shader_parameter/moon_pos = Vector2(0.776, 0.2269)
 shader_parameter/core_color = Color(0.8, 0.92, 1, 1)
-shader_parameter/core_size = 0.16
+shader_parameter/core_size = 0.133
 shader_parameter/core_intensity = 0.6
 shader_parameter/glow_color = Color(0.3, 0.55, 0.85, 1)
-shader_parameter/glow_size = 0.6
+shader_parameter/glow_size = 0.5
 shader_parameter/glow_intensity = 0.26
 shader_parameter/glow_falloff = 2.0
 shader_parameter/flicker_amount = 0.04
 shader_parameter/flicker_speed = 0.6
+
+[sub_resource type="ShaderMaterial" id="Cloud2NightMat"]
+shader = ExtResource("32_cloudnight")
+shader_parameter/shadow_color = Color(0.14, 0.19, 0.3, 1)
+shader_parameter/lit_color = Color(0.42, 0.55, 0.76, 1)
+shader_parameter/lum_lo = 0.05
+shader_parameter/lum_hi = 0.45
+shader_parameter/lit_gamma = 1.4
+shader_parameter/alpha_max = 0.9
+
+[sub_resource type="ShaderMaterial" id="CloudBankNightMat"]
+shader = ExtResource("32_cloudnight")
+shader_parameter/shadow_color = Color(0.1, 0.135, 0.22, 1)
+shader_parameter/lit_color = Color(0.52, 0.65, 0.85, 1)
+shader_parameter/lum_lo = 0.1
+shader_parameter/lum_hi = 0.3
+shader_parameter/lit_gamma = 1.5
+shader_parameter/alpha_max = 0.95
 
 [sub_resource type="ShaderMaterial" id="EdgeSoftenMat"]
 shader = ExtResource("16_edgesoft")
@@ -91,7 +109,7 @@ shader_parameter/flow_speed = 0.02
 
 [sub_resource type="ShaderMaterial" id="RooftopMoonMat"]
 shader = ExtResource("17_moonlight")
-shader_parameter/moon_dir = Vector2(0.72, -0.64)
+shader_parameter/moon_dir = Vector2(0.61, -0.79)
 shader_parameter/wave_speed = 1.0
 shader_parameter/wave_scale = 6.0
 shader_parameter/wave_strength = 0.40000000596046
@@ -100,33 +118,22 @@ shader_parameter/highlight_threshold = 0.0
 shader_parameter/highlight_softness = 0.4
 shader_parameter/moon_tint = Color(0.78, 0.88, 1, 1)
 shader_parameter/tint_strength = 0.6
-shader_parameter/patch_center = Vector2(0.33, 0.3)
+shader_parameter/patch_center = Vector2(0.28, 0.3)
 shader_parameter/patch_radius = Vector2(0.23, 0.16)
 shader_parameter/patch_angle = 0.0
 shader_parameter/patch_gain = 3.4
 shader_parameter/patch_tint = Color(0.62, 0.78, 1, 1)
 shader_parameter/patch_tint_strength = 0.3
 
-[sub_resource type="ShaderMaterial" id="FogBandMat"]
-shader = ExtResource("22_fogband")
-shader_parameter/fog_color = Color(0.55, 0.65, 0.8, 1)
-shader_parameter/alpha_max = 0.1
-shader_parameter/drift_speed = 0.01
-shader_parameter/scale_x = 2.0
-
-[sub_resource type="ShaderMaterial" id="LightShaftMat"]
-shader = ExtResource("23_shaft")
-shader_parameter/intensity = 0.13
-shader_parameter/fade_tail = 110.0
-shader_parameter/beam_from = Vector2(740, 60)
-shader_parameter/beam_to = Vector2(320, 430)
-
 [sub_resource type="ShaderMaterial" id="SmokeRoofMat"]
 shader = ExtResource("24_darksmoke")
-shader_parameter/mode_isolated = 1.0
+shader_parameter/fill_color = Color(0.045, 0.055, 0.085, 1)
+shader_parameter/lit_color = Color(0.55, 0.66, 0.86, 1)
+shader_parameter/lit_strength = 0.6
 shader_parameter/alpha_max = 0.88
 shader_parameter/flow_speed = 0.006
 shader_parameter/sway_speed = 0.18
+shader_parameter/mode_isolated = 1.0
 shader_parameter/cells = 10.0
 shader_parameter/keep = 0.5
 shader_parameter/cloud_size = 1.0
@@ -135,19 +142,20 @@ shader_parameter/row_h = 0.041
 shader_parameter/edge_h = 0.022
 shader_parameter/inner_contrast = 0.12
 shader_parameter/breath_amount = 0.18
+shader_parameter/breath_speed = 0.3
 shader_parameter/seed = 0.0
-shader_parameter/fill_color = Color(0.045, 0.055, 0.085, 1)
-shader_parameter/lit_color = Color(0.55, 0.66, 0.86, 1)
-shader_parameter/lit_strength = 0.6
 shader_parameter/aspect = 19.3
 shader_parameter/pixel_grid = Vector2(900, 47)
 
 [sub_resource type="ShaderMaterial" id="SmokeRoofNearMat"]
 shader = ExtResource("24_darksmoke")
-shader_parameter/mode_isolated = 1.0
+shader_parameter/fill_color = Color(0.035, 0.045, 0.07, 1)
+shader_parameter/lit_color = Color(0.5, 0.6, 0.8, 1)
+shader_parameter/lit_strength = 0.55
 shader_parameter/alpha_max = 0.92
 shader_parameter/flow_speed = 0.009
 shader_parameter/sway_speed = 0.13
+shader_parameter/mode_isolated = 1.0
 shader_parameter/cells = 8.0
 shader_parameter/keep = 0.55
 shader_parameter/cloud_size = 1.2
@@ -156,33 +164,27 @@ shader_parameter/row_h = 0.038
 shader_parameter/edge_h = 0.02
 shader_parameter/inner_contrast = 0.12
 shader_parameter/breath_amount = 0.22
+shader_parameter/breath_speed = 0.3
 shader_parameter/seed = 37.0
-shader_parameter/fill_color = Color(0.035, 0.045, 0.07, 1)
-shader_parameter/lit_color = Color(0.5, 0.6, 0.8, 1)
-shader_parameter/lit_strength = 0.55
 shader_parameter/aspect = 19.3
 shader_parameter/pixel_grid = Vector2(900, 47)
 
-[sub_resource type="ShaderMaterial" id="SmokeFrontMat"]
-shader = ExtResource("24_darksmoke")
-shader_parameter/mode_isolated = 0.0
-shader_parameter/alpha_max = 0.55
-shader_parameter/flow_speed = 0.014
-shader_parameter/sway_speed = 0.1
-shader_parameter/cells = 8.0
-shader_parameter/keep = 1.0
-shader_parameter/cloud_size = 1.6
-shader_parameter/base_frac = 0.5
-shader_parameter/row_h = 0.1
-shader_parameter/edge_h = 0.028
-shader_parameter/inner_contrast = 0.3
-shader_parameter/breath_amount = 0.08
-shader_parameter/seed = 73.0
-shader_parameter/fill_color = Color(0.14, 0.17, 0.24, 1)
-shader_parameter/lit_color = Color(0.45, 0.56, 0.74, 1)
-shader_parameter/lit_strength = 0.65
-shader_parameter/aspect = 10.46
-shader_parameter/pixel_grid = Vector2(906, 87)
+[sub_resource type="ShaderMaterial" id="LightShaftMat"]
+shader = ExtResource("23_shaft")
+shader_parameter/size_px = Vector2(860, 540)
+shader_parameter/beam_from = Vector2(609, 60)
+shader_parameter/beam_to = Vector2(320, 430)
+shader_parameter/shaft_color = Color(0.62, 0.78, 1, 1)
+shader_parameter/intensity = 0.13
+shader_parameter/width_main = 66.0
+shader_parameter/width_side = 26.0
+shader_parameter/side_offset = 118.0
+shader_parameter/side_gain = 0.45
+shader_parameter/edge_soft = 0.55
+shader_parameter/flow_speed = 0.008
+shader_parameter/grain_px = 3.0
+shader_parameter/fade_head = 130.0
+shader_parameter/fade_tail = 110.0
 
 [sub_resource type="ShaderMaterial" id="RfMat1"]
 shader = ExtResource("20_boxblur")
@@ -207,6 +209,13 @@ shader = ExtResource("20_boxblur")
 shader_parameter/blur_amount = 1.50000007125
 shader_parameter/silhouette = 0.2150000102125
 shader_parameter/brightness = 1.0
+
+[sub_resource type="ShaderMaterial" id="FogBandMat"]
+shader = ExtResource("22_fogband")
+shader_parameter/fog_color = Color(0.55, 0.65, 0.8, 1)
+shader_parameter/alpha_max = 0.1
+shader_parameter/drift_speed = 0.01
+shader_parameter/scale_x = 2.0
 
 [sub_resource type="Gradient" id="DustDot"]
 offsets = PackedFloat32Array(0, 0.55, 1)
@@ -262,6 +271,28 @@ turbulence_enabled = true
 turbulence_noise_strength = 2.6
 turbulence_noise_scale = 1.4
 
+[sub_resource type="ShaderMaterial" id="SmokeFrontMat"]
+shader = ExtResource("24_darksmoke")
+shader_parameter/fill_color = Color(0.14, 0.17, 0.24, 1)
+shader_parameter/lit_color = Color(0.45, 0.56, 0.74, 1)
+shader_parameter/lit_strength = 0.65
+shader_parameter/alpha_max = 0.55
+shader_parameter/flow_speed = 0.014
+shader_parameter/sway_speed = 0.1
+shader_parameter/mode_isolated = 0.0
+shader_parameter/cells = 8.0
+shader_parameter/keep = 1.0
+shader_parameter/cloud_size = 1.6
+shader_parameter/base_frac = 0.5
+shader_parameter/row_h = 0.1
+shader_parameter/edge_h = 0.028
+shader_parameter/inner_contrast = 0.3
+shader_parameter/breath_amount = 0.08
+shader_parameter/breath_speed = 0.3
+shader_parameter/seed = 73.0
+shader_parameter/aspect = 10.46
+shader_parameter/pixel_grid = Vector2(906, 87)
+
 [node name="Scene1" type="Control" unique_id=1035084574]
 layout_mode = 3
 anchors_preset = 15
@@ -310,43 +341,34 @@ color = Color(0, 0, 0, 0)
 [node name="Moon" type="TextureRect" parent="." unique_id=1860577512]
 self_modulate = Color(0.85, 0.9, 1, 1)
 layout_mode = 0
-offset_left = 1476.0
-offset_top = 176.0
-offset_right = 1764.0
-offset_bottom = 464.0
+offset_left = 1370.0
+offset_top = 125.0
+offset_right = 1610.0
+offset_bottom = 365.0
 mouse_filter = 2
 texture = ExtResource("5_moon")
 expand_mode = 1
 
-[node name="CloudBank" type="TextureRect" parent="."]
-modulate = Color(0.68, 0.73, 0.86, 1)
+[node name="Cloud2" type="TextureRect" parent="." unique_id=1938382910]
+material = SubResource("Cloud2NightMat")
 layout_mode = 0
-offset_left = -80.0
-offset_top = 380.0
-offset_right = 2040.0
-offset_bottom = 1572.0
+offset_left = -178.0
+offset_top = -212.0
+offset_right = 1942.0
+offset_bottom = 980.5
+mouse_filter = 2
+texture = ExtResource("28_cloud2")
+expand_mode = 1
+
+[node name="CloudBank" type="TextureRect" parent="." unique_id=1385800456]
+material = SubResource("CloudBankNightMat")
+layout_mode = 0
+offset_left = 165.0
+offset_top = 51.0
+offset_right = 2278.27
+offset_bottom = 1243.0
 mouse_filter = 2
 texture = ExtResource("25_cloudbank")
-
-[node name="CloudPuffA" type="TextureRect" parent="."]
-modulate = Color(0.5, 0.54, 0.68, 0.9)
-layout_mode = 0
-offset_left = 120.0
-offset_top = 40.0
-offset_right = 984.0
-offset_bottom = 526.0
-mouse_filter = 2
-texture = ExtResource("26_cloudpuffa")
-
-[node name="CloudPuffB" type="TextureRect" parent="."]
-modulate = Color(0.5, 0.54, 0.68, 0.85)
-layout_mode = 0
-offset_left = 640.0
-offset_top = -20.0
-offset_right = 1504.0
-offset_bottom = 466.0
-mouse_filter = 2
-texture = ExtResource("27_cloudpuffb")
 
 [node name="Mountain_left" type="TextureRect" parent="." unique_id=470350264]
 self_modulate = Color(0.8, 0.85, 1, 1)
@@ -361,6 +383,7 @@ mouse_filter = 2
 texture = ExtResource("12_mtntex")
 expand_mode = 1
 metadata/parallax_factor = 0.35
+metadata/_edit_lock_ = true
 
 [node name="Mountain_right" type="TextureRect" parent="." unique_id=2101690780]
 self_modulate = Color(0.58, 0.65, 0.88, 1)
@@ -375,6 +398,7 @@ mouse_filter = 2
 texture = ExtResource("12_mtntex")
 expand_mode = 1
 metadata/parallax_factor = 0.28
+metadata/_edit_lock_ = true
 
 [node name="HorizonHaze" type="ColorRect" parent="." unique_id=1841776131]
 material = SubResource("HazeMat")
@@ -387,6 +411,7 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(0, 0, 0, 0)
 metadata/parallax_factor = 0.5
+metadata/_edit_lock_ = true
 
 [node name="RooftopL" type="TextureRect" parent="." unique_id=111504973]
 self_modulate = Color(0.4, 0.46, 0.6, 1)
@@ -401,6 +426,7 @@ texture = ExtResource("14_front2")
 expand_mode = 1
 flip_h = true
 metadata/parallax_factor = 0.85
+metadata/_edit_lock_ = true
 
 [node name="RooftopR" type="TextureRect" parent="." unique_id=50263200]
 self_modulate = Color(0.4, 0.46, 0.6, 1)
@@ -414,6 +440,7 @@ mouse_filter = 2
 texture = ExtResource("13_front1")
 expand_mode = 1
 metadata/parallax_factor = 0.85
+metadata/_edit_lock_ = true
 
 [node name="Rooftop" type="TextureRect" parent="." unique_id=2002299607]
 material = SubResource("RooftopMoonMat")
@@ -425,26 +452,31 @@ offset_bottom = 1319.9995
 texture = ExtResource("2_roof")
 expand_mode = 1
 metadata/parallax_factor = 1.0
+metadata/_edit_lock_ = true
 
-[node name="SmokeRoof" type="ColorRect" parent="."]
+[node name="SmokeRoof" type="ColorRect" parent="." unique_id=456799238]
 material = SubResource("SmokeRoofMat")
+layout_mode = 0
 offset_left = -383.0
 offset_top = 690.0
 offset_right = 2317.0
 offset_bottom = 830.0
 mouse_filter = 2
 metadata/parallax_factor = 1.0
+metadata/_edit_lock_ = true
 
-[node name="SmokeRoofNear" type="ColorRect" parent="."]
+[node name="SmokeRoofNear" type="ColorRect" parent="." unique_id=1457007320]
 material = SubResource("SmokeRoofNearMat")
+layout_mode = 0
 offset_left = -383.0
 offset_top = 730.0
 offset_right = 2317.0
 offset_bottom = 870.0
 mouse_filter = 2
 metadata/parallax_factor = 1.06
+metadata/_edit_lock_ = true
 
-[node name="LightShaft" type="ColorRect" parent="."]
+[node name="LightShaft" type="ColorRect" parent="." unique_id=816487360]
 material = SubResource("LightShaftMat")
 layout_mode = 0
 offset_left = 760.0
@@ -454,6 +486,7 @@ offset_bottom = 880.0
 mouse_filter = 2
 color = Color(0, 0, 0, 0)
 metadata/parallax_factor = 0.6
+metadata/_edit_lock_ = true
 
 [node name="closeRf1" type="TextureRect" parent="." unique_id=1278310740]
 self_modulate = Color(0.34, 0.4, 0.52, 1)
@@ -479,6 +512,7 @@ offset_bottom = 1603.9995
 texture = ExtResource("2_roof")
 expand_mode = 1
 metadata/parallax_factor = 1.4
+metadata/_edit_lock_ = true
 
 [node name="closeRf3" type="TextureRect" parent="." unique_id=1825121946]
 self_modulate = Color(0.34, 0.4, 0.52, 1)
@@ -491,6 +525,7 @@ offset_bottom = 1666.9995
 texture = ExtResource("2_roof")
 expand_mode = 1
 metadata/parallax_factor = 1.4
+metadata/_edit_lock_ = true
 
 [node name="closeRf4" type="TextureRect" parent="." unique_id=387504312]
 self_modulate = Color(0.34, 0.4, 0.52, 1)
@@ -504,8 +539,9 @@ texture = ExtResource("2_roof")
 expand_mode = 1
 flip_h = true
 metadata/parallax_factor = 1.4
+metadata/_edit_lock_ = true
 
-[node name="FogBand" type="ColorRect" parent="."]
+[node name="FogBand" type="ColorRect" parent="." unique_id=1934176755]
 material = SubResource("FogBandMat")
 layout_mode = 0
 offset_left = -383.0
@@ -515,9 +551,10 @@ offset_bottom = 960.0
 mouse_filter = 2
 color = Color(0, 0, 0, 0)
 metadata/parallax_factor = 1.55
+metadata/_edit_lock_ = true
 
 [node name="MoonDust" type="GPUParticles2D" parent="." unique_id=171542226]
-position = Vector2(1240, 330)
+position = Vector2(1150, 270)
 texture = SubResource("DustTex")
 lifetime = 9.0
 preprocess = 6.0
@@ -536,8 +573,9 @@ local_coords = true
 process_material = SubResource("EmberMat")
 metadata/parallax_factor = 1.1
 
-[node name="SmokeFront" type="ColorRect" parent="."]
+[node name="SmokeFront" type="ColorRect" parent="." unique_id=815041195]
 material = SubResource("SmokeFrontMat")
+layout_mode = 0
 offset_left = -400.0
 offset_top = 920.0
 offset_right = 2320.0
