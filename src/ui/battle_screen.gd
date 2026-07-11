@@ -418,10 +418,16 @@ func _init_buttons() -> void:
 
 	FontManager.apply(timer_label, 32)   # 顶部常驻回合数(原倒计时位)·紧凑
 	timer_label.add_theme_color_override("font_color", Color(0.95, 0.91, 0.8))   # 暖米白（压暗背景）
+	timer_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	timer_label.add_theme_constant_override("outline_size", 4)
 	FontManager.apply(status_label, 44)
 	status_label.add_theme_color_override("font_color", Color(0.95, 0.91, 0.8))   # 暖米白
+	status_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	status_label.add_theme_constant_override("outline_size", 5)
 	FontManager.apply(big_turn_label, 72)   # 中间「回合开始」横幅 + 倒计时（72=12×6 整数倍·清晰）
 	big_turn_label.add_theme_color_override("font_color", Color(0.95, 0.91, 0.8))   # 暖米白
+	big_turn_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))   # 巨月做底后中央文字必须深描边
+	big_turn_label.add_theme_constant_override("outline_size", 6)
 	event_label.visible = false
 	# 备选血量/护甲：现由 ReserveHpRow（❤X[+灰❤X]·自绘居中·任务3b/4）显示，字体/配色在组件内处理，无需此处设置。
 

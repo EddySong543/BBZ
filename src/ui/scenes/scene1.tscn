@@ -53,8 +53,8 @@ shader_parameter/twinkle_speed = 0.7
 shader_parameter/twinkle_depth = 0.3
 shader_parameter/bright_ratio = 0.03
 shader_parameter/spike_strength = 0.0
-shader_parameter/moon_pos = Vector2(0.776, 0.2269)
-shader_parameter/moon_clear = 0.22
+shader_parameter/moon_pos = Vector2(0.5, 0.3981)
+shader_parameter/moon_clear = 0.4
 shader_parameter/edge_margin = 0.14
 shader_parameter/sky_bottom = 0.5
 shader_parameter/sky_fade = 0.14
@@ -63,13 +63,13 @@ shader_parameter/pixel_grid = 800.0
 
 [sub_resource type="ShaderMaterial" id="MoonHaloMat"]
 shader = ExtResource("6_halo")
-shader_parameter/moon_pos = Vector2(0.776, 0.2269)
+shader_parameter/moon_pos = Vector2(0.5, 0.3981)
 shader_parameter/core_color = Color(0.8, 0.92, 1, 1)
-shader_parameter/core_size = 0.133
-shader_parameter/core_intensity = 0.6
+shader_parameter/core_size = 0.3
+shader_parameter/core_intensity = 0.45
 shader_parameter/glow_color = Color(0.3, 0.55, 0.85, 1)
-shader_parameter/glow_size = 0.5
-shader_parameter/glow_intensity = 0.26
+shader_parameter/glow_size = 0.8
+shader_parameter/glow_intensity = 0.2
 shader_parameter/glow_falloff = 2.0
 shader_parameter/flicker_amount = 0.04
 shader_parameter/flicker_speed = 0.6
@@ -109,7 +109,7 @@ shader_parameter/flow_speed = 0.02
 
 [sub_resource type="ShaderMaterial" id="RooftopMoonMat"]
 shader = ExtResource("17_moonlight")
-shader_parameter/moon_dir = Vector2(0.61, -0.79)
+shader_parameter/moon_dir = Vector2(0.0, -1.0)
 shader_parameter/wave_speed = 1.0
 shader_parameter/wave_scale = 6.0
 shader_parameter/wave_strength = 0.40000000596046
@@ -118,10 +118,10 @@ shader_parameter/highlight_threshold = 0.0
 shader_parameter/highlight_softness = 0.4
 shader_parameter/moon_tint = Color(0.78, 0.88, 1, 1)
 shader_parameter/tint_strength = 0.6
-shader_parameter/patch_center = Vector2(0.28, 0.3)
+shader_parameter/patch_center = Vector2(0.5, 0.3)
 shader_parameter/patch_radius = Vector2(0.23, 0.16)
 shader_parameter/patch_angle = 0.0
-shader_parameter/patch_gain = 3.4
+shader_parameter/patch_gain = 2.8
 shader_parameter/patch_tint = Color(0.62, 0.78, 1, 1)
 shader_parameter/patch_tint_strength = 0.3
 
@@ -339,12 +339,12 @@ mouse_filter = 2
 color = Color(0, 0, 0, 0)
 
 [node name="Moon" type="TextureRect" parent="." unique_id=1860577512]
-self_modulate = Color(0.85, 0.9, 1, 1)
+self_modulate = Color(0.68, 0.76, 0.9, 1)
 layout_mode = 0
-offset_left = 1370.0
-offset_top = 125.0
-offset_right = 1610.0
-offset_bottom = 365.0
+offset_left = 600.0
+offset_top = 70.0
+offset_right = 1320.0
+offset_bottom = 790.0
 mouse_filter = 2
 texture = ExtResource("5_moon")
 expand_mode = 1
@@ -477,6 +477,7 @@ metadata/parallax_factor = 1.06
 metadata/_edit_lock_ = true
 
 [node name="LightShaft" type="ColorRect" parent="." unique_id=816487360]
+visible = false
 material = SubResource("LightShaftMat")
 layout_mode = 0
 offset_left = 760.0
@@ -554,7 +555,7 @@ metadata/parallax_factor = 1.55
 metadata/_edit_lock_ = true
 
 [node name="MoonDust" type="GPUParticles2D" parent="." unique_id=171542226]
-position = Vector2(1150, 270)
+position = Vector2(960, 330)
 texture = SubResource("DustTex")
 lifetime = 9.0
 preprocess = 6.0
