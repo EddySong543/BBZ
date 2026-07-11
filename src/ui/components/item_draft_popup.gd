@@ -127,14 +127,23 @@ func _build_card(item: ItemData, pos: Vector2, idx: int) -> void:
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card.add_child(icon)
 
+	# 描述定宽手动换行（2026-07-11 Eddy：AUTOWRAP 在长中文描述上溢出卡底被截）：
+	# 每行统一字数（宽度/字号），行数超出描述区高度 → 降号 16→12（Ark Pixel 整数倍档）重排。
+	var desc_text: String = item.description if item != null else ""
+	var box_w := CARD_W - 36.0
+	var box_h := CARD_H - desc_top - 24.0
+	var f_size := 16
+	var per_line := int(box_w / f_size)
+	if ceilf(desc_text.length() / float(per_line)) * f_size * 1.4 > box_h:
+		f_size = 12
+		per_line = int(box_w / f_size)
 	var desc_lbl := Label.new()
-	desc_lbl.text = item.description if item != null else ""
+	desc_lbl.text = _wrap_fixed(desc_text, per_line)
 	desc_lbl.position = Vector2(18.0, desc_top)
-	desc_lbl.size = Vector2(CARD_W - 36.0, CARD_H - desc_top - 24.0)
+	desc_lbl.size = Vector2(box_w, box_h)
 	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	desc_lbl.vertical_alignment = VERTICAL_ALIGNMENT_TOP
-	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc_lbl.add_theme_font_size_override("font_size", 16)
+	desc_lbl.add_theme_font_size_override("font_size", f_size)
 	desc_lbl.add_theme_color_override("font_color", Color(0.96, 0.95, 0.9))
 	desc_lbl.add_theme_color_override("font_outline_color", Color(0.05, 0.03, 0.02, 0.85))
 	desc_lbl.add_theme_constant_override("outline_size", 3)
@@ -158,6 +167,23 @@ func _make_card_jelly(dim: Color) -> ShaderMaterial:
 	m.set_shader_parameter("noise_amt", 0.06)
 	m.set_shader_parameter("wear", 0.18)
 	return m
+
+
+## 手动定宽换行：每行固定 chars 个字符（CJK 等宽·统一每行字数·保留已有换行）。
+func _wrap_fixed(text: String, chars: int) -> String:
+	var out := ""
+	var count := 0
+	for ch in text:
+		if ch == "\n":
+			out += ch
+			count = 0
+			continue
+		out += ch
+		count += 1
+		if count >= chars:
+			out += "\n"
+			count = 0
+	return out.trim_suffix("\n")
 
 
 func _input(event: InputEvent) -> void:

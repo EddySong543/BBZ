@@ -10,6 +10,8 @@ extends Control
 
 signal slot_clicked(slot: int)
 signal slot_upgrade_clicked(slot: int)   # 点击就绪可升级槽右上角「升」角标（C·升级线）
+signal slot_hovered(slot: int)           # 鼠标进入槽位（仅 interactive 行·悬停提示用·2026-07-11）
+signal slot_unhovered                    # 鼠标离开槽位
 
 const SLOT_W := 68.0   # 道具框（2026-06-28 Eddy：76→缩小一些）
 const SLOT_H := 68.0
@@ -157,6 +159,8 @@ func _ready() -> void:
 		btn.size = Vector2(SLOT_W, SLOT_H)
 		btn.mouse_filter = Control.MOUSE_FILTER_STOP if interactive else Control.MOUSE_FILTER_IGNORE
 		btn.pressed.connect(_on_slot_pressed.bind(i))
+		btn.mouse_entered.connect(_on_slot_hover.bind(i))
+		btn.mouse_exited.connect(_on_slot_unhover)
 		add_child(btn)
 		# 升级金角标（右上角·铺在点击层之上 → 角落点击=升级、槽身=使用）。默认隐藏，refresh 控显。
 		var up := _make_upgrade_badge(base, i)
@@ -217,6 +221,15 @@ func _on_slot_pressed(slot: int) -> void:
 func _on_upgrade_pressed(slot: int) -> void:
 	if interactive:
 		slot_upgrade_clicked.emit(slot)
+
+
+func _on_slot_hover(slot: int) -> void:
+	if interactive:
+		slot_hovered.emit(slot)
+
+
+func _on_slot_unhover() -> void:
+	slot_unhovered.emit()
 
 
 ## 按经济状态刷新 3 个芯片（颜色 + 文字）。battle 未启用经济（槽空）时安全跳过。

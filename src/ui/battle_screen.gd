@@ -42,7 +42,9 @@ const BattleDebugPanel := preload("res://src/ui/debug/battle_debug_panel.gd")   
 ## 各动画相位等待（秒），可在 Inspector 调。
 @export var anim_phase_duration: float = 1.0
 @export var action_phase_duration: float = 0.6
-@export var turn_time_limit: int = 5   # 每回合思考时限（秒），归零自动结算；可在 Inspector 调
+# 回合时限阶梯（2026-07-11 Eddy 定·由少到多·台阶绑道具解锁节奏）：回合 1-2 纯动作选择 10s →
+# 回合 3 起道具经济开动（3/4/5 逐格解锁）15s → 回合 6 起组合决策期（看描述/算对方）20s 封顶。
+const TURN_TIME_STEPS: Array = [[5, 20], [2, 15], [0, 10]]   # [起始回合(0-based), 秒]·降序查表
 
 enum State { TURN_INTRO, PLAYER_SELECT, RESOLVING, HERO_SELECT, GAME_OVER }
 
@@ -302,6 +304,7 @@ func _ready() -> void:
 		row.low_hp_ratio = LOW_HP_RATIO
 
 	_build_item_rows()
+	_build_hover_tips()        # 悬停提示（底部按钮+我方道具槽·2026-07-11）
 	if _overtime:
 		p1_item_row.visible = false   # 加时禁道具 → 道具栏整行隐藏
 		p2_item_row.visible = false
@@ -554,8 +557,16 @@ func _start_player_select() -> void:
 	_start_ai_think()   # 任务G：选招一开始就让对手在后台想（确认时零等待）
 
 
+## 当前回合思考时限（秒）：由少到多阶梯（TURN_TIME_STEPS 降序查表）。
+func _turn_time_limit() -> int:
+	for step in TURN_TIME_STEPS:
+		if battle.turn_number >= int(step[0]):
+			return int(step[1])
+	return int(TURN_TIME_STEPS[-1][1])
+
+
 func _start_timer() -> void:
-	timer_seconds = turn_time_limit
+	timer_seconds = _turn_time_limit()
 	big_turn_label.visible = true   # 中间显示倒计时（接续「回合开始」横幅）
 	_update_timer_label()
 	game_timer.start(1.0)
@@ -1290,9 +1301,7 @@ func _set_buttons_active(active: bool, dim_inactive: bool = true) -> void:
 func _layout_circles() -> void:
 	var has_active: bool = _player_has_active()
 	btn_special.visible = has_active
-	if has_active:
-		# 技能按钮无文字，技能说明放 tooltip（悬停可见，信息不丢）。
-		btn_special.tooltip_text = battle.active_hero(PLAYER).skill_description
+	# 技能说明改走自绘悬停提示（_build_hover_tips 像素框）；原生 tooltip_text 灰框不合语言已弃（2026-07-11）。
 	for btn in [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend]:
 		btn.visible = true
 	btn_confirm.visible = true
@@ -1443,6 +1452,170 @@ func _build_item_rows() -> void:
 	var row_w := ItemSlotRow.SLOT_W * 3.0 + ItemSlotRow.GAP * 2.0
 	p2_item_row.position = Vector2(SCREEN_W - ITEM_ROW_POS_P1.x - row_w, ITEM_ROW_POS_P1.y)
 	p2_hud.add_child(p2_item_row)
+
+
+# ============================================================
+# 悬停提示（2026-07-11 Eddy 点单·外部 UI 件到位前的程序化像素框版）
+# ============================================================
+
+const TIP_CHARS_PER_LINE := 18       # 提示每行统一字数（CJK 等宽手动换行）
+const TIP_GAP := 12.0                # 提示框与目标控件的间距(px)
+
+var _tip_panel: PanelContainer
+var _tip_label: Label
+
+
+## 建自绘悬停提示（暖骨像素框·抄 HeroFrame 配方）+ 挂满底部动作按钮与我方道具槽。
+## 动作/道具数值全部从 ActionDef / BattleCore 常量推导（禁硬编码游戏数值）。
+func _build_hover_tips() -> void:
+	_tip_panel = PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.14, 0.11, 0.07, 0.96)      # 暖黑纸底
+	sb.border_color = Color("b3a386")                 # 暖骨描边
+	sb.set_border_width_all(2)
+	sb.content_margin_left = 12.0
+	sb.content_margin_right = 12.0
+	sb.content_margin_top = 8.0
+	sb.content_margin_bottom = 8.0
+	_tip_panel.add_theme_stylebox_override("panel", sb)
+	_tip_panel.visible = false
+	_tip_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tip_panel.z_index = 90
+	_tip_label = Label.new()
+	FontManager.apply(_tip_label, 16)
+	_tip_label.add_theme_color_override("font_color", Color(0.95, 0.92, 0.84))
+	_tip_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
+	_tip_label.add_theme_constant_override("outline_size", 3)
+	_tip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tip_panel.add_child(_tip_label)
+	add_child(_tip_panel)
+	_register_tip(btn_charge, _action_tip.bind(A.CHARGE))
+	_register_tip(btn_attack, _action_tip.bind(A.ATTACK))
+	_register_tip(btn_big_attack, _action_tip.bind(A.BIG_ATTACK))
+	_register_tip(btn_defend, _action_tip.bind(A.DEFEND))
+	_register_tip(btn_big_defend, _action_tip.bind(A.BIG_DEFEND))
+	_register_tip(btn_special, _special_tip)
+	_register_tip(btn_confirm, _confirm_tip)
+	p1_item_row.slot_hovered.connect(_on_item_slot_hovered)
+	p1_item_row.slot_unhovered.connect(_hide_tip)
+
+
+func _register_tip(c: Control, provider: Callable) -> void:
+	c.mouse_entered.connect(_on_tip_enter.bind(c, provider))
+	c.mouse_exited.connect(_hide_tip)
+
+
+func _on_tip_enter(c: Control, provider: Callable) -> void:
+	_show_tip_at(c.get_global_rect(), str(provider.call()))
+
+
+func _on_item_slot_hovered(slot: int) -> void:
+	var base: Vector2 = p1_item_row.global_position \
+		+ Vector2(slot * (ItemSlotRow.SLOT_W + ItemSlotRow.GAP), 0.0)
+	_show_tip_at(Rect2(base, Vector2(ItemSlotRow.SLOT_W, ItemSlotRow.SLOT_H)), _item_slot_tip(slot))
+
+
+## 目标矩形上方居中放提示；上方放不下（道具行在屏幕上部）→ 落到下方。
+func _show_tip_at(target: Rect2, text: String) -> void:
+	if text == "":
+		_hide_tip()
+		return
+	_tip_label.text = _wrap_fixed(text, TIP_CHARS_PER_LINE)
+	_tip_panel.reset_size()
+	var sz: Vector2 = _tip_panel.size
+	var x: float = clampf(target.position.x + target.size.x * 0.5 - sz.x * 0.5, 8.0, SCREEN_W - sz.x - 8.0)
+	# 目标在上半屏（道具行）→ 提示放下方（防压顶部头像/血行）；下半屏（底部按钮）→ 放上方。
+	var y: float = target.end.y + TIP_GAP if target.get_center().y < SCREEN_H * 0.4 \
+		else target.position.y - sz.y - TIP_GAP
+	if y < 8.0 or y + sz.y > SCREEN_H - 8.0:
+		y = clampf(y, 8.0, SCREEN_H - sz.y - 8.0)
+	_tip_panel.global_position = Vector2(x, y)
+	_tip_panel.visible = true
+
+
+func _hide_tip() -> void:
+	if _tip_panel != null:
+		_tip_panel.visible = false
+
+
+## 基础动作提示（半点制换算为「点」显示·复用 _fmt_hp）。
+func _action_tip(action: int) -> String:
+	var d: Dictionary = ActionDef.BASE_ACTION_DEF[action]
+	match action:
+		A.CHARGE:
+			return "获得%s点能量" % _fmt_hp(int(d["energy_gain"]) / 2.0)
+		A.ATTACK:
+			return "消耗%s点能量\n造成%s点伤害" % [_fmt_hp(int(d["cost"]) / 2.0), _fmt_hp(int(d["damage"]) / 2.0)]
+		A.BIG_ATTACK:
+			return "消耗%s点能量\n造成%s点穿防伤害（大防可挡）" % [_fmt_hp(int(d["cost"]) / 2.0), _fmt_hp(int(d["damage"]) / 2.0)]
+		A.DEFEND:
+			return "挡下敌方普通攻击\n（穿防与真伤挡不住）"
+		A.BIG_DEFEND:
+			return "消耗%s点能量\n挡下普通与穿防攻击（真伤除外）" % _fmt_hp(int(d["cost"]) / 2.0)
+	return ""
+
+
+## 主动技提示：技能名+完整说明+费用（当前出战英雄·无主动技返回空=不显示）。
+func _special_tip() -> String:
+	var h: HeroData = battle.active_hero(PLAYER)
+	if h == null:
+		return ""
+	var txt := "【%s】" % h.skill_description
+	if h.skill_detail != "":
+		txt += "\n" + h.skill_detail
+	var c: int = battle.action_cost(PLAYER, ACTIVE)
+	if c > 0:
+		txt += "\n消耗%s点能量" % _fmt_hp(c / 2.0)
+	return txt
+
+
+func _confirm_tip() -> String:
+	return "锁定本回合行动并结算"
+
+
+## 我方道具槽提示（按槽状态）：解锁回合 / 抽·补·升费用 / 道具名+效果+锁定状态。
+func _item_slot_tip(slot: int) -> String:
+	match battle.slot_state(PLAYER, slot):
+		BattleCore.SlotState.SEALED:
+			return "第%d回合自动解锁" % (int(BattleCore.SLOT_UNLOCK_TURN[slot]) + 1)
+		BattleCore.SlotState.OPENED:
+			if battle.can_draw_slot(PLAYER, slot):
+				return "点击抽取道具（3选1·免费）"
+			return "下回合可抽取道具"
+		BattleCore.SlotState.CHARGING:
+			var item: ItemData = battle.slot_item(PLAYER, slot)
+			if item == null:
+				return ""
+			var txt := "【%s】\n%s" % [item.item_name, item.description]
+			if battle.slot_ready(PLAYER, slot):
+				txt += "\n— 点击使用"
+				if battle.can_upgrade(PLAYER, slot):
+					txt += "·「升」=升级（%s点能量）" % _fmt_hp(BattleCore.UPGRADE_COST / 2.0)
+			else:
+				txt += "\n— 锁定中·下回合可用"
+			return txt
+		BattleCore.SlotState.EMPTY:
+			if battle.can_refill(PLAYER, slot):
+				return "点击补充道具（3选1·消耗%s点能量）" % _fmt_hp(BattleCore.ITEM_REFILL_COST / 2.0)
+			return "空槽（补充需%s点能量）" % _fmt_hp(BattleCore.ITEM_REFILL_COST / 2.0)
+	return ""
+
+
+## 手动定宽换行：每行固定 chars 个字符（CJK 等宽·统一每行字数·保留已有换行）。
+func _wrap_fixed(text: String, chars: int) -> String:
+	var out := ""
+	var count := 0
+	for ch in text:
+		if ch == "\n":
+			out += ch
+			count = 0
+			continue
+		out += ch
+		count += 1
+		if count >= chars:
+			out += "\n"
+			count = 0
+	return out.trim_suffix("\n")
 
 
 ## 顶部头像框整体放大一档（Eddy·2026-06-20）：尺寸在 _update_single_frame 设（FRAME_*_SIZE），
