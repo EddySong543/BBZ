@@ -1919,8 +1919,8 @@ func _setup_fx_pools() -> void:
 		m.texture = coin_tex
 		m.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		m.stretch_mode = TextureRect.STRETCH_SCALE
-		m.size = Vector2(20, 20)
-		m.pivot_offset = Vector2(10, 10)
+		m.size = Vector2(45, 45)
+		m.pivot_offset = Vector2(22.5, 22.5)
 		m.visible = false
 		m.z_index = 90
 		m.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -2173,13 +2173,13 @@ func _fly_energy_motes(player: int, egain_half: int) -> void:
 		m.global_position = from - m.size * 0.5
 		var burst := from + Vector2(randf_range(-52.0, 52.0), randf_range(-70.0, -20.0)) - m.size * 0.5
 		var tw := create_tween()
-		var delay := i * 0.11
-		# 节奏放慢（Eddy 2026-07-10）：浮出 0.16→0.34（SINE 缓浮）·飞行 0.34→0.5 → 单粒全程 ≈0.94s
+		var delay := i * 0.12
+		# 尺寸对齐 HUD 金币 pip 45px+节奏微回快（Eddy 2026-07-11 二调）：浮出 0.38·飞行 0.58 → 单粒全程 ≈1.06s
 		tw.tween_interval(maxf(delay, 0.001))
 		tw.tween_property(m, "modulate:a", 1.0, 0.1)
-		tw.parallel().tween_property(m, "global_position", burst, 0.34).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-		tw.tween_property(m, "global_position", to - m.size * 0.5, 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		tw.parallel().tween_property(m, "scale", Vector2(0.55, 0.55), 0.5)
+		tw.parallel().tween_property(m, "global_position", burst, 0.38).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		tw.tween_property(m, "global_position", to - m.size * 0.5, 0.58).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tw.parallel().tween_property(m, "scale", Vector2(0.65, 0.65), 0.58)
 		tw.tween_callback(m.hide)
 		if i == count - 1:
 			tw.tween_callback(_pulse_pip_row.bind(row, Color(1.8, 1.6, 1.0)))   # 末粒到位=金币行收能脉冲
