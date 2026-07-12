@@ -52,9 +52,10 @@
 
 ## Migration（迁移路线·按依赖排序）
 
-- **M0（已完成·本 ADR 落地时）**：序列化+确定性测试（批②）、UI 只读守卫（批③）、随机归属审计（批④=零工作量结论）。
-- **M1 本地驱动抽象**：battle_screen 与 BattleCore 之间抽 `MatchDriver` 接口（本地实现=直连 core+AI；远程实现=网络代理）。改造面大（battle_screen ~2500 行），**等联机立项再做**，先决条件已备齐（命令面收敛+事件流化）。
-- **M2 服务端工程**：headless Godot 对局进程（复用 sim 启动器骨架）+ 房间/匹配 + per-player 视图过滤 + 断线重连（快照）。
+- **M0（✅ 2026-07-12）**：序列化+确定性测试（批②）、UI 只读守卫（批③）、随机归属审计（批④=零工作量结论）。
+- **M2a 对局协议栈（✅ 2026-07-12·联机线批A-D）**：`src/net/` 四件套——net_protocol（版本化+入包校验）/ match_room（权威房间：克隆预检提交·legal_actions 白名单·draft 权威门+私发·死亡换人相位·resync 快照）/ net_transport（Loopback+ENet 可靠 JSON 包）/ match_client（无 UI 协议端）。验证=GUT 9 用例（含两客户端经环回整局打穿·事件流双端逐位一致）+ tools/net_probe（真 ENet 127.0.0.1 混合传输 3 回合 PASS）。⚠ 权威门实录：begin_draft 本身不设防，服务端不把门=客户端可对未解锁槽强刷 rng——测试抓出后已在 match_room 收口。
+- **M1 客户端驱动接线**：battle_screen 挂 match_client（本地局=room 进程内直连·远程局=ENet）+ 建房/加入 UI。改造面大（battle_screen ~2500 行），**下一批主菜**，先决条件全部备齐。
+- **M2b 服务端工程（剩余）**：进程托管（headless Godot 复用 sim 启动器骨架）+ 大厅/匹配 + 多房间 + per-player 视图过滤（信息扭曲道具+快照私有字段）+ 断线重连 UI 接线 + 公网方案（个人项目候选：Steam P2P / 轻量中转服·另议）。
 - **M3 反作弊面收口**：联机构建禁用 src/ui/debug；回合时限服务端计时；提交去重（turn 号幂等）。
 - **M4 i18n 抽取**：~344 中文串 → 键表（独立机械批·与联机并行可做）。
 - **M5 账号/变现**：F2P 外观·绝不卖强度（Eddy 定·另立项）。

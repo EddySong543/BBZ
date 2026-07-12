@@ -1,0 +1,169 @@
+extends GutTest
+
+## 权威对局房间 行为锁定测试（联机线批B/C/D·2026-07-12）。
+## 大用例=两个 MatchClient 经 LoopbackTransport（含 JSON 降级模拟）与房间真打完整局：
+## 提交/结算/事件双端一致/死亡换人/胜负判定。另锁：非法提交全拒、抽卡选项只发本人、重连快照可续。
+
+const A := ActionDef.Action
+const NetProtocol := preload("res://src/net/net_protocol.gd")
+const MatchRoom := preload("res://src/net/match_room.gd")
+const MatchClient := preload("res://src/net/match_client.gd")
+const NetTransport := preload("res://src/net/net_transport.gd")
+const SEED := 777
+
+
+func _hero(id: String, hp: int) -> HeroData:
+	var h := HeroData.new()
+	h.hero_id = id
+	h.hero_name = id
+	h.max_hp = hp
+	h.skill_type = HeroData.SkillType.PASSIVE
+	return h
+
+
+func _team(prefix: String, hp: int) -> Array:
+	return [_hero(prefix + "1", hp), _hero(prefix + "2", hp), _hero(prefix + "3", hp)]
+
+
+## 组一桌：房间 + 双方环回传输 + 双客户端。返回 {room, clients, server_ends}。
+func _table(hp: int = 2) -> Dictionary:
+	var pair0: Array = NetTransport.LoopbackTransport.make_pair()
+	var pair1: Array = NetTransport.LoopbackTransport.make_pair()
+	var server_ends: Array = [pair0[0], pair1[0]]
+	var room: MatchRoom = MatchRoom.new()
+	room.start(_team("a", hp), _team("b", hp), SEED,
+		func(p: int, msg: Dictionary) -> void: server_ends[p].send(msg))
+	room.battle.energy = [999, 999]   # 测试夹具：垫满能量·专注协议流
+	var clients: Array = [MatchClient.new(pair0[1]), MatchClient.new(pair1[1])]
+	return {room = room, clients = clients, server_ends = server_ends}
+
+
+## 泵一拍：服务器收包喂房间 → 客户端消化回包。（server_ends 元素动态派发·鸭子 poll）
+func _pump(t: Dictionary) -> void:
+	for p in 2:
+		var inbox: Array = t["server_ends"][p].poll()
+		for msg in inbox:
+			(t.room as MatchRoom).handle(p, msg)
+	for c in t.clients:
+		(c as MatchClient).poll()
+
+
+func test_match_room_full_game_over_protocol() -> void:
+	# Arrange：低血量速战桌·P0 全程波·P1 全程攒
+	var t := _table(2)
+	var clients: Array = t.clients
+	var last_submit: Array[int] = [-1, -1]
+	# Act：驱动到终局（护栏 200 拍防死循环）
+	var guard := 0
+	while (clients[0] as MatchClient).phase != "over" and guard < 200:
+		guard += 1
+		_pump(t)
+		for i in 2:
+			var c: MatchClient = clients[i]
+			if c.phase == "select" and last_submit[i] != c.turn:
+				last_submit[i] = c.turn
+				c.submit(A.ATTACK if i == 0 else A.CHARGE)
+			elif c.phase == "death_switch":
+				var res: Array[int] = c.living_reserves()
+				assert_gt(res.size(), 0, "死亡换人时应有存活替补")
+				c.death_switch(res[0])
+				c.phase = "waiting"   # 测试夹具：防同拍重发
+		_pump(t)
+	# Assert：终局正确·双端事件流逐位一致·服务器状态吻合
+	assert_lt(guard, 200, "对局未在护栏内结束")
+	assert_eq((clients[0] as MatchClient).phase, "over")
+	assert_eq((clients[1] as MatchClient).phase, "over")
+	assert_eq((clients[0] as MatchClient).winner, BattleCore.WINNER_P1, "P0 全程输出应获胜")
+	assert_eq_deep((clients[0] as MatchClient).events_log, (clients[1] as MatchClient).events_log)
+	assert_true((t.room as MatchRoom).battle.game_over)
+	assert_eq((clients[0] as MatchClient).errors.size(), 0, "全程不应有拒绝: %s" % [(clients[0] as MatchClient).errors])
+	assert_eq((clients[1] as MatchClient).errors.size(), 0, "全程不应有拒绝: %s" % [(clients[1] as MatchClient).errors])
+
+
+func test_match_room_rejects_illegal_submissions() -> void:
+	# Arrange
+	var sent: Array = [[], []]
+	var room: MatchRoom = MatchRoom.new()
+	room.start(_team("a", 5), _team("b", 5), SEED,
+		func(p: int, msg: Dictionary) -> void: (sent[p] as Array).append(msg))
+	# Act + Assert：五路非法各得其码
+	room.handle(0, {v = 999, kind = "resync"})
+	assert_eq(_last_error(sent[0]), "version_mismatch")
+	room.handle(0, {v = NetProtocol.PROTO_VERSION, kind = "hack", turn = 0})
+	assert_eq(_last_error(sent[0]), "unknown_kind")
+	room.handle(0, NetProtocol.msg_submit_turn(999, A.CHARGE, -1, []))
+	assert_eq(_last_error(sent[0]), "turn_mismatch")
+	room.handle(0, NetProtocol.msg_submit_turn(room.battle.turn_number, 15, -1, []))
+	assert_eq(_last_error(sent[0]), "illegal_submission", "范围内但不合法的动作应被业务层拒绝")
+	room.handle(0, NetProtocol.msg_submit_turn(room.battle.turn_number, A.CHARGE, -1, []))
+	room.handle(0, NetProtocol.msg_submit_turn(room.battle.turn_number, A.CHARGE, -1, []))
+	assert_eq(_last_error(sent[0]), "already_submitted", "重复提交应被拒（先到先锁）")
+	# 非法提交不得污染真局（克隆预检契约）
+	assert_eq(room.battle.turn_number, 0, "非法/等待期间真局不得推进")
+
+
+func test_match_room_draft_offer_is_private() -> void:
+	# Arrange：推进到 slot1 解锁后请求 3 选 1
+	var t := _table(5)
+	var clients: Array = t.clients
+	var c0: MatchClient = clients[0]
+	var c1: MatchClient = clients[1]
+	var last_submit: Array[int] = [-1, -1]
+	var picked := false
+	var offer: Dictionary = {}   # pick 时的 offer 快照（turn_begin 会清 client.draft_offer）
+	var guard := 0
+	# Act：每回合 c0 先请求 slot1 抽卡并当拍取回选项（turn_begin 会清 offer·须同回合内完成请求→选择），
+	# 拿到选项即选 0 号；未解锁时服务器回 draft_unavailable（预期噪音·本用例不断言 errors 为空）。
+	while not picked and guard < 40:
+		guard += 1
+		_pump(t)
+		if c0.phase == "select":
+			if c0.draft_offer.is_empty():
+				c0.request_draft(1, false)
+				_pump(t)
+			if not c0.draft_offer.is_empty():
+				offer = c0.draft_offer
+				c0.pick(int(offer["slot"]), 0, false)
+				picked = true
+				_pump(t)
+			if last_submit[0] != c0.turn:
+				last_submit[0] = c0.turn
+				c0.submit(A.CHARGE)
+		if c1.phase == "select" and last_submit[1] != c1.turn:
+			last_submit[1] = c1.turn
+			c1.submit(A.CHARGE)
+		_pump(t)
+	# Assert：本人拿到 3 项·对手全程没收到任何 draft_offer·落格可见于公开视图
+	assert_true(picked, "40 拍内应完成一次抽卡")
+	assert_eq((offer["options"] as Array).size(), 3)
+	assert_true(c1.draft_offer.is_empty(), "抽卡选项泄漏给了对手")
+	_pump(t)
+	var slot1: Dictionary = (c1.view["slots"] as Array)[0][1]
+	assert_ne(String(slot1["item"]), "", "抽卡结果（明牌）应体现在双方公开视图")
+
+
+func test_match_room_resync_snapshot_resumable() -> void:
+	# Arrange：打两拍后请求重连快照
+	var sent: Array = [[], []]
+	var room: MatchRoom = MatchRoom.new()
+	room.start(_team("a", 5), _team("b", 5), SEED,
+		func(p: int, msg: Dictionary) -> void: (sent[p] as Array).append(msg))
+	room.battle.energy = [99, 99]
+	for _i in 2:
+		room.handle(0, NetProtocol.msg_submit_turn(room.battle.turn_number, A.ATTACK, -1, []))
+		room.handle(1, NetProtocol.msg_submit_turn(room.battle.turn_number, A.DEFEND, -1, []))
+	# Act
+	room.handle(0, NetProtocol.msg_resync())
+	var snap_msg: Dictionary = (sent[0] as Array).back()
+	# Assert：快照可恢复成逐位一致的战局（断线重连契约）
+	assert_eq(String(snap_msg["kind"]), "snapshot")
+	var b2 := BattleCore.new()
+	assert_true(b2.from_snapshot(snap_msg["snap"]))
+	assert_eq_deep(b2.to_snapshot(), room.battle.to_snapshot())
+
+
+func _last_error(msgs: Array) -> String:
+	for i in range(msgs.size() - 1, -1, -1):
+		if String((msgs[i] as Dictionary).get("kind", "")) == "error":
+			return String((msgs[i] as Dictionary).get("code", ""))
+	return ""
