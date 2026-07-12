@@ -15,6 +15,7 @@ const PAPER_SHADER := preload("res://assets/shaders/canvas_ui_paper.gdshader")  
 const CELL_BG_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")   # 格底：圆角+渐变（v5 中性深炭）
 const ROUND_MASK_SHADER := preload("res://assets/shaders/canvas_ui_round_mask.gdshader")  # 选中金框圆角
 const LEGENDARY_BG := preload("res://assets/ui/gold_bottom.png")                          # 传说道具金云纹格底(Eddy 美术)
+const SCROLL_TEX := preload("res://assets/ui/item_codex_scroll.png")                      # 整屏手卷卷轴(GPT 出图·2026-07-13 换皮·1672×941=16:9·上下白边已转透明)
 const LEGENDARY_BG_TINT := Color(1.0, 1.0, 1.0, 1.0)                                       # 原图亮度·不做暗处理(Eddy 2026-06-27)
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
 
@@ -59,7 +60,7 @@ const PAGE_R := Rect2(968, 128, 712, 842)      # 右页（详情）
 const BANNER := Rect2(806, 46, 308, 78)        # 悬挂牌匾（压住书顶缘）
 const TAB_W := 130.0                            # 书签页签（右缘伸出）
 const TAB_H := 86.0
-const TAB_X := 1684.0                           # 收起时 x（压住封皮缘）
+const TAB_X := 1648.0                           # 收起时 x（卷轴换皮后=贴右木轴内侧·原书壳期 1684）
 const TAB_PULL := 18.0                          # 选中抽出量
 const TAB_Y0 := 236.0
 const TAB_GAP := 112.0
@@ -126,7 +127,8 @@ func _retint_background() -> void:
 
 
 # ============================================================
-# 书本实体（封皮 + 页块台阶 + 双页 + 中缝 + 护角 + 书签页签）
+# 卷轴实体（2026-07-13 换皮：整屏手卷贴图替换程序化书壳·GPT 出图）
+#   旧书壳（封皮/页块台阶/双页/中缝/护角）全部退役——纸面/木轴/云纹/描边都在贴图里。
 # ============================================================
 
 func _build_book() -> void:
@@ -136,38 +138,24 @@ func _build_book() -> void:
 	add_child(_book_layer)
 	move_child(_book_layer, 1)   # 压在 Background 之上、网格/详情之下
 
-	# 封皮投影（书浮在夜色上·右下柔影）
-	_rect(_book_layer, Rect2(BOOK.position + Vector2(10, 14), BOOK.size), Color(0.0, 0.0, 0.05, 0.35))
-	# 封皮：深墨描边 + 象牙皮面（粗颗粒+边缘沉降=皮革感）
-	_rect(_book_layer, Rect2(BOOK.position - Vector2(3, 3), BOOK.size + Vector2(6, 6)), COVER_RIM)
-	var cover := _rect(_book_layer, BOOK, Color.WHITE)
-	cover.material = _paper_mat(BOOK.size, COVER, Color(0.72, 0.68, 0.56), 0.022, 0.45, 0.68)
-	# 页块台阶（页厚·底缘 + 左右外缘各两层）
-	var pb := Rect2(PAGE_L.position, Vector2(PAGE_R.end.x - PAGE_L.position.x, PAGE_L.size.y))
-	_rect(_book_layer, Rect2(pb.position + Vector2(-10, pb.size.y), Vector2(pb.size.x + 20, 7)), PAGE_STACK_A)
-	_rect(_book_layer, Rect2(pb.position + Vector2(-5, pb.size.y + 7), Vector2(pb.size.x + 10, 5)), PAGE_STACK_B)
-	for side_x: float in [pb.position.x - 10.0, pb.end.x + 4.0]:
-		_rect(_book_layer, Rect2(Vector2(side_x, pb.position.y + 8), Vector2(6, pb.size.y - 4)), PAGE_STACK_A)
-	# 双页（纸纹：细颗粒+边缘微沉·中心亮）
-	var page_deep := Color(0.76, 0.69, 0.51)
-	var pl := _rect(_book_layer, PAGE_L, Color.WHITE)
-	pl.material = _paper_mat(PAGE_L.size, PAGE, page_deep, 0.016, 0.40, 0.55)
-	var pr := _rect(_book_layer, PAGE_R, Color.WHITE)
-	pr.material = _paper_mat(PAGE_R.size, PAGE, page_deep, 0.016, 0.40, 0.55)
-	# 章名大字水印（ref18 的褪色大字·填空间不抢戏·随切阶换字见 _build_pool）
-	# 中缝（装订谷·两页间垂直阴影带·由外向内加深）
-	_rect(_book_layer, Rect2(Vector2(PAGE_L.end.x, PAGE_L.position.y), Vector2(PAGE_R.position.x - PAGE_L.end.x, PAGE_L.size.y)), PAGE)
-	_rect(_book_layer, Rect2(Vector2(934, PAGE_L.position.y), Vector2(26, PAGE_L.size.y)), Color(0.70, 0.63, 0.47, 0.22))
-	_rect(_book_layer, Rect2(Vector2(948, PAGE_L.position.y), Vector2(20, PAGE_L.size.y)), Color(0.62, 0.55, 0.40, 0.40))
-	_rect(_book_layer, Rect2(Vector2(956, PAGE_L.position.y), Vector2(8, PAGE_L.size.y)), Color(0.46, 0.39, 0.27, 0.55))
-	_rect(_book_layer, Rect2(Vector2(964, PAGE_L.position.y), Vector2(22, PAGE_L.size.y)), Color(0.70, 0.63, 0.47, 0.20))
-	# 金属护角 ×4（封皮角·金面深边）
-	for corner: Vector2 in [BOOK.position, Vector2(BOOK.end.x - 30, BOOK.position.y),
-			Vector2(BOOK.position.x, BOOK.end.y - 30), BOOK.end - Vector2(30, 30)]:
-		_rect(_book_layer, Rect2(corner - Vector2(2, 2), Vector2(34, 34)), COVER_RIM)
-		_rect(_book_layer, Rect2(corner, Vector2(30, 30)), GOLD_MID)
-		_rect(_book_layer, Rect2(corner + Vector2(7, 7), Vector2(16, 16)), Color(0.68, 0.50, 0.22))
-	# 三阶书签页签（书右缘伸出·实体附件）
+	# 衬底=夜色直透（2026-07-13 Eddy：木桌方案出戏·撤）——卷轴上下透明带后面
+	# 就是 Background 的深靛径向夜色（书壳时代同款·全游戏家调）；冷靛暗底衬暖纸=深框亮页。
+	# 木桌 shader 留档 assets/shaders/canvas_ui_wood_desk.gdshader（B 方案·未挂）。
+
+	# 整屏卷轴（1672×941 原生 16:9 → 拉伸满屏 ×1.148·NEAREST 保像素边·
+	# 「大小优先于严格完美像素」项目惯例）。左右木轴各约 120px，纸面 x≈120-1800。
+	var scroll := TextureRect.new()
+	scroll.name = "Scroll"
+	scroll.texture = SCROLL_TEX
+	scroll.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	scroll.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	scroll.stretch_mode = TextureRect.STRETCH_SCALE
+	scroll.position = Vector2.ZERO
+	scroll.size = Vector2(1920.0, 1080.0)   # ⚠ _book_layer 是零尺寸 Control——锚点满铺会塌 0，必须显式尺寸
+	scroll.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_book_layer.add_child(scroll)
+
+	# 三阶书签页签（纸面右缘·贴木轴内侧）
 	_build_bookmark_tabs()
 
 
@@ -573,7 +561,7 @@ func _build_detail_panel() -> void:
 	_d_flavor.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	# 快捷键提示：夜色上·书外底部（不占书页）
-	var hint := _make_label(Vector2(0, 1038), Vector2(1920, 24), 14, Color(IVORY, 0.5))
+	var hint := _make_label(Vector2(0, 986), Vector2(1920, 24), 14, Color(INK, 0.62))   # 卷轴换皮：纸面上墨字·纸底缘 1020 内（原夜色底米白·2026-07-13）
 	hint.text = tr("← → 切换道具 · 普通/稀有/传说 切阶 · ESC 返回")
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
