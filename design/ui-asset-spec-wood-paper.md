@@ -74,7 +74,7 @@ plain background, no text, no gems, minimal ornament --raw --v 8.1 --hd
 - **替换关系**：现暖金羊皮纸样式退役；结构（头像+名+描述）不变=零改版式代码，只换底图。
 - **⛔ MJ prompt v1 作废（2026-07-12 实测·教训）**：整卡单图生成＋实物木工词（cabinet/sill/thickness）→ 出来是"3D 实物"不是 2D UI，且木/纸接缝格格不入。
 - **v2 拆件实测结论（2026-07-12）**：**件1 纯纸 ✅ 成立**（flat scan 措辞管用·纸配方保留=A1/A2/A7 原料）；**⛔ 件2 纯木板条失败**——MJ 无法理解孤立木条（不构成"成立的画面"）。件3 未跑。
-- **MJ v3 = 件1纸＋件2木沿合并生成（2026-07-12·Eddy 定向·⛔不含头像窗框）**：木依托纸的语境出图（孤木条 MJ 不理解），保留件1 的 flat 2D 措辞纪律；**⛔ 件3 头像窗框元素不进 MJ**——后期由合成图木区切条拼，或引擎画。**合成图当"原料采集田"**——纸区/木区各自切出重拼，坐标与接缝不依赖 MJ。prompt 见下【v3 合并版】；件1 纯纸 prompt 保留备用：
+- **MJ v3 = 件1纸＋件2木沿合并生成（2026-07-12·Eddy 定向·⛔不含头像窗框）**：木依托纸的语境出图（孤木条 MJ 不理解），保留件1 的 flat 2D 措辞纪律；**⛔ 件3 头像窗框元素不进 MJ**——后期由合成图木区切条拼，或引擎画。**合成图当"原料采集田"**——纸区/木区各自切出重拼，坐标与接缝不依赖 MJ。prompt 见下【v3.1 合并版】；件1 纯纸 prompt 保留备用：
 
   **件1·宣纸底（✅已验证·全系列纸配方=A1/A2/A7 原料）**
   ```
@@ -88,23 +88,26 @@ plain background, no text, no gems, minimal ornament --raw --v 8.1 --hd
   --ar 14:5 --raw --v 8.1
   ```
 
-  **【v3 合并版】纸＋木沿·同图（现役·原料采集田·无头像窗）**
+  **【v3.1 合并版】纸＋木沿·同图（现役·原料采集田·无头像窗）**
+  > v3→v3.1 调整（2026-07-12·未实测）：①去掉 `card design`（"卡"易被 MJ 画成带厚度的实体卡牌）改 `panel`；②去掉 `wood plank`（板材=实物木工词·v1 病根）改"painted trim（画出来的木沿）"；③木沿占比锚定"约底部 1/6"（既是构图指令也给切片留够木料）；④`--no` 扩充 trading card / product shot / mockup。
   ```
-  flat 2D game UI texture, hand-painted storybook style, seen perfectly
-  straight-on with a flat scan look: a wide horizontal card design, a large
-  sheet of thick warm cream xuan rice paper layered over a dark lacquered
-  wood plank; the wood shows as a slim trim running along the entire bottom
-  edge and peeking out slightly at both ends; the paper's right edge is
-  deckled and torn with a second paper layer peeking beneath; subtle
-  low-contrast paper fiber texture; faint painted wood grain, deep brown-black
-  lacquer #2E1D12 with a warm highlight ridge line #5C3F26 along the wood's
-  upper edge; paper cream #E0D1AD shading to #C4B28A at the edges; soft even
-  lighting, completely flat, no perspective, no depth, centered on a plain
-  flat mid-gray background
-  --no 3d render, photograph, photorealistic, perspective, bevel, drop shadow, table, desk, gems, metal, nails, text, writing
+  flat 2D game UI texture for an oriental fantasy game, hand-painted
+  storybook style, seen perfectly straight-on with a flat scan look: a wide
+  horizontal panel, a large sheet of thick warm cream xuan rice paper laid
+  over a dark lacquered wood backing; the wood is visible only as a slim
+  painted trim running along the entire bottom edge, about one sixth of the
+  panel's height, peeking out slightly at both left and right ends; faint
+  painted wood grain, deep brown-black lacquer #2E1D12 with a single warm
+  highlight ridge line #5C3F26 along the trim's upper edge; the paper's
+  right edge is deckled and torn with a second paper layer peeking beneath,
+  subtle low-contrast paper fiber texture, cream #E0D1AD shading to #C4B28A
+  along the edges; soft even lighting, completely flat, no perspective, no
+  depth, centered on a plain flat mid-gray background
+  --no 3d render, photograph, photorealistic, perspective, bevel, drop shadow, table, desk, product shot, trading card, mockup, box, gems, metal, nails, text, writing
   --ar 14:5 --raw --v 8.1
   ```
-  可选增稳：把已中意的件1 纸图挂 `--sref`，锁住纸面画风再合并生成。
+  **出图流程（省额度）**：①同 prompt 先加 `--draft` 24 连抽海选构图 → ②选中 Vary 出全清 → ③定稿那张换 `--hd` 重出 ≈2K（切片余量）。
+  可选增稳：把已中意的件1 纸图挂 `--sref`，锁住纸面画风再合并生成；仍跑偏 3D → 平铺纸纹扫描图挂 `--sref` 锚死平面感。
 
   **压 3D 的措辞纪律（全系列适用）**：正文必带 `flat 2D game UI texture / flat scan look / completely flat, no perspective`；`--no 3d render, photograph, perspective, bevel, drop shadow` 常驻；⛔ 禁用实物木工词（cabinet/box/sill/thickness——"厚"改用毛边+叠页表达）。仍跑偏 → 挂一张平铺纸纹扫描图做 `--sref`。
 
