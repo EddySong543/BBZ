@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://tools/story_probe_root.gd" id="1_probe"]
+
+[node name="StoryProbe" type="Node"]
+script = ExtResource("1_probe")

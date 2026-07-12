@@ -169,12 +169,19 @@ func _open_settings() -> void:
 	add_child(panel)
 
 
-## 三牌阵：匹配对战接真实流程，远征接先行版，故事占位。悬停金框+放大在 ModeCard 内。
+## 三牌阵：匹配对战接真实流程，远征接先行版，故事接选关壳（任务 B·2026-07-12）。悬停金框+放大在 ModeCard 内。
 func _setup_modes() -> void:
 	($UI/ModeMatch as Button).pressed.connect(_on_match_pressed)
-	($UI/ModeStory as Button).pressed.connect(_on_placeholder_pressed.bind("故事模式"))
+	($UI/ModeStory as Button).pressed.connect(_on_story_pressed)
 	($UI/ModeTower as Button).pressed.connect(_on_expedition_pressed)   # 原爬塔·2026-07-06 接远征先行版
 	_build_cancel_button()
+
+
+## 故事模式入口：选关壳（关卡/文本全占位·待小传定稿填内容）。匹配中不离队。
+func _on_story_pressed() -> void:
+	if _match_state != MatchState.IDLE:
+		return
+	TransitionManager.transition_to("res://src/ui/story_screen.tscn")
 
 
 ## 远征模式入口：波幕转场（先行版·占位战斗）。匹配中不离队。

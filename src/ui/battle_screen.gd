@@ -149,6 +149,9 @@ var _pve_choice: Dictionary = {}              # 本拍怪物已定招（回合�
 var _pve_odds_label: Label                    # 明牌概率表（博弈系）/ 循环提示（考官系）
 var _pve_flee_btn: Button                     # 脱离按钮（挨一拍·退回地图）
 var _pve_ending := false                      # 防重复回程结算
+var _story := false                           # 本局=故事关卡（BattleSetup.story_mode·须在 reset() 前读）
+var _story_level_id := ""                     # 关卡 id（回程写 story_result 定位）
+var _story_ending := false                    # 防重复回程结算
 
 # ---- 选择 / 样式 ----
 var action_btn_list: Array[Button] = []
@@ -246,6 +249,8 @@ func _ready() -> void:
 	battle = BattleCore.new()
 	_overtime = BattleSetup.overtime   # 须在 reset() 前读取
 	_pve = BattleSetup.pve_mode        # 远征 PvE（任务 D）·同样须在 reset() 前读取
+	_story = BattleSetup.story_mode    # 故事关卡（任务 B 壳）·同样须在 reset() 前读取
+	_story_level_id = BattleSetup.story_level_id
 	var pve_monster: Dictionary = BattleSetup.pve_monster
 	var pve_monster_hp: int = BattleSetup.pve_monster_hp
 	var pve_team: Array = BattleSetup.pve_team.duplicate(true)
@@ -817,6 +822,28 @@ func _pve_finish(outcome: String, extra_beats: int = 0) -> void:
 	TransitionManager.transition_to("res://src/expedition/expedition_screen.tscn")
 
 
+## 故事关卡回程（任务 B 壳）：结果经 BattleSetup.story_result 写回 story_screen（远征 pve_result 同款管道）。
+## 平局不进加时——故事关=闯关判定，非胜即未通关（加时赛是 PvP 仪式）。
+func _story_finish(w: int) -> void:
+	if _story_ending:
+		return
+	_story_ending = true
+	state = State.GAME_OVER
+	_set_buttons_active(false)
+	var outcome := "lose"
+	if w == BattleCore.WINNER_P1:
+		outcome = "win"
+	elif w == BattleCore.WINNER_DRAW:
+		outcome = "draw"
+	BattleSetup.story_result = {level_id = _story_level_id, outcome = outcome}
+	var texts := {win = "胜利！", lose = "失败", draw = "平局·未通关"}
+	status_label.text = String(texts[outcome])
+	status_label.add_theme_color_override("font_color", Color("#5fd86b") if outcome == "win" else Color("#dddddd"))
+	status_label.visible = true
+	await get_tree().create_timer(1.4).timeout
+	TransitionManager.transition_to("res://src/ui/story_screen.tscn")
+
+
 # ============================================================
 # 任务G：AI 异步预想（选招期后台想·确认时重放·详见 _think_* 变量注释）
 # ============================================================
@@ -1002,6 +1029,10 @@ func _resolve() -> void:
 		# 远征 PvE：胜=怪死·其余（含同拍双死）=全灭 → 回地图结算·不走加时赛。
 		if _pve:
 			await _pve_finish("win" if w == BattleCore.WINNER_P1 else "lose")
+			return
+		# 故事关卡（任务 B 壳）：胜负立判（平局不进加时=未通关）→ 结果写回 → 回选关屏。
+		if _story:
+			await _story_finish(w)
 			return
 		# 加时赛触发（Q5）：主局双方同归 → 各自 3 选 1 白板满血 1v1；加时局再平 = 真平局（走下方正常结束）。
 		if w == BattleCore.WINNER_DRAW and not _overtime:
