@@ -40,19 +40,43 @@ class LoopbackTransport extends RefCounted:
 
 ## ENet 点对点（1v1 单对端）：host() 开门等一个客户端；join() 连主机。
 ## 可靠有序传输；对端 id 经 peer_connected 信号捕获。需定期调 poll()（驱动 ENet 泵+收包）。
+## M3a 加密：默认 DTLS——主机每次开房现生成自签证书（密钥不落盘·不进仓库·每局一换），
+## 客户端 client_unsafe=只加密不验证身份（防局域网抓包/篡改；防不了主动中间人——
+## 正经证书链等专用服务器=M2b·ADR-004）。加密初始化失败=拒绝开房/拨号（fail-closed 不降级明文）。
+## M3a 包体上限：入包超限直接丢（JSON 炸弹/内存放大防护）；服务器侧收 C2S 小包·上限另调更紧（net_session）。
 class ENetTransport extends RefCounted:
+	const DEFAULT_MAX_PACKET := 262144   # 256KB（客户端要收全量快照）
+
 	var peer := ENetMultiplayerPeer.new()
-	var remote_id: int = 0   # 对端 peer id（0=尚未连上）
+	var remote_id: int = 0               # 对端 peer id（0=尚未连上）
+	var max_packet_bytes: int = DEFAULT_MAX_PACKET
 
 	func _init() -> void:
 		peer.peer_connected.connect(func(id: int) -> void: remote_id = id)
 		peer.peer_disconnected.connect(func(_id: int) -> void: remote_id = 0)
 
-	func host(port: int) -> bool:
-		return peer.create_server(port, 1) == OK
+	func host(port: int, encrypted: bool = true) -> bool:
+		if peer.create_server(port, 1) != OK:
+			return false
+		if encrypted:
+			var crypto := Crypto.new()
+			var key := crypto.generate_rsa(2048)
+			var cert := crypto.generate_self_signed_certificate(key, "CN=bobozan-lan")
+			if peer.host.dtls_server_setup(TLSOptions.server(key, cert)) != OK:
+				push_warning("ENetTransport: DTLS 服务端初始化失败 → 拒绝开房（不降级明文）")
+				peer.close()
+				return false
+		return true
 
-	func join(ip: String, port: int) -> bool:
-		return peer.create_client(ip, port) == OK
+	func join(ip: String, port: int, encrypted: bool = true) -> bool:
+		if peer.create_client(ip, port) != OK:
+			return false
+		if encrypted:
+			if peer.host.dtls_client_setup(ip, TLSOptions.client_unsafe()) != OK:
+				push_warning("ENetTransport: DTLS 客户端初始化失败 → 拒绝拨号（不降级明文）")
+				peer.close()
+				return false
+		return true
 
 	func is_ready() -> bool:
 		return remote_id != 0 and peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED
@@ -68,7 +92,10 @@ class ENetTransport extends RefCounted:
 		peer.poll()
 		var out: Array = []
 		while peer.get_available_packet_count() > 0:
-			var parsed: Variant = JSON.parse_string(peer.get_packet().get_string_from_utf8())
+			var pkt: PackedByteArray = peer.get_packet()
+			if pkt.size() > max_packet_bytes:   # M3a：超限包直接丢（JSON 炸弹防护）
+				continue
+			var parsed: Variant = JSON.parse_string(pkt.get_string_from_utf8())
 			if parsed is Dictionary:   # 非法包直接丢弃（入包校验一道门在协议层）
 				out.append(parsed)
 		return out

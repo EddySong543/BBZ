@@ -55,7 +55,9 @@
 - **M0（✅ 2026-07-12）**：序列化+确定性测试（批②）、UI 只读守卫（批③）、随机归属审计（批④=零工作量结论）。
 - **M2a 对局协议栈（✅ 2026-07-12·联机线批A-D）**：`src/net/` 四件套——net_protocol（版本化+入包校验）/ match_room（权威房间：克隆预检提交·legal_actions 白名单·draft 权威门+私发·死亡换人相位·resync 快照）/ net_transport（Loopback+ENet 可靠 JSON 包）/ match_client（无 UI 协议端）。验证=GUT 9 用例（含两客户端经环回整局打穿·事件流双端逐位一致）+ tools/net_probe（真 ENet 127.0.0.1 混合传输 3 回合 PASS）。⚠ 权威门实录：begin_draft 本身不设防，服务端不把门=客户端可对未解锁槽强刷 rng——测试抓出后已在 match_room 收口。
 - **M1 客户端驱动接线**：battle_screen 挂 match_client（本地局=room 进程内直连·远程局=ENet）+ 建房/加入 UI。改造面大（battle_screen ~2500 行），**下一批主菜**，先决条件全部备齐。
-- **M2b 服务端工程（剩余）**：进程托管（headless Godot 复用 sim 启动器骨架）+ 大厅/匹配 + 多房间 + per-player 视图过滤（信息扭曲道具+快照私有字段）+ 断线重连 UI 接线 + 公网方案（个人项目候选：Steam P2P / 轻量中转服·另议）。
+- **M1 客户端驱动接线（✅ 2026-07-12）**：快照镜像 lockstep（本地 battle=权威快照只读镜像·UI 读代码零改动）+ 加入方视角翻转（flip_snapshot/events/winner·双翻恒等锁定）+ net_session 接线盒 + 局域网大厅（建房/输 IP 加入）。E2E=tools/net_battle_probe（真 ENet 上真战斗屏以加入方打满回合）。
+- **M3 安全收口（✅ 2026-07-12）**：①DTLS 传输加密（主机开房现生成自签证书·密钥不落盘·client_unsafe=加密不验身·fail-closed 不降级明文·⚠防不了主动 MITM=正经证书链等 M2b 专用服务器）②入包大小上限（服务器侧 8KB·JSON 炸弹防护）③服务端权威计时（TURN_TIME_STEPS+4s 宽限·超时代提交攒/代选替补·时钟可注入=GUT 锁定）④防洪令牌桶（突发 30·回填 10/s·超额静默丢）⑤调试面收口（release 剥离 + 联机局禁用）⑥PCK 加密=发布前手册 `docs/pck-encryption-guide.md`。
+- **M2b 服务端工程（剩余）**：BP/选人联机化（现固定阵容）+ 断线重连 UI 接线（快照地基已备）+ 进程托管（headless Godot 复用 sim 启动器骨架）+ 大厅/匹配 + 多房间 + per-player 视图过滤（信息扭曲道具+快照私有字段）+ 公网方案（个人项目候选：Steam P2P / 轻量中转服·需 Eddy 选型）。
 - **M3 反作弊面收口**：联机构建禁用 src/ui/debug；回合时限服务端计时；提交去重（turn 号幂等）。
 - **M4 i18n 抽取**：~344 中文串 → 键表（独立机械批·与联机并行可做）。
 - **M5 账号/变现**：F2P 外观·绝不卖强度（Eddy 定·另立项）。

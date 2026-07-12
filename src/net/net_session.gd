@@ -28,6 +28,7 @@ static func create_host(port: int = DEFAULT_PORT) -> RefCounted:
 	s.enet = NetTransport.ENetTransport.new()
 	if not s.enet.host(port):
 		return null
+	s.enet.max_packet_bytes = 8192   # M3a：服务器只收 C2S 小包·超限即丢（S2C 大快照不受影响）
 	var pair: Array = NetTransport.LoopbackTransport.make_pair()
 	s._loop_room_end = pair[0]
 	s.client = MatchClient.new(pair[1])
@@ -61,13 +62,14 @@ func start_room(t0: Array, t1: Array, seed_v: int) -> void:
 			enet.send(msg))
 
 
-## 每帧泵：房主=收双路包喂房间；双方=消化本端客户端消息。
+## 每帧泵：房主=收双路包喂房间+服务端计时；双方=消化本端客户端消息。
 func pump() -> void:
 	if role == "host" and room != null:
 		for msg in _loop_room_end.poll():
 			room.handle(0, msg)
 		for msg in enet.poll():
 			room.handle(1, msg)
+		room.check_deadline()   # M3b：服务端权威计时（拖时→代提交攒/代选替补）
 	client.poll()
 
 

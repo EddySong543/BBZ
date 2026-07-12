@@ -190,6 +190,69 @@ func test_match_client_snapshot_flip_roundtrip() -> void:
 	assert_eq(int(fev[1]["winner"]), BattleCore.WINNER_P2)
 
 
+func test_match_room_deadline_force_submits_charge() -> void:
+	# Arrange：假时钟·只有 p0 提交（p1 拖时）
+	var fake := {t = 0}
+	var sent: Array = [[], []]
+	var room: MatchRoom = MatchRoom.new()
+	room.now_ms = func() -> int: return int(fake.t)
+	room.start(_team("a", 5), _team("b", 5), SEED,
+		func(p: int, msg: Dictionary) -> void: (sent[p] as Array).append(msg))
+	room.battle.energy = [99, 99]
+	room.handle(0, NetProtocol.msg_submit_turn(0, A.DEFEND, -1, []))
+	assert_eq(room.battle.turn_number, 0, "只到一方提交不应结算")
+	# Act：拨过回合 0 时限（10s + 4s 宽限）
+	fake.t = 15000
+	room.check_deadline()
+	# Assert：p1 被服务器代提交「攒」→ 结算完成·回合推进（拖时锁不死对局）
+	assert_eq(room.battle.turn_number, 1, "超时后服务器应代提交并结算")
+	assert_eq(room.phase, MatchRoom.Phase.SELECT)
+
+
+func test_match_room_deadline_auto_switches_dead_player() -> void:
+	# Arrange：假时钟·敌方出战 0.5 血·大波击杀 → 进死亡换人相位后拖时
+	var fake := {t = 0}
+	var sent: Array = [[], []]
+	var room: MatchRoom = MatchRoom.new()
+	room.now_ms = func() -> int: return int(fake.t)
+	room.start(_team("a", 5), _team("b", 5), SEED,
+		func(p: int, msg: Dictionary) -> void: (sent[p] as Array).append(msg))
+	room.battle.energy = [99, 99]
+	room.battle.hp[1][0] = 1
+	room.handle(0, NetProtocol.msg_submit_turn(0, A.BIG_ATTACK, -1, []))
+	room.handle(1, NetProtocol.msg_submit_turn(0, A.CHARGE, -1, []))
+	assert_eq(room.phase, MatchRoom.Phase.DEATH_SWITCH, "击杀后应进换人相位")
+	# Act：拨过换人时限
+	fake.t = 999999
+	room.check_deadline()
+	# Assert：服务器代选首个存活替补·开新回合
+	assert_eq(room.phase, MatchRoom.Phase.SELECT, "超时后应代选替补并开新回合")
+	assert_eq(room.battle.active_index[1], 1, "应换上首个存活替补")
+
+
+func test_match_room_rate_limit_drops_flood_then_recovers() -> void:
+	# Arrange
+	var fake := {t = 0}
+	var sent: Array = [[], []]
+	var room: MatchRoom = MatchRoom.new()
+	room.now_ms = func() -> int: return int(fake.t)
+	room.start(_team("a", 5), _team("b", 5), SEED,
+		func(p: int, msg: Dictionary) -> void: (sent[p] as Array).append(msg))
+	var before: int = (sent[0] as Array).size()
+	# Act：同一毫秒灌 100 个 resync
+	for _i in 100:
+		room.handle(0, NetProtocol.msg_resync())
+	var replies: int = (sent[0] as Array).size() - before
+	# Assert：突发桶 30 → 只放行约 30 个 + 1 条 rate_limited·其余静默丢
+	assert_lt(replies, 40, "洪水应被限流·实际回复 %d" % replies)
+	assert_gt(replies, 25, "正常突发不应被误杀·实际回复 %d" % replies)
+	# 时间推进回填令牌 → 恢复服务（不误伤后续正常包）
+	fake.t = 5000
+	var b2: int = (sent[0] as Array).size()
+	room.handle(0, NetProtocol.msg_resync())
+	assert_gt((sent[0] as Array).size(), b2, "令牌回填后应恢复响应")
+
+
 func _last_error(msgs: Array) -> String:
 	for i in range(msgs.size() - 1, -1, -1):
 		if String((msgs[i] as Dictionary).get("kind", "")) == "error":

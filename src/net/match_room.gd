@@ -22,10 +22,22 @@ const NetProtocol := preload("res://src/net/net_protocol.gd")
 
 enum Phase { SELECT, DEATH_SWITCH, OVER }
 
+# —— M3b 服务端计时/防洪（时钟可注入=GUT 可测·真实源 Time.get_ticks_msec）——
+const TURN_TIME_STEPS: Array = [[5, 20], [2, 15], [0, 10]]   # 与 battle_screen:47 同表（服务器=权威·客户端=显示）
+const DEADLINE_GRACE_MS := 4000      # 比客户端显示宽 4s（覆盖回合开场演出漂移）：正常时客户端超时自提交先到·这是拖时/挂机的兜底
+const SWITCH_TIME_MS := 20000        # 死亡换人时限
+const RATE_BURST := 30.0             # 防洪令牌桶：突发上限（正常一回合十几个包远够）
+const RATE_REFILL_PER_SEC := 10.0    # 每秒回填
+
 var battle: BattleCore
 var phase: int = Phase.SELECT
+var now_ms: Callable = Callable(Time, "get_ticks_msec")   # 测试注入假时钟
 var _send: Callable                    # (player:int, msg:Dictionary) -> void
 var _pending: Array = [null, null]     # 本回合已收提交（先到先锁·拒绝重复提交）
+var _deadline_ms: int = 0
+var _rate_tokens: Array[float] = [RATE_BURST, RATE_BURST]
+var _rate_last_ms: Array[int] = [0, 0]
+var _rate_warned: Array[bool] = [false, false]
 
 
 func start(team0: Array, team1: Array, seed_v: int, send_cb: Callable) -> void:
@@ -35,14 +47,18 @@ func start(team0: Array, team1: Array, seed_v: int, send_cb: Callable) -> void:
 	battle.econ_init()
 	phase = Phase.SELECT
 	_pending = [null, null]
+	_rate_last_ms = [int(now_ms.call()), int(now_ms.call())]
+	_arm_turn_deadline()
 	for p in 2:
 		_send.call(p, {v = NetProtocol.PROTO_VERSION, kind = "match_start", you = p,
 			heroes = [_pack_team(0), _pack_team(1)], turn = battle.turn_number, view = _view(),
 			snap = battle.to_snapshot()})
 
 
-## 传输层入口：一切客户端包从这进。协议校验（一道门）→ 回合号校验 → 业务校验（二道门）。
+## 传输层入口：一切客户端包从这进。防洪（零道门）→ 协议校验（一道门）→ 回合号校验 → 业务校验（二道门）。
 func handle(player: int, msg: Variant) -> void:
+	if not _rate_ok(player):
+		return   # M3b 防洪：超额包静默丢（回错误包本身也会被刷成放大器·只在首超回一次提示）
 	var err := NetProtocol.validate_c2s(msg)
 	if err != "":
 		_send.call(player, NetProtocol.msg_error(err))
@@ -124,6 +140,7 @@ func _commit_and_resolve() -> void:
 		phase = Phase.OVER
 	elif bool(pending[0]) or bool(pending[1]):
 		phase = Phase.DEATH_SWITCH
+		_deadline_ms = int(now_ms.call()) + SWITCH_TIME_MS
 	for p in 2:
 		_send.call(p, {v = NetProtocol.PROTO_VERSION, kind = "resolve",
 			actions = [r.get("p1_action", -1), r.get("p2_action", -1)],
@@ -139,9 +156,56 @@ func _commit_and_resolve() -> void:
 func _begin_turn() -> void:
 	phase = Phase.SELECT
 	_pending = [null, null]
+	_arm_turn_deadline()
 	for p in 2:
 		_send.call(p, {v = NetProtocol.PROTO_VERSION, kind = "turn_begin",
 			turn = battle.turn_number, view = _view(), snap = battle.to_snapshot()})
+
+
+func _arm_turn_deadline() -> void:
+	var secs := 10
+	for step in TURN_TIME_STEPS:
+		if battle.turn_number >= int(step[0]):
+			secs = int(step[1])
+			break
+	_deadline_ms = int(now_ms.call()) + secs * 1000 + DEADLINE_GRACE_MS
+
+
+## M3b 服务端计时（宿主每帧调·net_session.pump）：超时方由服务器代提交——
+## 选招=攒·死亡换人=首个存活替补。拖时/挂机/断网不再能锁死对局（服务端权威计时·客户端计时=纯显示）。
+func check_deadline() -> void:
+	if phase == Phase.OVER or int(now_ms.call()) < _deadline_ms:
+		return
+	if phase == Phase.SELECT:
+		var turn := battle.turn_number
+		var missing: Array[int] = []
+		for p in 2:
+			if _pending[p] == null:
+				missing.append(p)
+		for p in missing:
+			_on_submit(p, NetProtocol.msg_submit_turn(turn, ActionDef.Action.CHARGE, -1, []))
+	elif phase == Phase.DEATH_SWITCH:
+		for p in 2:
+			if battle.pending_death_switch[p]:
+				var res: Array = battle.living_reserves(p)
+				if res.size() > 0:
+					_on_death_switch(p, int(res[0]))
+
+
+## M3b 防洪令牌桶：突发 RATE_BURST·每秒回填 RATE_REFILL_PER_SEC。超额静默丢、首超回一次 rate_limited。
+func _rate_ok(player: int) -> bool:
+	var now := int(now_ms.call())
+	var dt := maxf(0.0, float(now - _rate_last_ms[player]) / 1000.0)
+	_rate_last_ms[player] = now
+	_rate_tokens[player] = minf(RATE_BURST, _rate_tokens[player] + dt * RATE_REFILL_PER_SEC)
+	if _rate_tokens[player] < 1.0:
+		if not _rate_warned[player]:
+			_rate_warned[player] = true
+			_send.call(player, NetProtocol.msg_error("rate_limited"))
+		return false
+	_rate_warned[player] = false
+	_rate_tokens[player] -= 1.0
+	return true
 
 
 ## 付能补充空槽（start_refill 内部扣能+置 OPENED+缓存 3 选 1）→ 选项私发本人 + 双方视图刷新（扣能公开）。

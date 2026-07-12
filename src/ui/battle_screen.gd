@@ -2167,6 +2167,10 @@ func _unhandled_input(event: InputEvent) -> void:
 func _build_debug_buttons() -> void:
 	if not DEBUG_BUTTONS:
 		return
+	# M3c 反作弊面收口：调试面=全项目唯一 UI 直写引擎入口——联机局禁用（写镜像=自欺+乱像）·
+	# 发布构建剥离（导出模板 release 下 is_debug_build()=false·开发期照常）。
+	if _net or not OS.is_debug_build():
+		return
 	var panel := BattleDebugPanel.new()
 	panel.name = "DebugButtons"
 	add_child(panel)
