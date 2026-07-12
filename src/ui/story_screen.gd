@@ -57,9 +57,9 @@ func _consume_battle_result() -> void:
 	if String(r.get("outcome", "")) == "win":
 		_progress.mark_cleared(String(lv["id"]))
 		_progress.save_to_disk()
-		_toast("「%s」通关！" % title, COL_CLEARED)
+		_toast(tr("「%s」通关！") % tr(title), COL_CLEARED)
 	else:
-		_toast("「%s」未通关，再试一次" % title, Color(0.87, 0.85, 0.82))
+		_toast(tr("「%s」未通关，再试一次") % tr(title), Color(0.87, 0.85, 0.82))
 
 
 ## 四类纵列：类别标题 + 关卡按钮（✓=已通关·【锁】=前置未通关禁用）。
@@ -74,7 +74,7 @@ func _build_columns() -> void:
 		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		col.add_theme_constant_override("separation", 14)
 		var head := Label.new()
-		head.text = String(StoryCatalog.CATEGORY_NAMES[cat])
+		head.text = tr(String(StoryCatalog.CATEGORY_NAMES[cat]))
 		head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		head.add_theme_color_override("font_color", COL_HEADER)
 		FontManager.apply(head, 28)
@@ -94,11 +94,11 @@ func _make_level_button(lv: Dictionary) -> Button:
 	var btn := Button.new()
 	var id: String = String(lv["id"])
 	var unlocked := _progress.is_unlocked(lv)
-	var text: String = String(lv.get("title", id))
+	var text: String = tr(String(lv.get("title", id)))
 	if _progress.is_cleared(id):
 		text += " ✓"
 	elif not unlocked:
-		text = "【锁】" + text
+		text = tr("【锁】") + text
 	btn.text = text
 	btn.name = "Level_" + id
 	btn.disabled = not unlocked
@@ -136,7 +136,7 @@ func _open_intro(lv: Dictionary) -> void:
 	margin.add_child(box)
 
 	var title := Label.new()
-	title.text = String(lv.get("title", ""))
+	title.text = tr(String(lv.get("title", "")))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_color_override("font_color", COL_HEADER)
 	FontManager.apply(title, 28)
@@ -156,7 +156,7 @@ func _open_intro(lv: Dictionary) -> void:
 		ph.color = Color(0.09, 0.08, 0.11)
 		ph.custom_minimum_size = Vector2(884, 300)
 		var ph_lbl := Label.new()
-		ph_lbl.text = "【占位】静态图待美术"
+		ph_lbl.text = tr("【占位】静态图待美术")
 		ph_lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
 		ph_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		ph_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -166,7 +166,10 @@ func _open_intro(lv: Dictionary) -> void:
 		box.add_child(ph)
 
 	var body := Label.new()
-	body.text = "\n".join(lv.get("intro_lines", []))
+	var intro_tr: PackedStringArray = []
+	for ln in (lv.get("intro_lines", []) as Array):
+		intro_tr.append(tr(String(ln)))
+	body.text = "\n".join(intro_tr)
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART   # 定宽+高度自适应（VBox 撑开·非固定高容器）
 	body.custom_minimum_size = Vector2(884, 0)
 	FontManager.apply(body, 16)
@@ -177,13 +180,13 @@ func _open_intro(lv: Dictionary) -> void:
 	row.add_theme_constant_override("separation", 32)
 	var fight := Button.new()
 	fight.name = "FightButton"
-	fight.text = "开 战"
+	fight.text = tr("开 战")
 	fight.custom_minimum_size = Vector2(240, 64)
 	FontManager.apply_btn(fight, 20)
 	fight.pressed.connect(_start_battle.bind(lv))
 	row.add_child(fight)
 	var back := Button.new()
-	back.text = "返 回"
+	back.text = tr("返 回")
 	back.custom_minimum_size = Vector2(240, 64)
 	FontManager.apply_btn(back, 20)
 	back.pressed.connect(_close_intro)

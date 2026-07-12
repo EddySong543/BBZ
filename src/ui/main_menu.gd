@@ -189,7 +189,7 @@ func _on_story_pressed() -> void:
 func _build_net_button() -> void:
 	var b := Button.new()
 	b.name = "NetLobbyButton"
-	b.text = "联机对战·局域网"
+	b.text = tr("联机对战·局域网")
 	b.position = Vector2(1660, 980)
 	b.size = Vector2(220, 52)
 	b.modulate = Color(1, 1, 1, 0.75)
@@ -213,7 +213,7 @@ func _build_cancel_button() -> void:
 	var card := $UI/ModeMatch as Control
 	_cancel_btn = Button.new()
 	_cancel_btn.name = "CancelMatchButton"
-	_cancel_btn.text = "✕ 取消匹配"
+	_cancel_btn.text = tr("✕ 取消匹配")
 	var btn_size := Vector2(220, 52)
 	_cancel_btn.position = Vector2(
 		card.position.x + (card.size.x - btn_size.x) * 0.5,
@@ -417,7 +417,7 @@ func _process(delta: float) -> void:
 	var dots := int(_search_elapsed * 2.0) % 4
 	if dots != _last_dots:
 		_last_dots = dots
-		_match_card.card_title = "匹配中" + ".".repeat(dots)
+		_match_card.card_title = tr("匹配中") + ".".repeat(dots)
 	var secs := int(_search_elapsed)
 	if secs != _last_secs:
 		_last_secs = secs
@@ -463,7 +463,7 @@ func _shake_screen() -> void:
 
 ## 占位功能提示：淡入 → 停留 → 淡出。
 func _on_placeholder_pressed(feature: String) -> void:
-	_coming_soon.text = feature + " · 敬请期待"
+	_coming_soon.text = tr("%s · 敬请期待") % tr(feature)
 	if _toast_tween != null and _toast_tween.is_valid():
 		_toast_tween.kill()
 	_coming_soon.modulate.a = 0.0

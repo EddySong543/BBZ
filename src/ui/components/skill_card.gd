@@ -175,7 +175,7 @@ func _refresh_text() -> void:
 	if not _type_label:
 		return
 	# 顶部标题 = 英雄名（原「主动/被动技能」位置）；统一黑墨 + 同墨色描边仿粗体。
-	_type_label.text = hero_name
+	_type_label.text = tr(hero_name)
 	_type_label.add_theme_color_override("font_color", INK)
 	_type_label.add_theme_color_override("font_outline_color", INK)
 	_type_label.add_theme_constant_override("outline_size", 1)
@@ -184,11 +184,11 @@ func _refresh_text() -> void:
 		return
 	# 正文 = 【技能名】：技能描述（【技能名】加粗：同墨色 BBCode 描边 → 笔画变粗；描述普通墨字）。
 	# 英雄名已在上方 TypeLabel 自成一行，与本正文之间天然换行。
-	var body := skill_detail.strip_edges()
+	var body := tr(skill_detail.strip_edges()) if skill_detail.strip_edges() != "" else ""
 	var ink_hex := INK.to_html(false)
-	var bold_name := "[outline_size=1][outline_color=#%s]【%s】[/outline_color][/outline_size]" % [ink_hex, skill_name]
+	var bold_name := "[outline_size=1][outline_color=#%s]【%s】[/outline_color][/outline_size]" % [ink_hex, tr(skill_name)]
 	if skill_name != "" and body != "":
-		_desc_label.text = "%s：%s" % [bold_name, body]
+		_desc_label.text = tr("%s：%s") % [bold_name, body]
 	elif skill_name != "":
 		_desc_label.text = bold_name
 	else:

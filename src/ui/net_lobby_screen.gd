@@ -48,7 +48,7 @@ func _ready() -> void:
 		var h: HeroData = load(HERO_DATA_DIR + id + ".tres")
 		var b := Button.new()
 		b.toggle_mode = true
-		b.text = h.hero_name
+		b.text = tr(h.hero_name)
 		b.custom_minimum_size = Vector2(148, 52)
 		FontManager.apply_btn(b, 16)
 		b.toggled.connect(_on_hero_toggled.bind(id))
@@ -63,7 +63,7 @@ func _ready() -> void:
 
 	# —— 建房 / 加入 ——
 	_host_btn = Button.new()
-	_host_btn.text = "建 房（端口 %d）" % NetSession.DEFAULT_PORT
+	_host_btn.text = tr("建 房（端口 %d）") % NetSession.DEFAULT_PORT
 	_host_btn.custom_minimum_size = Vector2(0, 68)
 	FontManager.apply_btn(_host_btn, 20)
 	_host_btn.pressed.connect(_on_host)
@@ -72,11 +72,11 @@ func _ready() -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 16)
 	_ip_edit = LineEdit.new()
-	_ip_edit.placeholder_text = "对方 IP（如 192.168.1.5）"
+	_ip_edit.placeholder_text = tr("对方 IP（如 192.168.1.5）")
 	_ip_edit.custom_minimum_size = Vector2(420, 60)
 	row.add_child(_ip_edit)   # LineEdit 用默认字体（FontManager.apply 只收 Label）
 	_join_btn = Button.new()
-	_join_btn.text = "加 入 / 重连"
+	_join_btn.text = tr("加 入 / 重连")
 	_join_btn.custom_minimum_size = Vector2(200, 60)
 	FontManager.apply_btn(_join_btn, 20)
 	_join_btn.pressed.connect(_on_join)
@@ -84,7 +84,7 @@ func _ready() -> void:
 	box.add_child(row)
 
 	_status = Label.new()
-	_status.text = "选好 3 人阵容 → 一方建房，另一方输入房主 IP 加入。掉线后从这里加入同一 IP 即可续战。"
+	_status.text = tr("选好 3 人阵容 → 一方建房，另一方输入房主 IP 加入。掉线后从这里加入同一 IP 即可续战。")
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_status.custom_minimum_size = Vector2(920, 0)
 	_status.add_theme_color_override("font_color", Color(0.78, 0.74, 0.66))
@@ -103,16 +103,16 @@ func _process(delta: float) -> void:
 			for msg in _session.poll_prestart():
 				if NetProtocol.validate_c2s(msg) == "" and String(msg.get("kind", "")) == "hello":
 					_joiner_team = _sanitize_team(msg.get("team", []))
-					_status.text = "对方已就位，开局中…"
+					_status.text = tr("对方已就位，开局中…")
 					_session.start_room(_load_team(_picked), _load_team(_joiner_team), randi())
 	elif _mode == "join":
 		_join_waited += delta
 		if _session.is_link_ready() and not _hello_sent:
 			_hello_sent = true
 			_session.client.send_hello(_picked)
-			_status.text = "已连上，等待开局/续战…"
+			_status.text = tr("已连上，等待开局/续战…")
 		if not _session.is_link_ready() and _join_waited > JOIN_TIMEOUT:
-			_status.text = "连接失败：请确认对方已建房、IP 正确、同一局域网。"
+			_status.text = tr("连接失败：请确认对方已建房、IP 正确、同一局域网。")
 			_session.close()
 			_session = null
 			_mode = ""
@@ -134,7 +134,7 @@ func _on_hero_toggled(pressed: bool, id: String) -> void:
 		_picked.append(id)
 	else:
 		_picked.erase(id)
-	_pick_label.text = "我的阵容（%d/%d）：%s" % [_picked.size(), PICK_MAX, "、".join(_team_names())]
+	_pick_label.text = tr("我的阵容（%d/%d）：%s") % [_picked.size(), PICK_MAX, "、".join(_team_names())]
 
 
 func _team_names() -> Array:
@@ -149,10 +149,10 @@ func _on_host() -> void:
 		return
 	_session = NetSession.create_host()
 	if _session == null:
-		_status.text = "建房失败：端口 %d 被占用（是否已开着另一个游戏窗口？）" % NetSession.DEFAULT_PORT
+		_status.text = tr("建房失败：端口 %d 被占用（是否已开着另一个游戏窗口？）") % NetSession.DEFAULT_PORT
 		return
 	_mode = "host"
-	_status.text = "已建房，等待对方加入…（把你的局域网 IP 告诉对方）"
+	_status.text = tr("已建房，等待对方加入…（把你的局域网 IP 告诉对方）")
 	_set_controls_enabled(false)
 
 
@@ -161,22 +161,22 @@ func _on_join() -> void:
 		return
 	var ip := _ip_edit.text.strip_edges()
 	if not ip.is_valid_ip_address():
-		_status.text = "IP 格式不对：例如 192.168.1.5"
+		_status.text = tr("IP 格式不对：例如 192.168.1.5")
 		return
 	_session = NetSession.create_join(ip)
 	if _session == null:
-		_status.text = "拨号失败（网络不可用？）"
+		_status.text = tr("拨号失败（网络不可用？）")
 		return
 	_mode = "join"
 	_join_waited = 0.0
 	_hello_sent = false
-	_status.text = "连接 %s 中…" % ip
+	_status.text = tr("连接 %s 中…") % ip
 	_set_controls_enabled(false)
 
 
 func _pick_ready() -> bool:
 	if _picked.size() != PICK_MAX:
-		_status.text = "先把阵容选满 %d 人再开（当前 %d 人）。" % [PICK_MAX, _picked.size()]
+		_status.text = tr("先把阵容选满 %d 人再开（当前 %d 人）。") % [PICK_MAX, _picked.size()]
 		return false
 	return true
 

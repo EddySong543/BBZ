@@ -178,7 +178,7 @@ func _ready() -> void:
 ## 右上角「升」金色角标（jelly 金底 + 墨字·点角=升级·点槽身=使用）。
 func _make_upgrade_badge(base: Vector2, i: int) -> Button:
 	var up := Button.new()
-	up.text = "升"
+	up.text = tr("升")
 	up.flat = true
 	up.focus_mode = Control.FOCUS_NONE
 	up.position = base + Vector2(SLOT_W - 20.0, 1.0)
@@ -258,15 +258,15 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 		match st:
 			BattleCore.SlotState.SEALED:
 				# 未到解锁回合（格自动解锁·无开格操作）→ 显示解锁回合数电报（静默·文字退后）。
-				lbl.text = "回合%d\n解锁" % (int(BattleCore.SLOT_UNLOCK_TURN[i]) + 1)
+				lbl.text = tr("回合%d\n解锁") % (int(BattleCore.SLOT_UNLOCK_TURN[i]) + 1)
 				tcol = TXT_DIM
 			BattleCore.SlotState.OPENED:
 				ft = NEU_FT; fb = NEU_FB; ei = EMPTY_EDGE
 				if battle.can_draw_slot(player, i):
-					lbl.text = "可抽"
+					lbl.text = tr("可抽")
 					ready = true
 				else:
-					lbl.text = "待抽"
+					lbl.text = tr("待抽")
 					tcol = TXT_DIM
 			BattleCore.SlotState.CHARGING:
 				var item: ItemData = battle.slot_item(player, i)
@@ -274,7 +274,7 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 				legend = has_item and item.tier >= 3        # 传说 → 格底用 gold_bottom 金底图
 				if has_item:
 					glow = 0.0 if legend else 1.0           # 内外渐变（传说金底图自带亮心·不用）
-				var nm: String = item.item_name if item != null else ""
+				var nm: String = tr(item.item_name) if item != null else ""
 				var dim: Color = _rarity_color(item)   # 框色按稀有度（变量名 dim 历史遗留）
 				# 格底内外色（参传说 gold_bottom：中心亮/四角深·与图鉴同算法）。
 				var c_out: Color = Color.from_hsv(dim.h, minf(dim.s * 1.05, 1.0), 0.76)   # 四角深·更饱和
@@ -292,24 +292,24 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 					ei = dim                  # 框 = 稀有度色（普通蓝/稀有紫/传说金）
 					icon.modulate = Color.WHITE
 					if tex != null:
-						lbl.text = "✓用" if staged.has(i) else ""   # 有图 → 只留状态标签
+						lbl.text = tr("✓用") if staged.has(i) else ""   # 有图 → 只留状态标签
 					else:
-						lbl.text = nm + "\n✓用" if staged.has(i) else nm   # 缺图回退名
+						lbl.text = nm + "\n" + tr("✓用") if staged.has(i) else nm   # 缺图回退名
 				else:
 					# 锁中 = 稀有度内外渐变压暗（仍认得出蓝/紫/金归属）+ 图标压暗。
 					fb = c_out.darkened(0.32)
 					cell_inner = c_in.darkened(0.32)
 					ei = dim.darkened(0.35)
 					icon.modulate = Color(0.62, 0.62, 0.66)   # 图标压暗 = 读作锁中
-					lbl.text = "(锁)" if tex != null else nm + "\n(锁)"
+					lbl.text = tr("(锁)") if tex != null else nm + "\n" + tr("(锁)")
 					tcol = TXT_DIM
 			BattleCore.SlotState.EMPTY:
 				if battle.can_refill(player, i):
-					lbl.text = "可补"
+					lbl.text = tr("可补")
 					ready = true
 					ft = NEU_FT; fb = NEU_FB; ei = EMPTY_EDGE
 				else:
-					lbl.text = "空"
+					lbl.text = tr("空")
 					ft = EMP_FT; fb = EMP_FB; ei = EMPTY_EDGE
 					tcol = TXT_FAINT
 		lbl.modulate = Color.WHITE

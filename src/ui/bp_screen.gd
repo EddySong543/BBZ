@@ -280,7 +280,7 @@ func _play_phase_announce() -> void:
 	layer.add_child(edge_bot)
 
 	var title := Label.new()
-	title.text = "禁 用 阶 段" if is_ban else "出 战 阶 段"
+	title.text = tr("禁 用 阶 段") if is_ban else "出 战 阶 段"
 	FontManager.apply(title, 52)
 	title.add_theme_color_override("font_color", theme_col)
 	title.add_theme_constant_override("outline_size", 8)
@@ -292,7 +292,7 @@ func _play_phase_announce() -> void:
 	layer.add_child(title)
 
 	var sub := Label.new()
-	sub.text = "禁用 3 名英雄" if is_ban else "选择 3 名英雄"
+	sub.text = tr("禁用 3 名英雄") if is_ban else "选择 3 名英雄"
 	FontManager.apply(sub, 20)
 	sub.add_theme_color_override("font_color", Color(WARM_IVORY, 0.92))
 	sub.add_theme_constant_override("outline_size", 4)
@@ -429,7 +429,7 @@ func _update_all_cards() -> void:
 
 func _sync_step_ui() -> void:
 	# BAN/PICK 统一「确认选择」（2026-06-12 Eddy）；REVEAL 的「开始战斗」另设不走此处。
-	confirm_btn.text = "确认选择  %d/3" % my_sel.size()
+	confirm_btn.text = tr("确认选择  %d/3") % my_sel.size()
 	_set_confirm_enabled(my_sel.size() == 3)
 
 
@@ -479,11 +479,11 @@ func _opp_cover_next() -> void:
 
 
 func _update_opp_progress() -> void:
-	opp_progress.text = "敌方已选 %d/3" % _opp_covered
+	opp_progress.text = tr("敌方已选 %d/3") % _opp_covered
 
 
 func _update_timer_label() -> void:
-	timer_label.text = "剩余 %ds" % maxi(timer_seconds, 0)
+	timer_label.text = tr("剩余 %ds") % maxi(timer_seconds, 0)
 	timer_label.add_theme_color_override("font_color",
 		Color("#ff4444") if timer_seconds <= 5 else GOLD_TEXT)
 
@@ -634,7 +634,7 @@ func _run_ceremony(is_ban: bool) -> void:
 		# 此时刻的中央空位预留给**联机「等待对手 / 加载」动画**（对峙静帧上叠
 		# 加载指示，完成后接 _start_battle；本地版对峙+金钮自明，无需装饰）。
 		step = Step.REVEAL
-		confirm_btn.text = "开始战斗"
+		confirm_btn.text = tr("开始战斗")
 		confirm_btn.visible = true
 		_set_confirm_enabled(true)
 		_ceremony = false
@@ -654,8 +654,8 @@ func _show_collisions(cer: Control, my_cer: Array[HeroCard], opp_cer: Array) -> 
 		var oc: HeroCard = opp_cer[ai_bans.find(hero_idx)]
 		if oc:
 			oc.card_state = HeroCard.CardState.BANNED
-	var note := "双方同禁「%s」" % all_heroes[collide[0]].hero_name \
-		if collide.size() == 1 else "双方同禁 %d 名" % collide.size()
+	var note := tr("双方同禁「%s」") % tr(all_heroes[collide[0]].hero_name) \
+		if collide.size() == 1 else tr("双方同禁 %d 名") % collide.size()
 	var lbl := Label.new()
 	lbl.text = note
 	FontManager.apply(lbl, 24)
@@ -785,7 +785,7 @@ func _make_slot_pit(parent: Control, r: Rect2, hint: String) -> void:
 		parent.add_child(ln)
 	if hint != "":
 		var lbl := Label.new()
-		lbl.text = hint
+		lbl.text = tr(hint)
 		FontManager.apply(lbl, 16)
 		lbl.add_theme_color_override("font_color", Color(WARM_IVORY_DIM, 0.55))
 		lbl.position = r.position + Vector2(0, r.size.y * 0.5 - 12)

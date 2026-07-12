@@ -42,7 +42,7 @@ func setup(options: Array, can_cancel: bool = true, title_text: String = "抽取
 	add_child(dim)
 
 	var title := Label.new()
-	title.text = title_text   # 区分「抽取」/「升级」3 选 1
+	title.text = tr(title_text)   # 区分「抽取」/「升级」3 选 1
 	title.position = Vector2(0.0, SCREEN_H * 0.5 - CARD_H * 0.5 - 70.0)
 	title.size = Vector2(SCREEN_W, 48.0)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -60,7 +60,7 @@ func setup(options: Array, can_cancel: bool = true, title_text: String = "抽取
 
 	if can_cancel:
 		var cancel := Button.new()
-		cancel.text = "取消"
+		cancel.text = tr("取消")
 		cancel.size = Vector2(160.0, 48.0)
 		cancel.position = Vector2((SCREEN_W - 160.0) * 0.5, card_y + CARD_H + 36.0)
 		cancel.focus_mode = Control.FOCUS_NONE
@@ -104,7 +104,7 @@ func _build_card(item: ItemData, pos: Vector2, idx: int) -> void:
 	card.add_child(scrim)
 
 	var name_lbl := Label.new()
-	name_lbl.text = item.item_name if item != null else "?"
+	name_lbl.text = tr(item.item_name) if item != null else "?"
 	name_lbl.position = Vector2(12.0, 18.0)
 	name_lbl.size = Vector2(CARD_W - 24.0, 64.0)
 	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -129,7 +129,7 @@ func _build_card(item: ItemData, pos: Vector2, idx: int) -> void:
 
 	# 描述定宽手动换行（2026-07-11 Eddy：AUTOWRAP 在长中文描述上溢出卡底被截）：
 	# 每行统一字数（宽度/字号），行数超出描述区高度 → 降号 16→12（Ark Pixel 整数倍档）重排。
-	var desc_text: String = item.description if item != null else ""
+	var desc_text: String = tr(item.description) if item != null else ""
 	var box_w := CARD_W - 36.0
 	var box_h := CARD_H - desc_top - 24.0
 	var f_size := 16

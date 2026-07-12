@@ -523,7 +523,7 @@ func _build_detail_panel() -> void:
 	_d_detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	var hint := _make_label(Vector2(px, py + PANEL.size.y - 38), Vector2(PANEL.size.x, 24), 14, Color(IVORY_DIM, 0.85))
-	hint.text = "← → 切换英雄 · ESC 返回"
+	hint.text = tr("← → 切换英雄 · ESC 返回")
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 
@@ -554,19 +554,19 @@ func _select(idx: int) -> void:
 		_d_anim.visible = false
 		_d_fallback.texture = load(h.portrait_path) if ResourceLoader.exists(h.portrait_path) else null
 		_d_fallback.visible = true
-	_d_name.text = h.hero_name
+	_d_name.text = tr(h.hero_name)
 	_d_chip1_lbl.text = "No.%02d" % (idx + 1)
 	_d_hp_num.text = "%d" % h.max_hp
 	var is_passive := h.skill_type == HeroData.SkillType.PASSIVE
-	_d_tag.text = "被动" if is_passive else "主动"
+	_d_tag.text = tr("被动") if is_passive else tr("主动")
 	_d_tag_bg.color = PASSIVE_TAG if is_passive else ACTIVE_TAG
-	_d_skill_name.text = h.skill_description
+	_d_skill_name.text = tr(h.skill_description)
 	if h.skill_icon_path != "" and ResourceLoader.exists(h.skill_icon_path):
 		_d_skill_icon.texture = load(h.skill_icon_path)
 		_d_skill_icon.visible = true
 	else:
 		_d_skill_icon.visible = false
-	_d_detail.text = h.skill_detail if h.skill_detail != "" else h.skill_description
+	_d_detail.text = tr(h.skill_detail) if h.skill_detail != "" else tr(h.skill_description)
 	_layout_data_chips()
 	_layout_skill_row()
 	# 选中行亮条滑到所在行

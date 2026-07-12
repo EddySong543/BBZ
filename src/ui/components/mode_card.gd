@@ -50,17 +50,17 @@ const EMBLEM_COL := Color(0.86, 0.76, 0.58, 0.85)
 	set(v):
 		card_title = v
 		if _title:
-			_title.text = v
+			_title.text = tr(v)
 @export var card_subtitle: String = "":
 	set(v):
 		card_subtitle = v
 		if _sub:
-			_sub.text = v
+			_sub.text = tr(v)
 @export var card_caption: String = "":
 	set(v):
 		card_caption = v
 		if _cap:
-			_cap.text = "· %s ·" % v if v != "" else ""
+			_cap.text = tr("· %s ·") % tr(v) if v != "" else ""
 @export var emblem_char: String = "":
 	set(v):
 		emblem_char = v
@@ -211,11 +211,11 @@ func _build() -> void:
 	_sep = _rect(Color.WHITE)
 
 	_cap = _label(CAP_COL)
-	_cap.text = "· %s ·" % card_caption if card_caption != "" else ""
+	_cap.text = tr("· %s ·") % tr(card_caption) if card_caption != "" else ""
 	_title = _label(TITLE_COLD)
-	_title.text = card_title
+	_title.text = tr(card_title)
 	_sub = _label(SUB_COL)
-	_sub.text = card_subtitle
+	_sub.text = tr(card_subtitle)
 	_emblem = _label(EMBLEM_COL)
 	_emblem.text = emblem_char
 

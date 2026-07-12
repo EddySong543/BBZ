@@ -183,7 +183,7 @@ func _build_bookmark_tabs() -> void:
 		for s in ["normal", "hover", "pressed", "focus", "disabled"]:
 			btn.add_theme_stylebox_override(s, StyleBoxEmpty.new())
 		FontManager.apply_btn(btn, 24)
-		btn.text = TIER_LABEL[t]
+		btn.text = tr(String(TIER_LABEL[t]))
 		var edge := ColorRect.new()          # 墨描边
 		edge.name = "Edge"
 		edge.show_behind_parent = true
@@ -273,7 +273,7 @@ func _build_banner() -> void:
 	plate.material = _paper_mat(BANNER.size, Color(BANNER_PLATE, 0.98), Color(0.09, 0.10, 0.19), 0.03, 0.40, 0.55)
 	var frame := _rect(band, BANNER, Color.WHITE)
 	frame.material = _make_frame_mat(BANNER.size)
-	title_lbl.text = "道具图鉴"
+	title_lbl.text = tr("道具图鉴")
 	title_lbl.position = BANNER.position + Vector2(0, -4)
 	title_lbl.size = BANNER.size
 	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -348,7 +348,7 @@ func _select_tier(t: int) -> void:
 	_items = ItemCatalog.all_for_tier(t)
 	_sel_idx = -1
 	_build_pool()
-	count_lbl.text = "本页 %d 件" % _items.size()
+	count_lbl.text = tr("本页 %d 件") % _items.size()
 	if not _items.is_empty():
 		_select(0)
 
@@ -359,7 +359,7 @@ func _build_pool() -> void:
 	_cards.clear()
 	# 章名大字水印（ref18 的褪色大字·压在左页下部空区）
 	var wm := Label.new()
-	wm.text = TIER_LABEL[_tier]
+	wm.text = tr(String(TIER_LABEL[_tier]))
 	wm.position = Vector2(PAGE_L.position.x + 120, PAGE_L.end.y - 400)
 	wm.size = Vector2(480, 360)
 	wm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -370,7 +370,7 @@ func _build_pool() -> void:
 	pool_area.add_child(wm)
 	# 章头（ref15 的页首题字感）：阶名墨字 + 细墨线（计数注记在同行右端·见 _setup_top）
 	var chapter := Label.new()
-	chapter.text = TIER_LABEL[_tier]
+	chapter.text = tr(String(TIER_LABEL[_tier]))
 	chapter.position = Vector2(X0, 150)
 	chapter.size = Vector2(300, 40)
 	FontManager.apply(chapter, 26)
@@ -468,7 +468,7 @@ func _make_item_card(item: ItemData, idx: int) -> Button:
 		card.add_child(icon)
 	# 名字（框外下方·亮页墨字直读）
 	var name_lbl := Label.new()
-	name_lbl.text = item.item_name
+	name_lbl.text = tr(item.item_name)
 	name_lbl.position = Vector2(-12.0, BOX + 2.0)
 	name_lbl.size = Vector2(BOX + 24.0, NAME_H)
 	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -574,7 +574,7 @@ func _build_detail_panel() -> void:
 
 	# 快捷键提示：夜色上·书外底部（不占书页）
 	var hint := _make_label(Vector2(0, 1038), Vector2(1920, 24), 14, Color(IVORY, 0.5))
-	hint.text = "← → 切换道具 · 普通/稀有/传说 切阶 · ESC 返回"
+	hint.text = tr("← → 切换道具 · 普通/稀有/传说 切阶 · ESC 返回")
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 
@@ -612,14 +612,14 @@ func _select(idx: int) -> void:
 		_d_icon_fallback.visible = false
 	else:
 		_d_icon.visible = false
-		_d_icon_fallback.text = it.item_name
+		_d_icon_fallback.text = tr(it.item_name)
 		_d_icon_fallback.visible = true
-	_d_name.text = it.item_name
+	_d_name.text = tr(it.item_name)
 	_d_name_band.color = rc
-	_d_tier_lbl.text = TIER_LABEL[it.tier]
+	_d_tier_lbl.text = tr(String(TIER_LABEL[it.tier]))
 	_d_tier_fill.color = rc
-	_d_desc.text = it.description
-	_d_flavor.text = it.flavor
+	_d_desc.text = tr(it.description)
+	_d_flavor.text = tr(it.flavor)
 	_layout_chips()
 
 

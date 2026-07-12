@@ -21,10 +21,14 @@
 [ext_resource type="FontFile" uid="uid://crf26hvhxwgim" path="res://assets/font/ark-pixel-16px-proportional-zh_cn.ttf" id="23_pixelfont"]
 [ext_resource type="Script" uid="uid://cjou81ur7el87" path="res://src/ui/components/reserve_hp_row.gd" id="24_reservehp"]
 [ext_resource type="Script" uid="uid://dvdbihej8rx16" path="res://src/ui/components/icon_badge.gd" id="25_iconbadge"]
-[ext_resource type="Shader" path="res://assets/shaders/canvas_fx_finisher_veil.gdshader" id="26_finveil"]
+[ext_resource type="Shader" uid="uid://bqm1rtkp2e21g" path="res://assets/shaders/canvas_fx_finisher_veil.gdshader" id="26_finveil"]
 
 [sub_resource type="ShaderMaterial" id="FinisherVeilMat"]
 shader = ExtResource("26_finveil")
+shader_parameter/strength = 0.0
+shader_parameter/blur_px = 3.5
+shader_parameter/darken = 0.45
+shader_parameter/desat = 0.35
 
 [sub_resource type="Gradient" id="ShadowGradient"]
 offsets = PackedFloat32Array(0, 0.55, 1)
@@ -56,6 +60,16 @@ shader_parameter/vignette_radius = 0.91100004094343
 shader_parameter/vignette_softness = 0.55
 shader_parameter/grain_amount = 0.018
 shader_parameter/grain_scale = 1.6
+shader_parameter/impact_strength = 0.0
+shader_parameter/impact_invert = 0.0
+shader_parameter/impact_center = Vector2(0.5, 0.55)
+shader_parameter/impact_burst_radius = 0.26
+shader_parameter/impact_jag = 0.11
+shader_parameter/impact_jag_freq = 7.0
+shader_parameter/impact_th_out = 0.52
+shader_parameter/impact_th_in = 0.13
+shader_parameter/impact_white = 0.86
+shader_parameter/impact_px = 3.0
 
 [sub_resource type="FontVariation" id="PixelBold16"]
 base_font = ExtResource("23_pixelfont")
@@ -189,10 +203,10 @@ mouse_filter = 2
 pointer_parallax = true
 demo_click_shake = false
 
-[node name="FinisherGrab" type="BackBufferCopy" parent="."]
+[node name="FinisherGrab" type="BackBufferCopy" parent="." unique_id=2109875562]
 copy_mode = 0
 
-[node name="FinisherVeil" type="ColorRect" parent="."]
+[node name="FinisherVeil" type="ColorRect" parent="." unique_id=855055043]
 visible = false
 material = SubResource("FinisherVeilMat")
 layout_mode = 1
@@ -329,7 +343,6 @@ spacing = 5.0
 per_row_cap = 10
 row_spacing = -20.0
 show_empty = false
-allow_half = true
 extra_modulate = Color(0.85, 0.82, 0.74, 1)
 preview_cur = 10.865
 
@@ -448,7 +461,6 @@ right_to_left = true
 per_row_cap = 10
 row_spacing = -20.0
 show_empty = false
-allow_half = true
 extra_modulate = Color(0.85, 0.82, 0.74, 1)
 preview_cur = 10.0
 

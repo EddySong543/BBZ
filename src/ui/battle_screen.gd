@@ -335,7 +335,7 @@ func _ready() -> void:
 	if _overtime:
 		p1_item_row.visible = false   # 加时禁道具 → 道具栏整行隐藏
 		p2_item_row.visible = false
-		status_label.text = "加时赛 · 巅峰 1v1"
+		status_label.text = tr("加时赛 · 巅峰 1v1")
 		status_label.add_theme_color_override("font_color", Color("#ffd86a"))
 		status_label.visible = true
 	_enlarge_frames()
@@ -397,8 +397,8 @@ func _init_buttons() -> void:
 
 	# 攒/波/大波/防/大防 用 HoverIcon 美术图标（节点在 battle_screen.tscn 内，编辑器可见可调）；
 	# 技能按钮显示「技能」二字（详细说明仍放 tooltip，见 _layout_circles）。位置/尺寸由 .tscn 决定。
-	btn_special.text = "技能"
-	btn_confirm.text = "结束"
+	btn_special.text = tr("技能")
+	btn_confirm.text = tr("结束")
 
 	for btn in [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend, btn_special]:
 		FontManager.apply_btn(btn, 16)
@@ -424,7 +424,7 @@ func _init_buttons() -> void:
 	# 疾风开关：程序化创建（不动 .tscn）。节奏=紫底圆角；位置/尺寸运行期跟「结束」键上方（_refresh_jifeng）。
 	btn_jifeng = Button.new()
 	btn_jifeng.name = "BtnJifeng"
-	btn_jifeng.text = "疾风"
+	btn_jifeng.text = tr("疾风")
 	btn_jifeng.focus_mode = Control.FOCUS_NONE
 	btn_jifeng.clip_text = true
 	btn_jifeng.size = Vector2(120.0, 56.0)
@@ -563,11 +563,11 @@ func _show_turn_intro() -> void:
 		_pve_pick_turn()   # 远征：怪物回合开始即定招·明牌概率表先于玩家选择亮出（GDD 明牌博弈系）
 
 	# 顶部中间：持续显示回合数（每回合更新，整局常驻）。「回合」与数字间留一空格，避免拥挤。
-	timer_label.text = "回合 %d" % (battle.turn_number + 1)
+	timer_label.text = tr("回合 %d") % (battle.turn_number + 1)
 	timer_label.visible = true
 
 	# 中间：先「回合开始」横幅，随后(进入选择)在同一位置转为倒计时（无底板）
-	big_turn_label.text = "回合开始"
+	big_turn_label.text = tr("回合开始")
 	big_turn_label.visible = true
 	await get_tree().create_timer(1.0).timeout
 	_start_player_select()
@@ -703,8 +703,8 @@ func _net_pump() -> void:
 	var linked: bool = ses.enet.is_ready()
 	if not linked and not _net_link_lost and state != State.GAME_OVER:
 		_net_link_lost = true
-		status_label.text = "对方断线·等待重连…（计时已暂停）" if String(ses.role) == "host" \
-			else "与主机断开：回大厅→加入同一 IP 可续战"
+		status_label.text = tr("对方断线·等待重连…（计时已暂停）") if String(ses.role) == "host" \
+			else tr("与主机断开：回大厅→加入同一 IP 可续战")
 		status_label.add_theme_color_override("font_color", Color("#e0a84b"))
 		status_label.visible = true
 	elif linked and _net_link_lost:
@@ -780,7 +780,7 @@ func _net_submit_turn() -> void:
 	_set_confirm_active(false)
 	_set_buttons_active(false)
 	state = State.RESOLVING   # 锁输入·resolve 快照到达后播动画
-	status_label.text = "等待对方出招…"
+	status_label.text = tr("等待对方出招…")
 	status_label.add_theme_color_override("font_color", Color("#c9c2b4"))
 	status_label.visible = true
 
@@ -815,7 +815,7 @@ func _net_play_resolution(msg: Dictionary) -> void:
 	if bool(pending[0]):
 		await _net_death_switch()
 	elif bool(pending[1]):
-		status_label.text = "对方选择替补中…"
+		status_label.text = tr("对方选择替补中…")
 		status_label.add_theme_color_override("font_color", Color("#c9c2b4"))
 		status_label.visible = true
 	_net_busy = false   # 新回合由 turn_begin → _net_pump 检测 turn 变化接手
@@ -842,7 +842,7 @@ func _net_open_offer(offer: Dictionary) -> void:
 		options.append(ItemCatalog.make(String(id)))
 	var upgrade: bool = bool(offer.get("upgrade", false))
 	var slot: int = int(offer.get("slot", 0))
-	var c: int = await _show_draft(slot, options, "升级道具（3 选 1）" if upgrade else "抽取道具（3 选 1）")
+	var c: int = await _show_draft(slot, options, tr("升级道具（3 选 1）") if upgrade else tr("抽取道具（3 选 1）"))
 	if c >= 0:
 		BattleSetup.net_session.client.pick(slot, c, upgrade)
 	# 服务器回 view+snap → _net_pump 同步镜像并刷新 UI
@@ -852,13 +852,13 @@ func _net_game_over(w: int) -> void:
 	state = State.GAME_OVER
 	game_timer.stop()
 	_set_buttons_active(false)
-	var msg := "平局"
+	var msg := tr("平局")
 	var col := Color("#dddddd")
 	if w == BattleCore.WINNER_P1:
-		msg = "胜利！"
+		msg = tr("胜利！")
 		col = Color("#5fd86b")
 	elif w != BattleCore.WINNER_DRAW:
-		msg = "失败"
+		msg = tr("失败")
 		col = Color("#e0574b")
 	status_label.text = msg
 	status_label.add_theme_color_override("font_color", col)
@@ -936,7 +936,7 @@ func _pve_build_ui() -> void:
 	FontManager.apply(_pve_odds_label, 16)
 	add_child(_pve_odds_label)
 	_pve_flee_btn = Button.new()
-	_pve_flee_btn.text = "脱离战斗（挨一拍·退回）"
+	_pve_flee_btn.text = tr("脱离战斗（挨一拍·退回）")
 	_pve_flee_btn.position = Vector2(56, 700)
 	_pve_flee_btn.size = Vector2(250, 44)
 	FontManager.apply_btn(_pve_flee_btn, 16)
@@ -975,13 +975,13 @@ func _pve_pick_turn() -> void:
 	_pve_choice = _pve_policy.pick(battle, AI)
 	var odds: Dictionary = _pve_choice.get("odds", {})
 	if odds.is_empty():
-		_pve_odds_label.text = "明牌：无（此怪出招有循环·可观察学习）"
+		_pve_odds_label.text = tr("明牌：无（此怪出招有循环·可观察学习）")
 	else:
-		var names := {"attack": "波", "defend": "防", "charge": "攒", "bigAttack": "大波", "bigDefend": "大防"}
+		var names := {"attack": tr("波"), "defend": tr("防"), "charge": tr("攒"), "bigAttack": tr("大波"), "bigDefend": tr("大防")}
 		var parts: Array = []
 		for k in odds:
 			parts.append("%s %.0f%%" % [String(names.get(k, k)), float(odds[k])])
-		_pve_odds_label.text = "明牌 ｜ " + "  ·  ".join(parts)
+		_pve_odds_label.text = tr("明牌 ｜ ") + "  ·  ".join(parts)
 	# 明牌亮出 pop（J 任务·中心轴回弹·提示"新一拍的牌翻开了"）
 	_pve_odds_label.scale = Vector2(1.14, 1.14)
 	var tw := create_tween()
@@ -1015,7 +1015,7 @@ func _pve_finish(outcome: String, extra_beats: int = 0) -> void:
 		team_hp.append(maxi(0, battle.hp[PLAYER][i]))
 	BattleSetup.pve_result = {outcome = outcome, beats = battle.turn_number + extra_beats,
 		team_hp = team_hp, monster_hp = maxi(0, battle.hp[AI][0])}
-	var texts := {"win": "怪物被击败！", "lose": "全灭……", "flee": "脱离战斗"}
+	var texts := {"win": tr("怪物被击败！"), "lose": tr("全灭……"), "flee": tr("脱离战斗")}
 	status_label.text = String(texts[outcome])
 	status_label.add_theme_color_override("font_color", Color("#5fd86b") if outcome == "win" else Color("#dddddd"))
 	status_label.visible = true
@@ -1037,7 +1037,7 @@ func _story_finish(w: int) -> void:
 	elif w == BattleCore.WINNER_DRAW:
 		outcome = "draw"
 	BattleSetup.story_result = {level_id = _story_level_id, outcome = outcome}
-	var texts := {win = "胜利！", lose = "失败", draw = "平局·未通关"}
+	var texts := {win = tr("胜利！"), lose = tr("失败"), draw = tr("平局·未通关")}
 	status_label.text = String(texts[outcome])
 	status_label.add_theme_color_override("font_color", Color("#5fd86b") if outcome == "win" else Color("#dddddd"))
 	status_label.visible = true
@@ -1189,29 +1189,29 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 			"charge_gain", "repeat_energy", "taotie_feast":
 				egain[p] += int(ev.get("amount", 0))
 			"poison_detonate":
-				tags[p].append({text = "毒爆", col = COL_TAG_POISON})
+				tags[p].append({text = tr("毒爆"), col = COL_TAG_POISON})
 			"marked_hit":
-				tags[p].append({text = "印记", col = COL_TAG_AMP})
+				tags[p].append({text = tr("印记"), col = COL_TAG_AMP})
 			"vuln_hit":
-				tags[p].append({text = "易伤", col = COL_TAG_AMP})
+				tags[p].append({text = tr("易伤"), col = COL_TAG_AMP})
 			"shield_absorb":
-				tags[p].append({text = "护盾-%s" % _fmt_hp(float(ev.get("amount", 0)) / 2.0), col = COL_TAG_ABSORB})
+				tags[p].append({text = tr("护盾-%s") % _fmt_hp(float(ev.get("amount", 0)) / 2.0), col = COL_TAG_ABSORB})
 			"decoy_absorb":
-				tags[p].append({text = "替身-%s" % _fmt_hp(float(ev.get("amount", 0)) / 2.0), col = COL_TAG_ABSORB})
+				tags[p].append({text = tr("替身-%s") % _fmt_hp(float(ev.get("amount", 0)) / 2.0), col = COL_TAG_ABSORB})
 			"damage_immune":
-				tags[p].append({text = "免疫", col = COL_TAG_SAVE, pr = 0})
+				tags[p].append({text = tr("免疫"), col = COL_TAG_SAVE, pr = 0})
 			"armor_broken":
-				tags[p].append({text = "破甲", col = COL_TAG_BREAK})
+				tags[p].append({text = tr("破甲"), col = COL_TAG_BREAK})
 			"lethal_rescue":
-				tags[p].append({text = "护主", col = COL_TAG_SAVE, pr = 0})
+				tags[p].append({text = tr("护主"), col = COL_TAG_SAVE, pr = 0})
 			"huzhu_counter":
-				tags[1 - p].append({text = "反击", col = COL_TAG_BREAK})   # 反击伤害落在攻击方身上→标注也放那侧
+				tags[1 - p].append({text = tr("反击"), col = COL_TAG_BREAK})   # 反击伤害落在攻击方身上→标注也放那侧
 			"huanhun_revive":
-				tags[p].append({text = "还魂", col = COL_TAG_SAVE, pr = 0})
+				tags[p].append({text = tr("还魂"), col = COL_TAG_SAVE, pr = 0})
 			"exhausted":
-				pre_tags[p].append({text = "力竭", col = COL_BLOCK_TEXT})
+				pre_tags[p].append({text = tr("力竭"), col = COL_BLOCK_TEXT})
 			"switch_locked":
-				pre_tags[p].append({text = "定身", col = COL_BLOCK_TEXT})
+				pre_tags[p].append({text = tr("定身"), col = COL_BLOCK_TEXT})
 			"deferred_damage":
 				# 唯一不走 damage_taken 的掉血（引擎直写 HP）——不标就是"血凭空少了"。
 				if int(ev.get("slot", -1)) == active_before[p]:
@@ -1250,13 +1250,13 @@ func _post_resolution(r: Dictionary) -> void:
 			await _start_overtime()
 			return
 		state = State.GAME_OVER
-		var msg := "平局"
+		var msg := tr("平局")
 		var col := Color("#dddddd")
 		if w == BattleCore.WINNER_P1:
-			msg = "胜利！"
+			msg = tr("胜利！")
 			col = Color("#5fd86b")
 		elif w != BattleCore.WINNER_DRAW:
-			msg = "失败"
+			msg = tr("失败")
 			col = Color("#e0574b")
 		status_label.text = msg
 		status_label.add_theme_color_override("font_color", col)
@@ -1286,7 +1286,7 @@ func _post_resolution(r: Dictionary) -> void:
 func _start_overtime() -> void:
 	state = State.HERO_SELECT
 	_set_buttons_active(false)
-	status_label.text = "平局 → 加时赛！"
+	status_label.text = tr("平局 → 加时赛！")
 	status_label.add_theme_color_override("font_color", Color("#ffd86a"))
 	status_label.visible = true
 
@@ -1294,7 +1294,7 @@ func _start_overtime() -> void:
 	for s in range(battle.heroes[PLAYER].size()):
 		var h: HeroData = battle.heroes[PLAYER][s]
 		entries.append([s, h, float(h.max_hp)])   # 满血复活展示
-	_death_switch_overlay.show_selection(PLAYER, entries, "加时赛：选一人出战（满血·无技能无道具）")
+	_death_switch_overlay.show_selection(PLAYER, entries, tr("加时赛：选一人出战（满血·无技能无道具）"))
 	var pick: int = await _death_switch_overlay.selection_made
 	var ai_pick: int = BattleAI.choose_overtime_pick(battle, AI)
 
@@ -1515,7 +1515,7 @@ func _maybe_arm_enemy_targets() -> void:
 	for fi in [1, 2]:
 		var slot: int = p2_frame_slots[fi]
 		if slot >= 0 and slot != battle.active_index[AI] and battle.hp[AI][slot] > 0:
-			p2_frames[fi].set_switch_prompt(true, "揪")   # 敌方存活替补：盖「揪」提示（文字/样式待 F6 调）
+			p2_frames[fi].set_switch_prompt(true, tr("揪"))   # 敌方存活替补：盖「揪」提示（文字/样式待 F6 调）
 
 
 ## 敌方替补框点击（仅 h21 选目标态响应；平时 gate 掉 → 无副作用）：点存活敌方替补 → 设/换/取消揪目标。
@@ -1696,7 +1696,7 @@ func _refresh_jifeng() -> void:
 	if not ok:
 		_double_armed = false
 	btn_jifeng.disabled = not ok
-	btn_jifeng.text = "疾风×%d" % battle.double_uses_left(PLAYER)
+	btn_jifeng.text = tr("疾风×%d") % battle.double_uses_left(PLAYER)
 	_set_btn_selected(btn_jifeng, _double_armed)
 
 
@@ -1829,15 +1829,15 @@ func _action_tip(action: int) -> String:
 	var d: Dictionary = ActionDef.BASE_ACTION_DEF[action]
 	match action:
 		A.CHARGE:
-			return "获得%s点能量" % _fmt_hp(int(d["energy_gain"]) / 2.0)
+			return tr("获得%s点能量") % _fmt_hp(int(d["energy_gain"]) / 2.0)
 		A.ATTACK:
-			return "消耗%s点能量\n造成%s点伤害" % [_fmt_hp(int(d["cost"]) / 2.0), _fmt_hp(int(d["damage"]) / 2.0)]
+			return tr("消耗%s点能量\n造成%s点伤害") % [_fmt_hp(int(d["cost"]) / 2.0), _fmt_hp(int(d["damage"]) / 2.0)]
 		A.BIG_ATTACK:
-			return "消耗%s点能量\n造成%s点穿防伤害（大防可挡）" % [_fmt_hp(int(d["cost"]) / 2.0), _fmt_hp(int(d["damage"]) / 2.0)]
+			return tr("消耗%s点能量\n造成%s点穿防伤害（大防可挡）") % [_fmt_hp(int(d["cost"]) / 2.0), _fmt_hp(int(d["damage"]) / 2.0)]
 		A.DEFEND:
-			return "挡下敌方普通攻击\n（穿防与真伤挡不住）"
+			return tr("挡下敌方普通攻击\n（穿防与真伤挡不住）")
 		A.BIG_DEFEND:
-			return "消耗%s点能量\n挡下普通与穿防攻击（真伤除外）" % _fmt_hp(int(d["cost"]) / 2.0)
+			return tr("消耗%s点能量\n挡下普通与穿防攻击（真伤除外）") % _fmt_hp(int(d["cost"]) / 2.0)
 	return ""
 
 
@@ -1846,44 +1846,44 @@ func _special_tip() -> String:
 	var h: HeroData = battle.active_hero(PLAYER)
 	if h == null:
 		return ""
-	var txt := "【%s】" % h.skill_description
+	var txt := tr("【%s】") % tr(h.skill_description)
 	if h.skill_detail != "":
-		txt += "\n" + h.skill_detail
+		txt += "\n" + tr(h.skill_detail)
 	var c: int = battle.action_cost(PLAYER, ACTIVE)
 	if c > 0:
-		txt += "\n消耗%s点能量" % _fmt_hp(c / 2.0)
+		txt += tr("\n消耗%s点能量") % _fmt_hp(c / 2.0)
 	return txt
 
 
 func _confirm_tip() -> String:
-	return "锁定本回合行动并结算"
+	return tr("锁定本回合行动并结算")
 
 
 ## 我方道具槽提示（按槽状态）：解锁回合 / 抽·补·升费用 / 道具名+效果+锁定状态。
 func _item_slot_tip(slot: int) -> String:
 	match battle.slot_state(PLAYER, slot):
 		BattleCore.SlotState.SEALED:
-			return "第%d回合自动解锁" % (int(BattleCore.SLOT_UNLOCK_TURN[slot]) + 1)
+			return tr("第%d回合自动解锁") % (int(BattleCore.SLOT_UNLOCK_TURN[slot]) + 1)
 		BattleCore.SlotState.OPENED:
 			if battle.can_draw_slot(PLAYER, slot):
-				return "点击抽取道具（3选1·免费）"
-			return "下回合可抽取道具"
+				return tr("点击抽取道具（3选1·免费）")
+			return tr("下回合可抽取道具")
 		BattleCore.SlotState.CHARGING:
 			var item: ItemData = battle.slot_item(PLAYER, slot)
 			if item == null:
 				return ""
-			var txt := "【%s】\n%s" % [item.item_name, item.description]
+			var txt := tr("【%s】\n%s") % [tr(item.item_name), tr(item.description)]
 			if battle.slot_ready(PLAYER, slot):
-				txt += "\n— 点击使用"
+				txt += tr("\n— 点击使用")
 				if battle.can_upgrade(PLAYER, slot):
-					txt += "·「升」=升级（%s点能量）" % _fmt_hp(BattleCore.UPGRADE_COST / 2.0)
+					txt += tr("·「升」=升级（%s点能量）") % _fmt_hp(BattleCore.UPGRADE_COST / 2.0)
 			else:
-				txt += "\n— 锁定中·下回合可用"
+				txt += tr("\n— 锁定中·下回合可用")
 			return txt
 		BattleCore.SlotState.EMPTY:
 			if battle.can_refill(PLAYER, slot):
-				return "点击补充道具（3选1·消耗%s点能量）" % _fmt_hp(BattleCore.ITEM_REFILL_COST / 2.0)
-			return "空槽（补充需%s点能量）" % _fmt_hp(BattleCore.ITEM_REFILL_COST / 2.0)
+				return tr("点击补充道具（3选1·消耗%s点能量）") % _fmt_hp(BattleCore.ITEM_REFILL_COST / 2.0)
+			return tr("空槽（补充需%s点能量）") % _fmt_hp(BattleCore.ITEM_REFILL_COST / 2.0)
 	return ""
 
 
@@ -1973,7 +1973,7 @@ func _on_p1_slot_upgrade(s: int) -> void:
 			BattleSetup.net_session.client.request_draft(s, true)
 		return
 	if battle.can_upgrade(PLAYER, s):
-		var c: int = await _show_draft(s, battle.begin_upgrade_draft(PLAYER, s), "升级道具（3 选 1）")
+		var c: int = await _show_draft(s, battle.begin_upgrade_draft(PLAYER, s), tr("升级道具（3 选 1）"))
 		if c >= 0:
 			battle.pick_upgrade(PLAYER, s, c)   # 付能量 → 换升级件 → 锁本回合
 			selected_item_slots.erase(s)        # 升级后该槽不再就绪 → 撤销本回合「使用」点选
@@ -2136,7 +2136,7 @@ func _fmt_hp(v: float) -> String:
 func _build_settings_button() -> void:
 	var b := Button.new()
 	b.name = "SettingsButton"
-	b.text = "设置"
+	b.text = tr("设置")
 	FontManager.apply_btn(b, 16)
 	b.add_theme_color_override("font_color", Color(0.70, 0.64, 0.53))       # 暖骨降级字色（工具件·非主操作）
 	b.add_theme_color_override("font_hover_color", Color(0.95, 0.91, 0.8))  # hover 暖米白
@@ -2678,7 +2678,7 @@ func _block_fx(player: int, big_atk: bool) -> void:
 	var cd := _cd(player)
 	cd.pulse_rim(1.3 if big_atk else 0.8, 0.28)
 	_spawn_spark(player, big_atk, COL_BLOCK_SPARK)
-	_pop_float(player, "被挡", 36, COL_BLOCK_TEXT, Color(0.06, 0.08, 0.12, 0.95), 5,
+	_pop_float(player, tr("被挡"), 36, COL_BLOCK_TEXT, Color(0.06, 0.08, 0.12, 0.95), 5,
 		1.1, 62.0, 0.38)
 	if big_atk:
 		_hitstop(0.04)   # 挡下大波值得一拍定格（比命中定格 0.075 轻）
@@ -2951,11 +2951,11 @@ func _animate_bubble_pop(node: Control) -> void:
 
 func _action_name(act: int) -> String:
 	match act:
-		A.CHARGE: return "攒"
-		A.ATTACK: return "波"
-		A.DEFEND: return "防"
-		A.BIG_ATTACK: return "大波"
-		A.BIG_DEFEND: return "大防"
-		A.SWITCH: return "切换"
-		ACTIVE: return "技能"
+		A.CHARGE: return tr("攒")
+		A.ATTACK: return tr("波")
+		A.DEFEND: return tr("防")
+		A.BIG_ATTACK: return tr("大波")
+		A.BIG_DEFEND: return tr("大防")
+		A.SWITCH: return tr("切换")
+		ACTIVE: return tr("技能")
 	return "?"

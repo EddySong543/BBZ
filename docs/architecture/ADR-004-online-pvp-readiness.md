@@ -29,7 +29,7 @@
 |---|---|---|
 | draft 选项须服务器生成 | ✅ 已在引擎侧 | `begin_draft`/`begin_upgrade_draft`/`_weighted_draft_pick` 全在 BattleCore，随机走 core.rng；UI 只展示+提交选择 |
 | 死亡换人/draft await 内联改异步边界 | ✅ 引擎侧已异步 | `resolve()` 不阻塞：死亡换人=`pending_death_switch` 旗标+`force_switch_prompt` 事件，UI 事后 `execute_death_switch`；draft=begin/pick 两段式。await 只存在于 UI 收集本地输入，联机语义=「服务器要输入→客户端弹窗→回传」，结构已就位 |
-| ~344 硬编码中文串 i18n | ⏳ 未做 | 独立机械批·见 Migration M4 |
+| ~344 硬编码中文串 i18n | ✅ 主体已做（2026-07-12） | 「原文即键」tr() 包裹＋键表 389 键·见 Migration M4 |
 | （新增）UI 只读边界 | ✅ 已锁 | 唯一直写点=src/ui/debug 调试面（A2 拆出·联机禁用）；`tests/unit/ui/test_ui_readonly_boundary.gd` 守卫常绿 |
 | （新增）战局序列化 | ✅ 已落地 | `BattleCore.to_snapshot()/from_snapshot()`（版本化·JSON 安全·rng 64 位走字符串）；`test_battle_snapshot.gd` 锁「恢复局续打逐位一致」 |
 | （新增）动画事件流化 | ✅ 已完成 | A3a/A3b：战斗演出全部由 `events` 派生，不 diff 引擎状态 —— 客户端只收事件流即可重放演出 |
@@ -59,7 +59,7 @@
 - **M3 安全收口（✅ 2026-07-12）**：①DTLS 传输加密（主机开房现生成自签证书·密钥不落盘·client_unsafe=加密不验身·fail-closed 不降级明文·⚠防不了主动 MITM=正经证书链等 M2b 专用服务器）②入包大小上限（服务器侧 8KB·JSON 炸弹防护）③服务端权威计时（TURN_TIME_STEPS+4s 宽限·超时代提交攒/代选替补·时钟可注入=GUT 锁定）④防洪令牌桶（突发 30·回填 10/s·超额静默丢）⑤调试面收口（release 剥离 + 联机局禁用）⑥PCK 加密=发布前手册 `docs/pck-encryption-guide.md`。
 - **M2b 服务端工程（剩余）**：BP/选人联机化（现固定阵容）+ 断线重连 UI 接线（快照地基已备）+ 进程托管（headless Godot 复用 sim 启动器骨架）+ 大厅/匹配 + 多房间 + per-player 视图过滤（信息扭曲道具+快照私有字段）+ 公网方案（个人项目候选：Steam P2P / 轻量中转服·需 Eddy 选型）。
 - **M3 反作弊面收口**：联机构建禁用 src/ui/debug；回合时限服务端计时；提交去重（turn 号幂等）。
-- **M4 i18n 抽取**：~344 中文串 → 键表（独立机械批·与联机并行可做）。
+- **M4 i18n 抽取（✅ 主体 2026-07-12）**：方案=**「原文即键」**（中文原文即翻译键；未注册翻译表时 `tr()` 原样返回=零行为变化，`.tscn` 文本零改动=Godot 自动翻译按原文查表，Eddy 编辑器所见仍是中文）。已做：①UI/story 代码显示点全量 `tr()` 包裹（字面量就地包·模板在拼接处包·数据文案在显示汇点包 `tr(变量)`·逻辑键不包）；②键表生成器 `tools/i18n_scan.gd`（可重复跑）→ `assets/i18n/strings_zh.csv` 389 键（含英雄 .tres/道具 catalog/levels.json/.tscn 文本·带出处 context 列）；③GUT 28 脚本 360 用例全绿。**剩余（激活翻译时做）**：填 en 列 → 去 context 列 → 移除 `assets/i18n/.gdignore` → project.godot 注册 translations（风险操作·届时批准）。**明示缓办**：src/expedition（占位内容等 F/G/H 重做）、debug 面板（release 剥离）、标题屏像素字形字（美术资产范畴）。
 - **M5 账号/变现**：F2P 外观·绝不卖强度（Eddy 定·另立项）。
 
 ## Consequences

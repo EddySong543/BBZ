@@ -84,7 +84,7 @@ func _build() -> void:
 	margin.add_child(vbox)
 
 	var title := Label.new()
-	title.text = "设置"
+	title.text = tr("设置")
 	FontManager.apply(title, 40)
 	title.add_theme_color_override("font_color", INK)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -131,7 +131,7 @@ func _separator() -> Control:
 
 func _row_label(text: String) -> Label:
 	var l := Label.new()
-	l.text = text
+	l.text = tr(text)
 	FontManager.apply(l, 24)
 	l.add_theme_color_override("font_color", INK)
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -141,7 +141,7 @@ func _row_label(text: String) -> Label:
 
 func _make_button(text: String) -> Button:
 	var b := Button.new()
-	b.text = text
+	b.text = tr(text)
 	FontManager.apply_btn(b, 22)
 	b.add_theme_color_override("font_color", INK)
 	b.add_theme_color_override("font_hover_color", INK_SOFT)
@@ -159,7 +159,7 @@ func _window_mode_row() -> HBoxContainer:
 		var cur: int = WINDOW_MODES.find(String(GameSettings.get_value("window_mode")))
 		var next: String = WINDOW_MODES[(cur + 1) % WINDOW_MODES.size()]
 		GameSettings.set_value("window_mode", next)
-		btn.text = String(WINDOW_MODE_NAMES[next])
+		btn.text = tr(String(WINDOW_MODE_NAMES[next]))
 		_refresh_res_enabled())
 	row.add_child(btn)
 	return row

@@ -211,7 +211,7 @@ func set_switch_prompt(on: bool, label_text: String = "切换") -> void:
 		_switch_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
 		_switch_label.add_theme_constant_override("outline_size", 4)
 		add_child(_switch_label)   # 加在最后 → 渲染在边框/立绘之上
-	_switch_label.text = label_text   # 「切换」(己方换人) / 「揪」(h21 敌方揪目标) 复用同一 label
+	_switch_label.text = tr(label_text)   # 「切换」(己方换人) / 「揪」(h21 敌方揪目标) 复用同一 label
 	_switch_label.visible = on
 	if _portrait:
 		if on:

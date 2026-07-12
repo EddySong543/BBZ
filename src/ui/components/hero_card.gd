@@ -83,7 +83,7 @@ func _style_text(lbl: Label, col: Color) -> void:
 
 func _refresh_text() -> void:
 	if _name_label:
-		_name_label.text = hero_name
+		_name_label.text = tr(hero_name)
 	if _hp_badge:
 		_hp_badge.set_number(max_hp)
 
