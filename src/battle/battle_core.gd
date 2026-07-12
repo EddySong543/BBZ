@@ -933,6 +933,7 @@ static func _vanilla_copy(h: HeroData) -> HeroData:
 
 ## 深拷战局。状态容器全部独立深拷；HeroData（只读资源）/ HeroSkill（无状态组件 §D2）
 ## 共享引用（duplicate(true) 不复制 Object）；rng 独立复制（seed+state）→ 推演不扰动本局序列。
+## ⚠ 新增引擎状态字段必须三处同步：clone() / to_snapshot()+from_snapshot() / test_battle_snapshot.gd（ADR-004）。
 func clone() -> BattleCore:
 	var c := BattleCore.new()
 	c.heroes = heroes.duplicate(true)
@@ -977,6 +978,232 @@ func clone() -> BattleCore:
 	# 技能无状态，重建与共享行为等价；statuses 已在上面深拷，故不重跑 on_setup。
 	c._build_skills()
 	return c
+
+
+# === 联机/持久化快照（联机准备批②·2026-07-12）===
+#
+# to_snapshot()/from_snapshot()：全量战局 ↔ 纯数据 Dictionary。
+# 用途：联机断线重连/观战入场/服务端持久化/录像。设计约束：
+#   - 资源引用全部降为可重建数据：HeroData→{id,name,max_hp,skill_type}（恢复优先加载
+#     assets/data/heroes/<id>.tres·无资源文件=白板重建 → 测试/PvE 白板英雄同样可快照）；
+#     ItemData→item_id（ItemCatalog.make 重建独立实例）。
+#   - JSON 安全（网络消息可直接走文本）：数字经 JSON 往返会 int→float，恢复端 _snap_norm 归一；
+#     rng seed/state 是 64 位整数 → 存字符串（JSON double 在 2^53 以上丢精度）。
+#   - 版本化（网络代码规则：所有消息版本化）：SNAPSHOT_VERSION 不符拒绝恢复。
+#   - 单线程使用；非热路径（仅重连/落盘时调用，允许分配）。
+#   - ⚠ 新增引擎状态字段必须三处同步：clone() / 本快照对 / test_battle_snapshot.gd（ADR-004）。
+#
+# 用法：
+#   var wire := JSON.stringify(battle.to_snapshot())      # 服务端落盘 / 发给重连客户端
+#   var b := BattleCore.new()
+#   if b.from_snapshot(JSON.parse_string(wire)):
+#       b.select_action(0, ...)                           # 恢复后战局含随机流逐位一致，直接续打
+# 行为锁定：tests/unit/battle/v4/test_battle_snapshot.gd
+
+const SNAPSHOT_VERSION := 1
+const HERO_RES_DIR := "res://assets/data/heroes/"
+
+
+## 导出全量战局快照（纯数据·与本局零共享·JSON 安全）。
+func to_snapshot() -> Dictionary:
+	return {
+		v = SNAPSHOT_VERSION,
+		heroes = [_snap_pack_team(0), _snap_pack_team(1)],
+		active_index = active_index.duplicate(),
+		energy = energy.duplicate(),
+		hp = hp.duplicate(true),
+		max_hp = max_hp.duplicate(true),
+		shield = shield.duplicate(true),
+		pending_damage = pending_damage.duplicate(true),
+		statuses = statuses.duplicate(true),
+		selected_action = selected_action.duplicate(),
+		switch_to = _switch_to.duplicate(),
+		forced_pull = _forced_pull.duplicate(),
+		active_target = _active_target.duplicate(),
+		pending_death_switch = pending_death_switch.duplicate(),
+		death_processed = _death_processed.duplicate(true),
+		shuchao_procs = _shuchao_procs.duplicate(),
+		double = _double.duplicate(),
+		killer = _killer.duplicate(true),
+		last_action = _last_action.duplicate(),
+		items = [_snap_pack_items(items[0]), _snap_pack_items(items[1])],
+		item_uses = [_snap_pack_uses(0), _snap_pack_uses(1)],
+		info_distortion = info_distortion.duplicate(true),
+		item_buffs = item_buffs.duplicate(true),
+		imod = _imod.duplicate(true),
+		relics = [_snap_pack_relics(0), _snap_pack_relics(1)],
+		slots = [_snap_pack_slots(0), _snap_pack_slots(1)],
+		turn_number = turn_number,
+		game_over = game_over,
+		winner = winner,
+		overtime_mode = overtime_mode,
+		action_lock_turn = action_lock_turn.duplicate(),
+		action_locked = action_locked.duplicate(),
+		pierce_next_attack = pierce_next_attack.duplicate(),
+		pve_no_econ = pve_no_econ,
+		rng_seed = str(rng.seed),
+		rng_state = str(rng.state),
+	}
+
+
+## 从快照恢复战局（覆盖本实例全部状态·技能组件重建）。版本不符返回 false 且不动现状。
+func from_snapshot(d: Dictionary) -> bool:
+	if int(d.get("v", -1)) != SNAPSHOT_VERSION:
+		push_warning("BattleCore.from_snapshot: 快照版本不符 %s（期望 %d）" % [d.get("v"), SNAPSHOT_VERSION])
+		return false
+	var s: Dictionary = _snap_norm(d)
+	heroes = [_snap_unpack_team(s["heroes"][0]), _snap_unpack_team(s["heroes"][1])]
+	active_index.assign(s["active_index"])
+	energy.assign(s["energy"])
+	hp = s["hp"]
+	max_hp = s["max_hp"]
+	shield = s["shield"]
+	pending_damage = s["pending_damage"]
+	statuses = s["statuses"]
+	selected_action.assign(s["selected_action"])
+	_switch_to.assign(s["switch_to"])
+	_forced_pull.assign(s["forced_pull"])
+	_active_target.assign(s["active_target"])
+	pending_death_switch.assign(s["pending_death_switch"])
+	_death_processed = s["death_processed"]
+	_shuchao_procs.assign(s["shuchao_procs"])
+	_double.assign(s["double"])
+	_killer = s["killer"]
+	_last_action.assign(s["last_action"])
+	items = [_snap_unpack_items(s["items"][0]), _snap_unpack_items(s["items"][1])]
+	item_uses = [_snap_unpack_uses(s["item_uses"][0]), _snap_unpack_uses(s["item_uses"][1])]
+	var idist: Array[Dictionary] = []
+	idist.assign(s["info_distortion"])
+	info_distortion = idist
+	var ibuff: Array[Dictionary] = []
+	ibuff.assign(s["item_buffs"])
+	item_buffs = ibuff
+	_imod = s["imod"]
+	relics = [_snap_unpack_relics(s["relics"][0]), _snap_unpack_relics(s["relics"][1])]
+	slots = [_snap_unpack_slots(s["slots"][0]), _snap_unpack_slots(s["slots"][1])]
+	turn_number = int(s["turn_number"])
+	game_over = bool(s["game_over"])
+	winner = int(s["winner"])
+	overtime_mode = bool(s["overtime_mode"])
+	action_lock_turn.assign(s["action_lock_turn"])
+	action_locked.assign(s["action_locked"])
+	pierce_next_attack.assign(s["pierce_next_attack"])
+	pve_no_econ = bool(s["pve_no_econ"])
+	rng = RandomNumberGenerator.new()
+	rng.seed = String(s["rng_seed"]).to_int()    # ⚠ 先 seed 后 state（设 seed 会重置 state）
+	rng.state = String(s["rng_state"]).to_int()
+	_build_skills()
+	return true
+
+
+## JSON 往返归一：float 整数值还原为 int（JSON 无整数类型），数组/字典递归。深拷副本，不动入参。
+static func _snap_norm(v: Variant) -> Variant:
+	match typeof(v):
+		TYPE_FLOAT:
+			return int(v) if is_equal_approx(v, roundf(v)) else v
+		TYPE_ARRAY:
+			var oa: Array = []
+			for e in v:
+				oa.append(_snap_norm(e))
+			return oa
+		TYPE_DICTIONARY:
+			var od: Dictionary = {}
+			for k in v:
+				od[k] = _snap_norm(v[k])
+			return od
+	return v
+
+
+func _snap_pack_team(p: int) -> Array:
+	var out: Array = []
+	for h in heroes[p]:
+		var hd: HeroData = h
+		out.append({id = hd.hero_id, name = hd.hero_name, max_hp = hd.max_hp, skill_type = int(hd.skill_type)})
+	return out
+
+
+## 英雄恢复：优先资源文件（正式英雄全量字段）；无文件=白板重建（测试/PvE 白板·战斗所需四字段足够）。
+static func _snap_unpack_team(arr: Array) -> Array:
+	var team: Array = []
+	for hd in arr:
+		var id: String = String(hd["id"])
+		var path: String = HERO_RES_DIR + id + ".tres"
+		if ResourceLoader.exists(path):
+			team.append(load(path))
+		else:
+			var h := HeroData.new()
+			h.hero_id = id
+			h.hero_name = String(hd.get("name", id))
+			h.max_hp = int(hd.get("max_hp", 5))
+			h.skill_type = int(hd.get("skill_type", 0)) as HeroData.SkillType
+			team.append(h)
+	return team
+
+
+static func _snap_item_id(it: ItemData) -> String:
+	return "" if it == null else it.item_id
+
+
+static func _snap_item_make(id: String) -> ItemData:
+	return null if id.is_empty() else ItemCatalog.make(id)
+
+
+static func _snap_pack_items(arr: Array) -> Array:
+	var out: Array = []
+	for it in arr:
+		out.append(_snap_item_id(it))
+	return out
+
+
+static func _snap_unpack_items(arr: Array) -> Array:
+	var out: Array = []
+	for id in arr:
+		out.append(_snap_item_make(String(id)))
+	return out
+
+
+func _snap_pack_uses(p: int) -> Array:
+	var out: Array = []
+	for u in item_uses[p]:
+		out.append({id = _snap_item_id(u["data"]), when = int(u["when"]), target = int(u["target"])})
+	return out
+
+
+static func _snap_unpack_uses(arr: Array) -> Array:
+	var out: Array = []
+	for u in arr:
+		out.append({data = _snap_item_make(String(u["id"])), when = int(u["when"]), target = int(u["target"])})
+	return out
+
+
+func _snap_pack_relics(p: int) -> Array:
+	var out: Array = []
+	for r in relics[p]:
+		out.append({id = _snap_item_id(r["data"]), state = (r["state"] as Dictionary).duplicate(true)})
+	return out
+
+
+static func _snap_unpack_relics(arr: Array) -> Array:
+	var out: Array = []
+	for r in arr:
+		out.append({data = _snap_item_make(String(r["id"])), state = r["state"]})
+	return out
+
+
+func _snap_pack_slots(p: int) -> Array:
+	var out: Array = []
+	for sl in slots[p]:
+		out.append({state = int(sl["state"]), item = _snap_item_id(sl["item"]), since = int(sl["since"]),
+			used = bool(sl["used"]), draft = _snap_pack_items(sl["draft"]), upg_draft = _snap_pack_items(sl["upg_draft"])})
+	return out
+
+
+static func _snap_unpack_slots(arr: Array) -> Array:
+	var out: Array = []
+	for sl in arr:
+		out.append({state = int(sl["state"]), item = _snap_item_make(String(sl["item"])), since = int(sl["since"]),
+			used = bool(sl["used"]), draft = _snap_unpack_items(sl["draft"]), upg_draft = _snap_unpack_items(sl["upg_draft"])})
+	return out
 
 
 ## 枚举该玩家当前所有合法动作。返回 Array[{action:int, target:int}]，
