@@ -12,12 +12,15 @@ extends RefCounted
 ##   econ_pick    {v, kind, turn, slot, choice, upgrade:bool}
 ##   death_switch {v, kind, turn, slot}
 ##   resync       {v, kind}                        → 服务器回 snapshot（断线重连）
+##   hello        {v, kind, team:[hero_id×3]}      → 开局前=报到+交换阵容；开局后=重连（房间回 snapshot+turn_begin）
 ## S2C（服务器→客户端）kind：
 ##   match_start / turn_begin / draft_offer / resolve / view / game_over / snapshot / error
 ##   （match_start/turn_begin/resolve/view 均带 snap=权威全量快照 → 客户端镜像同步·M1）
 
 const PROTO_VERSION := 1
-const C2S_KINDS: Array[String] = ["submit_turn", "econ_draft", "econ_upgrade", "econ_refill", "econ_pick", "death_switch", "resync"]
+const C2S_KINDS: Array[String] = ["submit_turn", "econ_draft", "econ_upgrade", "econ_refill", "econ_pick", "death_switch", "resync", "hello"]
+const TEAM_SIZE := 3
+const MAX_HERO_ID_LEN := 8
 
 const MAX_ITEM_SLOTS := 3      # 与 BattleCore.SLOT_COUNT 一致（入包范围校验用·防超长数组）
 const MAX_ACTION := 16         # 动作枚举安全上限（真合法性由 match_room 按 legal_actions 判）
@@ -35,6 +38,15 @@ static func validate_c2s(msg: Variant) -> String:
 	if not C2S_KINDS.has(kind):
 		return "unknown_kind"
 	if kind == "resync":
+		return ""
+	if kind == "hello":
+		var team: Variant = d.get("team")
+		if not (team is Array) or (team as Array).size() != TEAM_SIZE:
+			return "bad_team"
+		for id in team:
+			if not (id is String) or (id as String).is_empty() or (id as String).length() > MAX_HERO_ID_LEN \
+					or not (id as String).is_valid_identifier():
+				return "bad_team"
 		return ""
 	if not _is_int(d.get("turn")) or int(d["turn"]) < 0:
 		return "bad_turn"
@@ -102,6 +114,10 @@ static func msg_death_switch(turn: int, slot: int) -> Dictionary:
 
 static func msg_resync() -> Dictionary:
 	return {v = PROTO_VERSION, kind = "resync"}
+
+
+static func msg_hello(team: Array) -> Dictionary:
+	return {v = PROTO_VERSION, kind = "hello", team = team.duplicate()}
 
 
 # —— S2C 构造（服务器用）——

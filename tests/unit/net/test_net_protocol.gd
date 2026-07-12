@@ -41,6 +41,14 @@ func test_net_protocol_field_ranges_rejected() -> void:
 	assert_eq(NetProtocol.validate_c2s(no_flag), "bad_upgrade_flag")
 
 
+func test_net_protocol_hello_team_validation() -> void:
+	# 合法 3 人队过·人数/伪造 id（路径穿越/超长）全拒
+	assert_eq(NetProtocol.validate_c2s(NetProtocol.msg_hello(["h01", "h02", "h03"])), "")
+	assert_eq(NetProtocol.validate_c2s(NetProtocol.msg_hello(["h01"])), "bad_team")
+	assert_eq(NetProtocol.validate_c2s(NetProtocol.msg_hello(["h01", "h02", "../evil"])), "bad_team")
+	assert_eq(NetProtocol.validate_c2s(NetProtocol.msg_hello(["h01", "h02", "reallylongheroid"])), "bad_team")
+
+
 func test_net_protocol_json_wire_degradation_accepted() -> void:
 	# JSON 往返 int→float：真实传输路径上的合法包仍须通过
 	var wire: Variant = JSON.parse_string(JSON.stringify(NetProtocol.msg_submit_turn(4, 2, -1, [0])))

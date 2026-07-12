@@ -73,6 +73,10 @@ func _on_msg(d: Dictionary) -> void:
 			winner = int(d["winner"])
 		"snapshot":
 			snapshot = d
+			you = int(d.get("you", you))   # 重连路径：snapshot 即"入场券"（大厅凭 you>=0 放行进战斗）
+			_take_snap(d)
+			if snap.has("turn_number"):
+				turn = int(snap["turn_number"])
 		"error":
 			errors.append(String(d.get("code", "")))
 
@@ -107,6 +111,10 @@ func death_switch(slot: int) -> void:
 
 func request_resync() -> void:
 	transport.send(NetProtocol.msg_resync())
+
+
+func send_hello(team: Array) -> void:
+	transport.send(NetProtocol.msg_hello(team))
 
 
 # —— 视角翻转（M1·加入方=服务器眼中的玩家 1·战斗屏恒以"玩家 0=自己"渲染）——

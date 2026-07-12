@@ -156,6 +156,7 @@ var _net := false                             # 本局=联机局（BattleSetup.n
 var _net_last_turn := 0                       # 已进入选招的回合号（检测服务器 turn_begin）
 var _net_busy := false                        # 联机结算演出进行中（pump 串行防重入）
 var _net_snap_rev := 0                        # 已上镜的快照版本号（client.snap_rev 对账）
+var _net_link_lost := false                   # 对端断线提示态（M2b·重连自动恢复）
 const MatchClientScript := preload("res://src/net/match_client.gd")   # 视角翻转静态工具（M1）
 
 # ---- 选择 / 样式 ----
@@ -698,6 +699,18 @@ func _net_pump() -> void:
 	if ses == null or battle == null:
 		return
 	ses.pump()
+	# M2b 断线感知：断链亮提示（房主等重连·加入方指路回大厅重连续战）·链路恢复自动消提示
+	var linked: bool = ses.enet.is_ready()
+	if not linked and not _net_link_lost and state != State.GAME_OVER:
+		_net_link_lost = true
+		status_label.text = "对方断线·等待重连…（计时已暂停）" if String(ses.role) == "host" \
+			else "与主机断开：回大厅→加入同一 IP 可续战"
+		status_label.add_theme_color_override("font_color", Color("#e0a84b"))
+		status_label.visible = true
+	elif linked and _net_link_lost:
+		_net_link_lost = false
+		if state == State.PLAYER_SELECT or state == State.RESOLVING:
+			status_label.visible = false
 	if _net_busy or _drafting:
 		return
 	var c: Variant = ses.client

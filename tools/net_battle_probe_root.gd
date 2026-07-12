@@ -98,6 +98,28 @@ func _ready() -> void:
 	if not (BattleSetup.net_session == null or BattleSetup.net_session.client.errors.is_empty()):
 		fails.append("出现服务器拒绝: %s" % [BattleSetup.net_session.client.errors])
 
+	# —— M2b 重连：加入方退场（会话关闭=断线）→ 新会话 hello 报到 → 快照续战（客户端级验证）——
+	var cur_turn: int = s.battle.turn_number
+	remove_child(s)
+	s.queue_free()   # _exit_tree 关旧会话
+	await _rt(0.4)
+	var ses2: Variant = NetSession.create_join("127.0.0.1", PORT)
+	waited = 0.0
+	while not ses2.is_link_ready() and waited < 5.0:
+		await _rt(0.05)   # 房主侧由 _process/_tick_host 持续泵（勿手动 poll 抢包）
+		waited += 0.05
+	ses2.client.send_hello(["h02", "h09", "h12"])
+	waited = 0.0
+	while int(ses2.client.you) < 0 and waited < 5.0:
+		ses2.pump()
+		await _rt(0.05)
+		waited += 0.05
+	if int(ses2.client.you) != 1:
+		fails.append("⑥重连未拿到玩家位: %d" % int(ses2.client.you))
+	elif int(ses2.client.snap.get("turn_number", -1)) < cur_turn:
+		fails.append("⑥重连快照回合倒退: %s < %d" % [ses2.client.snap.get("turn_number"), cur_turn])
+	ses2.close()
+
 	print("NET_BATTLE_PROBE: %s" % ("PASS" if fails.is_empty() else "FAIL " + str(fails)))
 	get_tree().quit()
 

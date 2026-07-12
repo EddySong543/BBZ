@@ -59,8 +59,8 @@ mouse_filter = 2
 
 [node name="Panel" type="VBoxContainer" parent="."]
 layout_mode = 0
-offset_left = 660.0
-offset_top = 320.0
-offset_right = 1260.0
-offset_bottom = 760.0
-theme_override_constants/separation = 28
+offset_left = 480.0
+offset_top = 180.0
+offset_right = 1440.0
+offset_bottom = 1000.0
+theme_override_constants/separation = 22

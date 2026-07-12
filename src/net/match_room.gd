@@ -65,9 +65,14 @@ func handle(player: int, msg: Variant) -> void:
 		return
 	var d: Dictionary = msg
 	var kind := String(d["kind"])
-	if kind == "resync":
+	if kind == "resync" or kind == "hello":
+		# 开局后的 hello = 断线重连报到（阵容字段忽略——阵容在开局时已定死·防中途换队）。
 		_send.call(player, {v = NetProtocol.PROTO_VERSION, kind = "snapshot", you = player,
 			phase = phase, snap = battle.to_snapshot()})
+		if phase == Phase.SELECT:
+			# 补发 turn_begin：重连者立刻回到选招（否则要干等到下一拍）
+			_send.call(player, {v = NetProtocol.PROTO_VERSION, kind = "turn_begin",
+				turn = battle.turn_number, view = _view(), snap = battle.to_snapshot()})
 		return
 	if phase == Phase.OVER:
 		_send.call(player, NetProtocol.msg_error("match_over"))

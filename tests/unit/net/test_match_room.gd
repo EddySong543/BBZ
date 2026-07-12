@@ -154,9 +154,13 @@ func test_match_room_resync_snapshot_resumable() -> void:
 		room.handle(1, NetProtocol.msg_submit_turn(room.battle.turn_number, A.DEFEND, -1, []))
 	# Act
 	room.handle(0, NetProtocol.msg_resync())
-	var snap_msg: Dictionary = (sent[0] as Array).back()
+	# resync 回两条：snapshot + 补发 turn_begin（M2b）→ 取最后一条 snapshot
+	var snap_msg: Dictionary = {}
+	for m in sent[0]:
+		if String((m as Dictionary).get("kind", "")) == "snapshot":
+			snap_msg = m
 	# Assert：快照可恢复成逐位一致的战局（断线重连契约）
-	assert_eq(String(snap_msg["kind"]), "snapshot")
+	assert_eq(String(snap_msg.get("kind", "")), "snapshot")
 	var b2 := BattleCore.new()
 	assert_true(b2.from_snapshot(snap_msg["snap"]))
 	assert_eq_deep(b2.to_snapshot(), room.battle.to_snapshot())
@@ -230,6 +234,28 @@ func test_match_room_deadline_auto_switches_dead_player() -> void:
 	assert_eq(room.battle.active_index[1], 1, "应换上首个存活替补")
 
 
+func test_match_room_hello_midgame_resumes_with_snapshot_and_turn_begin() -> void:
+	# Arrange：打一拍后掉线方 hello 报到（M2b 重连路径）
+	var sent: Array = [[], []]
+	var room: MatchRoom = MatchRoom.new()
+	room.start(_team("a", 5), _team("b", 5), SEED,
+		func(p: int, msg: Dictionary) -> void: (sent[p] as Array).append(msg))
+	room.battle.energy = [99, 99]
+	room.handle(0, NetProtocol.msg_submit_turn(0, A.CHARGE, -1, []))
+	room.handle(1, NetProtocol.msg_submit_turn(0, A.CHARGE, -1, []))
+	var before: int = (sent[1] as Array).size()
+	# Act
+	room.handle(1, NetProtocol.msg_hello(["h01", "h05", "h06"]))
+	# Assert：snapshot（you=1·逐位可恢复）+ 补发 turn_begin（重连即回选招·阵容字段被忽略）
+	var msgs: Array = (sent[1] as Array).slice(before)
+	assert_eq(String((msgs[0] as Dictionary)["kind"]), "snapshot")
+	assert_eq(int((msgs[0] as Dictionary)["you"]), 1)
+	var b2 := BattleCore.new()
+	assert_true(b2.from_snapshot((msgs[0] as Dictionary)["snap"]))
+	assert_eq_deep(b2.to_snapshot(), room.battle.to_snapshot())
+	assert_eq(String((msgs[1] as Dictionary)["kind"]), "turn_begin", "SELECT 相位应补发 turn_begin")
+
+
 func test_match_room_rate_limit_drops_flood_then_recovers() -> void:
 	# Arrange
 	var fake := {t = 0}
@@ -242,10 +268,13 @@ func test_match_room_rate_limit_drops_flood_then_recovers() -> void:
 	# Act：同一毫秒灌 100 个 resync
 	for _i in 100:
 		room.handle(0, NetProtocol.msg_resync())
-	var replies: int = (sent[0] as Array).size() - before
-	# Assert：突发桶 30 → 只放行约 30 个 + 1 条 rate_limited·其余静默丢
-	assert_lt(replies, 40, "洪水应被限流·实际回复 %d" % replies)
-	assert_gt(replies, 25, "正常突发不应被误杀·实际回复 %d" % replies)
+	# Assert：突发桶 30 → 只放行约 30 个（每个回 snapshot+turn_begin 两条）·其余静默丢
+	var snaps := 0
+	for i in range(before, (sent[0] as Array).size()):
+		if String(((sent[0] as Array)[i] as Dictionary).get("kind", "")) == "snapshot":
+			snaps += 1
+	assert_lt(snaps, 40, "洪水应被限流·实际放行 %d" % snaps)
+	assert_gt(snaps, 25, "正常突发不应被误杀·实际放行 %d" % snaps)
 	# 时间推进回填令牌 → 恢复服务（不误伤后续正常包）
 	fake.t = 5000
 	var b2: int = (sent[0] as Array).size()
