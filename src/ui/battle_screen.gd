@@ -199,7 +199,9 @@ var _world: Control = null    # P2b：立绘+阴影的 dolly 组（运行期归�
 # 环形复用：取下一格前先 kill 该节点在飞 tween（防残留动画把属性写回旧值·同终结演出教训）。
 # 并发超过池容量时回收最旧一个 = 视觉可接受。
 const FX_POOL_SIZE := 4                       # 斩击并发上限
-const FLOAT_POOL_SIZE := 6                    # 飘字并发上限（伤害×2+治疗+被挡 同拍可共存）
+const FLOAT_POOL_SIZE := 12                   # 飘字并发上限（伤害×2+治疗+被挡+A3b 注解×6 同拍可共存）
+const EVENT_TAG_MAX := 3                      # A3b 同拍同侧注解上限（再多=糊屏·溢出时救场金 pr=0 优先保留）
+const TAG_STAGGER := 0.14                     # A3b 同侧多条注解的逐条弹出间隔（秒）
 const MOTE_POOL_SIZE := 8                     # 能量飞粒并发上限（双方同拍攒也够用）
 var _dmg_pool: Array[Label] = []              # 飘字池（伤害/治疗/被挡 共用·_pop_float 单一出口）
 var _dmg_pool_idx: int = 0
@@ -224,6 +226,13 @@ const COL_HEAL := Color(0.62, 0.92, 0.55)         # ③ 治疗绿
 const COL_BLOCK_TEXT := Color(0.78, 0.82, 0.88)   # ② 被挡=银灰（"没打进"的冷反馈）
 const COL_BLOCK_SPARK := Color(0.62, 0.78, 1.0)   # ② 格挡火花=钢蓝（与命中暖白火星区分）
 const COL_SPARK_WARM := Color(1.0, 0.92, 0.62)    # 命中火花默认暖白（原配方）
+# A3b 事件注解飘字配色（伤害数字解释不了的时刻·沿用战斗已有色族不添新色相）
+const COL_TAG_POISON := Color(0.55, 0.88, 0.35)   # 毒爆=酸绿（比治疗绿偏黄·毒感）
+const COL_TAG_AMP := Color(1.0, 0.72, 0.35)       # 印记/易伤=暖橙（"这下更疼"的加伤注解）
+const COL_TAG_ABSORB := Color(0.62, 0.78, 1.0)    # 护盾/替身=钢蓝（与格挡火花同族·"被垫掉"）
+const COL_TAG_SAVE := Color(1.0, 0.86, 0.42)      # 护主/还魂/免疫=救场金（最该被看见的时刻）
+const COL_TAG_BREAK := Color(1.0, 0.45, 0.35)     # 破甲/反击=赤红（坏消息）
+const COL_DMG_BURN := Color(1.0, 0.58, 0.22)      # 延迟伤害到期（妖火/藤蔓）=余烬橙（动作前结算的旧账）
 
 
 # ============================================================
@@ -923,7 +932,12 @@ func _resolve() -> void:
 	var pen_max: Array[int] = [0, 0]        # ⑧ 本拍最高穿透档（damage_taken.pen·Pen 枚举有序 → 取最高档配色）
 	var blocked: Array[bool] = [false, false]     # ② 该方本拍挡下过攻击（player=防守方）
 	var block_big_atk: Array[bool] = [false, false]  # ② 挡下的是不是大波（演出隆重度）
-	var egain: Array[int] = [0, 0]          # ③ 本拍能量获得（半能单位·charge_gain 事件累加）
+	var egain: Array[int] = [0, 0]          # ③ 本拍能量获得（半能单位·charge_gain/repeat_energy/taotie_feast 累加）
+	# A3b 事件注解飘字：伤害数字解释不了的时刻逐条标出（每项={text,col,可选 size/y/outline/pr}）。
+	#   tags=命中拍弹出；pre_tags=出招拍弹出（力竭/定身/到期延迟伤害——都发生在动作揭示时刻）。
+	#   替补席事件（牧羊/饕餮回血、替补位延迟伤害）不在角色身位飘字——replay 到 HUD 替补行=后续候选。
+	var tags: Array = [[], []]
+	var pre_tags: Array = [[], []]
 	for ev in r.get("events", []):
 		var p: int = int(ev.get("player", 0))
 		match ev.get("id", ""):
@@ -937,8 +951,37 @@ func _resolve() -> void:
 				blocked[p] = true
 				if int(ev.get("kind", -1)) == A.BIG_ATTACK:
 					block_big_atk[p] = true
-			"charge_gain":
+			"charge_gain", "repeat_energy", "taotie_feast":
 				egain[p] += int(ev.get("amount", 0))
+			"poison_detonate":
+				tags[p].append({text = "毒爆", col = COL_TAG_POISON})
+			"marked_hit":
+				tags[p].append({text = "印记", col = COL_TAG_AMP})
+			"vuln_hit":
+				tags[p].append({text = "易伤", col = COL_TAG_AMP})
+			"shield_absorb":
+				tags[p].append({text = "护盾-%s" % _fmt_hp(float(ev.get("amount", 0)) / 2.0), col = COL_TAG_ABSORB})
+			"decoy_absorb":
+				tags[p].append({text = "替身-%s" % _fmt_hp(float(ev.get("amount", 0)) / 2.0), col = COL_TAG_ABSORB})
+			"damage_immune":
+				tags[p].append({text = "免疫", col = COL_TAG_SAVE, pr = 0})
+			"armor_broken":
+				tags[p].append({text = "破甲", col = COL_TAG_BREAK})
+			"lethal_rescue":
+				tags[p].append({text = "护主", col = COL_TAG_SAVE, pr = 0})
+			"huzhu_counter":
+				tags[1 - p].append({text = "反击", col = COL_TAG_BREAK})   # 反击伤害落在攻击方身上→标注也放那侧
+			"huanhun_revive":
+				tags[p].append({text = "还魂", col = COL_TAG_SAVE, pr = 0})
+			"exhausted":
+				pre_tags[p].append({text = "力竭", col = COL_BLOCK_TEXT})
+			"switch_locked":
+				pre_tags[p].append({text = "定身", col = COL_BLOCK_TEXT})
+			"deferred_damage":
+				# 唯一不走 damage_taken 的掉血（引擎直写 HP）——不标就是"血凭空少了"。
+				if int(ev.get("slot", -1)) == active_before[p]:
+					pre_tags[p].append({text = "-%s" % _fmt_hp(float(ev.get("amount", 0)) / 2.0),
+						col = COL_DMG_BURN, size = 44, y = 0.30, outline = Color(0.22, 0.08, 0.02, 0.95)})
 	# ③ 治疗量：同槽位显示 HP 前后差（阵亡/换槽不算）
 	var healed: Array[float] = [0.0, 0.0]
 	for p in 2:
@@ -950,7 +993,8 @@ func _resolve() -> void:
 	# 头顶招式圆圈（揭示双方盲选出招）→ 消失 → 再播打斗动画
 	await _show_action_indicators(r.get("p1_action", -1), r.get("p2_action", -1))
 	await _play_battle_anims(r.get("p1_action", -1), r.get("p2_action", -1), dmg, dead,
-		{pen = pen_max, blocked = blocked, block_big = block_big_atk, egain = egain, healed = healed})
+		{pen = pen_max, blocked = blocked, block_big = block_big_atk, egain = egain, healed = healed,
+			tags = tags, pre_tags = pre_tags})
 	_update_all()
 
 	if r.get("game_over", false):
@@ -1920,7 +1964,7 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 	var fin_kill_p2 := bool(dead[1]) and p1_off
 	var fin_kill_p1 := bool(dead[0]) and p2_off
 	if fin_kill_p1 or fin_kill_p2:
-		await _play_finisher(dmg, fin_kill_p2, fin_kill_p1)
+		await _play_finisher(dmg, fin_kill_p2, fin_kill_p1, fx)
 		return
 	var fdir := 0.0
 	if p1_off != p2_off:
@@ -1928,6 +1972,10 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 	stage.set_focus(p1_off or p2_off, fdir)
 	_act_juice(0, a0)
 	_act_juice(1, a1)
+	# A3b 出招拍注解：力竭/定身（解释"预期动作为何没发生"）+ 到期延迟伤害（结算在动作前·此刻掉的血）。
+	var pre_tags: Array = fx.get("pre_tags", [[], []])
+	for p in 2:
+		_pop_tags(p, pre_tags[p], 0.0)
 	# ③ 能量获得反馈：金币粒子从角色飞向 HUD 金币行（到位时金币行金色脉冲）。
 	var egain: Array = fx.get("egain", [0, 0])
 	for p in 2:
@@ -1962,6 +2010,10 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 	for p in 2:
 		if float(healed[p]) > 0.0:
 			_pop_heal(p, float(healed[p]))
+	# A3b 命中拍注解：毒爆/印记/易伤/护盾/替身/免疫/破甲/护主/反击/还魂——腹位小字逐条弹出。
+	var tags: Array = fx.get("tags", [[], []])
+	for p in 2:
+		_pop_tags(p, tags[p])
 	# ⑤ 方向性后坐：单侧受击=镜头朝受击方踢一脚（P0 左=-1/P1 右=+1）；双方同拍受击=对撞抵消不偏向。
 	var hit0 := int(dmg[0]) > 0 or bool(dead[0])
 	var hit1 := int(dmg[1]) > 0 or bool(dead[1])
@@ -1998,7 +2050,7 @@ func _big_attack_punch() -> void:
 ## 双死=居中对撞构图。后置条件与普通路径一致（阵亡变灰·镜头回正·time_scale=1）→ 换人流程照旧。
 ## 编排时钟全用 ignore_time_scale 真实时长（慢放期间 await 不被拉长）；视觉 tween 随 time_scale
 ## 自然慢放=演出本体。
-func _play_finisher(dmg: Array, kill_p2: bool, kill_p1: bool) -> void:
+func _play_finisher(dmg: Array, kill_p2: bool, kill_p1: bool, fx: Dictionary = {}) -> void:
 	var killer := 0 if kill_p2 else 1
 	var both := kill_p2 and kill_p1
 	var fdir := 0.0 if both else (1.0 if killer == 0 else -1.0)
@@ -2038,6 +2090,10 @@ func _play_finisher(dmg: Array, kill_p2: bool, kill_p1: bool) -> void:
 		_finisher_impact(0, int(dmg[0]))
 	# ⑤ 方向性后坐：朝倒下一方踢（双杀=对撞不偏向）
 	stage.shake(SHAKE_BIG * 1.3, (1.0 if kill_p2 else 0.0) - (1.0 if kill_p1 else 0.0))
+	# A3b：终结拍也补事件注解（毒爆致死的"为什么死了"就在这拍）——tween 随慢放自然慢速展开。
+	var ftags: Array = fx.get("tags", [[], []])
+	for p in 2:
+		_pop_tags(p, ftags[p], 0.12)
 	# 冲击帧（终结命中拍专属）：硬切三段（正片→负片→恢复·真实计时不受慢放拖拽）·炸开中心=受击者
 	var bw_center := Vector2(0.5, 0.58)   # 双杀=对撞中点
 	if not (kill_p1 and kill_p2):
@@ -2066,6 +2122,11 @@ func _play_finisher(dmg: Array, kill_p2: bool, kill_p1: bool) -> void:
 		tw.tween_property(cd, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_SINE)
 		tw.tween_property(cd, "position", _cd_home[p], 0.22).set_trans(Tween.TRANS_SINE)
 	stage.set_focus(false)
+	# A3b：终结分支早退不经过普通拍的能量粒起飞——恢复后补飞（饕餮吞魂等"死亡产能"正是这一拍）。
+	var eg: Array = fx.get("egain", [0, 0])
+	for p in 2:
+		if int(eg[p]) > 0:
+			_fly_energy_motes(p, int(eg[p]))
 	await get_tree().create_timer(0.3, true, false, true).timeout
 
 
@@ -2353,6 +2414,37 @@ func _block_fx(player: int, big_atk: bool) -> void:
 		1.1, 62.0, 0.38)
 	if big_atk:
 		_hitstop(0.04)   # 挡下大波值得一拍定格（比命中定格 0.075 轻）
+
+
+## A3b 事件注解批量弹出：同侧多条按 TAG_STAGGER 逐条错时，上限 EVENT_TAG_MAX 条防糊屏；
+## 溢出裁剪时救场级注解（pr=0·护主/还魂/免疫）优先保留，其余按事件发生顺序。
+## 延时用 tween（绑本节点·离场自动清）而非 SceneTreeTimer——防战斗屏销毁后回调打到空引用。
+func _pop_tags(player: int, tag_list: Array, base_delay: float = 0.08) -> void:
+	var list: Array = tag_list
+	if list.size() > EVENT_TAG_MAX:
+		list = []
+		for t in tag_list:
+			if int(t.get("pr", 1)) == 0:
+				list.append(t)
+		for t in tag_list:
+			if int(t.get("pr", 1)) != 0:
+				list.append(t)
+	for i in mini(list.size(), EVENT_TAG_MAX):
+		var t: Dictionary = list[i]
+		var d := base_delay + TAG_STAGGER * i
+		if d <= 0.0:
+			_pop_tag(player, t)
+		else:
+			var tw := create_tween()
+			tw.tween_interval(d)
+			tw.tween_callback(_pop_tag.bind(player, t))
+
+
+## A3b 单条事件注解：默认腹位（y_frac 0.52·避开胸口伤害字）小一号字；
+## 延迟伤害借道此出口弹 -N 大字（size/y/outline 均可被条目覆盖）。
+func _pop_tag(player: int, t: Dictionary) -> void:
+	_pop_float(player, String(t.get("text", "")), int(t.get("size", 30)), t.get("col", Color.WHITE),
+		t.get("outline", Color(0.09, 0.07, 0.05, 0.95)), 5, 1.08, 58.0, float(t.get("y", 0.52)))
 
 
 ## 通用飘字（伤害/治疗/被挡 单一出口·池化）：punch-in 过冲 → 抛物上浮淡出 → 隐藏归池。
