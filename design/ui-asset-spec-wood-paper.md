@@ -41,9 +41,9 @@ hand-painted storybook game UI asset, oriental fantasy, warm cream xuan
 paper with deckled torn edges and subtle layered sheets, dark lacquered
 wood frame, tiny gold leaf accent, muted elegant palette (cream #E0D1AD,
 dark wood #2E1D12, gold #D4A94E), flat front view, clean silhouette,
-plain background, no text, no gems, minimal ornament --style raw
+plain background, no text, no gems, minimal ornament --raw --v 8.1 --hd
 ```
-（MJ 无法直接出透明底：出图选 plain background 后抠底；`--style raw` 防过度装饰。）
+（MJ 无法直接出透明底：出图选 plain background 后抠底；raw 模式防过度装饰——V8 写法 `--raw`、V7 旧写 `--style raw`，实操以生效者为准。**版本纪律与参数速查见 `design/midjourney-reference.md`**：当前默认=V8.1（2026-06-10 起），`--hd` 直出 ≈2K 免 upscale，概念稿海选可先 `--draft` 24 连抽省额度。）
 
 ---
 
@@ -72,6 +72,41 @@ plain background, no text, no gems, minimal ornament --style raw
 - **尺寸**：出图 1520×544 → 交付 380×136。
 - **构图**：横向"木匣托纸"：左端木质匣框内嵌头像窗（≈96×96 圆角方窗·引擎放头像）、右侧大片宣纸区（引擎上技能文字）；纸右缘毛边+叠页；匣底木沿贯穿全宽（厚度感来源）。
 - **替换关系**：现暖金羊皮纸样式退役；结构（头像+名+描述）不变=零改版式代码，只换底图。
+- **⛔ MJ prompt v1 作废（2026-07-12 实测·教训）**：整卡单图生成＋实物木工词（cabinet/sill/thickness）→ 出来是"3D 实物"不是 2D UI，且木/纸接缝格格不入。
+- **v2 拆件实测结论（2026-07-12）**：**件1 纯纸 ✅ 成立**（flat scan 措辞管用·纸配方保留=A1/A2/A7 原料）；**⛔ 件2 纯木板条失败**——MJ 无法理解孤立木条（不构成"成立的画面"）。件3 未跑。
+- **MJ v3 = 件1纸＋件2木沿合并生成（2026-07-12·Eddy 定向·⛔不含头像窗框）**：木依托纸的语境出图（孤木条 MJ 不理解），保留件1 的 flat 2D 措辞纪律；**⛔ 件3 头像窗框元素不进 MJ**——后期由合成图木区切条拼，或引擎画。**合成图当"原料采集田"**——纸区/木区各自切出重拼，坐标与接缝不依赖 MJ。prompt 见下【v3 合并版】；件1 纯纸 prompt 保留备用：
+
+  **件1·宣纸底（✅已验证·全系列纸配方=A1/A2/A7 原料）**
+  ```
+  flat 2D game UI texture, hand-painted storybook style: a single sheet of
+  thick warm cream xuan rice paper seen perfectly straight-on, flat scan look,
+  deckled torn edges all around, a second paper layer peeking out under the
+  right edge, subtle low-contrast fiber texture, cream #E0D1AD shading to
+  #C4B28A along the edges, soft even lighting, completely flat, no perspective,
+  no depth, centered on a plain flat mid-gray background
+  --no 3d render, photograph, photorealistic, perspective, bevel, drop shadow, table, desk, wood, objects, hands, text, writing
+  --ar 14:5 --raw --v 8.1
+  ```
+
+  **【v3 合并版】纸＋木沿·同图（现役·原料采集田·无头像窗）**
+  ```
+  flat 2D game UI texture, hand-painted storybook style, seen perfectly
+  straight-on with a flat scan look: a wide horizontal card design, a large
+  sheet of thick warm cream xuan rice paper layered over a dark lacquered
+  wood plank; the wood shows as a slim trim running along the entire bottom
+  edge and peeking out slightly at both ends; the paper's right edge is
+  deckled and torn with a second paper layer peeking beneath; subtle
+  low-contrast paper fiber texture; faint painted wood grain, deep brown-black
+  lacquer #2E1D12 with a warm highlight ridge line #5C3F26 along the wood's
+  upper edge; paper cream #E0D1AD shading to #C4B28A at the edges; soft even
+  lighting, completely flat, no perspective, no depth, centered on a plain
+  flat mid-gray background
+  --no 3d render, photograph, photorealistic, perspective, bevel, drop shadow, table, desk, gems, metal, nails, text, writing
+  --ar 14:5 --raw --v 8.1
+  ```
+  可选增稳：把已中意的件1 纸图挂 `--sref`，锁住纸面画风再合并生成。
+
+  **压 3D 的措辞纪律（全系列适用）**：正文必带 `flat 2D game UI texture / flat scan look / completely flat, no perspective`；`--no 3d render, photograph, perspective, bevel, drop shadow` 常驻；⛔ 禁用实物木工词（cabinet/box/sill/thickness——"厚"改用毛边+叠页表达）。仍跑偏 → 挂一张平铺纸纹扫描图做 `--sref`。
 
 ### A5 木框条（底部按钮收纳托·九宫格）
 - **挂点**：底部六颗动作按钮身后的横托（按钮区 y870-1045·托约 560-1360 x 870-1050·先做 840×190）。
