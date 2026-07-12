@@ -5,17 +5,19 @@ extends RefCounted
 ## 服务器绝不信任客户端——本文件的 validate_c2s 是服务端第一道门（业务合法性在 match_room 二道门）。
 ##
 ## C2S（客户端→服务器）kind：
-##   submit_turn  {v, kind, turn, action:int, target:int, item_slots:Array[int]}
+##   submit_turn  {v, kind, turn, action:int, target:int, item_slots:Array[int], double:bool}
 ##   econ_draft   {v, kind, turn, slot}            → 服务器回 draft_offer（仅发本人）
 ##   econ_upgrade {v, kind, turn, slot}            → 服务器回 draft_offer(upgrade)（仅发本人）
+##   econ_refill  {v, kind, turn, slot}            → 付能补充（start_refill）→ draft_offer（仅发本人）
 ##   econ_pick    {v, kind, turn, slot, choice, upgrade:bool}
 ##   death_switch {v, kind, turn, slot}
 ##   resync       {v, kind}                        → 服务器回 snapshot（断线重连）
 ## S2C（服务器→客户端）kind：
-##   match_start / turn_begin / draft_offer / resolve / game_over / snapshot / error
+##   match_start / turn_begin / draft_offer / resolve / view / game_over / snapshot / error
+##   （match_start/turn_begin/resolve/view 均带 snap=权威全量快照 → 客户端镜像同步·M1）
 
 const PROTO_VERSION := 1
-const C2S_KINDS: Array[String] = ["submit_turn", "econ_draft", "econ_upgrade", "econ_pick", "death_switch", "resync"]
+const C2S_KINDS: Array[String] = ["submit_turn", "econ_draft", "econ_upgrade", "econ_refill", "econ_pick", "death_switch", "resync"]
 
 const MAX_ITEM_SLOTS := 3      # 与 BattleCore.SLOT_COUNT 一致（入包范围校验用·防超长数组）
 const MAX_ACTION := 16         # 动作枚举安全上限（真合法性由 match_room 按 legal_actions 判）
@@ -48,7 +50,9 @@ static func validate_c2s(msg: Variant) -> String:
 			for s in slots:
 				if not _is_int(s) or int(s) < 0 or int(s) > MAX_ITEM_SLOTS - 1:
 					return "bad_item_slots"
-		"econ_draft", "econ_upgrade":
+			if not (d.get("double", false) is bool):
+				return "bad_double_flag"
+		"econ_draft", "econ_upgrade", "econ_refill":
 			if not _slot_ok(d):
 				return "bad_slot"
 		"econ_pick":
@@ -75,12 +79,17 @@ static func _is_int(v: Variant) -> bool:
 
 # —— C2S 构造（客户端用·保证自家包永远过校验）——
 
-static func msg_submit_turn(turn: int, action: int, target: int, item_slots: Array) -> Dictionary:
-	return {v = PROTO_VERSION, kind = "submit_turn", turn = turn, action = action, target = target, item_slots = item_slots.duplicate()}
+static func msg_submit_turn(turn: int, action: int, target: int, item_slots: Array, double: bool = false) -> Dictionary:
+	return {v = PROTO_VERSION, kind = "submit_turn", turn = turn, action = action, target = target,
+		item_slots = item_slots.duplicate(), double = double}
 
 
 static func msg_econ_draft(turn: int, slot: int, upgrade: bool) -> Dictionary:
 	return {v = PROTO_VERSION, kind = ("econ_upgrade" if upgrade else "econ_draft"), turn = turn, slot = slot}
+
+
+static func msg_econ_refill(turn: int, slot: int) -> Dictionary:
+	return {v = PROTO_VERSION, kind = "econ_refill", turn = turn, slot = slot}
 
 
 static func msg_econ_pick(turn: int, slot: int, choice: int, upgrade: bool) -> Dictionary:

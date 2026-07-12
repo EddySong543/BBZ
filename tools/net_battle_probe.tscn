@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://tools/net_battle_probe_root.gd" id="1_probe"]
+
+[node name="NetBattleProbe" type="Node"]
+script = ExtResource("1_probe")

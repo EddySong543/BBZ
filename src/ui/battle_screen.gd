@@ -152,6 +152,11 @@ var _pve_ending := false                      # 防重复回程结算
 var _story := false                           # 本局=故事关卡（BattleSetup.story_mode·须在 reset() 前读）
 var _story_level_id := ""                     # 关卡 id（回程写 story_result 定位）
 var _story_ending := false                    # 防重复回程结算
+var _net := false                             # 本局=联机局（BattleSetup.net_session 非空·M1）
+var _net_last_turn := 0                       # 已进入选招的回合号（检测服务器 turn_begin）
+var _net_busy := false                        # 联机结算演出进行中（pump 串行防重入）
+var _net_snap_rev := 0                        # 已上镜的快照版本号（client.snap_rev 对账）
+const MatchClientScript := preload("res://src/net/match_client.gd")   # 视角翻转静态工具（M1）
 
 # ---- 选择 / 样式 ----
 var action_btn_list: Array[Button] = []
@@ -251,21 +256,28 @@ func _ready() -> void:
 	_pve = BattleSetup.pve_mode        # 远征 PvE（任务 D）·同样须在 reset() 前读取
 	_story = BattleSetup.story_mode    # 故事关卡（任务 B 壳）·同样须在 reset() 前读取
 	_story_level_id = BattleSetup.story_level_id
+	_net = BattleSetup.net_session != null   # 联机局（M1）·net_session 不被 reset() 清（生命周期独立）
 	var pve_monster: Dictionary = BattleSetup.pve_monster
 	var pve_monster_hp: int = BattleSetup.pve_monster_hp
 	var pve_team: Array = BattleSetup.pve_team.duplicate(true)
 	var pve_equipment: Array = BattleSetup.pve_equipment.duplicate()
 	var p0: Array
 	var p1: Array
-	if _pve:
+	if _net:
+		# 联机局（M1）：本地不建局——镜像=服务器权威快照（阵容/经济/随机流全在内·加入方视角已翻转）
+		BattleSetup.reset()
+		_net_sync_latest()
+		_net_last_turn = battle.turn_number
+	elif _pve:
 		# 远征队伍（1-3 人·存活者在前）与单怪都补足 3 槽白板（板凳 0 血·同加时赛零特判）
 		p0 = _pve_build_team(pve_team)
 		p1 = _pve_build_monster(pve_monster, pve_monster_hp)
 	else:
 		p0 = _resolve_team(BattleSetup.p1_heroes, DEFAULT_P0)
 		p1 = _resolve_team(BattleSetup.p2_heroes, DEFAULT_P1)
-	BattleSetup.reset()   # 消费即清空：防止下一局（未经 BP）复用本局阵容
-	battle.setup(p0, p1, randi())
+	if not _net:
+		BattleSetup.reset()   # 消费即清空：防止下一局（未经 BP）复用本局阵容
+		battle.setup(p0, p1, randi())
 	if _overtime:
 		# 加时赛（Q5·2026-07-03；2026-07-05 修订）：白板满血 1v1——slot0 出战、其余队友 0 血躺板凳
 		# （同归余烬·引擎/UI 全程正常 3 人局零特判）；无道具经济（不 econ_init）、被动能量照常、
@@ -283,8 +295,8 @@ func _ready() -> void:
 		_pve_policy = ExpeditionPolicy.new(pve_monster, randi())
 		_pve_build_ui()
 		p2_char_display.sprite_frames = _pve_monster_frames(pve_monster)   # 任务 I：白板→像素图签占位/MJ art 字段
-	else:
-		battle.econ_init()   # 启用道具经济（开局带 1 + 槽位状态机·M1）
+	elif not _net:
+		battle.econ_init()   # 启用道具经济（开局带 1 + 槽位状态机·M1）——联机局经济在服务器快照里
 
 	_init_buttons()
 	_connect_frame_signals()
@@ -340,6 +352,10 @@ func _exit_tree() -> void:
 	if _think_task >= 0:
 		WorkerThreadPool.wait_for_task_completion(_think_task)   # 任务G：离场前回收预想线程（防悬垂引用）
 		_think_task = -1
+	# 联机（M1）：离开战斗即结束会话（断链+释放·中途退场=断线·重连=M2b）
+	if _net and BattleSetup.net_session != null:
+		BattleSetup.net_session.close()
+		BattleSetup.net_session = null
 
 
 ## 顶部 UI 整组下移 TOP_UI_DROP 像素（避免太贴屏幕顶端）。
@@ -631,6 +647,11 @@ func _on_confirm_pressed() -> void:
 		return
 	game_timer.stop()
 
+	# 联机（M1）：本地不落子——payload 交服务器权威结算·镜像等 resolve 快照上镜
+	if _net:
+		_net_submit_turn()
+		return
+
 	# 玩家提交（未选 → 默认攒）
 	if selected_action == ACTIVE:
 		battle.select_active(PLAYER, _enemy_target_pick)   # 玩家点选的敌方揪目标（-1=未选→引擎随机）
@@ -662,6 +683,173 @@ func _on_confirm_pressed() -> void:
 	_reset_button_styles()
 	_set_confirm_active(false)   # 停止呼吸：已确认提交
 	await _resolve()
+
+
+# ============================================================
+# 联机局（M1·2026-07-12·ADR-004）：镜像 + 协议驱动
+# 本地 battle = 服务器权威快照的只读镜像（唯一写入口 _net_apply_snap）；
+# 加入方（you=1）快照/事件/动作/pending 全部经 MatchClientScript.flip_* 翻转 →
+# UI 恒以「玩家0=自己」渲染，两端各看各的视角。
+# ============================================================
+
+## 每帧网络泵 + 消息状态机（严格串行：结算动画期间不消化新消息）。
+func _net_pump() -> void:
+	var ses: Variant = BattleSetup.net_session
+	if ses == null or battle == null:
+		return
+	ses.pump()
+	if _net_busy or _drafting:
+		return
+	var c: Variant = ses.client
+	if not c.resolves.is_empty():
+		_net_play_resolution(c.resolves.pop_front())   # async·_net_busy 自守
+		return
+	if not c.draft_offer.is_empty() and state == State.PLAYER_SELECT:
+		var offer: Dictionary = c.draft_offer
+		c.draft_offer = {}
+		_net_open_offer(offer)   # async·_drafting 自守
+		return
+	if int(c.snap_rev) != _net_snap_rev:
+		_net_sync_latest()   # 对手抽/补/升级或换人 → 镜像跟进（明牌电报实时可见）
+		if state == State.PLAYER_SELECT:
+			_update_all()
+	if String(c.phase) == "over" and state != State.GAME_OVER:
+		var w: int = int(c.winner)
+		_net_game_over(MatchClientScript.flip_winner(w) if _net_flipped() else w)
+		return
+	if String(c.phase) == "select" and int(c.turn) != _net_last_turn \
+			and state != State.PLAYER_SELECT and state != State.TURN_INTRO:
+		_net_last_turn = int(c.turn)
+		_show_turn_intro()   # 服务器 turn_begin → 正常回合开场（选招流程与本地共用）
+
+
+func _net_flipped() -> bool:
+	return int(BattleSetup.net_session.client.you) == 1
+
+
+## 权威快照上镜（联机镜像唯一写入口）。
+func _net_apply_snap(snap: Dictionary) -> void:
+	battle.from_snapshot(MatchClientScript.flip_snapshot(snap) if _net_flipped() else snap)
+
+
+func _net_sync_latest() -> void:
+	var c: Variant = BattleSetup.net_session.client
+	_net_apply_snap(c.snap)
+	_net_snap_rev = int(c.snap_rev)
+
+
+## 确认提交（联机版）：UI 选择打包成 payload 上行·锁输入等服务器结算。
+func _net_submit_turn() -> void:
+	var action := A.CHARGE
+	var target := -1
+	if selected_action == ACTIVE:
+		action = ACTIVE
+		target = _enemy_target_pick
+		if target < 0:
+			# 需显式目标的主动技未点选：从镜像合法集代选（联机协议要求 target 精确匹配·不留引擎随机）
+			for la in battle.legal_actions(PLAYER):
+				if int(la["action"]) == ACTIVE:
+					target = int(la["target"])
+					break
+	elif selected_action == A.SWITCH and selected_switch >= 0:
+		action = A.SWITCH
+		target = selected_switch
+	elif selected_action >= 0:
+		action = selected_action
+	var dbl: bool = _double_armed and battle.can_double(PLAYER)
+	BattleSetup.net_session.client.submit(action, target, selected_item_slots.duplicate(), dbl)
+	selected_item_slots.clear()
+	selected_action = -1
+	selected_switch = -1
+	selected_btn = null
+	_double_armed = false
+	_reset_button_styles()
+	_set_confirm_active(false)
+	_set_buttons_active(false)
+	state = State.RESOLVING   # 锁输入·resolve 快照到达后播动画
+	status_label.text = "等待对方出招…"
+	status_label.add_theme_color_override("font_color", Color("#c9c2b4"))
+	status_label.visible = true
+
+
+## 联机结算演出：镜像前置基线 → 权威快照上镜 → 与本地共用 _animate_resolution 播事件流。
+func _net_play_resolution(msg: Dictionary) -> void:
+	_net_busy = true
+	state = State.RESOLVING
+	game_timer.stop()
+	_set_buttons_active(false)
+	big_turn_label.visible = false
+	status_label.visible = false
+	var active_before: Array[int] = [battle.active_index[0], battle.active_index[1]]
+	var hp_before: Array[float] = [
+		battle.hp_display(battle.hp[0][active_before[0]]),
+		battle.hp_display(battle.hp[1][active_before[1]])]
+	_net_apply_snap(msg["snap"])
+	var events: Array = msg.get("events", [])
+	var actions: Array = msg.get("actions", [-1, -1])
+	var pending: Array = (msg.get("pending", [false, false]) as Array).duplicate()
+	if _net_flipped():
+		events = MatchClientScript.flip_events(events)
+		actions = [actions[1], actions[0]]
+		pending = [pending[1], pending[0]]
+	await _animate_resolution(
+		{events = events, p1_action = int(actions[0]), p2_action = int(actions[1])},
+		active_before, hp_before)
+	if battle.game_over:
+		_net_game_over(battle.winner)   # 镜像已按本端视角翻转 → winner 直接可读
+		_net_busy = false
+		return
+	if bool(pending[0]):
+		await _net_death_switch()
+	elif bool(pending[1]):
+		status_label.text = "对方选择替补中…"
+		status_label.add_theme_color_override("font_color", Color("#c9c2b4"))
+		status_label.visible = true
+	_net_busy = false   # 新回合由 turn_begin → _net_pump 检测 turn 变化接手
+
+
+## 联机死亡换人：本端选替补 → 上行·服务器执行后 view/turn_begin 快照跟进。
+func _net_death_switch() -> void:
+	state = State.HERO_SELECT
+	_set_buttons_active(false)
+	status_label.visible = false
+	var reserves: Array = []
+	for slot in battle.living_reserves(PLAYER):
+		reserves.append([slot, battle.heroes[PLAYER][slot], battle.hp_display(battle.hp[PLAYER][slot])])
+	_death_switch_overlay.show_selection(PLAYER, reserves)
+	var pick: int = await _death_switch_overlay.selection_made
+	BattleSetup.net_session.client.death_switch(pick)
+	state = State.RESOLVING   # 等服务器广播（对方可能也在换）
+
+
+## 联机 3 选 1（服务器私发的选项 → 复用本地弹窗 → 选择上行）。
+func _net_open_offer(offer: Dictionary) -> void:
+	var options: Array = []
+	for id in offer.get("options", []):
+		options.append(ItemCatalog.make(String(id)))
+	var upgrade: bool = bool(offer.get("upgrade", false))
+	var slot: int = int(offer.get("slot", 0))
+	var c: int = await _show_draft(slot, options, "升级道具（3 选 1）" if upgrade else "抽取道具（3 选 1）")
+	if c >= 0:
+		BattleSetup.net_session.client.pick(slot, c, upgrade)
+	# 服务器回 view+snap → _net_pump 同步镜像并刷新 UI
+
+
+func _net_game_over(w: int) -> void:
+	state = State.GAME_OVER
+	game_timer.stop()
+	_set_buttons_active(false)
+	var msg := "平局"
+	var col := Color("#dddddd")
+	if w == BattleCore.WINNER_P1:
+		msg = "胜利！"
+		col = Color("#5fd86b")
+	elif w != BattleCore.WINNER_DRAW:
+		msg = "失败"
+		col = Color("#e0574b")
+	status_label.text = msg
+	status_label.add_theme_color_override("font_color", col)
+	status_label.visible = true
 
 
 # ============================================================
@@ -857,8 +1045,8 @@ func _items_key() -> String:
 
 ## 拉起/重启后台预想。仅 PvP 选招阶段（PvE 怪物驾驶员回合开始已定招·不经此路径）。
 func _start_ai_think() -> void:
-	if _pve or state != State.PLAYER_SELECT or battle == null or battle.game_over:
-		return
+	if _net or _pve or state != State.PLAYER_SELECT or battle == null or battle.game_over:
+		return   # 联机局无本地 AI（对手=真人·M1）
 	if _think_task >= 0:
 		_think_restart = true   # 正在想：标记重拉（旧结果会因 items_key/turn 校验不符被弃）
 		return
@@ -950,7 +1138,14 @@ func _resolve() -> void:
 		battle.hp_display(battle.hp[1][active_before[1]])]
 
 	var r: Dictionary = battle.resolve()
+	await _animate_resolution(r, active_before, hp_before)
+	await _post_resolution(r)
 
+
+## 结算演出（本地/联机共用·M1 抽取）：一切动画从事件流 + 前置基线派生，零依赖"谁 resolve 的"。
+## r 需含 events / p1_action / p2_action；active_before / hp_before = 结算前出战槽与其显示 HP
+## （本地=resolve 前捕获·联机=镜像上快照前捕获——两者同源=屏幕上正渲染的值）。
+func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Array[float]) -> void:
 	# 动画所需信息全部【从事件流派生】——不再 diff 结算后的引擎完整状态，
 	# 联机（服务器权威·客户端只收 events）下同样可行。A3a（2026-07-02）：死亡判定由血量 diff 改吃 hero_died。
 	#   damage_taken 累加受伤量；hero_died（槽 == 结算前出战槽）= 该方出战英雄阵亡。
@@ -1024,6 +1219,9 @@ func _resolve() -> void:
 			tags = tags, pre_tags = pre_tags})
 	_update_all()
 
+
+## 结算后续（本地流程尾）：终局/加时/AI 换人/玩家换人/下一回合。联机不走此路（服务器驱动相位）。
+func _post_resolution(r: Dictionary) -> void:
 	if r.get("game_over", false):
 		var w: int = r.get("winner", BattleCore.WINNER_UNDECIDED)
 		# 远征 PvE：胜=怪死·其余（含同拍双死）=全灭 → 回地图结算·不走加时赛。
@@ -1710,6 +1908,24 @@ func _enlarge_frames() -> void:
 func _on_p1_slot_clicked(s: int) -> void:
 	if state != State.PLAYER_SELECT or _drafting:
 		return
+	# 联机（M1）：抽/补=向服务器请求（选项服务器生成·draft_offer 回来经 _net_open_offer 弹窗）；
+	# 使用点选=纯本地暂存（提交时随 payload 上行），与本地同款 toggle。
+	if _net:
+		match battle.slot_state(PLAYER, s):
+			BattleCore.SlotState.OPENED:
+				if battle.can_draw_slot(PLAYER, s):
+					BattleSetup.net_session.client.request_draft(s, false)
+			BattleCore.SlotState.CHARGING:
+				if battle.slot_ready(PLAYER, s):
+					if selected_item_slots.has(s):
+						selected_item_slots.erase(s)
+					else:
+						selected_item_slots.append(s)
+					_update_all()
+			BattleCore.SlotState.EMPTY:
+				if battle.can_refill(PLAYER, s):
+					BattleSetup.net_session.client.request_refill(s)
+		return
 	match battle.slot_state(PLAYER, s):
 		BattleCore.SlotState.OPENED:
 			if battle.can_draw_slot(PLAYER, s):
@@ -1738,6 +1954,10 @@ func _on_p1_slot_clicked(s: int) -> void:
 ## C：升级就绪槽内道具（花能量 → 下一级池 3 选 1 → 换件并重新锁 1 回合·公开电报）。
 func _on_p1_slot_upgrade(s: int) -> void:
 	if state != State.PLAYER_SELECT or _drafting:
+		return
+	if _net:
+		if battle.can_upgrade(PLAYER, s):
+			BattleSetup.net_session.client.request_draft(s, true)
 		return
 	if battle.can_upgrade(PLAYER, s):
 		var c: int = await _show_draft(s, battle.begin_upgrade_draft(PLAYER, s), "升级道具（3 选 1）")
@@ -2559,6 +2779,9 @@ func _fly_energy_motes(player: int, egain_half: int) -> void:
 
 
 func _process(_delta: float) -> void:
+	# 联机（M1）：每帧泵网络——收包喂房间（房主）/消化服务器消息（双方）·状态机见 _net_pump。
+	if _net:
+		_net_pump()
 	# 受击震屏已移交舞台分层 stage.shake()（见 battle_stage.gd 按 parallax_factor 分摊衰减）——
 	# 根节点不再整体抖，故 UI 始终不动；震感与纵深由舞台层负责。
 	# 阴影对角色动作反应：水平位移跟随 + 离地缩小淡出 + 冲刺拉长（接地/重量感）。

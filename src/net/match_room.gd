@@ -37,7 +37,8 @@ func start(team0: Array, team1: Array, seed_v: int, send_cb: Callable) -> void:
 	_pending = [null, null]
 	for p in 2:
 		_send.call(p, {v = NetProtocol.PROTO_VERSION, kind = "match_start", you = p,
-			heroes = [_pack_team(0), _pack_team(1)], turn = battle.turn_number, view = _view()})
+			heroes = [_pack_team(0), _pack_team(1)], turn = battle.turn_number, view = _view(),
+			snap = battle.to_snapshot()})
 
 
 ## 传输层入口：一切客户端包从这进。协议校验（一道门）→ 回合号校验 → 业务校验（二道门）。
@@ -65,6 +66,8 @@ func handle(player: int, msg: Variant) -> void:
 			_on_econ_draft(player, int(d["slot"]), false)
 		"econ_upgrade":
 			_on_econ_draft(player, int(d["slot"]), true)
+		"econ_refill":
+			_on_econ_refill(player, int(d["slot"]))
 		"econ_pick":
 			_on_econ_pick(player, d)
 		"death_switch":
@@ -102,7 +105,14 @@ func _apply_payload(core: BattleCore, player: int, d: Dictionary) -> bool:
 			break
 	if not legal:
 		return false
-	return core.apply_choice(player, {action = want_action, target = want_target})
+	if not core.apply_choice(player, {action = want_action, target = want_target}):
+		return false
+	# 疾风附加动作（h16）：付第二份能·can_double 把门
+	if bool(d.get("double", false)):
+		if not core.can_double(player):
+			return false
+		core.select_double(player, true)
+	return true
 
 
 func _commit_and_resolve() -> void:
@@ -117,7 +127,8 @@ func _commit_and_resolve() -> void:
 	for p in 2:
 		_send.call(p, {v = NetProtocol.PROTO_VERSION, kind = "resolve",
 			actions = [r.get("p1_action", -1), r.get("p2_action", -1)],
-			events = r.get("events", []), pending = pending, view = _view()})
+			events = r.get("events", []), pending = pending, view = _view(),
+			snap = battle.to_snapshot()})
 	if phase == Phase.OVER:
 		for p in 2:
 			_send.call(p, NetProtocol.msg_game_over(battle.winner))
@@ -130,7 +141,28 @@ func _begin_turn() -> void:
 	_pending = [null, null]
 	for p in 2:
 		_send.call(p, {v = NetProtocol.PROTO_VERSION, kind = "turn_begin",
-			turn = battle.turn_number, view = _view()})
+			turn = battle.turn_number, view = _view(), snap = battle.to_snapshot()})
+
+
+## 付能补充空槽（start_refill 内部扣能+置 OPENED+缓存 3 选 1）→ 选项私发本人 + 双方视图刷新（扣能公开）。
+func _on_econ_refill(player: int, slot: int) -> void:
+	if phase != Phase.SELECT:
+		_send.call(player, NetProtocol.msg_error("bad_phase"))
+		return
+	if not battle.can_refill(player, slot):
+		_send.call(player, NetProtocol.msg_error("draft_unavailable"))
+		return
+	var options: Array = battle.start_refill(player, slot)
+	if options.is_empty():
+		_send.call(player, NetProtocol.msg_error("draft_unavailable"))
+		return
+	var ids: Array = []
+	for it in options:
+		ids.append((it as ItemData).item_id)
+	_send.call(player, {v = NetProtocol.PROTO_VERSION, kind = "draft_offer",
+		slot = slot, upgrade = false, options = ids})
+	for p in 2:
+		_send.call(p, _msg_view())
 
 
 func _on_econ_draft(player: int, slot: int, upgrade: bool) -> void:
@@ -166,7 +198,7 @@ func _on_econ_pick(player: int, d: Dictionary) -> void:
 		_send.call(player, NetProtocol.msg_error("pick_rejected"))
 		return
 	for p in 2:   # 槽位内容/能量变化=公开信息（明牌博弈）→ 双方刷新视图
-		_send.call(p, {v = NetProtocol.PROTO_VERSION, kind = "view", view = _view()})
+		_send.call(p, _msg_view())
 
 
 func _on_death_switch(player: int, slot: int) -> void:
@@ -177,9 +209,13 @@ func _on_death_switch(player: int, slot: int) -> void:
 		_send.call(player, NetProtocol.msg_error("illegal_switch"))
 		return
 	for p in 2:
-		_send.call(p, {v = NetProtocol.PROTO_VERSION, kind = "view", view = _view()})
+		_send.call(p, _msg_view())
 	if not battle.pending_death_switch[0] and not battle.pending_death_switch[1]:
 		_begin_turn()
+
+
+func _msg_view() -> Dictionary:
+	return {v = NetProtocol.PROTO_VERSION, kind = "view", view = _view(), snap = battle.to_snapshot()}
 
 
 ## 公开视图（MVP=全量公开·本作明牌博弈）。信息扭曲道具（幻影/迷雾）的按视角过滤=ADR-004 M3。

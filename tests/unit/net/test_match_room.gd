@@ -162,6 +162,34 @@ func test_match_room_resync_snapshot_resumable() -> void:
 	assert_eq_deep(b2.to_snapshot(), room.battle.to_snapshot())
 
 
+func test_match_client_snapshot_flip_roundtrip() -> void:
+	# Arrange：非对称中盘快照（能量/阵容/血上限两侧不同）
+	var sent: Array = [[], []]
+	var room: MatchRoom = MatchRoom.new()
+	room.start(_team("a", 5), _team("b", 3), SEED,
+		func(p: int, msg: Dictionary) -> void: (sent[p] as Array).append(msg))
+	room.battle.energy = [9, 3]
+	var snap: Dictionary = room.battle.to_snapshot()
+	# Act
+	var flipped: Dictionary = MatchClient.flip_snapshot(snap)
+	# Assert：双翻恒等·翻转后可恢复且视角互换（加入方镜像契约）
+	assert_eq_deep(MatchClient.flip_snapshot(flipped), snap)
+	var b := BattleCore.new()
+	assert_true(b.from_snapshot(flipped))
+	assert_eq(b.energy[0], 3, "翻转后玩家0=原玩家1")
+	assert_eq(b.energy[1], 9)
+	assert_eq((b.heroes[0][0] as HeroData).hero_id, "b1", "翻转后己方阵容=原对方阵容")
+	# winner 常量互换
+	var w := snap.duplicate(true)
+	w["winner"] = BattleCore.WINNER_P1
+	assert_eq(int(MatchClient.flip_snapshot(w)["winner"]), BattleCore.WINNER_P2)
+	# 事件翻转：player 0↔1·victory winner 互换
+	var evs: Array = [{id = "damage_taken", player = 0, amount = 2}, {id = "victory", winner = BattleCore.WINNER_P1}]
+	var fev: Array = MatchClient.flip_events(evs)
+	assert_eq(int(fev[0]["player"]), 1)
+	assert_eq(int(fev[1]["winner"]), BattleCore.WINNER_P2)
+
+
 func _last_error(msgs: Array) -> String:
 	for i in range(msgs.size() - 1, -1, -1):
 		if String((msgs[i] as Dictionary).get("kind", "")) == "error":

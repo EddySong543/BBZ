@@ -19,6 +19,9 @@ var view: Dictionary = {}            # 服务器最新公开视图（UI 只读�
 var heroes: Array = []               # 双方阵容 [{id,name,max_hp}...]×2（match_start 快照）
 var draft_offer: Dictionary = {}     # 本端最近 3 选 1 {slot, upgrade, options:[item_id]}
 var events_log: Array = []           # 每拍事件批（UI 演出按序消费·消费掉可 pop）
+var resolves: Array = []             # 结算消息队列（M1·battle_screen 逐条弹出播动画·含 snap）
+var snap: Dictionary = {}            # 服务器最新权威快照（镜像同步源·match_start/turn_begin/resolve/view 均更新）
+var snap_rev: int = 0                # 快照版本号（UI 检测"有新快照要上镜"）
 var winner: int = -99
 var errors: Array[String] = []       # 服务器拒绝记录（UI 提示/调试）
 var snapshot: Dictionary = {}        # resync 收到的重连快照
@@ -41,10 +44,12 @@ func _on_msg(d: Dictionary) -> void:
 			turn = int(d["turn"])
 			heroes = d.get("heroes", [])
 			view = d["view"]
+			_take_snap(d)
 			phase = "select"
 		"turn_begin":
 			turn = int(d["turn"])
 			view = d["view"]
+			_take_snap(d)
 			phase = "select"
 			draft_offer = {}
 		"draft_offer":
@@ -53,6 +58,8 @@ func _on_msg(d: Dictionary) -> void:
 			view = d["view"]
 			turn = int(view.get("turn", turn))
 			events_log.append(d.get("events", []))
+			resolves.append(d)
+			_take_snap(d)
 			var pending: Array = d.get("pending", [false, false])
 			if you >= 0 and bool(pending[you]):
 				phase = "death_switch"
@@ -60,6 +67,7 @@ func _on_msg(d: Dictionary) -> void:
 				phase = "waiting"   # 对手在选替补
 		"view":
 			view = d["view"]
+			_take_snap(d)
 		"game_over":
 			phase = "over"
 			winner = int(d["winner"])
@@ -69,14 +77,24 @@ func _on_msg(d: Dictionary) -> void:
 			errors.append(String(d.get("code", "")))
 
 
+func _take_snap(d: Dictionary) -> void:
+	if d.has("snap"):
+		snap = d["snap"]
+		snap_rev += 1
+
+
 # —— 玩家操作面（全部按当前 turn 打包·服务器二道门校验）——
 
-func submit(action: int, target: int = -1, item_slots: Array = []) -> void:
-	transport.send(NetProtocol.msg_submit_turn(turn, action, target, item_slots))
+func submit(action: int, target: int = -1, item_slots: Array = [], double: bool = false) -> void:
+	transport.send(NetProtocol.msg_submit_turn(turn, action, target, item_slots, double))
 
 
 func request_draft(slot: int, upgrade: bool = false) -> void:
 	transport.send(NetProtocol.msg_econ_draft(turn, slot, upgrade))
+
+
+func request_refill(slot: int) -> void:
+	transport.send(NetProtocol.msg_econ_refill(turn, slot))
 
 
 func pick(slot: int, choice: int, upgrade: bool = false) -> void:
@@ -89,6 +107,45 @@ func death_switch(slot: int) -> void:
 
 func request_resync() -> void:
 	transport.send(NetProtocol.msg_resync())
+
+
+# —— 视角翻转（M1·加入方=服务器眼中的玩家 1·战斗屏恒以"玩家 0=自己"渲染）——
+# 快照顶层每个 per-player 字段都是长度 2 的数组 → 通用交换即完成 0↔1 翻转；
+# winner 常量 P1↔P2 互换；双翻=恒等（test_match_room 锁定）。
+
+## 翻转快照视角（深拷·不动入参）。仅加入方（you==1）需要。
+static func flip_snapshot(d: Dictionary) -> Dictionary:
+	var out: Dictionary = d.duplicate(true)
+	for k in out:
+		var v: Variant = out[k]
+		if v is Array and (v as Array).size() == 2:
+			var a: Array = v
+			var tmp: Variant = a[0]
+			a[0] = a[1]
+			a[1] = tmp
+	out["winner"] = flip_winner(int(out.get("winner", BattleCore.WINNER_UNDECIDED)))
+	return out
+
+
+## 翻转事件批视角（player 字段 0↔1·victory 事件 winner 互换）。深拷。
+static func flip_events(events: Array) -> Array:
+	var out: Array = []
+	for e in events:
+		var ev: Dictionary = (e as Dictionary).duplicate(true)
+		if ev.has("player"):
+			ev["player"] = 1 - int(ev["player"])
+		if ev.has("winner"):
+			ev["winner"] = flip_winner(int(ev["winner"]))
+		out.append(ev)
+	return out
+
+
+static func flip_winner(w: int) -> int:
+	if w == BattleCore.WINNER_P1:
+		return BattleCore.WINNER_P2
+	if w == BattleCore.WINNER_P2:
+		return BattleCore.WINNER_P1
+	return w
 
 
 ## 我方存活替补槽（死亡换人可选项·从公开视图推导）。

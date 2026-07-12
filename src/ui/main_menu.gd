@@ -175,6 +175,7 @@ func _setup_modes() -> void:
 	($UI/ModeStory as Button).pressed.connect(_on_story_pressed)
 	($UI/ModeTower as Button).pressed.connect(_on_expedition_pressed)   # 原爬塔·2026-07-06 接远征先行版
 	_build_cancel_button()
+	_build_net_button()   # M1：局域网对战入口（低调工具件·⚠视觉待 Eddy F6·正式位可能并入匹配牌）
 
 
 ## 故事模式入口：选关壳（关卡/文本全占位·待小传定稿填内容）。匹配中不离队。
@@ -182,6 +183,21 @@ func _on_story_pressed() -> void:
 	if _match_state != MatchState.IDLE:
 		return
 	TransitionManager.transition_to("res://src/ui/story_screen.tscn")
+
+
+## M1：局域网对战入口（右下低调小钮·同战斗内设置钮一档的工具件视觉·不与三牌抢眼）。
+func _build_net_button() -> void:
+	var b := Button.new()
+	b.name = "NetLobbyButton"
+	b.text = "联机对战·局域网"
+	b.position = Vector2(1660, 980)
+	b.size = Vector2(220, 52)
+	b.modulate = Color(1, 1, 1, 0.75)
+	FontManager.apply_btn(b, 16)
+	b.pressed.connect(func() -> void:
+		if _match_state == MatchState.IDLE:
+			TransitionManager.transition_to("res://src/ui/net_lobby_screen.tscn"))
+	$UI.add_child(b)
 
 
 ## 远征模式入口：波幕转场（先行版·占位战斗）。匹配中不离队。

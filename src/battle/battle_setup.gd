@@ -25,6 +25,11 @@ var story_level_id := ""              # 关卡 id（assets/data/story/levels.jso
 # 回程（battle_screen 设 → story_screen 消费）：
 var story_result: Dictionary = {}     # {level_id:String, outcome:"win"|"lose"|"draw"}
 
+# ── 联机交接（M1·2026-07-12）──
+# 大厅屏创建（net_session.gd）→ battle_screen 消费（每帧 pump·退场 close+置空）。
+# ⚠ 不入 reset()：联机局生命周期由大厅/battle_screen 显式管理（reset 是"阵容消费即清"语义）。
+var net_session: RefCounted = null    # null=本地局；非空=联机局（battle_screen 走镜像+协议驱动）
+
 
 ## 清空阵容。被 battle_screen 消费后 / 一局结束 / 返回菜单时调用，
 ## 防止下一局（未重新走 BP）复用上一局残留的阵容。
