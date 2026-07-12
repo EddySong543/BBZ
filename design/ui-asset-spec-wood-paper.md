@@ -1,8 +1,8 @@
 # 「木骨纸芯」首批 UI 资产规格书
 
-> **状态**：v1.0（2026-07-09·依据 ui-design-system §1 材质定案「木骨纸芯」·Eddy 批准立项）
-> **用途**：MJ 出图 + pixellab 后处理的生产规格。每件资产走 **概念稿 F6 → 切片 → 挂点** 三步，⛔禁止跳过概念稿直接实装（回合牌程序化底板被否的教训）。
-> **真相源关系**：材质规则/配色令牌以 `design/ui-design-system.md` 为准；本文件只管"生产什么、多大、怎么验收"。
+> **状态**：v1.1（2026-07-12·**出图工具已换 GPT Image 2**——全美术线转向 Eddy 定·prompt 规则见 `design/gpt-image-reference.md`；文内 MJ prompt 段落全部作废仅留溯源。原 v1.0=2026-07-09 立项）
+> **用途**：GPT Image 2 出图 + pixellab 后处理的生产规格。每件资产走 **概念稿 F6 → 切片 → 挂点** 三步，⛔禁止跳过概念稿直接实装（回合牌程序化底板被否的教训）。
+> **真相源关系**：材质规则/配色令牌以 `design/ui-design-system.md` 为准；出图工具与提示词纪律以 `design/gpt-image-reference.md` 为准；本文件只管"生产什么、多大、怎么验收"。
 
 ---
 
@@ -30,12 +30,17 @@
 毛边/撕边（边缘不规则 2-4px）＋ 微叠页（下缘/右缘露出第二层纸 3-6px）＋ 细纸纹（低对比纤维纹·不是噪点）＋ 木质衬托（纸永远压在木件或深色上，不裸浮）。
 
 ### 0.4 交付与验收
-- **格式**：PNG 透明底；尺寸=下表目标 px（MJ 高清出图 → pixellab 缩到目标尺寸并清边）。
+- **格式**：PNG 透明底；尺寸=下表目标 px（GPT 高清**直出透明底**（Eddy 实测）→ pixellab 缩到目标尺寸并清边；直出失败才兜底纯色底后抠）。
 - **九宫格件**：四角完整、四边可平铺（角尺寸随件标注）；中心区域近纯色（引擎上字）。
 - **验收流程**：①我把资产贴进战斗截图做静态 mockup → ②Eddy F6 → ③过了才切片挂点。
 - **验收标准**：落位后与暖骨像素框同框不吵架；1920×1080 全屏截图缩到 50% 后构件仍可辨；中心区上 16px 像素字清晰可读。
 
-### 0.5 MJ prompt 公共前缀（草稿·可按件微调）
+### 0.5 出图公共风格锚（GPT Image 2·2026-07-12 起现役）
+
+**每件资产 prompt 一律以 `design/gpt-image-reference.md` 模板 §D（手绘 UI 件风格锚）置顶**，再接本文各件的 Subject 段（构图/尺寸/专属细节）。共用要点：自然语言完整句、无任何 `--` 参数；⛔ 别要透明底（gpt-image-2 已砍·纯 mid-gray 平底后抠）；草稿 low 档海选 → 对话增量改图 → high 档定稿。
+
+<details><summary>⛔ 旧 MJ 公共前缀（2026-07-12 弃用·仅溯源）</summary>
+
 ```
 hand-painted storybook game UI asset, oriental fantasy, warm cream xuan
 paper with deckled torn edges and subtle layered sheets, dark lacquered
@@ -43,7 +48,7 @@ wood frame, tiny gold leaf accent, muted elegant palette (cream #E0D1AD,
 dark wood #2E1D12, gold #D4A94E), flat front view, clean silhouette,
 plain background, no text, no gems, minimal ornament --raw --v 8.1 --hd
 ```
-（MJ 无法直接出透明底：出图选 plain background 后抠底；raw 模式防过度装饰——V8 写法 `--raw`、V7 旧写 `--style raw`，实操以生效者为准。**版本纪律与参数速查见 `design/midjourney-reference.md`**：当前默认=V8.1（2026-06-10 起），`--hd` 直出 ≈2K 免 upscale，概念稿海选可先 `--draft` 24 连抽省额度。）
+</details>
 
 ---
 
@@ -74,7 +79,7 @@ plain background, no text, no gems, minimal ornament --raw --v 8.1 --hd
 - **替换关系**：现暖金羊皮纸样式退役；结构（头像+名+描述）不变=零改版式代码，只换底图。
 - **⛔ MJ prompt v1 作废（2026-07-12 实测·教训）**：整卡单图生成＋实物木工词（cabinet/sill/thickness）→ 出来是"3D 实物"不是 2D UI，且木/纸接缝格格不入。
 - **v2 拆件实测结论（2026-07-12）**：**件1 纯纸 ✅ 成立**（flat scan 措辞管用·纸配方保留=A1/A2/A7 原料）；**⛔ 件2 纯木板条失败**——MJ 无法理解孤立木条（不构成"成立的画面"）。件3 未跑。
-- **MJ v3 = 件1纸＋件2木沿合并生成（2026-07-12·Eddy 定向·⛔不含头像窗框）**：木依托纸的语境出图（孤木条 MJ 不理解），保留件1 的 flat 2D 措辞纪律；**⛔ 件3 头像窗框元素不进 MJ**——后期由合成图木区切条拼，或引擎画。**合成图当"原料采集田"**——纸区/木区各自切出重拼，坐标与接缝不依赖 MJ。prompt 见下【v3.1 合并版】；件1 纯纸 prompt 保留备用：
+- **v3 定向 = 件1纸＋件2木沿合并生成（2026-07-12·Eddy 定向·⛔不含头像窗框）**：木依托纸的语境出图（孤木条模型不理解），保留件1 的 flat 2D 措辞纪律；**⛔ 件3 头像窗框元素不进出图**——后期由合成图木区切条拼，或引擎画。**合成图当"原料采集田"**——纸区/木区各自切出重拼，坐标与接缝不依赖模型。**现役 prompt 见下【v4·GPT 版】**；件1 纯纸 prompt（MJ 格式·已验证）留档备查：
 
   **件1·宣纸底（✅已验证·全系列纸配方=A1/A2/A7 原料）**
   ```
@@ -88,7 +93,32 @@ plain background, no text, no gems, minimal ornament --raw --v 8.1 --hd
   --ar 14:5 --raw --v 8.1
   ```
 
-  **【v3.1 合并版】纸＋木沿·同图（现役·原料采集田·无头像窗）**
+- **【v4.1·GPT Image 2 版·现役（2026-07-12 全线转 GPT·透明底直出）】纸＋木沿·同图·无头像窗**——继承 v3.1 的全部构图结论（去实物词/木沿 1/6/毛边叠页），改写为 GPT 自然语言范式。**出图**：宽幅（API `size:1792×1024`，或句中要求 14:5 宽幅）→ 直出透明底裁边 → pixellab 缩 380×136 清边；草稿 low 海选 → 对话增量改 → high 定稿：
+  ```
+  Style anchor: flat 2D game UI asset for an oriental fantasy game,
+  hand-painted storybook style with warm, restrained elegance. Completely
+  flat, seen perfectly straight-on like a flat scan of an illustration — no
+  perspective, no 3D depth, no bevels, no cast shadows, not a photograph,
+  not a product render. Restrained ornament: no gems, no metal rivets, no
+  text or lettering anywhere. The asset must be rendered alone on a fully
+  transparent background (PNG with alpha), nothing else in frame.
+
+  Subject: one wide horizontal card panel, aspect ratio about 14:5. A large
+  sheet of thick warm cream xuan rice paper (cream #E0D1AD, shading to
+  #C4B28A along the edges) lies over a dark lacquered wood backing. The
+  wood is visible only as a slim painted trim running along the entire
+  bottom edge — about one sixth of the panel's height — peeking out
+  slightly at both left and right ends; deep brown-black lacquer #2E1D12
+  with a single warm highlight ridge line #5C3F26 along the trim's upper
+  edge, and faint painted wood grain. The paper's right edge is deckled and
+  torn, with a second paper layer peeking out beneath it. Subtle
+  low-contrast paper fiber texture, soft even lighting. Do not draw any
+  portrait window, emblem, seal or text on the panel — leave the paper
+  surface clean and empty.
+  ```
+  跑偏成实物/3D → 对话补一句 "make it completely flat, like a scanned illustration, not a physical object"；仍不行再拆件（件1 纯纸配方仍成立）。
+
+  **⛔【v3.1 合并版·MJ 线弃用（2026-07-12 全线转 GPT·未实测）·仅溯源】**
   > v3→v3.1 调整（2026-07-12·未实测）：①去掉 `card design`（"卡"易被 MJ 画成带厚度的实体卡牌）改 `panel`；②去掉 `wood plank`（板材=实物木工词·v1 病根）改"painted trim（画出来的木沿）"；③木沿占比锚定"约底部 1/6"（既是构图指令也给切片留够木料）；④`--no` 扩充 trading card / product shot / mockup。
   ```
   flat 2D game UI texture for an oriental fantasy game, hand-painted

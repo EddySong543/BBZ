@@ -1,7 +1,10 @@
 # Midjourney — 版本参考（美术出图工具）
 
-> **用途**：本项目所有 MJ 提示词生成前必读的版本真相源（模式同 `docs/engine-reference/godot/VERSION.md`）。
-> **最后验证**：2026-07-12（WebSearch + 官方 updates 页）。MJ 迭代快，隔 1-2 个月生成大批 prompt 前建议重验一次。
+> ## ⛔ 已弃用（2026-07-12 Eddy 定·仅溯源）
+> **全部美术出图已转 GPT Image 2**（同日先收窄为"仅立绘线"，当晚扩为全线转）。现行真相源=`design/gpt-image-reference.md`。本文保留作历史溯源，⛔ 不再据此生成新 prompt。
+>
+> **用途（历史）**：本项目所有 MJ 提示词生成前必读的版本真相源（模式同 `docs/engine-reference/godot/VERSION.md`）。
+> **最后验证**：2026-07-12（WebSearch + 官方 updates 页）。
 
 | 字段 | 值 |
 |------|-----|
