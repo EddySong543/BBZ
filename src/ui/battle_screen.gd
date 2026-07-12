@@ -38,6 +38,7 @@ const DEFAULT_P1 := ["h02", "h09", "h12"]   # 丑牛 / 申猴 / 亥猪（首发 
 ## 仅本地调试：直接改 BattleCore 状态后刷新，不走战斗结算管线。
 const DEBUG_BUTTONS := true
 const BattleDebugPanel := preload("res://src/ui/debug/battle_debug_panel.gd")   # debug 面板（preload 引用·不靠全局 class_name 注册·headless / CLI 可用）
+const BattleCodexOverlay := preload("res://src/ui/components/battle_codex_overlay.gd")   # 图鉴浮层（同上·preload 引用）
 
 ## 各动画相位等待（秒），可在 Inspector 调。
 @export var anim_phase_duration: float = 1.0
@@ -85,11 +86,10 @@ var p1_frame_slots: Array[int] = [-1, -1, -1]
 var p2_frame_slots: Array[int] = [-1, -1, -1]
 
 # ---- 技能展示格：顺序浏览 [己方0,1,2 → 对方0,1,2]，点击翻页 ----
-var _skill_entries: Array = []   # [[player, slot], ...]
-var _skill_index: int = 0
+var btn_codex: Button = null          # 左下「图鉴」钮（原技能卡位·程序化创建=同疾风）
+var _codex_overlay: Control = null    # 战斗内图鉴浮层（懒创建·关闭仅隐藏）
 
 @onready var buttons_ctrl: Control = $Buttons
-@onready var skill_card: SkillCard = $SkillCard
 @onready var _death_switch_overlay: DeathSwitchOverlay = $DeathSwitchOverlay
 @onready var game_timer: Timer = $GameTimer
 @onready var stage: BattleStage = $Stage   # 多层视差舞台：受击震屏走 stage.shake 按 parallax_factor 分层（见 battle_stage.gd）
@@ -320,11 +320,6 @@ func _ready() -> void:
 	_build_settings_button()   # 战斗内设置入口（右上角小钮 + ESC·2026-07-09）
 	_setup_fx_pools()          # 命中特效对象池预分配（飘字/火花/斩击/尘土/能量粒）
 
-	_build_skill_entries()
-	skill_card.advance_requested.connect(_on_skill_card_advance)
-	skill_card.back_requested.connect(_on_skill_card_back)   # 右键 → 上一个英雄
-	_refresh_skill_card()
-
 	# 低血红闪（任务5）：出战血条剩余爱心在 HP 占比低时红色呼吸（IconPipRow 内部实现）。
 	for row in [p1_heart_row, p2_heart_row]:
 		row.low_hp_flash = true
@@ -444,6 +439,47 @@ func _init_buttons() -> void:
 	btn_jifeng.visible = false
 	buttons_ctrl.add_child(btn_jifeng)
 
+	# 图鉴入口（2026-07-13 Eddy）：原左下技能卡退役 → 与「结束」对称的图鉴钮
+	# （结束=(1762,26) 128×128 → 图鉴=(30,26) 同尺寸）。同款 jelly 板走亮羊皮+墨字
+	# （主菜单导航钮同语言·避开动作按钮语义色）；程序化创建不动 .tscn（同疾风）。
+	btn_codex = Button.new()
+	btn_codex.name = "BtnCodex"
+	btn_codex.text = tr("图鉴")
+	btn_codex.focus_mode = Control.FOCUS_NONE
+	btn_codex.clip_text = true
+	btn_codex.position = Vector2(30.0, 26.0)
+	btn_codex.size = Vector2(128.0, 128.0)
+	for st in ["normal", "hover", "pressed", "disabled", "focus"]:
+		btn_codex.add_theme_stylebox_override(st, StyleBoxEmpty.new())
+	var codex_bg := ColorRect.new()
+	codex_bg.name = "Bg"
+	codex_bg.show_behind_parent = true
+	codex_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	codex_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var codex_mat := ShaderMaterial.new()
+	codex_mat.shader = PVE_JELLY_SHADER
+	codex_mat.set_shader_parameter("fill_top", Color(0.90, 0.85, 0.72))     # 亮羊皮
+	codex_mat.set_shader_parameter("fill_bottom", Color(0.76, 0.69, 0.53))
+	codex_mat.set_shader_parameter("edge_inner", Color(0.95, 0.90, 0.76))
+	codex_mat.set_shader_parameter("edge_outer", Color(0.1, 0.09, 0.11))    # 深墨外缘（与结束钮同）
+	codex_mat.set_shader_parameter("fill_alpha", 1.0)
+	codex_mat.set_shader_parameter("pixel_grid", 38.0)
+	codex_mat.set_shader_parameter("corner", 0.22)
+	codex_mat.set_shader_parameter("edge_px", 2.0)
+	codex_mat.set_shader_parameter("aspect", 1.0)
+	codex_mat.set_shader_parameter("noise_amt", 0.08)
+	codex_mat.set_shader_parameter("wear", 0.24)
+	codex_mat.set_shader_parameter("solid_rim", true)
+	codex_mat.set_shader_parameter("rim_px", 1.5)
+	codex_bg.material = codex_mat
+	btn_codex.add_child(codex_bg)
+	FontManager.apply_btn(btn_codex, 30)
+	btn_codex.add_theme_color_override("font_color", Color(0.24, 0.19, 0.12))        # 墨字压亮纸底
+	btn_codex.add_theme_color_override("font_hover_color", Color(0.14, 0.10, 0.06))
+	_attach_button_juice(btn_codex)
+	btn_codex.pressed.connect(_on_codex_pressed)
+	buttons_ctrl.add_child(btn_codex)
+
 	# 镜头偏焦改由「执行动作」触发（见 _play_battle_anims）：波/大波→右聚敌、防/大防→左聚己、其余回正。
 	# 旧「hover 底部按钮 → 推近」已取消（2026-06-23 Eddy）。
 
@@ -508,46 +544,19 @@ func _connect_frame_signals() -> void:
 
 
 # ============================================================
-# 技能展示格（点击翻页浏览全部英雄技能：己方 → 对方）
+# 战斗内图鉴浮层（左下「图鉴」钮呼出·2026-07-13 替换原技能展示格）
 # ============================================================
 
-## 构建浏览顺序：先己方 3 个（含替补），再对方 3 个，按阵容槽位顺序。
-func _build_skill_entries() -> void:
-	_skill_entries.clear()
-	for p in [PLAYER, AI]:
-		for slot in range(battle.heroes[p].size()):
-			_skill_entries.append([p, slot])
-	_skill_index = 0
-
-
-## 把当前选中的英雄填进展示格。主动/被动取自运行时技能组件（h07 当先按主动算）。
-func _refresh_skill_card() -> void:
-	if _skill_entries.is_empty():
-		return
-	var e: Array = _skill_entries[_skill_index % _skill_entries.size()]
-	var p: int = int(e[0])
-	var slot: int = int(e[1])
-	var h: HeroData = battle.heroes[p][slot]
-	var sk: HeroSkill = battle.get_skill(p, slot)
-	var is_active: bool = sk != null and (sk.has_active() or sk.has_free_switch())
-	# 立绘一律朝右；阵营靠底色区分（己方冷蓝 / 对方暖红）。
-	skill_card.populate(h.hero_name, h.skill_description, h.skill_detail, is_active, h.portrait_path, p == PLAYER, h.skill_icon_path)
-
-
-## 左键点击展示格 → 翻到下一个英雄，循环。
-func _on_skill_card_advance() -> void:
-	if _skill_entries.is_empty():
-		return
-	_skill_index = (_skill_index + 1) % _skill_entries.size()
-	_refresh_skill_card()
-
-
-## 右键点击展示格 → 翻回上一个英雄，循环。
-func _on_skill_card_back() -> void:
-	if _skill_entries.is_empty():
-		return
-	_skill_index = (_skill_index - 1 + _skill_entries.size()) % _skill_entries.size()
-	_refresh_skill_card()
+## 图鉴浮层开关：懒创建（首开实例化）·再按=收起·浮层内 ESC/暗幕/返回钮均可关。
+func _on_codex_pressed() -> void:
+	if _codex_overlay == null:
+		_codex_overlay = BattleCodexOverlay.new()
+		_codex_overlay.name = "CodexOverlay"
+		add_child(_codex_overlay)
+	if _codex_overlay.visible:
+		_codex_overlay.close()
+	else:
+		_codex_overlay.open()
 
 
 # ============================================================
@@ -1571,15 +1580,11 @@ func _set_buttons_active(active: bool, dim_inactive: bool = true) -> void:
 	var show_affordance := active or not dim_inactive
 	var alpha := 1.0 if show_affordance else 0.4
 	buttons_ctrl.modulate = Color(1, 1, 1, alpha)
-	if skill_card:
-		skill_card.visible = true
-		skill_card.modulate = Color(1, 1, 1, alpha)
 	if show_affordance:
 		_refresh_action_affordance()   # 按能量显示亮/暗（开局与选择阶段一致）
 	else:
 		for btn in action_btn_list + [btn_confirm]:
-			btn.disabled = true        # 结算/过场：全禁用
-	_refresh_skill_card()
+			btn.disabled = true        # 结算/过场：全禁用（图鉴钮不禁——随时可查阅）
 
 
 ## 编辑器可摆位：按钮位置/尺寸全部读 .tscn，代码只管显隐与技能 tooltip，不再覆盖坐标。
@@ -1618,7 +1623,7 @@ func _attach_button_juice(btn: BaseButton) -> void:
 ## 选中态视觉：果冻底常显，选中按钮整体提亮 + 从中心放大（缩放手感交给 ButtonJuice 弹性处理）。
 ## （不再用不透明 StyleBox 盖住果冻 —— 那正是"点击后变回老版"的根因）。
 func _set_btn_selected(btn: Button, on: bool) -> void:
-	# B「典籍朱印」：羊皮按钮选中态镀金箔 —— 暖金提亮 modulate，呼应金箔高亮语言（与 skill_card 同体系）。
+	# B「典籍朱印」：羊皮按钮选中态镀金箔 —— 暖金提亮 modulate，呼应金箔高亮语言（源自原技能卡体系·卡已退役）。
 	btn.modulate = Color(1.5, 1.32, 0.82) if on else Color.WHITE
 	var juice := btn.get_node_or_null("ButtonJuice") as ButtonJuice
 	if juice != null:
@@ -2193,10 +2198,9 @@ func _build_debug_buttons() -> void:
 	panel.overtime_requested.connect(_on_debug_overtime)
 
 
-## debug 面板改了 battle 状态 → 刷新全套显示（含换英雄需刷技能卡·多刷无害）。
+## debug 面板改了 battle 状态 → 刷新全套显示。
 func _on_debug_state_changed() -> void:
 	_update_all()
-	_refresh_skill_card()
 	_start_ai_think()   # 任务G：调试面板直改引擎状态 → 预想作废重想
 
 

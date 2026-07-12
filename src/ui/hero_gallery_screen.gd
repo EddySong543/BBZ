@@ -648,7 +648,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
+## 战斗内嵌模式（battle_codex_overlay 注入）：有效时「返回/ESC」改走关闭浮层，不切场景。
+var embedded_close: Callable = Callable()
+
+
 func _back_to_menu() -> void:
+	if embedded_close.is_valid():
+		embedded_close.call()
+		return
 	TransitionManager.transition_to(MENU_SCENE)
 
 

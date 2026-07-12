@@ -17,7 +17,6 @@
 [ext_resource type="Texture2D" uid="uid://1wrmooe2eynb" path="res://assets/ui/icons/Fang_idle.png" id="19_fang"]
 [ext_resource type="Texture2D" uid="uid://bg6qynpwqkgmw" path="res://assets/ui/icons/DaFang_idle.png" id="20_dafang"]
 [ext_resource type="Shader" uid="uid://nr0mkp6afjoy" path="res://assets/shaders/canvas_button_jelly.gdshader" id="21_jelly"]
-[ext_resource type="PackedScene" path="res://src/ui/components/skill_card.tscn" id="22_skillcard"]
 [ext_resource type="FontFile" uid="uid://crf26hvhxwgim" path="res://assets/font/ark-pixel-16px-proportional-zh_cn.ttf" id="23_pixelfont"]
 [ext_resource type="Script" uid="uid://cjou81ur7el87" path="res://src/ui/components/reserve_hp_row.gd" id="24_reservehp"]
 [ext_resource type="Script" uid="uid://dvdbihej8rx16" path="res://src/ui/components/icon_badge.gd" id="25_iconbadge"]
@@ -902,13 +901,6 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-
-[node name="SkillCard" parent="." unique_id=712725023 instance=ExtResource("22_skillcard")]
-layout_mode = 0
-offset_left = 30.0
-offset_top = 896.0
-offset_right = 400.0
-offset_bottom = 1024.0
 
 [node name="DeathSwitchOverlay" parent="." unique_id=812501744 instance=ExtResource("6_death")]
 layout_mode = 1
