@@ -141,6 +141,7 @@ var _overtime := false                        # 本局是否加时赛（Q5·白�
 const ExpeditionPolicy := preload("res://src/expedition/expedition_monster_policy.gd")
 const ExpeditionPixelArt := preload("res://src/expedition/expedition_pixel_art.gd")
 const PVE_JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")
+const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")   # 导航钮贴图（米金纸面+角折·与主菜单同源）
 ## 怪物系列色（monsters.json "series"·任务 I）：博弈=金 / 考官=靛蓝 / 未知回退暖骨。
 const PVE_SERIES_COLORS: Dictionary = {"gamble": Color("e0b54a"), "exam": Color("3f6fb0")}
 var _pve := false                             # 本局=远征 PvE（BattleSetup.pve_mode·须在 reset() 前读）
@@ -440,8 +441,8 @@ func _init_buttons() -> void:
 	buttons_ctrl.add_child(btn_jifeng)
 
 	# 图鉴入口（2026-07-13 Eddy）：原左下技能卡退役 → 与「结束」对称的图鉴钮
-	# （结束=(1762,26) 128×128 → 图鉴=(30,26) 同尺寸）。同款 jelly 板走亮羊皮+墨字
-	# （主菜单导航钮同语言·避开动作按钮语义色）；程序化创建不动 .tscn（同疾风）。
+	# （结束=(1762,26) 128×128 → 图鉴=(30,26) 同尺寸）。导航钮贴图+墨字
+	# （主菜单导航钮同语言·2026-07-13 GPT 换皮·避开动作按钮语义色）；程序化创建不动 .tscn（同疾风）。
 	btn_codex = Button.new()
 	btn_codex.name = "BtnCodex"
 	btn_codex.text = tr("图鉴")
@@ -451,27 +452,19 @@ func _init_buttons() -> void:
 	btn_codex.size = Vector2(128.0, 128.0)
 	for st in ["normal", "hover", "pressed", "disabled", "focus"]:
 		btn_codex.add_theme_stylebox_override(st, StyleBoxEmpty.new())
-	var codex_bg := ColorRect.new()
+	var codex_bg := NinePatchRect.new()
 	codex_bg.name = "Bg"
+	codex_bg.texture = NAV_PLATE_TEX
+	codex_bg.patch_margin_left = 18    # =主菜单 NAV_PLATE_MARGIN·盖住回纹钩含沿边尾（16 切钩尾→梯档）
+	codex_bg.patch_margin_right = 18
+	codex_bg.patch_margin_top = 18
+	codex_bg.patch_margin_bottom = 18
+	codex_bg.axis_stretch_horizontal = NinePatchRect.AXIS_STRETCH_MODE_TILE   # 中段平铺防颗粒拉伸
+	codex_bg.axis_stretch_vertical = NinePatchRect.AXIS_STRETCH_MODE_TILE
+	codex_bg.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	codex_bg.show_behind_parent = true
 	codex_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	codex_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var codex_mat := ShaderMaterial.new()
-	codex_mat.shader = PVE_JELLY_SHADER
-	codex_mat.set_shader_parameter("fill_top", Color(0.90, 0.85, 0.72))     # 亮羊皮
-	codex_mat.set_shader_parameter("fill_bottom", Color(0.76, 0.69, 0.53))
-	codex_mat.set_shader_parameter("edge_inner", Color(0.95, 0.90, 0.76))
-	codex_mat.set_shader_parameter("edge_outer", Color(0.1, 0.09, 0.11))    # 深墨外缘（与结束钮同）
-	codex_mat.set_shader_parameter("fill_alpha", 1.0)
-	codex_mat.set_shader_parameter("pixel_grid", 38.0)
-	codex_mat.set_shader_parameter("corner", 0.22)
-	codex_mat.set_shader_parameter("edge_px", 2.0)
-	codex_mat.set_shader_parameter("aspect", 1.0)
-	codex_mat.set_shader_parameter("noise_amt", 0.08)
-	codex_mat.set_shader_parameter("wear", 0.24)
-	codex_mat.set_shader_parameter("solid_rim", true)
-	codex_mat.set_shader_parameter("rim_px", 1.5)
-	codex_bg.material = codex_mat
 	btn_codex.add_child(codex_bg)
 	FontManager.apply_btn(btn_codex, 30)
 	btn_codex.add_theme_color_override("font_color", Color(0.24, 0.19, 0.12))        # 墨字压亮纸底
@@ -1757,27 +1750,27 @@ var _tip_panel: PanelContainer
 var _tip_label: Label
 
 
-## 建自绘悬停提示（暖骨像素框·抄 HeroFrame 配方）+ 挂满底部动作按钮与我方道具槽。
+## 建悬停提示（GPT 回纹折纸面贴图 9-slice·2026-07-13 换皮）+ 挂满底部动作按钮与我方道具槽。
 ## 动作/道具数值全部从 ActionDef / BattleCore 常量推导（禁硬编码游戏数值）。
 func _build_hover_tips() -> void:
 	_tip_panel = PanelContainer.new()
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.14, 0.11, 0.07, 0.96)      # 暖黑纸底
-	sb.border_color = Color("b3a386")                 # 暖骨描边
-	sb.set_border_width_all(2)
-	sb.content_margin_left = 12.0
-	sb.content_margin_right = 12.0
-	sb.content_margin_top = 8.0
-	sb.content_margin_bottom = 8.0
+	var sb := StyleBoxTexture.new()
+	sb.texture = preload("res://assets/ui/ui_tooltip.png")   # 129×57·奶油纸面+胡桃木框+四角包角（2026-07-13 重制版）
+	sb.set_texture_margin_all(14.0)                          # 9-slice：四角包角块整块保形
+	sb.axis_stretch_horizontal = StyleBoxTexture.AXIS_STRETCH_MODE_TILE   # 中段平铺防颗粒拉伸
+	sb.axis_stretch_vertical = StyleBoxTexture.AXIS_STRETCH_MODE_TILE
+	sb.content_margin_left = 16.0
+	sb.content_margin_right = 16.0
+	sb.content_margin_top = 12.0
+	sb.content_margin_bottom = 12.0
 	_tip_panel.add_theme_stylebox_override("panel", sb)
+	_tip_panel.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST   # 像素贴图必须点采样（默认线性会糊）
 	_tip_panel.visible = false
 	_tip_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tip_panel.z_index = 90
 	_tip_label = Label.new()
 	FontManager.apply(_tip_label, 16)
-	_tip_label.add_theme_color_override("font_color", Color(0.95, 0.92, 0.84))
-	_tip_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
-	_tip_label.add_theme_constant_override("outline_size", 3)
+	_tip_label.add_theme_color_override("font_color", Color(0.24, 0.19, 0.12))   # 墨字压纸面（描边退役——亮底不需要）
 	_tip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tip_panel.add_child(_tip_label)
 	add_child(_tip_panel)

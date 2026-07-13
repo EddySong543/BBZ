@@ -29,14 +29,11 @@ var _last_dots: int = -1     # 匹配中标题省略号点数（变化才拼串 
 var _last_secs: int = -1     # 匹配中副标计时秒数（同上）
 var _cancel_btn: Button   # 匹配中才出现的「✕ 取消匹配」（_setup_modes 建·常态隐藏）
 
-## 小件像素底板（设置/段位徽章用）。
-## 2026-06-13 Eddy 选 B「典籍朱印」全局铺·主菜单首屏：底板=哑光羊皮（关糖光渐变）
-## + 墨线框；字/图标=墨色。（常量名仍叫 STEEL 是历史遗留，值已改羊皮。）
-const JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")
-const STEEL := {
-	"fill_top": Color(0.88, 0.82, 0.68), "fill_bottom": Color(0.82, 0.75, 0.60),
-	"edge_inner": Color(0.60, 0.50, 0.36), "edge_outer": Color(0.18, 0.12, 0.07),
-}
+## 小件像素底板（设置/退出/底坞导航/段位徽章用）。
+## 2026-06-13 Eddy 选 B「典籍朱印」全局铺；2026-07-13 换 GPT 导航钮贴图
+## （米金纸面+角上回纹折·9-slice 中段平铺·jelly 程序板/STEEL 色组退役）。
+const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")   # 220×49·回纹钩版（2026-07-13 重制）
+const NAV_PLATE_MARGIN := 18.0   # 9-slice 边距=回纹钩含沿边尾整块保形（16 会切到钩尾→平铺成梯档）
 const INK := Color(0.20, 0.14, 0.08)        # 墨（羊皮上的字/图标）
 const INK_SOFT := Color(0.42, 0.34, 0.24)   # 淡墨（次级字）
 const CREAM := Color(0.95, 0.91, 0.80)      # 暖米白（直接压在暗波上的字·非羊皮上）
@@ -477,45 +474,34 @@ func _on_placeholder_pressed(feature: String) -> void:
 # 小件样式辅助
 # ============================================================
 
-## 给按钮挂像素底板（jelly 钢蓝档）：清空默认 stylebox + Bg ColorRect 衬底。
+## 给按钮挂导航钮贴图底板（GPT 回纹折纸面·2026-07-13 换皮）：清空默认 stylebox + Bg NinePatch 衬底。
 func _apply_plate(btn: Button) -> void:
 	for s in ["normal", "hover", "pressed", "focus", "disabled"]:
 		btn.add_theme_stylebox_override(s, StyleBoxEmpty.new())
-	var bg := ColorRect.new()
-	bg.name = "Bg"
-	bg.show_behind_parent = true
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bg.material = _jelly_mat(btn.size)
-	btn.add_child(bg)
+	btn.add_child(_make_plate_bg())
 
 
-## 给任意 Control（如段位 Label）衬 jelly 底板。
+## 给任意 Control（如段位 Label）衬导航钮贴图底板。
 func _add_plate_bg(ctrl: Control) -> void:
-	var bg := ColorRect.new()
+	ctrl.add_child(_make_plate_bg())
+
+
+## 导航钮底板（NinePatch）：四角回纹折整块保形·中段横竖平铺防颗粒拉伸·像素点采样。
+func _make_plate_bg() -> NinePatchRect:
+	var bg := NinePatchRect.new()
 	bg.name = "Bg"
+	bg.texture = NAV_PLATE_TEX
+	bg.patch_margin_left = int(NAV_PLATE_MARGIN)
+	bg.patch_margin_right = int(NAV_PLATE_MARGIN)
+	bg.patch_margin_top = int(NAV_PLATE_MARGIN)
+	bg.patch_margin_bottom = int(NAV_PLATE_MARGIN)
+	bg.axis_stretch_horizontal = NinePatchRect.AXIS_STRETCH_MODE_TILE
+	bg.axis_stretch_vertical = NinePatchRect.AXIS_STRETCH_MODE_TILE
+	bg.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	bg.show_behind_parent = true
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bg.material = _jelly_mat(ctrl.size)
-	ctrl.add_child(bg)
-
-
-func _jelly_mat(plate_size: Vector2) -> ShaderMaterial:
-	var mat := ShaderMaterial.new()
-	mat.shader = JELLY_SHADER
-	mat.set_shader_parameter("fill_top", STEEL["fill_top"])
-	mat.set_shader_parameter("fill_bottom", STEEL["fill_bottom"])
-	mat.set_shader_parameter("edge_inner", STEEL["edge_inner"])
-	mat.set_shader_parameter("edge_outer", STEEL["edge_outer"])
-	mat.set_shader_parameter("corner", 0.2)
-	mat.set_shader_parameter("edge_px", 2.0)
-	mat.set_shader_parameter("noise_amt", 0.08)   # 纸纤维
-	mat.set_shader_parameter("wear", 0.24)         # 做旧
-	mat.set_shader_parameter("pixel_grid", 38.0)
-	mat.set_shader_parameter("fill_alpha", 0.95)
-	mat.set_shader_parameter("aspect", plate_size.x / maxf(plate_size.y, 1.0))
-	return mat
+	return bg
 
 
 ## 清空按钮默认皮肤，但保留左内边距（给 icon 锚位让位，文字在余下区域居中）。

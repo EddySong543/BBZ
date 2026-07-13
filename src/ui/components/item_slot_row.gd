@@ -302,11 +302,12 @@ func _make_seal(base: Vector2) -> Control:
 	return root
 
 
-## 角上半张小封条（锁中·冷却 1 回合）：短条斜贴右上角·单圆点=剩 1 回合（与大封条同语言）。
+## 角上半张小封条（锁中·冷却 1 回合）：短条斜贴左上角·单圆点=剩 1 回合。
+## 斜度与大封条完全同角（-0.30·Eddy 2026-07-13：视觉一致优先——同为横条同角即同斜）。
 func _make_mini_seal(base: Vector2) -> Control:
 	var root := Control.new()
-	root.position = base + Vector2(SLOT_W - 16.0, 14.0)
-	root.rotation = 0.62
+	root.position = base + Vector2(15.0, 13.0)
+	root.rotation = -0.30
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.visible = false
 	var w := 44.0

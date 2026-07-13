@@ -29,6 +29,10 @@ const TAB_CLOUD_TEX := {   # 三阶祥云页签(GPT 双端云头横幅·240×56�
 	2: preload("res://assets/ui/tab_cloud_t2.png"),
 	3: preload("res://assets/ui/tab_cloud_t3.png"),
 }
+const BANNER_TEX := preload("res://assets/ui/ui_banner_scroll.png")   # 道具名小卷轴横幅(GPT·224×45·轴杆+祥云端)
+const TIER_INK := {   # 道具名墨色三阶（压奶油纸·稀有度不再整条染横幅——2026-07-13 小卷轴换皮）
+	1: Color("34608F"), 2: Color("6B3D96"), 3: Color("8F6A1E"),
+}
 const LEGENDARY_BG_TINT := Color(1.0, 1.0, 1.0, 1.0)                                       # 原图亮度·不做暗处理(Eddy 2026-06-27)
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
 
@@ -103,8 +107,7 @@ var _d_icon: TextureRect
 var _d_icon_fallback: Label
 var _d_glow: TextureRect
 var _d_name: Label
-var _d_name_band: ColorRect
-var _d_name_band_edge: ColorRect
+var _d_name_banner: NinePatchRect   # 小卷轴横幅（原双 ColorRect 稀有度色条退役·2026-07-13）
 var _d_tier_edge: ColorRect
 var _d_tier_fill: ColorRect
 var _d_tier_lbl: Label
@@ -496,14 +499,23 @@ func _build_detail_panel() -> void:
 			Rect2(Vector2(inset.end.x, inset.position.y), Vector2(1, inset.size.y))]:
 		_rect(detail_area, er, Color(INK, 0.28))
 
-	# ── ① 稀有度横幅（道具名·白字深边·随稀有度换色）──
-	_d_name_band_edge = _rect(detail_area, Rect2(px + 54, py + 62, PAGE_R.size.x - 108, 64), COVER_RIM)
-	_d_name_band = _rect(detail_area, Rect2(px + 57, py + 65, PAGE_R.size.x - 114, 58), TIER_COLOR[1])
-	_d_name = _make_label(Vector2(px + 57, py + 65), Vector2(PAGE_R.size.x - 114, 58), 32, Color.WHITE)
+	# ── ① 道具名横幅=小卷轴（GPT 贴图·2026-07-13 换皮）：横向 9-slice（轴杆+祥云端固定·纸面平铺）；
+	#    竖向不切原生高（切了祥云会拉花）。稀有度改走道具名墨色三阶（TIER_INK·横幅不再染色）。
+	_d_name_banner = NinePatchRect.new()
+	_d_name_banner.texture = BANNER_TEX
+	_d_name_banner.patch_margin_left = 96    # 轴杆 26 + 祥云端 ~66（固定不拉伸）
+	_d_name_banner.patch_margin_right = 96
+	_d_name_banner.patch_margin_top = 0      # 竖向原生高·不切
+	_d_name_banner.patch_margin_bottom = 0
+	_d_name_banner.axis_stretch_horizontal = NinePatchRect.AXIS_STRETCH_MODE_TILE   # 纸面平铺防颗粒拉伸
+	_d_name_banner.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_d_name_banner.position = Vector2(px + 54, py + 72)
+	_d_name_banner.size = Vector2(PAGE_R.size.x - 108, 45)
+	_d_name_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail_area.add_child(_d_name_banner)
+	_d_name = _make_label(Vector2(px + 57, py + 72), Vector2(PAGE_R.size.x - 114, 45), 32, TIER_INK[1])
 	_d_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_d_name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_d_name.add_theme_constant_override("outline_size", 4)
-	_d_name.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.03, 0.9))
 
 	# ── ② 图标卡：钉在页上的层叠卡（偏移投影+墨线框）+ 暖辉光 + 放大图标 ──
 	var card := Rect2(px + (PAGE_R.size.x - 380) * 0.5, py + 170, 380, 380)
@@ -610,7 +622,7 @@ func _select(idx: int) -> void:
 		_d_icon_fallback.text = tr(it.item_name)
 		_d_icon_fallback.visible = true
 	_d_name.text = tr(it.item_name)
-	_d_name_band.color = rc
+	_d_name.add_theme_color_override("font_color", TIER_INK[it.tier])   # 稀有度=名字墨色（横幅不染）
 	_d_tier_lbl.text = tr(String(TIER_LABEL[it.tier]))
 	_d_tier_fill.color = rc
 	_d_desc.text = tr(it.description)

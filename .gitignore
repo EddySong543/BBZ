@@ -28,6 +28,10 @@ Desktop.ini
 # 外部导入资源统一暂存区（assets/import）：内容不入库·仅保留 README 说明约定
 /assets/import/*
 !/assets/import/README.md
+# GPT 出图原图源档（assets/art_src）：大图不入库·仅保留 README 与 .gdignore（成品在 assets/ui·同 import 规）
+/assets/art_src/*
+!/assets/art_src/README.md
+!/assets/art_src/.gdignore
 *.psd
 *.docx
 
