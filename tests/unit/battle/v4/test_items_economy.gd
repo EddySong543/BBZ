@@ -157,7 +157,15 @@ func test_item_slot_row_refreshes() -> void:
 	# t1_feibiao（生锈的暗器）已有图标 → 走图标路径：图标层显示、文字位让给图标（见 item_slot_row 220-234）。
 	assert_true(row._icons[0].visible, "带图标道具 → 显示图标层")
 	assert_eq(row._labels[0].text, "", "有图标 → 文字位空出给图标（无图才回退显示名）")
-	assert_eq(row._labels[1].text, "回合4\n解锁", "未到解锁回合显示解锁回合电报")
+	# 未解锁 = 封条无文字（2026-07-13 状态语言重做）：斜贴封条可见 + 圆点=剩余回合。
+	assert_eq(row._labels[1].text, "", "未解锁不再显示文字电报")
+	assert_true(row._seals[1].visible, "未解锁 = 斜贴封条")
+	var remain: int = clampi(int(BattleCore.SLOT_UNLOCK_TURN[1]) - b.turn_number, 0, 3)
+	var shown := 0
+	for p in row._seal_pips[1]:
+		if (p as ColorRect).visible:
+			shown += 1
+	assert_eq(shown, remain, "封条圆点数 = 剩余解锁回合数")
 
 
 # === M3：道具栏交互层 ===
@@ -197,14 +205,18 @@ func test_slot_row_staged_highlight() -> void:
 	var row := ItemSlotRow.new()
 	row.interactive = true
 	add_child_autofree(row)
-	# 已点选使用 → 框边转最亮金(GOLD_STAGED) + 「✓用」标记。
+	# 已点选使用 → 框边转最亮金(GOLD_STAGED·shader 框) + 图标下沉 3px（「✓用」文字已退役）；贴图框让位隐藏。
 	row.refresh(b, 0, [0])
 	assert_eq(row._frame_mats[0].get_shader_parameter("edge_mid"), ItemSlotRow.GOLD_STAGED, "暂存 = 最亮金边")
-	assert_true(row._labels[0].text.ends_with("✓用"), "暂存槽标 ✓用")
-	# 取消点选 → 就绪道具保持稀有度框色（2026 重构：金边只给暂存 / 空槽可操作·有道具的框走稀有度色）、无 ✓用。
+	assert_false(row._tex_frames[0].visible, "暂存 = shader 金边框·贴图框隐藏")
+	assert_eq(row._icons[0].position.y, ItemSlotRow.ICON_INSET + 3.0, "暂存 = 图标下沉（按下感）")
+	assert_eq(row._labels[0].text, "", "状态文字全退役")
+	# 取消点选 → 就绪道具回到回纹阶框贴图 + 图标回弹。
 	row.refresh(b, 0, [])
-	assert_eq(row._frame_mats[0].get_shader_parameter("edge_mid"), ItemCatalog.rarity_color(b.slot_item(0, 0).tier), "取消点选就绪道具 = 稀有度框色(非金)")
-	assert_false(row._labels[0].text.ends_with("✓用"))
+	assert_true(row._tex_frames[0].visible, "取消点选就绪道具 = 回纹阶框贴图")
+	assert_eq(row._tex_frames[0].texture, ItemSlotRow.ITEM_FRAME_TEX[b.slot_item(0, 0).tier], "贴图框 = 对应稀有度阶框")
+	assert_false(row._frames[0].visible, "shader 状态框隐藏")
+	assert_eq(row._icons[0].position.y, ItemSlotRow.ICON_INSET, "取消点选 = 图标回弹")
 
 
 func test_draft_popup_resolves_choice_once() -> void:
@@ -340,17 +352,20 @@ func test_cannot_upgrade_when_not_ready() -> void:
 	assert_false(b.can_upgrade(0, 0), "未就绪不可升")
 
 
-func test_slot_row_shows_upgrade_badge_when_upgradeable() -> void:
+func test_slot_row_shows_upgrade_cost_chip_when_upgradeable() -> void:
 	var b := _battle_ready(20)
 	b.slots[0][0]["item"] = ItemCatalog.make("t1_feibiao")
 	var row := ItemSlotRow.new()
 	row.interactive = true
 	add_child_autofree(row)
 	row.refresh(b, 0)
-	assert_true(row._upgrade_btns[0].visible, "就绪可升级 → 显示升级角标")
+	assert_true(row._cost_chips[0].visible, "就绪可升级 → 左上角费用章显示")
+	assert_eq(row._cost_chips[0].number, int(round(BattleCore.UPGRADE_COST / float(ActionDef.ENERGY_UNIT))), "费用章 = 升级整能费")
+	assert_true(row._can_up[0], "可升级标记（右键入口判据）")
 	b.slots[0][0]["item"] = ItemCatalog.make("t3_shengming")   # 顶级不可升
 	row.refresh(b, 0)
-	assert_false(row._upgrade_btns[0].visible, "顶级不可升 → 角标隐藏")
+	assert_false(row._cost_chips[0].visible, "顶级不可升 → 费用章隐藏")
+	assert_false(row._can_up[0])
 
 
 func test_slot_row_upgrade_signal_gated_by_interactive() -> void:
@@ -358,9 +373,14 @@ func test_slot_row_upgrade_signal_gated_by_interactive() -> void:
 	add_child_autofree(row)
 	var captured := [-99]
 	row.slot_upgrade_clicked.connect(func(s: int) -> void: captured[0] = s)
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_RIGHT
+	ev.pressed = true
 	row.interactive = false
-	row._on_upgrade_pressed(1)
+	row._can_up[1] = true
+	row._on_slot_gui_input(ev, 1)
 	assert_eq(captured[0], -99, "非交互行不发升级信号")
 	row.interactive = true
-	row._on_upgrade_pressed(2)
-	assert_eq(captured[0], 2, "交互行发升级信号")
+	row._can_up[2] = true
+	row._on_slot_gui_input(ev, 2)
+	assert_eq(captured[0], 2, "交互行右键发升级信号")

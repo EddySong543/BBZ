@@ -483,10 +483,11 @@ func _init_buttons() -> void:
 	# 镜头偏焦改由「执行动作」触发（见 _play_battle_anims）：波/大波→右聚敌、防/大防→左聚己、其余回正。
 	# 旧「hover 底部按钮 → 推近」已取消（2026-06-23 Eddy）。
 
-	# 动作按钮能量消耗金币数量（基础动作 cost 固定；攒/防=0 不显示）。技能键 cost 动态，随刷新更新。
+	# 动作按钮能量消耗金币数量（基础动作 cost 固定；攒=获取不显示）。技能键 cost 动态，随刷新更新。
 	_set_cost_pips(btn_attack, ActionDef.BASE_ACTION_DEF[A.ATTACK]["cost"])
 	_set_cost_pips(btn_big_attack, ActionDef.BASE_ACTION_DEF[A.BIG_ATTACK]["cost"])
 	_set_cost_pips(btn_big_defend, ActionDef.BASE_ACTION_DEF[A.BIG_DEFEND]["cost"])
+	_set_cost_pips(btn_defend, ActionDef.BASE_ACTION_DEF[A.DEFEND]["cost"], true)   # 防=0 费也显示（Eddy 2026-07-13·与其他按钮一致）
 
 	FontManager.apply(timer_label, 32)   # 顶部常驻回合数(原倒计时位)·紧凑
 	timer_label.add_theme_color_override("font_color", Color(0.95, 0.91, 0.8))   # 暖米白（压暗背景）
@@ -1714,15 +1715,15 @@ func _btn_action(btn: Button) -> int:
 	return -1
 
 
-## 填入动作按钮的能量消耗 = 一个金币 + 内嵌数字（= bp 血量同款 IconBadge·cost≤0 隐藏）。
-## CostPips 节点已在 battle_screen.tscn 内预置（编辑器可视化摆位/调大小·4 按钮统一以 BtnAttack 为准），
-## 代码只填数字·不再创建/定位。
-func _set_cost_pips(btn: Button, cost: int) -> void:
+## 填入动作按钮的能量消耗 = 一个金币 + 内嵌数字（= bp 血量同款 IconBadge）。
+## CostPips 节点已在 battle_screen.tscn 内预置（编辑器可视化摆位/调大小·统一以 BtnAttack 为准），
+## 代码只填数字·不再创建/定位。show_zero=0 费也显示（防按钮·Eddy 2026-07-13：与其他按钮一致）。
+func _set_cost_pips(btn: Button, cost: int, show_zero: bool = false) -> void:
 	var badge := btn.get_node_or_null("CostPips") as IconBadge
 	if badge == null:
 		return
-	badge.visible = cost > 0
-	if cost > 0:
+	badge.visible = cost > 0 or show_zero
+	if badge.visible:
 		badge.set_number(int(round(cost / float(ActionDef.ENERGY_UNIT))))   # cost 为半能 → 显示整能
 
 
@@ -1881,7 +1882,7 @@ func _item_slot_tip(slot: int) -> String:
 			if battle.slot_ready(PLAYER, slot):
 				txt += tr("\n— 点击使用")
 				if battle.can_upgrade(PLAYER, slot):
-					txt += tr("·「升」=升级（%s点能量）") % _fmt_hp(BattleCore.UPGRADE_COST / 2.0)
+					txt += tr("·右键升级（%s点能量）") % _fmt_hp(BattleCore.UPGRADE_COST / 2.0)
 			else:
 				txt += tr("\n— 锁定中·下回合可用")
 			return txt

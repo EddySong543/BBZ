@@ -12,6 +12,8 @@ extends Control
 ## ⚠ 装饰节点必须 mouse_filter=IGNORE——否则吞点击（返回失效·v1 踩过坑）。
 
 const HERO_FRAME_SCENE := preload("res://src/ui/components/hero_frame.tscn")   # 回纹头像框（2026-07-13 换装·hero_card 退出图鉴仅 BP/战斗用）
+const PLAQUE_TEX := preload("res://assets/ui/ui_plaque.png")                   # 悬挂牌匾(GPT 米色回纹匾·320×62·9-slice·与道具图鉴共用)
+const PLAQUE_INK := Color(0.24, 0.19, 0.12)                                    # 匾面墨字（米色亮面上·原泥金退役）
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")
 const HEART_SHEET := preload("res://assets/ui/icons/heart_idle.png")
 
@@ -132,27 +134,29 @@ func _setup_top() -> void:
 	back_btn.add_child(bj)
 
 
-## 顶带「鎏金牌匾」：标题装进横幅像素框 + 左右卷轴端头饰线 + 两端红宝石。
+## 顶带牌匾（2026-07-13 换皮：GPT 米色回纹匾 9-slice+墨字——像素框匾+红宝石退役·与道具图鉴共用素材）。
 func _build_plaque() -> void:
 	var band := $TopBand as Control
-	var backing := _band_rect(band, PLAQUE, EDGE_OUTER)
-	backing.name = "PlaqueBacking"
-	var fill := _band_rect(band,
-		Rect2(PLAQUE.position + Vector2(3, 3), PLAQUE.size - Vector2(6, 6)),
-		Color(PLATE, 0.97))
-	fill.name = "PlaqueFill"
-	var frame := _band_rect(band, PLAQUE, Color.WHITE)
-	frame.name = "PlaqueFrame"
-	frame.material = _make_frame_mat(PLAQUE.size)
+	var plaque := NinePatchRect.new()
+	plaque.name = "Plaque"
+	plaque.texture = PLAQUE_TEX
+	plaque.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	plaque.patch_margin_left = 50    # 回纹角区≈48px·四角原比例中段拉伸
+	plaque.patch_margin_right = 50
+	plaque.patch_margin_top = 20
+	plaque.patch_margin_bottom = 20
+	plaque.position = PLAQUE.position
+	plaque.size = PLAQUE.size
+	plaque.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	band.add_child(plaque)
 	# 标题挪进匾内。y-4：Ark 像素汉字无下伸部·Label 居中视觉偏下补正。
 	title_lbl.position = PLAQUE.position + Vector2(0, -4)
 	title_lbl.size = PLAQUE.size
 	title_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title_lbl.z_index = 1
 	FontManager.apply(title_lbl, 36)
-	title_lbl.add_theme_color_override("font_color", GOLD_TEXT)
-	title_lbl.add_theme_constant_override("outline_size", 2)
-	title_lbl.add_theme_color_override("font_outline_color", Color(0.05, 0.03, 0.02, 0.95))
+	title_lbl.add_theme_color_override("font_color", PLAQUE_INK)   # 匾面米色→墨字
+	title_lbl.add_theme_constant_override("outline_size", 0)
 	# 左右卷轴端头饰线（端头方块 + 细线·与匾垂直居中对齐）
 	var line_y := PLAQUE.position.y + PLAQUE.size.y * 0.5 - 1.0
 	for side: Array in [
@@ -160,9 +164,6 @@ func _build_plaque() -> void:
 			[Rect2(PLAQUE.end.x + 20, line_y, 168, 2), Rect2(PLAQUE.end.x + 188, line_y - 3, 8, 8)]]:
 		_band_rect(band, side[0], Color(GOLD_MID, 0.6))
 		_band_rect(band, side[1], Color(GOLD_MID, 0.8))
-	# 牌匾两端红宝石点缀（嵌金）
-	_gem(band, Vector2(PLAQUE.position.x + 16, PLAQUE.position.y + PLAQUE.size.y * 0.5), GEM_RED)
-	_gem(band, Vector2(PLAQUE.end.x - 16, PLAQUE.position.y + PLAQUE.size.y * 0.5), GEM_RED)
 
 
 ## 右上「收集度徽章」：英雄 icon + N / N + 进度条（现=满条）。

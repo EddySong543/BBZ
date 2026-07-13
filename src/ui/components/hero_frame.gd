@@ -13,7 +13,7 @@ const SELECTED_TINT := Color(1.28, 1.42, 1.6)
 
 ## 敌我框贴图（同源换色变体·tools/img_recolor.gd 产出）。
 const FRAME_TEX := preload("res://assets/ui/hero_avatar_frame.png")             # 我方=暖骨
-const FRAME_TEX_ENEMY := preload("res://assets/ui/hero_avatar_frame_enemy.png") # 敌方=赤陶 #B4544C
+const FRAME_TEX_ENEMY := preload("res://assets/ui/hero_avatar_frame_enemy.png") # 敌方=亮赤 #C86A5E(B4544C 偏暗→提亮·2026-07-13)
 
 @export var portrait_path: String = "":
 	set(v):

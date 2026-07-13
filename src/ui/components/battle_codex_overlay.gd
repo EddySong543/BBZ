@@ -8,6 +8,7 @@ extends Control
 
 const HERO_GALLERY_SCENE := preload("res://src/ui/hero_gallery_screen.tscn")
 const ITEM_GALLERY_SCENE := preload("res://src/ui/item_gallery_screen.tscn")
+const PLAQUE_TEX := preload("res://assets/ui/ui_plaque.png")   # 页签皮=米色回纹匾(9-slice·与两图鉴牌匾共用·2026-07-13)
 
 const DESIGN := Vector2(1920.0, 1080.0)   # 图鉴屏设计分辨率（缩放前）
 const PANEL_SCALE := 0.86                  # 「大部分屏幕但不占满」
@@ -17,10 +18,7 @@ const TAB_GAP := 24.0
 const TAB_Y := 16.0
 
 const INK := Color(0.24, 0.19, 0.12)             # 墨字（亮纸底·与主菜单导航钮同语言）
-const PAPER := Color(0.90, 0.85, 0.72)           # 选中页签=亮羊皮
-const PAPER_DIM := Color(0.62, 0.58, 0.48)       # 未选中页签=压暗羊皮
-const TAB_EDGE_SEL := Color("#e8bb52")           # 选中描边=泥金
-const TAB_EDGE_OFF := Color(0.22, 0.19, 0.13)    # 未选中描边=深墨
+const TAB_DIM := Color(0.72, 0.69, 0.63)         # 未选中页签=匾皮压暗（StyleBoxTexture modulate）
 
 var _holder: Control = null
 var _galleries: Array = [null, null]   # 0=英雄图鉴 1=道具图鉴（懒加载缓存）
@@ -58,6 +56,7 @@ func _ready() -> void:
 		var btn := Button.new()
 		btn.name = "Tab%d" % i
 		btn.text = String(labels[i])
+		btn.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST   # 匾皮像素边保真
 		btn.focus_mode = Control.FOCUS_NONE
 		btn.position = Vector2((DESIGN.x - total_w) * 0.5 + i * (TAB_SIZE.x + TAB_GAP), TAB_Y)
 		btn.size = TAB_SIZE
@@ -110,14 +109,17 @@ func _set_gallery_input(active_idx: int) -> void:
 
 
 func _refresh_tabs() -> void:
+	# 页签皮=米色回纹匾 9-slice（2026-07-13 换皮：StyleBoxFlat 羊皮胶囊退役）；选中=原亮/未选=压暗。
 	for i in _tab_btns.size():
 		var btn: Button = _tab_btns[i]
 		var sel: bool = (i == _current_tab)
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = PAPER if sel else PAPER_DIM
-		sb.set_corner_radius_all(10)
-		sb.set_border_width_all(2)
-		sb.border_color = TAB_EDGE_SEL if sel else TAB_EDGE_OFF
+		var sb := StyleBoxTexture.new()
+		sb.texture = PLAQUE_TEX
+		sb.texture_margin_left = 50    # 回纹角区≈48px（与两图鉴牌匾同边距）
+		sb.texture_margin_right = 50
+		sb.texture_margin_top = 20
+		sb.texture_margin_bottom = 20
+		sb.modulate_color = Color.WHITE if sel else TAB_DIM
 		for st in ["normal", "hover", "pressed", "disabled", "focus"]:
 			btn.add_theme_stylebox_override(st, sb)
 

@@ -11,8 +11,8 @@ extends Control
 ##   深靛做 UI 衬底已被整体否定=memory [[ui-backdrop-no-deep-indigo]]·牌匾深靛底属点缀件不在此列。）
 ## ⚠ 装饰 ColorRect 必须 mouse_filter=IGNORE（否则吞点击=返回/切阶失效·踩过坑）。
 
-const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")
 const PAPER_SHADER := preload("res://assets/shaders/canvas_ui_paper.gdshader")           # 纸/皮质感（v5.2·治纯色扁平）
+const PLAQUE_TEX := preload("res://assets/ui/ui_plaque.png")                              # 悬挂牌匾(GPT 米色回纹匾·320×62·9-slice 边距 50/20·2026-07-13)
 const CELL_BG_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")   # 格底：圆角+渐变（v5 中性深炭）
 const ROUND_MASK_SHADER := preload("res://assets/shaders/canvas_ui_round_mask.gdshader")  # 选中金框圆角
 const LEGENDARY_BG := preload("res://assets/ui/gold_bottom.png")                          # 传说道具金云纹格底(Eddy 美术)
@@ -23,6 +23,11 @@ const ITEM_FRAME_TEX := {   # 三阶回纹框(头像框素材同源换色·img_r
 	1: preload("res://assets/ui/item_frame_t1.png"),   # 普通=亮青空蓝 #8FB8E4(78A2CE→再亮)
 	2: preload("res://assets/ui/item_frame_t2.png"),   # 稀有=亮藕紫 #BFA0E8(A98BD8→再亮)
 	3: preload("res://assets/ui/item_frame_t3.png"),   # 传说=亮鎏金 #F0C468(E4B75C→再亮)
+}
+const TAB_CLOUD_TEX := {   # 三阶祥云页签(GPT 双端云头横幅·240×56·img_recolor 同三阶色·2026-07-13)
+	1: preload("res://assets/ui/tab_cloud_t1.png"),
+	2: preload("res://assets/ui/tab_cloud_t2.png"),
+	3: preload("res://assets/ui/tab_cloud_t3.png"),
 }
 const LEGENDARY_BG_TINT := Color(1.0, 1.0, 1.0, 1.0)                                       # 原图亮度·不做暗处理(Eddy 2026-06-27)
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
@@ -43,12 +48,11 @@ const PAGE_STACK_B := Color(0.76, 0.71, 0.55)  # 页块台阶 暗层
 
 const INK := Color(0.24, 0.19, 0.12)           # 墨（亮页主文字）
 const INK_DIM := Color(0.48, 0.41, 0.28)       # 淡墨（次级/划线/注记）
-# 格底亮方案（2026-07-13 Eddy 三改定版：内外对比对齐传说 gold_bottom——四角=饱和阶色·中心=略浅阶色
-# （⛔非白·白圈版被否"太白"）·中心 V≈0.97/四角 V≈0.93 与金底同比例——v5 深炭格退役）。
+# 格底方案（2026-07-13 Eddy 四改定版：格内整体【比外框深一档】——四角=深饱和阶色·中心=略浅阶色·
+# 内外层次仍对齐传说 gold_bottom；⛔白圈版/比框亮版均被否——v5 深炭格退役）。
 # 传说不走此表（格底=gold_bottom 金云纹美术·只换框色）。
-const CELL_FILL := {1: Color("#9CC2EE"), 2: Color("#B9A2EC")}     # 四角=饱和阶色（仍比框 8FB8E4/BFA0E8 亮）
-const CELL_CENTER := {1: Color("#CFE2F8"), 2: Color("#DED2F7")}   # 中心=略浅阶色（浅蓝/浅紫·清晰带色相）
-const BANNER_PLATE := Color(0.145, 0.16, 0.28) # 牌匾底=深靛（金字在其上跳）
+const CELL_FILL := {1: Color("#6E9BD2"), 2: Color("#9A7FD0")}     # 四角=深饱和阶色（比框 8FB8E4/BFA0E8 深）
+const CELL_CENTER := {1: Color("#88AEDE"), 2: Color("#B098E0")}   # 中心=略浅阶色（仍≤框亮度·层次感）
 
 # 维度 → 语义色（与战斗动作按钮/抽卡同源·详情维度章用）。
 const DIM_COLOR := {
@@ -68,9 +72,9 @@ const BOOK := Rect2(210, 96, 1500, 906)        # 封皮外框
 const PAGE_L := Rect2(240, 128, 712, 842)      # 左页（网格）
 const PAGE_R := Rect2(968, 128, 712, 842)      # 右页（详情）
 const BANNER := Rect2(806, 46, 308, 78)        # 悬挂牌匾（压住书顶缘）
-const TAB_W := 130.0                            # 书签页签（右缘伸出）
-const TAB_H := 86.0
-const TAB_X := 1648.0                           # 收起时 x（卷轴换皮后=贴右木轴内侧·原书壳期 1684）
+const TAB_W := 214.0                            # 祥云页签（2026-07-13 换皮：240×56 资产等比 4.28:1·原纸签 130×86）
+const TAB_H := 50.0
+const TAB_X := 1600.0                           # 收起时 x（右缘 1814≈右木轴内侧）
 const TAB_PULL := 18.0                          # 选中抽出量
 const TAB_Y0 := 236.0
 const TAB_GAP := 112.0
@@ -201,7 +205,7 @@ func _add_ink_cloud_band(r: Rect2, center_frac: float, seed_v: float, flow: floa
 	move_child(band, tree_idx)
 
 
-## 三阶页签=实体书签：羊皮身 + 稀有度色端带 + 墨描边；选中=抽出更长+金边+墨字。
+## 三阶页签=祥云签（2026-07-13 换皮：GPT 双端云头横幅·三阶同源换色——纸签+稀有度端带+描边全退役）。
 func _build_bookmark_tabs() -> void:
 	for i in 3:
 		var t := i + 1
@@ -212,32 +216,17 @@ func _build_bookmark_tabs() -> void:
 		btn.focus_mode = Control.FOCUS_NONE
 		for s in ["normal", "hover", "pressed", "focus", "disabled"]:
 			btn.add_theme_stylebox_override(s, StyleBoxEmpty.new())
-		FontManager.apply_btn(btn, 24)
+		FontManager.apply_btn(btn, 22)
 		btn.text = tr(String(TIER_LABEL[t]))
-		var edge := ColorRect.new()          # 墨描边
-		edge.name = "Edge"
-		edge.show_behind_parent = true
-		edge.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		edge.offset_left = -2
-		edge.offset_top = -2
-		edge.offset_right = 2
-		edge.offset_bottom = 2
-		edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		btn.add_child(edge)
-		var fill := ColorRect.new()          # 书签身（纸纹·选中态换色走 shader 参数）
-		fill.name = "Fill"
-		fill.show_behind_parent = true
-		fill.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		fill.material = _paper_mat(Vector2(TAB_W, TAB_H), Color(0.84, 0.80, 0.68), Color(0.70, 0.66, 0.54), 0.02, 0.30)
-		btn.add_child(fill)
-		var band := ColorRect.new()          # 稀有度色端带（书签外端·一眼分阶）
-		band.name = "Band"
-		band.position = Vector2(TAB_W - 18, 0)
-		band.size = Vector2(18, TAB_H)
-		band.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		band.color = TIER_COLOR[t]
-		btn.add_child(band)
+		var cloud := TextureRect.new()       # 祥云身（阶色贴图·选中提亮走 _refresh_tabs）
+		cloud.name = "Cloud"
+		cloud.texture = TAB_CLOUD_TEX[t]
+		cloud.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		cloud.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		cloud.show_behind_parent = true      # 垫到按钮文字之下
+		cloud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		cloud.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		btn.add_child(cloud)
 		btn.pressed.connect(_select_tier.bind(t))
 		var bj := ButtonJuice.new()
 		bj.name = "ButtonJuice"
@@ -246,18 +235,13 @@ func _build_bookmark_tabs() -> void:
 		_tab_btns.append(btn)
 
 
-## 刷新书签选中态：选中=抽出（x 左移）+象牙亮身+金边+墨字；未选=收进封皮下+淡墨。
+## 刷新页签选中态：选中=抽出+云身原亮+墨字；未选=收进+云身压暗+淡墨字。
 func _refresh_tabs() -> void:
 	for i in _tab_btns.size():
 		var btn := _tab_btns[i]
 		var sel := (i + 1) == _tier
-		var edge := btn.get_node("Edge") as ColorRect
-		var fill := btn.get_node("Fill") as ColorRect
-		edge.color = Color("#f2e08a") if sel else Color(COVER_RIM, 0.9)
-		var body := Color(0.97, 0.94, 0.83) if sel else Color(0.84, 0.80, 0.68)
-		var fm := fill.material as ShaderMaterial
-		fm.set_shader_parameter("base_color", body)
-		fm.set_shader_parameter("deep_color", body.darkened(0.16))
+		var cloud := btn.get_node("Cloud") as TextureRect
+		cloud.modulate = Color.WHITE if sel else Color(0.74, 0.72, 0.68)
 		btn.add_theme_color_override("font_color", INK if sel else Color(INK, 0.55))
 		var tx := TAB_X + (TAB_PULL if sel else 0.0)
 		create_tween().tween_property(btn, "position:x", tx, 0.15)\
@@ -279,30 +263,22 @@ func _setup_top() -> void:
 	count_lbl.size = Vector2(200, 26)
 
 
-## 像素框材质（大板按尺寸折算 ≈6px/格）。
-func _make_frame_mat(sz: Vector2) -> ShaderMaterial:
-	var m := ShaderMaterial.new()
-	m.shader = FRAME_SHADER
-	m.set_shader_parameter("edge_outer", COVER_RIM)
-	m.set_shader_parameter("edge_mid", GOLD_MID)
-	m.set_shader_parameter("edge_inner", Color(0.52, 0.38, 0.19))
-	m.set_shader_parameter("pixel_grid", sz.x / 6.0)
-	m.set_shader_parameter("border_px", 1.5)
-	m.set_shader_parameter("noise_amt", 0.05)
-	m.set_shader_parameter("light_amount", 0.16)
-	m.set_shader_parameter("aspect", sz.x / sz.y)
-	return m
-
-
-## 悬挂牌匾：深靛底金框金字·压住书顶缘（ref17 的挂牌感）。
+## 悬挂牌匾（2026-07-13 换皮：GPT 米色回纹匾 9-slice+墨字——深靛底+shader 金框+泥金字退役）。
 func _build_banner() -> void:
 	var band := $TopBand as Control
-	_rect(band, Rect2(BANNER.position + Vector2(6, 8), BANNER.size), Color(0.0, 0.0, 0.05, 0.35))
-	_rect(band, Rect2(BANNER.position - Vector2(3, 3), BANNER.size + Vector2(6, 6)), COVER_RIM)
-	var plate := _rect(band, BANNER, Color.WHITE)
-	plate.material = _paper_mat(BANNER.size, Color(BANNER_PLATE, 0.98), Color(0.09, 0.10, 0.19), 0.03, 0.40, 0.55)
-	var frame := _rect(band, BANNER, Color.WHITE)
-	frame.material = _make_frame_mat(BANNER.size)
+	_rect(band, Rect2(BANNER.position + Vector2(6, 8), BANNER.size), Color(0.0, 0.0, 0.05, 0.35))   # 软投影（引擎加·不画进资产）
+	var plaque := NinePatchRect.new()
+	plaque.name = "Plaque"
+	plaque.texture = PLAQUE_TEX
+	plaque.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	plaque.patch_margin_left = 50    # 回纹角区≈48px·9-slice 四角原比例中段拉伸（三挂点比例不一）
+	plaque.patch_margin_right = 50
+	plaque.patch_margin_top = 20
+	plaque.patch_margin_bottom = 20
+	plaque.position = BANNER.position
+	plaque.size = BANNER.size
+	plaque.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	band.add_child(plaque)
 	title_lbl.text = tr("道具图鉴")
 	title_lbl.position = BANNER.position + Vector2(0, -4)
 	title_lbl.size = BANNER.size
@@ -310,9 +286,8 @@ func _build_banner() -> void:
 	title_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title_lbl.z_index = 1
 	FontManager.apply(title_lbl, 36)
-	title_lbl.add_theme_color_override("font_color", GOLD_TEXT)
-	title_lbl.add_theme_constant_override("outline_size", 2)
-	title_lbl.add_theme_color_override("font_outline_color", Color(0.03, 0.03, 0.06, 0.95))
+	title_lbl.add_theme_color_override("font_color", INK)   # 匾面米色→墨字（亮面金字读不清）
+	title_lbl.add_theme_constant_override("outline_size", 0)
 
 
 func _style_back_button() -> void:
