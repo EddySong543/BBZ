@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://dlj8rlclef6rc"]
+
+[ext_resource type="Script" path="res://tools/gallery_click_probe.gd" id="1_script"]
+
+[node name="GalleryClickProbe" type="Node"]
+script = ExtResource("1_script")

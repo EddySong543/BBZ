@@ -1,22 +1,10 @@
-[gd_scene load_steps=11 format=3 uid="uid://bhfrm000000000001"]
+[gd_scene load_steps=9 format=3 uid="uid://bhfrm000000000001"]
 
 [ext_resource type="Script" path="res://src/ui/components/hero_frame.gd" id="1_script"]
-[ext_resource type="Shader" path="res://assets/shaders/canvas_ui_pixel_frame.gdshader" id="2_frame"]
-[ext_resource type="Script" path="res://src/ui/components/corner_overlay.gd" id="3_corner"]
+[ext_resource type="Texture2D" path="res://assets/ui/hero_avatar_frame.png" id="2_frametex"]
 [ext_resource type="Shader" path="res://assets/shaders/canvas_ui_inner_fx.gdshader" id="4_innerfx"]
 [ext_resource type="Shader" path="res://assets/shaders/canvas_ui_portrait_pixelate.gdshader" id="5_pixelate"]
 [ext_resource type="Shader" path="res://assets/shaders/canvas_ui_round_mask.gdshader" id="6_roundmask"]
-
-[sub_resource type="ShaderMaterial" id="FrameMat"]
-resource_local_to_scene = true
-shader = ExtResource("2_frame")
-shader_parameter/edge_outer = Color(0.05, 0.05, 0.06, 1)
-shader_parameter/edge_mid = Color(0.65, 0.67, 0.71, 1)
-shader_parameter/edge_inner = Color(0.34, 0.36, 0.39, 1)
-shader_parameter/pixel_grid = 24.0
-shader_parameter/border_px = 2.0
-shader_parameter/noise_amt = 0.06
-shader_parameter/corner_radius = 0.25
 
 [sub_resource type="ShaderMaterial" id="PortraitMat"]
 resource_local_to_scene = true
@@ -94,8 +82,8 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(1, 1, 1, 1)
 
-[node name="Bg" type="ColorRect" parent="."]
-material = SubResource("FrameMat")
+[node name="Bg" type="TextureRect" parent="."]
+texture_filter = 1
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -103,18 +91,8 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(1, 1, 1, 1)
-
-[node name="Corners" type="Control" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-script = ExtResource("3_corner")
-ref_size = 120.0
+texture = ExtResource("2_frametex")
+expand_mode = 1
 
 [node name="NameLabel" type="Label" parent="."]
 layout_mode = 1

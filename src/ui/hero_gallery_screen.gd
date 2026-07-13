@@ -11,20 +11,21 @@ extends Control
 ##   ③ 网格红心徽在图鉴里隐藏（HP 在详情板·24 红心=噪声）。HPBadge 属共用件不删、仅隐。
 ## ⚠ 装饰节点必须 mouse_filter=IGNORE——否则吞点击（返回失效·v1 踩过坑）。
 
-const HERO_CARD_SCENE := preload("res://src/ui/components/hero_card.tscn")
+const HERO_FRAME_SCENE := preload("res://src/ui/components/hero_frame.tscn")   # 回纹头像框（2026-07-13 换装·hero_card 退出图鉴仅 BP/战斗用）
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")
 const HEART_SHEET := preload("res://assets/ui/icons/heart_idle.png")
 
 const HERO_DATA_DIR := "res://assets/data/heroes/"
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
 
-# ── 左侧牌库网格（24 卡 0.846 缩放=110×134·六列固定网格 6×4）──
-const CARD_SCALE := 0.846
+# ── 左侧牌库网格（2026-07-13 换装：回纹头像框 104px+框下名字·六列固定网格 6×4）──
+const TILE_FRAME := 104.0   # 头像框边长（128px 资产 NEAREST 缩放）
+const TILE_NAME_H := 26.0   # 框下名字带高
 const POOL := Rect2(60, 140, 1032, 900)
 const COLS := 6
 const STEP_X := 121.0
 const ROW_H := 142.0
-const X0 := 218.0
+const X0 := 221.0           # 原 218（卡宽 110）→ +3 保持格中心不变（框宽 104）
 const ROW_Y0 := 186.0
 
 # ── 右侧详情板 ──
@@ -59,7 +60,8 @@ const PASSIVE_TAG := Color(0.30, 0.45, 0.63)   # 被动=靛蓝印
 const PLAQUE := Rect2(800, 26, 320, 64)
 
 var all_heroes: Array[HeroData] = []
-var card_cards: Array[HeroCard] = []
+var card_cards: Array[Button] = []        # 格子点击壳（入场动画/ButtonJuice 挂这层）
+var card_frames: Array[HeroFrame] = []    # 回纹头像框（选中态挂这层）
 var _sel_idx: int = -1
 
 # 详情板部件（_build_detail_panel 一次建好）
@@ -89,6 +91,9 @@ var _row_glow: ColorRect          # 左网格选中行微亮条
 
 
 func _ready() -> void:
+	# 战斗内嵌模式（Eddy 2026-07-13）：不带背景——图鉴实体直接悬在浮层暗幕上（与道具图鉴一致）。
+	if embedded_close.is_valid():
+		$Background.visible = false
 	all_heroes = HeroData.create_launch_pool(HERO_DATA_DIR)   # 首发 24（h01-h24）
 	_setup_top()
 	_build_pool()
@@ -287,24 +292,42 @@ func _build_pool() -> void:
 	pool_area.add_child(_row_glow)
 	for i in all_heroes.size():
 		var h := all_heroes[i]
-		var card := HERO_CARD_SCENE.instantiate() as HeroCard
-		card.hero_id = h.hero_id
-		card.hero_name = h.hero_name
-		card.max_hp = h.max_hp
-		card.portrait_path = h.portrait_path
-		card.scale = Vector2(CARD_SCALE, CARD_SCALE)
+		# 点击壳 Button（与道具图鉴道具卡同构：框+框外下方名字）
+		var card := Button.new()
+		card.flat = true
+		card.focus_mode = Control.FOCUS_NONE
+		card.size = Vector2(TILE_FRAME, TILE_FRAME + TILE_NAME_H)
+		for s in ["normal", "hover", "pressed", "focus", "disabled"]:
+			card.add_theme_stylebox_override(s, StyleBoxEmpty.new())
 		card.position = Vector2(X0 + (i % COLS) * STEP_X, ROW_Y0 + floorf(i / float(COLS)) * ROW_H)
+		# 回纹头像框（HeroFrame 组件·图鉴=中性暖骨·无阵营语义）
+		var frame := HERO_FRAME_SCENE.instantiate() as HeroFrame
+		frame.frame_size = Vector2(TILE_FRAME, TILE_FRAME)
+		frame.portrait_path = h.portrait_path
+		card.add_child(frame)
+		# 框下名字（泥金·深描边·与展板深红底搭）
+		var name_lbl := Label.new()
+		name_lbl.text = tr(h.hero_name)
+		name_lbl.position = Vector2(-8.0, TILE_FRAME + 2.0)
+		name_lbl.size = Vector2(TILE_FRAME + 16.0, TILE_NAME_H)
+		name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		name_lbl.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+		FontManager.apply(name_lbl, 16)
+		name_lbl.add_theme_color_override("font_color", GOLD_TEXT)
+		name_lbl.add_theme_color_override("font_outline_color", Color(0.05, 0.03, 0.02, 0.9))
+		name_lbl.add_theme_constant_override("outline_size", 3)
+		name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.add_child(name_lbl)
 		card.pressed.connect(_select.bind(i))
+		var bj := ButtonJuice.new()
+		bj.name = "ButtonJuice"
+		card.add_child(bj)
 		pool_area.add_child(card)
-		card.compensate_name_scale(CARD_SCALE)   # 名字整数像素渲染（防糊）
-		# 图鉴里隐藏 HP 红心徽（HP 在详情板·24 红心=网格噪声·HPBadge 属共用件仅隐不删）
-		var hb := card.get_node_or_null("HPBadge") as CanvasItem
-		if hb:
-			hb.visible = false
-		var bj := card.get_node_or_null("ButtonJuice") as ButtonJuice
-		if bj:
-			bj.base_scale = CARD_SCALE
+		# ⚠ 必须在入树【后】设 IGNORE：HeroFrame._ready(入树时才跑)会把 mouse_filter 设回 STOP——
+		#   入树前设置会被覆盖 → 框区吞点击=图鉴点选失灵（2026-07-13 实修·探针 gallery_click_probe 锁行为）。
+		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card_cards.append(card)
+		card_frames.append(frame)
 	pool_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
@@ -540,9 +563,9 @@ func _select(idx: int) -> void:
 	if idx == _sel_idx:
 		return
 	if _sel_idx >= 0:
-		card_cards[_sel_idx].card_state = HeroCard.CardState.NORMAL
+		card_frames[_sel_idx].is_selected = false
 	_sel_idx = idx
-	card_cards[idx].card_state = HeroCard.CardState.SELECTED
+	card_frames[idx].is_selected = true   # HeroFrame 选中态=提亮+弹跳 pop（替代旧卡金框）
 
 	var h := all_heroes[idx]
 	if h.sprite_frames_path != "" and ResourceLoader.exists(h.sprite_frames_path):
@@ -669,7 +692,7 @@ func _play_intro() -> void:
 	for i in card_cards.size():
 		var card := card_cards[i]
 		card.pivot_offset = card.size * 0.5
-		card.scale = Vector2(0.001, CARD_SCALE)
+		card.scale = Vector2(0.001, 1.0)
 		card.modulate.a = 0.0
 		var delay := 0.1 + floorf(i / float(COLS)) * 0.1 + (i % COLS) * 0.03
 		var ta := create_tween()
@@ -677,7 +700,7 @@ func _play_intro() -> void:
 		ta.tween_property(card, "modulate:a", 1.0, 0.1)
 		var tp := create_tween()
 		tp.tween_interval(delay)
-		tp.tween_property(card, "scale:x", CARD_SCALE, 0.2)\
+		tp.tween_property(card, "scale:x", 1.0, 0.2)\
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	detail_area.modulate.a = 0.0
 	var td := create_tween()

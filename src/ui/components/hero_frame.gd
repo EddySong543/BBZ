@@ -1,14 +1,19 @@
 class_name HeroFrame
 extends Panel
 
-## 竹节像素头像框(甲A + 底色兜底)：满幅头像 + canvas shader 像素边框 + 矢量菱形角饰 + 阵营暗底。
+## 回纹头像框(2026-07-13 换皮·同日二版：128px 精准资产+宝石退役+敌我=框色)：满幅头像 + 贴图边框 + 阵营暗底。
 ## 头像立绘(portrait_path·带背景方图) → 填满框内(stretch COVERED + clip)；底色层(BgFill)兜底头像没覆盖处(如底部)。
-## 节点层级(自下而上)：BgFill → Portrait 头像(像素化+posterize·nearest) → InnerFX 内阴影+扫描线 → Bg 像素边框 → Corners 四角阵营宝石 → NameLabel。
-## 边框统一「浅锡灰」(简约像素感·中性不偏阵营·出战/替补/敌我同款)；敌我=Corners 四角阵营宝石(我方蓝 / 敌方红)。
-## 内部FX：Portrait 走 PortraitMat(pixelate/posterize) 统一像素颗粒；InnerFX 走 InnerFXMat(暗角 vignette + 极淡扫描线)。阵亡=灰边/灰宝石+头像灰。
+## 节点层级(自下而上)：BgFill → Portrait 头像(像素化+posterize·nearest) → InnerFX 内阴影+扫描线 → Bg 贴图边框 → NameLabel。
+## 敌我=整框换色变体（我方暖骨 hero_avatar_frame.png / 敌方赤陶 _enemy.png·img_recolor 同源换色）——
+## 四角阵营宝石(Corners)已退役(Eddy 2026-07-13)。按 player_color 红蓝倾向自动选贴图·调用方零改动。
+## 状态走 Bg modulate：阵亡压灰·选中提亮。内部FX：PortraitMat 像素颗粒；InnerFXMat 暗角+扫描线。
 
 ## 选中补色（冷亮蓝白）：与战斗底部动作按钮 _set_btn_selected 的高亮一致。
 const SELECTED_TINT := Color(1.28, 1.42, 1.6)
+
+## 敌我框贴图（同源换色变体·tools/img_recolor.gd 产出）。
+const FRAME_TEX := preload("res://assets/ui/hero_avatar_frame.png")             # 我方=暖骨
+const FRAME_TEX_ENEMY := preload("res://assets/ui/hero_avatar_frame_enemy.png") # 敌方=赤陶 #B4544C
 
 @export var portrait_path: String = "":
 	set(v):
@@ -72,10 +77,9 @@ const SELECTED_TINT := Color(1.28, 1.42, 1.6)
 
 var _portrait: TextureRect
 var _name_label: Label
-var _bg: ColorRect
+var _bg: TextureRect          # 贴图边框（2026-07-13 换皮·原 shader ColorRect）
 var _bg_fill: ColorRect
 var _inner_fx: ColorRect
-var _corners: Control
 var _switch_label: Label   # 主动换人：armed 时盖在立绘上显示「切换」二字（任务5）
 var _sel_tween: Tween      # 选中弹跳动画（选择动作时的 pop）
 static var _cache: Dictionary = {}
@@ -96,10 +100,9 @@ func _ready() -> void:
 
 func _setup_children() -> void:
 	_portrait = _find_child_named("Portrait") as TextureRect
-	_bg = _find_child_named("Bg") as ColorRect
+	_bg = _find_child_named("Bg") as TextureRect
 	_bg_fill = _find_child_named("BgFill") as ColorRect
 	_inner_fx = _find_child_named("InnerFX") as ColorRect
-	_corners = _find_child_named("Corners") as Control
 	_name_label = _find_child_named("NameLabel") as Label
 	if _name_label:
 		_name_label.visible = false   # 头像框不显示英雄名(节点保留备用)
@@ -138,47 +141,27 @@ func _refresh_portrait() -> void:
 
 
 func _refresh_style() -> void:
-	# 边框统一中性「深板岩」(faction-neutral·占位色, 出战/替补/敌我同款)；
-	# 敌我改由 Corners 四角阵营宝石(蓝/红)区分。头像像素化/内阴影/扫描线由 PortraitMat + InnerFX 处理(常驻·与状态无关)。仅阵亡转灰。
-	var pc := player_color
-	var e_outer: Color
-	var e_mid: Color
-	var e_inner: Color
-	var corner: Color
+	# 敌我=整框换色贴图（我方暖骨/敌方赤陶·按 player_color 红蓝倾向选）；状态走 Bg modulate。
+	# 头像像素化/内阴影/扫描线由 PortraitMat + InnerFX 处理(常驻·与状态无关)。
 	var fill: Color
+	var frame_mod: Color
 	if is_dead:
-		e_outer = Color(0.04, 0.04, 0.05)
-		e_mid = Color(0.28, 0.29, 0.32)
-		e_inner = Color(0.16, 0.16, 0.18)
-		corner = Color(0.4, 0.4, 0.44)
 		fill = Color(0.1, 0.1, 0.11)
+		frame_mod = Color(0.42, 0.43, 0.46)   # 贴图框压灰（≈旧灰边档位）
 	else:
-		# B 典籍朱印（2026-06-13）：框语言转暖——干净暖骨边（非冷锡灰、非泥棕）+ 近黑暖底；
-		# 敌我仍靠四角宝石(蓝/红)。暖骨=高明度低饱和暖中性，清而不脏。
-		e_outer = Color(0.05, 0.045, 0.04)  # 近黑暖细描边(暗波上勾出框)
-		e_mid = Color(0.80, 0.71, 0.55)     # 暖骨色·提亮(2026-06-28：原0.70偏闷→更亮的浅鎏金、跟暖按钮同档跳出)
-		e_inner = Color(0.52, 0.43, 0.30)   # 暖中性内线·提亮
-		corner = pc                         # 阵营宝石(蓝/红)
-		fill = Color(0.17, 0.145, 0.115)    # 暖底·抬出近黑(原0.11像黑洞→暖深褐)
+		fill = Color(0.17, 0.145, 0.115)      # 暖底·抬出近黑(原0.11像黑洞→暖深褐)
+		frame_mod = Color.WHITE
 
-	# 选中高亮（换人待确认）：提亮边框 + 宝石。
+	# 选中高亮（换人待确认）：提亮边框（≈旧 e_mid.lightened(0.4) 档位·偏暖）。
 	if is_selected and not is_dead:
-		e_mid = e_mid.lightened(0.4)
-		e_inner = e_inner.lightened(0.3)
-		corner = corner.lightened(0.45)
+		frame_mod = Color(1.35, 1.32, 1.18)
 
-	if _bg and _bg.material is ShaderMaterial:
-		var m := _bg.material as ShaderMaterial
-		m.set_shader_parameter("edge_outer", e_outer)
-		m.set_shader_parameter("edge_mid", e_mid)
-		m.set_shader_parameter("edge_inner", e_inner)
+	if _bg:
+		_bg.texture = FRAME_TEX_ENEMY if player_color.r > player_color.b else FRAME_TEX
+		_bg.modulate = frame_mod
 
 	if _bg_fill:
 		_bg_fill.color = fill
-
-	if _corners:
-		_corners.set("corner_color", corner)
-		_corners.set("dead", is_dead)   # 死亡→四角宝石对角连线成 X
 
 	if _portrait:
 		if is_dead:

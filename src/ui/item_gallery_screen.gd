@@ -7,7 +7,8 @@ extends Control
 ##   · 三阶页签 = 从书右缘伸出的实体书签（选中抽出更长更亮）——不再是顶栏胶囊按钮。
 ##   · 标题 = 悬挂在书顶的牌匾；返回 = 夜色上的浮动羊皮芯片；顶栏整条删除。
 ##   · 左页 = 深炭格衬亮羊皮（彩色图标自己会跳）；右页 = 稀有度横幅 + 图标卡 + 划线手记。
-## ⛔ 配色禁区（Eddy 2026-07-04）：暗红/棕全抛；夜色=深靛（与游戏夜空同源）。
+## ⛔ 配色禁区（Eddy 2026-07-04）：暗红/棕全抛。（衬底沿革：深靛夜色 → 2026-07-13 宣纸淡墨山水贴图·
+##   深靛做 UI 衬底已被整体否定=memory [[ui-backdrop-no-deep-indigo]]·牌匾深靛底属点缀件不在此列。）
 ## ⚠ 装饰 ColorRect 必须 mouse_filter=IGNORE（否则吞点击=返回/切阶失效·踩过坑）。
 
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")
@@ -15,7 +16,14 @@ const PAPER_SHADER := preload("res://assets/shaders/canvas_ui_paper.gdshader")  
 const CELL_BG_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")   # 格底：圆角+渐变（v5 中性深炭）
 const ROUND_MASK_SHADER := preload("res://assets/shaders/canvas_ui_round_mask.gdshader")  # 选中金框圆角
 const LEGENDARY_BG := preload("res://assets/ui/gold_bottom.png")                          # 传说道具金云纹格底(Eddy 美术)
-const SCROLL_TEX := preload("res://assets/ui/item_codex_scroll.png")                      # 整屏手卷卷轴(GPT 出图·2026-07-13 换皮·1672×941=16:9·上下白边已转透明)
+const SCROLL_TEX := preload("res://assets/ui/item_codex_scroll.png")                      # 整屏手卷卷轴(GPT 出图·2026-07-13 二版·1672×941=16:9·棋盘格假透明已转真 alpha=img_checker_to_alpha)
+const BACKDROP_TEX := preload("res://assets/ui/item_codex_backdrop.png")                  # 衬底=宣纸淡墨山水(GPT 出图·2026-07-13 Eddy 选 A 修订版·下缘远山+顶部一线远峰·中部留白)
+const INK_CLOUDS_SHADER := preload("res://assets/shaders/canvas_ui_ink_clouds.gdshader")  # 衬底像素墨云旗 v2(上下环绕带·整像素步进流动·2026-07-13 重做)
+const ITEM_FRAME_TEX := {   # 三阶回纹框(头像框素材同源换色·img_recolor·2026-07-13·三提亮="太灰"再进一档)
+	1: preload("res://assets/ui/item_frame_t1.png"),   # 普通=亮青空蓝 #8FB8E4(78A2CE→再亮)
+	2: preload("res://assets/ui/item_frame_t2.png"),   # 稀有=亮藕紫 #BFA0E8(A98BD8→再亮)
+	3: preload("res://assets/ui/item_frame_t3.png"),   # 传说=亮鎏金 #F0C468(E4B75C→再亮)
+}
 const LEGENDARY_BG_TINT := Color(1.0, 1.0, 1.0, 1.0)                                       # 原图亮度·不做暗处理(Eddy 2026-06-27)
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
 
@@ -24,9 +32,8 @@ const GOLD_MID := Color(0.85, 0.65, 0.33)      # 鎏金（护角/牌匾框/金�
 const GOLD_TEXT := Color("#e8bb52")            # 泥金（标题/道具名）
 const IVORY := Color(0.95, 0.90, 0.78)         # 暖米白（夜色/深底上文字）
 
-const NIGHT_TOP := Color(0.115, 0.125, 0.24)   # 夜色衬底=深靛（与战斗夜空同源·非红非棕）
-const NIGHT_BOTTOM := Color(0.06, 0.065, 0.14)
-const NIGHT_CORNER := Color(0.04, 0.045, 0.10)
+# （2026-07-13 衬底换宣纸山水贴图：深靛 NIGHT_* 三常量与 _retint_background 退役——
+#   背景图不透明满屏盖住 Background 节点·gallery_background.tscn 本体不动=英雄图鉴共用。）
 
 const COVER := Color(0.89, 0.86, 0.76)         # 封皮=象牙（ref17：亮封皮浮在深底上）
 const COVER_RIM := Color(0.22, 0.19, 0.13)     # 封皮描边=深墨
@@ -36,8 +43,10 @@ const PAGE_STACK_B := Color(0.76, 0.71, 0.55)  # 页块台阶 暗层
 
 const INK := Color(0.24, 0.19, 0.12)           # 墨（亮页主文字）
 const INK_DIM := Color(0.48, 0.41, 0.28)       # 淡墨（次级/划线/注记）
-const CELL_DARK_FILL := Color(0.135, 0.125, 0.155)  # 深炭格四角（ref15：暗格衬亮页）
-const CELL_DARK_INNER := Color(0.205, 0.19, 0.23)   # 深炭格中心（微亮·冷调）
+# 格底亮方案（2026-07-13 Eddy 回归早期要求：内里=亮阶色（比框亮·非发白）·中心淡白圈托道具主体——v5 深炭格退役）。
+# 传说不走此表（格底=gold_bottom 金云纹美术·只换框色）。
+const CELL_FILL := {1: Color("#A8CDF4"), 2: Color("#C9B6F0")}   # 内里=亮蓝/亮紫（饱和保留·比框 8FB8E4/BFA0E8 更亮）
+const CELL_CENTER := Color("#FBF8EF")                            # 中心=暖白（淡淡白圈·center_glow 径向）
 const BANNER_PLATE := Color(0.145, 0.16, 0.28) # 牌匾底=深靛（金字在其上跳）
 
 # 维度 → 语义色（与战斗动作按钮/抽卡同源·详情维度章用）。
@@ -105,7 +114,6 @@ var _d_flavor: Label
 
 
 func _ready() -> void:
-	_retint_background()
 	_build_book()
 	_setup_top()
 	_build_detail_panel()
@@ -113,37 +121,51 @@ func _ready() -> void:
 	_play_intro()
 
 
-## 夜色衬底=深靛：duplicate 共享 codex 材质做本地覆盖
-## （⚠ 不改 gallery_background.tscn 本体——英雄图鉴共用·且资源缓存会串场景污染）。
-func _retint_background() -> void:
-	var codex := get_node_or_null("Background/Codex") as ColorRect
-	if codex == null or codex.material == null:
-		return
-	var mat := (codex.material as ShaderMaterial).duplicate() as ShaderMaterial
-	mat.set_shader_parameter("top_color", NIGHT_TOP)
-	mat.set_shader_parameter("bottom_color", NIGHT_BOTTOM)
-	mat.set_shader_parameter("corner_color", NIGHT_CORNER)
-	codex.material = mat
-
-
 # ============================================================
-# 卷轴实体（2026-07-13 换皮：整屏手卷贴图替换程序化书壳·GPT 出图）
+# 卷轴实体（2026-07-13 换皮：整屏手卷贴图替换程序化书壳·GPT 出图·
+#   同日二版：衬底换宣纸淡墨山水贴图，深靛夜色退役）
 #   旧书壳（封皮/页块台阶/双页/中缝/护角）全部退役——纸面/木轴/云纹/描边都在贴图里。
 # ============================================================
 
 func _build_book() -> void:
+	# 战斗内嵌模式（Eddy 2026-07-13）：不带任何背景——卷轴直接悬在浮层暗幕上。
+	# （embedded_close 由 battle_codex_overlay 在 add_child 前注入 → _ready 时已可判。）
+	var embedded := embedded_close.is_valid()
+	if embedded:
+		var bg := get_node_or_null("Background") as Control
+		if bg != null:
+			bg.visible = false
+	else:
+		# 衬底=宣纸淡墨山水（Eddy 选 A 修订版：GPT 静态图+像素墨云动效·仅主菜单直开挂）。
+		# ⚠ 独立静态层，不进 _book_layer——入场动画整层上浮+淡入，背景不该跟着飞。
+		# 木桌 shader 留档 assets/shaders/canvas_ui_wood_desk.gdshader（旧 B 方案·未挂）。
+		var backdrop := TextureRect.new()
+		backdrop.name = "Backdrop"
+		backdrop.texture = BACKDROP_TEX
+		backdrop.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR   # 软笔触画面非像素资产·NEAREST 拉伸会出格纹
+		backdrop.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		backdrop.stretch_mode = TextureRect.STRETCH_SCALE
+		backdrop.position = Vector2.ZERO
+		backdrop.size = Vector2(1920.0, 1080.0)   # ⚠ 锚点满铺在程序容器下会塌 0，必须显式尺寸
+		backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(backdrop)
+		move_child(backdrop, 1)   # Background 之上（不透明满屏=深靛夜色被整层盖住）
+
+		# 像素墨云带 v2.1 连绵态：上下环绕（衬底之上、卷轴之下·各掖 40px 进纸缘后面）。
+		# 参考战斗 dark_smoke 稳定骨架·长云搭接成起伏带（Eddy：孤立云朵慢+卡→连绵持续流动）。
+		# ⚠ 两条横带 quad 非全屏（全屏程序化 shader 性能黑洞教训）。
+		_add_ink_cloud_band(Rect2(0, 0, 1920, 150), 0.37, 0.0, 0.03, 2)      # 顶带：≈7px/s 整层平滑滑移(v2.2·非步进)
+		_add_ink_cloud_band(Rect2(0, 930, 1920, 150), 0.63, 5.0, -0.025, 3)  # 底带：反向≈6px/s
+
 	_book_layer = Control.new()
 	_book_layer.name = "BookLayer"
 	_book_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_book_layer)
-	move_child(_book_layer, 1)   # 压在 Background 之上、网格/详情之下
-
-	# 衬底=夜色直透（2026-07-13 Eddy：木桌方案出戏·撤）——卷轴上下透明带后面
-	# 就是 Background 的深靛径向夜色（书壳时代同款·全游戏家调）；冷靛暗底衬暖纸=深框亮页。
-	# 木桌 shader 留档 assets/shaders/canvas_ui_wood_desk.gdshader（B 方案·未挂）。
+	move_child(_book_layer, 1 if embedded else 4)   # 内嵌=Background 位·直开=压衬底+云气之上
 
 	# 整屏卷轴（1672×941 原生 16:9 → 拉伸满屏 ×1.148·NEAREST 保像素边·
-	# 「大小优先于严格完美像素」项目惯例）。左右木轴各约 120px，纸面 x≈120-1800。
+	# 「大小优先于严格完美像素」项目惯例）。二版实测（img_checker_to_alpha 报告换算）：
+	# 木轴内侧=纸面 x≈113-1808（与旧版几乎一致·横向布局不动），纸面纵向 y≈110-970（旧 60-1020）。
 	var scroll := TextureRect.new()
 	scroll.name = "Scroll"
 	scroll.texture = SCROLL_TEX
@@ -157,6 +179,25 @@ func _build_book() -> void:
 
 	# 三阶书签页签（纸面右缘·贴木轴内侧）
 	_build_bookmark_tabs()
+
+
+## 像素墨云横带（衬底装饰·shader=canvas_ui_ink_clouds v2）。
+## center_frac=云带垂直中心（带高比例）；seed_v=层种子（⚠上下带必须互异）；flow=流速（格/秒·负=反向）。
+func _add_ink_cloud_band(r: Rect2, center_frac: float, seed_v: float, flow: float, tree_idx: int) -> void:
+	var band := ColorRect.new()
+	band.name = "InkCloudsTop" if r.position.y < 540.0 else "InkCloudsBottom"
+	band.color = Color.WHITE           # shader 乘 COLOR·须白（跟随 modulate 惯例）
+	band.position = r.position
+	band.size = r.size
+	band.mouse_filter = Control.MOUSE_FILTER_IGNORE   # ⚠ 装饰件必 IGNORE（吞点击踩过坑）
+	var m := ShaderMaterial.new()
+	m.shader = INK_CLOUDS_SHADER
+	m.set_shader_parameter("center_frac", center_frac)
+	m.set_shader_parameter("seed", seed_v)
+	m.set_shader_parameter("flow_speed", flow)
+	band.material = m
+	add_child(band)
+	move_child(band, tree_idx)
 
 
 ## 三阶页签=实体书签：羊皮身 + 稀有度色端带 + 墨描边；选中=抽出更长+金边+墨字。
@@ -379,9 +420,8 @@ func _build_pool() -> void:
 	pool_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
-## 单件道具卡（深炭格衬亮页·稀有度框·图标自己跳）。选中=金框由 _select 刷。
+## 单件道具卡（深炭格衬亮页·回纹阶框=蓝/紫/金·图标自己跳）。选中=金框由 _select 刷。
 func _make_item_card(item: ItemData, idx: int) -> Button:
-	var rc: Color = ItemCatalog.rarity_color(item.tier)   # 稀有度色（蓝/紫/金）
 	var card := Button.new()
 	card.flat = true
 	card.focus_mode = Control.FOCUS_NONE
@@ -411,8 +451,8 @@ func _make_item_card(item: ItemData, idx: int) -> Button:
 	cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var cm := ShaderMaterial.new()
 	cm.shader = CELL_BG_SHADER
-	cm.set_shader_parameter("fill_color", CELL_DARK_FILL)
-	cm.set_shader_parameter("inner_color", CELL_DARK_INNER)
+	cm.set_shader_parameter("fill_color", CELL_FILL.get(item.tier, CELL_FILL[1]))
+	cm.set_shader_parameter("inner_color", CELL_CENTER)
 	cm.set_shader_parameter("center_glow", 1.0)
 	cm.set_shader_parameter("corner_radius", 0.18)
 	cm.set_shader_parameter("pixel_grid", BOX / 6.0)
@@ -423,20 +463,11 @@ func _make_item_card(item: ItemData, idx: int) -> Button:
 	cm.set_shader_parameter("cloud_on", 0.0)
 	cell.material = cm
 	card.add_child(cell)
-	# 像素框（边=稀有度色·圆角）
-	var frame := ColorRect.new()
-	var m := ShaderMaterial.new()
-	m.shader = FRAME_SHADER
-	m.set_shader_parameter("edge_outer", COVER_RIM)
-	m.set_shader_parameter("edge_mid", rc)
-	m.set_shader_parameter("edge_inner", rc.darkened(0.45))
-	m.set_shader_parameter("pixel_grid", BOX / 6.0)
-	m.set_shader_parameter("border_px", 2.0)
-	m.set_shader_parameter("noise_amt", 0.05)
-	m.set_shader_parameter("light_amount", 0.18)
-	m.set_shader_parameter("aspect", 1.0)
-	m.set_shader_parameter("corner_radius", 0.18)
-	frame.material = m
+	# 回纹阶框（2026-07-13 换皮：头像框素材同源换色三阶变体·原稀有度像素框 shader 退役）
+	var frame := TextureRect.new()
+	frame.texture = ITEM_FRAME_TEX[item.tier]
+	frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	frame.position = Vector2.ZERO
 	frame.size = Vector2(BOX, BOX)
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -560,8 +591,8 @@ func _build_detail_panel() -> void:
 	_d_flavor.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	_d_flavor.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
-	# 快捷键提示：夜色上·书外底部（不占书页）
-	var hint := _make_label(Vector2(0, 986), Vector2(1920, 24), 14, Color(INK, 0.62))   # 卷轴换皮：纸面上墨字·纸底缘 1020 内（原夜色底米白·2026-07-13）
+	# 快捷键提示：卷轴下方·宣纸衬底上的墨字注记（二版纸底缘≈970 → y986 落在衬底山水留白带）
+	var hint := _make_label(Vector2(0, 986), Vector2(1920, 24), 14, Color(INK, 0.62))
 	hint.text = tr("← → 切换道具 · 普通/稀有/传说 切阶 · ESC 返回")
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
