@@ -205,17 +205,20 @@ func test_slot_row_staged_highlight() -> void:
 	var row := ItemSlotRow.new()
 	row.interactive = true
 	add_child_autofree(row)
-	# 已点选使用 → 框边转最亮金(GOLD_STAGED·shader 框) + 图标下沉 3px（「✓用」文字已退役）；贴图框让位隐藏。
+	# 已点选使用 → 回纹框保留（不再清除换框——Eddy 2026-07-13 五改）+ 金晕外环 + 图标下沉 3px。
 	row.refresh(b, 0, [0])
-	assert_eq(row._frame_mats[0].get_shader_parameter("edge_mid"), ItemSlotRow.GOLD_STAGED, "暂存 = 最亮金边")
-	assert_false(row._tex_frames[0].visible, "暂存 = shader 金边框·贴图框隐藏")
-	assert_eq(row._icons[0].position.y, ItemSlotRow.ICON_INSET + 3.0, "暂存 = 图标下沉（按下感）")
+	assert_true(row._tex_frames[0].visible, "点选 = 回纹阶框保留不清除")
+	assert_true(row._frames[0].visible, "点选 = 金晕外环显示")
+	assert_eq(row._frame_mats[0].get_shader_parameter("edge_mid"), ItemSlotRow.GOLD_STAGED, "金晕 = 最亮金")
+	assert_eq(row._tex_frames[0].modulate, ItemSlotRow.STAGED_TINT, "点选 = 框身提金")
+	assert_false(row._up_badges[0].visible, "点选时升箭角标让位金晕")
+	assert_eq(row._icons[0].position.y, ItemSlotRow.ICON_INSET + 3.0, "点选 = 图标下沉（按下感）")
 	assert_eq(row._labels[0].text, "", "状态文字全退役")
-	# 取消点选 → 就绪道具回到回纹阶框贴图 + 图标回弹。
+	# 取消点选 → 金晕隐藏 + 图标回弹，回纹阶框一直在。
 	row.refresh(b, 0, [])
-	assert_true(row._tex_frames[0].visible, "取消点选就绪道具 = 回纹阶框贴图")
+	assert_true(row._tex_frames[0].visible, "取消点选 = 回纹阶框仍在")
 	assert_eq(row._tex_frames[0].texture, ItemSlotRow.ITEM_FRAME_TEX[b.slot_item(0, 0).tier], "贴图框 = 对应稀有度阶框")
-	assert_false(row._frames[0].visible, "shader 状态框隐藏")
+	assert_false(row._frames[0].visible, "金晕外环隐藏")
 	assert_eq(row._icons[0].position.y, ItemSlotRow.ICON_INSET, "取消点选 = 图标回弹")
 
 
@@ -352,20 +355,20 @@ func test_cannot_upgrade_when_not_ready() -> void:
 	assert_false(b.can_upgrade(0, 0), "未就绪不可升")
 
 
-func test_slot_row_shows_upgrade_cost_chip_when_upgradeable() -> void:
+func test_slot_row_tracks_upgradeable_state() -> void:
+	# 费用章已退役（Eddy 2026-07-13：槽顶费用章不合适）——升级入口=升箭角标点击/右键。
 	var b := _battle_ready(20)
 	b.slots[0][0]["item"] = ItemCatalog.make("t1_feibiao")
 	var row := ItemSlotRow.new()
 	row.interactive = true
 	add_child_autofree(row)
 	row.refresh(b, 0)
-	assert_true(row._cost_chips[0].visible, "就绪可升级 → 左上角费用章显示")
-	assert_eq(row._cost_chips[0].number, int(round(BattleCore.UPGRADE_COST / float(ActionDef.ENERGY_UNIT))), "费用章 = 升级整能费")
-	assert_true(row._can_up[0], "可升级标记（右键入口判据）")
+	assert_true(row._can_up[0], "就绪可升级 → 可升级标记（升级入口判据）")
+	assert_true(row._up_badges[0].visible, "就绪可升级 → 右上升箭角标显示")
 	b.slots[0][0]["item"] = ItemCatalog.make("t3_shengming")   # 顶级不可升
 	row.refresh(b, 0)
-	assert_false(row._cost_chips[0].visible, "顶级不可升 → 费用章隐藏")
-	assert_false(row._can_up[0])
+	assert_false(row._can_up[0], "顶级不可升 → 标记清除")
+	assert_false(row._up_badges[0].visible, "顶级不可升 → 角标隐藏")
 
 
 func test_slot_row_upgrade_signal_gated_by_interactive() -> void:
@@ -384,3 +387,11 @@ func test_slot_row_upgrade_signal_gated_by_interactive() -> void:
 	row._can_up[2] = true
 	row._on_slot_gui_input(ev, 2)
 	assert_eq(captured[0], 2, "交互行右键发升级信号")
+	# 升箭角标点击 = 同一升级信号（主入口·右键降为快捷）。
+	row._can_up[0] = true
+	row._on_up_badge_pressed(0)
+	assert_eq(captured[0], 0, "角标点击发升级信号")
+	captured[0] = -99
+	row.interactive = false
+	row._on_up_badge_pressed(0)
+	assert_eq(captured[0], -99, "非交互行角标点击不发信号")

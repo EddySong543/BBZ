@@ -3,11 +3,13 @@ extends Control
 
 ## 道具栏组件（2026-07-13 无文字状态语言重做·同日二版按 Eddy 反馈修）：横排 3 格。
 ## 状态语言=回纹框（全状态统一·有道具=阶框/无道具=暖骨中性框）+ 小配饰 + 动效，状态文字全退役：
-##   未解锁=斜贴封条（挂锁图标+圆点=剩余回合·到点撕落+框弹亮）；锁中=阶框压暗+角上小封条（带小挂锁）；
-##   可抽/可补=同语言（卡背浮动+框金呼吸=本回合可点·补货费走费用章）；待抽=卡背压暗静止；
-##   就绪=全彩；点选=金边+图标下沉；空=纯暗格。
-## 升级入口=右键点槽（悬停提示说明）；费用展示=槽左上角能量章（IconBadge·与底部按钮 CostPips 同款）。
-## （升条/▲pip 方案已撤销：升条与悬停提示框抢槽下空间、pip 不明显——Eddy 2026-07-13。）
+##   未解锁=斜贴封条（圆点=剩余回合·到点撕落+框弹亮）；锁中=阶框压暗+角上小封条（单圆点=1回合）；
+##   可抽/可补=同语言（锦囊轻浮+框金呼吸=本回合可点）；待抽=锦囊压暗静止；
+##   就绪=全彩；可升级=右上金升箭角标（点击/右键=升级）+框向下一阶色呼吸；
+##   点选=金晕外环+框身提金+图标下沉（回纹框保留不清除）；空=纯暗格。
+## 升级入口=升箭角标点击 / 右键点槽（费用见悬停提示）。
+## （挂锁图标/槽顶费用章/卡背/点选换金边框/升条/▲pip 均已退役——Eddy 2026-07-13 三轮反馈：
+##  锁多此一举、费用章不合适、卡背与道具无关、点选清框不和谐、升条撞提示框、pip 不明显。）
 ## 原则「框安静、内容响」。interactive=true（P1）可点击/有 CTA 动效；false（P2·AI 道具-blind）仅显示状态。
 ## 用法：add_child → interactive/connect（仅 P1）→ 每次 _update_all 调 refresh(battle, player, staged)。
 
@@ -30,7 +32,7 @@ const DIM_COLOR := {
 ## 道具框形式（2026-06-28 Eddy：战斗道具栏统一为「道具图鉴」同款形式）：
 ##   双层 = 暗格底 canvas_ui_item_cell_bg（稀有度暗底 + 中心高亮 + 传说金底图）+ 稀有度像素框 canvas_ui_pixel_frame。
 ##   与 item_gallery_screen 完全同源（像素框 + 暗格 + 居中图标 + 全圆角）。jelly 仅保留给右上「升」角标。
-const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")        # 状态框（无道具/金边态·有道具改走回纹贴图框）
+const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")        # 点选金晕外环用（框本体全走回纹贴图）
 const ITEM_FRAME_TEX := {   # 三阶回纹框（2026-07-13 与图鉴同源同款贴图）
 	1: preload("res://assets/ui/item_frame_t1.png"),
 	2: preload("res://assets/ui/item_frame_t2.png"),
@@ -64,13 +66,35 @@ const EMP_EI := Color(0.44, 0.40, 0.32)
 const EMPTY_EDGE := Color(0.43, 0.42, 0.41)
 # ── 无文字状态语言（2026-07-13 重做·Eddy 批 B+A 方案）：状态=回纹框+小配饰+动效·文字全退役 ──
 const NEUTRAL_FRAME_TEX := preload("res://assets/ui/hero_avatar_frame.png")   # 无道具态回纹框（暖骨中性·与头像框同源）
-const COIN_SHEET := preload("res://assets/ui/icons/energy_idle.png")          # 费用章金币（IconBadge·与底部按钮 CostPips 同款）
 const SEAL_PAPER := Color("#E8DCC0")            # 封条纸面（米色封印语言·与匾/签同族）
 const SEAL_EDGE_INK := Color(0.23, 0.17, 0.12)  # 封条描边
 const SEAL_PIP_INK := Color(0.45, 0.34, 0.23)   # 封条圆点（剩余回合数）
-const CARD_EDGE := Color(0.32, 0.24, 0.17)      # 卡背描边（可抽=面朝下的卡）
-const CARD_FILL := Color(0.62, 0.50, 0.36)      # 卡背暖褐
-const CARD_MOTIF := Color(0.80, 0.70, 0.54)     # 卡背中心菱纹
+# 锦囊（可抽/可补·2026-07-13 Eddy：卡背与道具无关→换"装道具的袋子"）：束口布袋+金绳袋口+绣纹点缀。
+const POUCH_EDGE := Color(0.32, 0.24, 0.17)     # 袋描边
+const POUCH_CLOTH := Color(0.62, 0.50, 0.36)    # 袋身暖褐布
+const POUCH_CLOTH_DK := Color(0.50, 0.40, 0.29) # 袋揪/袋底（暗一档=体积感）
+const POUCH_TIE := Color(0.90, 0.76, 0.42)      # 束口金绳（袋口透金光）
+const POUCH_MOTIF := Color(0.80, 0.70, 0.54)    # 袋身绣纹菱点
+const POUCH_RECTS: Array = [                    # [Rect2, 色]（26×33 画布·双耳束口+鼓身=一眼袋子·后续可换 GPT 贴图）
+	[Rect2(6, 0, 5, 6), POUCH_CLOTH],      # 左布耳（束口上方布揪·中间缺口=收拢褶）
+	[Rect2(15, 0, 5, 6), POUCH_CLOTH],     # 右布耳
+	[Rect2(8, 6, 10, 3), POUCH_TIE],       # 束口金绳（窄于袋身=勒紧·防读成罐盖）
+	[Rect2(5, 9, 16, 4), POUCH_CLOTH],     # 肩
+	[Rect2(2, 13, 22, 6), POUCH_CLOTH],
+	[Rect2(0, 19, 26, 7), POUCH_CLOTH],    # 腹（最宽·鼓袋）
+	[Rect2(2, 26, 22, 4), POUCH_CLOTH],
+	[Rect2(5, 30, 16, 3), POUCH_CLOTH_DK], # 底
+]
+const POUCH_W := 26.0
+const POUCH_H := 33.0   # = POUCH_ROWS 高度和
+# 升级表现（2026-07-13 Eddy 定 A+B）：右上金升箭角标（可点=升级）+ 回纹框向下一阶色呼吸。
+const NEXT_TIER_TINT := {   # modulate 乘色：当前阶框主色 → 下一阶主色（8FB8E4→BFA0E8→F0C468 通道比）
+	1: Color(1.34, 0.87, 1.02),
+	2: Color(1.26, 1.23, 0.45),
+}
+# 点选表现（2026-07-13 Eddy 定 A）：回纹框保留·外扩金晕环+框身提亮+图标下沉。
+const STAGED_TINT := Color(1.18, 1.10, 0.98)    # 点选=框身轻暖提亮（乘色·不动色相防蓝框染绿）
+const RING_PAD := 4.0                           # 金晕外环外扩像素（外露部分须是金——外描边也走金）
 # 文字层级（2026-07-08 优化点②）：静默态文字退后、可操作态文字响——「框安静、内容响」延伸到字。
 const TXT_BRIGHT := Color(0.98, 0.96, 0.9)      # 可抽/可补/就绪/✓用（可操作·亮米白）
 const TXT_DIM := Color(0.78, 0.74, 0.66)        # 锁/待抽/锁中（静默电报·暖灰退后）
@@ -87,8 +111,8 @@ const ICON_INSET := 9.0                          # 图标内缩（露出框·与
 
 var _cells: Array[ColorRect] = []              # 每槽暗格底（cell_bg：稀有度暗底 + 中心高亮 + 传说金底图）
 var _cell_mats: Array[ShaderMaterial] = []     # refresh 重设 fill_color / center_glow / use_tex
-var _frames: Array[ColorRect] = []             # 每槽状态像素框（pixel_frame·无道具/金边态用）
-var _frame_mats: Array[ShaderMaterial] = []    # refresh 重设 edge_mid / edge_inner（状态色）
+var _frames: Array[ColorRect] = []             # 每槽点选金晕外环（pixel_frame·外扩金边·仅点选显示）
+var _frame_mats: Array[ShaderMaterial] = []    # 金晕材质（金色在 _ready 一次性设定）
 var _tex_frames: Array[TextureRect] = []       # 每槽回纹阶框贴图（有道具时替换 shader 框·与图鉴同款）
 var _icons: Array[TextureRect] = []            # 道具图标层（缺图隐藏 → 回退文字·零回归）
 var _icon_cache := {}                          # id → Texture2D / null（避免每帧 load/exists）
@@ -98,13 +122,15 @@ var _buttons: Array[Button] = []
 var _seals: Array[Control] = []                # 未解锁=斜贴封条（挂锁图标+剩余回合圆点）
 var _seal_pips: Array[Array] = []              # 每封条 3 圆点
 var _mini_seals: Array[Control] = []           # 锁中=角上半张小封条（带小挂锁）
-var _cardbacks: Array[Control] = []            # 可抽/待抽/可补=面朝下小卡背（抽补同语言）
-var _cost_chips: Array[IconBadge] = []         # 左上角费用章（能量币+数字·与底部按钮同款·升级/补货费）
+var _pouches: Array[Control] = []              # 可抽/待抽/可补=锦囊（抽补同语言）
+var _up_badges: Array[Button] = []             # 右上升箭角标（可点=升级·可升级且未点选时显示）
+var _up_chevs: Array[Control] = []             # 角标内双升箭容器（跳动动效对象）
 var _can_up: Array[bool] = [false, false, false]
 var _anim_keys: Array[String] = ["", "", ""]   # 每槽 ambient 动效键（变更才重建 tween·恢复前必 kill）
-var _anim_tweens: Array = [null, null, null]
+var _anim_tweens: Array = [[], [], []]         # 每槽 ambient tween 列表（upN=框呼吸+角标跳双 tween）
 var _prev_sealed: Array = [null, null, null]   # 上帧封印态（null=首刷不放撕封条动画）
 var _prev_locked: Array = [null, null, null]
+var _prev_staged: Array = [null, null, null]   # 上帧点选态（false→true 才放金晕 pop）
 
 
 ## 暗格底材质（cell_bg·与图鉴同 shader）：稀有度暗底 + 中心高亮 + 传说金底图。颜色/高亮每次 refresh 重设。
@@ -121,7 +147,7 @@ func _make_cell_material() -> ShaderMaterial:
 	return m
 
 
-## 稀有度像素框材质（pixel_frame·与图鉴/英雄卡同 shader）。edge_mid/inner 每次 refresh 设状态/稀有度色。
+## 金晕外环材质（pixel_frame·与图鉴/英雄卡同 shader）：点选态金边·edge 色在 _ready 一次性设定。
 func _make_frame_material() -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = FRAME_SHADER
@@ -150,14 +176,18 @@ func _ready() -> void:
 		cell.material = cmat
 		cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(cell)
-		# 稀有度像素框（pixel_frame·中心透明只画边）：覆在格底上、图标之下。
+		# 点选金晕外环（pixel_frame shader·金边·外扩 RING_PAD）：仅点选显示·衬在回纹框后（不再换框）。
 		var frame := ColorRect.new()
 		frame.color = Color.WHITE
-		frame.position = base
-		frame.size = Vector2(SLOT_W, SLOT_H)
+		frame.position = base - Vector2(RING_PAD, RING_PAD)
+		frame.size = Vector2(SLOT_W + RING_PAD * 2.0, SLOT_H + RING_PAD * 2.0)
 		var fmat := _make_frame_material()
+		fmat.set_shader_parameter("edge_outer", GOLD_STAGED.darkened(0.25))   # 外露 4px 必须是金（深咖会读成黑圈）
+		fmat.set_shader_parameter("edge_mid", GOLD_STAGED)
+		fmat.set_shader_parameter("edge_inner", GOLD_STAGED.darkened(0.5))
 		frame.material = fmat
 		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		frame.visible = false
 		add_child(frame)
 		# 回纹阶框贴图（有道具时显示·替换 shader 框·与图鉴同款素材）。
 		var tframe := TextureRect.new()
@@ -192,23 +222,13 @@ func _ready() -> void:
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(lbl)
 		# 点击层（透明 flat 按钮，铺满整格）：仅 interactive 时吃点击。
-		# ── 无文字状态语言部件（封条/小封条/卡背/金币/▲pip·全 IGNORE·refresh 控显）──
+		# ── 无文字状态语言部件（封条/小封条/锦囊·全 IGNORE·refresh 控显）──
 		var seal := _make_seal(base)
 		add_child(seal)
 		var mseal := _make_mini_seal(base)
 		add_child(mseal)
-		var cback := _make_cardback(base)
-		add_child(cback)
-		# 费用章（左上角能量币+数字·与底部按钮 CostPips 同语言）：可升级=升级费·可补=补货费。
-		var chip := IconBadge.new()
-		chip.position = base + Vector2(-9.0, -10.0)
-		chip.size = Vector2(26.0, 26.0)
-		chip.set_icon(COIN_SHEET, 4, 4, 0)
-		chip.font_size = 12
-		chip.outline_size = 4
-		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		chip.visible = false
-		add_child(chip)
+		var pouch := _make_pouch(base)
+		add_child(pouch)
 		var btn := Button.new()
 		btn.flat = true
 		btn.focus_mode = Control.FOCUS_NONE
@@ -216,10 +236,23 @@ func _ready() -> void:
 		btn.size = Vector2(SLOT_W, SLOT_H)
 		btn.mouse_filter = Control.MOUSE_FILTER_STOP if interactive else Control.MOUSE_FILTER_IGNORE
 		btn.pressed.connect(_on_slot_pressed.bind(i))
-		btn.gui_input.connect(_on_slot_gui_input.bind(i))   # A 方案：右键=升级
+		btn.gui_input.connect(_on_slot_gui_input.bind(i))   # 右键=升级（快捷入口·与角标同信号）
 		btn.mouse_entered.connect(_on_slot_hover.bind(i))
 		btn.mouse_exited.connect(_on_slot_unhover)
 		add_child(btn)
+		# 升箭角标（右上·可点=升级）：金色双升箭+深描边·加在点击层之后=接管角标区点击。
+		var badge := Button.new()
+		badge.flat = true
+		badge.focus_mode = Control.FOCUS_NONE
+		badge.position = base + Vector2(SLOT_W - 18.0, -4.0)
+		badge.size = Vector2(22.0, 22.0)
+		badge.visible = false
+		badge.pressed.connect(_on_up_badge_pressed.bind(i))
+		badge.mouse_entered.connect(_on_slot_hover.bind(i))   # 角标区悬停仍算槽悬停（提示框不闪断）
+		badge.mouse_exited.connect(_on_slot_unhover)
+		var chev := _make_chevrons()
+		badge.add_child(chev)
+		add_child(badge)
 		_cells.append(cell)
 		_cell_mats.append(cmat)
 		_frames.append(frame)
@@ -230,11 +263,12 @@ func _ready() -> void:
 		_buttons.append(btn)
 		_seals.append(seal)
 		_mini_seals.append(mseal)
-		_cardbacks.append(cback)
-		_cost_chips.append(chip)
+		_pouches.append(pouch)
+		_up_badges.append(badge)
+		_up_chevs.append(chev)
 
 
-## 斜贴封条（未解锁）：米色纸条+深褐描边+剩余回合圆点（手贴微斜=封印语言·与匾/签同族）。
+## 斜贴封条（未解锁）：米色纸条+深褐描边+剩余回合圆点居中（手贴微斜=封印语言·与匾/签同族·挂锁已退役）。
 func _make_seal(base: Vector2) -> Control:
 	var root := Control.new()
 	root.position = base + Vector2(SLOT_W * 0.5, SLOT_H * 0.5)
@@ -255,13 +289,12 @@ func _make_seal(base: Vector2) -> Control:
 	paper.size = Vector2(w, h)
 	paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(paper)
-	_add_padlock(root, Vector2(-24.0, 0.0), 1.0)   # 挂锁图标="封住"一眼知义（Eddy：封条莫名其妙）
 	var pips: Array = []
 	for k in 3:
 		var p := ColorRect.new()
 		p.color = SEAL_PIP_INK
 		p.size = Vector2(6.0, 6.0)
-		p.position = Vector2(-6.0 + k * 12.0, -3.0)
+		p.position = Vector2(-15.0 + k * 12.0, -3.0)   # 三点整组居中（挂锁退役后左移补位）
 		p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		root.add_child(p)
 		pips.append(p)
@@ -269,22 +302,7 @@ func _make_seal(base: Vector2) -> Control:
 	return root
 
 
-## 像素挂锁图标（画在封条上）：锁体 + 锁梁三段（顶横+两腿）·全 ColorRect。
-func _add_padlock(parent: Control, at: Vector2, s: float = 1.0) -> void:
-	for r: Rect2 in [
-			Rect2(at + Vector2(-5.0, -1.0) * s, Vector2(10.0, 8.0) * s),   # 锁体
-			Rect2(at + Vector2(-3.0, -6.0) * s, Vector2(6.0, 2.0) * s),    # 锁梁顶横
-			Rect2(at + Vector2(-3.0, -4.0) * s, Vector2(2.0, 3.0) * s),    # 锁梁左腿
-			Rect2(at + Vector2(1.0, -4.0) * s, Vector2(2.0, 3.0) * s)]:    # 锁梁右腿
-		var c := ColorRect.new()
-		c.color = SEAL_EDGE_INK
-		c.position = r.position
-		c.size = r.size
-		c.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		parent.add_child(c)
-
-
-## 角上半张小封条（锁中·冷却 1 回合）：短条斜贴右上角。
+## 角上半张小封条（锁中·冷却 1 回合）：短条斜贴右上角·单圆点=剩 1 回合（与大封条同语言）。
 func _make_mini_seal(base: Vector2) -> Control:
 	var root := Control.new()
 	root.position = base + Vector2(SLOT_W - 16.0, 14.0)
@@ -305,35 +323,73 @@ func _make_mini_seal(base: Vector2) -> Control:
 	paper.size = Vector2(w, h)
 	paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(paper)
-	_add_padlock(root, Vector2(0.0, 0.5), 0.9)   # 小挂锁居中（锁中一眼知义）
+	var pip := ColorRect.new()
+	pip.color = SEAL_PIP_INK
+	pip.size = Vector2(6.0, 6.0)
+	pip.position = Vector2(-3.0, -3.0)   # 单点居中=剩 1 回合
+	pip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(pip)
 	return root
 
 
-## 面朝下小卡背（可抽/可补同语言·Eddy：两者保持一致）：暖褐卡+中心菱纹·可操作时轻浮动。
-func _make_cardback(base: Vector2) -> Control:
+## 锦囊（可抽/可补同语言·"打开锦囊得道具"）：双耳束口布袋居中·金绳勒口·绣纹菱点·可操作时轻浮动。
+## 剪影两遍绘制：先描边层（每块外扩 1px·相邻块叠出整体轮廓）再填充层。
+func _make_pouch(base: Vector2) -> Control:
 	var root := Control.new()
-	root.position = base + Vector2((SLOT_W - 24.0) * 0.5, (SLOT_H - 32.0) * 0.5)
+	root.position = base + Vector2((SLOT_W - POUCH_W) * 0.5, (SLOT_H - POUCH_H) * 0.5)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.visible = false
-	var edge := ColorRect.new()
-	edge.color = CARD_EDGE
-	edge.size = Vector2(24.0, 32.0)
-	edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(edge)
-	var fill := ColorRect.new()
-	fill.color = CARD_FILL
-	fill.position = Vector2(2.0, 2.0)
-	fill.size = Vector2(20.0, 28.0)
-	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(fill)
-	var motif := ColorRect.new()
-	motif.color = CARD_MOTIF
-	motif.size = Vector2(8.0, 8.0)
-	motif.position = Vector2(8.0, 12.0)
-	motif.pivot_offset = Vector2(4.0, 4.0)
+	for pr: Array in POUCH_RECTS:
+		var r: Rect2 = pr[0]
+		var e := ColorRect.new()
+		e.color = POUCH_EDGE
+		e.position = r.position - Vector2.ONE
+		e.size = r.size + Vector2.ONE * 2.0
+		e.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(e)
+	for pr: Array in POUCH_RECTS:
+		var f := ColorRect.new()
+		f.color = pr[1]
+		f.position = (pr[0] as Rect2).position
+		f.size = (pr[0] as Rect2).size
+		f.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(f)
+	var motif := ColorRect.new()   # 绣纹菱点（袋腹中心·与旧卡背菱纹同语言延续）
+	motif.color = POUCH_MOTIF
+	motif.size = Vector2(7.0, 7.0)
+	motif.position = Vector2((POUCH_W - 7.0) * 0.5, 19.0)
+	motif.pivot_offset = Vector2(3.5, 3.5)
 	motif.rotation = 0.785
 	motif.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(motif)
+	return root
+
+
+## 金色双升箭（∧∧·全 ColorRect 两遍=深描边底+金身·装进角标钮内）。
+func _make_chevrons() -> Control:
+	var root := Control.new()
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var rects: Array = []
+	for cy: float in [3.0, 10.0]:   # 上下两道箭·每道 5 段阶梯
+		rects.append(Rect2(9.0, cy, 4.0, 3.0))          # 箭尖
+		rects.append(Rect2(6.0, cy + 2.0, 4.0, 3.0))    # 中段左右
+		rects.append(Rect2(12.0, cy + 2.0, 4.0, 3.0))
+		rects.append(Rect2(3.0, cy + 4.0, 4.0, 3.0))    # 外段左右
+		rects.append(Rect2(15.0, cy + 4.0, 4.0, 3.0))
+	for r: Rect2 in rects:
+		var e := ColorRect.new()
+		e.color = SEAL_EDGE_INK
+		e.position = r.position - Vector2.ONE
+		e.size = r.size + Vector2.ONE * 2.0
+		e.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(e)
+	for r: Rect2 in rects:
+		var c := ColorRect.new()
+		c.color = GOLD_READY
+		c.position = r.position
+		c.size = r.size
+		c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(c)
 	return root
 
 
@@ -342,11 +398,17 @@ func _on_slot_pressed(slot: int) -> void:
 		slot_clicked.emit(slot)
 
 
-## 升级入口=右键点槽（悬停提示有说明·费用见槽左上角能量章。升条/▲pip 方案已撤销：与提示框抢位+不明显）。
+## 升级快捷入口=右键点槽（主入口=升箭角标点击·两者同信号·费用见悬停提示）。
 func _on_slot_gui_input(event: InputEvent, slot: int) -> void:
 	var mb := event as InputEventMouseButton
 	if mb != null and mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT \
 			and interactive and _can_up[slot]:
+		slot_upgrade_clicked.emit(slot)
+
+
+## 升箭角标点击=升级（入口从纯右键改为可见可点——Eddy 2026-07-13：悬停文字讲解完全看不出来）。
+func _on_up_badge_pressed(slot: int) -> void:
+	if interactive and _can_up[slot]:
 		slot_upgrade_clicked.emit(slot)
 
 
@@ -380,12 +442,13 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 		var has_item := false
 		var sealed := st == BattleCore.SlotState.SEALED
 		var locked_item := false           # 有道具但冷却锁中
-		var anim := ""                     # ambient 动效键：cta（卡背浮+框金呼吸=本回合可点）/ 空
+		var anim := ""                     # ambient 动效键：cta（锦囊浮+框金呼吸）/ upN（升箭跳+升阶呼吸）/ 空
+		var cur_tier := 1                  # 当前道具阶（upN 动效键用）
 		var frame_tex: Texture2D = NEUTRAL_FRAME_TEX   # 全状态统一回纹框：无道具=暖骨中性
 		var frame_mod := Color.WHITE
 		_seals[i].visible = false
 		_mini_seals[i].visible = false
-		_cardbacks[i].visible = false
+		_pouches[i].visible = false
 		match st:
 			BattleCore.SlotState.SEALED:
 				# 未解锁 = 压暗中性回纹框 + 斜贴封条·剩余回合=封条圆点（每回合掉一点）。
@@ -396,16 +459,16 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 				for k in 3:
 					(_seal_pips[i][k] as ColorRect).visible = k < remain
 			BattleCore.SlotState.OPENED:
-				# 可抽 = 卡背轻浮动 + 框金呼吸（直接的"可点"信号）；本回合不能抽 = 卡背静止压暗。
+				# 可抽 = 锦囊轻浮动 + 框金呼吸（直接的"可点"信号）；本回合不能抽 = 锦囊静止压暗。
 				ft = NEU_FT; fb = NEU_FB
-				_cardbacks[i].visible = true
+				_pouches[i].visible = true
 				if battle.can_draw_slot(player, i):
-					_cardbacks[i].modulate = Color.WHITE
+					_pouches[i].modulate = Color.WHITE
 					if interactive:
 						anim = "cta"
 				else:
 					frame_mod = Color(0.74, 0.72, 0.69)
-					_cardbacks[i].modulate = Color(0.72, 0.72, 0.72)
+					_pouches[i].modulate = Color(0.72, 0.72, 0.72)
 			BattleCore.SlotState.CHARGING:
 				var item: ItemData = battle.slot_item(player, i)
 				has_item = item != null
@@ -414,6 +477,7 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 					glow = 0.0 if legend else 1.0
 					frame_tex = ITEM_FRAME_TEX.get(item.tier, ITEM_FRAME_TEX[1])
 				var tier_key: int = item.tier if item != null else 1
+				cur_tier = tier_key
 				var c_out: Color = CELL_FILL_T.get(tier_key, CELL_FILL_T[1])
 				var c_in: Color = CELL_CENTER_T.get(tier_key, CELL_CENTER_T[1])
 				var tex: Texture2D = _icon_for(item.item_id) if item != null else null
@@ -435,11 +499,11 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 					icon.modulate = Color(0.62, 0.62, 0.66)
 					_mini_seals[i].visible = true
 			BattleCore.SlotState.EMPTY:
-				# 可补 = 与可抽同语言（Eddy 定）：卡背浮动+框金呼吸，费用差异走左上角能量章；不可补 = 纯空暗格。
+				# 可补 = 与可抽同语言（Eddy 定）：锦囊浮动+框金呼吸，补货费见悬停提示；不可补 = 纯空暗格。
 				if battle.can_refill(player, i):
 					ft = NEU_FT; fb = NEU_FB
-					_cardbacks[i].visible = true
-					_cardbacks[i].modulate = Color.WHITE
+					_pouches[i].visible = true
+					_pouches[i].modulate = Color.WHITE
 					if interactive:
 						anim = "cta"
 				else:
@@ -449,7 +513,7 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 		if not has_item:
 			glow = 0.45
 			cell_inner = ft
-		# 点选使用 = 金边 shader 框 + 图标下沉 3px（按下感·「✓用」文字退役）。
+		# 点选使用 = 金晕外环 + 框身提金 + 图标下沉 3px（回纹框保留不清除——Eddy 2026-07-13 五改）。
 		var staged_now: bool = staged.has(i)
 		icon.position.y = ICON_INSET + (3.0 if staged_now else 0.0)
 		# 格底应用
@@ -461,16 +525,14 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 		if legend:
 			cmat.set_shader_parameter("bg_tex", LEGENDARY_BG)
 			cmat.set_shader_parameter("tex_tint", LEGENDARY_BG_TINT)
-		# 框应用：点选=shader 金边框；其余全状态=回纹贴图框（有道具=阶框/无道具=暖骨中性框）。
-		_tex_frames[i].visible = not staged_now
+		# 框应用：全状态=回纹贴图框（有道具=阶框/无道具=暖骨中性框）；点选叠金晕外环+框身提金（入场 pop 一次）。
+		_tex_frames[i].visible = true
+		_tex_frames[i].texture = frame_tex
+		_tex_frames[i].modulate = STAGED_TINT if staged_now else frame_mod
 		_frames[i].visible = staged_now
-		if staged_now:
-			var fmat: ShaderMaterial = _frame_mats[i]
-			fmat.set_shader_parameter("edge_mid", GOLD_STAGED)
-			fmat.set_shader_parameter("edge_inner", GOLD_STAGED.darkened(0.5))
-		else:
-			_tex_frames[i].texture = frame_tex
-			_tex_frames[i].modulate = frame_mod
+		if staged_now and _prev_staged[i] != true:
+			_play_stage_pop(i)
+		_prev_staged[i] = staged_now
 		# 解锁演出：封条撕落（未解锁→解锁）/ 小封条飘走（锁中→就绪）+ 框弹亮（有 cta 呼吸时略过闪·防抢属性）。首刷不放。
 		if _prev_sealed[i] == true and not sealed:
 			_play_seal_tear(i, false, frame_mod, anim == "")
@@ -478,44 +540,74 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 			_play_seal_tear(i, true, frame_mod, anim == "")
 		_prev_sealed[i] = sealed
 		_prev_locked[i] = locked_item
-		# 可升级判据（右键入口）+ 费用章 + ambient 动效
+		# 可升级（角标点击/右键·费用见悬停提示）：升箭角标显隐 + upN 升阶呼吸（点选时让位金晕）。
 		_can_up[i] = interactive and battle.can_upgrade(player, i)
-		var chip: IconBadge = _cost_chips[i]
-		if _can_up[i]:
-			chip.set_number(int(round(BattleCore.UPGRADE_COST / float(ActionDef.ENERGY_UNIT))))
-			chip.visible = true
-		elif interactive and st == BattleCore.SlotState.EMPTY and battle.can_refill(player, i):
-			chip.set_number(int(round(BattleCore.ITEM_REFILL_COST / float(ActionDef.ENERGY_UNIT))))
-			chip.visible = true
-		else:
-			chip.visible = false
-		_set_ambient(i, anim, frame_mod)
+		_up_badges[i].visible = _can_up[i] and not staged_now
+		if _up_badges[i].visible:
+			anim = "up%d" % cur_tier
+		_set_ambient(i, anim, STAGED_TINT if staged_now else frame_mod)
 
 
-## ambient 动效（cta=卡背浮动+框金呼吸="本回合可点"）：键变更才重建；恢复前必 kill（慢放 tween 教训）。
+## ambient 动效：cta=锦囊浮动+框金呼吸（"本回合可点"）；upN=升箭轻跳+框向下一阶色呼吸（可升级）。
+## 键变更才重建；恢复前必 kill 全部旧 tween（慢放 tween 教训）。
 func _set_ambient(i: int, key: String, base_mod: Color) -> void:
 	if _anim_keys[i] == key:
 		return
 	_anim_keys[i] = key
-	var old: Tween = _anim_tweens[i]
-	if old != null and old.is_valid():
-		old.kill()
-	_anim_tweens[i] = null
-	var cy := (SLOT_H - 32.0) * 0.5
-	_cardbacks[i].position.y = cy
+	for old: Tween in _anim_tweens[i]:
+		if old != null and old.is_valid():
+			old.kill()
+	_anim_tweens[i] = []
+	var cy := (SLOT_H - POUCH_H) * 0.5
+	_pouches[i].position.y = cy
+	_up_chevs[i].position.y = 0.0
 	_tex_frames[i].modulate = base_mod   # 杀掉旧 tween 后必须复位（tween 残值会盖掉刚 apply 的状态色）
 	if key == "cta":
 		var tw := create_tween().set_loops()
 		tw.set_parallel(true)
-		tw.tween_property(_cardbacks[i], "position:y", cy - 2.0, 0.6)\
+		tw.tween_property(_pouches[i], "position:y", cy - 2.0, 0.6)\
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		tw.tween_property(_tex_frames[i], "modulate", Color(1.22, 1.14, 0.88), 0.6)\
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		tw.chain().tween_property(_cardbacks[i], "position:y", cy + 1.0, 0.6)\
+		tw.chain().tween_property(_pouches[i], "position:y", cy + 1.0, 0.6)\
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		tw.parallel().tween_property(_tex_frames[i], "modulate", Color.WHITE, 0.6)\
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		_anim_tweens[i] = tw
+		_anim_tweens[i].append(tw)
+	elif key.begins_with("up"):
+		# 升阶呼吸：回纹框 modulate 周期透向下一阶主色再回（"框想变成下一阶的颜色"）。
+		var tint: Color = NEXT_TIER_TINT.get(int(key.substr(2)), Color.WHITE)
+		var breath := create_tween().set_loops()
+		breath.tween_property(_tex_frames[i], "modulate", tint, 1.2)\
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		breath.tween_property(_tex_frames[i], "modulate", Color.WHITE, 1.2)\
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		_anim_tweens[i].append(breath)
+		# 升箭轻跳：每 ~2s 上跳 2px 弹回（提醒入口·幅度克制不抢戏）。
+		var hop := create_tween().set_loops()
+		hop.tween_interval(1.7)
+		hop.tween_property(_up_chevs[i], "position:y", -2.0, 0.10)\
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		hop.tween_property(_up_chevs[i], "position:y", 0.0, 0.18)\
+			.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+		_anim_tweens[i].append(hop)
+
+
+## 点选入场 pop（一次性）：金晕外环从外扩 3px/全透明 收拢到位+淡入（0.14s·轻快不黏）。
+func _play_stage_pop(i: int) -> void:
+	var ring: ColorRect = _frames[i]
+	var base := Vector2(float(i) * (SLOT_W + GAP), 0.0)
+	var end_pos := base - Vector2(RING_PAD, RING_PAD)
+	var end_size := Vector2(SLOT_W + RING_PAD * 2.0, SLOT_H + RING_PAD * 2.0)
+	ring.position = end_pos - Vector2(3.0, 3.0)
+	ring.size = end_size + Vector2(6.0, 6.0)
+	ring.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	var tw := create_tween().set_parallel(true)
+	tw.tween_property(ring, "position", end_pos, 0.14)\
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(ring, "size", end_size, 0.14)\
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(ring, "modulate:a", 1.0, 0.14)
 
 
 ## 解锁演出：封条幽灵副本撕落飘出（位移+旋转+淡出）+ 回纹框弹亮回落（flash=false 时只撕不闪）。

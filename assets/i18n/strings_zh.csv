@@ -137,7 +137,6 @@ keys,en,context
 "对方已就位，开局中…",,"src/ui/net_lobby_screen.gd:106"
 "对方断线·等待重连…（计时已暂停）",,"src/ui/battle_screen.gd:716"
 "对方选择替补中…",,"src/ui/battle_screen.gd:828"
-"封住",,"src/ui/components/item_slot_row.gd:258"
 "封印卷轴",,"src/battle/item_catalog.gd:262"
 "尾后针",,"src/battle/item_catalog.gd:250"
 "尾火【虎】",,"assets/data/heroes/h03.tres:9"
