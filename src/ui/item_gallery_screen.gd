@@ -43,10 +43,11 @@ const PAGE_STACK_B := Color(0.76, 0.71, 0.55)  # 页块台阶 暗层
 
 const INK := Color(0.24, 0.19, 0.12)           # 墨（亮页主文字）
 const INK_DIM := Color(0.48, 0.41, 0.28)       # 淡墨（次级/划线/注记）
-# 格底亮方案（2026-07-13 Eddy 回归早期要求：内里=亮阶色（比框亮·非发白）·中心淡白圈托道具主体——v5 深炭格退役）。
+# 格底亮方案（2026-07-13 Eddy 三改定版：内外对比对齐传说 gold_bottom——四角=饱和阶色·中心=略浅阶色
+# （⛔非白·白圈版被否"太白"）·中心 V≈0.97/四角 V≈0.93 与金底同比例——v5 深炭格退役）。
 # 传说不走此表（格底=gold_bottom 金云纹美术·只换框色）。
-const CELL_FILL := {1: Color("#A8CDF4"), 2: Color("#C9B6F0")}   # 内里=亮蓝/亮紫（饱和保留·比框 8FB8E4/BFA0E8 更亮）
-const CELL_CENTER := Color("#FBF8EF")                            # 中心=暖白（淡淡白圈·center_glow 径向）
+const CELL_FILL := {1: Color("#9CC2EE"), 2: Color("#B9A2EC")}     # 四角=饱和阶色（仍比框 8FB8E4/BFA0E8 亮）
+const CELL_CENTER := {1: Color("#CFE2F8"), 2: Color("#DED2F7")}   # 中心=略浅阶色（浅蓝/浅紫·清晰带色相）
 const BANNER_PLATE := Color(0.145, 0.16, 0.28) # 牌匾底=深靛（金字在其上跳）
 
 # 维度 → 语义色（与战斗动作按钮/抽卡同源·详情维度章用）。
@@ -452,7 +453,7 @@ func _make_item_card(item: ItemData, idx: int) -> Button:
 	var cm := ShaderMaterial.new()
 	cm.shader = CELL_BG_SHADER
 	cm.set_shader_parameter("fill_color", CELL_FILL.get(item.tier, CELL_FILL[1]))
-	cm.set_shader_parameter("inner_color", CELL_CENTER)
+	cm.set_shader_parameter("inner_color", CELL_CENTER.get(item.tier, CELL_CENTER[1]))
 	cm.set_shader_parameter("center_glow", 1.0)
 	cm.set_shader_parameter("corner_radius", 0.18)
 	cm.set_shader_parameter("pixel_grid", BOX / 6.0)
