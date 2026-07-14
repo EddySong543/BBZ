@@ -10,11 +10,12 @@ extends Control
 ## ⛔ 配色禁区（Eddy 2026-07-04）：暗红/棕全抛。（衬底沿革：深靛夜色 → 2026-07-13 宣纸淡墨山水贴图·
 ##   深靛做 UI 衬底已被整体否定=memory [[ui-backdrop-no-deep-indigo]]·牌匾深靛底属点缀件不在此列。）
 ## ⚠ 装饰 ColorRect 必须 mouse_filter=IGNORE（否则吞点击=返回/切阶失效·踩过坑）。
+## 2026-07-14 三改（Eddy）：牌匾阴影贴形（矩形→贴图剪影）+ 选中重设计（金晕外环=战斗点选同语言）
+##   + 右页排版重构（单列居中主轴·图标卡/辉光/手记划线退役）+ 返回钮换导航钮皮 + 左页大字水印退役。
 
-const PAPER_SHADER := preload("res://assets/shaders/canvas_ui_paper.gdshader")           # 纸/皮质感（v5.2·治纯色扁平）
 const PLAQUE_TEX := preload("res://assets/ui/ui_plaque.png")                              # 悬挂牌匾(GPT 米色回纹匾·320×62·9-slice 边距 50/20·2026-07-13)
 const CELL_BG_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")   # 格底：圆角+渐变（v5 中性深炭）
-const ROUND_MASK_SHADER := preload("res://assets/shaders/canvas_ui_round_mask.gdshader")  # 选中金框圆角
+const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")      # 选中金晕外环（与战斗道具栏点选同语言·2026-07-14）
 const LEGENDARY_BG := preload("res://assets/ui/gold_bottom.png")                          # 传说道具金云纹格底(Eddy 美术)
 const SCROLL_TEX := preload("res://assets/ui/item_codex_scroll.png")                      # 整屏手卷卷轴(GPT 出图·2026-07-13 二版·1672×941=16:9·棋盘格假透明已转真 alpha=img_checker_to_alpha)
 const BACKDROP_TEX := preload("res://assets/ui/item_codex_backdrop.png")                  # 衬底=宣纸淡墨山水(GPT 出图·2026-07-13 Eddy 选 A 修订版·下缘远山+顶部一线远峰·中部留白)
@@ -30,25 +31,27 @@ const TAB_CLOUD_TEX := {   # 三阶祥云页签(GPT 双端云头横幅·240×56�
 	3: preload("res://assets/ui/tab_cloud_t3.png"),
 }
 const BANNER_TEX := preload("res://assets/ui/ui_banner_scroll.png")   # 道具名小卷轴横幅(GPT·224×45·轴杆+祥云端)
+const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")   # 返回钮=主菜单导航钮同皮(2026-07-14 排版重构·重出图落位后自动跟新)
+const NAV_PLATE_MARGIN := 18   # 9-slice 边距=main_menu 同值(16 会切到回纹钩尾→平铺成梯档)
 const TIER_INK := {   # 道具名墨色三阶（压奶油纸·稀有度不再整条染横幅——2026-07-13 小卷轴换皮）
 	1: Color("34608F"), 2: Color("6B3D96"), 3: Color("8F6A1E"),
 }
 const LEGENDARY_BG_TINT := Color(1.0, 1.0, 1.0, 1.0)                                       # 原图亮度·不做暗处理(Eddy 2026-06-27)
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
 
-# ── 配色 v5「实体典籍」(2026-07-04·⛔暗红/棕禁区) ──
-const GOLD_MID := Color(0.85, 0.65, 0.33)      # 鎏金（护角/牌匾框/金轨）
-const GOLD_TEXT := Color("#e8bb52")            # 泥金（标题/道具名）
-const IVORY := Color(0.95, 0.90, 0.78)         # 暖米白（夜色/深底上文字）
+# （2026-07-14 死码清理：v5 书壳时代配色 GOLD_MID/GOLD_TEXT/IVORY/COVER*/PAGE*、
+#   纸质感 PAPER_SHADER+_paper_mat 全退役——挂点已陆续换贴图资产，无引用。）
+
+# ── 选中态（2026-07-14 重设计：旧 3px 金边 ColorRect 在亮三阶框上几乎不可见——
+#    换战斗道具栏「点选」同语言=金晕外环+框身提亮·全游戏点选一个金）──
+# ⚠ 亮度档随衬底走（实测教训）：战斗暗底=淡金 fff0a0 能读；图鉴亮纸上淡金≈隐形（就是旧版"极淡黄光"的死法）
+#   → 亮纸语境用深饱和金（传说金 dca12e 同源）·外露带必须整条是金（外描边也走金·深咖在暗底读成黑圈）。
+const GOLD_SEL := Color("dca12e")              # 金晕环主色（亮纸档·与稀有度传说金同源）
+const RING_PAD := 6.0                          # 金晕外环外扩像素（战斗=4·图鉴格小+框带深描边吃掉视觉宽度→加到 6 才够跳）
+const SEL_TINT := Color(1.18, 1.10, 0.98)      # 选中框身轻暖提亮（乘色不压蓝通道·防蓝框染绿·战斗定版同值）
 
 # （2026-07-13 衬底换宣纸山水贴图：深靛 NIGHT_* 三常量与 _retint_background 退役——
 #   背景图不透明满屏盖住 Background 节点·gallery_background.tscn 本体不动=英雄图鉴共用。）
-
-const COVER := Color(0.89, 0.86, 0.76)         # 封皮=象牙（ref17：亮封皮浮在深底上）
-const COVER_RIM := Color(0.22, 0.19, 0.13)     # 封皮描边=深墨
-const PAGE := Color(0.92, 0.86, 0.67)          # 书页=暖亮羊皮（压掉"发白"·仍亮）
-const PAGE_STACK_A := Color(0.85, 0.80, 0.63)  # 页块台阶（页厚）亮层
-const PAGE_STACK_B := Color(0.76, 0.71, 0.55)  # 页块台阶 暗层
 
 const INK := Color(0.24, 0.19, 0.12)           # 墨（亮页主文字）
 const INK_DIM := Color(0.48, 0.41, 0.28)       # 淡墨（次级/划线/注记）
@@ -105,7 +108,8 @@ var _tab_btns: Array[Button] = []
 # 详情板部件（_build_detail_panel 一次建好）
 var _d_icon: TextureRect
 var _d_icon_fallback: Label
-var _d_glow: TextureRect
+var _d_cell_mat: ShaderMaterial     # 右页大图鉴格底材质（稀有度色/传说金底按选中件重设·2026-07-14）
+var _d_frame: TextureRect           # 右页大回纹阶框（128 源 ×2=256 整数放大·2026-07-14）
 var _d_name: Label
 var _d_name_banner: NinePatchRect   # 小卷轴横幅（原双 ColorRect 稀有度色条退役·2026-07-13）
 var _d_tier_edge: ColorRect
@@ -113,6 +117,8 @@ var _d_tier_fill: ColorRect
 var _d_tier_lbl: Label
 var _d_desc: Label
 var _d_flavor: Label
+var _d_pop_tween: Tween             # 右页图标落位微弹（快速方向键换件时先 kill 再建）
+var _sel_tweens: Array[Tween] = []  # 选中动效 tween（pop+呼吸·换选先 kill 全部）
 
 @onready var pool_area: Control = $PoolArea
 @onready var detail_area: Control = $DetailArea
@@ -269,7 +275,21 @@ func _setup_top() -> void:
 ## 悬挂牌匾（2026-07-13 换皮：GPT 米色回纹匾 9-slice+墨字——深靛底+shader 金框+泥金字退役）。
 func _build_banner() -> void:
 	var band := $TopBand as Control
-	_rect(band, Rect2(BANNER.position + Vector2(6, 8), BANNER.size), Color(0.0, 0.0, 0.05, 0.35))   # 软投影（引擎加·不画进资产）
+	# 贴形投影（2026-07-14 Eddy：矩形投影与匾形不匹配）：牌匾贴图自身当剪影——
+	# 同 9-slice 同尺寸偏移一份·modulate 乘暗=轮廓/透明区完全跟形（引擎加·不画进资产）。
+	var shadow := NinePatchRect.new()
+	shadow.name = "PlaqueShadow"
+	shadow.texture = PLAQUE_TEX
+	shadow.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	shadow.patch_margin_left = 50
+	shadow.patch_margin_right = 50
+	shadow.patch_margin_top = 20
+	shadow.patch_margin_bottom = 20
+	shadow.position = BANNER.position + Vector2(6, 8)
+	shadow.size = BANNER.size
+	shadow.modulate = Color(0.10, 0.07, 0.05, 0.38)   # 暖黑剪影（与宣纸暖底同温·⛔冷藏青）
+	shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	band.add_child(shadow)
 	var plaque := NinePatchRect.new()
 	plaque.name = "Plaque"
 	plaque.texture = PLAQUE_TEX
@@ -298,23 +318,21 @@ func _style_back_button() -> void:
 	back_btn.add_theme_color_override("font_color", INK)
 	for s in ["normal", "hover", "pressed", "focus", "disabled"]:
 		back_btn.add_theme_stylebox_override(s, StyleBoxEmpty.new())
-	var edge := ColorRect.new()
-	edge.color = COVER_RIM
-	edge.show_behind_parent = true
-	edge.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	edge.offset_left = -2
-	edge.offset_top = -2
-	edge.offset_right = 2
-	edge.offset_bottom = 2
-	edge.mouse_filter = Control.MOUSE_FILTER_IGNORE   # ⚠ 缺这行=吞点击（返回失效）
-	back_btn.add_child(edge)
-	var backing := ColorRect.new()
-	backing.color = Color(1, 1, 1, 0.98)   # 羊皮浮动芯片（夜色上亮块·与书同皮面纸纹）
-	backing.show_behind_parent = true
-	backing.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	backing.material = _paper_mat(back_btn.size, COVER, Color(0.72, 0.68, 0.56), 0.02, 0.35)
-	back_btn.add_child(backing)
+	# 2026-07-14 排版重构：灰白羊皮芯片退役→主菜单导航钮同皮（回纹钩 9-slice·全游戏导航一个语言）。
+	var plate := NinePatchRect.new()
+	plate.name = "Plate"
+	plate.texture = NAV_PLATE_TEX
+	plate.patch_margin_left = NAV_PLATE_MARGIN
+	plate.patch_margin_right = NAV_PLATE_MARGIN
+	plate.patch_margin_top = NAV_PLATE_MARGIN
+	plate.patch_margin_bottom = NAV_PLATE_MARGIN
+	plate.axis_stretch_horizontal = NinePatchRect.AXIS_STRETCH_MODE_TILE
+	plate.axis_stretch_vertical = NinePatchRect.AXIS_STRETCH_MODE_TILE
+	plate.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	plate.show_behind_parent = true
+	plate.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE   # ⚠ 缺这行=吞点击（返回失效）
+	back_btn.add_child(plate)
 	back_btn.pressed.connect(_back_to_menu)
 	var bj := ButtonJuice.new()
 	bj.name = "ButtonJuice"
@@ -329,20 +347,6 @@ func _rect(parent: Control, r: Rect2, col: Color) -> ColorRect:
 	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(rect)
 	return rect
-
-
-## 纸/皮质感材质（粗格颗粒+内渐变+色阶量化·颗粒粒径≈4px 时 cells=宽/4）。
-func _paper_mat(sz: Vector2, base: Color, deep: Color, grain: float, shade: float, shade_start: float = 0.55) -> ShaderMaterial:
-	var m := ShaderMaterial.new()
-	m.shader = PAPER_SHADER
-	m.set_shader_parameter("base_color", base)
-	m.set_shader_parameter("deep_color", deep)
-	m.set_shader_parameter("cells_x", sz.x / 4.0)
-	m.set_shader_parameter("aspect", sz.x / sz.y)
-	m.set_shader_parameter("grain_amt", grain)
-	m.set_shader_parameter("shade_amt", shade)
-	m.set_shader_parameter("shade_start", shade_start)
-	return m
 
 
 # ============================================================
@@ -365,17 +369,7 @@ func _build_pool() -> void:
 	for c in pool_area.get_children():
 		c.queue_free()
 	_cards.clear()
-	# 章名大字水印（ref18 的褪色大字·压在左页下部空区）
-	var wm := Label.new()
-	wm.text = tr(String(TIER_LABEL[_tier]))
-	wm.position = Vector2(PAGE_L.position.x + 120, PAGE_L.end.y - 400)
-	wm.size = Vector2(480, 360)
-	wm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	wm.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	FontManager.apply(wm, 192)
-	wm.add_theme_color_override("font_color", Color(INK, 0.055))
-	wm.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	pool_area.add_child(wm)
+	# （2026-07-14 排版重构：章名大字水印退役——压在第 3/4 行卡名底下=乱源·阶名已有章头+页签双表达。）
 	# 章头（ref15 的页首题字感）：阶名墨字 + 细墨线（计数注记在同行右端·见 _setup_top）
 	var chapter := Label.new()
 	chapter.text = tr(String(TIER_LABEL[_tier]))
@@ -407,21 +401,28 @@ func _make_item_card(item: ItemData, idx: int) -> Button:
 	card.size = Vector2(CARD_W, CARD_H)
 	for s in ["normal", "hover", "pressed", "focus", "disabled"]:
 		card.add_theme_stylebox_override(s, StyleBoxEmpty.new())
-	# 选中金框（先建·常态隐藏·_select 切显隐）
-	var sel_edge := ColorRect.new()
-	sel_edge.name = "SelEdge"
-	sel_edge.color = GOLD_TEXT
-	sel_edge.show_behind_parent = true
-	sel_edge.position = Vector2(-3, -3)
-	sel_edge.size = Vector2(BOX + 6, BOX + 6)
-	sel_edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	sel_edge.visible = false
-	var sm := ShaderMaterial.new()   # 选中金框也圆角（不露方角）
-	sm.shader = ROUND_MASK_SHADER
-	sm.set_shader_parameter("corner_radius", 0.2)
-	sm.set_shader_parameter("pixel_grid", (BOX + 6) / 6.0)
-	sel_edge.material = sm
-	card.add_child(sel_edge)
+	# 选中金晕外环（2026-07-14 重设计·与战斗点选同源同参）：pixel_frame 金环外扩 4px·
+	# 衬在回纹框后（框永不清除/不换色相）·常态隐藏·_select 切显隐+pop+呼吸。
+	var ring := ColorRect.new()
+	ring.name = "SelRing"
+	ring.color = Color.WHITE
+	ring.position = Vector2(-RING_PAD, -RING_PAD)
+	ring.size = Vector2(BOX + RING_PAD * 2.0, BOX + RING_PAD * 2.0)
+	var rm := ShaderMaterial.new()
+	rm.shader = FRAME_SHADER
+	rm.set_shader_parameter("edge_outer", GOLD_SEL.darkened(0.1))    # 外露 4px 就是这层——必须整条是金
+	rm.set_shader_parameter("edge_mid", GOLD_SEL)
+	rm.set_shader_parameter("edge_inner", GOLD_SEL.darkened(0.5))
+	rm.set_shader_parameter("pixel_grid", (BOX + RING_PAD * 2.0) / 6.0)   # 像素粒径≈6px·与格底/战斗同比
+	rm.set_shader_parameter("border_px", 2.0)
+	rm.set_shader_parameter("noise_amt", 0.05)
+	rm.set_shader_parameter("light_amount", 0.18)
+	rm.set_shader_parameter("aspect", 1.0)
+	rm.set_shader_parameter("corner_radius", 0.18)
+	ring.material = rm
+	ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ring.visible = false
+	card.add_child(ring)
 	# 格底：深炭中性格（ref15——亮页上的暗格·彩色图标自己跳）；传说铺金云纹美术。
 	var cell := ColorRect.new()
 	cell.color = Color.WHITE
@@ -444,6 +445,7 @@ func _make_item_card(item: ItemData, idx: int) -> Button:
 	card.add_child(cell)
 	# 回纹阶框（2026-07-13 换皮：头像框素材同源换色三阶变体·原稀有度像素框 shader 退役）
 	var frame := TextureRect.new()
+	frame.name = "Frame"   # 选中提亮要取（2026-07-14）
 	frame.texture = ITEM_FRAME_TEX[item.tier]
 	frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -484,20 +486,14 @@ func _make_item_card(item: ItemData, idx: int) -> Button:
 
 
 # ============================================================
-# 右页：稀有度横幅 + 图标卡 + 划线手记（ref18 感觉）
+# 右页：单列居中主轴（2026-07-14 排版重构·Eddy：旧版混乱不美观·要简约一目了然）
+#   ①名字小卷轴 → ②大号图鉴格（=左页格同语言 2× 放大） → ③阶章 → ④一条分隔墨线 → ⑤描述 → ⑥风味
+#   退役：页内四边细饰框 / 纸面图标卡+偏移投影+墨线框 / 径向暖辉光 / 三条手记划线（与文字错位=乱源）
 # ============================================================
 
 func _build_detail_panel() -> void:
 	var px := PAGE_R.position.x
 	var py := PAGE_R.position.y
-	# 页内细饰框（ref15 右页的仪式感·细墨线不抢戏）
-	var inset := Rect2(px + 26, py + 26, PAGE_R.size.x - 52, PAGE_R.size.y - 52)
-	for er: Rect2 in [
-			Rect2(inset.position, Vector2(inset.size.x, 1)),
-			Rect2(Vector2(inset.position.x, inset.end.y), Vector2(inset.size.x, 1)),
-			Rect2(inset.position, Vector2(1, inset.size.y)),
-			Rect2(Vector2(inset.end.x, inset.position.y), Vector2(1, inset.size.y))]:
-		_rect(detail_area, er, Color(INK, 0.28))
 
 	# ── ① 道具名横幅=小卷轴（GPT 贴图·2026-07-13 换皮）：横向 9-slice（轴杆+祥云端固定·纸面平铺）；
 	#    竖向不切原生高（切了祥云会拉花）。稀有度改走道具名墨色三阶（TIER_INK·横幅不再染色）。
@@ -517,45 +513,49 @@ func _build_detail_panel() -> void:
 	_d_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_d_name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
-	# ── ② 图标卡：钉在页上的层叠卡（偏移投影+墨线框）+ 暖辉光 + 放大图标 ──
-	var card := Rect2(px + (PAGE_R.size.x - 380) * 0.5, py + 170, 380, 380)
-	_rect(detail_area, Rect2(card.position + Vector2(8, 10), card.size), Color(0.30, 0.26, 0.16, 0.35))  # 卡投影
-	_rect(detail_area, Rect2(card.position - Vector2(2, 2), card.size + Vector2(4, 4)), Color(INK, 0.75)) # 墨线框
-	var card_face := _rect(detail_area, card, Color.WHITE)                                                # 卡面（比页更亮一档·细纸纹）
-	card_face.material = _paper_mat(card.size, Color(0.97, 0.94, 0.82), Color(0.87, 0.83, 0.67), 0.012, 0.30)
+	# ── ② 大号图鉴格：与左页格完全同语言（格底 shader+回纹阶框贴图）·128px 框源 ×2=256 整数放大保像素 ──
+	var cell_r := Rect2(px + (PAGE_R.size.x - 256.0) * 0.5, py + 164, 256.0, 256.0)
+	var cell := ColorRect.new()
+	cell.color = Color.WHITE
+	cell.position = cell_r.position
+	cell.size = cell_r.size
+	cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_d_cell_mat = ShaderMaterial.new()
+	_d_cell_mat.shader = CELL_BG_SHADER
+	_d_cell_mat.set_shader_parameter("fill_color", CELL_FILL[1])
+	_d_cell_mat.set_shader_parameter("inner_color", CELL_CENTER[1])
+	_d_cell_mat.set_shader_parameter("center_glow", 1.0)
+	_d_cell_mat.set_shader_parameter("corner_radius", 0.18)
+	_d_cell_mat.set_shader_parameter("pixel_grid", 256.0 / 6.0)   # 像素粒径 6px=与左页格同比
+	_d_cell_mat.set_shader_parameter("cloud_on", 0.0)
+	_d_cell_mat.set_shader_parameter("bg_tex", LEGENDARY_BG)      # 传说金底常驻·use_tex 按选中件切
+	_d_cell_mat.set_shader_parameter("tex_tint", LEGENDARY_BG_TINT)
+	cell.material = _d_cell_mat
+	detail_area.add_child(cell)
+	_d_frame = TextureRect.new()
+	_d_frame.texture = ITEM_FRAME_TEX[1]
+	_d_frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_d_frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_d_frame.position = cell_r.position
+	_d_frame.size = cell_r.size
+	_d_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail_area.add_child(_d_frame)
 
-	_d_glow = TextureRect.new()
-	var grad := Gradient.new()
-	grad.set_color(0, Color(1.0, 0.90, 0.55, 0.38))
-	grad.set_color(1, Color(1.0, 0.90, 0.55, 0.0))
-	var gtex := GradientTexture2D.new()
-	gtex.gradient = grad
-	gtex.fill = GradientTexture2D.FILL_RADIAL
-	gtex.fill_from = Vector2(0.5, 0.5)
-	gtex.fill_to = Vector2(0.5, 0.0)
-	gtex.width = 256
-	gtex.height = 256
-	_d_glow.texture = gtex
-	_d_glow.position = card.position + card.size * 0.5 - Vector2(170, 170)
-	_d_glow.size = Vector2(340, 340)
-	_d_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	detail_area.add_child(_d_glow)
-
-	# 放大图标（128px 源 → NEAREST 像素清晰）
+	# 放大图标（居中比例与左页格同源：70/92 ≈ 192/256）
 	_d_icon = TextureRect.new()
 	_d_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_d_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_d_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_d_icon.size = Vector2(300, 300)
-	_d_icon.position = card.position + (card.size - _d_icon.size) * 0.5
+	_d_icon.size = Vector2(192, 192)
+	_d_icon.position = cell_r.position + (cell_r.size - _d_icon.size) * 0.5
 	_d_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	detail_area.add_child(_d_icon)
-	_d_icon_fallback = _make_label(card.position, card.size, 48, Color(INK, 0.6))
+	_d_icon_fallback = _make_label(cell_r.position, cell_r.size, 48, Color(INK, 0.6))
 	_d_icon_fallback.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_d_icon_fallback.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_d_icon_fallback.visible = false
 
-	# ── ③ 阶章（居中药丸）──
+	# ── ③ 阶章（居中药丸·紧跟大格）──
 	_d_tier_edge = _chip_rect(Color(INK, 0.75))
 	_d_tier_fill = _chip_rect(TIER_COLOR[1])
 	_d_tier_lbl = _make_label(Vector2.ZERO, Vector2(120, 36), 18, Color.WHITE)
@@ -563,18 +563,19 @@ func _build_detail_panel() -> void:
 	_d_tier_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_chip_text_outline(_d_tier_lbl)
 
-	# ── ④ 手记段：描述写在划线上（ref18 的手记感）+ 风味淡墨 ──
-	for i in 3:
-		_rect(detail_area, Rect2(px + 90, py + 686 + i * 36, PAGE_R.size.x - 180, 1), Color(INK, 0.20))
+	# ── ④ 一条分隔墨线（替代三条错位手记线）──
+	_rect(detail_area, Rect2(px + (PAGE_R.size.x - 360.0) * 0.5, py + 532, 360, 1), Color(INK, 0.25))
+
+	# ── ⑤ 描述（24px 墨字·定宽居中·Ark 整数档 2×12）+ ⑥ 风味淡墨 ──
 	_d_desc = _make_label(
-		Vector2(px + 96, py + 636),
-		Vector2(PAGE_R.size.x - 192, 108), 18, INK)
+		Vector2(px + 76, py + 560),
+		Vector2(PAGE_R.size.x - 152, 168), 24, INK)
 	_d_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_d_desc.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	_d_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_d_flavor = _make_label(
-		Vector2(px + 96, py + 756),
-		Vector2(PAGE_R.size.x - 192, 60), 16, Color(INK_DIM, 0.95))
+		Vector2(px + 76, py + 700),
+		Vector2(PAGE_R.size.x - 152, 96), 16, Color(INK_DIM, 0.95))   # 最长描述 3 行止于 +662·风味贴着接（不孤儿化）
 	_d_flavor.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_d_flavor.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	_d_flavor.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -599,16 +600,24 @@ func _chip_text_outline(lbl: Label) -> void:
 	lbl.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.03, 0.9))
 
 
-## 选中某件道具：左卡换金框 + 右页填充（横幅换稀有度色 / 图标 / 阶章 / 手记）。
+## 选中某件道具：左卡金晕外环+框身提亮（战斗点选同语言）+ 右页填充（大格/图标/阶章/描述）。
 func _select(idx: int) -> void:
 	if idx < 0 or idx >= _items.size():
 		return
 	if _sel_idx == idx:
 		return
+	for tw: Tween in _sel_tweens:
+		if tw != null and tw.is_valid():
+			tw.kill()
+	_sel_tweens.clear()
 	if _sel_idx >= 0 and _sel_idx < _cards.size():
-		(_cards[_sel_idx].get_node("SelEdge") as ColorRect).visible = false
+		var old := _cards[_sel_idx]
+		var old_ring := old.get_node("SelRing") as ColorRect
+		old_ring.visible = false
+		old_ring.modulate = Color.WHITE
+		(old.get_node("Frame") as TextureRect).modulate = Color.WHITE
 	_sel_idx = idx
-	(_cards[idx].get_node("SelEdge") as ColorRect).visible = true
+	_play_select_fx(_cards[idx])
 
 	var it := _items[idx]
 	var rc: Color = TIER_COLOR[it.tier]
@@ -621,6 +630,19 @@ func _select(idx: int) -> void:
 		_d_icon.visible = false
 		_d_icon_fallback.text = tr(it.item_name)
 		_d_icon_fallback.visible = true
+	# 右页大格跟随稀有度（材质持久·三参数每次重设：普通/稀有=色对·传说=金底图）
+	_d_frame.texture = ITEM_FRAME_TEX[it.tier]
+	_d_cell_mat.set_shader_parameter("fill_color", CELL_FILL.get(it.tier, CELL_FILL[1]))
+	_d_cell_mat.set_shader_parameter("inner_color", CELL_CENTER.get(it.tier, CELL_CENTER[1]))
+	_d_cell_mat.set_shader_parameter("use_tex", 1.0 if it.tier == 3 else 0.0)
+	# 图标落位微弹（0.12s·换件时右页也有反馈·快速方向键连按先 kill）
+	if _d_pop_tween != null and _d_pop_tween.is_valid():
+		_d_pop_tween.kill()
+	_d_icon.pivot_offset = _d_icon.size * 0.5
+	_d_icon.scale = Vector2(1.06, 1.06)
+	_d_pop_tween = create_tween()
+	_d_pop_tween.tween_property(_d_icon, "scale", Vector2.ONE, 0.12)\
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	_d_name.text = tr(it.item_name)
 	_d_name.add_theme_color_override("font_color", TIER_INK[it.tier])   # 稀有度=名字墨色（横幅不染）
 	_d_tier_lbl.text = tr(String(TIER_LABEL[it.tier]))
@@ -630,10 +652,39 @@ func _select(idx: int) -> void:
 	_layout_chips()
 
 
+## 选中动效（2026-07-14 重设计）：金晕环收拢 pop（0.14s·战斗同参）→ 安静呼吸（2.6s 循环·
+## 在 24 格网格里"找得到"但不吵——图鉴动效拨杆=低）。框身提亮即时生效。
+func _play_select_fx(card: Button) -> void:
+	var ring := card.get_node("SelRing") as ColorRect
+	(card.get_node("Frame") as TextureRect).modulate = SEL_TINT
+	var end_pos := Vector2(-RING_PAD, -RING_PAD)
+	var end_size := Vector2(BOX + RING_PAD * 2.0, BOX + RING_PAD * 2.0)
+	ring.visible = true
+	ring.position = end_pos - Vector2(3, 3)
+	ring.size = end_size + Vector2(6, 6)
+	ring.modulate = Color(1, 1, 1, 0.0)
+	var pop := create_tween()
+	pop.set_parallel(true)
+	pop.tween_property(ring, "position", end_pos, 0.14)\
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	pop.tween_property(ring, "size", end_size, 0.14)\
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	pop.tween_property(ring, "modulate:a", 1.0, 0.12)
+	_sel_tweens.append(pop)
+	var breath := create_tween()   # 首步 interval=让过 pop（两条 tween 不同时碰 modulate:a）
+	breath.set_loops()
+	breath.tween_interval(0.5)
+	breath.tween_property(ring, "modulate:a", 0.85, 1.0)\
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	breath.tween_property(ring, "modulate:a", 1.0, 1.1)\
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_sel_tweens.append(breath)
+
+
 ## 阶章在页内水平居中（章宽随文字 → 每次按内容重排）。
 ## 维度章不对玩家展示（内部设计分类·含设计术语·Eddy 2026-06-30）。
 func _layout_chips() -> void:
-	var y0: float = PAGE_R.position.y + 578
+	var y0: float = PAGE_R.position.y + 452   # 2026-07-14 重排：紧跟 256 大格（164+256+32）
 	var f: Font = _d_tier_lbl.get_theme_font("font")
 	var fs: int = _d_tier_lbl.get_theme_font_size("font_size")
 	var w1: float = f.get_string_size(_d_tier_lbl.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 40.0
