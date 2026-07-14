@@ -81,6 +81,12 @@ class ENetTransport extends RefCounted:
 	func is_ready() -> bool:
 		return remote_id != 0 and peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED
 
+	## 只驱动 ENet 泵（推进连接/DTLS 握手·处理连断信号），⛔ 不取业务包——包留在内部队列等 poll()。
+	## 2026-07-14 修：链路探测（is_link_ready）以前直接调 poll()=收到的包被整批丢弃（"吃包"）；
+	## 现役大厅纯靠帧序运气没踩中，探针在同拍先探后泵=必吃 match_start。探测一律走本口。
+	func pump_only() -> void:
+		peer.poll()
+
 	func send(d: Dictionary) -> bool:
 		if not is_ready():
 			return false
@@ -99,6 +105,12 @@ class ENetTransport extends RefCounted:
 			if parsed is Dictionary:   # 非法包直接丢弃（入包校验一道门在协议层）
 				out.append(parsed)
 		return out
+
+	## 踢掉当前对端（好友房准入·2026-07-14）：礼貌断开=已排队的可靠包（如 error 提示）先送达。
+	## 用途：口令/版本不合的连接占着唯一席位 → 踢掉腾位（防陌生人卡死好友的加入/重连）。
+	func kick() -> void:
+		if remote_id != 0:
+			peer.disconnect_peer(remote_id)
 
 	func close() -> void:
 		peer.close()

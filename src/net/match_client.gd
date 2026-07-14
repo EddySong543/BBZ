@@ -78,7 +78,8 @@ func _on_msg(d: Dictionary) -> void:
 			if snap.has("turn_number"):
 				turn = int(snap["turn_number"])
 		"error":
-			errors.append(String(d.get("code", "")))
+			var detail := String(d.get("detail", ""))   # 可选附加信息（如 bad_version 附房主版本）
+			errors.append(String(d.get("code", "")) + ("" if detail.is_empty() else ":" + detail))
 
 
 func _take_snap(d: Dictionary) -> void:
@@ -113,8 +114,9 @@ func request_resync() -> void:
 	transport.send(NetProtocol.msg_resync())
 
 
-func send_hello(team: Array) -> void:
-	transport.send(NetProtocol.msg_hello(team))
+## room_pass=房间口令（好友房准入）·gv=版本串（默认空=构造器取本机版本）。
+func send_hello(team: Array, room_pass: String = "", gv: String = "") -> void:
+	transport.send(NetProtocol.msg_hello(team, room_pass, gv))
 
 
 # —— 视角翻转（M1·加入方=服务器眼中的玩家 1·战斗屏恒以"玩家 0=自己"渲染）——

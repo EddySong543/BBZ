@@ -12,7 +12,8 @@ extends RefCounted
 ##   econ_pick    {v, kind, turn, slot, choice, upgrade:bool}
 ##   death_switch {v, kind, turn, slot}
 ##   resync       {v, kind}                        → 服务器回 snapshot（断线重连）
-##   hello        {v, kind, team:[hero_id×3]}      → 开局前=报到+交换阵容；开局后=重连（房间回 snapshot+turn_begin）
+##   hello        {v, kind, team:[hero_id×3], pass?, gv?} → 开局前=报到+交换阵容；开局后=重连（房间回 snapshot+turn_begin）
+##                pass=房间口令（可选·好友房准入·2026-07-14）·gv=游戏版本（版本握手）·门在 net_session.poll_prestart
 ## S2C（服务器→客户端）kind：
 ##   match_start / turn_begin / draft_offer / resolve / view / game_over / snapshot / error
 ##   （match_start/turn_begin/resolve/view 均带 snap=权威全量快照 → 客户端镜像同步·M1）
@@ -21,6 +22,8 @@ const PROTO_VERSION := 1
 const C2S_KINDS: Array[String] = ["submit_turn", "econ_draft", "econ_upgrade", "econ_refill", "econ_pick", "death_switch", "resync", "hello"]
 const TEAM_SIZE := 3
 const MAX_HERO_ID_LEN := 8
+const MAX_PASS_LEN := 16       # 房间口令上限（好友房准入·2026-07-14）
+const MAX_GV_LEN := 16         # 版本串上限（版本握手）
 
 const MAX_ITEM_SLOTS := 3      # 与 BattleCore.SLOT_COUNT 一致（入包范围校验用·防超长数组）
 const MAX_ACTION := 16         # 动作枚举安全上限（真合法性由 match_room 按 legal_actions 判）
@@ -47,6 +50,12 @@ static func validate_c2s(msg: Variant) -> String:
 			if not (id is String) or (id as String).is_empty() or (id as String).length() > MAX_HERO_ID_LEN \
 					or not (id as String).is_valid_identifier():
 				return "bad_team"
+		var pass_v: Variant = d.get("pass", "")   # 可选字段：缺省=空串（旧包兼容）·带则限型限长
+		if not (pass_v is String) or (pass_v as String).length() > MAX_PASS_LEN:
+			return "bad_pass_field"
+		var gv_v: Variant = d.get("gv", "")
+		if not (gv_v is String) or (gv_v as String).length() > MAX_GV_LEN:
+			return "bad_gv_field"
 		return ""
 	if not _is_int(d.get("turn")) or int(d["turn"]) < 0:
 		return "bad_turn"
@@ -116,14 +125,25 @@ static func msg_resync() -> Dictionary:
 	return {v = PROTO_VERSION, kind = "resync"}
 
 
-static func msg_hello(team: Array) -> Dictionary:
-	return {v = PROTO_VERSION, kind = "hello", team = team.duplicate()}
+## room_pass=房间口令（空=公开房）·gv=游戏版本（版本握手·默认取本机）。⚠ "pass" 是 GDScript 关键字，
+## 参数/键名分别用 room_pass / 字符串键 "pass"。
+static func msg_hello(team: Array, room_pass: String = "", gv: String = "") -> Dictionary:
+	return {"v": PROTO_VERSION, "kind": "hello", "team": team.duplicate(),
+		"pass": room_pass.substr(0, MAX_PASS_LEN), "gv": (game_version() if gv.is_empty() else gv)}
+
+
+## 本机游戏版本（版本握手用·真相源=project.godot application/config/version）。
+static func game_version() -> String:
+	return String(ProjectSettings.get_setting("application/config/version", "0"))
 
 
 # —— S2C 构造（服务器用）——
 
-static func msg_error(code: String) -> Dictionary:
-	return {v = PROTO_VERSION, kind = "error", code = code}
+## detail=附加信息（可选·如 bad_version 附房主版本号·客户端展示为 code:detail）。
+static func msg_error(code: String, detail: String = "") -> Dictionary:
+	if detail.is_empty():
+		return {v = PROTO_VERSION, kind = "error", code = code}
+	return {v = PROTO_VERSION, kind = "error", code = code, detail = detail}
 
 
 static func msg_game_over(winner: int) -> Dictionary:

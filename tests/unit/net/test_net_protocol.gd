@@ -53,3 +53,45 @@ func test_net_protocol_json_wire_degradation_accepted() -> void:
 	# JSON 往返 int→float：真实传输路径上的合法包仍须通过
 	var wire: Variant = JSON.parse_string(JSON.stringify(NetProtocol.msg_submit_turn(4, 2, -1, [0])))
 	assert_eq(NetProtocol.validate_c2s(wire), "")
+
+
+func test_net_protocol_hello_pass_and_version_fields_validated() -> void:
+	# Arrange + Act + Assert（好友开房准备批·2026-07-14）
+	# 带口令+版本的 hello 过校验；构造器默认自动带本机版本
+	var msg := NetProtocol.msg_hello(["h01", "h02", "h03"], "sesame")
+	assert_eq(NetProtocol.validate_c2s(msg), "")
+	assert_eq(String(msg["gv"]), NetProtocol.game_version())
+	# 旧式无 pass/gv 字段仍过（可选字段·后向兼容）
+	var legacy := {v = NetProtocol.PROTO_VERSION, kind = "hello", team = ["h01", "h02", "h03"]}
+	assert_eq(NetProtocol.validate_c2s(legacy), "")
+	# 超长/非字符串口令拒；非字符串版本拒（⚠ pass 是关键字→整个字面量用字符串键·禁混风格）
+	var long_pass := {"v": NetProtocol.PROTO_VERSION, "kind": "hello", "team": ["h01", "h02", "h03"],
+		"pass": "x".repeat(NetProtocol.MAX_PASS_LEN + 1)}
+	assert_eq(NetProtocol.validate_c2s(long_pass), "bad_pass_field")
+	var num_pass := {"v": NetProtocol.PROTO_VERSION, "kind": "hello", "team": ["h01", "h02", "h03"], "pass": 5}
+	assert_eq(NetProtocol.validate_c2s(num_pass), "bad_pass_field")
+	var bad_gv := {"v": NetProtocol.PROTO_VERSION, "kind": "hello", "team": ["h01", "h02", "h03"], "gv": 1.0}
+	assert_eq(NetProtocol.validate_c2s(bad_gv), "bad_gv_field")
+
+
+func test_net_protocol_error_detail_attached_only_when_given() -> void:
+	# Arrange + Act
+	var bare := NetProtocol.msg_error("bad_pass")
+	var rich := NetProtocol.msg_error("bad_version", "0.1.0")
+	# Assert
+	assert_false(bare.has("detail"))
+	assert_eq(String(rich["detail"]), "0.1.0")
+
+
+func test_net_protocol_session_pass_gate_matches_exactly() -> void:
+	# Arrange：口令门纯逻辑（net_session.hello_pass_ok·不开任何 socket）
+	var NetSession := preload("res://src/net/net_session.gd")
+	var open_room: RefCounted = NetSession.new()
+	var locked: RefCounted = NetSession.new()
+	locked.password = "sesame"
+	# Act + Assert：公开房全放行；口令房全等才放行（缺字段=空串=不匹配）
+	assert_true(open_room.hello_pass_ok({}))
+	assert_true(open_room.hello_pass_ok({"pass": "whatever"}))
+	assert_true(locked.hello_pass_ok({"pass": "sesame"}))
+	assert_false(locked.hello_pass_ok({"pass": "SESAME"}))
+	assert_false(locked.hello_pass_ok({}))
