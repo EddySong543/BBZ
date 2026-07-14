@@ -106,7 +106,8 @@ centered vertically, front view, flat, on a fully transparent background
 
 ## ② 导航钮 v12「回纹抱端签牌」（✅ 已落位 2026-07-14·全文留作单参考范式成功模板）
 
-> **落位实录**：出图实色底+泛光→img_bg_flood_to_alpha→裁 (99,330,1338,312)→÷6=**223×52**→assets/ui/ui_nav_button.png；9-slice 边距四向不对称=**左右 21/上下 15**（实测抱端深 18-19·钩横笔 y0-13/39-51·中段带=纯竖线+纸→双向 TILE 安全·128 方钮实证保形）；三挂点同步（main_menu 常量拆 X/Y+battle codex_bg+图鉴 NAV_PLATE_MARGIN_X/Y）；menu/图鉴/tip_probe 截图目检过·GUT 360 绿；源档=art_src/ui/ui_nav_button.png（旧版 `_retired` 保留）。⚠ 纸面残留 ~2-3% 纵向泛光渐变：边距设置后平铺带内仅 ~2%·截图未见百叶窗；若后续大尺寸挂点出现横缝→img_flatten_rows（⚠边距参数须避开钩行）。
+> **落位实录 v12a（首版·已退役）**：出图实色底+泛光→flood_to_alpha→÷6=223×52·边距左右21/上下15。Eddy 判**外框中棕太淡**→退役（源档 `_v12a_light_border_retired` 保留）。
+> **落位实录 v12b（现役·2026-07-14 二版）**：Eddy 重出图（棋盘格底）→img_checker_to_alpha→裁 (27,110,2115,495)→÷9=**235×55**→**外框环带换色对齐悬停框族色**（新工具 `tools/img_ring_recolor.gd`：BFS 距透明轮廓≤5px ∩ V<0.62 选外框带→三档映射浓缩咖啡阶 `140a04/1a0e05/221107`=ui_tooltip `#1F1006` 族；内线/抱端在环带外不动）→assets/ui/ui_nav_button.png；9-slice 边距=**左右 21/上下 18**（实测抱端深 18·钩横笔 y0-16/37-54）三挂点同步；menu/battle 方钮/图鉴返回钮截图目检过（近黑框在夜景/亮纸分离度均优于中棕版）·GUT 376 绿；源档=art_src/ui/ui_nav_button.png。
 
 **范式=悬停框 v11 同款（2026-07-14 验证通过）：在役资产单参考+族语归位。**
 设计=**牌匾的直角矩形亲戚**：暖茶纸签牌（`#EFD6A1`·现役钮实测同色）+暖木棕细边框（`#7B4728`=牌匾外带实测色+近黑描边 `#321B08`）+**深巧克力内线两端收「回纹抱端」**（`#4F2B14`·内线长边直行·两端各收一组上下双钩夹竖折的端返=牌匾内线端头同构）+细匀纹。

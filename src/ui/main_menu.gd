@@ -32,9 +32,9 @@ var _cancel_btn: Button   # 匹配中才出现的「✕ 取消匹配」（_setup
 ## 小件像素底板（设置/退出/底坞导航/段位徽章用）。
 ## 2026-06-13 Eddy 选 B「典籍朱印」全局铺；2026-07-13 换 GPT 导航钮贴图
 ## （米金纸面+角上回纹折·9-slice 中段平铺·jelly 程序板/STEEL 色组退役）。
-const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")   # 223×52·回纹抱端签牌 v12（2026-07-14 GPT 重制·牌匾同语内线+端返双钩）
-const NAV_PLATE_MARGIN_X := 21.0   # 9-slice 左右边距=抱端深 18-19 实测+2（盖全端返钩）
-const NAV_PLATE_MARGIN_Y := 15.0   # 9-slice 上下边距=钩横笔行 y0-13/39-51 实测+1（中段带=纯竖线+纸·双向平铺安全）
+const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")   # 235×55·回纹抱端签牌 v12b（2026-07-14 二版·外框环带换色对齐悬停框近黑 #1F1006 族）
+const NAV_PLATE_MARGIN_X := 21.0   # 9-slice 左右边距=抱端深 18 实测+3（盖全端返钩）
+const NAV_PLATE_MARGIN_Y := 18.0   # 9-slice 上下边距=钩横笔行 y0-16/37-54 实测+1（中段带=纯竖线+纸·双向平铺安全）
 const INK := Color(0.20, 0.14, 0.08)        # 墨（羊皮上的字/图标）
 const INK_SOFT := Color(0.42, 0.34, 0.24)   # 淡墨（次级字）
 const CREAM := Color(0.95, 0.91, 0.80)      # 暖米白（直接压在暗波上的字·非羊皮上）
