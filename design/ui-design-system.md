@@ -178,7 +178,7 @@
 | 语言 | shader | 用在 | 圆角 |
 |------|--------|------|------|
 | **暖骨像素框** | `canvas_ui_pixel_frame` | 头像框、图鉴卡、面板（🟡 待升级鎏金浮雕） | `corner_radius 0.25`（方形配 `canvas_ui_round_mask`） |
-| **Jelly 圆角芯片** | `canvas_button_jelly` | 动作按钮、技能格、道具栏芯片、draft 卡 | `corner 0.22` |
+| **Jelly 圆角芯片** | `canvas_button_jelly` | 动作按钮、技能格、道具栏芯片（~~draft 卡~~ 2026-07-14 退役→纸卡贴图 `item_draft_card.png`·悬停框族语竖版+TIER_INK 卡名+阶框图标） | `corner 0.22` |
 
 - **圆角常用值**：ModeCard `0.045`（像素台阶）/ HeroCard·SkillCard `0.3` / HeroFrame `0.25`。切角（八角斜切）按 §1 可作奇幻签名。
 - ⚠ **长矩形必须设 `aspect = 宽/高`**（jelly + pixel_frame 都有此 uniform），否则像素横向拉糊、圆角变椭圆；近方形用默认 `1.0`。

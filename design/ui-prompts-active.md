@@ -220,6 +220,105 @@ centered vertically, front view, flat, on a fully transparent background
 (PNG with alpha).
 ```
 
+## ③ 抽卡衬纸 v1「悬停框竖版亲戚」（F 件·✅ 已落位 2026-07-14·一次过）
+
+> **落位实录**：白底→checker_to_alpha→裁 (16,14,1052,1420)→÷4=**263×355**→assets/ui/item_draft_card.png（定尺寸展示不吃 9-slice·CARD_W/H 常量跟随实寸改）；item_draft_popup 重构=jelly 稀有度芯片/DIM_COLOR/_make_card_jelly 死码全清→纸卡贴图+卡名 TIER_INK 三阶+图标套 item_frame_t1/2/3 阶框（128 原生尺寸）+**格底=图鉴同配方**（CELL_BG_SHADER 四角深阶色/中心略浅/传说 gold_bottom·Eddy 补正"抽卡格底须与图鉴一致"）+分隔墨线+描述墨字直书（scrim/白字描边退役）+取消钮穿导航钮皮；tip_draft 截图目检过·GUT 376 绿；源档=art_src/ui/item_draft_card.png。
+
+设计（§15 范式·2026-07-14）：3选1 抽卡 240×320 卡面换纸——**深框浅芯构成竖版化**（近黑框+奶油纸+巧克力内线+四角回纹钩=悬停框 v11 已过同款·两者同为"浮在战场上的纸面件"）。**资产稀有度中性一张图**（⛔整图染·§10）：稀有度=卡名墨色三阶 TIER_INK（34608F/6B3D96/8F6A1E·图鉴小卷轴同规）+图标外套现役 item_frame_t1/2/3 阶框（引擎侧复用）；描述暗底 scrim 退役=墨字直书纸面。
+参考图=`assets/art_src/ui/ui_tooltip.png` 单参考（取：框色框重+内线回纹角形制+纸色纸纹；弃：横版比例与小尺寸）。
+落位管线：出图 1024×1792 竖版→转透明→量边界→k=round(w/240) 裁整除→÷k（**最终尺寸就近浮动·item_draft_popup CARD_W/H 常量跟随实量改**·卡是定尺寸展示不吃 9-slice 拉伸）→ _build_card jelly 芯片退役换贴图+pop 动画保留；引擎侧配套=名字染 TIER_INK/图标阶框/描述墨字（落位批一起做）。
+
+```text
+Style anchor: 2D game pixel art for an oriental fantasy game, hand-drawn
+storybook warmth fused with retro pixel aesthetics. Crisp hard-edged square
+pixels, no anti-aliasing, no blur, no dithering gradients. Warm top-down
+neutral lighting, no cast shadows painted into the asset. Restrained
+ornament: no gems, no rivet arrays, no heavy embossing. No text or lettering
+anywhere. The asset is rendered alone on a fully transparent background
+(PNG with alpha), nothing else in frame.
+
+Attached image 1 is the finalized tooltip panel from this game's UI set —
+same family, painted by the same hand. The new asset must look like it
+belongs to exactly this set. From image 1 take ONLY: the near-black frame
+color and weight, the dark chocolate inner line and the way it turns into
+small squared meander hooks at its four corners, and the warm cream paper
+with its fine quiet grain. IGNORE from image 1: its small size and wide
+landscape proportions — the new asset is a large PORTRAIT card.
+
+Subject: a single tall reward-card backing for the same game — a flat
+sheet of warm cream paper held in a heavy dark painted frame, portrait
+orientation like a playing card; no table, no backdrop, no glow, no
+shadow beneath it. It must read as a hand-crafted PIXEL-ART UI component
+from the same set as image 1, with chunky pixel steps on corners and
+curves — a plain undecorated rectangle is a FAILED result.
+
+Composition lock (CRITICAL): the card is a portrait rectangle with
+width : height = 3 : 4, spanning the entire canvas width edge to edge and
+centered vertically; only transparent margins remain above and below.
+Straight-on flat view, no perspective, no 3D depth, no bevels.
+
+This card has exactly FOUR visible features. All four are REQUIRED and
+must be clearly present in the final image:
+
+Feature 1 — the outer frame: a chunky near-black espresso band (#1F1006
+family, the same color as image 1's frame), about 6 pixels thick, painted
+flat on the same plane as the paper, even thickness all the way around,
+with pixel-stepped slightly rounded corners. This is the heaviest,
+darkest element — the card floats over a busy game scene and this frame
+is what separates it.
+
+Feature 2 — the inner line: about 4 pixels inside the frame runs ONE thin
+dark-chocolate line (#4F2B14 family — brown ink like image 1's inner
+line, NOT gold, NOT metallic), 3 pixels thick, forming one complete
+unbroken rectangle, keeping the same color and thickness along its entire
+run.
+
+Feature 3 — the four corner hooks: at each of the four corners of that
+inner line, the line turns into a small squared meander hook — the same
+corner motif as image 1: hard right angles only, about two turns, strokes
+3 pixels thick, each hook fitting inside a zone of about 18×16 pixels.
+All four corners carry the same hook. The paper around and inside each
+hook keeps the base cream — pure line work, no filled patch, no block,
+no shadow in the corner region.
+
+Feature 4 — the paper face: warm cream paper (#F3E4BC family, like
+image 1) carrying a fine, quiet tone-on-tone grain — tiny specks a few
+percent darker than the base, fine-grained and evenly spread, visible up
+close but calm at a glance. NOT heavy blotches, NOT noise, and NOT a flat
+digital fill. The whole central area stays completely empty — no icon, no
+emblem, no picture, no divider, no mark of any kind (the item name, icon
+and description are all rendered by the game engine on top).
+
+Even lighting: the sheet is equally bright from edge to edge and into
+every corner — no vignette, no corner darkening, no glow around the card,
+no shading where the frame meets the paper.
+
+Small-size discipline (CRITICAL): displayed small in game — every stroke
+at least 3 grid pixels thick (the frame band about 6); no hairline
+details. No top-to-bottom and no left-to-right gradient anywhere; all
+four edges between the corner zones must be perfectly straight and
+uniform.
+
+Pixel grid and size: designed on a strict 240×320 pixel grid; frame
+≈6 px, inner line 3 px, each corner hook within ≈18×16 px; final in-game
+size ≈240×320 px, displayed at fixed size (no stretching).
+
+Final self-check — the image FAILS if ANY of these is true:
+· any of the four features is missing or barely visible — a bare flat
+  rectangle is JUST AS WRONG as an over-decorated one;
+· the corner hooks are missing, curved, or replaced by filled blocks;
+· there is any icon, picture, emblem or divider drawn on the paper;
+· there is any gold, metallic trim, red mark, or a third line;
+· there is a glow, halo, drop shadow or any backdrop around the card;
+· there is a dark smudge or filled patch in any corner, a directional
+  gradient, or hairline strokes;
+· the card is landscape instead of portrait 3:4.
+
+Output: one single portrait card spanning the entire canvas width edge to
+edge, centered vertically, front view, flat, on a fully transparent
+background (PNG with alpha).
+```
+
 ### 导航钮备选（v12 仍不合意再展开）
 
 - **D 祥云托角式**：素签牌+一角同色系祥云（tab_cloud 族语）；柔和·风险=低对比下存在感不足。

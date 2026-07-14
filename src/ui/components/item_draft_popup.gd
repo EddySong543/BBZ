@@ -1,30 +1,38 @@
 class_name ItemDraftPopup
 extends Control
 
-## 道具 3 选 1 弹窗（抽取 / 升级·M3）：模态全屏暗幕 + 居中候选卡（jelly 圆角卡·维度色·名 + 一句话描述）。
-## 卡片 = 与道具栏/动作按钮同款 canvas_button_jelly 语言（2026-06-20 配色统一·取代旧暖骨像素边框）。
-## ⚠ 占位：程序化建子节点 + 占位文字，待 scene 化 + 换美术（图标任务延后）。
+## 道具 3 选 1 弹窗（抽取 / 升级·M3）：模态全屏暗幕 + 居中候选卡。
+## 卡面 = 纸卡贴图（2026-07-14 卡衬纸落位：悬停框族语竖版=近黑框+奶油纸+回纹角·jelly 稀有度色芯片退役）。
+## 稀有度表达：卡名墨色三阶 TIER_INK（图鉴同源·⛔整卡染色）+ 图标外套 item_frame_t1/2/3 阶框；
+## 描述=墨字直书纸面（暗衬 scrim / 白字描边随亮纸退役）。
 ## 用法：实例化 → add_child（覆盖在 battle_screen 上）→ setup(options, can_cancel, title)
 ##   → `var choice: int = await popup.resolved`（返回选中 index；-1 = 取消）→ 调用方 queue_free。
 
 signal resolved(choice: int)
 
-const CARD_W := 240.0
-const CARD_H := 320.0
+const CARD_W := 263.0                 # =贴图实寸（源 1052×1420 ÷4 整数倍降采样·2026-07-14）
+const CARD_H := 355.0
 const CARD_GAP := 28.0
 const SCREEN_W := 1920.0
 const SCREEN_H := 1080.0
 
-## 维度 → 卡底色（与 ItemSlotRow / 动作按钮同源的语义色板）。
-const DIM_COLOR := {
-	"进攻": Color("b8402f"), "防御": Color("3f6fb0"), "能量": Color("d2a32a"),
-	"节奏": Color("c47f33"), "状态": Color("4f9d52"), "干扰": Color("6f5bb0"),
-	"导出": Color("5f8a9a"), "随机": Color("8a8f98"),
+const CARD_TEX := preload("res://assets/ui/item_draft_card.png")     # 纸卡衬纸（悬停框族语竖版）
+const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")  # 取消钮底板（全游戏导航一个语言）
+const TIER_FRAME := {   # 图标阶框（图鉴格同款回纹阶框·128 原生尺寸）
+	1: preload("res://assets/ui/item_frame_t1.png"),
+	2: preload("res://assets/ui/item_frame_t2.png"),
+	3: preload("res://assets/ui/item_frame_t3.png"),
 }
-
-## jelly 卡底（与按钮 / 道具芯片同款 shader → 统一 UI 语言）。
-const JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")
-const EDGE_OUTER := Color(0.10, 0.09, 0.11)   # 统一暗轮廓（场景无关）
+# 格底（=item_gallery_screen 同源配方·2026-07-14 Eddy：抽卡格底须与图鉴一致）：
+# 四角=深饱和阶色·中心=略浅阶色·传说=gold_bottom 金云纹贴图（只换框色）。
+const CELL_BG_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")
+const LEGENDARY_BG := preload("res://assets/ui/gold_bottom.png")
+const CELL_FILL := {1: Color("#6E9BD2"), 2: Color("#9A7FD0")}
+const CELL_CENTER := {1: Color("#88AEDE"), 2: Color("#B098E0")}
+const TIER_INK := {   # 卡名墨色三阶（=item_gallery_screen.TIER_INK 同源·稀有度不染卡面）
+	1: Color("34608F"), 2: Color("6B3D96"), 3: Color("8F6A1E"),
+}
+const INK := Color(0.24, 0.19, 0.12)  # 墨字（亮纸主文字·与战斗悬停提示同源）
 
 var _can_cancel := true
 var _done := false   # 防重复 resolve（连点 / ESC 抢答）
@@ -64,6 +72,22 @@ func setup(options: Array, can_cancel: bool = true, title_text: String = "抽取
 		cancel.size = Vector2(160.0, 48.0)
 		cancel.position = Vector2((SCREEN_W - 160.0) * 0.5, card_y + CARD_H + 36.0)
 		cancel.focus_mode = Control.FOCUS_NONE
+		for st in ["normal", "hover", "pressed", "disabled", "focus"]:
+			cancel.add_theme_stylebox_override(st, StyleBoxEmpty.new())
+		cancel.add_theme_color_override("font_color", INK)
+		var plate := NinePatchRect.new()   # 导航钮皮（与主菜单/图鉴返回一个语言）
+		plate.texture = NAV_PLATE_TEX
+		plate.patch_margin_left = 21
+		plate.patch_margin_right = 21
+		plate.patch_margin_top = 18
+		plate.patch_margin_bottom = 18
+		plate.axis_stretch_horizontal = NinePatchRect.AXIS_STRETCH_MODE_TILE
+		plate.axis_stretch_vertical = NinePatchRect.AXIS_STRETCH_MODE_TILE
+		plate.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		plate.show_behind_parent = true
+		plate.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cancel.add_child(plate)
 		cancel.pressed.connect(_resolve.bind(-1))
 		add_child(cancel)
 
@@ -80,46 +104,65 @@ func _build_card(item: ItemData, pos: Vector2, idx: int) -> void:
 	card.pressed.connect(_resolve.bind(idx))
 	add_child(card)
 
-	# 卡底改按【稀有度】上色（2026-06-26 Eddy·普通灰/稀有蓝/传说金·变量名 dim 历史遗留）。
-	var dim: Color = ItemCatalog.rarity_color(item.tier) if item != null else Color(0.42, 0.42, 0.47)
-	# 图标（缺图 → 描述区维持原位、卡面与现状一像素不变·零回归）。
-	var tex: Texture2D = ItemCatalog.load_icon(item.item_id) if item != null else null
-	var scrim_top := 184.0 if tex != null else 92.0    # 有图 → 描述区下移给图标腾窗
-	var desc_top := 192.0 if tex != null else 100.0
-	# jelly 卡底（圆角果冻·维度色渐变·与道具栏/按钮同语言）。子节点 IGNORE，点击穿透到 card。
-	var jelly := ColorRect.new()
-	jelly.color = Color.WHITE   # jelly shader 乘 COLOR，须白
-	jelly.position = Vector2.ZERO
-	jelly.size = Vector2(CARD_W, CARD_H)
-	jelly.material = _make_card_jelly(dim)
-	jelly.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(jelly)
+	var tier: int = item.tier if item != null else 1
+	# 卡面=纸卡贴图（2026-07-14 卡衬纸·jelly 芯片退役）。子节点全 IGNORE，点击穿透到 card。
+	var bg := TextureRect.new()
+	bg.texture = CARD_TEX
+	bg.position = Vector2.ZERO
+	bg.size = Vector2(CARD_W, CARD_H)
+	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bg.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(bg)
 
-	# 描述区暗衬（内缩不碰圆角）：提升长描述在饱和卡上的可读性。
-	var scrim := ColorRect.new()
-	scrim.color = Color(0.0, 0.0, 0.0, 0.26)
-	scrim.position = Vector2(14.0, scrim_top)
-	scrim.size = Vector2(CARD_W - 28.0, CARD_H - scrim_top - 16.0)
-	scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(scrim)
+	# 图标（缺图 → 描述区上移占满）。
+	var tex: Texture2D = ItemCatalog.load_icon(item.item_id) if item != null else null
+	var desc_top := 244.0 if tex != null else 116.0
 
 	var name_lbl := Label.new()
 	name_lbl.text = tr(item.item_name) if item != null else "?"
-	name_lbl.position = Vector2(12.0, 18.0)
-	name_lbl.size = Vector2(CARD_W - 24.0, 64.0)
+	name_lbl.position = Vector2(24.0, 24.0)
+	name_lbl.size = Vector2(CARD_W - 48.0, 56.0)
 	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	name_lbl.add_theme_font_size_override("font_size", 22)
-	name_lbl.add_theme_color_override("font_color", Color(0.99, 0.97, 0.92))   # 亮米白压饱和卡
-	name_lbl.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.03, 0.9))
-	name_lbl.add_theme_constant_override("outline_size", 5)
+	name_lbl.add_theme_font_size_override("font_size", 24)
+	name_lbl.add_theme_color_override("font_color", TIER_INK.get(tier, INK))   # 稀有度=名字墨色（亮纸免描边）
 	name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(name_lbl)
 
 	if tex != null:
+		# 格底（图鉴格同配方：四角深阶色+中心略浅·传说=gold_bottom）——铺在阶框下。
+		var cell := ColorRect.new()
+		cell.color = Color.WHITE
+		cell.position = Vector2(CARD_W * 0.5 - 64.0, 92.0)
+		cell.size = Vector2(128.0, 128.0)
+		cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var cm := ShaderMaterial.new()
+		cm.shader = CELL_BG_SHADER
+		cm.set_shader_parameter("fill_color", CELL_FILL.get(tier, CELL_FILL[1]))
+		cm.set_shader_parameter("inner_color", CELL_CENTER.get(tier, CELL_CENTER[1]))
+		cm.set_shader_parameter("center_glow", 1.0)
+		cm.set_shader_parameter("corner_radius", 0.18)
+		cm.set_shader_parameter("pixel_grid", 128.0 / 6.0)
+		if tier == 3:
+			cm.set_shader_parameter("use_tex", 1.0)
+			cm.set_shader_parameter("bg_tex", LEGENDARY_BG)
+			cm.set_shader_parameter("tex_tint", Color(1.0, 1.0, 1.0, 1.0))
+		cm.set_shader_parameter("cloud_on", 0.0)
+		cell.material = cm
+		card.add_child(cell)
+		# 阶框+图标（图鉴格同语言·128 阶框原生尺寸不缩放）。
+		var frame := TextureRect.new()
+		frame.texture = TIER_FRAME.get(tier, TIER_FRAME[1])
+		frame.position = Vector2(CARD_W * 0.5 - 64.0, 92.0)
+		frame.size = Vector2(128.0, 128.0)
+		frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.add_child(frame)
 		var icon := TextureRect.new()
 		icon.texture = tex
-		icon.position = Vector2(CARD_W * 0.5 - 48.0, 84.0)
+		icon.position = Vector2(CARD_W * 0.5 - 48.0, 108.0)
 		icon.size = Vector2(96.0, 96.0)
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -127,11 +170,19 @@ func _build_card(item: ItemData, pos: Vector2, idx: int) -> void:
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card.add_child(icon)
 
-	# 描述定宽手动换行（2026-07-11 Eddy：AUTOWRAP 在长中文描述上溢出卡底被截）：
+	# 分隔墨线（图鉴右页同手法）。
+	var divider := ColorRect.new()
+	divider.color = Color(INK.r, INK.g, INK.b, 0.45)
+	divider.position = Vector2(40.0, desc_top - 14.0)
+	divider.size = Vector2(CARD_W - 80.0, 2.0)
+	divider.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(divider)
+
+	# 描述=墨字直书纸面·定宽手动换行（2026-07-11 Eddy：AUTOWRAP 在长中文描述上溢出卡底被截）：
 	# 每行统一字数（宽度/字号），行数超出描述区高度 → 降号 16→12（Ark Pixel 整数倍档）重排。
 	var desc_text: String = tr(item.description) if item != null else ""
-	var box_w := CARD_W - 36.0
-	var box_h := CARD_H - desc_top - 24.0
+	var box_w := CARD_W - 60.0
+	var box_h := CARD_H - desc_top - 28.0
 	var f_size := 16
 	var per_line := int(box_w / f_size)
 	if ceilf(desc_text.length() / float(per_line)) * f_size * 1.4 > box_h:
@@ -139,34 +190,14 @@ func _build_card(item: ItemData, pos: Vector2, idx: int) -> void:
 		per_line = int(box_w / f_size)
 	var desc_lbl := Label.new()
 	desc_lbl.text = _wrap_fixed(desc_text, per_line)
-	desc_lbl.position = Vector2(18.0, desc_top)
+	desc_lbl.position = Vector2(30.0, desc_top)
 	desc_lbl.size = Vector2(box_w, box_h)
 	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	desc_lbl.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	desc_lbl.add_theme_font_size_override("font_size", f_size)
-	desc_lbl.add_theme_color_override("font_color", Color(0.96, 0.95, 0.9))
-	desc_lbl.add_theme_color_override("font_outline_color", Color(0.05, 0.03, 0.02, 0.85))
-	desc_lbl.add_theme_constant_override("outline_size", 3)
+	desc_lbl.add_theme_color_override("font_color", INK)
 	desc_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(desc_lbl)
-
-
-## 造 jelly 卡底材质：维度色竖直渐变 + 立体边 + 大卡小圆角（aspect=宽/高·tall 卡像素方正）。
-func _make_card_jelly(dim: Color) -> ShaderMaterial:
-	var m := ShaderMaterial.new()
-	m.shader = JELLY_SHADER
-	m.set_shader_parameter("fill_top", dim.lightened(0.12))
-	m.set_shader_parameter("fill_bottom", dim.darkened(0.32))
-	m.set_shader_parameter("edge_inner", dim.lightened(0.38))
-	m.set_shader_parameter("edge_outer", EDGE_OUTER)
-	m.set_shader_parameter("fill_alpha", 1.0)
-	m.set_shader_parameter("pixel_grid", 60.0)        # 大卡 → 更细像素格
-	m.set_shader_parameter("corner", 0.07)            # 大卡小圆角（避免过圆）
-	m.set_shader_parameter("edge_px", 2.0)
-	m.set_shader_parameter("aspect", CARD_W / CARD_H) # tall 卡 → 像素方正、圆角/边四周等宽
-	m.set_shader_parameter("noise_amt", 0.06)
-	m.set_shader_parameter("wear", 0.18)
-	return m
 
 
 ## 手动定宽换行：每行固定 chars 个字符（CJK 等宽·统一每行字数·保留已有换行）。
