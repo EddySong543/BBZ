@@ -85,11 +85,14 @@ const AI := 1       # 对手 AI
 var p1_frame_slots: Array[int] = [-1, -1, -1]
 var p2_frame_slots: Array[int] = [-1, -1, -1]
 
-# ---- 技能展示格：顺序浏览 [己方0,1,2 → 对方0,1,2]，点击翻页 ----
-var btn_codex: Button = null          # 左下「图鉴」钮（原技能卡位·程序化创建=同疾风）
+# ---- 技能展示格：顺序浏览 [己方0,1,2 → 对方0,1,2]，点击翻页（2026-07-14 Eddy 定回归左下）----
+var _skill_entries: Array = []   # [[player, slot], ...]
+var _skill_index: int = 0
+var btn_codex: Button = null          # 「图鉴」钮（2026-07-14 移到右侧结束旁·程序化创建=同疾风）
 var _codex_overlay: Control = null    # 战斗内图鉴浮层（懒创建·关闭仅隐藏）
 
 @onready var buttons_ctrl: Control = $Buttons
+@onready var skill_card: SkillCard = $SkillCard
 @onready var _death_switch_overlay: DeathSwitchOverlay = $DeathSwitchOverlay
 @onready var game_timer: Timer = $GameTimer
 @onready var stage: BattleStage = $Stage   # 多层视差舞台：受击震屏走 stage.shake 按 parallax_factor 分层（见 battle_stage.gd）
@@ -321,6 +324,12 @@ func _ready() -> void:
 	_build_settings_button()   # 战斗内设置入口（右上角小钮 + ESC·2026-07-09）
 	_setup_fx_pools()          # 命中特效对象池预分配（飘字/火花/斩击/尘土/能量粒）
 
+	# 技能卡回归（2026-07-14 Eddy·c877107 退役后复位）：左下顺序浏览双方英雄技能。
+	_build_skill_entries()
+	skill_card.advance_requested.connect(_on_skill_card_advance)
+	skill_card.back_requested.connect(_on_skill_card_back)   # 右键 → 上一个英雄
+	_refresh_skill_card()
+
 	# 低血红闪（任务5）：出战血条剩余爱心在 HP 占比低时红色呼吸（IconPipRow 内部实现）。
 	for row in [p1_heart_row, p2_heart_row]:
 		row.low_hp_flash = true
@@ -440,15 +449,15 @@ func _init_buttons() -> void:
 	btn_jifeng.visible = false
 	buttons_ctrl.add_child(btn_jifeng)
 
-	# 图鉴入口（2026-07-13 Eddy）：原左下技能卡退役 → 与「结束」对称的图鉴钮
-	# （结束=(1762,26) 128×128 → 图鉴=(30,26) 同尺寸）。导航钮贴图+墨字
-	# （主菜单导航钮同语言·2026-07-13 GPT 换皮·避开动作按钮语义色）；程序化创建不动 .tscn（同疾风）。
+	# 图鉴入口（2026-07-14 Eddy：技能卡回归左下 → 图鉴钮移到「结束」左侧成组
+	# （结束=(1762,26) 128×128 → 图鉴=(1610,26) 同尺寸·间距 24·与技能钮隔 76 分组））。
+	# 导航钮贴图+墨字（主菜单导航钮同语言·避开动作按钮语义色）；程序化创建不动 .tscn（同疾风）。
 	btn_codex = Button.new()
 	btn_codex.name = "BtnCodex"
 	btn_codex.text = tr("图鉴")
 	btn_codex.focus_mode = Control.FOCUS_NONE
 	btn_codex.clip_text = true
-	btn_codex.position = Vector2(30.0, 26.0)
+	btn_codex.position = Vector2(1610.0, 26.0)
 	btn_codex.size = Vector2(128.0, 128.0)
 	for st in ["normal", "hover", "pressed", "disabled", "focus"]:
 		btn_codex.add_theme_stylebox_override(st, StyleBoxEmpty.new())
@@ -551,6 +560,49 @@ func _on_codex_pressed() -> void:
 		_codex_overlay.close()
 	else:
 		_codex_overlay.open()
+
+
+# ============================================================
+# 技能展示格（2026-07-14 回归：点击翻页浏览全部英雄技能：己方 → 对方）
+# ============================================================
+
+## 构建浏览顺序：先己方 3 个（含替补），再对方 3 个，按阵容槽位顺序。
+func _build_skill_entries() -> void:
+	_skill_entries.clear()
+	for p in [PLAYER, AI]:
+		for slot in range(battle.heroes[p].size()):
+			_skill_entries.append([p, slot])
+	_skill_index = 0
+
+
+## 把当前选中的英雄填进展示格。主动/被动取自运行时技能组件（h07 当先按主动算）。
+func _refresh_skill_card() -> void:
+	if _skill_entries.is_empty():
+		return
+	var e: Array = _skill_entries[_skill_index % _skill_entries.size()]
+	var p: int = int(e[0])
+	var slot: int = int(e[1])
+	var h: HeroData = battle.heroes[p][slot]
+	var sk: HeroSkill = battle.get_skill(p, slot)
+	var is_active: bool = sk != null and (sk.has_active() or sk.has_free_switch())
+	# 立绘一律朝右；阵营靠底色区分（己方冷蓝 / 对方暖红）。
+	skill_card.populate(h.hero_name, h.skill_description, h.skill_detail, is_active, h.portrait_path, p == PLAYER, h.skill_icon_path)
+
+
+## 左键点击展示格 → 翻到下一个英雄，循环。
+func _on_skill_card_advance() -> void:
+	if _skill_entries.is_empty():
+		return
+	_skill_index = (_skill_index + 1) % _skill_entries.size()
+	_refresh_skill_card()
+
+
+## 右键点击展示格 → 翻回上一个英雄，循环。
+func _on_skill_card_back() -> void:
+	if _skill_entries.is_empty():
+		return
+	_skill_index = (_skill_index - 1 + _skill_entries.size()) % _skill_entries.size()
+	_refresh_skill_card()
 
 
 # ============================================================
@@ -1574,11 +1626,15 @@ func _set_buttons_active(active: bool, dim_inactive: bool = true) -> void:
 	var show_affordance := active or not dim_inactive
 	var alpha := 1.0 if show_affordance else 0.4
 	buttons_ctrl.modulate = Color(1, 1, 1, alpha)
+	if skill_card:
+		skill_card.visible = true
+		skill_card.modulate = Color(1, 1, 1, alpha)
 	if show_affordance:
 		_refresh_action_affordance()   # 按能量显示亮/暗（开局与选择阶段一致）
 	else:
 		for btn in action_btn_list + [btn_confirm]:
 			btn.disabled = true        # 结算/过场：全禁用（图鉴钮不禁——随时可查阅）
+	_refresh_skill_card()
 
 
 ## 编辑器可摆位：按钮位置/尺寸全部读 .tscn，代码只管显隐与技能 tooltip，不再覆盖坐标。
@@ -2192,9 +2248,10 @@ func _build_debug_buttons() -> void:
 	panel.overtime_requested.connect(_on_debug_overtime)
 
 
-## debug 面板改了 battle 状态 → 刷新全套显示。
+## debug 面板改了 battle 状态 → 刷新全套显示（含换英雄需刷技能卡·多刷无害）。
 func _on_debug_state_changed() -> void:
 	_update_all()
+	_refresh_skill_card()
 	_start_ai_think()   # 任务G：调试面板直改引擎状态 → 预想作废重想
 
 
