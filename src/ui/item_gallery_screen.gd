@@ -31,8 +31,9 @@ const TAB_CLOUD_TEX := {   # 三阶祥云页签(GPT 双端云头横幅·240×56�
 	3: preload("res://assets/ui/tab_cloud_t3.png"),
 }
 const BANNER_TEX := preload("res://assets/ui/ui_banner_scroll.png")   # 道具名小卷轴横幅(GPT·224×45·轴杆+祥云端)
-const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")   # 返回钮=主菜单导航钮同皮(2026-07-14 排版重构·重出图落位后自动跟新)
-const NAV_PLATE_MARGIN := 18   # 9-slice 边距=main_menu 同值(16 会切到回纹钩尾→平铺成梯档)
+const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")   # 返回钮=主菜单导航钮同皮(v12 回纹抱端签牌·2026-07-14 落位)
+const NAV_PLATE_MARGIN_X := 21   # 9-slice 左右边距=抱端深实测+2(main_menu 同值)
+const NAV_PLATE_MARGIN_Y := 15   # 9-slice 上下边距=钩横笔行实测+1(main_menu 同值)
 const TIER_INK := {   # 道具名墨色三阶（压奶油纸·稀有度不再整条染横幅——2026-07-13 小卷轴换皮）
 	1: Color("34608F"), 2: Color("6B3D96"), 3: Color("8F6A1E"),
 }
@@ -322,10 +323,10 @@ func _style_back_button() -> void:
 	var plate := NinePatchRect.new()
 	plate.name = "Plate"
 	plate.texture = NAV_PLATE_TEX
-	plate.patch_margin_left = NAV_PLATE_MARGIN
-	plate.patch_margin_right = NAV_PLATE_MARGIN
-	plate.patch_margin_top = NAV_PLATE_MARGIN
-	plate.patch_margin_bottom = NAV_PLATE_MARGIN
+	plate.patch_margin_left = NAV_PLATE_MARGIN_X
+	plate.patch_margin_right = NAV_PLATE_MARGIN_X
+	plate.patch_margin_top = NAV_PLATE_MARGIN_Y
+	plate.patch_margin_bottom = NAV_PLATE_MARGIN_Y
 	plate.axis_stretch_horizontal = NinePatchRect.AXIS_STRETCH_MODE_TILE
 	plate.axis_stretch_vertical = NinePatchRect.AXIS_STRETCH_MODE_TILE
 	plate.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST

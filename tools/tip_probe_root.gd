@@ -6,7 +6,7 @@ extends Node
 ##   直接调 battle_screen 的提示函数 → 三截图：①攒按钮提示 ②道具槽提示 ③3选1 最长描述卡。
 ## 输出到 session scratchpad（不落仓库目录）。
 
-const OUT_DIR := "C:/Users/Edzzz/AppData/Local/Temp/claude/D--Game-BoBoZan-Claude-Code-Game-Studios-cn-localization/d876abac-d136-4bc5-969a-26bb80fa7d86/scratchpad/"
+const OUT_DIR := "C:/Users/Edzzz/AppData/Local/Temp/claude/D--Game-BoBoZan-Claude-Code-Game-Studios-cn-localization/ce241ba4-b053-41bc-b841-ba00c18ed717/scratchpad/"
 const DraftPopup := preload("res://src/ui/components/item_draft_popup.gd")
 
 

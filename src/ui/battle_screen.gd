@@ -464,10 +464,10 @@ func _init_buttons() -> void:
 	var codex_bg := NinePatchRect.new()
 	codex_bg.name = "Bg"
 	codex_bg.texture = NAV_PLATE_TEX
-	codex_bg.patch_margin_left = 18    # =主菜单 NAV_PLATE_MARGIN·盖住回纹钩含沿边尾（16 切钩尾→梯档）
-	codex_bg.patch_margin_right = 18
-	codex_bg.patch_margin_top = 18
-	codex_bg.patch_margin_bottom = 18
+	codex_bg.patch_margin_left = 21    # =主菜单 NAV_PLATE_MARGIN_X/Y·v12 回纹抱端（左右盖抱端深 18-19·上下盖钩横笔 y0-13/39-51）
+	codex_bg.patch_margin_right = 21
+	codex_bg.patch_margin_top = 15
+	codex_bg.patch_margin_bottom = 15
 	codex_bg.axis_stretch_horizontal = NinePatchRect.AXIS_STRETCH_MODE_TILE   # 中段平铺防颗粒拉伸
 	codex_bg.axis_stretch_vertical = NinePatchRect.AXIS_STRETCH_MODE_TILE
 	codex_bg.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -1811,8 +1811,8 @@ var _tip_label: Label
 func _build_hover_tips() -> void:
 	_tip_panel = PanelContainer.new()
 	var sb := StyleBoxTexture.new()
-	sb.texture = preload("res://assets/ui/ui_tooltip.png")   # 129×57·奶油纸面+胡桃木框+四角包角（2026-07-13 重制版）
-	sb.set_texture_margin_all(14.0)                          # 9-slice：四角包角块整块保形
+	sb.texture = preload("res://assets/ui/ui_tooltip.png")   # 131×57·族语版 v11（2026-07-14 GPT 重制·近黑框+茶纸+牌匾同语回纹角内线）
+	sb.set_texture_margin_all(20.0)                          # 9-slice：四角回纹钩整块保形（实测钩横笔 y≤11/≥45·深≤18）
 	sb.axis_stretch_horizontal = StyleBoxTexture.AXIS_STRETCH_MODE_TILE   # 中段平铺防颗粒拉伸
 	sb.axis_stretch_vertical = StyleBoxTexture.AXIS_STRETCH_MODE_TILE
 	sb.content_margin_left = 16.0
