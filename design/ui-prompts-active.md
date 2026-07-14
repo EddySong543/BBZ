@@ -319,6 +319,75 @@ edge, centered vertically, front view, flat, on a fully transparent
 background (PNG with alpha).
 ```
 
+## ④ 鼠标指针 v1「如意云头小柄」（G 件·C 方案·⏳ 待出图·单参考版）
+
+设计（2026-07-14 Eddy 选 C）：斜置如意小柄——**左上尖端**（点击热点·必须收束到单像素尖）+右下**祥云头收尾**（tab_cloud 端头云卷同形制）；主体近黑浓缩咖啡+云头茶金+**全轮廓奶油描边 1-2px**（保证亮纸/夜景双衬底可见）。48×48 档。
+形态规划：ARROW（本 prompt）+ POINTING_HAND（出图后**对话增量改**："Keep exactly this cursor; only tint the cloud head warm gold (#D4A94E family) and open its curls slightly. Same silhouette, same tip."·同轮廓同热点）+ IBEAM 首版用引擎默认。
+参考图=`assets/art_src/ui/tab_cloud.png` 单参考（取：端头祥云卷形制；弃：横幅结构/金色/尺寸）。
+落位管线：出图 1024×1024→转透明→量边界→整数倍降采样 48×48→量尖端像素=hotspot→开机入口 `Input.set_custom_mouse_cursor(tex, ARROW/POINTING_HAND, hotspot)`（零 project.godot 改动）。⚠ OS 指针不进视口截图：自检=预览探针把贴图按实寸画在亮纸/夜景衬底上；实机手感=Eddy F6。
+
+```text
+Style anchor: 2D game pixel art for an oriental fantasy game, hand-drawn
+storybook warmth fused with retro pixel aesthetics. Crisp hard-edged square
+pixels, no anti-aliasing, no blur, no dithering gradients. Warm top-down
+neutral lighting, no cast shadows painted into the asset. Restrained
+ornament: no gems, no rivet arrays, no heavy embossing. No text or lettering
+anywhere. The asset is rendered alone on a fully transparent background
+(PNG with alpha), nothing else in frame.
+
+Attached image 1 is the finalized cloud-head tab banner from this game's UI
+set — same family, painted by the same hand. From image 1 take ONLY the way
+its two ends curl into round auspicious cloud heads (the spiral cloud
+lobes). IGNORE everything else about it: its long banner shape, its gold
+color, its size and horizontal layout.
+
+Subject: a single mouse cursor for the same game — a tiny ruyi wand seen
+diagonally: a slender pointed shaft whose sharp tip aims to the UPPER-LEFT,
+and whose lower-right end blooms into a small auspicious cloud head in the
+manner of image 1's end curls. It must read instantly as a game cursor:
+one sharp point to click with, one decorative cloud tail.
+
+Composition lock (CRITICAL): exactly ONE cursor, centered, filling about
+80% of the canvas, its tip pointing toward the upper-left corner along a
+45-degree diagonal. Straight-on flat view, no perspective, no 3D, no
+rotation ambiguity.
+
+This cursor has exactly THREE visible features. All three are REQUIRED:
+
+Feature 1 — the shaft: a slender straight shaft running from the upper-left
+tip to the lower-right, filled dark espresso (#1F1006 family). Toward the
+upper-left it tapers needle-sharp: the final tip must converge to a single
+crisp pixel corner — this is the click point. No blunt or rounded tip.
+
+Feature 2 — the cloud head: at the lower-right end the shaft blooms into a
+compact auspicious cloud head — two or three round curl lobes exactly in
+the manner of image 1's end curls — filled warm tea (#F0D7A2 family) with
+a dark espresso outline. Compact and chunky, not wispy.
+
+Feature 3 — the rim: the ENTIRE cursor silhouette carries a thin warm
+cream outer rim (#F3E4BC family), 1-2 pixels thick and unbroken, so the
+cursor stays visible on both dark night scenes and bright paper screens.
+
+Even lighting: no glow, no halo, no drop shadow, no backdrop of any kind.
+
+Small-size discipline (CRITICAL): designed on a strict 48×48 pixel grid —
+every stroke at least 2 grid pixels thick (the single-pixel tip is the
+only exception); the cloud head fits within about 22×22 px; no hairline
+curls, no fine filigree.
+
+Pixel grid and size: strict 48×48 pixel grid; final in-game size 48×48 px.
+
+Final self-check — the image FAILS if ANY of these is true:
+· the tip is blunt, rounded, or does not point to the upper-left;
+· the cloud head is missing, wispy, or has more than three lobes;
+· the cream rim is missing or broken;
+· there is any gold, red, glow, shadow, or a second object in frame;
+· strokes thinner than 2 grid pixels appear anywhere except the tip.
+
+Output: one single cursor, centered, front view, flat, on a fully
+transparent background (PNG with alpha).
+```
+
 ### 导航钮备选（v12 仍不合意再展开）
 
 - **D 祥云托角式**：素签牌+一角同色系祥云（tab_cloud 族语）；柔和·风险=低对比下存在感不足。
