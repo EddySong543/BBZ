@@ -19,7 +19,7 @@ func _ready() -> void:
 		if (f as Control).mouse_filter != Control.MOUSE_FILTER_IGNORE:
 			filter_ok = false
 	var target := 2
-	var pos := Vector2(221.0 + target * 121.0 + 52.0, 186.0 + 52.0)   # 第 3 格框中心
+	var pos := Vector2(282.0 + target * 108.0 + 46.0, 236.0 + 46.0)   # 第 3 格框中心（2026-07-15 回纹卷轴换装几何）
 	_click(pos)
 	await get_tree().create_timer(0.3).timeout
 	var sel: int = g._sel_idx
