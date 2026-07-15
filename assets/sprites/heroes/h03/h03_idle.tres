@@ -1,6 +1,35 @@
 [gd_resource type="SpriteFrames" format=3]
 
 [ext_resource type="Texture2D" path="res://assets/sprites/heroes/h03/h03_idle.png" id="1_lcnao"]
+[ext_resource type="Texture2D" path="res://assets/sprites/heroes/h03/h03_attack.png" id="1_p43ar"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_3p2yu"]
+atlas = ExtResource("1_p43ar")
+region = Rect2(0, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_2n5ib"]
+atlas = ExtResource("1_p43ar")
+region = Rect2(256, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_e70wb"]
+atlas = ExtResource("1_p43ar")
+region = Rect2(512, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_ncagw"]
+atlas = ExtResource("1_p43ar")
+region = Rect2(768, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_ysbm5"]
+atlas = ExtResource("1_p43ar")
+region = Rect2(0, 256, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_jk51d"]
+atlas = ExtResource("1_p43ar")
+region = Rect2(256, 256, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_g1fae"]
+atlas = ExtResource("1_p43ar")
+region = Rect2(512, 256, 256, 256)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_p43ar"]
 atlas = ExtResource("1_lcnao")
@@ -26,6 +55,32 @@ region = Rect2(0, 256, 256, 256)
 animations = [{
 "frames": [{
 "duration": 1.0,
+"texture": SubResource("AtlasTexture_3p2yu")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_2n5ib")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_e70wb")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_ncagw")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_ysbm5")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_jk51d")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_g1fae")
+}],
+"loop": 0,
+"name": &"attack",
+"speed": 11.666666666666668
+}, {
+"frames": [{
+"duration": 1.0,
 "texture": SubResource("AtlasTexture_p43ar")
 }, {
 "duration": 1.0,
@@ -40,7 +95,7 @@ animations = [{
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_cru1c")
 }],
-"loop": true,
+"loop": 1,
 "name": &"idle",
 "speed": 8.0
 }]
