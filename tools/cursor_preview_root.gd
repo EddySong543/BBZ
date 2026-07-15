@@ -38,7 +38,7 @@ func _ready() -> void:
 				tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 				tr.stretch_mode = TextureRect.STRETCH_SCALE
 				tr.position = Vector2(x0 + v * 260.0, 80.0 + s * 190.0)
-				tr.size = Vector2(48, 48) * k
+				tr.size = tex.get_size() * k   # 按贴图原尺寸放大（成品非正方·写死 48 会拉变形）
 				root.add_child(tr)
 
 	await get_tree().create_timer(0.4, true, false, true).timeout
