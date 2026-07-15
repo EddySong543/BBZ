@@ -5,8 +5,8 @@ extends Node
 ## 两张：①战斗屏含右上角"设置"钮 ②打开设置浮层（显示模式/分辨率行可见）。
 ## 输出仓库外 D:/Game/BoBoZan/（勿堆仓库·[[dont-dump-screenshots]]）。
 
-const OUT_BTN := "D:/Game/BoBoZan/battle_settings_btn_shot.png"
-const OUT_PANEL := "D:/Game/BoBoZan/battle_settings_panel_shot.png"
+const OUT_BTN := "C:/Users/Edzzz/AppData/Local/Temp/claude/D--Game-BoBoZan-Claude-Code-Game-Studios-cn-localization/6e0b7c09-95ef-4eec-aff5-b75e12a43c22/scratchpad/battle_settings_btn_shot.png"
+const OUT_PANEL := "C:/Users/Edzzz/AppData/Local/Temp/claude/D--Game-BoBoZan-Claude-Code-Game-Studios-cn-localization/6e0b7c09-95ef-4eec-aff5-b75e12a43c22/scratchpad/battle_settings_panel_shot.png"
 
 
 func _ready() -> void:
