@@ -104,7 +104,189 @@ centered vertically, front view, flat, on a fully transparent background
 (PNG with alpha).
 ```
 
-## ② 导航钮 v12「回纹抱端签牌」（✅ 已落位 2026-07-14·全文留作单参考范式成功模板）
+## ② 导航钮（现役=v12b·v13 修正 ⏳ 待出图）
+
+### v14「头像框回纹实钩移植」（现役 ⏳ 待出图·UI 重构 Epic 项③·2026-07-15）
+
+> Eddy 否 v13 方向：**内饰根本不是纹理、是简笔画**——病根=单线细螺旋本身就是简笔画体质，翻卷向救不了。
+> **新教训入红线池：纹样要读作纹理必须"粗笔+实心芯"——单线卷=简笔画**（v12b 轱辘/v13 翻向 两代实证）。
+> v14=对齐在役资产形制（Eddy：有必要就对齐其他美术资产）：**四角轱辘全废→移植 hero_avatar_frame 的
+> 回纹实钩**（家族旗舰纹样：粗笔方折+螺旋芯收一颗实心方块+向内卷向面板——正好同时满足 v13 的内卷要求）。
+> 双参考分工（§13 验证写法）：image1=`art_src/ui/ui_nav_button.png`（锁钮身：比例/纸纹/边框/内线·
+> ⛔忽略其四角简笔卷）+image2=`art_src/ui/hero_avatar_frame.png`（只取角部回纹实钩构造·⛔忽略方形比例/框形/尺寸）。
+> 落位管线（v12b 同款）：checker_to_alpha→裁÷k≈235×55→img_ring_recolor 外框浓缩咖啡阶→同路径替换
+> →--import→9-slice 边距按新图实量（角部钩区必须全落固定区）→三挂点截图目检→GUT。
+
+```text
+Style anchor: 2D game pixel art for an oriental fantasy game, hand-drawn
+storybook warmth fused with retro pixel aesthetics. Crisp hard-edged square
+pixels, no anti-aliasing, no blur, no dithering gradients. Warm top-down
+neutral lighting, no cast shadows painted into the asset. Restrained
+ornament: no gems, no rivet arrays, no heavy embossing. No text or lettering
+anywhere. The asset is rendered alone on a fully transparent background
+(PNG with alpha), nothing else in frame.
+
+Attached image 1 is this game's current navigation button. It is the
+design authority for everything EXCEPT its corner ornaments: reproduce
+faithfully its proportions, its warm tea paper with the fine quiet grain,
+its wood-brown border with the thin dark outer contour, and its
+dark-chocolate inner line with its long straight runs. COMPLETELY IGNORE
+image 1's four corner ornaments — those thin curling single-line scrolls
+are exactly what is being replaced; do not reproduce them in any form.
+
+Attached image 2 is this game's hero portrait frame — same set, painted
+by the same hand. From image 2 take ONLY its corner ornament
+construction: at each corner the inner line gathers into a squared
+meander fret — a CHUNKY hook of hard right angles that coils INWARD and
+closes on a SOLID FILLED SQUARE at its heart. Thick confident strokes
+with the filled square eye make it read as carved ornament, as pattern —
+never as a drawn line. IGNORE everything else about image 2: its square
+proportions, its double-frame layout, its size.
+
+Subject: the same navigation button as image 1 with its four corner
+ornaments replaced by image 2's corner frets. It must read as a
+hand-crafted PIXEL-ART UI component from the same set as both references.
+
+Composition lock (CRITICAL): the button spans the entire canvas edge to
+edge; only thin transparent margins remain outside it. Straight-on flat
+view, no perspective, no 3D depth, no bevels. The silhouette stays as in
+image 1 — corners NOT cut off diagonally, nothing protruding.
+
+This button has exactly FOUR visible features. All four are REQUIRED:
+
+Feature 1 — the border: image 1's slim wood-brown band with its thin
+dark outer contour, even thickness all the way around, unchanged.
+
+Feature 2 — the inner line: image 1's single dark-chocolate line, its
+long top and bottom runs perfectly straight, uniform color and thickness
+along their entire length, unchanged.
+
+Feature 3 — the corner frets (THE replacement): at each of the four
+corners the inner line gathers into a squared meander fret exactly in
+the manner of image 2's corners: stroke about 3 pixels thick, hard right
+angles only, coiling INWARD so that its solid filled square eye sits
+toward the paper field's center — never opening outward. One fret per
+corner, all four mirror-symmetric (left/right mirrored, top/bottom
+mirrored), each fret compact and fitting inside the outer 30 pixels of
+its corner, joined seamlessly to the inner line's runs. The fret is
+line-plus-eye ornament painted directly on the paper — the tea paper
+stays visible around and between its coils; no filled background patch
+behind it. A single thin curling line here is a FAILED result — the
+fret must carry the thick stroke and the solid square eye of image 2.
+
+Feature 4 — the paper face: image 1's warm tea paper carrying the same
+fine, quiet tone-on-tone grain — visible up close, calm at a glance.
+The central stretch stays empty (button text is rendered by the game
+engine) but still carries this same grain.
+
+Even lighting: equally bright edge to edge and into every corner — no
+vignette, no corner darkening, no glow, no shading where border meets
+paper.
+
+Small-size discipline (CRITICAL): designed on a strict 235×55 pixel
+grid, final in-game size ≈235×55 px before 9-slice stretching — every
+stroke at least 2 grid pixels thick, fret strokes about 3; no hairline
+details; no top-to-bottom or left-to-right gradient anywhere; the long
+middle stretch stays uniform and tileable (the button is 9-slice
+stretched both ways; only the corner fret zones stay fixed).
+
+Final self-check — the image FAILS if ANY of these is true:
+· any corner ornament is a thin single-line scroll or doodle instead of
+  a thick squared fret with a solid filled square eye;
+· any fret coils outward, or its eye faces away from the paper center;
+· frets are missing on any corner, asymmetric, detached from the inner
+  line, or spill outside their corner zones toward the middle;
+· anything else changed versus image 1 — new ornament, removed grain,
+  different colors, cut-off corners, gold or metallic trim, red marks;
+· a glow, halo, drop shadow or backdrop appears anywhere;
+· OR the opposite failure: an over-decorated result — extra pattern on
+  the paper, doubled lines, or ornament beyond the four corner frets.
+
+Output: one single button spanning the entire canvas width edge to edge,
+centered vertically, front view, flat, on a fully transparent background
+(PNG with alpha).
+```
+
+### ~~v13「轱辘内卷」修正版~~（⛔ 已否·Eddy：内饰仍是简笔画非纹理·翻卷向救不了·换形制=v14）
+
+> Eddy 验收 v12b：外观配色没有大问题·**唯一问题=内线四角轱辘（方折螺旋卷）卷口朝外开——现实中没有或极少见**
+> （中式家具/画框回纹角花均向内卷向面板）→ v13=**照参考忠实重绘只改点名处**（§13 正解范式）：
+> image1=现役钮唯一设计权威·全图原样重绘·只翻四角轱辘卷向（卷口+芯尖朝纸面中心·四角镜像对称）。
+> 参考图 image1=`assets/art_src/ui/ui_nav_button.png`（高清原档·⚠出图回来外框仍是中棕=正常，
+> 落位管线会重跑 img_ring_recolor 换浓缩咖啡阶——v12b 同规）。
+> 落位管线（v12b 同款）：checker_to_alpha→裁整除区→÷k≈235×55→img_ring_recolor 外框带三档映射
+> （140a04/1a0e05/221107）→同路径替换 assets/ui/ui_nav_button.png→--import→9-slice 边距按新图实量
+> →三挂点截图目检（menu/battle 方钮/图鉴返回）→GUT。
+
+```text
+Style anchor: 2D game pixel art for an oriental fantasy game, hand-drawn
+storybook warmth fused with retro pixel aesthetics. Crisp hard-edged square
+pixels, no anti-aliasing, no blur, no dithering gradients. Warm top-down
+neutral lighting, no cast shadows painted into the asset. Restrained
+ornament: no gems, no rivet arrays, no heavy embossing. No text or lettering
+anywhere. The asset is rendered alone on a fully transparent background
+(PNG with alpha), nothing else in frame.
+
+Attached image 1 is this game's current navigation button. It is the ONLY
+design authority for this task: the new image is a FAITHFUL REDRAW of
+image 1 — same proportions, same warm tea paper with its fine quiet grain,
+same wood-brown border with its thin dark outer contour, same
+dark-chocolate inner line with its long straight runs, same overall size
+and layout. Do not redesign, do not restyle, do not add or remove any
+element.
+
+The ONE and ONLY change (CRITICAL): in image 1 the inner line ends, at
+each of the four corners, in a small squared spiral scroll that curls
+OUTWARD, its opening facing away from the paper field. Real furniture
+and frame corner scrolls never do this. Flip the direction: redraw each
+of the four corner spirals so it curls INWARD — each spiral's opening
+and its innermost tip must face the CENTER of the paper field, the way
+squared meander corner motifs sit on real Chinese furniture frames. Keep
+everything else about the spirals unchanged: same stroke thickness (2-3
+pixels), same hard right angles only (no curved strokes), same size
+(each spiral stays inside its original corner zone), same dark-chocolate
+color, still joined to the inner line exactly where they join now, pure
+line work with the tea paper showing around and inside the coils. The
+four corners stay mirror-symmetric: left/right mirrored, top/bottom
+mirrored.
+
+Composition lock (CRITICAL): the button spans the entire canvas edge to
+edge; only thin transparent margins remain outside it. Straight-on flat
+view, no perspective, no 3D depth, no bevels. The silhouette stays as in
+image 1 — corners NOT cut off diagonally, nothing protruding.
+
+Everything-else-identical checklist — all of these must match image 1:
+· the slim wood-brown border band with its thin dark outer contour;
+· the single dark-chocolate inner line, perfectly straight along the top
+  and bottom runs, uniform color and thickness over its whole length;
+· the warm tea paper face with its fine, quiet tone-on-tone grain —
+  visible up close, calm at a glance; the central stretch stays empty
+  (button text is rendered by the game engine);
+· even lighting edge to edge — no vignette, no glow, no corner darkening.
+
+Small-size discipline (CRITICAL): designed on a strict 235×55 pixel grid,
+final in-game size ≈235×55 px before 9-slice stretching — every stroke at
+least 2 grid pixels thick (the 1-pixel outer contour is the only
+exception); no hairline details; no top-to-bottom or left-to-right
+gradient anywhere; the long middle stretch stays uniform and tileable
+(the button is 9-slice stretched both ways; only the end zones and
+corners stay fixed).
+
+Final self-check — the image FAILS if ANY of these is true:
+· any corner spiral still opens outward, away from the paper center;
+· the spirals became curved scrolls instead of hard right-angle meanders,
+  grew or shrank outside their corner zones, or detached from the inner
+  line;
+· anything else changed versus image 1 — new ornament, removed grain,
+  different colors, cut-off corners, gold or metallic trim, red marks;
+· a glow, halo, drop shadow or backdrop appears anywhere.
+
+Output: one single button spanning the entire canvas width edge to edge,
+centered vertically, front view, flat, on a fully transparent background
+(PNG with alpha).
+```
+
+### v12「回纹抱端签牌」（✅ 已落位 2026-07-14·全文留作单参考范式成功模板）
 
 > **落位实录 v12a（首版·已退役）**：出图实色底+泛光→flood_to_alpha→÷6=223×52·边距左右21/上下15。Eddy 判**外框中棕太淡**→退役（源档 `_v12a_light_border_retired` 保留）。
 > **落位实录 v12b（现役·2026-07-14 二版）**：Eddy 重出图（棋盘格底）→img_checker_to_alpha→裁 (27,110,2115,495)→÷9=**235×55**→**外框环带换色对齐悬停框族色**（新工具 `tools/img_ring_recolor.gd`：BFS 距透明轮廓≤5px ∩ V<0.62 选外框带→三档映射浓缩咖啡阶 `140a04/1a0e05/221107`=ui_tooltip `#1F1006` 族；内线/抱端在环带外不动）→assets/ui/ui_nav_button.png；9-slice 边距=**左右 21/上下 18**（实测抱端深 18·钩横笔 y0-16/37-54）三挂点同步；menu/battle 方钮/图鉴返回钮截图目检过（近黑框在夜景/亮纸分离度均优于中棕版）·GUT 376 绿；源档=art_src/ui/ui_nav_button.png。
@@ -115,7 +297,7 @@ centered vertically, front view, flat, on a fully transparent background
 - **vs 悬停框 v11**：框轻色暖（浅骨深纹）vs 框重色黑（深框浅芯）·钩在两端 vs 四角·茶纸 vs 奶油纸。
 - **vs 牌匾**：牌匾=切角+骨缘+最大；导航钮=直角+无骨缘——减法分层不抢位（原备选 B"横匾缩印"由此吸收且规避其抢层级风险）。
 - **9-slice 保形自证**：端头双钩落上下角区（固定）·竖折落左右边带（纵向拉伸=直线变长无损）·长边直行可平铺——128×128 战斗图鉴钮双向拉伸全安全。
-⛔ 累计红线：朱砂印/红点缀（v9/v10）·卷轴复用含滚轴圆头帽（v8）·金/金内圈（v5）·切角轮廓=牌匾形制（v11 教训）·漂浮孤钩=旧版同构（v6/v7）·素板（§14）。
+⛔ 累计红线：朱砂印/红点缀（v9/v10）·卷轴复用含滚轴圆头帽（v8）·金/金内圈（v5）·切角轮廓=牌匾形制（v11 教训）·漂浮孤钩=旧版同构（v6/v7）·素板（§14）·**单线细螺旋轱辘=简笔画非纹理——纹样必须粗笔+实心芯（v12b/v13 两代实证·2026-07-15）**。
 迭代史：v5 金内圈⛔ → v6/v7 同构⛔ → v8 卷轴复用⛔ → v9/v10 朱砂印⛔ → v11 切角挂起（与牌匾撞形制+纯文字范式证伪）→ **v12=回纹抱端（资产参考范式）**。
 参考图=`assets/art_src/ui/ui_plaque.png` 单参考（取：内线+端返双钩形制+茶纸与纹理+木棕带色+暖调；弃：切角轮廓/骨色外缘/横幅比例）。
 落位管线：转透明→裁整除区→整数倍降采样≈220×49→三挂点同步（main_menu `_make_plate_bg`+battle `codex_bg` battle_screen.gd ~L467+图鉴 `NAV_PLATE_MARGIN`）·9-slice 边距按新图实量（预估左右 ~24 盖抱端·上下 ~14 盖钩+框·四向不对称）·TILE。
