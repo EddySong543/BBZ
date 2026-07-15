@@ -14,13 +14,16 @@ const WAVE_SHADER := preload("res://assets/shaders/canvas_transition_wave.gdshad
 const COVER_TIME := 0.38
 const REVEAL_TIME := 0.45
 
-# 自定义鼠标指针（G 件·B 方案「族语化经典箭头」·2026-07-15 Eddy GPT 出图落位=tools/import_cursor_art.gd）：
-# 借这个常驻视觉 autoload 开机注册·零 project.godot 改动。暖纸身+近黑描边（38×54·texel 39px
-# 量化 17×25 设计格 ×2）；悬停手型=乘色暖金身（按钮侧由 ButtonJuice 挂载时开 POINTING_HAND）。
-# hotspot=描边尖端像素（落位工具 stdout 打点）。重出图=丢 import 重跑工具+--import。
+# 自定义鼠标指针（G 件·2026-07-15 晚定版=程序生成 tools/gen_ui_cursor.gd v6·Eddy 四轮定调：
+# ①GPT 出图理解不好→程序实现转正 ②尾腿怎么做都怪→纯箭镞 ③悬停深色金身看不出还误导⛔
+# ④悬停手型读作竖中指⛔→保持箭头形·悬停=描边外圈**金晕外环**·⛔变暗⛔换形）：
+# 借这个常驻视觉 autoload 开机注册·零 project.godot 改动。两态箭镞同形同色（暖纸身+近黑描边·
+# 48×48·24 设计格 ×2），悬停只向外绽 1 设计格深金晕=全游戏点选同语言（按钮侧由 ButtonJuice
+# 挂载时开 POINTING_HAND）。hotspot 两态同=描边尖端（金晕只占透明区·切换零跳动点击点不漂）。
+# 改形状=调 gen_ui_cursor.gd 形状表重跑+--import；悬停退回"什么都不变"=下行 CURSOR_HAND 改 CURSOR_ARROW。
 const CURSOR_ARROW := preload("res://assets/ui/cursor_arrow.png")
 const CURSOR_HAND := preload("res://assets/ui/cursor_hand.png")
-const CURSOR_HOTSPOT := Vector2(2, 2)
+const CURSOR_HOTSPOT := Vector2(4, 2)
 
 var _rect: ColorRect
 var _mat: ShaderMaterial

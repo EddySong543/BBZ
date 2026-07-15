@@ -321,13 +321,110 @@ background (PNG with alpha).
 
 ## ④ 鼠标指针（G 件·B 方案「族语化经典箭头」）
 
-> 沿革：v1 如意云头⛔（Eddy 2026-07-15 否·联想弱+云头喧宾）→ v2 程序自产（tools/gen_ui_cursor.gd·
-> Eddy 复判"底部有个不协调拐弯"=直角甩尾硬伤）→ **v3 GPT 出图版=现役 ⏳待出图（本节 prompt）**。
-> v2 贴图当前在位=占位（v3 出图后同路径替换 cursor_arrow/hand.png + --import 即换装·接线零改动）。
+> 沿革：v1 如意云头⛔（Eddy 2026-07-15 否·联想弱+云头喧宾）→ v2 程序自产⛔（"底部有个不协调拐弯"=直角甩尾硬伤·
+> 生成器 tools/gen_ui_cursor.gd 仍在库可重跑·其产出贴图已被 5d6c00f GPT 版覆盖·原件可从 git 60f486f 找回）
+> → v3.1 GPT 暖色经典箭头（2026-07-15 出图落位 5d6c00f）⛔ Eddy 判效果一般
+> → v4「鎏金锋」草案⛔（未出图即否·**Eddy 定调：鼠标要简约·内部填充不要两种颜色·外深内浅即可**——金尖/形体影=设计过度·教训=简约件别加戏）
+> → v5「简约双色锁」GPT prompt ⛔搁置（Eddy：AI 无法很好理解·转程序实现——简约几何件程序自产比出图可控）
+> → v6 程序版转正（gen v3 尾腿顺斜方切）⛔ Eddy 复判：长方形拖尾仍怪·AI 和程序都不擅长这附肢→整条去掉
+> → v6.1 去尾箭镞版（箭头外形 Eddy ✅通过·教训=细长附肢在 48px 档怎么做都别扭·经典箭镞已足够读作指针）
+> → 悬停金身乘色⛔（Eddy：用深色表示悬停完全看不出来还误导→重设计）
+> → v6.2 悬停手型⛔（Eddy：像竖着中指·保持箭头形·要么不变要么换动效但⛔变暗）
+> → **v6.3 悬停金晕版（现役·2026-07-15 晚落位）**：gen_ui_cursor.gd v6=两态箭镞完全同形同色·
+>   悬停只在描边外圈绽 1 设计格**金晕外环 #DCA12E**（全游戏点选同语言=道具格/图鉴选中金晕·深金档双衬底已验证·
+>   变亮不变暗）·hotspot 两态同=描边尖端 (4,2)（金晕只占透明区=切换零跳动点击点不漂）·
+>   像素自检 20 项 PASS（含金晕全包描边+两态描边/身像素集逐点一致）+预览截图目检过·GUT 376 绿·待 Eddy 亲审。
+>   退路：悬停"什么都不变"=transition_manager 把 POINTING_HAND 注册指向 CURSOR_ARROW 一行即回。
+> v3.1 贴图当前在位=占位（v4 出图后丢 `assets/import/鼠标箭头.png` 同名→重跑 tools/import_cursor_art.gd→--import 即换装·接线零改动）。
 > 接线（已落位·不随出图变）：注册=transition_manager._ready（hotspot 按新图重量）；
 > 悬停手型=button_juice 全线 POINTING_HAND；预览=tools/cursor_preview（⚠OS 指针不进截图·手感=Eddy F6）。
 
-### v3.1「族语化经典箭头·暖色版」GPT prompt（⏳ 待出图·单参考版）
+### ~~v5「简约双色锁·经典箭头」GPT prompt~~（⛔ 搁置·Eddy 转程序实现=v6 现役·本 prompt 留作备用溯源）
+
+> v5 修正（2026-07-15 Eddy 否 v4：设计差·鼠标要**简约**·内部填充不要两种颜色·**外深内浅**即可）：
+> 全图锁死两色=近黑描边 #130C08（外深·2 设计格）+暖纸身 #F0D7A2（内浅·单一平色）；
+> ⛔金尖/⛔形体影/⛔任何第三色——加**双色铁锁段**+检查单明列"出现第三色即废"（防模型自作主张加装饰）。
+> 与 v3.1 结构同源·实质差异=双色锁写死+描边统一 2 设计格。
+> 悬停版=乘色派生照旧零改动（纸身 F0D7A2→暖金 D4A94E·近黑描边几乎不动）。
+
+参考图 image1=`assets/ui/ui_nav_button.png`（取：近黑框族色+暖纸面色+像素笔感；弃：签牌形制/回纹钩/尺寸——同 v3.1 用法）。
+落位管线照旧：出图→丢 `assets/import/鼠标箭头.png` 同名→重跑 tools/import_cursor_art.gd→--import→cursor_preview 双衬底目检→Eddy 实机 F6。
+
+```text
+Style anchor: 2D game pixel art for an oriental fantasy game, hand-drawn
+storybook warmth fused with retro pixel aesthetics. Crisp hard-edged square
+pixels, no anti-aliasing, no blur, no dithering gradients. Warm top-down
+neutral lighting, no cast shadows painted into the asset. Restrained
+ornament: no gems, no rivet arrays, no heavy embossing. No text or lettering
+anywhere. The asset is rendered alone on a fully transparent background
+(PNG with alpha), nothing else in frame.
+
+Attached image 1 is the finalized navigation button plate from this game's
+UI set — same family, painted by the same hand. From image 1 take ONLY its
+color family (the near-black espresso of its dark frame, #130C08 family,
+and the warm cream of its paper face, #F0D7A2 family) and its chunky
+confident pixel stroke feel. IGNORE everything else about it: its plate
+shape, its meander hook corners, its layout and size.
+
+Subject: the mouse cursor for the same game — the universally recognized
+CLASSIC ARROW cursor silhouette, the same shape every desktop arrow cursor
+has: a straight vertical left edge, a straight diagonal right edge meeting
+it at a needle-sharp tip pointing UPPER-LEFT, a neat notched heel, and one
+short straight tail leg. Zero learning cost: anyone sees it and knows it
+is the pointer. It is deliberately SIMPLE and clean.
+
+Composition lock (CRITICAL): exactly ONE cursor, centered, filling about
+80% of the canvas height, tip aimed at the upper-left corner. Straight-on
+flat view, no perspective, no 3D, no rotation ambiguity.
+
+This cursor has exactly THREE visible features. All three are REQUIRED:
+
+Feature 1 — the tip: the upper-left point converges to a single crisp
+pixel corner — this is the click point. No blunt or rounded tip.
+
+Feature 2 — the two-color body (CRITICAL lock): the entire cursor uses
+exactly TWO colors and nothing else — dark outside, light inside. The
+ENTIRE silhouette carries an unbroken near-black espresso outline
+(#130C08 family), 2 grid pixels thick; the whole interior is ONE single
+flat warm cream paper fill (#F0D7A2 family). No gold, no second interior
+tone, no shading step, no highlight, no texture — any third color
+anywhere is a FAILURE. Bright warm body pops on dark night scenes; the
+dark outline defines it on bright paper screens.
+
+Feature 3 — the pixel craft: the diagonal edges show visible square pixel
+staircase steps (retro JRPG feel). A smooth vector-clean arrow with no
+visible pixel steps is a FAILURE.
+
+Tail discipline (CRITICAL): the tail leg is ONE short straight stroke
+ending in a clean square cut, aligned with the leg's own direction. NO
+hook, NO bend, NO flick, NO curl, NO extra appendage of any kind at the
+tail or heel. The silhouette contains nothing that is not part of the
+classic arrow shape.
+
+Even lighting: no glow, no halo, no drop shadow, no backdrop of any kind.
+
+Small-size discipline (CRITICAL): designed on a strict 48×48 pixel grid —
+final in-game size is about 40×56 px; every stroke at least 2 grid pixels
+thick (the single-pixel tip is the only exception); no hairlines, no fine
+filigree.
+
+Final self-check — the image FAILS if ANY of these is true:
+· the tip is blunt, rounded, or does not point to the upper-left;
+· any third color appears anywhere — gold accents, interior shading,
+  highlights, or a two-tone fill;
+· the body is white, gray or cold instead of warm cream;
+· the dark outline is missing or broken anywhere;
+· any hook, bend, curl or appendage exists at the tail or heel;
+· any gradient, anti-aliasing, dithering, glow or shadow appears;
+· there is a second object, a backdrop, or any text in frame;
+· the diagonal edges are smooth vector curves with no visible pixel
+  staircase.
+
+Output: one single cursor, centered, front view, flat, on a fully
+transparent background (PNG with alpha).
+```
+
+### ~~v3.1「族语化经典箭头·暖色版」~~（⛔ 已否·溯源——2026-07-15 出图落位后 Eddy 判"效果一般"·病根见上沿革）
 
 > v3.1 修订（Eddy 2026-07-15：**避免暗色作主色·改暖色**）：主体=暖纸身 #F0D7A2 + 近黑描边 #130C08
 > （亮填充+暗轮廓=设计系统 §2 取色铁律——暗夜亮身跳出·亮纸暗轮廓勾形）；悬停版=身换暖金 #D4A94E。

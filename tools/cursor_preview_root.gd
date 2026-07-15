@@ -4,7 +4,7 @@ extends Node
 ## 亮宣纸/暗夜两块衬底上（1×/2×/4× 三档），截图自检形状与双衬底可见性。实机手感=Eddy F6。
 ## 带窗口跑：godot --path . res://tools/cursor_preview.tscn
 
-const OUT := "C:/Users/Edzzz/AppData/Local/Temp/claude/D--Game-BoBoZan-Claude-Code-Game-Studios-cn-localization/ef8edc84-b5fb-49a6-967e-6aa8a4693e9f/scratchpad/cursor_preview.png"
+const OUT := "C:/Users/Edzzz/AppData/Local/Temp/claude/D--Game-BoBoZan-Claude-Code-Game-Studios-cn-localization/6e0b7c09-95ef-4eec-aff5-b75e12a43c22/scratchpad/cursor_preview.png"
 const BACKDROP := preload("res://assets/ui/item_codex_backdrop.png")
 
 

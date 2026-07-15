@@ -1,22 +1,28 @@
 extends SceneTree
 
-## 鼠标指针生成器（G 件·B 方案「族语化经典箭头」·2026-07-15 Eddy 选 B·程序自产零外部资产）：
-## 经典箭头剪影（认知零成本）+ 家族材质。**v2 暖色版（Eddy 2026-07-15：避免暗色主色）**：
-## 暖纸身 #F0D7A2 + 近黑描边 #130C08——亮填充+暗轮廓=§2 取色铁律（暗夜亮身跳出·亮纸暗轮廓勾形）。
-## 悬停变体=身换暖金 #D4A94E（描边不动）。24×24 设计网格 ×2 = 48×48 成品（描边 1 设计格=2 成品px）。
+## 鼠标指针生成器（G 件·2026-07-15 Eddy 选 B「族语化经典箭头」·程序自产零外部资产）：
+## 沿革：v2 暖色 → v3 尾腿顺斜方切 → v4 去尾箭镞（外形 Eddy ✅）→ v5 悬停手型⛔（读作竖中指）→
+## **v6 悬停金晕版（2026-07-15 晚·Eddy：保持箭头形·动效不变暗）**：两态箭镞完全同形同色，
+## 悬停只在描边外圈加 1 设计格**金晕外环** #DCA12E——搬全游戏现成点选语言（道具格/图鉴选中=金晕外环·
+## 深金档=亮纸暗夜双衬底已验证），箭头纹丝不动、金晕向外绽出，⛔变暗⛔换形。
+## 常态双色=暖纸身 #F0D7A2 + 近黑描边 #130C08（外深内浅·Eddy 定·§2 取色铁律）。
+## 24×24 设计网格 ×2 = 48×48 成品（描边/金晕各 1 设计格=2 成品px）。
 ## 跑法：godot --headless --path . -s res://tools/gen_ui_cursor.gd
-## 输出：assets/ui/cursor_arrow.png / cursor_hand.png + stdout 打 hotspot 像素坐标。
-## ⚠ 覆盖同路径贴图后必须跑 --import（老规矩）。
+## 输出：assets/ui/cursor_arrow.png / cursor_hand.png（文件名沿用 POINTING_HAND 槽位名·实际=箭镞+金晕）
+## + stdout 打 hotspot（两态同=近黑描边尖端·金晕只向外扩不动内容=悬停切换零跳动）。
+## ⚠ 覆盖同路径贴图后必须跑 --import（老规矩）。悬停想退回"什么都不变"：transition_manager
+## 把 POINTING_HAND 注册指向 CURSOR_ARROW 即可。
 
 const GRID := 24
 const SCALE := 2
-const BODY := Color("F0D7A2")        # 暖纸身（牌匾/导航钮族纸面色·资产实测）
-const BODY_HOVER := Color("D4A94E")  # 悬停=身换暖金（牌匾族金）
-const RIM := Color("130C08")         # 近黑描边（悬停框族近黑·亮纸上勾形）
+const BODY := Color("F0D7A2")   # 暖纸身（牌匾/导航钮族纸面色·资产实测）
+const RIM := Color("130C08")    # 近黑描边（悬停框族近黑·亮纸上勾形）
+const HALO := Color("DCA12E")   # 金晕外环（图鉴选中深金档·亮纸暗夜双衬底已验证）
 
-# 箭头身（设计格行段表：y -> [x_start, x_end] 列表·手调迭代口）。
-# 头=经典三角（尖 (3,2)·45° 斜边·左缘垂直）；尾=右倾短腿收回纹钩（下横+上挑=方折「回」意）。
-const SPANS := {
+# 箭镞形状表（v4 定稿不动·设计格行段表 y -> [x_start, x_end]·手调迭代口）：
+# 头三角（尖 (3,2)·45° 斜边·左缘垂直）+跟部收锋 (3,16)·⛔尾腿
+# （尾腿三代全废教训：细长附肢在 48px 档怎么做都别扭·经典箭镞本身已足够读作指针——见 git 史）。
+const ARROW_SPANS := {
 	2:  [[3, 3]],
 	3:  [[3, 4]],
 	4:  [[3, 5]],
@@ -28,53 +34,63 @@ const SPANS := {
 	10: [[3, 11]],
 	11: [[3, 12]],
 	12: [[3, 13]],
-	13: [[3, 6], [8, 10]],
-	14: [[3, 5], [8, 10]],
-	15: [[3, 4], [9, 11]],
-	16: [[3, 3], [9, 11]],
-	17: [[10, 12]],
-	18: [[10, 12]],
-	19: [[10, 15]],
-	20: [[10, 15]],
+	13: [[3, 6]],
+	14: [[3, 5]],
+	15: [[3, 4]],
+	16: [[3, 3]],
 }
-# （尾部=单记直角右甩；首版"上挑笔+底横"回纹钩在 48px 糊成实心块的教训见 git 史）
 
 
 func _init() -> void:
 	var body_px := {}
-	for y: int in SPANS:
-		for span: Array in SPANS[y]:
+	for y: int in ARROW_SPANS:
+		for span: Array in ARROW_SPANS[y]:
 			for x in range(int(span[0]), int(span[1]) + 1):
 				body_px[Vector2i(x, y)] = true
+	var rim_px := _shell(body_px, body_px)
+	var solid := body_px.duplicate()
+	solid.merge(rim_px)
+	var halo_px := _shell(solid, solid)
 
-	for variant: Array in [["cursor_arrow", BODY], ["cursor_hand", BODY_HOVER]]:
-		var body_col: Color = variant[1]
+	for variant: Array in [["cursor_arrow", false], ["cursor_hand", true]]:
 		var img := Image.create(GRID * SCALE, GRID * SCALE, false, Image.FORMAT_RGBA8)
 		img.fill(Color(0, 0, 0, 0))
-		# 第一遍：描边=身像素的 8 邻域中非身格（家族两遍描边法·近黑勾形）
+		if variant[1]:
+			for p: Vector2i in halo_px:
+				_put(img, p, HALO)
+		for p: Vector2i in rim_px:
+			_put(img, p, RIM)
 		for p: Vector2i in body_px:
-			for dy in [-1, 0, 1]:
-				for dx in [-1, 0, 1]:
-					var n := p + Vector2i(dx, dy)
-					if not body_px.has(n):
-						_put(img, n, RIM)
-		# 第二遍：身色盖上（普通=暖纸·悬停=暖金）
-		for p: Vector2i in body_px:
-			_put(img, p, body_col)
+			_put(img, p, BODY)
 		var path := "res://assets/ui/%s.png" % variant[0]
 		img.save_png(ProjectSettings.globalize_path(path))
-		print("saved: %s" % path)
+		print("saved: %s  hotspot: %s" % [path, _rim_tip(img)])
+	quit()
 
-	# hotspot=全图最靠左上的不透明像素（x+y 最小·并列取 y 小）——即描边尖端
-	var probe := Image.load_from_file(ProjectSettings.globalize_path("res://assets/ui/cursor_arrow.png"))
+
+## 外壳：base 的 8 邻域中不属于 exclude 的格（第一次调=描边·第二次调=金晕·家族两遍描边法推广）
+func _shell(base: Dictionary, exclude: Dictionary) -> Dictionary:
+	var out := {}
+	for p: Vector2i in base:
+		for dy in [-1, 0, 1]:
+			for dx in [-1, 0, 1]:
+				var n := p + Vector2i(dx, dy)
+				if not exclude.has(n):
+					out[n] = true
+	return out
+
+
+## hotspot（成品像素坐标）＝近黑描边最靠左上像素（x+y 最小·并列取 y 小）＝箭镞尖端。
+## 两态同值：金晕只占透明区、描边/身像素坐标不动 → 悬停切换箭头零跳动、点击点不漂。
+func _rim_tip(img: Image) -> Vector2i:
 	var best := Vector2i(9999, 9999)
-	for y in probe.get_height():
-		for x in probe.get_width():
-			if probe.get_pixel(x, y).a > 0.5:
+	for y in img.get_height():
+		for x in img.get_width():
+			var c := img.get_pixel(x, y)
+			if c.a > 0.5 and c.to_html(false) == RIM.to_html(false):
 				if x + y < best.x + best.y or (x + y == best.x + best.y and y < best.y):
 					best = Vector2i(x, y)
-	print("hotspot: %s" % best)
-	quit()
+	return best
 
 
 func _put(img: Image, p: Vector2i, col: Color) -> void:
