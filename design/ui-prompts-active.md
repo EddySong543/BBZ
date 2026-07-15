@@ -319,7 +319,103 @@ edge, centered vertically, front view, flat, on a fully transparent
 background (PNG with alpha).
 ```
 
-## ④ 鼠标指针 v1「如意云头小柄」（G 件·C 方案·⏳ 待出图·单参考版）
+## ④ 鼠标指针（G 件·B 方案「族语化经典箭头」）
+
+> 沿革：v1 如意云头⛔（Eddy 2026-07-15 否·联想弱+云头喧宾）→ v2 程序自产（tools/gen_ui_cursor.gd·
+> Eddy 复判"底部有个不协调拐弯"=直角甩尾硬伤）→ **v3 GPT 出图版=现役 ⏳待出图（本节 prompt）**。
+> v2 贴图当前在位=占位（v3 出图后同路径替换 cursor_arrow/hand.png + --import 即换装·接线零改动）。
+> 接线（已落位·不随出图变）：注册=transition_manager._ready（hotspot 按新图重量）；
+> 悬停手型=button_juice 全线 POINTING_HAND；预览=tools/cursor_preview（⚠OS 指针不进截图·手感=Eddy F6）。
+
+### v3.1「族语化经典箭头·暖色版」GPT prompt（⏳ 待出图·单参考版）
+
+> v3.1 修订（Eddy 2026-07-15：**避免暗色作主色·改暖色**）：主体=暖纸身 #F0D7A2 + 近黑描边 #130C08
+> （亮填充+暗轮廓=设计系统 §2 取色铁律——暗夜亮身跳出·亮纸暗轮廓勾形）；悬停版=身换暖金 #D4A94E。
+> 程序占位（tools/gen_ui_cursor.gd）已同步暖色方案。
+
+参考图 image1=`assets/art_src/ui/ui_nav_button.png`（取：近黑框族色+暖纸面色+像素笔感；弃：签牌形制/回纹钩/尺寸）。
+悬停手型版=出图后**对话增量改**（附后）。落位管线：转透明→量边界→整数倍降采样 48×48→量尖端 hotspot→同路径替换→--import。
+
+```text
+Style anchor: 2D game pixel art for an oriental fantasy game, hand-drawn
+storybook warmth fused with retro pixel aesthetics. Crisp hard-edged square
+pixels, no anti-aliasing, no blur, no dithering gradients. Warm top-down
+neutral lighting, no cast shadows painted into the asset. Restrained
+ornament: no gems, no rivet arrays, no heavy embossing. No text or lettering
+anywhere. The asset is rendered alone on a fully transparent background
+(PNG with alpha), nothing else in frame.
+
+Attached image 1 is the finalized navigation button plate from this game's
+UI set — same family, painted by the same hand. From image 1 take ONLY its
+color family (the near-black espresso of its dark frame, #130C08 family,
+and the warm cream of its paper face, #F0D7A2 family) and its chunky
+confident pixel stroke feel. IGNORE everything else about it: its plate
+shape, its meander hook corners, its layout and size.
+
+Subject: a single mouse cursor for the same game — the universally
+recognized CLASSIC ARROW cursor silhouette, the same shape every desktop
+arrow cursor has: a straight vertical left edge, a straight diagonal right
+edge meeting at a needle-sharp tip pointing UPPER-LEFT, a notched heel, and
+one short straight tail leg. Zero learning cost: anyone sees it and knows
+it is the pointer.
+
+Composition lock (CRITICAL): exactly ONE cursor, centered, filling about
+80% of the canvas, tip aimed at the upper-left corner. Straight-on flat
+view, no perspective, no 3D, no rotation ambiguity.
+
+This cursor has exactly FOUR visible features. All four are REQUIRED:
+
+Feature 1 — the tip: the upper-left point converges to a single crisp
+pixel corner — this is the click point. No blunt or rounded tip.
+
+Feature 2 — the body: filled warm cream paper tone (#F0D7A2 family), one
+solid flat color, no gradient, no texture inside. The body must be LIGHT
+and WARM — a dark-bodied arrow is a FAILURE.
+
+Feature 3 — the rim: the ENTIRE silhouette carries a thin near-black
+espresso outline (#130C08 family), 1-2 pixels thick and unbroken. Bright
+warm body pops on dark night scenes; the dark outline defines it on
+bright paper screens.
+
+Feature 4 — the pixel craft: the diagonal edges show visible square pixel
+staircase steps (retro JRPG feel). A smooth vector-clean arrow with no
+visible pixel steps is a FAILURE.
+
+Tail discipline (CRITICAL — this fixes the previous version): the tail leg
+is ONE short straight stroke ending in a clean square cut, aligned with
+the leg's own direction. NO hook, NO bend, NO flick, NO curl, NO extra
+appendage of any kind at the tail or heel. The silhouette contains nothing
+that is not part of the classic arrow shape.
+
+Even lighting: no glow, no halo, no drop shadow, no backdrop of any kind.
+
+Small-size discipline (CRITICAL): designed on a strict 48×48 pixel grid —
+every stroke at least 2 grid pixels thick (the single-pixel tip is the
+only exception); no hairlines, no fine filigree.
+
+Final self-check — the image FAILS if ANY of these is true:
+· the tip is blunt, rounded, or does not point to the upper-left;
+· any hook, bend, curl or appendage exists at the tail or heel;
+· the body is dark, cold, or gray instead of warm cream;
+· the dark outline is missing or broken anywhere;
+· any gradient, anti-aliasing, dithering, glow or shadow appears;
+· there is a second object, a backdrop, or any text in frame;
+· OR the opposite failure: a featureless smooth vector arrow with no
+  visible pixel staircase — a sterile flat icon is JUST AS WRONG.
+
+Output: one single cursor, centered, front view, flat, on a fully
+transparent background (PNG with alpha).
+```
+
+**悬停手型版（出图过审后对话增量改·同轮廓同热点）**：
+
+```text
+Keep exactly this cursor — same silhouette, same tip, same proportions.
+Only change the body fill from warm cream to warm gold (#D4A94E family).
+The near-black outline stays unchanged, unbroken as before.
+```
+
+### ~~v1「如意云头小柄」~~（⛔ 已否·溯源）
 
 设计（2026-07-14 Eddy 选 C）：斜置如意小柄——**左上尖端**（点击热点·必须收束到单像素尖）+右下**祥云头收尾**（tab_cloud 端头云卷同形制）；主体近黑浓缩咖啡+云头茶金+**全轮廓奶油描边 1-2px**（保证亮纸/夜景双衬底可见）。48×48 档。
 形态规划：ARROW（本 prompt）+ POINTING_HAND（出图后**对话增量改**："Keep exactly this cursor; only tint the cloud head warm gold (#D4A94E family) and open its curls slightly. Same silhouette, same tip."·同轮廓同热点）+ IBEAM 首版用引擎默认。

@@ -14,6 +14,14 @@ const WAVE_SHADER := preload("res://assets/shaders/canvas_transition_wave.gdshad
 const COVER_TIME := 0.38
 const REVEAL_TIME := 0.45
 
+# 自定义鼠标指针（G 件·B 方案「族语化经典箭头」·2026-07-15·程序自产=tools/gen_ui_cursor.gd）：
+# 借这个常驻视觉 autoload 开机注册·零 project.godot 改动。暖色版（Eddy：避免暗色主色）=
+# 暖纸身+近黑描边；悬停手型=暖金身（按钮侧由 ButtonJuice 挂载时开 POINTING_HAND）。
+# hotspot=描边尖端像素（生成器 stdout 打点）。Eddy GPT 出图后同路径替换 png+--import 即换装。
+const CURSOR_ARROW := preload("res://assets/ui/cursor_arrow.png")
+const CURSOR_HAND := preload("res://assets/ui/cursor_hand.png")
+const CURSOR_HOTSPOT := Vector2(4, 2)
+
 var _rect: ColorRect
 var _mat: ShaderMaterial
 var _wave_t: float = 0.0
@@ -33,6 +41,8 @@ func _ready() -> void:
 	add_child(_rect)
 	_update_aspect()
 	get_viewport().size_changed.connect(_update_aspect)
+	Input.set_custom_mouse_cursor(CURSOR_ARROW, Input.CURSOR_ARROW, CURSOR_HOTSPOT)
+	Input.set_custom_mouse_cursor(CURSOR_HAND, Input.CURSOR_POINTING_HAND, CURSOR_HOTSPOT)
 
 
 func _update_aspect() -> void:

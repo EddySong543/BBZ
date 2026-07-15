@@ -43,6 +43,8 @@ func _ready() -> void:
 	if par is BaseButton:
 		_btn = par as BaseButton
 		_btn.pivot_offset = _btn.size * 0.5
+		# 悬停=手型指针（族语金箭头·TransitionManager 开机注册）——挂 Juice 的按钮全线点亮
+		_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		_connect(_btn.mouse_entered, _on_enter)
 		_connect(_btn.mouse_exited, _on_exit)
 		_connect(_btn.button_down, _on_down)
