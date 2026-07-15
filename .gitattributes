@@ -5,6 +5,7 @@
 *.gd    text eol=lf
 *.tscn  text eol=lf
 *.tres  text eol=lf
+*.gdshader text eol=lf
 
 # Markdown and config — also LF for consistency.
 *.md    text eol=lf
