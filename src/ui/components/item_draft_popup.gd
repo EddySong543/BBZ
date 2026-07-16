@@ -77,10 +77,10 @@ func setup(options: Array, can_cancel: bool = true, title_text: String = "抽取
 		cancel.add_theme_color_override("font_color", INK)
 		var plate := NinePatchRect.new()   # 导航钮皮（与主菜单/图鉴返回一个语言）
 		plate.texture = NAV_PLATE_TEX
-		plate.patch_margin_left = 21
-		plate.patch_margin_right = 21
-		plate.patch_margin_top = 18
-		plate.patch_margin_bottom = 18
+		plate.patch_margin_left = 22    # =主菜单 NAV_PLATE_MARGIN_X/Y·v14 净面
+		plate.patch_margin_right = 22
+		plate.patch_margin_top = 20
+		plate.patch_margin_bottom = 20
 		plate.axis_stretch_horizontal = NinePatchRect.AXIS_STRETCH_MODE_TILE
 		plate.axis_stretch_vertical = NinePatchRect.AXIS_STRETCH_MODE_TILE
 		plate.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST

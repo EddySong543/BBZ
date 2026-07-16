@@ -10,6 +10,8 @@ extends Control
 ## ⚠️ 历史否决（勿再走）：海面化 / 星空压暗 / 中央大物或留白 / 公告卡 / 今日一抽（第七轮裁掉）。
 
 const BP_SCENE := "res://src/ui/bp_screen.tscn"
+const PROFILE_SCENE := "res://src/ui/profile_screen.tscn"
+const ProfileStore := preload("res://src/core/player_profile.gd")   # 个人资料存档（headless 安全走 preload）
 
 # ---- 匹配状态机（临战升温·2026-06-12 改版：翻面盖牌废弃——对波卡面是全场最活的
 # 东西，翻成静态王冠=出戏。匹配中改为卡面对波升温备战，取消把手独立成钮）----
@@ -32,9 +34,10 @@ var _cancel_btn: Button   # 匹配中才出现的「✕ 取消匹配」（_setup
 ## 小件像素底板（设置/退出/底坞导航/段位徽章用）。
 ## 2026-06-13 Eddy 选 B「典籍朱印」全局铺；2026-07-13 换 GPT 导航钮贴图
 ## （米金纸面+角上回纹折·9-slice 中段平铺·jelly 程序板/STEEL 色组退役）。
-const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")   # 235×55·回纹抱端签牌 v12b（2026-07-14 二版·外框环带换色对齐悬停框近黑 #1F1006 族）
-const NAV_PLATE_MARGIN_X := 21.0   # 9-slice 左右边距=抱端深 18 实测+3（盖全端返钩）
-const NAV_PLATE_MARGIN_Y := 18.0   # 9-slice 上下边距=钩横笔行 y0-16/37-54 实测+1（中段带=纯竖线+纸·双向平铺安全）
+const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")   # 235×55·v14 净面版（2026-07-16 Eddy 定内饰多余·img_inner_clear 去回纹钩+内线·只留深咖外框+净纸面）
+const PIXEL_FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")   # 身份带悬停金晕外环
+const NAV_PLATE_MARGIN_X := 22.0   # 9-slice 边距（v14 净面后内里全纸·任意≥框厚均可·沿用实钩期数值）
+const NAV_PLATE_MARGIN_Y := 20.0
 const INK := Color(0.20, 0.14, 0.08)        # 墨（羊皮上的字/图标）
 const INK_SOFT := Color(0.42, 0.34, 0.24)   # 淡墨（次级字）
 const CREAM := Color(0.95, 0.91, 0.80)      # 暖米白（直接压在暗波上的字·非羊皮上）
@@ -106,14 +109,48 @@ func _build_vignette() -> void:
 	move_child(vig, 1)   # Background(0) < Vignette(1) < UI(2)
 
 
-## 顶左身份带：头像框(HeroFrame)+名字+段位占位，整体=资料入口。
+## 顶左身份带：头像框(HeroFrame)+名字+段位占位，整体=资料入口（Epic 项⑥·2026-07-16 接真跳转）。
+## 可点性三重反馈（Eddy 反馈"分不清能不能点"）：整带 ButtonJuice（悬停轻放大+手型金晕指针）
+## + 悬停头像金晕外环（全游戏点选同语言·暗波底=淡金档）。
 func _setup_identity() -> void:
 	var btn: Button = $UI/IdentityButton
 	for s in ["normal", "hover", "pressed", "focus", "disabled"]:
 		btn.add_theme_stylebox_override(s, StyleBoxEmpty.new())
+	var avatar := $UI/IdentityButton/AvatarFrame as HeroFrame
+	avatar.portrait_path = ProfileStore.avatar_portrait_path()   # 资料存档选的头像英雄（缺图回落 h01）
+	# ⚠ HeroFrame._ready 会把 mouse_filter 设回 STOP（组件默认）→ 头像区吞点击=
+	#   "点名字有用点头像没反应"的病根。子节点已全 ready，此处强制放行给整带按钮。
+	avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var name_lbl: Label = $UI/IdentityButton/NameLabel
 	FontManager.apply(name_lbl, 26)
 	name_lbl.add_theme_color_override("font_color", CREAM)   # 直接压暗波上→暖米白
+	name_lbl.text = ProfileStore.get_player_name()
+	# 悬停金晕外环：衬在头像框外圈（暗波底=淡金 fff0a0·图鉴亮纸才用深金 dca12e）
+	var ring := ColorRect.new()
+	ring.name = "HoverRing"
+	ring.color = Color.WHITE
+	ring.position = avatar.position - Vector2(5, 5)
+	ring.size = avatar.frame_size + Vector2(10, 10)
+	var rm := ShaderMaterial.new()
+	rm.shader = PIXEL_FRAME_SHADER
+	var gold := Color("fff0a0")
+	rm.set_shader_parameter("edge_outer", gold.darkened(0.1))   # 外露带整条是金（深咖会读成黑圈）
+	rm.set_shader_parameter("edge_mid", gold)
+	rm.set_shader_parameter("edge_inner", gold.darkened(0.5))
+	rm.set_shader_parameter("pixel_grid", (avatar.frame_size.x + 10.0) / 6.0)
+	rm.set_shader_parameter("border_px", 2.0)
+	rm.set_shader_parameter("noise_amt", 0.05)
+	rm.set_shader_parameter("light_amount", 0.18)
+	rm.set_shader_parameter("aspect", 1.0)
+	rm.set_shader_parameter("corner_radius", 0.18)
+	ring.material = rm
+	ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ring.visible = false
+	btn.add_child(ring)
+	btn.move_child(ring, 0)   # 环衬在头像框之后（只露外扩带）
+	btn.mouse_entered.connect(func() -> void: ring.visible = true)
+	btn.mouse_exited.connect(func() -> void: ring.visible = false)
+	_attach_juice(btn)   # 悬停轻放大+按压反馈+手型金晕指针（导航钮同手感）
 	var rank_lbl: Label = $UI/IdentityButton/RankLabel
 	FontManager.apply(rank_lbl, 16)
 	rank_lbl.add_theme_color_override("font_color", INK)     # 段位章在羊皮板上→墨字
@@ -129,7 +166,14 @@ func _setup_identity() -> void:
 	shield.modulate = INK
 	shield.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	rank_lbl.add_child(shield)
-	btn.pressed.connect(_on_placeholder_pressed.bind("个人资料"))
+	btn.pressed.connect(_on_profile_pressed)
+
+
+## 个人资料入口：波幕转场（menu↔profile 同图鉴语言）。匹配中不离队。
+func _on_profile_pressed() -> void:
+	if _match_state != MatchState.IDLE:
+		return
+	TransitionManager.transition_to(PROFILE_SCENE)
 
 
 func _setup_settings() -> void:

@@ -104,9 +104,22 @@ centered vertically, front view, flat, on a fully transparent background
 (PNG with alpha).
 ```
 
-## ② 导航钮（现役=v12b·v13 修正 ⏳ 待出图）
+## ② 导航钮（现役=v14 净面版 ✅ 2026-07-16）
 
-### v14「头像框回纹实钩移植」（现役 ⏳ 待出图·UI 重构 Epic 项③·2026-07-15）
+> 🔴 **终态=净面（同日 Eddy 二裁）**：v14 实钩落位当天 Eddy 再判**内饰整体多余**（四角回纹钩+上下内线全去）
+> → 新工具 tools/img_inner_clear（花纹区选取/全选重铺+四向内插补纸+带内平滑）就地清除·只留深咖外框+净纸面。
+> **牌匾 ui_plaque.png 同日同规去内饰**（内框线+四角钩→净面·四块矩形全选重铺）。9-slice 边距 22/20 沿用。
+> ⚠ 后续同族小件出图 prompt 应直接**不带内饰**（纹样红线池之上再加一条：内饰装饰整类先问 Eddy 再画）。
+
+### v14「头像框回纹实钩移植」（✅ 出图通过·已落位 2026-07-16·**内饰同日被裁多余→净面**·UI 重构 Epic 项③）
+
+> **落位实录（2026-07-16）**：原图 2172×724 棋盘格假透明 → checker_to_alpha（内容 2127×509）
+> → 中心裁 (28,113,2115,495)=9 整除区 → ÷9 NEAREST → 235×55 → img_ring_recolor 默认三档
+> （140a04/1a0e05/221107·换 1696 px·环深 5 只吃外框带·四角实钩内饰不动）→ 同路径替换 assets/ui/ui_nav_button.png。
+> **9-slice 实量**：角钩区 x≤20 / 上钩 y≤17 / 下钩起 y36 → 边距 X=22 / Y=20（钩区全落固定区·七挂点同步：
+> main_menu 常量 / battle codex / hero·item 图鉴 / profile / settings / item_draft_popup）。
+> 目检实证：段位窄条 32px 压缩保形 / 128² 图鉴方钮双向拉伸保形 / 44px 改名钮不破 / 全线无梯子档。
+> 源档=art_src/ui/ui_nav_button.png（v12b 退役档=ui_nav_button_v12b_wheel_curls_retired.png）。
 
 > Eddy 否 v13 方向：**内饰根本不是纹理、是简笔画**——病根=单线细螺旋本身就是简笔画体质，翻卷向救不了。
 > **新教训入红线池：纹样要读作纹理必须"粗笔+实心芯"——单线卷=简笔画**（v12b 轱辘/v13 翻向 两代实证）。

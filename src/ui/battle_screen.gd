@@ -39,6 +39,7 @@ const DEFAULT_P1 := ["h02", "h09", "h12"]   # 丑牛 / 申猴 / 亥猪（首发 
 const DEBUG_BUTTONS := true
 const BattleDebugPanel := preload("res://src/ui/debug/battle_debug_panel.gd")   # debug 面板（preload 引用·不靠全局 class_name 注册·headless / CLI 可用）
 const BattleCodexOverlay := preload("res://src/ui/components/battle_codex_overlay.gd")   # 图鉴浮层（同上·preload 引用）
+const ProfileStore := preload("res://src/core/player_profile.gd")   # 个人资料战绩计数（同上·preload 引用）
 
 ## 各动画相位等待（秒），可在 Inspector 调。
 @export var anim_phase_duration: float = 1.0
@@ -464,10 +465,10 @@ func _init_buttons() -> void:
 	var codex_bg := NinePatchRect.new()
 	codex_bg.name = "Bg"
 	codex_bg.texture = NAV_PLATE_TEX
-	codex_bg.patch_margin_left = 21    # =主菜单 NAV_PLATE_MARGIN_X/Y·v12b 回纹抱端（左右盖抱端深 18·上下盖钩横笔 y0-16/37-54）
-	codex_bg.patch_margin_right = 21
-	codex_bg.patch_margin_top = 18
-	codex_bg.patch_margin_bottom = 18
+	codex_bg.patch_margin_left = 22    # =主菜单 NAV_PLATE_MARGIN_X/Y·v14 净面
+	codex_bg.patch_margin_right = 22
+	codex_bg.patch_margin_top = 20
+	codex_bg.patch_margin_bottom = 20
 	codex_bg.axis_stretch_horizontal = NinePatchRect.AXIS_STRETCH_MODE_TILE   # 中段平铺防颗粒拉伸
 	codex_bg.axis_stretch_vertical = NinePatchRect.AXIS_STRETCH_MODE_TILE
 	codex_bg.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -791,6 +792,15 @@ func _net_pump() -> void:
 		_show_turn_intro()   # 服务器 turn_begin → 正常回合开场（选招流程与本地共用）
 
 
+## 终局 winner → 个人资料战绩键（本地直读 / 联机须先翻转为本端视角再传入）。
+func _profile_outcome(w: int) -> String:
+	if w == BattleCore.WINNER_P1:
+		return "win"
+	if w == BattleCore.WINNER_DRAW:
+		return "draw"
+	return "lose"
+
+
 func _net_flipped() -> bool:
 	return int(BattleSetup.net_session.client.you) == 1
 
@@ -904,7 +914,11 @@ func _net_open_offer(offer: Dictionary) -> void:
 
 
 func _net_game_over(w: int) -> void:
+	# 幂等：终局可能双路到达（镜像结算演出末尾 + 服务器 over 相位消息）——战绩只记一次。
+	if state == State.GAME_OVER:
+		return
 	state = State.GAME_OVER
+	ProfileStore.record_result("net", _profile_outcome(w))   # 个人资料战绩（联机·w 已翻转为本端视角）
 	game_timer.stop()
 	_set_buttons_active(false)
 	var msg := tr("平局")
@@ -1305,6 +1319,7 @@ func _post_resolution(r: Dictionary) -> void:
 			await _start_overtime()
 			return
 		state = State.GAME_OVER
+		ProfileStore.record_result("match", _profile_outcome(w))   # 个人资料战绩（本地匹配·终局仅此一处）
 		var msg := tr("平局")
 		var col := Color("#dddddd")
 		if w == BattleCore.WINNER_P1:

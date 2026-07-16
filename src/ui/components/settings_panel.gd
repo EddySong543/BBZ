@@ -13,8 +13,8 @@ signal closed
 const CARD_TEX := preload("res://assets/ui/item_draft_card.png")
 const PLAQUE_TEX := preload("res://assets/ui/ui_plaque.png")
 const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")
-const NAV_PLATE_MARGIN_X := 21   # 9-slice 左右=抱端深实测+3（main_menu/图鉴同值）
-const NAV_PLATE_MARGIN_Y := 18   # 9-slice 上下=钩横笔行实测+1（v12b）
+const NAV_PLATE_MARGIN_X := 22   # v14 净面（main_menu/图鉴同值）
+const NAV_PLATE_MARGIN_Y := 20
 
 const INK := Color(0.24, 0.19, 0.12)           # 墨（纸面主文字·图鉴同值）
 const INK_DIM := Color(0.48, 0.41, 0.28)       # 淡墨（次级字/分隔线·图鉴同值）

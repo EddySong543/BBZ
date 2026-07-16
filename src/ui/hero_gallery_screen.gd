@@ -19,8 +19,8 @@ const CELL_BG_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gds
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")   # 选中金晕外环
 const BANNER_TEX := preload("res://assets/ui/ui_banner_scroll.png")            # 英雄名小卷轴横幅（右页）
 const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")            # 返回钮=导航钮同皮
-const NAV_PLATE_MARGIN_X := 21
-const NAV_PLATE_MARGIN_Y := 18
+const NAV_PLATE_MARGIN_X := 22   # v14（main_menu 同值）
+const NAV_PLATE_MARGIN_Y := 20
 const HEART_SHEET := preload("res://assets/ui/icons/heart_idle.png")
 
 const HERO_DATA_DIR := "res://assets/data/heroes/"
