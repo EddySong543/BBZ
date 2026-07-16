@@ -115,10 +115,10 @@ func _refresh_tabs() -> void:
 		var sel: bool = (i == _current_tab)
 		var sb := StyleBoxTexture.new()
 		sb.texture = PLAQUE_TEX
-		sb.texture_margin_left = 50    # 回纹角区≈48px（与两图鉴牌匾同边距）
-		sb.texture_margin_right = 50
-		sb.texture_margin_top = 20
-		sb.texture_margin_bottom = 20
+		sb.texture_margin_left = 26    # 新牌匾（265×63）角钩区实量（与两图鉴牌匾同边距）
+		sb.texture_margin_right = 26
+		sb.texture_margin_top = 23
+		sb.texture_margin_bottom = 23
 		sb.modulate_color = Color.WHITE if sel else TAB_DIM
 		for st in ["normal", "hover", "pressed", "disabled", "focus"]:
 			btn.add_theme_stylebox_override(st, sb)

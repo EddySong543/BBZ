@@ -782,3 +782,64 @@ transparent background (PNG with alpha).
 - **E 界画双线式**：方角+双线+回字角、无端饰；比 v12 更收敛的退路。
 - ~~B 横匾缩印式~~：**已由 v12 吸收**（直角+去骨缘=规避抢牌匾层级的原风险）。
 - ⛔ 已排除：朱砂印/红点缀·卷轴复用（含滚轴/圆头帽）·金/金内圈·切角轮廓（=牌匾形制·v11 教训）·漂浮孤钩（=旧版同构）·素板。
+
+---
+
+## ⑤ 牌匾净面重制（🔚 已结·2026-07-16 当日 Eddy 自出图「回纹实钩二版」落位取代·本 prompt 未采用留档；层级语言定=牌匾带纹/导航钮净面）
+
+> **背景**：2026-07-16 Eddy 裁牌匾内饰（内框线+四角括弓）多余 → 我方用 img_inner_clear 在成品图上
+> 手术净面（当日已 commit）。Eddy 判手术质感不够好 → 重出图替换。本 prompt=对应"现在的净面牌匾"。
+> **参考图 image1**=`assets/art_src/ui/ui_plaque.png`（高清原档·⚠带内饰·prompt 已明令 OMIT）。
+> **hex 全部实测自在役资产**（tools/img_pick_colors）：外描边 301804/框身 5a3116/纸心 f4daa6/
+> 上下渐晕 e6c48e/侧缘 ebcf9b。
+> **落位管线**（导航钮同规）：checker_to_alpha（如带棋盘底）→ 量内容 → 裁整除区 → ÷k NEAREST →
+> **320×62** → 同路径替换 `assets/ui/ui_plaque.png` → --import → 四挂点目检（道具图鉴/英雄图鉴/
+> 设置弹框/个人资料·9-slice 边距 50/20 按新图复量）。
+
+```text
+Style anchor: 2D game pixel art for an oriental fantasy game, hand-drawn
+storybook warmth fused with retro pixel aesthetics. Crisp hard-edged square
+pixels, no anti-aliasing, no blur, no dithering gradients. Warm top-down
+ambient light, flat frontal view.
+
+Subject: ONE horizontal hanging title plaque (framed wooden board) for the
+game's UI — a wide rounded-rectangle wooden frame holding a blank warm
+paper face. In-game it is shown at 320x62 logical pixels and gets stretched
+horizontally by 9-slice, so the horizontal middle section must stay
+completely uniform and feature-free.
+
+Reference (image1 = the in-service plaque source): faithfully follow its
+overall silhouette — wide board, stepped corners, the slim tabs protruding
+at the left and right ends, its frame thickness and its warm palette.
+IGNORE and OMIT the interior decoration seen in image1 entirely: no inner
+rectangular line, no corner fret hooks, no bracket motifs — the paper face
+must be completely blank.
+
+Frame (structural wood, espresso-brown family, hex measured from the
+in-service asset): near-black outline #301804, frame body #5a3116, with a
+subtle lighter bevel step between outline and body that reads as carved
+wood thickness — 2 or 3 clean pixel value steps, not a smooth gradient.
+
+Face (content paper): warm golden paper, center #f4daa6, gently darkening
+toward the top and bottom frame edges to #e6c48e (soft vignette), #ebcf9b
+near the side frames. The paper MUST carry a subtle mottled hand-made
+grain — fine, even, low-contrast (5-8% value variation), no directional
+streaks, no random isolated dark specks. A blank face does NOT mean a
+flat solid fill.
+
+Pixel discipline: every stroke and bevel step at least 2 pixels thick at
+final size (the artwork will be integer-downscaled to 320x62 with nearest
+sampling — draw at one uniform large scale so this survives). The plaque
+spans the entire canvas width edge to edge, centered vertically.
+
+Reject if:
+· any lettering, calligraphy or seal mark appears on the face;
+· any interior ornament returns — inner line, corner frets, medallions;
+· gold or metallic trim, gems, red marks, or multi-color on the frame;
+· a glow, halo, drop shadow or backdrop appears anywhere;
+· OR the opposite failure: the face is a flat featureless solid color
+  with no paper grain and no vignette — a plain slab is equally rejected.
+
+Output: one single plaque on a fully transparent background (PNG with
+alpha), flat front view.
+```

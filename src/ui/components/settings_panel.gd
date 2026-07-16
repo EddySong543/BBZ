@@ -162,10 +162,10 @@ func _plaque_rect() -> NinePatchRect:
 	var p := NinePatchRect.new()
 	p.texture = PLAQUE_TEX
 	p.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	p.patch_margin_left = 50
-	p.patch_margin_right = 50
-	p.patch_margin_top = 20
-	p.patch_margin_bottom = 20
+	p.patch_margin_left = 26   # 新牌匾（265×63）角钩区实量（图鉴同值）
+	p.patch_margin_right = 26
+	p.patch_margin_top = 23
+	p.patch_margin_bottom = 23
 	p.size = PLAQUE_SIZE
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return p
