@@ -91,14 +91,13 @@ var p1_frame_slots: Array[int] = [-1, -1, -1]
 var p2_frame_slots: Array[int] = [-1, -1, -1]
 
 # ---- 技能展示格：顺序浏览 [己方0,1,2 → 对方0,1,2]，点击翻页（2026-07-14 Eddy 定回归左下）----
-var _skill_entries: Array = []   # [[player, slot], ...]
-var _skill_index: int = 0
+const SkillInfoBtns := preload("res://src/ui/components/skill_info_buttons.gd")
+var _skill_info: SkillInfoBtns = null   # 技能情报双钮（2026-07-17 取代 SkillCard 大卡）
 var btn_codex: Button = null          # 「图鉴」钮（2026-07-14 移到右侧结束旁·程序化创建=同疾风）
 var _special_icon: TextureRect = null # 技能钮内的英雄专属技能图标（2026-07-17 Eddy 点单·懒创建）
 var _codex_overlay: Control = null    # 战斗内图鉴浮层（懒创建·关闭仅隐藏）
 
 @onready var buttons_ctrl: Control = $Buttons
-@onready var skill_card: SkillCard = $SkillCard
 @onready var _death_switch_overlay: DeathSwitchOverlay = $DeathSwitchOverlay
 @onready var game_timer: Timer = $GameTimer
 @onready var stage: BattleStage = $Stage   # 多层视差舞台：受击震屏走 stage.shake 按 parallax_factor 分层（见 battle_stage.gd）
@@ -309,11 +308,14 @@ func _ready() -> void:
 	add_child(_fx)
 	_fx.setup(self)
 
-	# 技能卡回归（2026-07-14 Eddy·c877107 退役后复位）：左下顺序浏览双方英雄技能。
-	_build_skill_entries()
-	skill_card.advance_requested.connect(_on_skill_card_advance)
-	skill_card.back_requested.connect(_on_skill_card_back)   # 右键 → 上一个英雄
-	_refresh_skill_card()
+	# 技能情报双钮（2026-07-17 Eddy 方案A·取代 SkillCard 大卡）：左=己方/右=敌方·
+	# 悬停出介绍（复用 _tip_panel 家族）·左键下一个/右键上一个·默认跟随出战英雄。
+	_skill_info = SkillInfoBtns.new()
+	_skill_info.position = Vector2(30.0, 916.0)   # 旧技能卡位·108 档底缘对齐 1024 一线
+	add_child(_skill_info)
+	_skill_info.tip_requested.connect(_on_skill_info_tip)
+	_skill_info.tip_dismissed.connect(_hide_tip)
+	_skill_info.refresh(battle)
 
 	# 低血红闪（任务5）：出战血条剩余爱心在 HP 占比低时红色呼吸（IconPipRow 内部实现）。
 	for row in [p1_heart_row, p2_heart_row]:
@@ -557,46 +559,16 @@ func _on_codex_pressed() -> void:
 
 
 # ============================================================
-# 技能展示格（2026-07-14 回归：点击翻页浏览全部英雄技能：己方 → 对方）
+# 技能情报双钮（2026-07-17 方案A：左=己方/右=敌方·悬停介绍·翻页浏览各自三人）
 # ============================================================
 
-## 构建浏览顺序：先己方 3 个（含替补），再对方 3 个，按阵容槽位顺序。
-func _build_skill_entries() -> void:
-	_skill_entries.clear()
-	for p in [PLAYER, AI]:
-		for slot in range(battle.heroes[p].size()):
-			_skill_entries.append([p, slot])
-	_skill_index = 0
-
-
-## 把当前选中的英雄填进展示格。主动/被动取自运行时技能组件（h07 当先按主动算）。
-func _refresh_skill_card() -> void:
-	if _skill_entries.is_empty():
-		return
-	var e: Array = _skill_entries[_skill_index % _skill_entries.size()]
-	var p: int = int(e[0])
-	var slot: int = int(e[1])
-	var h: HeroData = battle.heroes[p][slot]
-	var sk: HeroSkill = battle.get_skill(p, slot)
-	var is_active: bool = sk != null and (sk.has_active() or sk.has_free_switch())
-	# 立绘一律朝右；阵营靠底色区分（己方冷蓝 / 对方暖红）。
-	skill_card.populate(h.hero_name, h.skill_description, h.skill_detail, is_active, h.portrait_path, p == PLAYER, h.skill_icon_path)
-
-
-## 左键点击展示格 → 翻到下一个英雄，循环。
-func _on_skill_card_advance() -> void:
-	if _skill_entries.is_empty():
-		return
-	_skill_index = (_skill_index + 1) % _skill_entries.size()
-	_refresh_skill_card()
-
-
-## 右键点击展示格 → 翻回上一个英雄，循环。
-func _on_skill_card_back() -> void:
-	if _skill_entries.is_empty():
-		return
-	_skill_index = (_skill_index - 1 + _skill_entries.size()) % _skill_entries.size()
-	_refresh_skill_card()
+## 技能情报钮悬停/悬停中翻页 → 复用统一悬停提示浮层（族语浮层·方位规则同 _show_tip_at）。
+## 定位矩形向上扩 18px：pip 行悬于钮顶外，浮层要落在 pip 之上不压点。
+func _on_skill_info_tip(target: Control, text: String) -> void:
+	var r := target.get_global_rect()
+	r.position.y -= 18.0
+	r.size.y += 18.0
+	_show_tip_at(r, text)
 
 
 # ============================================================
@@ -1496,15 +1468,16 @@ func _set_buttons_active(active: bool, dim_inactive: bool = true) -> void:
 	var show_affordance := active or not dim_inactive
 	var alpha := 1.0 if show_affordance else 0.4
 	buttons_ctrl.modulate = Color(1, 1, 1, alpha)
-	if skill_card:
-		skill_card.visible = true
-		skill_card.modulate = Color(1, 1, 1, alpha)
+	if _skill_info:
+		_skill_info.visible = true
+		_skill_info.modulate = Color(1, 1, 1, alpha)
 	if show_affordance:
 		_refresh_action_affordance()   # 按能量显示亮/暗（开局与选择阶段一致）
 	else:
 		for btn in action_btn_list + [btn_confirm]:
 			btn.disabled = true        # 结算/过场：全禁用（图鉴钮不禁——随时可查阅）
-	_refresh_skill_card()
+	if _skill_info:
+		_skill_info.refresh(battle)
 
 
 ## 编辑器可摆位：按钮位置/尺寸全部读 .tscn，代码只管显隐与技能 tooltip，不再覆盖坐标。
@@ -1744,6 +1717,10 @@ func _build_hover_tips() -> void:
 	_register_tip(btn_confirm, _confirm_tip)
 	p1_item_row.slot_hovered.connect(_on_item_slot_hovered)
 	p1_item_row.slot_unhovered.connect(_hide_tip)
+	# 敌方道具同享悬停查看（2026-07-17 Eddy）：只读提示·无点击 CTA（hoverable 不解锁点击）。
+	p2_item_row.hoverable = true
+	p2_item_row.slot_hovered.connect(_on_item_slot_hovered_p2)
+	p2_item_row.slot_unhovered.connect(_hide_tip)
 
 
 func _register_tip(c: Control, provider: Callable) -> void:
@@ -1759,6 +1736,15 @@ func _on_item_slot_hovered(slot: int) -> void:
 	var base: Vector2 = p1_item_row.global_position \
 		+ Vector2(slot * (ItemSlotRow.SLOT_W + ItemSlotRow.GAP), 0.0)
 	_show_tip_at(Rect2(base, Vector2(ItemSlotRow.SLOT_W, ItemSlotRow.SLOT_H)), _item_slot_tip(slot))
+
+
+## 敌方道具悬停（2026-07-17 Eddy：敌方道具同享查看）：行带 0.85 缩放 → 槽矩形按实显宽算。
+func _on_item_slot_hovered_p2(slot: int) -> void:
+	var sc: Vector2 = p2_item_row.scale
+	var base: Vector2 = p2_item_row.global_position \
+		+ Vector2(slot * (ItemSlotRow.SLOT_W + ItemSlotRow.GAP) * sc.x, 0.0)
+	_show_tip_at(Rect2(base, Vector2(ItemSlotRow.SLOT_W * sc.x, ItemSlotRow.SLOT_H * sc.y)),
+		_item_slot_tip(slot, AI))
 
 
 ## 目标矩形上方居中放提示；上方放不下（道具行在屏幕上部）→ 落到下方。
@@ -1820,28 +1806,37 @@ func _confirm_tip() -> String:
 
 
 ## 我方道具槽提示（按槽状态）：解锁回合 / 抽·补·升费用 / 道具名+效果+锁定状态。
-func _item_slot_tip(slot: int) -> String:
-	match battle.slot_state(PLAYER, slot):
+## p=PLAYER 带操作 CTA（点击使用/右键升级/补充）；p=AI 只读版（敌方道具查看·无 CTA·2026-07-17）。
+func _item_slot_tip(slot: int, p: int = PLAYER) -> String:
+	var mine := p == PLAYER
+	match battle.slot_state(p, slot):
 		BattleCore.SlotState.SEALED:
 			return tr("第%d回合自动解锁") % (int(BattleCore.SLOT_UNLOCK_TURN[slot]) + 1)
 		BattleCore.SlotState.OPENED:
-			if battle.can_draw_slot(PLAYER, slot):
+			if not mine:
+				return tr("待抽取道具")
+			if battle.can_draw_slot(p, slot):
 				return tr("点击抽取道具（3选1·免费）")
 			return tr("下回合可抽取道具")
 		BattleCore.SlotState.CHARGING:
-			var item: ItemData = battle.slot_item(PLAYER, slot)
+			var item: ItemData = battle.slot_item(p, slot)
 			if item == null:
 				return ""
 			var txt := tr("【%s】\n%s") % [tr(item.item_name), tr(item.description)]
-			if battle.slot_ready(PLAYER, slot):
-				txt += tr("\n— 点击使用")
-				if battle.can_upgrade(PLAYER, slot):
-					txt += tr("·右键升级（%s点能量）") % _fmt_hp(BattleCore.UPGRADE_COST / 2.0)
+			if battle.slot_ready(p, slot):
+				if mine:
+					txt += tr("\n— 点击使用")
+					if battle.can_upgrade(p, slot):
+						txt += tr("·右键升级（%s点能量）") % _fmt_hp(BattleCore.UPGRADE_COST / 2.0)
+				else:
+					txt += tr("\n— 就绪")
 			else:
 				txt += tr("\n— 锁定中·下回合可用")
 			return txt
 		BattleCore.SlotState.EMPTY:
-			if battle.can_refill(PLAYER, slot):
+			if not mine:
+				return tr("空槽")
+			if battle.can_refill(p, slot):
 				return tr("点击补充道具（3选1·消耗%s点能量）") % _fmt_hp(BattleCore.ITEM_REFILL_COST / 2.0)
 			return tr("空槽（补充需%s点能量）") % _fmt_hp(BattleCore.ITEM_REFILL_COST / 2.0)
 	return ""
@@ -2153,10 +2148,10 @@ func _build_debug_buttons() -> void:
 	panel.overtime_requested.connect(_on_debug_overtime)
 
 
-## debug 面板改了 battle 状态 → 刷新全套显示（含换英雄需刷技能卡·多刷无害）。
+## debug 面板改了 battle 状态 → 刷新全套显示（含换英雄需刷技能情报钮·多刷无害）。
 func _on_debug_state_changed() -> void:
 	_update_all()
-	_refresh_skill_card()
+	_skill_info.refresh(battle)
 	_start_ai_think()   # 任务G：调试面板直改引擎状态 → 预想作废重想
 
 

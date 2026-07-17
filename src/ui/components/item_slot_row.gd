@@ -65,7 +65,9 @@ const EMP_EI := Color(0.44, 0.40, 0.32)
 # 无道具态（空/未解锁/不可操作）框色：去饱和中性灰（2026-06-28 Eddy：去掉"木色"边框；有道具一律走稀有度色）。
 const EMPTY_EDGE := Color(0.43, 0.42, 0.41)
 # ── 无文字状态语言（2026-07-13 重做·Eddy 批 B+A 方案）：状态=回纹框+小配饰+动效·文字全退役 ──
-const NEUTRAL_FRAME_TEX := preload("res://assets/ui/hero_avatar_frame.png")   # 无道具态回纹框（暖骨中性·与头像框同源）
+# 无道具态外框=图鉴 t1 回纹框（2026-07-17 Eddy：道具框外框须与道具图鉴一致——旧 hero_avatar_frame
+# 是英雄族素材·道具行里穿错家族衣服；抽卡池 T1-only → 空/可抽格穿 t1 蓝语义也通·各态压暗沿用 frame_mod）。
+const NEUTRAL_FRAME_TEX := preload("res://assets/ui/item_frame_t1.png")
 const SEAL_PAPER := Color("#E8DCC0")            # 封条纸面（米色封印语言·与匾/签同族）
 const SEAL_EDGE_INK := Color(0.23, 0.17, 0.12)  # 封条描边
 const SEAL_PIP_INK := Color(0.45, 0.34, 0.23)   # 封条圆点（剩余回合数）
@@ -100,12 +102,23 @@ const TXT_BRIGHT := Color(0.98, 0.96, 0.9)      # 可抽/可补/就绪/✓用（
 const TXT_DIM := Color(0.78, 0.74, 0.66)        # 锁/待抽/锁中（静默电报·暖灰退后）
 const TXT_FAINT := Color(0.62, 0.58, 0.50)      # 空格（最弱）
 
-## interactive：本地玩家行可点击。setter 立即把按钮 mouse_filter 设为 STOP；P2（false）→ IGNORE。
+## interactive：本地玩家行可点击。hoverable：非交互行也发悬停信号（P2 敌方道具查看·
+## 2026-07-17 Eddy）——点击/右键升级仍被 interactive 门控，悬停只读无副作用。
 var interactive := false:
 	set(v):
 		interactive = v
-		for b in _buttons:
-			b.mouse_filter = Control.MOUSE_FILTER_STOP if v else Control.MOUSE_FILTER_IGNORE
+		_apply_mouse_filter()
+
+var hoverable := false:
+	set(v):
+		hoverable = v
+		_apply_mouse_filter()
+
+
+func _apply_mouse_filter() -> void:
+	for b in _buttons:
+		b.mouse_filter = Control.MOUSE_FILTER_STOP if (interactive or hoverable) \
+				else Control.MOUSE_FILTER_IGNORE
 
 const ICON_INSET := 9.0                          # 图标内缩（露出框·与图鉴 17/138≈12% 同比例·落在内框里不溢出）
 
@@ -234,7 +247,8 @@ func _ready() -> void:
 		btn.focus_mode = Control.FOCUS_NONE
 		btn.position = base
 		btn.size = Vector2(SLOT_W, SLOT_H)
-		btn.mouse_filter = Control.MOUSE_FILTER_STOP if interactive else Control.MOUSE_FILTER_IGNORE
+		btn.mouse_filter = Control.MOUSE_FILTER_STOP if (interactive or hoverable) \
+				else Control.MOUSE_FILTER_IGNORE
 		btn.pressed.connect(_on_slot_pressed.bind(i))
 		btn.gui_input.connect(_on_slot_gui_input.bind(i))   # 右键=升级（快捷入口·与角标同信号）
 		btn.mouse_entered.connect(_on_slot_hover.bind(i))
@@ -414,7 +428,7 @@ func _on_up_badge_pressed(slot: int) -> void:
 
 
 func _on_slot_hover(slot: int) -> void:
-	if interactive:
+	if interactive or hoverable:
 		slot_hovered.emit(slot)
 
 
