@@ -5,8 +5,8 @@ extends Node
 ## 直接组白板加时局（跳过主局）→ 定时两截图：①眼珠右看途中 ②flash 后紫日食定格。
 ## 输出到 session scratchpad（不落仓库目录）。
 
-const OUT_LOOK := "C:/Users/Edzzz/AppData/Local/Temp/claude/D--Game-BoBoZan-Claude-Code-Game-Studios-cn-localization/cf36fe78-6059-4d01-bcba-909e48747428/scratchpad/eclipse_look.png"
-const OUT_DONE := "C:/Users/Edzzz/AppData/Local/Temp/claude/D--Game-BoBoZan-Claude-Code-Game-Studios-cn-localization/cf36fe78-6059-4d01-bcba-909e48747428/scratchpad/eclipse_done.png"
+const OUT_LOOK := "D:/Game/BoBoZan/eclipse_look.png"
+const OUT_DONE := "D:/Game/BoBoZan/eclipse_done.png"
 
 
 func _ready() -> void:
