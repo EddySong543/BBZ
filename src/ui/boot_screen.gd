@@ -11,13 +11,17 @@ extends Control
 ##   → 第 5 下崩溃决堤（clash 冲到 0/1 + burst 全屏光爆发 + 强 shake）
 ##   → 交棒全局波幕（TransitionManager.reveal_into）：胜方波同色同向接管 → 切菜单 → 排走揭幕。
 ##
-## 像素机制：shader 64 列大格、每格纯色；亮度量化 40 档 + Bayer 抖动 → 复古像素渐变。
-## 波形：非对称浪头（陡前缘 + 长拖尾）；颗粒：2D 格点 hash（非水平长条）。
+## 像素机制：shader 64 列大格、每格纯色；亮度量化 40 档 + Bayer 抖动。
+## 视觉 v3「对波解剖」（2026-07-17·canvas_boot_wave_clash.gdshader）：暗档底场（无满屏噪点）
+## + 波前三层（暗缘/爆亮芯/色鞘·电性碎沿·脉动呼吸）+ 向心能量丝 + 窄炽角力光墙；
+## 撞点火花/电弧演出在 clash_fx.gd 节点层（本脚本喂 seam + 按节拍 burst）。
+## ⚠ 旧 wave_clash.gdshader 仍归主菜单 mode_card 卡面用，两文件独立。
 
 const NEXT_SCENE := "res://src/ui/main_menu.tscn"
 
 # preload 而非裸 class_name：新建全局类在 headless/GUT 场景缓存未刷新时会报 not declared。
 const AudioEventsBoot := preload("res://src/core/audio_events.gd")
+const ClashFx := preload("res://src/ui/components/clash_fx.gd")
 
 const ADVANCE_TIME := 0.85
 const IMPACT_TIME := 0.20
@@ -44,8 +48,10 @@ var _phase_r := 0.25           # 红侧波累积相位（初始偏移 → 左右
 var _speed_l := BASE_PHASE_SPEED
 var _speed_r := BASE_PHASE_SPEED
 var _shake_amt := 0.0          # 当前 shake 幅度（_process 每帧衰减）
+var _clash_cur := 0.5          # clash_pos 当前值（撞点特效层每帧要读）
 var _phase := "advance"
 var _title: TitleLogo
+var _fx: ClashFx
 
 
 func _ready() -> void:
@@ -55,6 +61,8 @@ func _ready() -> void:
 	_mat = _wave.material as ShaderMaterial
 	_update_aspect()
 	get_viewport().size_changed.connect(_update_aspect)
+	_fx = ClashFx.new()   # 撞点火花/电弧层：Wave 之上、标题之下
+	add_child(_fx)
 	_build_labels()
 	# 起手：两道大波在屏幕最外缘；底色档 ~14（base 0.35 × 40 档）已就位
 	_mat.set_shader_parameter("pulse_l_x", 0.0)
@@ -104,6 +112,8 @@ func _run_intro() -> void:
 	_phase = "impact"
 	_shake_amt = SHAKE_IMPACT       # 初次对撞 shake（_process 内自然衰减）
 	_title.play_entrance()          # 撞击瞬间 → 标题逐字入场
+	_fx.set_active(true)            # 撞点演出开启：僵持自然迸溅 + 偶发电弧
+	_fx.burst(14, 0.0, 1.2)         # 初撞对称迸溅一股
 	var tw_i := create_tween().set_parallel(true)
 	tw_i.tween_method(_set_pulse_amp, 1.0, 0.0, IMPACT_TIME)
 	tw_i.tween_method(_set_center, 0.0, 1.0, IMPACT_TIME) \
@@ -125,6 +135,7 @@ func _process(delta: float) -> void:
 	_mat.set_shader_parameter("wave_time", _wave_t)
 	_mat.set_shader_parameter("phase_l", _phase_l)
 	_mat.set_shader_parameter("phase_r", _phase_r)
+	_fx.set_seam(_clash_cur * get_viewport_rect().size.x)   # 火花/电弧跟随撞点
 	# 受击 shake：随机抖动 UV，按 SHAKE_DECAY 衰减归零
 	if _shake_amt > 0.0:
 		_shake_amt = max(0.0, _shake_amt - delta * SHAKE_DECAY)
@@ -190,6 +201,8 @@ func _run_combo(blue_wins: bool) -> void:
 		_set_hit(1.0)
 		_shake_amt = SHAKE_HIT         # 每击轻微 shake
 		_title.combo_hit(dir)          # 标题随每击被朝胜方方向震推
+		_fx.burst(10, dir, 1.5)        # 每击一股火花砸向败方侧
+		_fx.fire_arc()                 # 击点电弧闪现
 		var tw := create_tween()
 		tw.tween_method(_set_hit, 1.0, 0.0, dur + 0.06)
 		# 中线受击震颤：阻尼正弦来回摆动并衰减（丝滑，无急停转折）
@@ -206,6 +219,7 @@ func _run_combo(blue_wins: bool) -> void:
 	var cur2 := _mat.get_shader_parameter("clash_pos") as float
 	_set_hit(1.0)
 	_shake_amt = SHAKE_BURST          # 崩溃强 shake（随 _process 自然衰减）
+	_fx.burst(26, dir, 2.2)           # 决堤大迸发（随 seam 冲锋一路拖尾）
 	var bt := create_tween().set_parallel(true)
 	bt.tween_method(_set_clash, cur2, target, 0.34) \
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
@@ -236,6 +250,7 @@ func _apply_kick(u: float, dir: float, amp: float) -> void:
 
 # ── shader 参数 setter ────────────────────────────────────────
 func _set_clash(v: float) -> void:
+	_clash_cur = v
 	_mat.set_shader_parameter("clash_pos", v)
 
 func _set_intensity(v: float) -> void:

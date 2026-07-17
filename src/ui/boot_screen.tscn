@@ -1,6 +1,6 @@
 [gd_scene load_steps=4 format=3]
 
-[ext_resource type="Shader" path="res://assets/shaders/wave_clash.gdshader" id="1"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_boot_wave_clash.gdshader" id="1"]
 [ext_resource type="Script" path="res://src/ui/boot_screen.gd" id="2"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_1"]
