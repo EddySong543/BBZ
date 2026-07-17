@@ -24,10 +24,10 @@ const TOP_UI_DROP := 26.0   # 顶部 UI 整体下移量（2026-06-28 Eddy：44�
 const BUBBLE_HEAD_RISE := 102.0  # 出招气泡锚点：角色显示容器「中心」上移此值（越大气泡越高·够高才不压角色·随立绘 2.0x 同步 2026-07-11）
 const BUBBLE_SIDE_X := 91.0      # 出招气泡水平偏移：己方(P0)放头「右上」/ 敌方(P1)镜像「左上」（越大越往外侧·够大才不和角色重合·随立绘 2.0x 同步）
 
-## 顶部头像框尺寸（Eddy 要求整体放大一档·2026-06-20）。出战 / 替补；放大走「底固定向上长」
-## （见 _enlarge_frames），不压下方血行/名字。原基准 72 / 68。
-const FRAME_ACTIVE_SIZE := 80.0
-const FRAME_BENCH_SIZE := 76.0
+## 顶部头像框尺寸。出战 / 替补；≠基准(72/68)时走「底固定向上长」放大（见 _enlarge_frames），
+## 不压下方血行/名字。2026-06-20 放大一档(80/76)→2026-07-17 战斗 UI 集体缩小批回基准（=tscn 原位）。
+const FRAME_ACTIVE_SIZE := 72.0
+const FRAME_BENCH_SIZE := 68.0
 
 ## 默认阵容 fallback：直接打开 battle_screen.tscn(F6) 测试用，BattleSetup 为空时启用。
 const HERO_DATA_DIR := "res://assets/data/heroes/"
@@ -124,6 +124,7 @@ var _codex_overlay: Control = null    # 战斗内图鉴浮层（懒创建·关�
 # 道具栏（M2·占位）：程序化挂在各 HUD 下。P1=贴左(对齐左侧框组·28px 内边距)；
 # P2=镜像右贴(右内边距=P1 左内边距)，由 _build_item_rows 随槽宽自动算，修「敌方框偏左」错位。
 const ITEM_ROW_POS_P1 := Vector2(28.0, 150.0)   # 2026-06-28 Eddy：道具栏上移一些(168→150)
+const ITEM_ROW_SCALE := 0.85   # 战斗 UI 集体缩小批（2026-07-17）：道具行整体缩放（容器件档·组件内部零改动）
 var p1_item_row: ItemSlotRow
 var p2_item_row: ItemSlotRow
 ## M3：本回合已点选「使用」的道具槽（仅 P1）；确认时统一 use_slot 提交，进新回合清空。
@@ -440,8 +441,8 @@ func _init_buttons() -> void:
 	btn_codex.text = tr("图鉴")
 	btn_codex.focus_mode = Control.FOCUS_NONE
 	btn_codex.clip_text = true
-	btn_codex.position = Vector2(1610.0, 26.0)
-	btn_codex.size = Vector2(128.0, 128.0)
+	btn_codex.position = Vector2(1620.0, 36.0)   # 集体缩小批（2026-07-17）：128→108 与结束钮同档·中心不动
+	btn_codex.size = Vector2(108.0, 108.0)
 	for st in ["normal", "hover", "pressed", "disabled", "focus"]:
 		btn_codex.add_theme_stylebox_override(st, StyleBoxEmpty.new())
 	var codex_bg := NinePatchRect.new()
@@ -1643,13 +1644,16 @@ func _set_cost_pips(btn: Button, cost: int, show_zero: bool = false) -> void:
 func _build_item_rows() -> void:
 	p1_item_row = ItemSlotRow.new()
 	p1_item_row.position = ITEM_ROW_POS_P1
+	p1_item_row.scale = Vector2.ONE * ITEM_ROW_SCALE
 	p1_item_row.interactive = true   # M3：本地玩家行可点击
 	p1_item_row.slot_clicked.connect(_on_p1_slot_clicked)
 	p1_item_row.slot_upgrade_clicked.connect(_on_p1_slot_upgrade)   # C：升级角标
 	p1_hud.add_child(p1_item_row)
 	p2_item_row = ItemSlotRow.new()   # P2 = AI·道具-blind（ADR D9）→ 仅显示
+	p2_item_row.scale = Vector2.ONE * ITEM_ROW_SCALE
 	# 右贴镜像 P1：P2 右内边距 = P1 左内边距(28) → 与右侧 P2 框组对齐(修敌方道具行偏左)。
-	var row_w := ItemSlotRow.SLOT_W * 3.0 + ItemSlotRow.GAP * 2.0
+	# 镜像宽度按缩放后的实显宽算（否则 P2 行会向内缩进一截）。
+	var row_w := (ItemSlotRow.SLOT_W * 3.0 + ItemSlotRow.GAP * 2.0) * ITEM_ROW_SCALE
 	p2_item_row.position = Vector2(SCREEN_W - ITEM_ROW_POS_P1.x - row_w, ITEM_ROW_POS_P1.y)
 	p2_hud.add_child(p2_item_row)
 

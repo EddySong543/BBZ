@@ -321,8 +321,8 @@ idle_rest_min = 2.0
 idle_rest_max = 5.0
 wave_idle = true
 wave_speed_by_hp = true
-pip_size = 100.0
-spacing = -50.0
+pip_size = 84.0
+spacing = -42.0
 extra_modulate = Color(0.85, 0.82, 0.74, 1)
 
 [node name="P1CoinRow" parent="P1Hud" unique_id=1966048575 instance=ExtResource("4_piprow")]
@@ -338,8 +338,8 @@ vframes = 4
 fps = 18.0
 idle_rest_min = 4.0
 idle_rest_max = 9.0
-pip_size = 45.0
-spacing = 5.0
+pip_size = 38.0
+spacing = 4.2
 per_row_cap = 10
 row_spacing = -20.0
 show_empty = false
@@ -437,8 +437,8 @@ idle_rest_min = 2.0
 idle_rest_max = 5.0
 wave_idle = true
 wave_speed_by_hp = true
-pip_size = 100.0
-spacing = -50.0
+pip_size = 84.0
+spacing = -42.0
 right_to_left = true
 extra_modulate = Color(0.85, 0.82, 0.74, 1)
 
@@ -455,8 +455,8 @@ vframes = 4
 fps = 18.0
 idle_rest_min = 4.0
 idle_rest_max = 9.0
-pip_size = 45.0
-spacing = 4.7
+pip_size = 38.0
+spacing = 4.0
 right_to_left = true
 per_row_cap = 10
 row_spacing = -20.0
@@ -578,10 +578,10 @@ mouse_filter = 2
 
 [node name="BtnCharge" type="Button" parent="Buttons" unique_id=1005743617]
 layout_mode = 0
-offset_left = 885.0
-offset_top = 15.0
-offset_right = 1035.0
-offset_bottom = 165.0
+offset_left = 896.0
+offset_top = 26.0
+offset_right = 1024.0
+offset_bottom = 154.0
 theme_override_styles/normal = SubResource("BtnTransparent")
 theme_override_styles/pressed = SubResource("BtnTransparent")
 theme_override_styles/hover = SubResource("BtnTransparent")
@@ -620,10 +620,10 @@ inset_ratio = 0.14
 
 [node name="BtnAttack" type="Button" parent="Buttons" unique_id=1348519698]
 layout_mode = 0
-offset_left = 726.0
-offset_top = 26.0
-offset_right = 854.0
-offset_bottom = 154.0
+offset_left = 736.0
+offset_top = 36.0
+offset_right = 844.0
+offset_bottom = 144.0
 theme_override_styles/normal = SubResource("BtnTransparent")
 theme_override_styles/pressed = SubResource("BtnTransparent")
 theme_override_styles/hover = SubResource("BtnTransparent")
@@ -679,10 +679,10 @@ embolden = 0.7
 
 [node name="BtnBigAttack" type="Button" parent="Buttons" unique_id=1182840675]
 layout_mode = 0
-offset_left = 556.0
-offset_top = 26.0
-offset_right = 684.0
-offset_bottom = 154.0
+offset_left = 566.0
+offset_top = 36.0
+offset_right = 674.0
+offset_bottom = 144.0
 theme_override_styles/normal = SubResource("BtnTransparent")
 theme_override_styles/pressed = SubResource("BtnTransparent")
 theme_override_styles/hover = SubResource("BtnTransparent")
@@ -740,10 +740,10 @@ embolden = 0.7
 
 [node name="BtnDefend" type="Button" parent="Buttons" unique_id=1455563286]
 layout_mode = 0
-offset_left = 1066.0
-offset_top = 26.0
-offset_right = 1194.0
-offset_bottom = 154.0
+offset_left = 1076.0
+offset_top = 36.0
+offset_right = 1184.0
+offset_bottom = 144.0
 theme_override_styles/normal = SubResource("BtnTransparent")
 theme_override_styles/pressed = SubResource("BtnTransparent")
 theme_override_styles/hover = SubResource("BtnTransparent")
@@ -798,10 +798,10 @@ number = 0
 
 [node name="BtnBigDefend" type="Button" parent="Buttons" unique_id=772727519]
 layout_mode = 0
-offset_left = 1236.0
-offset_top = 26.0
-offset_right = 1364.0
-offset_bottom = 154.0
+offset_left = 1246.0
+offset_top = 36.0
+offset_right = 1354.0
+offset_bottom = 144.0
 theme_override_styles/normal = SubResource("BtnTransparent")
 theme_override_styles/pressed = SubResource("BtnTransparent")
 theme_override_styles/hover = SubResource("BtnTransparent")
@@ -857,10 +857,10 @@ embolden = 0.7
 
 [node name="BtnSpecial" type="Button" parent="Buttons" unique_id=581864479]
 layout_mode = 0
-offset_left = 1406.0
-offset_top = 26.0
-offset_right = 1534.0
-offset_bottom = 154.0
+offset_left = 1416.0
+offset_top = 36.0
+offset_right = 1524.0
+offset_bottom = 144.0
 theme_override_styles/normal = SubResource("BtnTransparent")
 theme_override_styles/pressed = SubResource("BtnTransparent")
 theme_override_styles/hover = SubResource("BtnTransparent")
@@ -896,10 +896,10 @@ embolden = 0.7
 
 [node name="BtnConfirm" type="Button" parent="Buttons" unique_id=2072422273]
 layout_mode = 0
-offset_left = 1762.0
-offset_top = 26.0
-offset_right = 1890.0
-offset_bottom = 154.0
+offset_left = 1772.0
+offset_top = 36.0
+offset_right = 1880.0
+offset_bottom = 144.0
 theme_override_styles/normal = SubResource("BtnTransparent")
 theme_override_styles/pressed = SubResource("BtnTransparent")
 theme_override_styles/hover = SubResource("BtnTransparent")
@@ -920,9 +920,10 @@ mouse_filter = 2
 [node name="SkillCard" parent="." unique_id=712725023 instance=ExtResource("22_skillcard")]
 layout_mode = 0
 offset_left = 30.0
-offset_top = 896.0
+offset_top = 915.0
 offset_right = 400.0
-offset_bottom = 1024.0
+offset_bottom = 1043.0
+scale = Vector2(0.85, 0.85)
 
 [node name="DeathSwitchOverlay" parent="." unique_id=812501744 instance=ExtResource("6_death")]
 layout_mode = 1
