@@ -12,14 +12,18 @@ extends RefCounted
 ##   econ_pick    {v, kind, turn, slot, choice, upgrade:bool}
 ##   death_switch {v, kind, turn, slot}
 ##   resync       {v, kind}                        → 服务器回 snapshot（断线重连）
-##   hello        {v, kind, team:[hero_id×3], pass?, gv?} → 开局前=报到+交换阵容；开局后=重连（房间回 snapshot+turn_begin）
+##   hello        {v, kind, team:[hero_id×3]|[], pass?, gv?} → 开局前=报到+交换阵容；开局后=重连（房间回 snapshot+turn_begin）
 ##                pass=房间口令（可选·好友房准入·2026-07-14）·gv=游戏版本（版本握手）·门在 net_session.poll_prestart
+##                **空 team=BP 流程报到（2026-07-17 BP 联机化）**：阵容不在大厅定·由 BP 阶段决出
+##   bp_progress  {v, kind, n:0..3}                → BP 期：我方已亮张数（服务器转发对方=盖牌演出真信号·不带内容）
+##   bp_confirm   {v, kind, picks:[hero_id×3]}     → BP 期：最终盲选提交（bp_room 二道门校验）
 ## S2C（服务器→客户端）kind：
 ##   match_start / turn_begin / draft_offer / resolve / view / game_over / snapshot / error
 ##   （match_start/turn_begin/resolve/view 均带 snap=权威全量快照 → 客户端镜像同步·M1）
+##   bp_start {you, pool} / bp_progress {n=对方张数} / bp_reveal {picks:[双方×3]·绝对视角}（BP 阶段·2026-07-17）
 
 const PROTO_VERSION := 1
-const C2S_KINDS: Array[String] = ["submit_turn", "econ_draft", "econ_upgrade", "econ_refill", "econ_pick", "death_switch", "resync", "hello"]
+const C2S_KINDS: Array[String] = ["submit_turn", "econ_draft", "econ_upgrade", "econ_refill", "econ_pick", "death_switch", "resync", "hello", "bp_progress", "bp_confirm"]
 const TEAM_SIZE := 3
 const MAX_HERO_ID_LEN := 8
 const MAX_PASS_LEN := 16       # 房间口令上限（好友房准入·2026-07-14）
@@ -43,19 +47,27 @@ static func validate_c2s(msg: Variant) -> String:
 	if kind == "resync":
 		return ""
 	if kind == "hello":
+		# 空 team=BP 流程报到（阵容由 BP 阶段决出）；非空必须 3 个合法 id
 		var team: Variant = d.get("team")
-		if not (team is Array) or (team as Array).size() != TEAM_SIZE:
+		if not (team is Array) or ((team as Array).size() != TEAM_SIZE and not (team as Array).is_empty()):
 			return "bad_team"
-		for id in team:
-			if not (id is String) or (id as String).is_empty() or (id as String).length() > MAX_HERO_ID_LEN \
-					or not (id as String).is_valid_identifier():
-				return "bad_team"
+		if not _ids_ok(team):
+			return "bad_team"
 		var pass_v: Variant = d.get("pass", "")   # 可选字段：缺省=空串（旧包兼容）·带则限型限长
 		if not (pass_v is String) or (pass_v as String).length() > MAX_PASS_LEN:
 			return "bad_pass_field"
 		var gv_v: Variant = d.get("gv", "")
 		if not (gv_v is String) or (gv_v as String).length() > MAX_GV_LEN:
 			return "bad_gv_field"
+		return ""
+	if kind == "bp_progress":
+		if not _is_int(d.get("n")) or int(d["n"]) < 0 or int(d["n"]) > TEAM_SIZE:
+			return "bad_n"
+		return ""
+	if kind == "bp_confirm":
+		var picks: Variant = d.get("picks")
+		if not (picks is Array) or (picks as Array).size() != TEAM_SIZE or not _ids_ok(picks):
+			return "bad_picks"
 		return ""
 	if not _is_int(d.get("turn")) or int(d["turn"]) < 0:
 		return "bad_turn"
@@ -91,6 +103,15 @@ static func validate_c2s(msg: Variant) -> String:
 
 static func _slot_ok(d: Dictionary) -> bool:
 	return _is_int(d.get("slot")) and int(d["slot"]) >= 0 and int(d["slot"]) <= MAX_ITEM_SLOTS - 1
+
+
+## 英雄 id 数组形状校验（hello team / bp_confirm picks 共用）：每个都是合法标识符且限长。
+static func _ids_ok(arr: Variant) -> bool:
+	for id in arr:
+		if not (id is String) or (id as String).is_empty() or (id as String).length() > MAX_HERO_ID_LEN \
+				or not (id as String).is_valid_identifier():
+			return false
+	return true
 
 
 ## JSON 往返后 int 会变 float —— 整数判定两者都收。
@@ -135,6 +156,16 @@ static func msg_hello(team: Array, room_pass: String = "", gv: String = "") -> D
 ## 本机游戏版本（版本握手用·真相源=project.godot application/config/version）。
 static func game_version() -> String:
 	return String(ProjectSettings.get_setting("application/config/version", "0"))
+
+
+# —— BP 阶段 C2S（2026-07-17 BP 联机化逻辑层）——
+
+static func msg_bp_progress(n: int) -> Dictionary:
+	return {v = PROTO_VERSION, kind = "bp_progress", n = clampi(n, 0, TEAM_SIZE)}
+
+
+static func msg_bp_confirm(picks: Array) -> Dictionary:
+	return {v = PROTO_VERSION, kind = "bp_confirm", picks = picks.duplicate()}
 
 
 # —— S2C 构造（服务器用）——

@@ -37,6 +37,11 @@ func poll() -> void:
 		_on_msg(msg)
 
 
+## 单包注入（net_session.pump_bp 路由用——BP 期统一收包·避免与 BpClient 抢 poll）。
+func feed(msg: Dictionary) -> void:
+	_on_msg(msg)
+
+
 func _on_msg(d: Dictionary) -> void:
 	match String(d.get("kind", "")):
 		"match_start":
