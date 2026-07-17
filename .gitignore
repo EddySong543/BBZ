@@ -35,10 +35,9 @@ Desktop.ini
 *.psd
 *.docx
 
-# === Godot Plugins / Addons (installed via AssetLib by each developer) ===
-# GUT (Godot Unit Test) is installed locally via AssetLib to keep third-party
-# code out of git history. New devs: re-install via Project → AssetLib → search "Gut".
-/addons/gut/
+# === Godot Plugins / Addons ===
+# GUT (Godot Unit Test) 9.6.0 已入库锁版本（2026-07-17 审计修复④）：project.godot 默认
+# 启用该插件，此前整目录被忽略 = 新克隆跑不了测试、也没有版本锁定。测试框架随仓库走。
 
 # === Local sim / tooling scratch outputs (per-run, regenerated; never shipped) ===
 # run_sim.gd 写出的临时平衡/烟雾测试目录（out_btest / out_smoke14 / out_upgrade_ab / out_planab …）。
