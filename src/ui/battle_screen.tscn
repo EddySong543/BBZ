@@ -578,9 +578,9 @@ mouse_filter = 2
 
 [node name="BtnCharge" type="Button" parent="Buttons" unique_id=1005743617]
 layout_mode = 0
-offset_left = 896.0
-offset_top = 26.0
-offset_right = 1024.0
+offset_left = 904.0
+offset_top = 42.0
+offset_right = 1016.0
 offset_bottom = 154.0
 theme_override_styles/normal = SubResource("BtnTransparent")
 theme_override_styles/pressed = SubResource("BtnTransparent")
@@ -620,10 +620,10 @@ inset_ratio = 0.14
 
 [node name="BtnAttack" type="Button" parent="Buttons" unique_id=1348519698]
 layout_mode = 0
-offset_left = 736.0
-offset_top = 36.0
-offset_right = 844.0
-offset_bottom = 144.0
+offset_left = 754.0
+offset_top = 42.0
+offset_right = 866.0
+offset_bottom = 154.0
 theme_override_styles/normal = SubResource("BtnTransparent")
 theme_override_styles/pressed = SubResource("BtnTransparent")
 theme_override_styles/hover = SubResource("BtnTransparent")
@@ -679,10 +679,10 @@ embolden = 0.7
 
 [node name="BtnBigAttack" type="Button" parent="Buttons" unique_id=1182840675]
 layout_mode = 0
-offset_left = 566.0
-offset_top = 36.0
-offset_right = 674.0
-offset_bottom = 144.0
+offset_left = 604.0
+offset_top = 42.0
+offset_right = 716.0
+offset_bottom = 154.0
 theme_override_styles/normal = SubResource("BtnTransparent")
 theme_override_styles/pressed = SubResource("BtnTransparent")
 theme_override_styles/hover = SubResource("BtnTransparent")
@@ -740,10 +740,10 @@ embolden = 0.7
 
 [node name="BtnDefend" type="Button" parent="Buttons" unique_id=1455563286]
 layout_mode = 0
-offset_left = 1076.0
-offset_top = 36.0
-offset_right = 1184.0
-offset_bottom = 144.0
+offset_left = 1054.0
+offset_top = 42.0
+offset_right = 1166.0
+offset_bottom = 154.0
 theme_override_styles/normal = SubResource("BtnTransparent")
 theme_override_styles/pressed = SubResource("BtnTransparent")
 theme_override_styles/hover = SubResource("BtnTransparent")
@@ -798,10 +798,10 @@ number = 0
 
 [node name="BtnBigDefend" type="Button" parent="Buttons" unique_id=772727519]
 layout_mode = 0
-offset_left = 1246.0
-offset_top = 36.0
-offset_right = 1354.0
-offset_bottom = 144.0
+offset_left = 1204.0
+offset_top = 42.0
+offset_right = 1316.0
+offset_bottom = 154.0
 theme_override_styles/normal = SubResource("BtnTransparent")
 theme_override_styles/pressed = SubResource("BtnTransparent")
 theme_override_styles/hover = SubResource("BtnTransparent")
@@ -857,10 +857,10 @@ embolden = 0.7
 
 [node name="BtnSpecial" type="Button" parent="Buttons" unique_id=581864479]
 layout_mode = 0
-offset_left = 1416.0
-offset_top = 36.0
-offset_right = 1524.0
-offset_bottom = 144.0
+offset_left = 1354.0
+offset_top = 42.0
+offset_right = 1466.0
+offset_bottom = 154.0
 theme_override_styles/normal = SubResource("BtnTransparent")
 theme_override_styles/pressed = SubResource("BtnTransparent")
 theme_override_styles/hover = SubResource("BtnTransparent")
@@ -897,9 +897,9 @@ embolden = 0.7
 [node name="BtnConfirm" type="Button" parent="Buttons" unique_id=2072422273]
 layout_mode = 0
 offset_left = 1772.0
-offset_top = 36.0
+offset_top = 46.0
 offset_right = 1880.0
-offset_bottom = 144.0
+offset_bottom = 154.0
 theme_override_styles/normal = SubResource("BtnTransparent")
 theme_override_styles/pressed = SubResource("BtnTransparent")
 theme_override_styles/hover = SubResource("BtnTransparent")

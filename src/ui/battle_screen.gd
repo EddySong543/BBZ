@@ -94,6 +94,7 @@ var p2_frame_slots: Array[int] = [-1, -1, -1]
 var _skill_entries: Array = []   # [[player, slot], ...]
 var _skill_index: int = 0
 var btn_codex: Button = null          # 「图鉴」钮（2026-07-14 移到右侧结束旁·程序化创建=同疾风）
+var _special_icon: TextureRect = null # 技能钮内的英雄专属技能图标（2026-07-17 Eddy 点单·懒创建）
 var _codex_overlay: Control = null    # 战斗内图鉴浮层（懒创建·关闭仅隐藏）
 
 @onready var buttons_ctrl: Control = $Buttons
@@ -441,20 +442,29 @@ func _init_buttons() -> void:
 	btn_codex.text = tr("图鉴")
 	btn_codex.focus_mode = Control.FOCUS_NONE
 	btn_codex.clip_text = true
-	btn_codex.position = Vector2(1620.0, 36.0)   # 集体缩小批（2026-07-17）：128→108 与结束钮同档·中心不动
+	btn_codex.position = Vector2(1626.0, 46.0)   # 集体缩小批（2026-07-17）：108 与结束钮同档·底缘对齐 154·与结束间隔 38=动作排同律
 	btn_codex.size = Vector2(108.0, 108.0)
 	for st in ["normal", "hover", "pressed", "disabled", "focus"]:
 		btn_codex.add_theme_stylebox_override(st, StyleBoxEmpty.new())
-	var codex_bg := NinePatchRect.new()
+	# 微调③（2026-07-17 Eddy）：导航钮皮→与攒/波同款像素果冻框（参数抄 JellyZan·奶油纸填色保图鉴识别）。
+	var codex_bg := ColorRect.new()
 	codex_bg.name = "Bg"
-	codex_bg.texture = NAV_PLATE_TEX
-	codex_bg.patch_margin_left = 22    # =主菜单 NAV_PLATE_MARGIN_X/Y·v14 净面
-	codex_bg.patch_margin_right = 22
-	codex_bg.patch_margin_top = 20
-	codex_bg.patch_margin_bottom = 20
-	codex_bg.axis_stretch_horizontal = NinePatchRect.AXIS_STRETCH_MODE_TILE   # 中段平铺防颗粒拉伸
-	codex_bg.axis_stretch_vertical = NinePatchRect.AXIS_STRETCH_MODE_TILE
-	codex_bg.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var codex_mat := ShaderMaterial.new()
+	codex_mat.shader = preload("res://assets/shaders/canvas_button_jelly.gdshader")
+	codex_mat.set_shader_parameter("fill_top", Color(0.92, 0.87, 0.70))
+	codex_mat.set_shader_parameter("fill_bottom", Color(0.76, 0.68, 0.50))
+	codex_mat.set_shader_parameter("edge_inner", Color(1.0, 0.95, 0.80))
+	codex_mat.set_shader_parameter("edge_outer", Color(0.1, 0.09, 0.11))
+	codex_mat.set_shader_parameter("fill_alpha", 1.0)
+	codex_mat.set_shader_parameter("pixel_grid", 38.0)
+	codex_mat.set_shader_parameter("corner", 0.22)
+	codex_mat.set_shader_parameter("edge_px", 2.0)
+	codex_mat.set_shader_parameter("aspect", 1.0)
+	codex_mat.set_shader_parameter("noise_amt", 0.08)
+	codex_mat.set_shader_parameter("wear", 0.24)
+	codex_mat.set_shader_parameter("solid_rim", true)
+	codex_mat.set_shader_parameter("rim_px", 1.5)
+	codex_bg.material = codex_mat
 	codex_bg.show_behind_parent = true
 	codex_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	codex_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1502,6 +1512,8 @@ func _set_buttons_active(active: bool, dim_inactive: bool = true) -> void:
 func _layout_circles() -> void:
 	var has_active: bool = _player_has_active()
 	btn_special.visible = has_active
+	if has_active:
+		_refresh_special_icon()   # 图标=出战英雄专属技能图标（换人/翻面后跟随刷新）
 	# 技能说明改走自绘悬停提示（_build_hover_tips 像素框）；原生 tooltip_text 灰框不合语言已弃（2026-07-11）。
 	for btn in [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend]:
 		btn.visible = true
@@ -1512,6 +1524,36 @@ func _layout_circles() -> void:
 func _player_has_active() -> bool:
 	var sk: HeroSkill = battle.get_skill(PLAYER, battle.active_index[PLAYER])
 	return sk != null and sk.has_active()
+
+
+## 技能钮图标 = 出战英雄专属技能图标（h*_skill.png·2026-07-17 Eddy 点单）；无图回退「技能」二字。
+func _refresh_special_icon() -> void:
+	if _special_icon == null:
+		_special_icon = TextureRect.new()
+		_special_icon.name = "SkillIcon"
+		_special_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		_special_icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		_special_icon.offset_left = 18.0
+		_special_icon.offset_top = 16.0
+		_special_icon.offset_right = -18.0
+		_special_icon.offset_bottom = -20.0
+		_special_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE   # 小尺寸 TextureRect 必 IGNORE_SIZE
+		_special_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		_special_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		btn_special.add_child(_special_icon)
+	var h: HeroData = battle.heroes[PLAYER][battle.active_index[PLAYER]]
+	var icon_path: String = h.skill_icon_path
+	if String(_special_icon.get_meta("icon_path", "")) == icon_path:
+		return   # 同图跳过（affordance 每刷都会经过这里·防重复 load）
+	_special_icon.set_meta("icon_path", icon_path)
+	if icon_path != "" and ResourceLoader.exists(icon_path):
+		_special_icon.texture = load(icon_path)
+		_special_icon.visible = true
+		btn_special.text = ""
+	else:
+		_special_icon.texture = null
+		_special_icon.visible = false
+		btn_special.text = tr("技能")
 
 
 func _reset_button_styles() -> void:

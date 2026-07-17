@@ -2,12 +2,12 @@
 class_name SkillCard
 extends Control
 
-## 技能展示格 = 金色书本 / 图鉴页（方案 B+②）。
-## 结构 = 烫金外框(书的装帧) + 阵营色羊皮内页 + 左侧金框「插画窗」(头像) +
-##        页面右侧墨字（上=英雄名(标题) · 下=【技能名】：技能描述）。
+## 技能展示格 = 木骨纸芯（2026-07-17 换色：金色书本→图鉴系配色）。
+## 结构 = 深漆木外框(jelly·近黑 rim) + 阵营色纸面内页 + 左侧「插画窗」(头像·回纹资产框) +
+##        页面右侧墨字（【技能名】：技能描述·英雄名已撤）。
 ##
-## 外框与插画窗 = 金色 jelly（恒定金，书的装帧）；内页 = 羊皮纸 jelly，按阵营染色：
-##   己方=冷调羊皮 / 对方=暖调羊皮。立绘一律朝右（不翻转）。文字=深褐墨字（羊皮纸上可读）。
+## 外框 = 深漆木 jelly（图鉴系承重色）；内页 = 纸面 jelly，按阵营染色：
+##   己方=冷调纸 / 对方=暖调纸。插画窗框 = hero_avatar_frame 资产（敌我换色变体·与顶部头像框同族）。
 ##
 ## 纯展示组件：显示哪个英雄、如何翻页由外部（battle_screen）驱动。
 ## 玩家点击本格 → 发出 advance_requested，外部据此翻到下一个英雄。
@@ -20,10 +20,9 @@ signal back_requested      # 右键 → 上一个英雄
 const ALLY_TINT := Color(0.94, 0.95, 0.98)   # 己方·近中性微冷(2026-06-28：原0.82冷调把暖羊皮压冷显暗→提亮，阵营靠四角宝石区分)
 const ENEMY_TINT := Color(1.0, 0.91, 0.80)   # 对方·暖调羊皮·小提亮
 
-## 敌我区分（呼应战斗内头像框的四角阵营宝石语言）：插画窗四角宝石染阵营色（己方蓝 / 敌方红）。
-## 注：角色名已从 skillcard 移除；主被动标签的阵营染色已按「先统一黑色」停用。
-const ALLY_GEM := Color("#3f86c8")   # 己方蓝（与战斗内头像框宝石同色）
-const ENEMY_GEM := Color("#d24a44")  # 敌方红
+## 敌我区分（与顶部头像框同语言·2026-07-17）：插画窗框贴图换色变体（我方暖骨/敌方阵营红）。
+const FRAME_TEX := preload("res://assets/ui/hero_avatar_frame.png")
+const FRAME_TEX_ENEMY := preload("res://assets/ui/hero_avatar_frame_enemy.png")
 
 const INK := Color(0.14, 0.09, 0.04)              # 深褐墨字（描述正文）·加深提升可读性·同色描边做仿粗体
 
@@ -86,7 +85,7 @@ const PASSIVE_COLOR := Color(0.34, 0.4, 0.46)  # 黛蓝灰（去饱和·被动=�
 @onready var _skill_icon: TextureRect = $PortraitCell/SkillIcon
 @onready var _type_label: Label = $TypeLabel
 @onready var _desc_label: RichTextLabel = $DescLabel
-@onready var _corners: Control = $PortraitCell/Corners
+@onready var _frame: TextureRect = $PortraitCell/Frame
 
 static var _tex_cache: Dictionary = {}
 
@@ -131,12 +130,12 @@ func populate(p_hero_name: String, p_skill_name: String, p_skill_detail: String,
 	skill_icon_path = p_skill_icon
 
 
-## 阵营区分：羊皮纸冷/暖 + 插画窗四角宝石蓝/红（文字一律黑色，敌我只靠宝石+羊皮冷暖）。
+## 阵营区分：纸面冷/暖 + 插画窗资产框换色变体（我方暖骨/敌方阵营红·与顶部头像框同族）。
 func _refresh_faction() -> void:
 	if _page:
 		_page.color = ALLY_TINT if is_ally else ENEMY_TINT
-	if _corners:
-		_corners.set("corner_color", ALLY_GEM if is_ally else ENEMY_GEM)   # 四角阵营宝石（同战斗内头像框）
+	if _frame:
+		_frame.texture = FRAME_TEX if is_ally else FRAME_TEX_ENEMY
 
 
 func _refresh_portrait() -> void:
@@ -174,11 +173,8 @@ func _refresh_skill_icon() -> void:
 func _refresh_text() -> void:
 	if not _type_label:
 		return
-	# 顶部标题 = 英雄名（原「主动/被动技能」位置）；统一黑墨 + 同墨色描边仿粗体。
-	_type_label.text = tr(hero_name)
-	_type_label.add_theme_color_override("font_color", INK)
-	_type_label.add_theme_color_override("font_outline_color", INK)
-	_type_label.add_theme_constant_override("outline_size", 1)
+	# 英雄名标题已移除（2026-07-17 Eddy：卡内不再显示英雄名·正文上移占位）；节点保留备用。
+	_type_label.visible = false
 
 	if not _desc_label:
 		return
