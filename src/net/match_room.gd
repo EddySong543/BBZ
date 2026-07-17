@@ -9,8 +9,10 @@ extends RefCounted
 ##     与 AI 异步预想同款模式）；双方到齐一次性落真局+resolve。
 ##   - 抽卡/升级选项由真局 core.rng 生成（服务器权威随机）·draft_offer 只发本人（私有信息）。
 ##   - 死亡换人=resolve 后 DEATH_SWITCH 相位，逐方提交，清空后开新回合。
-##   - 断线重连：resync → 全量快照（to_snapshot）。⚠ MVP 快照含双方 draft 选项（私有信息
-##     过滤=ADR-004 M3·信息扭曲道具的视角过滤同批）。
+##   - 断线重连：resync → 按接收者过滤的快照（_snap_for·2026-07-17 审计修复：对方 draft/
+##     upg_draft 候选+info_distortion 剥除——改包客户端偷看不到 3 选 1）。
+##   - 提交即锁经济（_econ_gate·同批修复）：已提交方的 draft/refill/pick 全拒——防提交后
+##     改真局让缓存动作的预检结论失效。
 ##   - 平局=直接结案（线上加时赛=后续立项·同故事模式先例）。回合计时=M3（服务端计时）。
 ##
 ## 用法（测试/未来 match_host 同款）：
@@ -52,7 +54,7 @@ func start(team0: Array, team1: Array, seed_v: int, send_cb: Callable) -> void:
 	for p in 2:
 		_send.call(p, {v = NetProtocol.PROTO_VERSION, kind = "match_start", you = p,
 			heroes = [_pack_team(0), _pack_team(1)], turn = battle.turn_number, view = _view(),
-			snap = battle.to_snapshot()})
+			snap = _snap_for(p)})
 
 
 ## 传输层入口：一切客户端包从这进。防洪（零道门）→ 协议校验（一道门）→ 回合号校验 → 业务校验（二道门）。
@@ -68,11 +70,11 @@ func handle(player: int, msg: Variant) -> void:
 	if kind == "resync" or kind == "hello":
 		# 开局后的 hello = 断线重连报到（阵容字段忽略——阵容在开局时已定死·防中途换队）。
 		_send.call(player, {v = NetProtocol.PROTO_VERSION, kind = "snapshot", you = player,
-			phase = phase, snap = battle.to_snapshot()})
+			phase = phase, snap = _snap_for(player)})
 		if phase == Phase.SELECT:
 			# 补发 turn_begin：重连者立刻回到选招（否则要干等到下一拍）
 			_send.call(player, {v = NetProtocol.PROTO_VERSION, kind = "turn_begin",
-				turn = battle.turn_number, view = _view(), snap = battle.to_snapshot()})
+				turn = battle.turn_number, view = _view(), snap = _snap_for(player)})
 		return
 	if phase == Phase.OVER:
 		_send.call(player, NetProtocol.msg_error("match_over"))
@@ -138,7 +140,10 @@ func _apply_payload(core: BattleCore, player: int, d: Dictionary) -> bool:
 
 func _commit_and_resolve() -> void:
 	for p in 2:
-		_apply_payload(battle, p, _pending[p])   # 预检已过·此处必成（固定 p0→p1 序=确定性）
+		# 预检已过且提交即锁经济（_econ_gate）→ 此处应必成；万一失败=真局与预检漂移·
+		# 状态可能已部分应用——绝不静默（2026-07-17 审计修复）。
+		if not _apply_payload(battle, p, _pending[p]):
+			push_error("MatchRoom: 已提交动作落真局失败（p%d·预检与真局漂移·请查经济门）" % p)
 	var r: Dictionary = battle.resolve()
 	var pending := battle.pending_death_switch.duplicate()
 	if battle.game_over:
@@ -150,7 +155,7 @@ func _commit_and_resolve() -> void:
 		_send.call(p, {v = NetProtocol.PROTO_VERSION, kind = "resolve",
 			actions = [r.get("p1_action", -1), r.get("p2_action", -1)],
 			events = r.get("events", []), pending = pending, view = _view(),
-			snap = battle.to_snapshot()})
+			snap = _snap_for(p)})
 	if phase == Phase.OVER:
 		for p in 2:
 			_send.call(p, NetProtocol.msg_game_over(battle.winner))
@@ -164,7 +169,7 @@ func _begin_turn() -> void:
 	_arm_turn_deadline()
 	for p in 2:
 		_send.call(p, {v = NetProtocol.PROTO_VERSION, kind = "turn_begin",
-			turn = battle.turn_number, view = _view(), snap = battle.to_snapshot()})
+			turn = battle.turn_number, view = _view(), snap = _snap_for(p)})
 
 
 func _arm_turn_deadline() -> void:
@@ -213,10 +218,22 @@ func _rate_ok(player: int) -> bool:
 	return true
 
 
-## 付能补充空槽（start_refill 内部扣能+置 OPENED+缓存 3 选 1）→ 选项私发本人 + 双方视图刷新（扣能公开）。
-func _on_econ_refill(player: int, slot: int) -> void:
+## 经济操作门（2026-07-17 审计修复）：本回合已提交动作 = 经济状态冻结。
+## 否则提交后的抽卡/补充/升级会改变真局 → _commit_and_resolve 重放缓存动作时预检结论失效
+## （能量已花/道具已换 → use_slot/apply_choice 失败 → 状态部分应用）。
+func _econ_gate(player: int) -> bool:
 	if phase != Phase.SELECT:
 		_send.call(player, NetProtocol.msg_error("bad_phase"))
+		return false
+	if _pending[player] != null:
+		_send.call(player, NetProtocol.msg_error("already_submitted"))
+		return false
+	return true
+
+
+## 付能补充空槽（start_refill 内部扣能+置 OPENED+缓存 3 选 1）→ 选项私发本人 + 双方视图刷新（扣能公开）。
+func _on_econ_refill(player: int, slot: int) -> void:
+	if not _econ_gate(player):
 		return
 	if not battle.can_refill(player, slot):
 		_send.call(player, NetProtocol.msg_error("draft_unavailable"))
@@ -231,12 +248,11 @@ func _on_econ_refill(player: int, slot: int) -> void:
 	_send.call(player, {v = NetProtocol.PROTO_VERSION, kind = "draft_offer",
 		slot = slot, upgrade = false, options = ids})
 	for p in 2:
-		_send.call(p, _msg_view())
+		_send.call(p, _msg_view(p))
 
 
 func _on_econ_draft(player: int, slot: int, upgrade: bool) -> void:
-	if phase != Phase.SELECT:
-		_send.call(player, NetProtocol.msg_error("bad_phase"))
+	if not _econ_gate(player):
 		return
 	# 权威门：begin_* 本身不校验槽状态（本地 UI 先查再调）——服务端必须先把门，
 	# 否则恶意客户端可对未解锁槽强刷 rng / 提前窥探卡池（本用例测试抓出的真漏洞）。
@@ -257,8 +273,7 @@ func _on_econ_draft(player: int, slot: int, upgrade: bool) -> void:
 
 
 func _on_econ_pick(player: int, d: Dictionary) -> void:
-	if phase != Phase.SELECT:
-		_send.call(player, NetProtocol.msg_error("bad_phase"))
+	if not _econ_gate(player):
 		return
 	var slot := int(d["slot"])
 	var ok: bool = battle.pick_upgrade(player, slot, int(d["choice"])) if bool(d["upgrade"]) \
@@ -267,7 +282,7 @@ func _on_econ_pick(player: int, d: Dictionary) -> void:
 		_send.call(player, NetProtocol.msg_error("pick_rejected"))
 		return
 	for p in 2:   # 槽位内容/能量变化=公开信息（明牌博弈）→ 双方刷新视图
-		_send.call(p, _msg_view())
+		_send.call(p, _msg_view(p))
 
 
 func _on_death_switch(player: int, slot: int) -> void:
@@ -278,13 +293,27 @@ func _on_death_switch(player: int, slot: int) -> void:
 		_send.call(player, NetProtocol.msg_error("illegal_switch"))
 		return
 	for p in 2:
-		_send.call(p, _msg_view())
+		_send.call(p, _msg_view(p))
 	if not battle.pending_death_switch[0] and not battle.pending_death_switch[1]:
 		_begin_turn()
 
 
-func _msg_view() -> Dictionary:
-	return {v = NetProtocol.PROTO_VERSION, kind = "view", view = _view(), snap = battle.to_snapshot()}
+func _msg_view(viewer: int) -> Dictionary:
+	return {v = NetProtocol.PROTO_VERSION, kind = "view", view = _view(), snap = _snap_for(viewer)}
+
+
+## 按接收者过滤的权威快照（2026-07-17 审计修复·ADR-004「视图过滤」首段落地）：
+## 对方槽位的 draft/upg_draft 候选清空——3 选 1 候选=私有信息，全量快照广播等于
+## 把"只发本人"的 draft_offer 从后门泄漏（改包客户端可偷看）；对方 info_distortion 同剥
+## （预留机制·同属私有面）。自己侧原样 → 本端 UI/断线重连镜像零影响。
+func _snap_for(viewer: int) -> Dictionary:
+	var s: Dictionary = battle.to_snapshot()
+	var opp: int = 1 - viewer
+	for sl in (s["slots"] as Array)[opp]:
+		(sl as Dictionary)["draft"] = []
+		(sl as Dictionary)["upg_draft"] = []
+	(s["info_distortion"] as Array)[opp] = {}
+	return s
 
 
 ## 公开视图（MVP=全量公开·本作明牌博弈）。信息扭曲道具（幻影/迷雾）的按视角过滤=ADR-004 M3。

@@ -1420,7 +1420,7 @@ func resolve() -> Dictionary:
 				pen = maxi(pen, ActionDef.Pen.PIERCE_BIGDEF)   # 火兆兑现（Pen 枚举有序·真伤不降档）
 				pierce_next_attack[p] = false                  # 兑现即消（疾风双发复制 hit=两段同穿）
 			if dmg > 0:
-				var hit := {damage = dmg, kind = kind, pen = pen, riders = item_mod(p, "riders", []), action = true, active = false}
+				var hit := {damage = dmg, kind = kind, pen = pen, riders = item_mod(p, "riders", []), action = true, active = false, src_slot = aslot}
 				hitlists[p].append(hit)
 				if _double[p] and a[p] in DOUBLEABLE_ACTIONS:   # 疾风：附加同一攻击再打一次
 					hitlists[p].append(hit.duplicate(true))
@@ -1438,22 +1438,26 @@ func resolve() -> Dictionary:
 					apen = maxi(apen, ActionDef.Pen.PIERCE_BIGDEF)   # 火兆兑现（攻击型主动技同属"我方下一次攻击"）
 					pierce_next_attack[p] = false
 				if admg > 0:
-					hitlists[p].append({damage = admg, kind = akind, pen = apen, riders = item_mod(p, "riders", []), action = true, active = true})
+					hitlists[p].append({damage = admg, kind = akind, pen = apen, riders = item_mod(p, "riders", []), action = true, active = true, src_slot = aslot})
 		# 3) 动作【后】道具自身伤害 hit（T1 暂无）
 		for use_h2 in item_uses[p]:
 			if int(use_h2["when"]) == ItemData.Seq.POST:
 				for ih2 in use_h2["data"].effect.hits(self, p, int(use_h2["target"]), use_h2["data"]):
 					hitlists[p].append(ih2)
 	# 施加：值已对快照算好 → 跨玩家同时；己方 hit-list 按序施加（动作前道具 → 动作 → 动作后道具）。
+	# 归因钉快照槽（src_slot·2026-07-17 审计修复）：先施加方可触发后施加方的护主换人
+	# （active_index 中途变）——on-hit/主动技回调必须归出招英雄，否则先后手不对称。
 	for p in [0, 1]:
 		for h in hitlists[p]:
 			var riders: Array = h.get("riders", [])
 			var hsrc: String = "action" if bool(h.get("action", false)) else "item"
-			var dealt: int = _apply_damage(1 - p, int(h["damage"]), p, int(h["kind"]), int(h["pen"]), a[1 - p], events, riders, hsrc)
+			var sslot: int = int(h.get("src_slot", -1))
+			var dealt: int = _apply_damage(1 - p, int(h["damage"]), p, int(h["kind"]), int(h["pen"]), a[1 - p], events, riders, hsrc, sslot)
 			if bool(h.get("active", false)):
-				var sk2: HeroSkill = _skills[p][active_index[p]]
+				var sk_slot: int = sslot if sslot >= 0 else active_index[p]
+				var sk2: HeroSkill = _skills[p][sk_slot]
 				if sk2 != null and sk2.active_is_attack():
-					sk2.on_active_attack_resolved(self, p, active_index[p], dealt)
+					sk2.on_active_attack_resolved(self, p, sk_slot, dealt)
 
 	# Phase 5: 死亡结算 + 强制切换 + 胜负
 	_resolve_deaths(a, events)
@@ -1701,13 +1705,16 @@ func strike(target_player: int, raw: int, attacker_player: int, pen: int, events
 ## 伤害管线 (§D4)：防御门 → 中毒引爆 → 受伤 hook(平减) → 护盾 → 落 HP → on-hit 触发。
 ## 返回实际落在 HP 上的伤害（半点），供攻击型主动技回调使用。
 ## src = 本次 hit 的来源标签（"action"=动作攻击/技能·"item"=道具 hit）——只写进事件供统计（sim 道具伤害占比），不影响结算。
+## attacker_slot = 出手英雄槽（hit 生成时的快照值·-1=用实时出战位）——同时结算里先施加的一方
+## 可能触发后施加方的护主换人（active_index 中途变化），on-hit 归因必须钉在出招英雄身上，
+## 否则先后手不对称（2026-07-17 审计修复·独立 hit（护主反击/毒爆等）传 -1=原语义不变）。
 ## 周天罡气（t3_yiqi·2026-07-04 重做）：该方本回合是否"无敌"——免疫一切【敌源】伤害
 ## （动作攻击/道具直伤/延迟灼烧/溅射/穷追/反震/冲撞/死亡反击）。自付代价（凶药）不算"受到伤害"、不拦。
 func damage_immune(player: int) -> bool:
 	return int(item_mod(player, "damage_immune", 0)) > 0
 
 
-func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_action: int, pen: int, def_action: int, events: Array, item_riders: Array = [], src: String = "action") -> int:
+func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_action: int, pen: int, def_action: int, events: Array, item_riders: Array = [], src: String = "action", attacker_slot: int = -1) -> int:
 	var slot: int = active_index[target_player]
 
 	# 周天罡气：无敌方本回合所有指向性伤害事件整个不发生（含附带 on-hit·同"落空"语义）
@@ -1843,8 +1850,9 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		if hp[target_player][slot] <= 0:
 			_killer[target_player][slot] = attacker_player
 
-	# Stage B10: on-hit 触发（穿过防御门即算命中，按 hit_count 次；含队友监听如鸡剑气）
-	var aslot: int = active_index[attacker_player]
+	# Stage B10: on-hit 触发（穿过防御门即算命中，按 hit_count 次；含队友监听如鸡剑气）。
+	# 出手槽优先用 hit 快照值（attacker_slot≥0）——防同拍护主换人后归因给顶班守护者。
+	var aslot: int = attacker_slot if attacker_slot >= 0 else active_index[attacker_player]
 	var atk_skill: HeroSkill = _skills[attacker_player][aslot]
 	var hc: int = 1
 	if atk_skill != null:

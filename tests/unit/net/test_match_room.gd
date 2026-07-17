@@ -287,3 +287,45 @@ func _last_error(msgs: Array) -> String:
 		if String((msgs[i] as Dictionary).get("kind", "")) == "error":
 			return String((msgs[i] as Dictionary).get("code", ""))
 	return ""
+
+
+func test_match_room_submitted_player_economy_frozen() -> void:
+	# Arrange（2026-07-17 审计修复②）：提交动作后经济状态必须冻结——否则提交后
+	# 抽卡/补充改真局 → 缓存动作落真局时预检结论失效（能量已花=部分应用污染）。
+	var t := _table(5)
+	var c0: MatchClient = t.clients[0]
+	_pump(t)
+	var energy_before: int = int((t.room as MatchRoom).battle.energy[0])
+	c0.submit(ActionDef.Action.CHARGE, -1, [])
+	_pump(t)
+
+	# Act：提交后尝试经济操作（门必须先于一切槽状态判断）
+	c0.request_refill(0)
+	c0.request_draft(0)
+	_pump(t)
+
+	# Assert：全拒 already_submitted·真局能量分文未动
+	assert_true(c0.errors.has("already_submitted"), "提交后经济操作应拒 already_submitted")
+	assert_eq(int((t.room as MatchRoom).battle.energy[0]), energy_before, "提交后的经济操作不得改变真局能量")
+
+
+func test_match_room_snapshot_hides_opponent_draft_options() -> void:
+	# Arrange（2026-07-17 审计修复③）：往 P0 槽 0 塞 3 选 1 候选（模拟 draft 进行中）
+	var t := _table(5)
+	_pump(t)
+	var room: MatchRoom = t.room
+	var some_id: String = String(ItemCatalog.ids()[0])
+	(room.battle.slots[0][0] as Dictionary)["draft"] = [ItemCatalog.make(some_id)]
+
+	# Act：双方各自 resync 拿全量快照
+	(t.clients[0] as MatchClient).request_resync()
+	(t.clients[1] as MatchClient).request_resync()
+	_pump(t)
+
+	# Assert：本人快照含候选·对手快照被剥空（防改包偷看=「只发本人」不再有快照后门）
+	var snap0: Dictionary = (t.clients[0] as MatchClient).snapshot["snap"]
+	var snap1: Dictionary = (t.clients[1] as MatchClient).snapshot["snap"]
+	var mine: Array = snap0["slots"][0][0]["draft"]
+	var theirs: Array = snap1["slots"][0][0]["draft"]
+	assert_eq(mine.size(), 1, "本人应看到自己的候选")
+	assert_eq(theirs.size(), 0, "对手侧快照的候选必须剥空")
