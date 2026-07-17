@@ -2363,9 +2363,9 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 		var bkick := (1.0 if bool(blocked[1]) else 0.0) - (1.0 if bool(blocked[0]) else 0.0)
 		stage.shake(SHAKE_BLOCK, bkick)
 	if bool(dead[0]):
-		p1_char_display.modulate = Color(0.35, 0.35, 0.35)
+		_play_defeat(0)
 	if bool(dead[1]):
-		p2_char_display.modulate = Color(0.35, 0.35, 0.35)
+		_play_defeat(1)
 
 	await get_tree().create_timer(action_phase_duration).timeout
 	stage.set_focus(false)   # 动作结束 → 镜头回正中
@@ -2481,11 +2481,22 @@ func _finisher_impact(target_player: int, dmg_half: int) -> void:
 	var tw := create_tween()
 	tw.tween_property(cd, "scale", Vector2.ONE * (FINISHER_SCALE * 1.08), 0.06).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	tw.tween_property(cd, "scale", Vector2.ONE * FINISHER_SCALE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	cd.modulate = Color(0.35, 0.35, 0.35)   # 阵亡变灰（与普通路径一致）
+	_play_defeat(target_player)   # 死亡演出（与普通路径一致）·慢放下 defeat 帧自然慢速展开
 	var tw2 := create_tween()
 	tw2.tween_property(cd, "position:y", cd.position.y + 14.0, 0.3).set_trans(Tween.TRANS_SINE)
 	_fin_impact_tweens.append(tw)
 	_fin_impact_tweens.append(tw2)
+
+
+## 死亡演出：有 defeat 表=播倒地帧动画（非循环停末帧·管线=import_hero_batch _defeat 线）；
+## 无表=阵亡变灰保底（旧路径·试点表入库前全员走此路）。换人后 _update_character_displays
+## 重载新英雄 idle + modulate 复位，两条路都被自然接管。
+func _play_defeat(player: int) -> void:
+	var cd := _cd(player)
+	if cd.has_action_anim("defeat"):
+		cd.play_animation("defeat", false)
+	else:
+		cd.modulate = Color(0.35, 0.35, 0.35)
 
 
 func _cd(player: int) -> CharacterDisplay:

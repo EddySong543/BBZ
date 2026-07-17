@@ -1,24 +1,31 @@
 extends SceneTree
 
-## 英雄美术批量导入（2026-07-15·import_h01_attack 泛化版·Eddy 两大波资产）：
-## 处理 assets/import 里的 hXX_attack.png（攻击 sheet）与 hXX.png（MJ 全身立绘）。
+## 英雄美术批量导入（2026-07-15·import_h01_attack 泛化版·Eddy 两大波资产；
+## 2026-07-17 扩 defeat 死亡表——同管线同规格·打地基批）：
+## 处理 assets/import 里的 hXX_attack.png（攻击 sheet）/ hXX_defeat.png（死亡 sheet）
+## 与 hXX.png（MJ 全身立绘）。
 ## 用法（三阶段·prep 与 build 之间必须 --import 注册新 png）：
 ##   godot --headless --path . --script res://tools/import_hero_batch.gd -- --phase scan
 ##   godot --headless --path . --script res://tools/import_hero_batch.gd -- --phase prep
 ##   godot --headless --path . --import
 ##   godot --headless --path . --script res://tools/import_hero_batch.gd -- --phase build
+##   godot --headless --path . --script res://tools/import_hero_batch.gd -- --phase verify
 ## scan：只报尺寸/格径/逐格空帧表（不写盘·先看清再动手）。
-## prep：攻击 sheet 128 格→2× 最近邻放大成 256 格（h01 先例）→ heroes/hXX/hXX_attack.png；
+## prep：sheet 128 格→2× 最近邻放大成 256 格（h01 先例）→ heroes/hXX/hXX_attack|defeat.png；
 ##       立绘原样落 heroes/hXX/hXX.png（旧版被覆盖·git 有历史）。⚠不动 import 原件（清理另议）。
-## build：切 256 格跳全透明帧→追加 "attack" 进 hXX_idle.tres（非循环·fps=帧数/0.6s 对齐
-##        action_phase·h01 先例）——battle 侧 has_action_anim("attack") 自动吃上，零代码改动。
-##        h19 尾帧空白=靠跳空帧自动裁掉（Eddy 交代·scan 先验证确实全透明）。
+## build：切 256 格跳全透明帧→追加 "attack"/"defeat" 进 hXX_idle.tres（均非循环）。
+##        attack fps=帧数/0.6s 对齐 action_phase（h01 先例）；defeat fps=帧数/0.7s
+##        （倒地读得清·终结演出慢放窗口内能放完）·停末帧靠 play_animation(false)。
+##        battle 侧 has_action_anim() 自动吃上，零代码改动。尾帧空白=跳空帧自动裁掉。
+## verify：新表验收铁律（h02/h07/h11 实测定标）——首帧与 idle 站姿同尺寸同坐标
+##        （首格 alpha bbox 全等）。范围=本批 import 区里的表（对照 DST 落位后的成品图）。
 
 const IMPORT_DIR := "res://assets/import/"
 const DST := "res://assets/sprites/heroes/"
 const CELL := 256
 const COLS := 4
 const ACTION_PHASE := 0.6
+const DEFEAT_PHASE := 0.7
 # h19 走专段（--phase h19）：原件=GPT 生图未过管线（棋盘假透明+7 姿势松散摆放非严格网格·
 # 人物≈2× 大）——通用 prep/build 会切出 16 帧棋盘垃圾，必须排除。
 const SPECIAL: Array = ["h19"]
@@ -38,6 +45,8 @@ func _initialize() -> void:
 			ok = _prep()
 		"build":
 			ok = _build()
+		"verify":
+			ok = _verify()
 		"h19":
 			ok = _prep_h19()
 		_:
@@ -47,9 +56,10 @@ func _initialize() -> void:
 	quit(0 if ok else 1)
 
 
-## import 区清点：攻击表 [id]=文件名 / 立绘 [id]=文件名。
+## import 区清点：攻击表/死亡表/立绘 各 [id]=文件名。
 func _list_batch() -> Dictionary:
 	var attacks := {}
+	var defeats := {}
 	var arts := {}
 	var da := DirAccess.open(IMPORT_DIR)
 	if da == null:
@@ -60,35 +70,48 @@ func _list_batch() -> Dictionary:
 	while f != "":
 		if f.match("h??_attack.png"):
 			attacks[f.substr(0, 3)] = f
+		elif f.match("h??_defeat.png"):
+			defeats[f.substr(0, 3)] = f
 		elif f.match("h??.png"):
 			arts[f.substr(0, 3)] = f
 		f = da.get_next()
 	da.list_dir_end()
-	return {attacks = attacks, arts = arts}
+	return {attacks = attacks, defeats = defeats, arts = arts}
+
+
+## 表种类 → 动画名（文件后缀与动画名一致：attacks→attack / defeats→defeat）。
+const SHEET_KINDS: Array = ["attacks", "defeats"]
+
+
+static func _anim_of(kind: String) -> String:
+	return kind.trim_suffix("s")
 
 
 func _scan() -> bool:
 	var batch := _list_batch()
-	var attacks: Dictionary = batch["attacks"]
 	var arts: Dictionary = batch["arts"]
-	print("攻击表 %d 张 / 立绘 %d 张" % [attacks.size(), arts.size()])
-	for id: String in _sorted(attacks):
-		var img := Image.load_from_file(ProjectSettings.globalize_path(IMPORT_DIR + attacks[id]))
-		if img == null:
-			print("[attack] %s: 加载失败" % id)
-			continue
-		var cell: int = img.get_width() / COLS
-		var rows: int = img.get_height() / cell
-		var empties: Array = []
-		var filled := 0
-		for r in rows:
-			for c in COLS:
-				if _cell_empty(img, c * cell, r * cell, cell):
-					empties.append("r%dc%d" % [r, c])
-				else:
-					filled += 1
-		print("[attack] %s: %dx%d 格径=%d 网格=%dx%d 实帧=%d 空格=%s"
-				% [id, img.get_width(), img.get_height(), cell, COLS, rows, filled, str(empties)])
+	print("攻击表 %d 张 / 死亡表 %d 张 / 立绘 %d 张"
+			% [batch["attacks"].size(), batch["defeats"].size(), arts.size()])
+	for kind: String in SHEET_KINDS:
+		var sheets: Dictionary = batch[kind]
+		var tag := _anim_of(kind)
+		for id: String in _sorted(sheets):
+			var img := Image.load_from_file(ProjectSettings.globalize_path(IMPORT_DIR + sheets[id]))
+			if img == null:
+				print("[%s] %s: 加载失败" % [tag, id])
+				continue
+			var cell: int = img.get_width() / COLS
+			var rows: int = img.get_height() / cell
+			var empties: Array = []
+			var filled := 0
+			for r in rows:
+				for c in COLS:
+					if _cell_empty(img, c * cell, r * cell, cell):
+						empties.append("r%dc%d" % [r, c])
+					else:
+						filled += 1
+			print("[%s] %s: %dx%d 格径=%d 网格=%dx%d 实帧=%d 空格=%s"
+					% [tag, id, img.get_width(), img.get_height(), cell, COLS, rows, filled, str(empties)])
 	for id: String in _sorted(arts):
 		var img := Image.load_from_file(ProjectSettings.globalize_path(IMPORT_DIR + arts[id]))
 		if img == null:
@@ -102,25 +125,27 @@ func _scan() -> bool:
 func _prep() -> bool:
 	var batch := _list_batch()
 	var ok := true
-	for id: String in _sorted(batch["attacks"]):
-		if id in SPECIAL:
-			print("[prep-attack] %s: 专段处理（--phase h19）·通用线跳过" % id)
-			continue
-		var img := Image.load_from_file(ProjectSettings.globalize_path(IMPORT_DIR + batch["attacks"][id]))
-		if img == null:
-			ok = false
-			continue
-		var cell: int = img.get_width() / COLS
-		if cell == 128:
-			img.resize(img.get_width() * 2, img.get_height() * 2, Image.INTERPOLATE_NEAREST)
-		elif cell != CELL:
-			push_error("%s: 非常规格径 %d（既非 128 也非 256）·跳过" % [id, cell])
-			ok = false
-			continue
-		var out := ProjectSettings.globalize_path("%s%s/%s_attack.png" % [DST, id, id])
-		var err := img.save_png(out)
-		print("[prep-attack] %s: → %dx%d (err=%d)" % [id, img.get_width(), img.get_height(), err])
-		ok = ok and err == OK
+	for kind: String in SHEET_KINDS:
+		var tag := _anim_of(kind)
+		for id: String in _sorted(batch[kind]):
+			if kind == "attacks" and id in SPECIAL:
+				print("[prep-attack] %s: 专段处理（--phase h19）·通用线跳过" % id)
+				continue
+			var img := Image.load_from_file(ProjectSettings.globalize_path(IMPORT_DIR + batch[kind][id]))
+			if img == null:
+				ok = false
+				continue
+			var cell: int = img.get_width() / COLS
+			if cell == 128:
+				img.resize(img.get_width() * 2, img.get_height() * 2, Image.INTERPOLATE_NEAREST)
+			elif cell != CELL:
+				push_error("%s: 非常规格径 %d（既非 128 也非 256）·跳过" % [id, cell])
+				ok = false
+				continue
+			var out := ProjectSettings.globalize_path("%s%s/%s_%s.png" % [DST, id, id, tag])
+			var err := img.save_png(out)
+			print("[prep-%s] %s: → %dx%d (err=%d)" % [tag, id, img.get_width(), img.get_height(), err])
+			ok = ok and err == OK
 	for id: String in _sorted(batch["arts"]):
 		var img := Image.load_from_file(ProjectSettings.globalize_path(IMPORT_DIR + batch["arts"][id]))
 		if img == null:
@@ -184,48 +209,83 @@ func _flood_cutout(img: Image, tol: float = 0.055) -> int:
 func _build() -> bool:
 	var batch := _list_batch()
 	var ok := true
-	for id: String in _sorted(batch["attacks"]):
-		var png := "%s%s/%s_attack.png" % [DST, id, id]
-		var tres := "%s%s/%s_idle.tres" % [DST, id, id]
-		if not ResourceLoader.exists(png):
-			push_error("%s: 放大图未注册（先跑 --import）" % id)
-			ok = false
-			continue
-		if not ResourceLoader.exists(tres):
-			push_error("%s: idle.tres 不存在" % id)
-			ok = false
-			continue
-		var tex: Texture2D = load(png)
-		var img := Image.load_from_file(ProjectSettings.globalize_path(png))
-		var sf: SpriteFrames = load(tres)
-		if tex == null or img == null or sf == null:
-			push_error("%s: 资源加载失败" % id)
-			ok = false
-			continue
-		if sf.has_animation("attack"):
-			sf.remove_animation("attack")
-		sf.add_animation("attack")
-		sf.set_animation_loop("attack", false)
-		var rows: int = img.get_height() / CELL
-		var frames := 0
-		for r in rows:
-			for c in COLS:
-				if _cell_empty(img, c * CELL, r * CELL, CELL):
-					continue
-				var atlas := AtlasTexture.new()
-				atlas.atlas = tex
-				atlas.region = Rect2(c * CELL, r * CELL, CELL, CELL)
-				sf.add_frame("attack", atlas)
-				frames += 1
-		if frames == 0:
-			push_error("%s: attack 无有效帧" % id)
-			ok = false
-			continue
-		var fps: float = float(frames) / ACTION_PHASE
-		sf.set_animation_speed("attack", fps)
-		var err := ResourceSaver.save(sf, tres)
-		print("[build] %s: attack %d 帧·%.1f fps → %s (err=%d)" % [id, frames, fps, tres, err])
-		ok = ok and err == OK
+	for kind: String in SHEET_KINDS:
+		var anim := _anim_of(kind)
+		var phase: float = ACTION_PHASE if anim == "attack" else DEFEAT_PHASE
+		for id: String in _sorted(batch[kind]):
+			ok = _build_anim(id, anim, phase) and ok
+	return ok
+
+
+## 把落位成品 sheet 切帧追加为 hXX_idle.tres 里的一条非循环动画（attack/defeat 共用）。
+func _build_anim(id: String, anim: String, phase: float) -> bool:
+	var png := "%s%s/%s_%s.png" % [DST, id, id, anim]
+	var tres := "%s%s/%s_idle.tres" % [DST, id, id]
+	if not ResourceLoader.exists(png):
+		push_error("%s: %s 放大图未注册（先跑 --import）" % [id, anim])
+		return false
+	if not ResourceLoader.exists(tres):
+		push_error("%s: idle.tres 不存在" % id)
+		return false
+	var tex: Texture2D = load(png)
+	var img := Image.load_from_file(ProjectSettings.globalize_path(png))
+	var sf: SpriteFrames = load(tres)
+	if tex == null or img == null or sf == null:
+		push_error("%s: 资源加载失败" % id)
+		return false
+	if sf.has_animation(anim):
+		sf.remove_animation(anim)
+	sf.add_animation(anim)
+	sf.set_animation_loop(anim, false)
+	var rows: int = img.get_height() / CELL
+	var frames := 0
+	for r in rows:
+		for c in COLS:
+			if _cell_empty(img, c * CELL, r * CELL, CELL):
+				continue
+			var atlas := AtlasTexture.new()
+			atlas.atlas = tex
+			atlas.region = Rect2(c * CELL, r * CELL, CELL, CELL)
+			sf.add_frame(anim, atlas)
+			frames += 1
+	if frames == 0:
+		push_error("%s: %s 无有效帧" % [id, anim])
+		return false
+	var fps: float = float(frames) / phase
+	sf.set_animation_speed(anim, fps)
+	var err := ResourceSaver.save(sf, tres)
+	print("[build] %s: %s %d 帧·%.1f fps → %s (err=%d)" % [id, anim, frames, fps, tres, err])
+	return err == OK
+
+
+## 验收铁律核验（本批 import 区范围）：成品 sheet 首格 alpha bbox 必须与 idle 首格全等
+## （=首帧站姿同尺寸同坐标·衔接零跳变）。不等=FAILED·按 h19 法人工定标后重跑。
+func _verify() -> bool:
+	var batch := _list_batch()
+	var ok := true
+	var checked := 0
+	for kind: String in SHEET_KINDS:
+		var anim := _anim_of(kind)
+		for id: String in _sorted(batch[kind]):
+			var idle_png := ProjectSettings.globalize_path("%s%s/%s_idle.png" % [DST, id, id])
+			var sheet_png := ProjectSettings.globalize_path("%s%s/%s_%s.png" % [DST, id, id, anim])
+			var idle := Image.load_from_file(idle_png)
+			var sheet := Image.load_from_file(sheet_png)
+			if idle == null or sheet == null:
+				push_error("[verify] %s %s: 图缺失（idle=%s sheet=%s）"
+						% [id, anim, str(idle != null), str(sheet != null)])
+				ok = false
+				continue
+			var ib := _alpha_bbox(idle, Rect2i(0, 0, CELL, CELL))
+			var sb := _alpha_bbox(sheet, Rect2i(0, 0, CELL, CELL))
+			checked += 1
+			if sb == ib:
+				print("[verify] %s %s: 首帧 %s = idle ✓零偏差" % [id, anim, sb])
+			else:
+				print("[verify] %s %s: ⚠首帧 %s ≠ idle %s（偏移 Δpos=%s Δsize=%s）"
+						% [id, anim, sb, ib, sb.position - ib.position, sb.size - ib.size])
+				ok = false
+	print("[verify] 共核验 %d 张" % checked)
 	return ok
 
 
