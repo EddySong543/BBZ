@@ -14,6 +14,7 @@ const BATTLE_SCENE := "res://src/ui/battle_screen.tscn"
 const HERO_DATA_DIR := "res://assets/data/heroes/"
 const StoryCatalog := preload("res://src/story/story_catalog.gd")
 const StoryProgress := preload("res://src/story/story_progress.gd")
+const RESULT_PANEL_SCRIPT := preload("res://src/ui/components/story_result_panel.gd")   # 结算浮层骨架（2026-07-17）
 
 # ── 家族资产（图鉴/资料/设置同源）──
 const PLAQUE_TEX := preload("res://assets/ui/ui_plaque.png")
@@ -35,8 +36,7 @@ const SHADOW_TINT := Color(0.10, 0.07, 0.05, 0.38)
 const BANNER := Rect2(806, 46, 308, 78)          # 悬挂牌匾（家族同位）
 const FOCUS_WARM := Color(1.18, 1.10, 0.98)      # 键盘焦点=框身轻暖提亮（图鉴选中同值）
 
-const COL_CLEARED := Color(0.62, 0.92, 0.55)     # 回程通告绿（浮字自带深描边·底无关）
-const COL_INFO := Color(0.87, 0.85, 0.82)
+# （旧回程通告色 COL_CLEARED/COL_INFO 已随 toast 退役——结算浮层色板在组件内）
 
 # ── 简介浮层几何 ──
 const INTRO_W := 940.0
@@ -46,6 +46,8 @@ var _levels: Array = []
 var _progress := StoryProgress.new()
 var _intro_layer: Control = null   # 简介浮层（开着时非空·ui_cancel 可关）
 var _book_layer: Control = null    # 卷轴实体（入场上浮层）
+var _result_panel: Control = null  # 结算浮层骨架（懒建复用·2026-07-17）
+var _result_level: Dictionary = {} # 结算对应关卡（再战钮重开用）
 
 @onready var _categories: HBoxContainer = $Categories
 
@@ -216,6 +218,8 @@ func _apply_nav_plate(btn: Button, locked: bool = false) -> void:
 # ============================================================
 
 ## 回程结算：battle_screen 写的 story_result 消费后自清（远征同款）。胜=记通关+存档。
+## 提示升级（2026-07-17 打地基批·任务10 子项）：顶部 toast 退役 → 结算浮层骨架
+## （story_result_panel·胜=继续/负=再战·奖励占位口）。deferred 弹=等 _build_columns 完成。
 func _consume_battle_result() -> void:
 	var r: Dictionary = BattleSetup.story_result
 	if r.is_empty():
@@ -224,13 +228,27 @@ func _consume_battle_result() -> void:
 	var lv: Dictionary = StoryCatalog.find_level(_levels, String(r.get("level_id", "")))
 	if lv.is_empty():
 		return
-	var title: String = String(lv.get("title", ""))
-	if String(r.get("outcome", "")) == "win":
+	var outcome: String = String(r.get("outcome", ""))
+	if outcome == "win":
 		_progress.mark_cleared(String(lv["id"]))
 		_progress.save_to_disk()
-		_toast(tr("「%s」通关！") % tr(title), COL_CLEARED)
-	else:
-		_toast(tr("「%s」未通关，再试一次") % tr(title), COL_INFO)
+	_show_result_panel.call_deferred(lv, outcome)
+
+
+## 弹结算浮层（懒建单例·浮层常驻复用）。继续=关浮层重建列表恢复焦点；再战=直接重开该关。
+func _show_result_panel(lv: Dictionary, outcome: String) -> void:
+	if _result_panel == null:
+		_result_panel = RESULT_PANEL_SCRIPT.new()
+		_result_panel.name = "StoryResultPanel"
+		add_child(_result_panel)
+		_result_panel.continue_pressed.connect(func() -> void:
+			_result_panel.close()
+			_build_columns())   # 重建=恢复列表焦点（键盘/手柄可达）
+		_result_panel.retry_pressed.connect(func() -> void:
+			_result_panel.close()
+			_start_battle(_result_level))
+	_result_level = lv
+	_result_panel.show_result(String(lv.get("title", "")), outcome, lv.get("rewards", []))
 
 
 ## 四类纵列：章头墨字+通关计数+细墨线 + 关卡钮（✓=已通关泥金·【锁】=前置未通关禁用）。
@@ -527,21 +545,4 @@ func _play_intro() -> void:
 	ta.tween_property(_categories, "modulate:a", 1.0, 0.35)
 
 
-## 顶部通告（回程结算提示）：淡入停留淡出（浮字自带深描边·任意底可读）。
-func _toast(text: String, col: Color) -> void:
-	var lbl := Label.new()
-	lbl.text = text
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.add_theme_color_override("font_color", col)
-	lbl.add_theme_color_override("font_outline_color", Color(0.06, 0.05, 0.04, 0.9))
-	lbl.add_theme_constant_override("outline_size", 6)
-	FontManager.apply(lbl, 24)
-	lbl.position = Vector2(0, 136)
-	lbl.size = Vector2(1920, 40)
-	lbl.modulate.a = 0.0
-	add_child(lbl)
-	var tw := create_tween()
-	tw.tween_property(lbl, "modulate:a", 1.0, 0.25)
-	tw.tween_interval(2.2)
-	tw.tween_property(lbl, "modulate:a", 0.0, 0.5)
-	tw.tween_callback(lbl.queue_free)
+# （旧顶部 toast 已随结算浮层骨架退役——2026-07-17 打地基批·见 _show_result_panel）
