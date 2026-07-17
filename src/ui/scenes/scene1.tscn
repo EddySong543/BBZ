@@ -309,6 +309,38 @@ turbulence_enabled = true
 turbulence_noise_strength = 2.6
 turbulence_noise_scale = 1.4
 
+[sub_resource type="ParticleProcessMaterial" id="EmberFarMat"]
+emission_shape = 3
+emission_box_extents = Vector3(900, 130, 1)
+direction = Vector3(0, -1, 0)
+spread = 20.0
+initial_velocity_min = 2.0
+initial_velocity_max = 6.0
+gravity = Vector3(0, -2, 0)
+scale_min = 0.22
+scale_max = 0.65
+color = Color(0.85, 0.91, 1, 0.38)
+color_ramp = SubResource("DustRamp")
+turbulence_enabled = true
+turbulence_noise_strength = 1.6
+turbulence_noise_scale = 1.1
+
+[sub_resource type="ParticleProcessMaterial" id="EmberNearMat"]
+emission_shape = 3
+emission_box_extents = Vector3(940, 150, 1)
+direction = Vector3(0, -1, 0)
+spread = 24.0
+initial_velocity_min = 8.0
+initial_velocity_max = 18.0
+gravity = Vector3(0, -8, 0)
+scale_min = 2.0
+scale_max = 3.4
+color = Color(1, 1, 1, 0.5)
+color_ramp = SubResource("DustRamp")
+turbulence_enabled = true
+turbulence_noise_strength = 3.2
+turbulence_noise_scale = 1.6
+
 [sub_resource type="ShaderMaterial" id="SmokeFrontMat"]
 shader = ExtResource("24_darksmoke")
 shader_parameter/fill_color = Color(0.14, 0.17, 0.24, 1)
@@ -487,6 +519,17 @@ color = Color(0, 0, 0, 0)
 metadata/parallax_factor = 0.5
 metadata/_edit_lock_ = true
 
+[node name="EmberFar" type="GPUParticles2D" parent="." unique_id=171542228]
+material = SubResource("EmberBlend")
+position = Vector2(960, 560)
+amount = 26
+texture = SubResource("DustTex")
+lifetime = 12.0
+preprocess = 9.0
+local_coords = true
+process_material = SubResource("EmberFarMat")
+metadata/parallax_factor = 0.5
+
 [node name="RooftopL" type="TextureRect" parent="." unique_id=111504973]
 self_modulate = Color(0.4, 0.46, 0.6, 1)
 texture_filter = 2
@@ -646,6 +689,17 @@ preprocess = 5.0
 local_coords = true
 process_material = SubResource("EmberMat")
 metadata/parallax_factor = 1.1
+
+[node name="EmberNear" type="GPUParticles2D" parent="." unique_id=171542229]
+material = SubResource("EmberBlend")
+position = Vector2(960, 940)
+amount = 10
+texture = SubResource("DustTex")
+lifetime = 6.0
+preprocess = 5.0
+local_coords = true
+process_material = SubResource("EmberNearMat")
+metadata/parallax_factor = 1.5
 
 [node name="SmokeFront" type="ColorRect" parent="." unique_id=815041195]
 material = SubResource("SmokeFrontMat")
