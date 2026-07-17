@@ -329,3 +329,22 @@ func test_match_room_snapshot_hides_opponent_draft_options() -> void:
 	var theirs: Array = snap1["slots"][0][0]["draft"]
 	assert_eq(mine.size(), 1, "本人应看到自己的候选")
 	assert_eq(theirs.size(), 0, "对手侧快照的候选必须剥空")
+
+
+func test_match_room_reconnect_during_death_switch_restores_phase() -> void:
+	# Arrange（2026-07-17 审计修复）：DEATH_SWITCH 期没有 turn_begin 可跟——重连快照
+	# 必须恢复相位，否则客户端只能干等服务器超时代选。夹具直设房间/引擎态。
+	var t := _table(5)
+	_pump(t)
+	var room: MatchRoom = t.room
+	room.phase = MatchRoom.Phase.DEATH_SWITCH
+	room.battle.pending_death_switch = [true, false]
+
+	# Act：双方各自重连 resync
+	(t.clients[0] as MatchClient).request_resync()
+	(t.clients[1] as MatchClient).request_resync()
+	_pump(t)
+
+	# Assert：待换人方恢复 death_switch·对方=waiting（等对面选）
+	assert_eq((t.clients[0] as MatchClient).phase, "death_switch", "pending 方重连应直接回到选替补")
+	assert_eq((t.clients[1] as MatchClient).phase, "waiting", "非 pending 方重连=等待对面")

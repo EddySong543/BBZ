@@ -32,6 +32,8 @@ Godot 导出时可用 256 位 AES 密钥加密 PCK 里的脚本与资源。解�
    - 「加密」页勾选 *Encrypt Exported PCK* 与 *Encrypt Index*
    - 「脚本导出模式」保持二进制 token（4.x 默认）
    - 过滤器把 `*.gd` 之外的敏感数据文件（如 `assets/data/**`）也纳入加密
+   - **排除过滤器加 `src/ui/debug/**` 与 `tools/**`**（调试面板运行时已双门禁用，但脚本
+     本体不排除会进 release 包——2026-07-17 审计；tools 全是开发管线脚本同理）
 
 4. **验证**：导出后用 PCK 提取工具（如 godotpcktool）尝试解包——应报错/得到密文。
 

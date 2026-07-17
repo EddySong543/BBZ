@@ -409,7 +409,10 @@ func _state_value(b: BattleCore, perspective: int, depth: int) -> float:
 ## （波被"防"挡、大波被"大防"挡，错配则穿）。深层矩阵 ~5×5→~7×7（约 2× 慢），换取深层评估更全面。
 func _shortlist(b: BattleCore, player: int) -> Array:
 	var out: Array = []
-	out.append({action = ActionDef.Action.CHARGE, target = -1})   # 攒恒合法
+	# 攒也过 can_afford（2026-07-17 审计修复）：锁招拍（h17 阖眸成夜·锁定动作可执行时）
+	# 攒非法——旧"攒恒合法"假设早于锁招机制·非法行会稀释深层收益矩阵。
+	if b.can_afford(player, ActionDef.Action.CHARGE):
+		out.append({action = ActionDef.Action.CHARGE, target = -1})
 	for a in [ActionDef.Action.ATTACK, ActionDef.Action.BIG_ATTACK,
 			ActionDef.Action.DEFEND, ActionDef.Action.BIG_DEFEND]:
 		if b.can_afford(player, a):
@@ -428,15 +431,16 @@ func _shortlist(b: BattleCore, player: int) -> Array:
 			out.append({action = ActionDef.ACTIVE, target = pull})
 		else:
 			out.append({action = ActionDef.ACTIVE, target = -1})
-	# 最优切换（换到血最高替补）
-	var best_sw := -1
-	var best_hp := -1
-	for s in b.living_reserves(player):
-		if b.hp[player][s] > best_hp:
-			best_hp = b.hp[player][s]
-			best_sw = s
-	if best_sw >= 0:
-		out.append({action = ActionDef.Action.SWITCH, target = best_sw})
+	# 最优切换（换到血最高替补）——同过 can_afford（锁招/缠绕 h18 期切换非法·同批修复）
+	if b.can_afford(player, ActionDef.Action.SWITCH):
+		var best_sw := -1
+		var best_hp := -1
+		for s in b.living_reserves(player):
+			if b.hp[player][s] > best_hp:
+				best_hp = b.hp[player][s]
+				best_sw = s
+		if best_sw >= 0:
+			out.append({action = ActionDef.Action.SWITCH, target = best_sw})
 	return out
 
 

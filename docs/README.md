@@ -44,6 +44,8 @@
 |------|------|
 | [`ADR-002-battle-core-v4-architecture.md`](architecture/ADR-002-battle-core-v4-architecture.md) | **v4 战斗核心架构决议**（英雄重写，已全部落地） |
 | [`ADR-001-battlecore-boundary.md`](architecture/ADR-001-battlecore-boundary.md) | BattleCore 职责边界（v3 时代历史决策，边界原则由 v4 延续） |
+| [`ADR-003-item-system.md`](architecture/ADR-003-item-system.md) | 道具系统架构（槽位状态机 / 经济 / 结算序） |
+| [`ADR-004-online-pvp-readiness.md`](architecture/ADR-004-online-pvp-readiness.md) | **联机 PvP 真相源**（权威模型 / 里程碑 M1-M2f / 迁移路线） |
 | [`battlecore-risk-notes.md`](architecture/battlecore-risk-notes.md) | 短文档 — 关键隐式规则与未来重构原则 |
 
 ### 流程 / 协作（`docs/`）
@@ -63,7 +65,7 @@
 
 | 位置 | 定位 |
 |------|------|
-| `tests/unit/battle/{v4,ai}/*.gd`（14 文件） | **当前 v4 行为的真相源**（GUT，221 测试 / 668 断言全绿） |
+| `tests/unit/{battle,net,core,story,ui,expedition}/**/*.gd`（38 脚本） | **当前行为的真相源**（GUT·423 用例 / 1530 断言全绿·2026-07-17·精确数以实跑为准） |
 | `tests/BEHAVIOR_NOTES.md` | 行为锁定笔记（含 v3 历史溯源） |
 
 ---

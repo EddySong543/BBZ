@@ -82,6 +82,18 @@ func _on_msg(d: Dictionary) -> void:
 			_take_snap(d)
 			if snap.has("turn_number"):
 				turn = int(snap["turn_number"])
+			# 重连相位恢复（2026-07-17 审计修复·房间 Phase{0=SELECT,1=DEATH_SWITCH,2=OVER}）：
+			# DEATH_SWITCH 期没有 turn_begin 可跟——不恢复=UI 干等服务器超时代选。
+			# pending 数组为绝对视角（本层不翻转）·you 直接索引。
+			match int(d.get("phase", 0)):
+				1:
+					var pend: Array = snap.get("pending_death_switch", [false, false])
+					phase = "death_switch" if (you >= 0 and bool(pend[you])) else "waiting"
+				2:
+					phase = "over"
+					winner = int(snap.get("winner", winner))
+				_:
+					pass   # SELECT：房间随后必补发 turn_begin → phase="select"（原路径不动）
 		"error":
 			var detail := String(d.get("detail", ""))   # 可选附加信息（如 bad_version 附房主版本）
 			errors.append(String(d.get("code", "")) + ("" if detail.is_empty() else ":" + detail))

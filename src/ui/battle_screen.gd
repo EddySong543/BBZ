@@ -34,8 +34,10 @@ const HERO_DATA_DIR := "res://assets/data/heroes/"
 const DEFAULT_P0 := ["h01", "h05", "h06"]   # 子鼠 / 辰龙 / 巳蛇（首发 12 生肖）
 const DEFAULT_P1 := ["h02", "h09", "h12"]   # 丑牛 / 申猴 / 亥猪（首发 12 生肖）
 
-## 左侧调试测试按钮（满能量/满血/造伤/加盾）。发布或联机前设 false（或删整块）。
-## 仅本地调试：直接改 BattleCore 状态后刷新，不走战斗结算管线。
+## 左侧调试测试按钮（满能量/满血/造伤/加盾）。仅本地调试：直改 BattleCore 状态后刷新。
+## 运行时双门在 _build_debug_buttons：联机局禁用 + release 模板不建（OS.is_debug_build()）——
+## 本常量=开发期手动总开关无须动。⚠脚本文件仍会进 release 包：发布时导出过滤须排除
+## src/ui/debug/**（已列入 docs/pck-encryption-guide.md 发布清单·2026-07-17 审计）。
 const DEBUG_BUTTONS := true
 const BattleDebugPanel := preload("res://src/ui/debug/battle_debug_panel.gd")   # debug 面板（preload 引用·不靠全局 class_name 注册·headless / CLI 可用）
 const BattleCodexOverlay := preload("res://src/ui/components/battle_codex_overlay.gd")   # 图鉴浮层（同上·preload 引用）
@@ -789,6 +791,13 @@ func _net_pump() -> void:
 		var w: int = int(c.winner)
 		_net_game_over(MatchClientScript.flip_winner(w) if _net_flipped() else w)
 		return
+	# 重连恢复死亡换人（2026-07-17 审计修复）：DEATH_SWITCH 期重连没有 resolve/turn_begin
+	# 可跟——凭快照恢复的 client.phase 直接弹换人浮窗（否则只能干等服务器 20s 代选）。
+	# 正常路径的换人在 _net_play_resolution 内（_net_busy 期）不经此口=不双弹。
+	if String(c.phase) == "death_switch" and state != State.HERO_SELECT \
+			and bool(battle.pending_death_switch[PLAYER]):
+		_net_resume_death_switch()   # async·_net_busy 自守
+		return
 	if String(c.phase) == "select" and int(c.turn) != _net_last_turn \
 			and state != State.PLAYER_SELECT and state != State.TURN_INTRO:
 		_net_last_turn = int(c.turn)
@@ -887,6 +896,13 @@ func _net_play_resolution(msg: Dictionary) -> void:
 		status_label.add_theme_color_override("font_color", Color("#c9c2b4"))
 		status_label.visible = true
 	_net_busy = false   # 新回合由 turn_begin → _net_pump 检测 turn 变化接手
+
+
+## 重连恢复死亡换人（_net_pump 检测 client.phase 触发·_net_busy 挡住期间的重复泵）。
+func _net_resume_death_switch() -> void:
+	_net_busy = true
+	await _net_death_switch()
+	_net_busy = false
 
 
 ## 联机死亡换人：本端选替补 → 上行·服务器执行后 view/turn_begin 快照跟进。
