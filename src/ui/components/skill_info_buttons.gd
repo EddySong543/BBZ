@@ -31,10 +31,11 @@ const POP_DIP := 3.0         # 翻页图标下沉像素（点选下沉同语言�
 const FOLLOW_BACK_DELAY := 2.5   # 悬停结束后多久回落跟随出战英雄（s·立即回跳太急——Eddy）
 
 const JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")
-# 阵营染色（比动作钮压一档饱和：档案柜不是糖果钮）；公共参数抄图鉴钮配方。
-const FILL_TOP: Array[Color] = [Color(0.30, 0.45, 0.66), Color(0.62, 0.34, 0.28)]
-const FILL_BOTTOM: Array[Color] = [Color(0.20, 0.31, 0.48), Color(0.47, 0.24, 0.19)]
-const EDGE_INNER: Array[Color] = [Color(0.55, 0.75, 1.0), Color(1.0, 0.62, 0.50)]
+# 四色版裁色（2026-07-17 配色批·Eddy 批概念稿）：情报钮归纸面工具族（图鉴同身），
+# 敌我只靠阵营色细边（edge_inner）——信息件不占彩色配额。公共参数抄图鉴钮配方。
+const FILL_TOP: Array[Color] = [Color(0.92, 0.87, 0.70), Color(0.92, 0.87, 0.70)]
+const FILL_BOTTOM: Array[Color] = [Color(0.76, 0.68, 0.50), Color(0.76, 0.68, 0.50)]
+const EDGE_INNER: Array[Color] = [Color(0.43, 0.63, 0.88), Color(0.88, 0.52, 0.42)]
 const EDGE_OUTER := Color(0.1, 0.09, 0.11)
 const PIP_ON := Color("ffd86a")                  # 当前英雄=亮金（就绪金同源）
 const PIP_OFF := Color(0.45, 0.41, 0.35, 0.9)    # 其余=暖灰（钮外落在暗夜景上·暗点会隐形）
