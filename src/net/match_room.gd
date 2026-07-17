@@ -34,6 +34,7 @@ const RATE_REFILL_PER_SEC := 10.0    # 每秒回填
 var battle: BattleCore
 var phase: int = Phase.SELECT
 var now_ms: Callable = Callable(Time, "get_ticks_msec")   # 测试注入假时钟
+var _rtk: Array[String] = ["", ""]     # 重连令牌（2026-07-17 审计修复·match_start 只发本人·重连报到必对上）
 var _send: Callable                    # (player:int, msg:Dictionary) -> void
 var _pending: Array = [null, null]     # 本回合已收提交（先到先锁·拒绝重复提交）
 var _deadline_ms: int = 0
@@ -51,10 +52,15 @@ func start(team0: Array, team1: Array, seed_v: int, send_cb: Callable) -> void:
 	_pending = [null, null]
 	_rate_last_ms = [int(now_ms.call()), int(now_ms.call())]
 	_arm_turn_deadline()
+	# 重连令牌（2026-07-17 审计修复）：开局发给各自玩家·中局重连报到必须对上——
+	# 否则原玩家掉线后任何过口令门（公开房=无门）的新连接都能顶席位拿快照+控制权。
+	var crypto := Crypto.new()
+	for p in 2:
+		_rtk[p] = crypto.generate_random_bytes(16).hex_encode()
 	for p in 2:
 		_send.call(p, {v = NetProtocol.PROTO_VERSION, kind = "match_start", you = p,
 			heroes = [_pack_team(0), _pack_team(1)], turn = battle.turn_number, view = _view(),
-			snap = _snap_for(p)})
+			rtk = _rtk[p], snap = _snap_for(p)})
 
 
 ## 传输层入口：一切客户端包从这进。防洪（零道门）→ 协议校验（一道门）→ 回合号校验 → 业务校验（二道门）。
@@ -69,6 +75,11 @@ func handle(player: int, msg: Variant) -> void:
 	var kind := String(d["kind"])
 	if kind == "resync" or kind == "hello":
 		# 开局后的 hello = 断线重连报到（阵容字段忽略——阵容在开局时已定死·防中途换队）。
+		# 身份门（2026-07-17 审计修复）：重连令牌必须对上（match_start 只发过本人）——
+		# resync 同过此门·防新连接顶席位后跳过 hello 直接 resync 拿快照。
+		if String(d.get("rtk", "")) != _rtk[player] or _rtk[player].is_empty():
+			_send.call(player, NetProtocol.msg_error("bad_token"))
+			return
 		_send.call(player, {v = NetProtocol.PROTO_VERSION, kind = "snapshot", you = player,
 			phase = phase, snap = _snap_for(player)})
 		if phase == Phase.SELECT:
@@ -170,6 +181,12 @@ func _begin_turn() -> void:
 	for p in 2:
 		_send.call(p, {v = NetProtocol.PROTO_VERSION, kind = "turn_begin",
 			turn = battle.turn_number, view = _view(), snap = _snap_for(p)})
+
+
+## 断线冻结（2026-07-17 审计修复）：deadline 是绝对时间戳——旧行为"断线期不检查"只是不判，
+## 时间照流·重连同帧立即超时被代提交「攒」。真冻结=随断线时长顺延（net_session.pump 断链期喂）。
+func defer_deadline(ms: int) -> void:
+	_deadline_ms += maxi(0, ms)
 
 
 func _arm_turn_deadline() -> void:

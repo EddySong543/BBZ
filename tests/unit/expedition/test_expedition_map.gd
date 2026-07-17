@@ -176,3 +176,22 @@ func test_map_recruit_caps_at_three() -> void:
 	assert_ne(m.recruit(), "")
 	assert_eq(m.recruit(), "", "满 3 人后招募返回空")
 	assert_eq(m.team.size(), 3)
+
+
+func test_map_start_never_boxed_in_softlock_guard() -> void:
+	# 审计修复（2026-07-17 三轮⑤·≈0.8%/局）：起点三邻各 20% 独立成墙——三墙同出时
+	# 撤离点会连环盖到起点·撤离又只在「移动进入」触发=既动不了也撤不了。
+	# 保底=确定性凿开右邻。500 种子扫描（期望原软锁种子约 4 个·修复后全可动）。
+	var locked: Array = []
+	for seed_v: int in range(500):
+		var m: MapState = _make(seed_v)
+		var s: Vector2i = m.start_pos
+		var open := false
+		for d: Vector2i in [Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			var n: Vector2i = s + d
+			if n.y >= 0 and n.y < MapState.SIZE and m.grid[n.y][n.x] != MapState.Tile.WALL:
+				open = true
+				break
+		if not open:
+			locked.append(seed_v)
+	assert_eq(locked, [], "被三墙围死的软锁种子: %s" % str(locked))

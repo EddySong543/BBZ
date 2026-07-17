@@ -1532,6 +1532,16 @@ func resolve() -> Dictionary:
 		hp[0][oa] -= drain
 		hp[1][ob] -= drain
 		events.append({id = "overtime_sudden_death", drain = drain})
+		# 标准事件补发（2026-07-17 审计修复）：直写 HP 原本不发 damage_taken/hero_died——
+		# UI 演出全靠这两个事件驱动（A3a），缺了=血条突跳、无掉血/死亡演出（"零特判"注释不实）。
+		# 不走 _apply_damage（骤死=无视防御/护盾/on-hit·语义就是直扣），只补事件落账。
+		if drain > 0:
+			events.append({id = "damage_taken", player = 0, amount = drain, src = "overtime", pen = ActionDef.Pen.TRUE_DMG})
+			events.append({id = "damage_taken", player = 1, amount = drain, src = "overtime", pen = ActionDef.Pen.TRUE_DMG})
+		if hp[0][oa] <= 0:
+			events.append({id = "hero_died", player = 0, slot = oa})
+		if hp[1][ob] <= 0:
+			events.append({id = "hero_died", player = 1, slot = ob})
 		var od0 := alive_count(0) == 0
 		var od1 := alive_count(1) == 0
 		if od0 and od1:

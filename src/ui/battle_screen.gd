@@ -241,6 +241,9 @@ func _ready() -> void:
 	if _net:
 		# 联机局（M1）：本地不建局——镜像=服务器权威快照（阵容/经济/随机流全在内·加入方视角已翻转）
 		BattleSetup.reset()
+		# 重连令牌转存（2026-07-17 身份门）：match_start 下发·跨场景留底——断线后大厅重连
+		# 用新 client 报到时凭它取回席位（没有它=任何过口令门的连接都能顶号）。
+		BattleSetup.net_rtk = String(BattleSetup.net_session.client.rtk)
 		_net_sync_latest()
 		_net_last_turn = battle.turn_number
 	elif _pve:

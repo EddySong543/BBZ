@@ -29,6 +29,7 @@ var story_result: Dictionary = {}     # {level_id:String, outcome:"win"|"lose"|"
 # 大厅屏创建（net_session.gd）→ battle_screen 消费（每帧 pump·退场 close+置空）。
 # ⚠ 不入 reset()：联机局生命周期由大厅/battle_screen 显式管理（reset 是"阵容消费即清"语义）。
 var net_session: RefCounted = null    # null=本地局；非空=联机局（battle_screen 走镜像+协议驱动）
+var net_rtk := ""                     # 重连令牌（2026-07-17 身份门·battle_screen 从 match_start 转存·大厅重连 hello 带上·开新局被覆盖）
 
 
 ## 清空阵容。被 battle_screen 消费后 / 一局结束 / 返回菜单时调用，

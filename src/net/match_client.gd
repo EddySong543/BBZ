@@ -25,6 +25,7 @@ var snap_rev: int = 0                # 快照版本号（UI 检测"有新快照�
 var winner: int = -99
 var errors: Array[String] = []       # 服务器拒绝记录（UI 提示/调试）
 var snapshot: Dictionary = {}        # resync 收到的重连快照
+var rtk := ""                        # 重连令牌（match_start 下发·重连报到/要快照必带·2026-07-17 身份门）
 
 
 func _init(t: Variant) -> void:
@@ -49,6 +50,7 @@ func _on_msg(d: Dictionary) -> void:
 			turn = int(d["turn"])
 			heroes = d.get("heroes", [])
 			view = d["view"]
+			rtk = String(d.get("rtk", ""))   # 重连令牌留底（身份门·battle_screen 会转存 BattleSetup 供跨场景重连）
 			_take_snap(d)
 			phase = "select"
 		"turn_begin":
@@ -128,12 +130,13 @@ func death_switch(slot: int) -> void:
 
 
 func request_resync() -> void:
-	transport.send(NetProtocol.msg_resync())
+	transport.send(NetProtocol.msg_resync(rtk))
 
 
-## room_pass=房间口令（好友房准入）·gv=版本串（默认空=构造器取本机版本）。
-func send_hello(team: Array, room_pass: String = "", gv: String = "") -> void:
-	transport.send(NetProtocol.msg_hello(team, room_pass, gv))
+## room_pass=房间口令（好友房准入）·gv=版本串（默认空=构造器取本机版本）·
+## reconnect_token=重连令牌（大厅重连传 BattleSetup.net_rtk·首次报到留空）。
+func send_hello(team: Array, room_pass: String = "", gv: String = "", reconnect_token: String = "") -> void:
+	transport.send(NetProtocol.msg_hello(team, room_pass, gv, reconnect_token))
 
 
 # —— 视角翻转（M1·加入方=服务器眼中的玩家 1·战斗屏恒以"玩家 0=自己"渲染）——

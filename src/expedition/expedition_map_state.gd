@@ -360,6 +360,13 @@ func _generate() -> void:
 	start_pos = Vector2i(0, SIZE / 2)
 	grid[start_pos.y][start_pos.x] = Tile.START
 	player = start_pos
+	# 软锁保底（2026-07-17 审计修复·≈0.8%/局）：起点在左边界、三邻各 20% 独立成墙——
+	# 三墙同出=BFS 只剩起点·三个撤离点还会连环盖到起点，而撤离只在「移动进入」触发
+	# =既动不了也撤不了。确定性凿开右邻（固定方向·只影响中招的种子·其余图纹丝不动）。
+	if grid[start_pos.y][start_pos.x + 1] == Tile.WALL \
+			and grid[start_pos.y - 1][start_pos.x] == Tile.WALL \
+			and grid[start_pos.y + 1][start_pos.x] == Tile.WALL:
+		grid[start_pos.y][start_pos.x + 1] = Tile.FLOOR
 	var dist := _bfs_dist(start_pos)
 	for y: int in SIZE:
 		for x: int in SIZE:

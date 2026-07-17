@@ -108,7 +108,9 @@ func _ready() -> void:
 	while not ses2.is_link_ready() and waited < 5.0:
 		await _rt(0.05)   # 房主侧由 _process/_tick_host 持续泵（勿手动 poll 抢包）
 		waited += 0.05
-	ses2.client.send_hello(["h02", "h09", "h12"])
+	# 重连令牌（2026-07-17 身份门）：真实路径=battle_screen 已把 match_start 的令牌转存
+	# BattleSetup.net_rtk——新会话报到必须带上（不带=bad_token 拒·防陌生连接顶席位）。
+	ses2.client.send_hello(["h02", "h09", "h12"], "", "", BattleSetup.net_rtk)
 	waited = 0.0
 	while int(ses2.client.you) < 0 and waited < 5.0:
 		ses2.pump()

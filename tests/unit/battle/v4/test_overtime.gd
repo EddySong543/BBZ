@@ -132,3 +132,26 @@ func test_choose_overtime_pick_takes_max_hp() -> void:
 	b.hp[0][1] = 0   # 最大 HP 英雄已阵亡也不妨碍（加时满血复活）
 	assert_eq(BattleAI.choose_overtime_pick(b, 0), 1, "P0 选 7HP 的 b（阵亡也可选·满血复活）")
 	assert_eq(BattleAI.choose_overtime_pick(b, 1), 0, "P1 血量并列取靠前的 x")
+
+
+func test_overtime_sudden_death_emits_standard_events() -> void:
+	# 审计修复（2026-07-17 三轮⑥）：骤死直写 HP 原本不发 damage_taken/hero_died——
+	# UI 演出全靠这两个事件驱动（A3a）·缺了=血条突跳无掉血/死亡演出。
+	var d := BattleCore.create_overtime(_hero("a", 5), _hero("x", 5), 42)
+	d.hp[1][0] = 6   # P1 低血 → 骤死归零判负
+	var last: Dictionary = {}
+	for _t in range(BattleCore.OVERTIME_TURN_CAP):
+		d.select_action(0, A.CHARGE)
+		d.select_action(1, A.CHARGE)
+		last = d.resolve()
+		if d.game_over:
+			break
+	var dmg_n := 0
+	var died_n := 0
+	for ev in last.get("events", []):
+		if String(ev.get("id", "")) == "damage_taken" and String(ev.get("src", "")) == "overtime":
+			dmg_n += 1
+		elif String(ev.get("id", "")) == "hero_died":
+			died_n += 1
+	assert_eq(dmg_n, 2, "骤死拍双方各一条 damage_taken（UI 掉血演出/飘字靠它）")
+	assert_eq(died_n, 1, "归零方应发 hero_died（死亡演出靠它）")

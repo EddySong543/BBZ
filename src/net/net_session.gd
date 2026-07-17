@@ -28,6 +28,7 @@ var bp_client: BpClient = null        # 双方·BP 阶段本端（UI 读进度/�
 var password := ""                    # 房主：房间口令（空=公开房·好友房准入·2026-07-14）
 var last_reject := ""                 # 房主：最近一次准入拒绝（"bad_pass"/"bad_version:<对方版本>"·大厅读后清）
 var _kick_at_ms := 0                  # >0=到点踢当前对端（拒绝方通常先自行断开·这是兜底）
+var _last_pump_ms := 0                # 上次 pump 时刻（断线期冻结 deadline 用·2026-07-17 审计修复）
 
 
 ## 建房：开 ENet 门 + 本地环回接自己的客户端。room_pass=房间口令（空=公开房）。失败返回 null。
@@ -127,13 +128,26 @@ func pump() -> void:
 		for msg in _loop_room_end.poll():
 			room.handle(0, msg)
 		for msg in enet.poll():
-			if String(msg.get("kind", "")) == "hello" and not hello_pass_ok(msg):
-				enet.send(NetProtocol.msg_error("bad_pass"))
-				_schedule_kick()   # 腾出唯一席位给真正的重连方（延迟踢·让 error 先送达）
-				continue
+			if String(msg.get("kind", "")) == "hello":
+				# 重连报到门=口令+版本（2026-07-17 审计修复：旧门只查口令——版本不合的客户端
+				# 能中局重连拿快照·与 poll_prestart 的门对齐）。身份令牌门在 room.handle 内。
+				var gv := String(msg.get("gv", ""))
+				if gv != NetProtocol.game_version():
+					enet.send(NetProtocol.msg_error("bad_version", NetProtocol.game_version()))
+					_schedule_kick()
+					continue
+				if not hello_pass_ok(msg):
+					enet.send(NetProtocol.msg_error("bad_pass"))
+					_schedule_kick()   # 腾出唯一席位给真正的重连方（延迟踢·让 error 先送达）
+					continue
 			room.handle(1, msg)
 		if enet.is_ready():
 			room.check_deadline()   # M3b：服务端权威计时（拖时→代提交攒/代选替补）
+		elif _last_pump_ms > 0:
+			# 断线期真冻结（2026-07-17 审计修复）：deadline 随实际流逝顺延——
+			# 否则重连同帧旧 deadline 立即触发·被代提交「攒」白丢一回合。
+			room.defer_deadline(Time.get_ticks_msec() - _last_pump_ms)
+		_last_pump_ms = Time.get_ticks_msec()
 	client.poll()
 
 

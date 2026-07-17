@@ -152,8 +152,9 @@ func test_match_room_resync_snapshot_resumable() -> void:
 	for _i in 2:
 		room.handle(0, NetProtocol.msg_submit_turn(room.battle.turn_number, A.ATTACK, -1, []))
 		room.handle(1, NetProtocol.msg_submit_turn(room.battle.turn_number, A.DEFEND, -1, []))
-	# Act
-	room.handle(0, NetProtocol.msg_resync())
+	# Act（重连令牌=match_start 第一条下发·2026-07-17 身份门后必带）
+	var rtk0 := String(((sent[0] as Array)[0] as Dictionary).get("rtk", ""))
+	room.handle(0, NetProtocol.msg_resync(rtk0))
 	# resync 回两条：snapshot + 补发 turn_begin（M2b）→ 取最后一条 snapshot
 	var snap_msg: Dictionary = {}
 	for m in sent[0]:
@@ -244,8 +245,9 @@ func test_match_room_hello_midgame_resumes_with_snapshot_and_turn_begin() -> voi
 	room.handle(0, NetProtocol.msg_submit_turn(0, A.CHARGE, -1, []))
 	room.handle(1, NetProtocol.msg_submit_turn(0, A.CHARGE, -1, []))
 	var before: int = (sent[1] as Array).size()
-	# Act
-	room.handle(1, NetProtocol.msg_hello(["h01", "h05", "h06"]))
+	# Act（重连 hello 带身份令牌·2026-07-17 门后必带）
+	var rtk1 := String(((sent[1] as Array)[0] as Dictionary).get("rtk", ""))
+	room.handle(1, NetProtocol.msg_hello(["h01", "h05", "h06"], "", "", rtk1))
 	# Assert：snapshot（you=1·逐位可恢复）+ 补发 turn_begin（重连即回选招·阵容字段被忽略）
 	var msgs: Array = (sent[1] as Array).slice(before)
 	assert_eq(String((msgs[0] as Dictionary)["kind"]), "snapshot")
@@ -265,9 +267,10 @@ func test_match_room_rate_limit_drops_flood_then_recovers() -> void:
 	room.start(_team("a", 5), _team("b", 5), SEED,
 		func(p: int, msg: Dictionary) -> void: (sent[p] as Array).append(msg))
 	var before: int = (sent[0] as Array).size()
-	# Act：同一毫秒灌 100 个 resync
+	# Act：同一毫秒灌 100 个 resync（带正牌令牌·测的是防洪不是身份门）
+	var rtk0 := String(((sent[0] as Array)[0] as Dictionary).get("rtk", ""))
 	for _i in 100:
-		room.handle(0, NetProtocol.msg_resync())
+		room.handle(0, NetProtocol.msg_resync(rtk0))
 	# Assert：突发桶 30 → 只放行约 30 个（每个回 snapshot+turn_begin 两条）·其余静默丢
 	var snaps := 0
 	for i in range(before, (sent[0] as Array).size()):
@@ -278,7 +281,7 @@ func test_match_room_rate_limit_drops_flood_then_recovers() -> void:
 	# 时间推进回填令牌 → 恢复服务（不误伤后续正常包）
 	fake.t = 5000
 	var b2: int = (sent[0] as Array).size()
-	room.handle(0, NetProtocol.msg_resync())
+	room.handle(0, NetProtocol.msg_resync(rtk0))
 	assert_gt((sent[0] as Array).size(), b2, "令牌回填后应恢复响应")
 
 
@@ -348,3 +351,66 @@ func test_match_room_reconnect_during_death_switch_restores_phase() -> void:
 	# Assert：待换人方恢复 death_switch·对方=waiting（等对面选）
 	assert_eq((t.clients[0] as MatchClient).phase, "death_switch", "pending 方重连应直接回到选替补")
 	assert_eq((t.clients[1] as MatchClient).phase, "waiting", "非 pending 方重连=等待对面")
+
+
+func test_enet_transport_released_without_close() -> void:
+	# 审计修复（2026-07-17 三轮①）：信号 lambda 弱捕获——不 close 也随引用归零释放
+	# （原=lambda 捕获 self 经 peer 信号成环·RefCounted 永生·每次建房/拨号泄一对）。
+	var t: RefCounted = NetTransport.ENetTransport.new()
+	var wr: WeakRef = weakref(t)
+
+	# Act：唯一引用归零
+	t = null
+
+	# Assert
+	assert_null(wr.get_ref(), "ENetTransport 应随引用归零释放（无 lambda 引用环）")
+
+
+func test_match_room_defer_deadline_freezes_countdown() -> void:
+	# 审计修复（三轮②）：断线期 deadline 顺延——旧行为只是"不检查"·时间照流·
+	# 重连同帧旧 deadline 立即触发被代提交「攒」。
+	var t := _table(5)
+	var room: MatchRoom = t.room
+	var fake_ms: Array = [0]
+	room.now_ms = func() -> int: return int(fake_ms[0])
+	room._deadline_ms = 5000   # 换假时钟坐标系重新武装
+	_pump(t)
+	var turn_before: int = room.battle.turn_number
+
+	# Act：模拟断线 8s=顺延 8000 → 原 deadline(5000) 时刻已过但顺延后(13000)未到
+	room.defer_deadline(8000)
+	fake_ms[0] = 8000
+	room.check_deadline()
+	assert_eq(room.battle.turn_number, turn_before, "顺延期内不得代提交推进回合")
+
+	# Act：过顺延后的 deadline → 双方被代提交「攒」→ 回合推进
+	fake_ms[0] = 14000
+	room.check_deadline()
+	assert_gt(room.battle.turn_number, turn_before, "过顺延后 deadline 才代提交")
+
+
+func test_match_room_reconnect_requires_token() -> void:
+	# 审计修复（三轮③）：中局重连身份门——原行为=任何过口令门（公开房无门）的新连接
+	# 都能顶席位拿快照+控制权。令牌 match_start 只发本人·hello/resync 报到必须对上。
+	var t := _table(5)
+	_pump(t)
+	var c0: MatchClient = t.clients[0]
+	var c1: MatchClient = t.clients[1]
+	assert_false(c0.rtk.is_empty(), "match_start 应下发重连令牌")
+
+	# Act / Assert：正牌（resync 自动带 rtk）→ 收快照
+	c0.request_resync()
+	_pump(t)
+	assert_false(c0.snapshot.is_empty(), "正牌令牌应收到快照")
+
+	# Act / Assert：伪牌 → bad_token 拒·快照不发
+	(t.room as MatchRoom).handle(1, NetProtocol.msg_resync("wrong_token"))
+	_pump(t)
+	assert_true(c1.errors.has("bad_token"), "伪令牌应拒 bad_token")
+	assert_true(c1.snapshot.is_empty(), "伪令牌不得拿到快照")
+
+
+func test_net_protocol_hello_rejects_duplicate_team_ids() -> void:
+	# 审计修复（三轮⑦）：旧 LAN 直开局路径可被恶意客户端塞同队重复英雄。
+	assert_eq(NetProtocol.validate_c2s(NetProtocol.msg_hello(["h01", "h01", "h02"])), "bad_team")
+	assert_eq(NetProtocol.validate_c2s(NetProtocol.msg_hello(["h01", "h02", "h03"])), "")

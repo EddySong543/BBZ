@@ -52,8 +52,18 @@ class ENetTransport extends RefCounted:
 	var max_packet_bytes: int = DEFAULT_MAX_PACKET
 
 	func _init() -> void:
-		peer.peer_connected.connect(func(id: int) -> void: remote_id = id)
-		peer.peer_disconnected.connect(func(_id: int) -> void: remote_id = 0)
+		# weakref 捕获（2026-07-17 审计修复）：lambda 直接捕获 self 会经成员 peer 的信号形成
+		# transport→peer→signal→lambda→transport 引用环——RefCounted 无 GC·每次建房/拨号泄一对
+		# （close 断信号只救走 close 的路径·弱引用救全部路径）。
+		var wself: WeakRef = weakref(self)
+		peer.peer_connected.connect(func(id: int) -> void:
+			var s: RefCounted = wself.get_ref()
+			if s != null:
+				s.remote_id = id)
+		peer.peer_disconnected.connect(func(_id: int) -> void:
+			var s: RefCounted = wself.get_ref()
+			if s != null:
+				s.remote_id = 0)
 
 	func host(port: int, encrypted: bool = true) -> bool:
 		if peer.create_server(port, 1) != OK:

@@ -28,6 +28,7 @@ const TEAM_SIZE := 3
 const MAX_HERO_ID_LEN := 8
 const MAX_PASS_LEN := 16       # 房间口令上限（好友房准入·2026-07-14）
 const MAX_GV_LEN := 16         # 版本串上限（版本握手）
+const MAX_RTK_LEN := 64        # 重连令牌上限（中局重连身份凭据·2026-07-17 审计修复）
 
 const MAX_ITEM_SLOTS := 3      # 与 BattleCore.SLOT_COUNT 一致（入包范围校验用·防超长数组）
 const MAX_ACTION := 16         # 动作枚举安全上限（真合法性由 match_room 按 legal_actions 判）
@@ -45,20 +46,32 @@ static func validate_c2s(msg: Variant) -> String:
 	if not C2S_KINDS.has(kind):
 		return "unknown_kind"
 	if kind == "resync":
+		var rr: Variant = d.get("rtk", "")
+		if not (rr is String) or (rr as String).length() > MAX_RTK_LEN:
+			return "bad_rtk_field"
 		return ""
 	if kind == "hello":
-		# 空 team=BP 流程报到（阵容由 BP 阶段决出）；非空必须 3 个合法 id
+		# 空 team=BP 流程报到（阵容由 BP 阶段决出）；非空必须 3 个合法且不重复的 id
+		# （队内去重=2026-07-17 审计修复：旧 LAN 直开局路径可被恶意客户端塞同队重复英雄）。
 		var team: Variant = d.get("team")
 		if not (team is Array) or ((team as Array).size() != TEAM_SIZE and not (team as Array).is_empty()):
 			return "bad_team"
 		if not _ids_ok(team):
 			return "bad_team"
+		var seen := {}
+		for id in team:
+			if seen.has(id):
+				return "bad_team"
+			seen[id] = true
 		var pass_v: Variant = d.get("pass", "")   # 可选字段：缺省=空串（旧包兼容）·带则限型限长
 		if not (pass_v is String) or (pass_v as String).length() > MAX_PASS_LEN:
 			return "bad_pass_field"
 		var gv_v: Variant = d.get("gv", "")
 		if not (gv_v is String) or (gv_v as String).length() > MAX_GV_LEN:
 			return "bad_gv_field"
+		var rtk_v: Variant = d.get("rtk", "")   # 重连令牌（可选·开局后重连报到必带·2026-07-17）
+		if not (rtk_v is String) or (rtk_v as String).length() > MAX_RTK_LEN:
+			return "bad_rtk_field"
 		return ""
 	if kind == "bp_progress":
 		if not _is_int(d.get("n")) or int(d["n"]) < 0 or int(d["n"]) > TEAM_SIZE:
@@ -142,15 +155,18 @@ static func msg_death_switch(turn: int, slot: int) -> Dictionary:
 	return {v = PROTO_VERSION, kind = "death_switch", turn = turn, slot = slot}
 
 
-static func msg_resync() -> Dictionary:
-	return {v = PROTO_VERSION, kind = "resync"}
+## rtk=重连令牌（开局后向房间要快照必带·2026-07-17 身份门）。
+static func msg_resync(rtk: String = "") -> Dictionary:
+	return {"v": PROTO_VERSION, "kind": "resync", "rtk": rtk.substr(0, MAX_RTK_LEN)}
 
 
-## room_pass=房间口令（空=公开房）·gv=游戏版本（版本握手·默认取本机）。⚠ "pass" 是 GDScript 关键字，
+## room_pass=房间口令（空=公开房）·gv=游戏版本（版本握手·默认取本机）·rtk=重连令牌
+## （开局后重连报到必带·match_start 下发·空=首次报到）。⚠ "pass" 是 GDScript 关键字，
 ## 参数/键名分别用 room_pass / 字符串键 "pass"。
-static func msg_hello(team: Array, room_pass: String = "", gv: String = "") -> Dictionary:
+static func msg_hello(team: Array, room_pass: String = "", gv: String = "", rtk: String = "") -> Dictionary:
 	return {"v": PROTO_VERSION, "kind": "hello", "team": team.duplicate(),
-		"pass": room_pass.substr(0, MAX_PASS_LEN), "gv": (game_version() if gv.is_empty() else gv)}
+		"pass": room_pass.substr(0, MAX_PASS_LEN), "gv": (game_version() if gv.is_empty() else gv),
+		"rtk": rtk.substr(0, MAX_RTK_LEN)}
 
 
 ## 本机游戏版本（版本握手用·真相源=project.godot application/config/version）。

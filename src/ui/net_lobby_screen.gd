@@ -153,7 +153,9 @@ func _process(delta: float) -> void:
 		_join_waited += delta
 		if _session.is_link_ready() and not _hello_sent:
 			_hello_sent = true
-			_session.client.send_hello(_picked, _pass_edit.text.strip_edges())
+			# rtk=重连令牌（2026-07-17 身份门）：断线重连=凭上局 match_start 留底的令牌取回席位；
+			# 首次加入=空串（房间开局前不查·开局时会下发新令牌覆盖留底）。
+			_session.client.send_hello(_picked, _pass_edit.text.strip_edges(), "", BattleSetup.net_rtk)
 			_status.text = tr("已连上，等待开局/续战…")
 		if not _session.client.errors.is_empty():   # 被房主拒（口令/版本）→ 收摊重来
 			_status.text = _reject_text(String(_session.client.errors[0]))
