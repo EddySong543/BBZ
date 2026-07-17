@@ -68,7 +68,7 @@ func _ready() -> void:
 
 ## 找当前可见、文本完全匹配的池化飘字。
 func _find_float(s: Node, text: String) -> Label:
-	for l in s._dmg_pool:
+	for l in s._fx._dmg_pool:
 		if l.visible and l.text == text:
 			return l
 	return null
@@ -76,7 +76,7 @@ func _find_float(s: Node, text: String) -> Label:
 
 ## 找当前可见、文本以 prefix 开头的池化飘字。
 func _find_float_prefix(s: Node, prefix: String) -> Label:
-	for l in s._dmg_pool:
+	for l in s._fx._dmg_pool:
 		if l.visible and l.text.begins_with(prefix):
 			return l
 	return null

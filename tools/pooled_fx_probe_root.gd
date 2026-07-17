@@ -17,13 +17,13 @@ func _ready() -> void:
 	var fails: Array[String] = []
 
 	# ① 池已预分配且全部待机（飘字池=FLOAT_POOL_SIZE 6·②③⑧ 反馈批扩容）
-	if s._dmg_pool.size() != 6:
-		fails.append("dmg_pool size=%d" % s._dmg_pool.size())
-	if s._slash_pool.size() != 4:
-		fails.append("slash_pool size=%d" % s._slash_pool.size())
-	if s._spark_pool_big.size() != 2 or s._spark_pool_small.size() != 2:
+	if s._fx._dmg_pool.size() != s._fx.FLOAT_POOL_SIZE:
+		fails.append("dmg_pool size=%d" % s._fx._dmg_pool.size())
+	if s._fx._slash_pool.size() != s._fx.FX_POOL_SIZE:
+		fails.append("slash_pool size=%d" % s._fx._slash_pool.size())
+	if s._fx._spark_pool_big.size() != 2 or s._fx._spark_pool_small.size() != 2:
 		fails.append("spark pools size")
-	for l in s._dmg_pool:
+	for l in s._fx._dmg_pool:
 		if l.visible:
 			fails.append("飘字待机时可见")
 
@@ -34,7 +34,7 @@ func _ready() -> void:
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png(OUT_MID)
 	var vis := 0
-	for l in s._dmg_pool:
+	for l in s._fx._dmg_pool:
 		if l.visible:
 			vis += 1
 	if vis != 2:
@@ -50,13 +50,13 @@ func _ready() -> void:
 
 	# ④ 静置 → 全部归池：飘字全隐/斩击停播停帧/火花烧完/time_scale 复位
 	await _rt(1.5)
-	for l in s._dmg_pool:
+	for l in s._fx._dmg_pool:
 		if l.visible:
 			fails.append("飘字未归池")
-	for sl in s._slash_pool:
+	for sl in s._fx._slash_pool:
 		if sl.visible or sl.is_processing():
 			fails.append("斩击未归池")
-	for p in (s._spark_pool_big + s._spark_pool_small):
+	for p in (s._fx._spark_pool_big + s._fx._spark_pool_small):
 		if p.emitting:
 			fails.append("火花仍在发射")
 	if Engine.time_scale != 1.0:
