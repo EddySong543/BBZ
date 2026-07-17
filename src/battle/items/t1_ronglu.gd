@@ -5,7 +5,7 @@ extends ItemEffect
 func apply_pre(battle: BattleCore, player: int, _target: int, data: ItemData) -> void:
 	var sl: Array = battle.slots[player]
 	for s in sl:
-		var it = s.get("item", null)
+		var it: ItemData = s.get("item", null)
 		if it != null and it.item_id != data.item_id and not bool(s.get("used", false)):
 			s["item"] = null
 			s["used"] = true

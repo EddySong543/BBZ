@@ -63,7 +63,7 @@ const AI := 1       # 对手 AI
 @onready var event_label: Label = $EventLabel
 @onready var big_turn_label: Label = $BigTurnLabel
 
-# 出战角色名(每回合随出战英雄更新) + 玩家伪 id(常驻·占位)。
+# 出战角色名(每回合随出战英雄更新) + 玩家名(我方=资料档案真名·对手=场景占位值·联机对手名待协议捎带)。
 @onready var p1_active_name: Label = $P1Hud/P1ActiveName
 @onready var p2_active_name: Label = $P2Hud/P2ActiveName
 @onready var p1_player_id: Label = $P1Hud/P1PlayerId
@@ -307,6 +307,9 @@ func _ready() -> void:
 	_init_buttons()
 	_connect_frame_signals()
 	game_timer.timeout.connect(_on_timer_tick)
+	# 我方玩家名=资料档案真名（技术债#3·2026-07-17）。对手名保持场景占位值——
+	# 本地对手=AI 无名可言；联机对手名待协议捎带（hello 加字段·另批）。
+	p1_player_id.text = ProfileStore.get_player_name()
 
 	# P2（对手）立绘 + 头像朝左（面向中间）；记录立绘原位供前冲 juice 复位
 	_cd_home[0] = p1_char_display.position
