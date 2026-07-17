@@ -29,6 +29,13 @@ const DEFEAT_PHASE := 0.7
 # h19 走专段（--phase h19）：原件=GPT 生图未过管线（棋盘假透明+7 姿势松散摆放非严格网格·
 # 人物≈2× 大）——通用 prep/build 会切出 16 帧棋盘垃圾，必须排除。
 const SPECIAL: Array = ["h19"]
+# 倒向修正名单（逐格 flip_x·姿态+位移轨迹一起镜像·verify 走「镜像盒等式」）。
+# 沿革：2026-07-17 h17 旧表倒姿被判反曾入列（程序镜像过渡用）→ Eddy 当日重制新表
+# 按本意画（首帧核验原样匹配 idle）→ 名单清空。机制保留：以后哪张表倒反，id 入列重跑 prep 即可。
+const FLIP_DEFEAT: Array = []
+# verify 首帧盒公差（px·256 源格）：≤2px=GPT 摆姿噪声（h07/h09 defeat 批实测·屏上无感），
+# 警示通过；超限仍 FAILED（铁律拦的是真错位不是像素噪）。
+const VERIFY_TOL := 2
 
 
 func _initialize() -> void:
@@ -142,6 +149,9 @@ func _prep() -> bool:
 				push_error("%s: 非常规格径 %d（既非 128 也非 256）·跳过" % [id, cell])
 				ok = false
 				continue
+			if kind == "defeats" and id in FLIP_DEFEAT:
+				_flip_cells(img, CELL)
+				print("[prep-%s] %s: 倒向镜像修正（逐格 flip_x）" % [tag, id])
 			var out := ProjectSettings.globalize_path("%s%s/%s_%s.png" % [DST, id, id, tag])
 			var err := img.save_png(out)
 			print("[prep-%s] %s: → %dx%d (err=%d)" % [tag, id, img.get_width(), img.get_height(), err])
@@ -160,6 +170,17 @@ func _prep() -> bool:
 				% [id, img.get_width(), img.get_height(), cleared, id, id, err])
 		ok = ok and err == OK
 	return ok
+
+
+## 逐格水平镜像（绕格心）：姿态与位移轨迹一起翻转 → 动画内部连贯（FLIP_DEFEAT 名单用）。
+static func _flip_cells(img: Image, cell: int) -> void:
+	var cols := img.get_width() / cell
+	var rows := img.get_height() / cell
+	for r in rows:
+		for c in cols:
+			var region := img.get_region(Rect2i(c * cell, r * cell, cell, cell))
+			region.flip_x()
+			img.blit_rect(region, Rect2i(0, 0, cell, cell), Vector2i(c * cell, r * cell))
 
 
 ## 邻差泛洪抠底：四边种子 BFS·邻居与当前像素色距≤阈值即蔓延（渐晕跟得上·硬轮廓挡得住）。
@@ -279,11 +300,24 @@ func _verify() -> bool:
 			var ib := _alpha_bbox(idle, Rect2i(0, 0, CELL, CELL))
 			var sb := _alpha_bbox(sheet, Rect2i(0, 0, CELL, CELL))
 			checked += 1
-			if sb == ib:
-				print("[verify] %s %s: 首帧 %s = idle ✓零偏差" % [id, anim, sb])
+			var expect := ib
+			var tag := ""
+			if anim == "defeat" and id in FLIP_DEFEAT:
+				# 倒向镜像修正名单：首帧=idle 的水平镜像 → 期望盒绕格心翻转
+				expect = Rect2i(CELL - ib.position.x - ib.size.x, ib.position.y, ib.size.x, ib.size.y)
+				tag = "（镜像盒等式）"
+			var dp := sb.position - expect.position
+			var ds := sb.size - expect.size
+			if sb == expect:
+				print("[verify] %s %s: 首帧 %s = idle ✓零偏差%s" % [id, anim, sb, tag])
+			elif absi(dp.x) <= VERIFY_TOL and absi(dp.y) <= VERIFY_TOL \
+					and absi(ds.x) <= VERIFY_TOL and absi(ds.y) <= VERIFY_TOL:
+				# ≤2px=GPT 摆姿噪声（h07/h09 defeat 批实测·屏上 scale2.0 无感）·警示通过
+				print("[verify] %s %s: 首帧 %s ≈ 期望%s（Δpos=%s Δsize=%s ≤%dpx 容差·通过）"
+						% [id, anim, sb, tag, dp, ds, VERIFY_TOL])
 			else:
-				print("[verify] %s %s: ⚠首帧 %s ≠ idle %s（偏移 Δpos=%s Δsize=%s）"
-						% [id, anim, sb, ib, sb.position - ib.position, sb.size - ib.size])
+				print("[verify] %s %s: ⚠首帧 %s ≠ 期望 %s%s（偏移 Δpos=%s Δsize=%s）"
+						% [id, anim, sb, expect, tag, dp, ds])
 				ok = false
 	print("[verify] 共核验 %d 张" % checked)
 	return ok

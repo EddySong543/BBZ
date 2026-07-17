@@ -2,6 +2,7 @@
 
 [ext_resource type="Texture2D" path="res://assets/sprites/heroes/h13/h13_attack.png" id="1_2ih7y"]
 [ext_resource type="Texture2D" path="res://assets/sprites/heroes/h13/h13_idle.png" id="1_xe6hc"]
+[ext_resource type="Texture2D" path="res://assets/sprites/heroes/h13/h13_defeat.png" id="2_gexk2"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_pkji0"]
 atlas = ExtResource("1_2ih7y")
@@ -49,6 +50,54 @@ region = Rect2(512, 512, 256, 256)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_hvwy1"]
 atlas = ExtResource("1_2ih7y")
+region = Rect2(768, 512, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_kynt1"]
+atlas = ExtResource("2_gexk2")
+region = Rect2(0, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_mfrtn"]
+atlas = ExtResource("2_gexk2")
+region = Rect2(256, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_7jwow"]
+atlas = ExtResource("2_gexk2")
+region = Rect2(512, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_678k1"]
+atlas = ExtResource("2_gexk2")
+region = Rect2(768, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_xx36t"]
+atlas = ExtResource("2_gexk2")
+region = Rect2(0, 256, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_hsfj6"]
+atlas = ExtResource("2_gexk2")
+region = Rect2(256, 256, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_jpp0v"]
+atlas = ExtResource("2_gexk2")
+region = Rect2(512, 256, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_61ch1"]
+atlas = ExtResource("2_gexk2")
+region = Rect2(768, 256, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_rsk0x"]
+atlas = ExtResource("2_gexk2")
+region = Rect2(0, 512, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_qtl6j"]
+atlas = ExtResource("2_gexk2")
+region = Rect2(256, 512, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_345hx"]
+atlas = ExtResource("2_gexk2")
+region = Rect2(512, 512, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_0saa8"]
+atlas = ExtResource("2_gexk2")
 region = Rect2(768, 512, 256, 256)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_2ih7y"]
@@ -117,6 +166,47 @@ animations = [{
 "loop": 0,
 "name": &"attack",
 "speed": 20.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_kynt1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_mfrtn")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_7jwow")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_678k1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_xx36t")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_hsfj6")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_jpp0v")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_61ch1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_rsk0x")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_qtl6j")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_345hx")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_0saa8")
+}],
+"loop": 0,
+"name": &"defeat",
+"speed": 17.142857142857142
 }, {
 "frames": [{
 "duration": 1.0,

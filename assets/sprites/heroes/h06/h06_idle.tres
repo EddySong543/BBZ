@@ -2,6 +2,7 @@
 
 [ext_resource type="Texture2D" path="res://assets/sprites/heroes/h06/h06_idle.png" id="1_gswep"]
 [ext_resource type="Texture2D" path="res://assets/sprites/heroes/h06/h06_attack.png" id="1_pnmff"]
+[ext_resource type="Texture2D" path="res://assets/sprites/heroes/h06/h06_defeat.png" id="2_garhj"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_c362m"]
 atlas = ExtResource("1_pnmff")
@@ -66,6 +67,54 @@ region = Rect2(512, 768, 256, 256)
 [sub_resource type="AtlasTexture" id="AtlasTexture_woj4i"]
 atlas = ExtResource("1_pnmff")
 region = Rect2(768, 768, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_l0838"]
+atlas = ExtResource("2_garhj")
+region = Rect2(0, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_w65j5"]
+atlas = ExtResource("2_garhj")
+region = Rect2(256, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_tg5hy"]
+atlas = ExtResource("2_garhj")
+region = Rect2(512, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_l02qp"]
+atlas = ExtResource("2_garhj")
+region = Rect2(768, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_yhtsc"]
+atlas = ExtResource("2_garhj")
+region = Rect2(0, 256, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_k1o06"]
+atlas = ExtResource("2_garhj")
+region = Rect2(256, 256, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_gq8lp"]
+atlas = ExtResource("2_garhj")
+region = Rect2(512, 256, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_t636x"]
+atlas = ExtResource("2_garhj")
+region = Rect2(768, 256, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_0sodk"]
+atlas = ExtResource("2_garhj")
+region = Rect2(0, 512, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_iau4y"]
+atlas = ExtResource("2_garhj")
+region = Rect2(256, 512, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_panpb"]
+atlas = ExtResource("2_garhj")
+region = Rect2(512, 512, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_cyiev"]
+atlas = ExtResource("2_garhj")
+region = Rect2(768, 512, 256, 256)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_pnmff"]
 atlas = ExtResource("1_gswep")
@@ -141,6 +190,47 @@ animations = [{
 "loop": 0,
 "name": &"attack",
 "speed": 26.666666666666668
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_l0838")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_w65j5")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_tg5hy")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_l02qp")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_yhtsc")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_k1o06")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_gq8lp")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_t636x")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_0sodk")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_iau4y")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_panpb")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_cyiev")
+}],
+"loop": 0,
+"name": &"defeat",
+"speed": 17.142857142857142
 }, {
 "frames": [{
 "duration": 1.0,
