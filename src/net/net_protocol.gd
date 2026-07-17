@@ -40,7 +40,11 @@ static func validate_c2s(msg: Variant) -> String:
 	if not (msg is Dictionary):
 		return "bad_payload"
 	var d: Dictionary = msg
-	if int(d.get("v", -1)) != PROTO_VERSION:
+	# 版本门先验类型（2026-07-17 终审修复）：旧写法 int(d.get("v")) 有两病——
+	# ① v 是 Array/Dictionary 时 int() 直接运行时脚本错误（10 万畸形包实测 3.5 万次报错=
+	#    12.7MB 日志放大·预连接阶段可达）；② int() 宽松转换让 v="1"/true/1.9 全部过门。
+	# 只接受 int 或值为整数的 float（JSON 数字线上形态）——_is_int 收口。
+	if not _is_int(d.get("v")) or int(d["v"]) != PROTO_VERSION:
 		return "version_mismatch"
 	var kind: String = String(d.get("kind", ""))
 	if not C2S_KINDS.has(kind):

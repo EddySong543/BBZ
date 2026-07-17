@@ -56,3 +56,17 @@ func test_game_settings_resolution_presets_all_parseable() -> void:
 	for s: String in Settings.RESOLUTION_PRESETS:
 		var v := Settings.parse_resolution(s)
 		assert_eq("%dx%d" % [v.x, v.y], s, "预设 '%s' 应可解析往返" % s)
+
+
+func test_game_settings_sanitize_rejects_malformed_values() -> void:
+	# 终审修复（2026-07-17）：语法合法但类型/数值异常的配置必须规范化——
+	# 旧行为="LOUD" 音量/天价分辨率/数组布尔（bool() 构造脚本错误）原样入内存。
+	assert_eq(float(Settings.sanitize("music_volume", "LOUD")), float(Settings.DEFAULTS["music_volume"]))
+	assert_eq(float(Settings.sanitize("music_volume", -1000)), 0.0, "负音量钳 0")
+	assert_eq(float(Settings.sanitize("music_volume", 1000)), 1.0, "超界音量钳 1")
+	assert_eq(String(Settings.sanitize("window_mode", 42)), String(Settings.DEFAULTS["window_mode"]))
+	assert_eq(String(Settings.sanitize("resolution", "999999999x999999999")),
+		String(Settings.DEFAULTS["resolution"]), "天价分辨率回默认（预设白名单）")
+	assert_eq(Settings.sanitize("invert_colors", [1, 2]), Settings.DEFAULTS["invert_colors"],
+		"数组布尔回默认（防 bool() 构造炸）")
+	assert_eq(Settings.sanitize("invert_colors", true), true, "合法值原样通过")

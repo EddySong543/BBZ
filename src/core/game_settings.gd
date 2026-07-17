@@ -57,7 +57,7 @@ static func set_value(key: String, value: Variant) -> void:
 		return
 	if not _loaded:
 		load_from_disk()
-	_data[key] = value
+	_data[key] = sanitize(key, value)   # 代码路径同过规范化门（终审修复·与读盘同一收口）
 	_apply_one(key)
 	save()
 
@@ -79,18 +79,39 @@ static func load_from_disk() -> void:
 	if cfg.load(_PATH) == OK:
 		for k: String in DEFAULTS.keys():
 			if cfg.has_section_key(_SECTION, k):
-				_data[k] = cfg.get_value(_SECTION, k, DEFAULTS[k])
+				_data[k] = sanitize(k, cfg.get_value(_SECTION, k, DEFAULTS[k]))
 		# 旧键迁移：fullscreen(bool) → window_mode（2026-07-09 显示设置改版）
 		if cfg.has_section_key(_SECTION, "fullscreen") and not cfg.has_section_key(_SECTION, "window_mode"):
 			_data["window_mode"] = "borderless" if bool(cfg.get_value(_SECTION, "fullscreen", false)) else "windowed"
 	_loaded = true
 
 
+## 配置项规范化（2026-07-17 终审修复）：语法合法但类型/数值异常的配置（音量="LOUD"/-1000·
+## 分辨率=999999999x999999999·布尔=数组→ bool() 构造脚本错误）落进类型门+钳制+枚举白名单，
+## 异常值静默回默认——手改 cfg/坏盘不再能在启动时炸脚本或开天价窗口。
+static func sanitize(key: String, v: Variant) -> Variant:
+	match key:
+		"master_volume", "music_volume", "sfx_volume":
+			if v is float or v is int:
+				return clampf(float(v), 0.0, 1.0)
+		"window_mode":
+			if v is String and String(v) in ["windowed", "borderless", "fullscreen"]:
+				return v
+		"resolution":
+			if v is String and String(v) in RESOLUTION_PRESETS:
+				return v
+		"invert_colors":
+			if v is bool:
+				return v
+	return DEFAULTS.get(key)
+
+
 static func save() -> void:
 	var cfg := ConfigFile.new()
 	for k: String in _data.keys():
 		cfg.set_value(_SECTION, k, _data[k])
-	cfg.save(_PATH)
+	if cfg.save(_PATH) != OK:
+		push_warning("GameSettings: 设置保存失败（%s·磁盘只读/占用?）——本次改动仅内存生效" % _PATH)   # 终审修复：保存失败不再静默
 
 
 # ============================================================

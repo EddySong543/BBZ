@@ -120,3 +120,33 @@ func test_battle_core_snapshot_version_mismatch_rejected() -> void:
 	var ok := b2.from_snapshot(d)
 	# Assert
 	assert_false(ok, "版本不符必须拒绝（网络消息版本化规则）")
+
+
+func test_snapshot_malformed_rejected_without_mutation() -> void:
+	# 终审修复（2026-07-17）：畸形快照原会在硬索引处炸脚本错误且半恢复污染现状——
+	# schema 门=必需键全量核对·缺键拒绝且本实例纹丝不动·调用方按返回值兜底。
+	var b := BattleCore.new()
+	var h1: Array = []
+	var h2: Array = []
+	for i in 3:
+		var h := HeroData.new()
+		h.hero_id = ""
+		h.hero_name = "t%d" % i
+		h.max_hp = 5
+		h1.append(h)
+		var g := HeroData.new()
+		g.hero_id = ""
+		g.hero_name = "u%d" % i
+		g.max_hp = 5
+		h2.append(g)
+	b.setup(h1, h2, 99)
+	var before: Dictionary = b.to_snapshot()
+
+	# Act / Assert：空快照、只带版本、缺 heroes 的半截快照——全拒且状态不变
+	assert_false(b.from_snapshot({}), "空快照应拒")
+	assert_false(b.from_snapshot({v = 1}), "缺必需键应拒")
+	var half: Dictionary = before.duplicate(true)
+	half.erase("heroes")
+	assert_false(b.from_snapshot(half), "缺 heroes 应拒")
+	assert_false(b.from_snapshot({v = [], heroes = []}), "v 为数组不得炸脚本（类型门）")
+	assert_eq_deep(b.to_snapshot(), before)

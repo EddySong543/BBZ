@@ -414,3 +414,13 @@ func test_net_protocol_hello_rejects_duplicate_team_ids() -> void:
 	# 审计修复（三轮⑦）：旧 LAN 直开局路径可被恶意客户端塞同队重复英雄。
 	assert_eq(NetProtocol.validate_c2s(NetProtocol.msg_hello(["h01", "h01", "h02"])), "bad_team")
 	assert_eq(NetProtocol.validate_c2s(NetProtocol.msg_hello(["h01", "h02", "h03"])), "")
+
+
+func test_net_protocol_version_field_type_gate() -> void:
+	# 终审修复（2026-07-17）：v 字段先验类型——旧 int() 强转让 "1"/true/1.9 全过门·
+	# Array/Dictionary 直接运行时脚本错误（10 万畸形包=3.5 万报错/12.7MB 日志放大）。
+	for bad_v: Variant in ["1", true, 1.9, [], {}, null]:
+		assert_eq(NetProtocol.validate_c2s({"v": bad_v, "kind": "resync", "rtk": ""}),
+			"version_mismatch", "v=%s 应拒" % str(bad_v))
+	# JSON 线上形态（int→float 整数值）必须放行
+	assert_eq(NetProtocol.validate_c2s({"v": 1.0, "kind": "resync", "rtk": ""}), "")

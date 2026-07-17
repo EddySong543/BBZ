@@ -794,9 +794,11 @@ func _net_flipped() -> bool:
 	return int(BattleSetup.net_session.client.you) == 1
 
 
-## 权威快照上镜（联机镜像唯一写入口）。
+## 权威快照上镜（联机镜像唯一写入口）。恢复失败=保留旧镜像并报警（2026-07-17 终审修复：
+## 原先不查返回值——畸形快照会让客户端揣着半新不旧的状态继续渲染）。
 func _net_apply_snap(snap: Dictionary) -> void:
-	battle.from_snapshot(MatchClientScript.flip_snapshot(snap) if _net_flipped() else snap)
+	if not battle.from_snapshot(MatchClientScript.flip_snapshot(snap) if _net_flipped() else snap):
+		push_error("battle_screen: 权威快照恢复失败（schema/版本不符）——保留旧镜像·等下一份快照")
 
 
 func _net_sync_latest() -> void:

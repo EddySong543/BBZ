@@ -153,12 +153,18 @@ static func load_from_disk() -> void:
 	if cfg.load(_PATH) == OK:
 		for k: String in ["player_name", "avatar_hero", "created_ts"]:
 			if cfg.has_section_key(_SEC_ID, k):
-				_data[k] = cfg.get_value(_SEC_ID, k, _data[k])
+				var raw: Variant = cfg.get_value(_SEC_ID, k, _data[k])
+				# 类型门（2026-07-17 终审修复）：手改/坏盘的异常类型回默认（防下游 String()/int() 炸）
+				if (k == "created_ts" and (raw is int or raw is float)) \
+						or (k != "created_ts" and raw is String):
+					_data[k] = raw
 		for m: String in MODES:
 			for o: String in OUTCOMES:
 				var key := _stat_key(m, o)
 				if cfg.has_section_key(_SEC_STATS, key):
-					_data[key] = int(cfg.get_value(_SEC_STATS, key, 0))
+					var rv: Variant = cfg.get_value(_SEC_STATS, key, 0)
+					# 战绩钳制（终审修复）：负数/非数值=本地篡改或坏档 → 归零（计数只增不减）
+					_data[key] = maxi(0, int(rv)) if (rv is int or rv is float) else 0
 	_loaded = true
 	# 首次建档：盖建档时间戳并落盘（生成存档文件）。
 	if int(_data["created_ts"]) <= 0 and save_enabled:
@@ -178,7 +184,8 @@ static func _save() -> void:
 		for o: String in OUTCOMES:
 			var key := _stat_key(m, o)
 			cfg.set_value(_SEC_STATS, key, int(_data[key]))
-	cfg.save(_PATH)
+	if cfg.save(_PATH) != OK:
+		push_warning("PlayerProfile: 资料保存失败（%s·磁盘只读/占用?）——本次改动仅内存生效" % _PATH)   # 终审修复：保存失败不再静默
 
 
 ## 重置为默认（测试/探针·或将来"重置资料"入口）。save_enabled 关闭时纯内存。

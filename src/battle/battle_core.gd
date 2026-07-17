@@ -1002,6 +1002,14 @@ func clone() -> BattleCore:
 
 const SNAPSHOT_VERSION := 1
 const HERO_RES_DIR := "res://assets/data/heroes/"
+## 快照必需键（2026-07-17 终审修复·schema 门）：⚠新增引擎状态字段的"三处同步"升级为四处——
+## clone() / to_snapshot()+from_snapshot() / 本表 / 快照测试。
+const SNAP_REQUIRED_KEYS: Array[String] = ["v", "heroes", "active_index", "energy", "hp", "max_hp",
+	"shield", "pending_damage", "statuses", "selected_action", "switch_to", "forced_pull",
+	"active_target", "pending_death_switch", "death_processed", "shuchao_procs", "double", "killer",
+	"last_action", "items", "item_uses", "info_distortion", "item_buffs", "imod", "relics", "slots",
+	"turn_number", "game_over", "winner", "overtime_mode", "action_lock_turn", "action_locked",
+	"pierce_next_attack", "pve_no_econ", "rng_seed", "rng_state"]
 
 
 ## 导出全量战局快照（纯数据·与本局零共享·JSON 安全）。
@@ -1048,9 +1056,17 @@ func to_snapshot() -> Dictionary:
 
 ## 从快照恢复战局（覆盖本实例全部状态·技能组件重建）。版本不符返回 false 且不动现状。
 func from_snapshot(d: Dictionary) -> bool:
-	if int(d.get("v", -1)) != SNAPSHOT_VERSION:
+	# 版本门先验类型（2026-07-17 终审修复）：v 为 Array/Dictionary 时旧 int() 直接脚本错误。
+	var ver: Variant = d.get("v")
+	if not (ver is int or ver is float) or int(ver) != SNAPSHOT_VERSION:
 		push_warning("BattleCore.from_snapshot: 快照版本不符 %s（期望 %d）" % [d.get("v"), SNAPSHOT_VERSION])
 		return false
+	# schema 门（同批修复）：畸形快照原会在下方硬索引处炸脚本错误且半恢复污染现状——
+	# 必需键全量核对·缺任何一个=拒绝且不动本实例（调用方检查返回值·battle_screen 同批接住）。
+	for k: String in SNAP_REQUIRED_KEYS:
+		if not d.has(k):
+			push_warning("BattleCore.from_snapshot: 快照缺字段 '%s' → 拒绝恢复" % k)
+			return false
 	var s: Dictionary = _snap_norm(d)
 	heroes = [_snap_unpack_team(s["heroes"][0]), _snap_unpack_team(s["heroes"][1])]
 	active_index.assign(s["active_index"])

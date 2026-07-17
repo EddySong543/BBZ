@@ -17,6 +17,7 @@ const BpClient := preload("res://src/net/bp_client.gd")
 
 const DEFAULT_PORT := 47777
 const KICK_GRACE_MS := 300            # 拒绝后延迟踢席位（先让 error 包送达·立踢会跟断连赛跑丢包·2026-07-14 探针实证）
+const PRESTART_MSG_BUDGET := 30       # 开局前每次轮询处理包上限（房间建立前无令牌桶·终审修复=预连接防洪）
 
 var role := ""                        # "host" / "join"
 var enet: NetTransport.ENetTransport
@@ -159,7 +160,11 @@ func poll_prestart() -> Array:
 		return []
 	_tick_kick()
 	var ok: Array = []
+	var budget := PRESTART_MSG_BUDGET   # 终审修复：预连接阶段无令牌桶——每次轮询限量·超量静默丢（防洪/防日志放大）
 	for msg in enet.poll():
+		budget -= 1
+		if budget < 0:
+			continue
 		if NetProtocol.validate_c2s(msg) != "" or String(msg.get("kind", "")) != "hello":
 			continue
 		var gv := String(msg.get("gv", ""))
