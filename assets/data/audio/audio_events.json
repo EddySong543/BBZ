@@ -1,0 +1,4 @@
+{
+	"_doc": "音频事件表（AudioEvents 骨架·2026-07-17）。键=事件id·值={stream, bus, volume_db}。'_'开头键=文档保留·加载时跳过。循环与否在流资源导入设置上定。UI/玩法层一律 AudioEvents.play('事件id')·禁直接建播放器。",
+	"_example": {"stream": "res://assets/audio/sfx/ui_click.ogg", "bus": "SFX", "volume_db": 0.0}
+}

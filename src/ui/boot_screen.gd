@@ -16,6 +16,9 @@ extends Control
 
 const NEXT_SCENE := "res://src/ui/main_menu.tscn"
 
+# preload 而非裸 class_name：新建全局类在 headless/GUT 场景缓存未刷新时会报 not declared。
+const AudioEventsBoot := preload("res://src/core/audio_events.gd")
+
 const ADVANCE_TIME := 0.85
 const IMPACT_TIME := 0.20
 const WAVE_AMP_INTRO := 0.10   # 推进期小波（背景纹理让方格颗粒可见，被 pulse 主导）
@@ -46,6 +49,7 @@ var _title: TitleLogo
 
 
 func _ready() -> void:
+	AudioEventsBoot.ensure_buses()   # 建 Music/SFX 总线（音频事件骨架）——须在音量应用前
 	GameSettings.load_and_apply()   # 应用持久化设置（窗口模式 / 音量 / 界面主色翻转）
 	PixelGlyphs.preheat()   # icon/王冠预热：缓存全量生成 + 字形可渲染冒烟检查
 	_mat = _wave.material as ShaderMaterial

@@ -8,8 +8,9 @@ extends RefCounted
 ## 设置面板（settings_panel.gd）每次改动调 set_value() → 即时应用 + 落盘。
 ##
 ## 覆盖的游戏相关设置：
-##   - master_volume / music_volume / sfx_volume：音量（接 AudioServer 总线，
-##     Music/SFX 总线尚未建[无音频内容期]→值仍持久化、等音频接入即生效）。
+##   - master_volume / music_volume / sfx_volume：音量（接 AudioServer 总线；
+##     Music/SFX 总线由 AudioEvents.ensure_buses() 运行时建——boot 启动即建·
+##     建完回调 apply_volumes() 回灌持久化值）。
 ##   - window_mode：显示模式 windowed(窗口化) / borderless(全屏窗口化) / fullscreen(独占全屏)。
 ##     （2026-07-09 取代旧 fullscreen 布尔键·旧 cfg 自动迁移）
 ##   - resolution："宽x高" 字符串，仅窗口化模式生效（全屏两档跟随屏幕）。
@@ -107,6 +108,12 @@ static func apply_all() -> void:
 		_apply_one(k)
 
 
+## 仅重应用三个音量键（AudioEvents.ensure_buses 建完总线后回调·不碰窗口/主色）。
+static func apply_volumes() -> void:
+	for k: String in ["master_volume", "music_volume", "sfx_volume"]:
+		_apply_one(k)
+
+
 static func _apply_one(key: String) -> void:
 	match key:
 		"master_volume":
@@ -121,7 +128,7 @@ static func _apply_one(key: String) -> void:
 			BootResult.invert_colors = bool(get_value("invert_colors"))
 
 
-## 设音量总线。Music/SFX 总线尚未建时静默跳过（值已持久化，等音频接入即生效）。
+## 设音量总线。总线尚未建时静默跳过（值已持久化·AudioEvents.ensure_buses 建完会回灌）。
 static func _apply_bus_volume(bus_name: String, v: float) -> void:
 	var idx := AudioServer.get_bus_index(bus_name)
 	if idx < 0:
