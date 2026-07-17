@@ -37,6 +37,21 @@ Godot 导出时可用 256 位 AES 密钥加密 PCK 里的脚本与资源。解�
 
 4. **验证**：导出后用 PCK 提取工具（如 godotpcktool）尝试解包——应报错/得到密文。
 
+## 发布前核对清单（2026-07-17 发行审计汇总·发布期逐项打勾）
+
+已就绪（随仓库·2026-07-17 落地）：
+- [x] `export_presets.example.cfg` 脱敏模板（严格排除过滤=审计副本验证过的白名单思路·元数据已填·复制改名即用）
+- [x] 非运行时目录 `.gdignore`（font/ ref/ res/ production/·174MB 源字体库等不再被导入/打包）
+- [x] 调试面板可剥离（preload→双门后 load·排除 src/ui/debug/** 不再炸编译）
+- [x] `THIRD-PARTY-NOTICES.md` + 字体 OFL 随包（include_filter 强制打包）
+
+发布期执行（需要 Eddy 拍板/花钱/手动）：
+- [ ] PCK 加密：编译带 AES 密钥的自定义模板（本指南 §1-4·密钥存密码管理器）→ example 三开关打开
+- [ ] Authenticode 代码签名（SmartScreen 信任·需证书·涉费用）
+- [ ] 版本元数据随发布版本同步（file_version/product_version 对齐 project.godot）
+- [ ] 导出后包内探针复查：tools/tests/gut/debug 面板/.ghlp 不在包内·OFL 在包内（发行审计⑦白名单原则）
+- [ ] CI 自动导出流水线（可选·个人项目现阶段不建）
+
 ## 导出配置可复现性（2026-07-17 审计修复⑤·约定先立·发布期执行）
 
 现状：`export_presets.cfg` 被 .gitignore 忽略（Godot 惯例·本机也尚未创建=项目未到导出期）。

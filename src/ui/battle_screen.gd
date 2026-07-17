@@ -39,7 +39,9 @@ const DEFAULT_P1 := ["h02", "h09", "h12"]   # 丑牛 / 申猴 / 亥猪（首发 
 ## 本常量=开发期手动总开关无须动。⚠脚本文件仍会进 release 包：发布时导出过滤须排除
 ## src/ui/debug/**（已列入 docs/pck-encryption-guide.md 发布清单·2026-07-17 审计）。
 const DEBUG_BUTTONS := true
-const BattleDebugPanel := preload("res://src/ui/debug/battle_debug_panel.gd")   # debug 面板（preload 引用·不靠全局 class_name 注册·headless / CLI 可用）
+# debug 面板改运行时 load（2026-07-17 发行审计②）：preload=硬编译引用——发行导出按
+# export_presets.example.cfg 排除 src/ui/debug/** 后会让本文件编译失败；load 在
+# _build_debug_buttons 双门（联机禁用+is_debug_build）之后才执行=开发期照常·发行包可剥离。
 const BattleCodexOverlay := preload("res://src/ui/components/battle_codex_overlay.gd")   # 图鉴浮层（同上·preload 引用）
 const ProfileStore := preload("res://src/core/player_profile.gd")   # 个人资料战绩计数（同上·preload 引用）
 
@@ -2094,7 +2096,7 @@ func _build_debug_buttons() -> void:
 	# 发布构建剥离（导出模板 release 下 is_debug_build()=false·开发期照常）。
 	if _net or not OS.is_debug_build():
 		return
-	var panel := BattleDebugPanel.new()
+	var panel: Node = load("res://src/ui/debug/battle_debug_panel.gd").new()
 	panel.name = "DebugButtons"
 	add_child(panel)
 	panel.setup(battle)
