@@ -171,7 +171,9 @@ func _build() -> void:
 				_art_mat.set_shader_parameter("intensity", 0.85)
 				_art_mat.set_shader_parameter("pulse_amp", 0.0)
 				_art_mat.set_shader_parameter("center_amp", 0.30)
-				_art_mat.set_shader_parameter("wave_amp", 0.42)
+				# v3 对波解剖后回调（2026-07-17 波家族同步）：芯/鞘增益比旧亮度带高一截，
+				# 0.42 会顶到爆白——0.20 与 boot 稳态 0.18 同档。
+				_art_mat.set_shader_parameter("wave_amp", 0.20)
 				_art_mat.set_shader_parameter("levels", 40)
 				_art_mat.set_shader_parameter("dither_amt", 1.0)
 			ArtKind.CAMPFIRE:

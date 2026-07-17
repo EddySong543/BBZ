@@ -115,12 +115,12 @@ func reveal_into(scene_path: String, reveal_time: float = REVEAL_TIME) -> void:
 
 
 ## 胜方色 + 推进方向继承 boot 对波（蓝胜→蓝波向右涌；红胜→红波向左涌）。
-## deep 取 crest 压暗 35%（2026-06-10 55%→35%：配合 shader body_min 提高，
-## 波幕整体反转为亮色调——Eddy 反馈旧版中段过暗）。
+## deep 取 crest 压暗 62%（2026-07-17 35%→62%：波家族 v3 暗场化——boot 底=暗档能量场、
+## 亮只留芯线/浪尖，波幕跟队。⛔旧「亮幕」决定（2026-06-10 中段过暗反转）随 v3 作废）。
 func _apply_winner_style() -> void:
 	# 方向与色相均取 effective（含界面主色翻转）：翻转开时方向曾用原始 last_blue_wins、
 	# 色却用 dip_color()=effective → 推进方向与色相打架。统一为 effective（2026-06-27 修复）。
 	_mat.set_shader_parameter("dir", 1.0 if BootResult.effective_blue_wins() else -1.0)
 	var crest := BootResult.dip_color()
 	_mat.set_shader_parameter("crest_color", crest)
-	_mat.set_shader_parameter("deep_color", crest.darkened(0.35))
+	_mat.set_shader_parameter("deep_color", crest.darkened(0.62))

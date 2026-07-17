@@ -1,24 +1,14 @@
 shader_type canvas_item;
 
-// ── 波波攒 · 对波启动过场（boot_screen）着色器 · 风格化 v2b ─────
+// ── 波波攒 · 对波 shader（主菜单 mode_card「匹配对战」卡面用）· v3「对波解剖」─────
 //
-// 从原型 prototypes/wave_clash_title/ 提升为生产资源（2026-05-29）。完整机制与迭代血泪见原型 README。
-// 核心：
-//   1) 非对称浪头波形：陡前缘 + 长拖尾 → 波"有形"而非亮斑
-//   2) 生命周期振幅包络：波从屏幕外淡入、推进到中央侧淡出 → 无"冒出来"
-//   3) 2D 格点 hash 颗粒 + Bayer 4x4 dithering → 复古像素渐变（非数据条纹图）
-//   4) 连击盖过：hit_flash 撞击局部闪 + burst 全屏光爆发 + shake 受击抖动
-//
-// 时间轴 uniforms 由 boot_screen.gd 每帧驱动：
-//   pulse_l_x / pulse_r_x : 大波位置（推进期 0→0.5 / 1→0.5）
-//   pulse_amp             : 大波振幅（推进期 1，撞击后衰减 0）
-//   center_amp            : 中央白柱（撞击后起，僵持期微脉动）
-//   wave_amp              : 持续涌入小波振幅
-//   phase_l / phase_r     : 蓝/红侧小波累积相位（脚本每帧累加，盖过期胜方加速）
-//   wave_time             : 仅用于波纹纵向漂浮（与推进相位解耦）
-//   hit_flash             : 连击撞击瞬间的中央局部闪（每击 0→1→0）
-//   burst                 : 最终崩溃全屏光爆发 0→1.3（以中央为心向外散发、自然衰落）
-//   shake                 : 受击屏幕抖动（UV 偏移；连击轻微、崩溃强，脚本驱动衰减）
+// 2026-07-17 与 boot（canvas_boot_wave_clash.gdshader）同步为 v3 对波解剖（Eddy：波家族全线同风格）：
+//   1) 底场＝暗档能量场：无满屏噪点（底场钉量化档中点 + 能量体死区裁尾 → 零棋盘纹）
+//   2) 波身＝竖直波列：每道波前 = 暗缘 + 爆亮芯 + 色鞘 三层；颗粒只在鞘内；波身脉动呼吸
+//   3) 流势＝波列间向心流动的能量丝（短拖尾头亮尾淡）
+//   4) 撞点＝窄而炽的角力光墙（缘部逐行蠕动）
+// 与 boot 文件的差异仅两处：保留 corner_radius 像素台阶圆角（卡面自切）；无火花/电弧节点层。
+// 时间轴 uniforms 全套保留（pulse/hit/burst/ripple 卡面虽不用·prototype 与调参兼容）。
 
 uniform float clash_pos : hint_range(0.0, 1.0) = 0.5;
 uniform float aspect = 1.777;
@@ -40,22 +30,58 @@ uniform float dither_amt : hint_range(0.0, 2.0) = 1.0;
 
 uniform float hit_flash : hint_range(0.0, 1.0) = 0.0;
 uniform float burst : hint_range(0.0, 1.5) = 0.0;
-uniform float ripple : hint_range(0.0, 1.0) = 0.0;  // 初撞涟漪：两道竖直亮带自 clash_pos 向左右荡开
+uniform float ripple : hint_range(0.0, 1.0) = 0.0;
 uniform vec2 shake = vec2(0.0);
 
-// 像素台阶圆角遮罩（ModeCard 卡面用·默认 0=关，boot 全屏不受影响 2026-06-12）。
+// 像素台阶圆角遮罩（ModeCard 卡面用·默认 0=关）。
 // ⚠ Godot clip_children 不执行父节点自定义 shader → 圆角必须由本层自切。
 uniform float corner_radius : hint_range(0.0, 0.4) = 0.0;  // 半径(高度UV比例)
 uniform float corner_grid : hint_range(12.0, 200.0) = 88.0; // 台阶量化格数(与框 shader 对齐)
 
-// Bayer 4x4 有序抖动矩阵（值 0..15，用于档位边界棋盘交错）
+// ── 解剖旋钮（与 boot v3 同值同义·单位 uv 除注明外）────────────────────
+const float BASE_DARK = 0.1625;      // 僵持期底场亮度（6.5/40 档中点·⚠改 levels 须重新对档）
+const float BASE_FLOOD = 0.6125;     // 盖满后的底场亮度（24.5/40 档中点）
+const float K_CORE = 6500.0;         // 波前爆亮芯高斯衰减（半宽 ~0.8 格）
+const float K_SHEATH = 90.0;         // 色鞘拖尾衰减（半宽 ~5.6 格）
+const float K_RIM = 5000.0;          // 暗缘衰减
+const float RIM_AHEAD = 0.018;       // 暗缘在芯前方的距离
+const float CORE_GAIN = 2.4;         // 芯亮度增益（× wave_amp·暖白即止·纯白留给光墙）
+const float SHEATH_GAIN = 1.5;       // 鞘亮度增益
+const float RIM_DARK = 0.55;         // 暗缘压暗量
+const float BREATH_AMT = 0.10;       // 波身脉动呼吸幅度
+const float BREATH_HZ = 2.6;
+const float CRACKLE_HZ = 6.0;        // 芯沿电性碎抖整档步进频率（防连续噪闪）
+const float CRACKLE_AMP = 0.008;
+const float FLOW_DENSITY = 0.22;     // 能量丝行激活率
+const float FLOW_LEN = 0.075;        // 能量丝拖尾长
+const float FLOW_BRIGHT = 0.17;
+const float WALL_K_CORE = 90.0;      // 角力光墙窄芯
+const float WALL_K_HALO = 14.0;
+const float WALL_HALO = 0.30;
+const float WALL_WOBBLE = 0.010;
+
 const float BAYER[16] = float[16](
 	 0.0,  8.0,  2.0, 10.0,
 	12.0,  4.0, 14.0,  6.0,
 	 3.0, 11.0,  1.0,  9.0,
 	15.0,  7.0, 13.0,  5.0);
 
-// ── 蓝色 ramp：5 个关键色之间 mix（输入量化后的 L 0~1）─────
+// 死区裁尾：指数长尾低于 DEAD 归零（连续无跳变）——没有它微量尾巴把底场推离档中点=棋盘纹复发。
+const float DEAD = 0.06;
+
+float dz(float v) {
+	return max(v - DEAD, 0.0) / (1.0 - DEAD);
+}
+
+float hash11(float n) {
+	return fract(sin(n) * 43758.5453);
+}
+
+float hash21(vec2 p) {
+	return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+// ── 蓝/红 ramp（全波家族同源·决堤/波幕交棒同色）─────
 vec3 blue_color_at(float L) {
 	vec3 c0 = vec3(0.04, 0.07, 0.18);
 	vec3 c1 = vec3(0.08, 0.20, 0.42);
@@ -84,97 +110,114 @@ vec3 red_color_at(float L) {
 	return mix(c4, cW, min((L - 0.80) / 0.20, 1.0));
 }
 
-// ── 非对称浪头：s = 沿传播方向的有符号距离 ─────
-// s>0 在波前（中央侧，即将到达）→ 陡前缘；s<0 在波尾（边缘侧，已掠过）→ 长拖尾
-float wave_head(float s) {
-	float K_FRONT = 520.0;  // 前缘陡（半高 ~2.3 格）
-	float K_BACK  = 70.0;   // 后缘拖尾（半高 ~6 格）
-	return s > 0.0 ? exp(-s * s * K_FRONT) : exp(-s * s * K_BACK);
+// ── 波前三层剖面：x=爆亮芯 y=色鞘(仅波后) z=暗缘(芯前一格) ─────
+vec3 front_profile(float s) {
+	float core = dz(exp(-s * s * K_CORE));
+	float sheath = dz(exp(-s * s * K_SHEATH)) * step(s, 0.0);
+	float d = s - RIM_AHEAD;
+	float rim = dz(exp(-d * d * K_RIM));
+	return vec3(core, sheath, rim);
 }
 
-// 单侧两道波（A 主 + B 半周期错开），返回该列波强度（0~1）
-// dir=+1 蓝波向右推 / dir=-1 红波向左推；origin 屏外起点，target 中央侧终点
-float wave_side(float x, float phase, float dir, float origin, float target) {
+// 单侧波列（A 主 + B 半周期错开），返回三层剖面（分量取 max）
+vec3 wave_side(float x, float phase, float dir, float origin, float target, float jit) {
 	float cA = fract(phase);
 	float cB = fract(phase + 0.5);
 	float posA = mix(origin, target, cA);
 	float posB = mix(origin, target, cB);
-	// 生命周期包络：c∈[0,0.12] 淡入，[0.80,1.0] 淡出
 	float envA = smoothstep(0.0, 0.12, cA) * (1.0 - smoothstep(0.80, 1.0, cA));
 	float envB = smoothstep(0.0, 0.12, cB) * (1.0 - smoothstep(0.80, 1.0, cB));
-	float sA = (x - posA) * dir;
-	float sB = (x - posB) * dir;
-	return max(wave_head(sA) * envA, wave_head(sB) * envB);
+	float sA = (x - posA) * dir + jit;
+	float sB = (x - posB) * dir + jit;
+	return max(front_profile(sA) * envA, front_profile(sB) * envB);
 }
 
-// 每格中心算亮度 L (0~1)
+// 能量丝：该行一条自外缘流向中线的短拖尾（头亮尾淡·稀疏激活）
+float flow_streak(float x, float row, float dir, float origin, float stop_x, float seed) {
+	float act = step(hash11(row * 7.31 + seed), FLOW_DENSITY);
+	float spd = 0.10 + 0.12 * hash11(row * 3.17 + seed + 5.0);
+	float prog = fract(wave_time * spd + hash11(row * 9.13 + seed + 9.0));
+	float sx = mix(origin, stop_x, prog);
+	float d = (x - sx) * dir;
+	float body = step(-FLOW_LEN, d) * step(d, 0.0) * (1.0 + d / FLOW_LEN);
+	float env = smoothstep(0.02, 0.10, prog) * (1.0 - smoothstep(0.72, 0.95, prog));
+	return act * body * env;
+}
+
 float energy(vec2 cuv, vec2 ci) {
-	// 2D 格点 hash（替代旧整行 hash → 颗粒为随机点而非水平长条）
-	float cell_hash = fract(sin(dot(ci, vec2(12.9898, 78.233))) * 43758.5453);
+	float cell_hash = hash21(ci);
+	float tstep = floor(wave_time * CRACKLE_HZ);
 
-	// 1) 底色：盖过越多越亮（flood）+ 2D 格点微颗粒
-	//    上限 0.62 → 盖过末态是"饱和亮蓝/红"而非泛白浅色（避免铺满时糊成白）
+	// 1) 底场：暗档能量场（⛔满屏颗粒）；盖过 flood 提亮成饱和阵营色场
 	float flood = abs(clash_pos - 0.5) * 2.0;
-	float L_base = mix(0.35, 0.62, flood) + (cell_hash - 0.5) * 0.05;
+	float L_base = mix(BASE_DARK, BASE_FLOOD, flood);
 
-	// 2) 大波（推进期主角）：高斯衰减 30 → 波宽 ~10 格多格明暗渐变
+	// 2) 推进大波（卡面 pulse_amp=0 不走）：宽鞘 + 前缘亮芯
 	float dl = cuv.x - pulse_l_x;
 	float dr = pulse_r_x - cuv.x;
-	float L_pulse_l = exp(-dl * dl * 30.0) * pulse_amp;
-	float L_pulse_r = exp(-dr * dr * 30.0) * pulse_amp;
+	float pl = exp(-dl * dl * 30.0) * 0.80 + exp(-(dl - 0.010) * (dl - 0.010) * 2600.0) * 0.55;
+	float pr = exp(-dr * dr * 30.0) * 0.80 + exp(-(dr - 0.010) * (dr - 0.010) * 2600.0) * 0.55;
+	float L_pulse = max(pl, pr) * pulse_amp;
 
-	// 3) 中央白柱（僵持期主角）：衰减 8.1 → 对峙发光带宽 ~7-8 格
-	float L_center = exp(-abs(cuv.x - clash_pos) * 8.1) * center_amp;
+	// 3) 撞点角力光墙：窄芯 + 微晕，缘部逐行蠕动
+	float wob = (hash21(vec2(ci.y * 3.7, tstep)) - 0.5) * WALL_WOBBLE;
+	float dxw = abs(cuv.x - clash_pos + wob);
+	float L_wall = (dz(exp(-dxw * WALL_K_CORE)) + dz(exp(-dxw * WALL_K_HALO)) * WALL_HALO) * center_amp;
 
-	// 4) 持续涌入小波（非对称浪头 + 生命周期包络）
-	float side = step(cuv.x - clash_pos, 0.0);  // 1=蓝侧
-	// 纵向振幅调制：sin 波纹起伏 + 格点颗粒（不再水平长条）
-	float y_amp = 0.80 + sin(cuv.y * 12.0 + wave_time) * 0.18 + (cell_hash - 0.5) * 0.30;
-	float wl = wave_side(cuv.x, phase_l,  1.0, -0.12, 0.58);
-	float wr = wave_side(cuv.x, phase_r, -1.0,  1.12, 0.42);
-	float dist_l = max(clash_pos - cuv.x, 0.0);
-	float dist_r = max(cuv.x - clash_pos, 0.0);
-	float L_wave_l = wl * wave_amp * y_amp * smoothstep(0.0, 0.22, dist_l) * side;
-	float L_wave_r = wr * wave_amp * y_amp * smoothstep(0.0, 0.22, dist_r) * (1.0 - side);
+	// 4) 波列：暗缘 + 爆亮芯 + 色鞘（颗粒只在鞘内·脉动呼吸·近中线让位光墙）
+	float side = step(cuv.x - clash_pos, 0.0);
+	float jl = (hash21(vec2(ci.y, tstep)) - 0.5) * CRACKLE_AMP;
+	float jr = (hash21(vec2(ci.y + 57.0, tstep)) - 0.5) * CRACKLE_AMP;
+	vec3 wl = wave_side(cuv.x, phase_l, 1.0, -0.12, 0.58, jl);
+	vec3 wr = wave_side(cuv.x, phase_r, -1.0, 1.12, 0.42, jr);
+	float grain = 0.75 + cell_hash * 0.50;
+	float breath_l = 1.0 - BREATH_AMT * 0.5 + BREATH_AMT * 0.5 * sin(wave_time * BREATH_HZ);
+	float breath_r = 1.0 - BREATH_AMT * 0.5 + BREATH_AMT * 0.5 * sin(wave_time * BREATH_HZ + 1.7);
+	float near_l = smoothstep(0.0, 0.16, max(clash_pos - cuv.x, 0.0));
+	float near_r = smoothstep(0.0, 0.16, max(cuv.x - clash_pos, 0.0));
+	float amp_l = wave_amp * breath_l * near_l * side;
+	float amp_r = wave_amp * breath_r * near_r * (1.0 - side);
+	float L_wave = (wl.x * CORE_GAIN + wl.y * SHEATH_GAIN * grain) * amp_l
+			+ (wr.x * CORE_GAIN + wr.y * SHEATH_GAIN * grain) * amp_r;
+	float L_rim = wl.z * RIM_DARK * amp_l + wr.z * RIM_DARK * amp_r;
 
-	// 5) 连击撞击闪：clash_pos 处局部高亮带（每击 hit_flash 脉冲）
+	// 5) 能量丝：波列间向心流动
+	float gate = smoothstep(0.05, 0.18, wave_amp);
+	float fl = flow_streak(cuv.x, ci.y, 1.0, -0.05, clash_pos - 0.05, 3.0) * side;
+	float fr = flow_streak(cuv.x, ci.y, -1.0, 1.05, clash_pos + 0.05, 11.0) * (1.0 - side);
+	float L_flow = (fl + fr) * FLOW_BRIGHT * gate;
+
+	// 6) 连击闪 / 光爆 / 涟漪（机制保留·卡面不用）
 	float hit = exp(-abs(cuv.x - clash_pos) * 13.0) * hit_flash;
-
-	// 6) 崩溃全屏光爆发：以 clash_pos 为中心向左右散发的宽光晕，
-	//    随 burst 从中央小光团扩展到全屏、并在 burst 后期整体自然衰落（替代旧窄扩散环）
-	float glow_w = 0.12 + burst * 1.25;             // 光晕半宽随 burst 扩展到全屏
+	float glow_w = 0.12 + burst * 1.25;
 	float gdist = (cuv.x - clash_pos) / glow_w;
-	// fade：burst 0→0.15 淡入、0.55→1.25 淡出 → burst=0（平时/僵持期）完全无 glow，仅崩溃时爆发
 	float glow_fade = smoothstep(0.0, 0.15, burst) * (1.0 - smoothstep(0.55, 1.25, burst));
 	float glow = exp(-gdist * gdist * 2.2) * glow_fade * 1.25;
-
-	// 7) 初撞涟漪：以 clash_pos 为心，两道【竖直】亮带分别向左 / 右荡开并消散
-	//    （竖直保持对波主题、非圆形；两侧对称各一道；仅随 x 变化 → 满高竖线）
-	float r_offset = ripple * 0.6;                         // 每道带从中央向外行进 0→0.6（出屏）
-	float r_dl = (cuv.x - (clash_pos - r_offset)) / 0.06;  // 向左行进的带（带宽 ~0.06，加宽显格子列）
-	float r_dr = (cuv.x - (clash_pos + r_offset)) / 0.06;  // 向右行进的带
-	float r_fade = smoothstep(0.0, 0.12, ripple) * (1.0 - ripple); // 起始淡入 + 扩张中消散
+	float r_offset = ripple * 0.6;
+	float r_dl = (cuv.x - (clash_pos - r_offset)) / 0.06;
+	float r_dr = (cuv.x - (clash_pos + r_offset)) / 0.06;
+	float r_fade = smoothstep(0.0, 0.12, ripple) * (1.0 - ripple);
 	float ripple_ring = max(exp(-r_dl * r_dl), exp(-r_dr * r_dr)) * r_fade * 0.65;
 
-	float L_base_mod = L_base + L_wave_l + L_wave_r;
-	float L = max(L_base_mod, max(max(L_pulse_l, L_pulse_r), L_center));
+	float L_body = max(L_base + L_wave + L_flow - L_rim, 0.05);
+	float L = max(L_body, max(L_pulse, L_wall));
 	L = max(L, max(hit, glow));
 	L = max(L, ripple_ring);
 	return clamp(L * intensity, 0.0, 0.9999);
 }
 
 void fragment() {
-	vec2 uv = UV + shake;  // 受击 shake：整屏 UV 偏移（幅度小，越界由 energy 平滑延续不穿帮）
+	vec2 uv = UV + shake;
 	vec2 grid = vec2(cells_x, cells_x / aspect);
 	vec2 ci = floor(uv * grid);
 	vec2 cuv = (ci + 0.5) / grid;
 
 	float L = energy(cuv, ci);
 
-	// Bayer 抖动后量化：档位边界棋盘交错（复古像素渐变）
+	// Bayer 抖动后量化（底场已平·抖动只见于能量体渐变处）
 	int bx = int(mod(ci.x, 4.0));
 	int by = int(mod(ci.y, 4.0));
-	float dith = (BAYER[by * 4 + bx] + 0.5) / 16.0 - 0.5;  // ≈ -0.47 ~ +0.47
+	float dith = (BAYER[by * 4 + bx] + 0.5) / 16.0 - 0.5;
 	L = clamp(L + dith * dither_amt / float(levels), 0.0, 0.9999);
 	L = floor(L * float(levels)) / float(levels);
 
