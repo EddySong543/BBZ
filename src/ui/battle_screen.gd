@@ -1168,7 +1168,9 @@ func _post_resolution(r: Dictionary) -> void:
 			ai_slot = ai_reserves[0] if ai_reserves.size() > 0 else -1
 		if ai_slot >= 0:
 			battle.execute_death_switch(AI, ai_slot)
-		_update_all()
+			await _death_switch_transition(AI)   # 遗体消散→新人入场（秒切退役）
+		else:
+			_update_all()
 
 	# 玩家死亡换人：弹浮窗
 	if battle.pending_death_switch[PLAYER]:
@@ -1277,7 +1279,7 @@ func _show_death_switch_selection(player: int) -> void:
 	_death_switch_overlay.show_selection(player, reserves)
 	var selected_slot: int = await _death_switch_overlay.selection_made
 	battle.execute_death_switch(player, selected_slot)
-	_update_all()
+	await _death_switch_transition(player)   # 遗体消散→新人入场（秒切退役）
 
 
 # ============================================================
@@ -2382,6 +2384,30 @@ func _play_defeat(player: int) -> void:
 		cd.play_animation("defeat", false)
 	else:
 		cd.modulate = Color(0.35, 0.35, 0.35)
+
+
+## 死亡换人过渡（2026-07-17 Eddy：换人秒切不协调）：遗体消散 → 透明期换装 → 新人落点入场。
+## 消散=躺姿淡出+微下沉（能量散逸·非位移演出）；入场=自上小落+淡入+落地尘
+## （攻击回位蹬地尘同语言）。⚠ _update_all 在全透明期间执行=换装不可见；
+## _update_character_displays 会复位 modulate=WHITE → 换装后须重设 alpha 再淡入。
+func _death_switch_transition(player: int) -> void:
+	var cd := _cd(player)
+	var home: Vector2 = _cd_home[player]
+	var out := create_tween().set_parallel(true)
+	out.tween_property(cd, "modulate:a", 0.0, 0.38) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	out.tween_property(cd, "position", home + Vector2(0.0, 8.0), 0.38)
+	await out.finished
+	_update_all()   # 全透明 → 秒换看不见
+	cd.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	cd.position = home + Vector2(0.0, -26.0)
+	var inw := create_tween().set_parallel(true)
+	inw.tween_property(cd, "modulate:a", 1.0, 0.22)
+	inw.tween_property(cd, "position", home, 0.26) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	inw.chain().tween_callback(_fx._spawn_dust.bind(player))   # 落地蹬起尘土
+	await inw.finished
+	cd.position = home
 
 
 func _cd(player: int) -> CharacterDisplay:
