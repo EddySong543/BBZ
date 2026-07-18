@@ -48,6 +48,14 @@ const ProfileStore := preload("res://src/core/player_profile.gd")   # 个人资�
 ## 各动画相位等待（秒），可在 Inspector 调。
 @export var anim_phase_duration: float = 1.0
 @export var action_phase_duration: float = 0.6
+## 死亡节拍 v3（2026-07-18 Eddy 批 A 方案·倒地后在地时长定 2s）：
+## 致命定格 0.2 → 倒地 0.7 → 落地宣告（尘+轻震+遗体褪色 0.4）→ 静躺 1.6 → 消散换人。
+## death_lie_duration = 从 defeat 起播到允许消散的保底总时长（0.7 倒地 + 2.0 在地）。
+## 换人过渡按「已躺时长」补差额——玩家选人/终结慢放耗时计入，不重复罚站。
+@export var death_lie_duration: float = 2.7
+@export var kill_hitstop_duration: float = 0.2   # ① 致命定格（真实秒·普通 0.045/重击 0.075 的加重档）
+@export var death_gray_duration: float = 0.4     # ③ 遗体褪色时长（落地宣告拍）
+const DEFEAT_FALL_TIME := 0.7   # defeat 帧表标准时长（import_hero_batch 管线：帧数/0.7s）
 # 回合时限阶梯（2026-07-11 Eddy 定·由少到多·台阶绑道具解锁节奏）：回合 1-2 纯动作选择 10s →
 # 回合 3 起道具经济开动（3/4/5 逐格解锁）15s → 回合 6 起组合决策期（看描述/算对方）20s 封顶。
 const TURN_TIME_STEPS: Array = [[5, 20], [2, 15], [0, 10]]   # [起始回合(0-based), 秒]·降序查表
@@ -1172,8 +1180,14 @@ func _post_resolution(r: Dictionary) -> void:
 		else:
 			_update_all()
 
-	# 玩家死亡换人：弹浮窗
+	# 玩家死亡换人：弹浮窗（死亡节拍 v3：先看清死亡——倒地+宣告 ≈1.1s 后才弹，差额补等；
+	# AI 侧若先走完换人过渡，其耗时已计入 → 不二次等待）
 	if battle.pending_death_switch[PLAYER]:
+		if _defeat_at_ms[PLAYER] > 0:
+			var seen := float(Time.get_ticks_msec() - _defeat_at_ms[PLAYER]) / 1000.0
+			var need := DEFEAT_FALL_TIME + death_gray_duration
+			if seen < need:
+				await get_tree().create_timer(need - seen).timeout
 		await _show_death_switch_selection(PLAYER)
 
 	await get_tree().create_timer(maxf(0.1, anim_phase_duration * 0.5)).timeout
@@ -1969,6 +1983,12 @@ func _update_all() -> void:
 func _update_character_displays() -> void:
 	for p in [0, 1]:
 		var cd: CharacterDisplay = p1_char_display if p == 0 else p2_char_display
+		# 死亡节拍 v3 守卫（2026-07-18 Eddy："在地最长的灰色状态成了站立 idle"修复）：
+		# 出战位还是遗体（阵亡未换人 / 终局尸身）时跳过刷新——sprite_frames_path setter
+		# 会重播 idle 把遗体拉起来站好，modulate 复位也会洗掉灰化。结算尾的 _update_all
+		# 正撞在倒地中段（~0.6s）。换人后出战位是活人，刷新自然恢复。
+		if battle.hp[p][battle.active_index[p]] <= 0:
+			continue
 		cd.modulate = Color.WHITE  # 复位（死亡变暗 / 防御蓝闪 / 攒黄闪）
 		var h: HeroData = battle.active_hero(p)
 		if h.sprite_frames_path != "":
@@ -2242,17 +2262,24 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 	# ⑤ 方向性后坐：单侧受击=镜头朝受击方踢一脚（P0 左=-1/P1 右=+1）；双方同拍受击=对撞抵消不偏向。
 	var hit0 := int(dmg[0]) > 0 or bool(dead[0])
 	var hit1 := int(dmg[1]) > 0 or bool(dead[1])
+	var lethal := bool(dead[0]) or bool(dead[1])
 	if any:
 		var kick := (1.0 if hit1 else 0.0) - (1.0 if hit0 else 0.0)
-		stage.shake(SHAKE_BIG if (a0 == A.BIG_ATTACK or a1 == A.BIG_ATTACK) else SHAKE_HIT, kick)
+		# 击杀拍震屏强制加档（死亡节拍 v3 ①：这一下就该和普通命中不一样）
+		stage.shake(SHAKE_BIG if (lethal or a0 == A.BIG_ATTACK or a1 == A.BIG_ATTACK) else SHAKE_HIT, kick)
 	elif any_block:
 		# 没打进也有"接触感"：轻震朝防守方踢（力被盾接住的方向感）
 		var bkick := (1.0 if bool(blocked[1]) else 0.0) - (1.0 if bool(blocked[0]) else 0.0)
 		stage.shake(SHAKE_BLOCK, bkick)
-	if bool(dead[0]):
-		_play_defeat(0)
-	if bool(dead[1]):
-		_play_defeat(1)
+	# ①② 死亡节拍 v3（2026-07-18 Eddy 批 A 方案）：致命一击加重定格（盖过 _impact 常规档·
+	# token 后发覆盖），按真实时长等冻结放开 → 倒地独享一拍起播，不再被命中特效淹没。
+	if lethal:
+		_hitstop(kill_hitstop_duration)
+		await get_tree().create_timer(kill_hitstop_duration + 0.02, true, false, true).timeout
+		if bool(dead[0]):
+			_play_defeat(0)
+		if bool(dead[1]):
+			_play_defeat(1)
 
 	await get_tree().create_timer(action_phase_duration).timeout
 	stage.set_focus(false)   # 动作结束 → 镜头回正中
@@ -2375,15 +2402,32 @@ func _finisher_impact(target_player: int, dmg_half: int) -> void:
 	_fin_impact_tweens.append(tw2)
 
 
+var _defeat_at_ms: Array[int] = [0, 0]   # 各侧 defeat 起播时刻（遗体停留拍计时用·死亡低频非热路径）
+
+
 ## 死亡演出：有 defeat 表=播倒地帧动画（非循环停末帧·管线=import_hero_batch _defeat 线）；
 ## 无表=阵亡变灰保底（旧路径·试点表入库前全员走此路）。换人后 _update_character_displays
 ## 重载新英雄 idle + modulate 复位，两条路都被自然接管。
 func _play_defeat(player: int) -> void:
+	_defeat_at_ms[player] = Time.get_ticks_msec()
 	var cd := _cd(player)
 	if cd.has_action_anim("defeat"):
 		cd.play_animation("defeat", false)
+		# ③ 落地宣告排程：帧表播毕（0.7s·计时默认随 time_scale → 终结慢放下与帧表同步拉伸）。
+		# 绑 self 方法=场景中途释放（故事关卡收场等）时连接自动失效，无需手动守卫。
+		get_tree().create_timer(DEFEAT_FALL_TIME).timeout.connect(_announce_death.bind(player))
 	else:
 		cd.modulate = Color(0.35, 0.35, 0.35)
+
+
+## ③ 死亡宣告（死亡节拍 v3）：落地瞬间蹬尘+朝倒地侧轻震（躯体的重量感），随后遗体
+## 0.4s 褪成灰蓝（生命离开的颜色信号·黑暗地牢式）。褪色走 CharacterDisplay.modulate
+## （防御蓝闪同通道·舞台立绘无 shader 拦截），换人后 _update_character_displays 复位 WHITE 自然接管。
+func _announce_death(player: int) -> void:
+	_fx._spawn_dust(player)
+	stage.shake(SHAKE_HIT * 0.6, 1.0 if player == 1 else -1.0)
+	var tw := create_tween()
+	tw.tween_property(_cd(player), "modulate", Color(0.52, 0.52, 0.58), death_gray_duration)
 
 
 ## 死亡换人过渡（2026-07-17 Eddy：换人秒切不协调）：遗体消散 → 透明期换装 → 新人落点入场。
@@ -2391,6 +2435,13 @@ func _play_defeat(player: int) -> void:
 ## （攻击回位蹬地尘同语言）。⚠ _update_all 在全透明期间执行=换装不可见；
 ## _update_character_displays 会复位 modulate=WHITE → 换装后须重设 alpha 再淡入。
 func _death_switch_transition(player: int) -> void:
+	# ① 遗体停留拍（2026-07-18 Eddy：倒地 1 帧就切换=不协调）：普通拍到这里时倒地动画
+	#   还剩 ~0.1s 没播完——先把倒地播完并静躺够 death_lie_duration（从起播计），再开始消散。
+	#   按差额补等：终结慢放/玩家选人等已耗时的路径不重复罚站。
+	if _defeat_at_ms[player] > 0:
+		var lying := float(Time.get_ticks_msec() - _defeat_at_ms[player]) / 1000.0
+		if lying < death_lie_duration:
+			await get_tree().create_timer(death_lie_duration - lying).timeout
 	var cd := _cd(player)
 	var home: Vector2 = _cd_home[player]
 	var out := create_tween().set_parallel(true)
