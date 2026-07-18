@@ -4,6 +4,7 @@
 [ext_resource type="PackedScene" uid="uid://ccx2qeqk5rvx5" path="res://src/ui/components/character_display.tscn" id="2_char_display"]
 [ext_resource type="PackedScene" uid="uid://b6i5h2alff53a" path="res://src/ui/components/hero_frame.tscn" id="3_hero_frame"]
 [ext_resource type="PackedScene" uid="uid://b1iconpiprow0" path="res://src/ui/components/icon_pip_row.tscn" id="4_piprow"]
+[ext_resource type="PackedScene" path="res://src/ui/components/hp_slant_bar.tscn" id="5_hpbar"]
 [ext_resource type="PackedScene" path="res://src/ui/components/death_switch_overlay.tscn" id="6_death"]
 [ext_resource type="PackedScene" uid="uid://cscn1rftp00a" path="res://src/ui/scenes/scene1.tscn" id="7_stage"]
 [ext_resource type="Shader" uid="uid://dnycv6j3wn0ot" path="res://assets/shaders/post_fx_color_grade.gdshader" id="8_postfx"]
@@ -307,22 +308,15 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="P1HeartRow" parent="P1Hud" unique_id=140100001 instance=ExtResource("4_piprow")]
-texture_filter = 1
+[node name="P1HeartRow" parent="P1Hud" unique_id=140100001 instance=ExtResource("5_hpbar")]
 anchors_preset = 0
-offset_left = 95.2
-offset_top = -24.435
-offset_right = 449.2
-offset_bottom = 21.564985
-sheet = ExtResource("13_heart")
-hframes = 4
-idle_rest_min = 2.0
-idle_rest_max = 5.0
+offset_left = 124.0
+offset_top = 28.0
+offset_right = 684.0
+offset_bottom = 40.0
+slant = -4.0
 wave_idle = true
 wave_speed_by_hp = true
-pip_size = 84.0
-spacing = -42.0
-extra_modulate = Color(0.85, 0.82, 0.74, 1)
 
 [node name="P1CoinRow" parent="P1Hud" unique_id=1966048575 instance=ExtResource("4_piprow")]
 texture_filter = 1
@@ -350,12 +344,14 @@ offset_left = 30.0
 offset_top = 8.0
 offset_right = 102.0
 offset_bottom = 80.0
+diamond_mode = true
 
 [node name="P1Frame1" parent="P1Hud" unique_id=1566007647 instance=ExtResource("3_hero_frame")]
 offset_left = 796.0
 offset_top = 6.0
 offset_right = 864.0
 offset_bottom = 74.0
+diamond_mode = true
 
 [node name="P1Frame1HpRow" type="Control" parent="P1Hud" unique_id=1327412840]
 texture_filter = 1
@@ -374,6 +370,7 @@ offset_left = 716.0
 offset_top = 6.0
 offset_right = 784.0
 offset_bottom = 74.0
+diamond_mode = true
 
 [node name="P1Frame2HpRow" type="Control" parent="P1Hud" unique_id=1749780638]
 texture_filter = 1
@@ -423,23 +420,15 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="P2HeartRow" parent="P2Hud" unique_id=140100002 instance=ExtResource("4_piprow")]
-texture_filter = 1
+[node name="P2HeartRow" parent="P2Hud" unique_id=140100002 instance=ExtResource("5_hpbar")]
 anchors_preset = 0
-offset_left = 1827.005
-offset_top = -24.68
-offset_right = 2027.005
-offset_bottom = 21.319992
-sheet = ExtResource("13_heart")
-hframes = 4
-idle_rest_min = 2.0
-idle_rest_max = 5.0
+offset_left = 1796.0
+offset_top = 28.0
+offset_right = 2356.0
+offset_bottom = 40.0
+right_to_left = true
 wave_idle = true
 wave_speed_by_hp = true
-pip_size = 84.0
-spacing = -42.0
-right_to_left = true
-extra_modulate = Color(0.85, 0.82, 0.74, 1)
 
 [node name="P2CoinRow" parent="P2Hud" unique_id=1708577516 instance=ExtResource("4_piprow")]
 texture_filter = 1
@@ -468,12 +457,14 @@ offset_left = 1818.0
 offset_top = 8.0
 offset_right = 1890.0
 offset_bottom = 80.0
+diamond_mode = true
 
 [node name="P2Frame1" parent="P2Hud" unique_id=1621653890 instance=ExtResource("3_hero_frame")]
 offset_left = 1070.0
 offset_top = 6.0
 offset_right = 1138.0
 offset_bottom = 74.0
+diamond_mode = true
 
 [node name="P2Frame1HpRow" type="Control" parent="P2Hud" unique_id=757910723]
 texture_filter = 1
@@ -491,6 +482,7 @@ offset_left = 1150.0
 offset_top = 6.0
 offset_right = 1218.0
 offset_bottom = 74.0
+diamond_mode = true
 
 [node name="P2Frame2HpRow" type="Control" parent="P2Hud" unique_id=1880263533]
 texture_filter = 1

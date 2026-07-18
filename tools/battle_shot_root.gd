@@ -8,6 +8,10 @@ const OUT := "D:/Game/BoBoZan/battle_screen_shot.png"
 
 
 func _ready() -> void:
+	# ⚠窗口尺寸必须钉死：不钉的话本机偶发开成 1444×1061，截图右侧整块缺失
+	# （踩过：P2 侧裁图全黑）。scene2_shot_runner 同款处理。
+	get_window().size = Vector2i(1920, 1080)
+	get_window().position = Vector2i(0, 0)
 	var s: Node = load("res://src/ui/battle_screen.tscn").instantiate()
 	add_child(s)
 	await get_tree().create_timer(2.2).timeout   # 等进入选择态（按钮 + 道具栏可见）

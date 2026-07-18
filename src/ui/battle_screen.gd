@@ -44,6 +44,9 @@ const DEBUG_BUTTONS := true
 # _build_debug_buttons 双门（联机禁用+is_debug_build）之后才执行=开发期照常·发行包可剥离。
 const BattleCodexOverlay := preload("res://src/ui/components/battle_codex_overlay.gd")   # 图鉴浮层（同上·preload 引用）
 const ProfileStore := preload("res://src/core/player_profile.gd")   # 个人资料战绩计数（同上·preload 引用）
+## 出战血条＝斜切分段条（2026-07-18 取代心形 IconPipRow）。走 preload 常量当类型：
+## 新 class_name 在 headless/GUT 首跑可能尚未注册（踩过·见 memory godot-headless-classname-preload）。
+const HpSlantBarScript := preload("res://src/ui/components/hp_slant_bar.gd")
 
 ## 各动画相位等待（秒），可在 Inspector 调。
 @export var anim_phase_duration: float = 1.0
@@ -124,8 +127,8 @@ var _codex_overlay: Control = null    # 战斗内图鉴浮层（懒创建·关�
 @onready var btn_confirm: Button = $Buttons/BtnConfirm
 
 # 新美术 HUD：心形血珠 + 金币能量点（替换旧 EnergyBar / ArcHealthBar）。
-@onready var p1_heart_row: IconPipRow = $P1Hud/P1HeartRow
-@onready var p2_heart_row: IconPipRow = $P2Hud/P2HeartRow
+@onready var p1_heart_row: HpSlantBarScript = $P1Hud/P1HeartRow
+@onready var p2_heart_row: HpSlantBarScript = $P2Hud/P2HeartRow
 @onready var p1_coin_row: IconPipRow = $P1Hud/P1CoinRow
 @onready var p2_coin_row: IconPipRow = $P2Hud/P2CoinRow
 
@@ -449,7 +452,7 @@ func _init_buttons() -> void:
 	# 导航钮贴图+墨字（主菜单导航钮同语言·避开动作按钮语义色）；程序化创建不动 .tscn（同疾风）。
 	btn_codex = Button.new()
 	btn_codex.name = "BtnCodex"
-	btn_codex.text = tr("图鉴")
+	btn_codex.text = ""   # 「图鉴」二字 → 书本图标（2026-07-18 Eddy·图标见下方 BookIcon）
 	btn_codex.focus_mode = Control.FOCUS_NONE
 	btn_codex.clip_text = true
 	btn_codex.position = Vector2(1626.0, 46.0)   # 集体缩小批（2026-07-17）：108 与结束钮同档·底缘对齐 154·与结束间隔 38=动作排同律
@@ -479,9 +482,21 @@ func _init_buttons() -> void:
 	codex_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	codex_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	btn_codex.add_child(codex_bg)
-	FontManager.apply_btn(btn_codex, 30)
-	btn_codex.add_theme_color_override("font_color", Color(0.24, 0.19, 0.12))        # 墨字压亮纸底
-	btn_codex.add_theme_color_override("font_hover_color", Color(0.14, 0.10, 0.06))
+	# 书本图标取代「图鉴」二字（2026-07-18 Eddy）：64×64 原图 **1:1 摆放**（108 钮内缩 22
+	# → 恰好 64 见方）——像素纪律：非整数倍缩放会糊，宁可留白也不拉伸。
+	var book := TextureRect.new()
+	book.name = "BookIcon"
+	book.texture = preload("res://assets/ui/icons/codex_book.png")
+	book.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	book.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	book.offset_left = 22.0
+	book.offset_top = 22.0
+	book.offset_right = -22.0
+	book.offset_bottom = -22.0
+	book.expand_mode = TextureRect.EXPAND_IGNORE_SIZE   # 小尺寸 TextureRect 必 IGNORE_SIZE
+	book.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	book.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	btn_codex.add_child(book)
 	_attach_button_juice(btn_codex)
 	btn_codex.pressed.connect(_on_codex_pressed)
 	buttons_ctrl.add_child(btn_codex)
@@ -495,7 +510,13 @@ func _init_buttons() -> void:
 	_set_cost_pips(btn_big_defend, ActionDef.BASE_ACTION_DEF[A.BIG_DEFEND]["cost"])
 	_set_cost_pips(btn_defend, ActionDef.BASE_ACTION_DEF[A.DEFEND]["cost"], true)   # 防=0 费也显示（Eddy 2026-07-13·与其他按钮一致）
 
-	FontManager.apply(timer_label, 32)   # 顶部常驻回合数(原倒计时位)·紧凑
+	# 顶部常驻回合数(原倒计时位)·紧凑。加粗（Eddy 2026-07-18）：走 FontVariation 描粗
+	# 而非换字重——Ark Pixel 只有一个字重；base 仍取 f16（32=16 整 2 倍·像素不糊）。
+	var turn_bold := FontVariation.new()
+	turn_bold.base_font = FontManager.f16
+	turn_bold.variation_embolden = 0.6
+	timer_label.add_theme_font_override("font", turn_bold)
+	timer_label.add_theme_font_size_override("font_size", 32)
 	timer_label.add_theme_color_override("font_color", Color(0.95, 0.91, 0.8))   # 暖米白（压暗背景）
 	timer_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
 	timer_label.add_theme_constant_override("outline_size", 4)
@@ -2090,7 +2111,7 @@ func _update_hp_labels() -> void:
 		var hp_max := battle.hp_display(battle.current_max_hp(p))
 		var sh := battle.hp_display(battle.shield[p][battle.active_index[p]])
 		# 心形血珠：满+半+暗色空心到 max；护盾作青色额外心追加。
-		var row: IconPipRow = p1_heart_row if p == 0 else p2_heart_row
+		var row: HpSlantBarScript = p1_heart_row if p == 0 else p2_heart_row
 		row.set_value(hp_now, hp_max, sh)
 		# 数字重量(b)：HP 变化时心条 flinch 脉冲（掉血偏红 / 回血偏绿）。
 		if _prev_hp_disp[p] >= 0.0 and not is_equal_approx(hp_now, _prev_hp_disp[p]):

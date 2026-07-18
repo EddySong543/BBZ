@@ -313,12 +313,12 @@ func _pop_float(player: int, text: String, font_size: int, col: Color, outline: 
 
 ## 数字重量(b)：HP 变化时给出战心条一个 modulate flinch（掉血偏红 / 回血偏绿），
 ## 用 modulate 而非 scale → 不受 RTL 心条(右起左排)的布局影响、稳健。
-func _flinch_heart_row(row: IconPipRow, is_loss: bool) -> void:
+func _flinch_heart_row(row: Control, is_loss: bool) -> void:
 	_pulse_pip_row(row, Color(1.7, 1.35, 1.35) if is_loss else Color(1.35, 1.7, 1.4))
 
 
 ## pip 行 modulate 脉冲（心条 flinch / ③ 金币行收能）单一出口。
-func _pulse_pip_row(row: IconPipRow, peak: Color) -> void:
+func _pulse_pip_row(row: Control, peak: Color) -> void:
 	var tw := create_tween()
 	tw.tween_property(row, "modulate", peak, 0.06).set_trans(Tween.TRANS_SINE)
 	tw.tween_property(row, "modulate", Color.WHITE, 0.30).set_trans(Tween.TRANS_SINE)
