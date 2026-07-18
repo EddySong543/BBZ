@@ -22,7 +22,19 @@ enum Step { BAN, PICK, REVEAL }
 const HERO_DATA_DIR := "res://assets/data/heroes/"
 const HERO_CARD_SCENE := preload("res://src/ui/components/hero_card.tscn")
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")
-const JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")
+# ── 家族换装（2026-07-16 Epic 项⑭·裸件全退役：灰蓝平板/黑方块槽/黑信息板/鎏金 jelly 钮）──
+const TOOLTIP_TEX := preload("res://assets/ui/ui_tooltip.png")            # 深框奶油纸（战场悬浮件语言·牌池桌面+信息板）
+const CELL_BG_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")   # 席位槽格底（图鉴/资料同配方）
+const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")       # 确认钮=导航钮皮（全游戏导航一语言）
+const NAV_PLATE_MARGIN_X := 22
+const NAV_PLATE_MARGIN_Y := 20
+const TOOLTIP_MARGIN := 20        # ui_tooltip 9-slice 边距（battle _tip_panel 同值）
+const SHADOW_TINT := Color(0.10, 0.07, 0.05, 0.38)   # 贴形投影暖黑（牌匾/纸卡同值）
+const INK := Color(0.24, 0.19, 0.12)                 # 墨字（奶油纸上·图鉴家族同值）
+const OPP_INK := Color("a83a2c")                     # 朱墨（敌方语义·纸上深红=图鉴 HP 同值）
+const CELL_FILL := Color("221c15")                   # 槽格底四角=暖深（资料大格同值）
+const CELL_CENTER := Color("2e2720")                 # 槽格底中心=略浅暖深
+const OPP_FRAME_TINT := Color("c86a5e")              # 敌方槽框=亮赤陶（敌方头像框同族）
 
 const STEP_TIME := 30
 const BAN_COUNT := 3
@@ -61,18 +73,12 @@ const EDGE_MID := Color(0.70, 0.64, 0.52)      # 暖骨中段（替原冷灰）
 const EDGE_INNER := Color(0.42, 0.36, 0.26)    # 暖骨内段（替原冷灰）
 const GOLD_TEXT := Color("#f4c84b")            # 金字标题（暗底，节制）
 const BAN_RED := Color("#d24a44")              # 敌方红（功能色，勿改）
-const CINNABAR := Color(0.74, 0.24, 0.18)      # 朱砂（主行动/确认）
-const CINNABAR_INK := Color(0.52, 0.18, 0.12)  # 朱砂墨（朱砂按钮的字）
+# （旧朱砂 CINNABAR/CINNABAR_INK 已随鎏金 jelly 钮退役——确认钮墨字见 INK）
 # 暗底文字
 const WARM_IVORY := Color(0.95, 0.91, 0.80)    # 暖米白（压暗背景）
 const WARM_IVORY_DIM := Color(0.80, 0.74, 0.60)  # 暖米白次级
 const DARK_WARM := Color(0.09, 0.085, 0.075)   # 近黑暖暗底（保留为暗的大块面）
-# 确认钮 = 鎏金羊皮主行动钮（2026-06-13 回修：全朱砂大红填充读成危险/取消；主 CTA 应是
-# "鎏金"——与主菜单金色匹配钮同级。羊皮提亮底 + 金箔内边 + 暗金外边，字用朱砂墨点睛）。
-const TIER_GOLD := {
-	"fill_top": Color(0.95, 0.90, 0.76), "fill_bottom": Color(0.89, 0.82, 0.67),
-	"edge_inner": Color(0.97, 0.85, 0.48), "edge_outer": Color(0.40, 0.28, 0.10),
-}
+# （旧确认钮 TIER_GOLD 鎏金 jelly 已退役——2026-07-16 换导航钮皮·全游戏导航一语言）
 
 var all_heroes: Array[HeroData] = []
 var _draft_ai := DraftAI.new()       # 对手选人 AI（任务#5·2026-07-03 接入·随机种子）
@@ -127,54 +133,51 @@ func _ready() -> void:
 
 func _setup_ui() -> void:
 	FontManager.apply(timer_label, 22)
-	timer_label.add_theme_color_override("font_color", GOLD_TEXT)
+	timer_label.add_theme_color_override("font_color", INK)   # 奶油纸板上→墨字（告急转朱红见 _update_timer_label）
 
 	FontManager.apply($OppBand/OppName, 22)
 	$OppBand/OppName.add_theme_color_override("font_color", Color("#e0938c"))   # 敌方暖红（暗底）
 	FontManager.apply($OppBand/OppRank, 14)
 	$OppBand/OppRank.add_theme_color_override("font_color", Color(WARM_IVORY_DIM, 0.8))
 	FontManager.apply(opp_progress, 16)
-	opp_progress.add_theme_color_override("font_color", Color("#e0938c"))      # 敌方暖红（暗底）
+	opp_progress.add_theme_color_override("font_color", OPP_INK)      # 敌方语义·奶油纸上→朱墨
 	FontManager.apply($MyBand/MyName, 22)
 	$MyBand/MyName.add_theme_color_override("font_color", Color("#9cc0e8"))     # 我方蓝（阵营功能色·勿改）
 	FontManager.apply($MyBand/MyHint, 14)
 	$MyBand/MyHint.add_theme_color_override("font_color", Color(WARM_IVORY_DIM, 0.8))
 
-	# 席位槽底（对手 3 + 手牌 3）
+	# 席位槽底（对手 3 + 手牌 3）：格底 shader+暖骨像素框（黑方块+发丝线退役）·敌方槽框=赤陶
 	for p in OPP_SLOTS:
-		_make_slot_pit(opp_band, Rect2(p, OPP_SLOT_SIZE), "··")
+		_make_slot_pit(opp_band, Rect2(p, OPP_SLOT_SIZE), "··", true)
 	for p in HAND_SLOTS:
-		_make_slot_pit(my_band, Rect2(p, HAND_SLOT_SIZE), "空")
+		_make_slot_pit(my_band, Rect2(p, HAND_SLOT_SIZE), "空", false)
 
-	# 右上信息底板（2026-06-12 Eddy：裸文字格格不入）——槽位暗井同语言，
-	# 与下方确认钮同列同宽（360 @ x1460）成上下呼应；文字 z 提到板上层。
-	_make_slot_pit(opp_band, Rect2(1460, 50, 360, 90), "")
+	# 右上信息底板（2026-06-12 Eddy：裸文字格格不入）——深框奶油纸小板（悬停框同皮·
+	# 战场悬浮件语言），与下方确认钮同列同宽（360 @ x1460）成上下呼应；文字 z 提到板上层。
+	_make_paper_panel(opp_band, Rect2(1460, 50, 360, 90))
 	opp_progress.z_index = 1
 	timer_label.z_index = 1
 
-	# 确认钮：鎏金羊皮大钮（主菜单匹配钮同级）·朱砂墨字（压在浅金羊皮上）
+	# 确认钮：导航钮皮+墨字（全游戏导航一语言·旧鎏金 jelly 退役）
 	for s in ["normal", "hover", "pressed", "focus", "disabled"]:
 		confirm_btn.add_theme_stylebox_override(s, StyleBoxEmpty.new())
 	FontManager.apply_btn(confirm_btn, 26)
-	confirm_btn.add_theme_color_override("font_color", CINNABAR_INK)
-	var bg := ColorRect.new()
-	bg.name = "Bg"
-	bg.show_behind_parent = true
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var mat := ShaderMaterial.new()
-	mat.shader = JELLY_SHADER
-	for k in TIER_GOLD:
-		mat.set_shader_parameter(k, TIER_GOLD[k])
-	mat.set_shader_parameter("corner", 0.2)
-	mat.set_shader_parameter("edge_px", 2.0)
-	mat.set_shader_parameter("noise_amt", 0.08)   # 纸感
-	mat.set_shader_parameter("wear", 0.24)         # 纸感
-	mat.set_shader_parameter("pixel_grid", 38.0)
-	mat.set_shader_parameter("fill_alpha", 0.95)
-	mat.set_shader_parameter("aspect", confirm_btn.size.x / maxf(confirm_btn.size.y, 1.0))
-	bg.material = mat
-	confirm_btn.add_child(bg)
+	confirm_btn.add_theme_color_override("font_color", INK)
+	confirm_btn.add_theme_color_override("font_disabled_color", Color(INK, 0.55))   # ⚠ 禁用态走这个主题色·不覆盖=默认灰字洗白
+	var plate := NinePatchRect.new()
+	plate.name = "Plate"
+	plate.texture = NAV_PLATE_TEX
+	plate.patch_margin_left = NAV_PLATE_MARGIN_X
+	plate.patch_margin_right = NAV_PLATE_MARGIN_X
+	plate.patch_margin_top = NAV_PLATE_MARGIN_Y
+	plate.patch_margin_bottom = NAV_PLATE_MARGIN_Y
+	plate.axis_stretch_horizontal = NinePatchRect.AXIS_STRETCH_MODE_TILE
+	plate.axis_stretch_vertical = NinePatchRect.AXIS_STRETCH_MODE_TILE
+	plate.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	plate.show_behind_parent = true
+	plate.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE   # ⚠ 缺这行=吞点击
+	confirm_btn.add_child(plate)
 	confirm_btn.pressed.connect(_on_confirm)
 	var bj := ButtonJuice.new()
 	bj.name = "ButtonJuice"
@@ -184,9 +187,10 @@ func _setup_ui() -> void:
 	bp_timer.timeout.connect(_on_timer_tick)
 
 
-## 牌库摊开：霜玻璃桌面 + 46 卡均匀四行（系徽/分隔线已撤——正常排列，2026-06-11 Eddy）。
+## 牌库摊开：奶油纸桌面（深框浅芯·悬停框同皮）+ 24 卡六列四行（系徽/分隔线已撤·2026-06-11 Eddy）。
 func _build_pool() -> void:
-	_make_frosted(pool_area, POOL)
+	_make_pool_paper(pool_area, POOL)
+	_build_role_legend(pool_area)
 	for r in ROWS.size():
 		var start: int = ROWS[r][0]
 		var count: int = ROWS[r][1]
@@ -206,6 +210,9 @@ func _build_pool() -> void:
 			card.scale = Vector2(CARD_SCALE, CARD_SCALE)
 			card.position = Vector2(x0 + c * STEP_X, ROW_Y0 + r * ROW_H)
 			card.pressed.connect(_on_card_clicked.bind(i))
+			card.ink_name = true   # 池卡摆在奶油纸桌面→墨字名（组件 opt-in·手牌/仪式卡在暗带保持白字）
+			card.team_role = h.team_role       # 组队三分类框（进攻红/防守蓝/经济金·2026-07-18）
+			card.dim_when_picked = true        # 已入手留印=头像压灰（框色让给类型后的新留印语言）
 			pool_area.add_child(card)
 			card.compensate_name_scale(CARD_SCALE)   # 名字整数像素渲染（防糊）
 			var bj := card.get_node_or_null("ButtonJuice") as ButtonJuice
@@ -355,6 +362,7 @@ func _add_to_hand(idx: int, instant: bool = false) -> void:
 	hc.hero_name = h.hero_name
 	hc.max_hp = h.max_hp
 	hc.portrait_path = h.portrait_path
+	hc.team_role = h.team_role   # 手牌同框：一眼看队伍三色配比
 	hc.card_state = HeroCard.CardState.SELECTED
 	hc.position = HAND_SLOTS[slot]
 	hc.set_meta("hero_idx", idx)
@@ -445,7 +453,7 @@ func _set_confirm_enabled(on: bool) -> void:
 		_glow_tween.tween_property(confirm_btn, "modulate", Color.WHITE, 0.7)\
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	else:
-		confirm_btn.modulate = Color(0.55, 0.55, 0.55)
+		confirm_btn.modulate = Color(0.78, 0.76, 0.72)   # 禁用=轻暖压暗（0.55 深灰把导航皮压成泥·换皮后调档）
 
 
 # ============================================================
@@ -485,7 +493,7 @@ func _update_opp_progress() -> void:
 func _update_timer_label() -> void:
 	timer_label.text = tr("剩余 %ds") % maxi(timer_seconds, 0)
 	timer_label.add_theme_color_override("font_color",
-		Color("#ff4444") if timer_seconds <= 5 else GOLD_TEXT)
+		BAN_RED if timer_seconds <= 5 else INK)   # 奶油纸板上：墨字·告急转朱红
 
 
 ## 超时自动补满当前步并确认。
@@ -694,6 +702,7 @@ func _spawn_cer_card(cer: Control, h: HeroData, state: int) -> HeroCard:
 	c.hero_name = h.hero_name
 	c.max_hp = h.max_hp
 	c.portrait_path = h.portrait_path
+	c.team_role = h.team_role   # 仪式卡同框（归属靠左右列位+名字色·框色留给类型）
 	c.card_state = state
 	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cer.add_child(c)
@@ -748,41 +757,108 @@ func _play_intro() -> void:
 # 自绘部件（demo 同源）
 # ============================================================
 
-## 牌库桌面（B2）：暖骨细边 + 近黑暖暗底（替原月光青+深蓝；大块面保持暗，别抢立绘）。
-func _make_frosted(parent: Control, r: Rect2) -> void:
-	var border := ColorRect.new()
-	border.color = Color(EDGE_MID, 0.35)
-	border.position = r.position
-	border.size = r.size
-	border.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	parent.add_child(border)
-	var fill := ColorRect.new()
-	fill.color = Color(DARK_WARM, 0.45)
-	fill.position = r.position + Vector2(2, 2)
-	fill.size = r.size - Vector2(4, 4)
-	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	parent.add_child(fill)
+## 牌库桌面（2026-07-16 家族换装）：深框奶油纸大板（ui_tooltip 9-slice·战场悬浮件语言）
+## + 贴形投影（牌匾同手法·压在波流上给纵深）。旧霜玻璃灰蓝平板退役。
+func _make_pool_paper(parent: Control, r: Rect2) -> void:
+	var shadow := _tooltip_patch()
+	shadow.position = r.position + Vector2(6, 8)
+	shadow.size = r.size
+	shadow.modulate = SHADOW_TINT
+	parent.add_child(shadow)
+	var panel := _tooltip_patch()
+	panel.position = r.position
+	panel.size = r.size
+	parent.add_child(panel)
 
 
-## 席位暗井槽（近黑暖底 + 暖骨内线 + 暖米白次级提示字）。
-func _make_slot_pit(parent: Control, r: Rect2, hint: String) -> void:
-	var backing := ColorRect.new()
-	backing.color = Color(DARK_WARM, 0.85)
-	backing.position = r.position
-	backing.size = r.size
-	backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	parent.add_child(backing)
-	for line_r: Rect2 in [
-			Rect2(r.position, Vector2(r.size.x, 2)),
-			Rect2(r.position + Vector2(0, r.size.y - 2), Vector2(r.size.x, 2)),
-			Rect2(r.position, Vector2(2, r.size.y)),
-			Rect2(r.position + Vector2(r.size.x - 2, 0), Vector2(2, r.size.y))]:
-		var ln := ColorRect.new()
-		ln.color = Color(EDGE_INNER, 0.6)
-		ln.position = line_r.position
-		ln.size = line_r.size
-		ln.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		parent.add_child(ln)
+## 三分类图例（2026-07-18 组队标签线）：池面左空带竖排三条=框色小样+墨字类型名，
+## 教玩家「框色=英雄类型」（战斗四色版同源：攻红/防蓝/攒金）。
+## ⚠「进攻/防守/经济」为占位命名（Eddy 后续定稿）——改名动这里 + hero_card.TYPE_FRAME_PATH 键 + .tres 值。
+func _build_role_legend(parent: Control) -> void:
+	var entries: Array = [
+		["进攻", "res://assets/ui/hero_avatar_frame_atk.png"],
+		["防守", "res://assets/ui/hero_avatar_frame_def.png"],
+		["经济", "res://assets/ui/hero_avatar_frame_econ.png"],
+	]
+	for i in entries.size():
+		var y := 448.0 + i * 64.0   # 三条竖排（448-616）≈ 池面(210-874)垂直居中
+		var icon := TextureRect.new()
+		icon.texture = load(entries[i][1])
+		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_SCALE
+		icon.position = Vector2(352, y)
+		icon.size = Vector2(40, 40)
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		parent.add_child(icon)
+		var lbl := Label.new()
+		lbl.text = tr(entries[i][0])
+		FontManager.apply(lbl, 16)
+		lbl.add_theme_color_override("font_color", INK)
+		lbl.position = Vector2(404, y + 10.0)
+		lbl.size = Vector2(120, 22)
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		parent.add_child(lbl)
+
+
+## 深框奶油纸小板（右上信息板用·悬停框同皮同边距）。
+func _make_paper_panel(parent: Control, r: Rect2) -> void:
+	var panel := _tooltip_patch()
+	panel.position = r.position
+	panel.size = r.size
+	parent.add_child(panel)
+
+
+func _tooltip_patch() -> NinePatchRect:
+	var p := NinePatchRect.new()
+	p.texture = TOOLTIP_TEX
+	p.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	p.patch_margin_left = TOOLTIP_MARGIN
+	p.patch_margin_right = TOOLTIP_MARGIN
+	p.patch_margin_top = TOOLTIP_MARGIN
+	p.patch_margin_bottom = TOOLTIP_MARGIN
+	p.axis_stretch_horizontal = NinePatchRect.AXIS_STRETCH_MODE_TILE   # 中段平铺防颗粒拉伸
+	p.axis_stretch_vertical = NinePatchRect.AXIS_STRETCH_MODE_TILE
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return p
+
+
+## 席位槽（2026-07-16 家族换装）：格底 shader（图鉴/资料同配方·暖深两档）+ 暖骨像素框
+## （§2.1 通用配方·敌方槽框转赤陶=阵营语义）。旧纯黑方块+发丝线退役。
+func _make_slot_pit(parent: Control, r: Rect2, hint: String, is_opp: bool) -> void:
+	var cell := ColorRect.new()
+	cell.color = Color.WHITE
+	cell.position = r.position
+	cell.size = r.size
+	cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var cm := ShaderMaterial.new()
+	cm.shader = CELL_BG_SHADER
+	cm.set_shader_parameter("fill_color", CELL_FILL)
+	cm.set_shader_parameter("inner_color", CELL_CENTER)
+	cm.set_shader_parameter("center_glow", 1.0)
+	cm.set_shader_parameter("corner_radius", 0.14)
+	cm.set_shader_parameter("pixel_grid", r.size.x / 6.0)
+	cm.set_shader_parameter("cloud_on", 0.0)
+	cell.material = cm
+	parent.add_child(cell)
+	var frame := ColorRect.new()
+	frame.color = Color.WHITE
+	frame.position = r.position
+	frame.size = r.size
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var fm := ShaderMaterial.new()
+	fm.shader = FRAME_SHADER
+	fm.set_shader_parameter("edge_outer", EDGE_OUTER)
+	fm.set_shader_parameter("edge_mid", OPP_FRAME_TINT if is_opp else EDGE_MID)   # 敌赤陶/我暖骨
+	fm.set_shader_parameter("edge_inner", Color(OPP_FRAME_TINT, 1.0).darkened(0.5) if is_opp else EDGE_INNER)
+	fm.set_shader_parameter("pixel_grid", 24.0)
+	fm.set_shader_parameter("border_px", 2.0)
+	fm.set_shader_parameter("noise_amt", 0.05)
+	fm.set_shader_parameter("light_amount", 0.13)
+	fm.set_shader_parameter("aspect", r.size.x / maxf(r.size.y, 1.0))   # ⚠ 长矩形必设 aspect
+	fm.set_shader_parameter("corner_radius", 0.14)
+	frame.material = fm
+	parent.add_child(frame)
 	if hint != "":
 		var lbl := Label.new()
 		lbl.text = tr(hint)

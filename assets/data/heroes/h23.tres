@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1_h23")
 hero_id = "h23"
+team_role = "防守"
 dimension = "防御"
 hero_name = "天狗【狗】"
 max_hp = 6
