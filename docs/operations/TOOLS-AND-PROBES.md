@@ -27,7 +27,7 @@ Codex及无人值守任务统一使用：
 & .\tools\run_godot.ps1 -Mode Probe -Target 'res://tools/xxx_probe.tscn'
 ```
 
-禁止Codex直接启动常驻 `--editor`。统一启动器会等待自己启动的Godot进程，超时只清理该进程，并将崩溃转为退出码和日志，避免Windows应用程序错误框永久卡住。
+禁止Codex替用户启动常驻 `--editor`。统一启动器会等待自己启动的Godot进程，超时只清理它自己创建并持有的进程，并将自动化崩溃转为退出码和日志。用户手动启动的Godot用于F6验收，任何情况下都不得由Codex关闭；发生冲突时停止自动化并汇报。
 
 以下直接命令只供人工排障理解；自动化不得绕过统一启动器。
 

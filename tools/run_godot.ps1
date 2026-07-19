@@ -112,6 +112,8 @@ finally {
 try {
     if (-not $GodotProcess.WaitForExit($TimeoutSeconds * 1000)) {
         try {
+            # This object is exactly the process created by Start-Process above.
+            # Never enumerate or terminate any pre-existing/user-started Godot process here.
             # Windows PowerShell 5.1 exposes Kill() but not the newer Kill(entireProcessTree) overload.
             $GodotProcess.Kill()
             $GodotProcess.WaitForExit(5000) | Out-Null
