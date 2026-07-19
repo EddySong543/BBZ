@@ -24,10 +24,59 @@ const TOP_UI_DROP := 26.0   # 顶部 UI 整体下移量（2026-06-28 Eddy：44�
 const BUBBLE_HEAD_RISE := 102.0  # 出招气泡锚点：角色显示容器「中心」上移此值（越大气泡越高·够高才不压角色·随立绘 2.0x 同步 2026-07-11）
 const BUBBLE_SIDE_X := 91.0      # 出招气泡水平偏移：己方(P0)放头「右上」/ 敌方(P1)镜像「左上」（越大越往外侧·够大才不和角色重合·随立绘 2.0x 同步）
 
-## 顶部头像框尺寸。出战 / 替补；≠基准(72/68)时走「底固定向上长」放大（见 _enlarge_frames），
-## 不压下方血行/名字。2026-06-20 放大一档(80/76)→2026-07-17 战斗 UI 集体缩小批回基准（=tscn 原位）。
-const FRAME_ACTIVE_SIZE := 72.0
-const FRAME_BENCH_SIZE := 68.0
+## 顶部头像框尺寸。出战 / 替补。**摆位一律在 battle_screen.tscn 里定**（offset_* 已按本尺寸摆好），
+## 代码只负责把尺寸喂给 HeroFrame —— 旧 _enlarge_frames「按基准差量偏移」的代偿已退役。
+## 尺寸线：72/68（2026-07-17 缩小批）→ **80/76（2026-07-18 Eddy「只要微微放大」·92/84 一版判过大回调）**。
+const FRAME_ACTIVE_SIZE := 80.0
+const FRAME_BENCH_SIZE := 76.0
+
+## 菱形头像的**绝对**高度（成品像素）——与框尺寸解耦：框放大时头像原地不动
+## （Eddy 2026-07-18：「只放大头像框，不放大内部头像」）。取值 = 放大前的视觉大小
+## （旧 72×1.15 / 68×1.15），所以这批只有框变大、头像一像素没动。
+const PORTRAIT_ACTIVE_PX := 82.8
+const PORTRAIT_BENCH_PX := 78.2
+
+## 菱形头像在框内的上抬量（像素）。**这才是"脸被斜边切到"的唯一有效旋钮**：
+## 下巴处允许的横向宽度 = 下巴离框底的高度，与框边长无关 → 放大框不解决遮挡，抬头才解决
+## （一轮靠放大"顺带"顶上去，被 Eddy 判为没真修）。12/11 = 实拍逐档（tools/diamond_probe 扫 rise）
+## 挑出的分水岭：脸完全脱离斜边、只切衣领，框底露出的暗底楔形也还不难看。
+const PORTRAIT_ACTIVE_RISE := 12.0
+const PORTRAIT_BENCH_RISE := 11.0
+
+## battle_screen 顶部菱形头像框专用描边；HeroFrame 默认值仍供其他界面沿用。
+## 亮边 4px → 6px，近黑外压边保持 2px，增强小尺寸 HUD 上的轮廓辨识度。
+const BATTLE_DIAMOND_STROKE_PX := 6.0
+
+## 这 8 位英雄的旧 portrait 是从头部中段截出的截图，头饰/耳朵已在源文件里被裁掉。
+## 战斗顶部单独改用手动裁好的 battle portrait；图鉴、BP 等其他构图不受影响。
+const BATTLE_PORTRAIT_OVERRIDES := {
+	"h04": "res://assets/sprites/heroes/h04/h04_battle_portrait.png",
+	"h05": "res://assets/sprites/heroes/h05/h05_battle_portrait.png",
+	"h08": "res://assets/sprites/heroes/h08/h08_battle_portrait.png",
+	"h10": "res://assets/sprites/heroes/h10/h10_battle_portrait.png",
+	"h12": "res://assets/sprites/heroes/h12/h12_battle_portrait.png",
+	"h19": "res://assets/sprites/heroes/h19/h19_battle_portrait.png",
+	"h20": "res://assets/sprites/heroes/h20/h20_battle_portrait.png",
+	"h22": "res://assets/sprites/heroes/h22/h22_battle_portrait.png",
+}
+
+## 手裁 battle portrait 保留原始像素，因此画布尺寸并不统一；统一压成 82.8/78.2px 会让
+## 大画布英雄的脸缩小。这里按人物实际占比逐个校准显示倍率与水平中心，不修改手裁资产本身。
+## scale：相对常规 portrait 显示高度；x/y：出战框成品像素偏移（替补按框比例同步缩放）。
+## x 只以未翻转原图的脸部中心为准；P2 水平翻转时 HeroFrame 会自动反号，保证两边都居中。
+const BATTLE_PORTRAIT_TUNING := {
+	"h03": {"scale": 1.00, "x": 0.0, "y": -2.0},  # 轻微下移
+	"h04": {"scale": 1.30, "x": -7.0, "y": -2.0}, # 与 h03 同幅下移
+	"h05": {"scale": 1.22, "x": 0.0, "y": -4.0},  # 再向左下各微调 2px
+	"h08": {"scale": 1.10, "x": 0.0, "y": 0.0},   # 已验收，保持不动
+	"h10": {"scale": 1.04, "x": 2.0, "y": 2.0},   # 水平不动，仅轻微上提脸部
+	"h07": {"scale": 1.00, "x": -5.0, "y": -3.0}, # 再向左微调 2px
+	"h12": {"scale": 0.98, "x": 0.0, "y": 0.0},   # 再向右移动 3px
+	"h19": {"scale": 1.05, "x": -4.0, "y": 0.0},  # 再向右移动 3px
+	"h20": {"scale": 1.22, "x": -5.0, "y": 0.0},  # 再向右微调 2px
+	"h21": {"scale": 1.00, "x": 0.0, "y": -6.0},  # 再向下移动 3px
+	"h22": {"scale": 1.02, "x": 0.0, "y": 2.0},   # 水平不动，仅轻微上提脸部
+}
 
 ## 默认阵容 fallback：直接打开 battle_screen.tscn(F6) 测试用，BattleSetup 为空时启用。
 const HERO_DATA_DIR := "res://assets/data/heroes/"
@@ -95,7 +144,7 @@ const AI := 1       # 对手 AI
 
 @onready var p1_frames: Array[HeroFrame] = [$P1Hud/P1Frame0, $P1Hud/P1Frame1, $P1Hud/P1Frame2]
 @onready var p2_frames: Array[HeroFrame] = [$P2Hud/P2Frame0, $P2Hud/P2Frame1, $P2Hud/P2Frame2]
-# 待选英雄血量/护甲紧凑居中显示（ReserveHpRow·❤X[+灰❤X]·任务3b/4）。index 0 = 出战位 → null（出战血量看大心条）。
+# 待选英雄血量/护甲=单个平行四边形符号+数字（英雄图鉴「图标+数字」版式）。index 0 = 出战位 → null。
 @onready var p1_frame_hp_rows: Array = [null, $P1Hud/P1Frame1HpRow, $P1Hud/P1Frame2HpRow]
 @onready var p2_frame_hp_rows: Array = [null, $P2Hud/P2Frame1HpRow, $P2Hud/P2Frame2HpRow]
 var p1_frame_slots: Array[int] = [-1, -1, -1]
@@ -341,7 +390,6 @@ func _ready() -> void:
 		status_label.text = tr("加时赛 · 巅峰 1v1")
 		status_label.add_theme_color_override("font_color", Color("#ffd86a"))
 		status_label.visible = true
-	_enlarge_frames()
 	_update_all()
 	_show_turn_intro()
 	if _overtime:
@@ -529,7 +577,7 @@ func _init_buttons() -> void:
 	big_turn_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))   # 巨月做底后中央文字必须深描边
 	big_turn_label.add_theme_constant_override("outline_size", 6)
 	event_label.visible = false
-	# 备选血量/护甲：现由 ReserveHpRow（❤X[+灰❤X]·自绘居中·任务3b/4）显示，字体/配色在组件内处理，无需此处设置。
+	# 备选血量/护甲：ReserveHpRow 自绘单个斜切符号 + 数字，配色/居中均由组件处理。
 
 	# 出战角色名 / 玩家 id 的字体·字号·颜色·描边·玩家id文本 全部在 battle_screen.tscn 设置
 	# （像素字体 ttf 直接引用·import 已关 AA → 编辑器所见即所得，可在 Inspector 手调位置/大小）。
@@ -1896,17 +1944,6 @@ func _wrap_fixed(text: String, chars: int) -> String:
 	return out.trim_suffix("\n")
 
 
-## 顶部头像框整体放大一档（Eddy·2026-06-20）：尺寸在 _update_single_frame 设（FRAME_*_SIZE），
-## 这里只把每框位置按增量「左移半量 + 上移全量」→ 横向居中变宽、纵向底固定向上长，
-## 不压下方血行/名字、保持顶部 UI 和谐。仅运行一次（_ready）。frame[0]=出战 / 1,2=替补。
-func _enlarge_frames() -> void:
-	for frames in [p1_frames, p2_frames]:
-		for i in range(frames.size()):
-			var f: HeroFrame = frames[i]
-			var d: float = (FRAME_ACTIVE_SIZE - 72.0) if i == 0 else (FRAME_BENCH_SIZE - 68.0)
-			f.position -= Vector2(d * 0.5, d)
-
-
 ## M3：P1 道具槽点击分派（按槽态）。抽/补 = 立即生效（公开电报）；
 ## 使用 = 暂存点选（金边），确认时与动作一起盲选提交。
 ## 格解锁自动（第 3/4/5 回合·无开格步骤/费用·2026-07-03）→ SEALED（未到解锁回合）点击无操作。
@@ -2059,8 +2096,9 @@ func _update_hero_frames() -> void:
 					hp_rows[fi].visible = false
 
 
-## 出战位(is_active)：只画头像，血量/护盾由上方大心条显示 → 替补血量行隐藏。
-## 待选位：头像 + ReserveHpRow（❤X[+灰❤X]·自绘居中·小数也居中·任务3b/4）。
+## 出战位(is_active)：只画头像，血量/护盾由上方大血条显示 → 替补血量行隐藏。
+## 待选位：头像 + 单个平行四边形血量符号 + 数字；有护盾时追加银灰符号 + 数字。
+## 内容按真实文本宽度整体居中，整数和半点数都不会偏轴。
 ## hp_row 在 index 0(出战位) 为 null；摆位/大小在 battle_screen.tscn 调，代码只填值。
 func _update_single_frame(frame: HeroFrame, hp_row, player: int, slot: int, is_active: bool, pcolor: Color) -> void:
 	if slot < 0 or slot >= battle.heroes[player].size():
@@ -2075,11 +2113,20 @@ func _update_single_frame(frame: HeroFrame, hp_row, player: int, slot: int, is_a
 	var dead: bool = battle.hp[player][slot] <= 0
 
 	frame.hero_name = h.hero_name
-	frame.portrait_path = h.portrait_path
 	frame.is_active = is_active
 	frame.is_dead = dead
 	frame.player_color = pcolor
 	frame.frame_size = Vector2(FRAME_ACTIVE_SIZE, FRAME_ACTIVE_SIZE) if is_active else Vector2(FRAME_BENCH_SIZE, FRAME_BENCH_SIZE)
+	# 头像大小/抬升与框解耦（见常量注释）：框尺寸再动也不会连带缩放头像。
+	var base_portrait_px := PORTRAIT_ACTIVE_PX if is_active else PORTRAIT_BENCH_PX
+	var portrait_tune: Dictionary = BATTLE_PORTRAIT_TUNING.get(h.hero_id, {})
+	frame.diamond_portrait_px = base_portrait_px * float(portrait_tune.get("scale", 1.0))
+	var base_rise := PORTRAIT_ACTIVE_RISE if is_active else PORTRAIT_BENCH_RISE
+	frame.diamond_portrait_rise = base_rise + float(portrait_tune.get("y", 0.0)) * base_portrait_px / PORTRAIT_ACTIVE_PX
+	frame.diamond_portrait_shift_x = float(portrait_tune.get("x", 0.0)) * base_portrait_px / PORTRAIT_ACTIVE_PX
+	frame.diamond_stroke_px = BATTLE_DIAMOND_STROKE_PX
+	# 放在所有几何参数之后赋值：换贴图时一次性按最终框宽/抬升重新布局。
+	frame.portrait_path = _battle_portrait_path(h)
 
 	# 出战位 / 阵亡位：替补血量行隐藏（出战血量看上方大心条；阵亡不显示 0hp/护盾）。
 	if is_active or dead:
@@ -2087,12 +2134,16 @@ func _update_single_frame(frame: HeroFrame, hp_row, player: int, slot: int, is_a
 			hp_row.visible = false
 		return
 
-	# 待选位：❤X[+灰❤X]，按内容测宽居中（整数/小数一致·护甲灰心）。
+	# 待选位：一个斜切血量符号 + 数字（护盾同理），而不是按 HP 个数铺满多个血块。
 	if hp_row != null:
 		hp_row.visible = true
 		var hp_now := battle.hp_display(battle.hp[player][slot])
 		var sh := battle.hp_display(battle.shield[player][slot])
 		hp_row.set_values(hp_now, sh)
+
+
+func _battle_portrait_path(h: HeroData) -> String:
+	return String(BATTLE_PORTRAIT_OVERRIDES.get(h.hero_id, h.portrait_path))
 
 
 func _update_energy_labels() -> void:

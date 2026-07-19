@@ -64,9 +64,13 @@ const FRAME_TEX_ENEMY := preload("res://assets/ui/hero_avatar_frame_enemy.png") 
 
 @export var frame_size: Vector2 = Vector2(72, 72):
 	set(v):
+		if frame_size.is_equal_approx(v):
+			return
 		frame_size = v
 		if is_node_ready():
 			size = v
+			if diamond_mode:
+				_sync_diamond_geometry()
 
 ## 头像水平翻转（P2 对手头像朝左用）。
 @export var flip_h: bool = false:
@@ -74,6 +78,8 @@ const FRAME_TEX_ENEMY := preload("res://assets/ui/hero_avatar_frame_enemy.png") 
 		flip_h = v
 		if is_node_ready() and _portrait:
 			(_portrait as TextureRect).flip_h = v
+			if diamond_mode:
+				_layout_diamond_portrait()
 
 # ── 菱形模式（2026-07-18 Eddy·ref10 左侧头像语言）────────────────────
 # **opt-in**：默认 false = 回纹方框原样。本组件同时被 BP 牌池 / 阵亡替补浮窗 /
@@ -86,32 +92,66 @@ const FRAME_TEX_ENEMY := preload("res://assets/ui/hero_avatar_frame_enemy.png") 
 			_apply_diamond_mode()
 
 ## 菱形模式下头像相对框的放大倍率。**底边对齐框底** → 调大只向上长（头顶自然溢出框外）。
+## ⚠框与头像联动的档位：调框尺寸会连带把头像一起放大。想「只放大框、头像不动」请改用
+## diamond_portrait_px（下一个旋钮），本倍率仅作为它=0 时的退回档。
 @export_range(1.0, 2.5, 0.05) var diamond_portrait_zoom: float = 1.15:
 	set(v):
 		diamond_portrait_zoom = v
 		if is_node_ready() and diamond_mode:
 			_layout_diamond_portrait()
 
+## 菱形模式下头像的**绝对**高度（成品像素）。>0 时压过 diamond_portrait_zoom，
+## 让「框尺寸」与「头像大小」彻底解耦 —— 框放大时头像原地不动（Eddy 2026-07-18 二轮点名：
+## 「只放大头像框，不放大内部头像」）。0 = 退回 frame_size × zoom 的联动老档（BP/图鉴等沿用）。
+@export var diamond_portrait_px: float = 0.0:
+	set(v):
+		diamond_portrait_px = v
+		if is_node_ready() and diamond_mode:
+			_layout_diamond_portrait()
+
 ## 菱形模式下头像整体再上移的像素（正=更往上顶·负=下沉）。
+## **这是"脸被斜边切到"的唯一有效旋钮**（2026-07-18 二轮几何复核）：
+## 头像底边贴框底时，下巴处允许的横向宽度 = 下巴离框底的高度 = 0.38×头像高 + rise，
+## **与框边长无关** —— 所以放大框对遮挡毫无帮助（一轮踩过：靠 zoom 放大头像"顺带"把脸顶上去，
+## 被 Eddy 判为"只是集体放大、没真修问题"）。把头抬起来才是修法，代价是框底露出一截暗底楔形。
 @export var diamond_portrait_rise: float = 0.0:
 	set(v):
 		diamond_portrait_rise = v
 		if is_node_ready() and diamond_mode:
 			_layout_diamond_portrait()
 
+## 菱形头像水平微调（成品像素）。以未翻转原图的脸部中心为准；P2 flip_h 时自动反号，
+## 让同一张侧脸无论位于哪一方都落在框心。不改资产像素，也不影响其他界面。
+@export var diamond_portrait_shift_x: float = 0.0:
+	set(v):
+		diamond_portrait_shift_x = v
+		if is_node_ready() and diamond_mode:
+			_layout_diamond_portrait()
+
 ## 菱形亮边宽度（成品像素·阵营色）。
 @export var diamond_stroke_px: float = 4.0:
 	set(v):
+		if is_equal_approx(diamond_stroke_px, v):
+			return
 		diamond_stroke_px = v
 		if is_node_ready() and diamond_mode:
-			_apply_diamond_mode()
+			_sync_diamond_geometry()
 
 ## 亮边外面那圈近黑压边宽度（成品像素）。单亮边贴夜空显单薄 → 外套暗边才立得住。
 @export var diamond_rim_px: float = 2.0:
 	set(v):
+		if is_equal_approx(diamond_rim_px, v):
+			return
 		diamond_rim_px = v
 		if is_node_ready() and diamond_mode:
-			_apply_diamond_mode()
+			_sync_diamond_geometry()
+
+## 亮边内侧的连续暗描边（从 diamond_stroke_px 内部分走，不增加总厚度）。
+@export var diamond_inner_rim_px: float = 1.5:
+	set(v):
+		diamond_inner_rim_px = clampf(v, 0.0, diamond_stroke_px)
+		if is_node_ready() and diamond_mode:
+			_sync_diamond_geometry()
 
 ## 上半收口：**负数 = 完全不收**（默认·ref10 原意：上半头像盖过上半菱形框，Eddy 2026-07-18 拍板）。
 ## ≥0 则把菱形顶点往上拉长这么多像素再收口（0 = 上下一样收死）——想把头顶收紧时才用。
@@ -129,6 +169,7 @@ var _inner_fx: ColorRect
 var _switch_label: Label   # 主动换人：armed 时盖在立绘上显示「切换」二字（任务5）
 var _sel_tween: Tween      # 选中弹跳动画（选择动作时的 pop）
 var _diamond: ColorRect    # 菱形外框（diamond_mode 懒建）
+var _death_cross: DeathCross   # 阵亡红✕（懒建·is_dead 才出现）
 static var _cache: Dictionary = {}
 
 const DIAMOND_FRAME_SHADER := preload("res://assets/shaders/canvas_ui_diamond_frame.gdshader")
@@ -234,10 +275,44 @@ func _refresh_style() -> void:
 	if _name_label:
 		(_name_label as Label).text = hero_name.substr(0, 2) if hero_name != "" else ""
 
+	_refresh_death_cross()
+
+
+## 阵亡红✕（2026-07-18 Eddy：「不仅变灰，再加一个叉叉」）——压灰只是"暗了一点"，
+## 三米外扫一眼分不出死活；红✕是 BP 禁用卡早已验证过的一眼读法（hero_card.BanMark 同源），
+## 这里按菱形框的内接正方形收边，✕ 的四个端点正落在菱形四条边的中点上、不出框。
+func _refresh_death_cross() -> void:
+	if not is_dead:
+		if _death_cross != null:
+			_death_cross.visible = false
+		return
+	if _death_cross == null:
+		_death_cross = DeathCross.new()
+		_death_cross.name = "DeathCross"
+		_death_cross.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		add_child(_death_cross)
+	# 树序最后 → 画在立绘/边框之上（set_switch_prompt 的「切换」字若已建也在其下，
+	# 但阵亡英雄不会进 armed 态，二者不同时出现）。
+	move_child(_death_cross, get_child_count() - 1)
+	_death_cross.inscribed = diamond_mode   # 菱形=按内接正方形收边；方框=四角留边即可
+	_death_cross.visible = true
+	_death_cross.queue_redraw()
+
 
 # ============================================================
 # 菱形模式（opt-in·ref10 左侧头像语言）
 # ============================================================
+
+## 运行时只同步尺寸/描边 uniform，不重建头像遮罩材质。
+## battle_screen 每次刷新都会重复喂同一组尺寸；setter 的等值短路 + 本函数避免无谓分配。
+func _sync_diamond_geometry() -> void:
+	if _diamond != null and _diamond.material is ShaderMaterial:
+		var m := _diamond.material as ShaderMaterial
+		m.set_shader_parameter("size_px", frame_size)
+		m.set_shader_parameter("stroke_px", diamond_stroke_px)
+		m.set_shader_parameter("rim_px", diamond_rim_px)
+		m.set_shader_parameter("inner_rim_px", diamond_inner_rim_px)
+	_layout_diamond_portrait()
 
 ## 切换菱形/方框两套外观。方框三层（回纹框 Bg / 内阴影 InnerFX / 底色 BgFill）整组隐藏，
 ## 换上菱形外框；头像换遮罩材质并重新摆位。关掉即完全复原（BP/浮窗/图鉴走的就是这条）。
@@ -263,6 +338,7 @@ func _apply_diamond_mode() -> void:
 			m.set_shader_parameter("size_px", frame_size)
 			m.set_shader_parameter("stroke_px", diamond_stroke_px)
 			m.set_shader_parameter("rim_px", diamond_rim_px)
+			m.set_shader_parameter("inner_rim_px", diamond_inner_rim_px)
 
 	if _portrait == null:
 		return
@@ -291,12 +367,14 @@ func _layout_diamond_portrait() -> void:
 	var p := _portrait as TextureRect
 	# rect 按纹理长宽比定形（非正方立绘 h01/h03/h05/h15 才有区别）→ STRETCH_SCALE 零失真，
 	# 且绘制四边形 == rect，遮罩坐标才对得上。
-	var h: float = frame_size.y * diamond_portrait_zoom
+	# 绝对像素优先（框/头像解耦）；未设时退回与框联动的倍率档。
+	var h: float = diamond_portrait_px if diamond_portrait_px > 0.0 else frame_size.y * diamond_portrait_zoom
 	var w: float = h
 	var tex: Texture2D = p.texture
 	if tex != null and tex.get_height() > 0:
 		w = h * float(tex.get_width()) / float(tex.get_height())
-	var px: float = (frame_size.x - w) * 0.5
+	var shift_x := -diamond_portrait_shift_x if flip_h else diamond_portrait_shift_x
+	var px: float = (frame_size.x - w) * 0.5 + shift_x
 	var py: float = frame_size.y - h - diamond_portrait_rise
 	p.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	p.position = Vector2(px, py)
@@ -341,6 +419,49 @@ func set_switch_prompt(on: bool, label_text: String = "切换") -> void:
 			_refresh_portrait()
 	# armed ≠ selected（任务5修订）：仅显示「切换」二字 + 隐立绘，不自动高亮；
 	# 选中高亮/选择动画由调用方再点一次时通过 is_selected 触发。
+
+
+## 阵亡红✕：两道像素台阶粗斜杠（近黑衬底 + 阵亡红主体），与 hero_card.BanMark 同源画法
+## （量化到格坐标逐格行走 → 台阶等宽、不出半像素毛边）。
+## inscribed=true（菱形框）时收进内接正方形：菱形 |x|/a+|y|/b≤1 的最大内接正方形半边 = a/2，
+## 于是 ✕ 的端点正落在四条斜边的中点，既撑得开又一点不出框。
+class DeathCross extends Control:
+	const X_RED := Color("#d8453e")
+	const X_DARK := Color(0.04, 0.02, 0.02, 0.9)
+
+	## true = 按菱形内接正方形收边（diamond_mode）；false = 方框四角留边。
+	var inscribed: bool = false:
+		set(v):
+			inscribed = v
+			queue_redraw()
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		resized.connect(queue_redraw)
+
+	func _draw() -> void:
+		var block := maxf(roundf(size.x / 24.0), 2.0)
+		# 菱形：内接正方形边长 = 框的一半 → 四周各让出 1/4；方框：沿用 BanMark 的 4 格内缩。
+		var ins: float = size.x * 0.25 if inscribed else block * 4.0
+		var cells: Array[Vector2] = []
+		_collect(Vector2(ins, ins), Vector2(size.x - ins, size.y - ins), block, cells)
+		_collect(Vector2(size.x - ins, ins), Vector2(ins, size.y - ins), block, cells)
+		# 两道斜杠先齐画衬底、再齐画红体 → 交叉处不露暗缝
+		for c in cells:
+			draw_rect(Rect2(c.x - 2.0, c.y - 2.0, block * 2.0 + 4.0, block * 2.0 + 4.0), X_DARK)
+		for c in cells:
+			draw_rect(Rect2(c.x, c.y, block * 2.0, block * 2.0), X_RED)
+
+	## 量化到格坐标逐格行走，收集每格 2×2 块簇的左上角。
+	func _collect(a: Vector2, b: Vector2, block: float, out: Array[Vector2]) -> void:
+		var ca := Vector2(roundf(a.x / block), roundf(a.y / block))
+		var cb := Vector2(roundf(b.x / block), roundf(b.y / block))
+		var steps := int(maxf(absf(cb.x - ca.x), absf(cb.y - ca.y)))
+		for i in steps + 1:
+			var t := float(i) / maxf(float(steps), 1.0)
+			out.append(Vector2(
+				roundf(lerpf(ca.x, cb.x, t)) * block - block * 0.5,
+				roundf(lerpf(ca.y, cb.y, t)) * block - block * 0.5))
 
 
 ## 选择弹跳动画：选中=带 overshoot 放大(像底部按钮 ButtonJuice)；取消=回弹归位。

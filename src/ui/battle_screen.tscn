@@ -9,7 +9,6 @@
 [ext_resource type="PackedScene" uid="uid://cscn1rftp00a" path="res://src/ui/scenes/scene1.tscn" id="7_stage"]
 [ext_resource type="Shader" uid="uid://dnycv6j3wn0ot" path="res://assets/shaders/post_fx_color_grade.gdshader" id="8_postfx"]
 [ext_resource type="PackedScene" uid="uid://bforedustcmp" path="res://src/ui/components/fore_dust.tscn" id="12_foredust"]
-[ext_resource type="Texture2D" uid="uid://cq7w4kpww2rkq" path="res://assets/ui/icons/heart_idle.png" id="13_heart"]
 [ext_resource type="Texture2D" uid="uid://dmk21cawlx7uf" path="res://assets/ui/icons/energy_idle.png" id="14_coin"]
 [ext_resource type="Script" uid="uid://cel6yroklcse5" path="res://src/ui/components/hover_icon.gd" id="15_hovericon"]
 [ext_resource type="Texture2D" uid="uid://cbwxfqjpi8q5r" path="res://assets/ui/icons/Zan_idle.png" id="16_zan"]
@@ -340,48 +339,46 @@ extra_modulate = Color(0.85, 0.82, 0.74, 1)
 preview_cur = 10.865
 
 [node name="P1Frame0" parent="P1Hud" unique_id=2129820687 instance=ExtResource("3_hero_frame")]
-offset_left = 30.0
-offset_top = 8.0
-offset_right = 102.0
-offset_bottom = 80.0
+offset_left = 26.0
+offset_top = 4.0
+offset_right = 106.0
+offset_bottom = 84.0
 diamond_mode = true
 
 [node name="P1Frame1" parent="P1Hud" unique_id=1566007647 instance=ExtResource("3_hero_frame")]
-offset_left = 796.0
-offset_top = 6.0
-offset_right = 864.0
-offset_bottom = 74.0
+offset_left = 792.0
+offset_top = 2.0
+offset_right = 868.0
+offset_bottom = 78.0
 diamond_mode = true
 
 [node name="P1Frame1HpRow" type="Control" parent="P1Hud" unique_id=1327412840]
 texture_filter = 1
 anchors_preset = 0
 offset_left = 786.0
-offset_top = 76.0
+offset_top = 80.0
 offset_right = 874.0
-offset_bottom = 106.0
+offset_bottom = 108.0
 mouse_filter = 2
 script = ExtResource("24_reservehp")
-heart_sheet = ExtResource("13_heart")
 preview_shield = 2.0
 
 [node name="P1Frame2" parent="P1Hud" unique_id=1208252427 instance=ExtResource("3_hero_frame")]
-offset_left = 716.0
-offset_top = 6.0
-offset_right = 784.0
-offset_bottom = 74.0
+offset_left = 712.0
+offset_top = 2.0
+offset_right = 788.0
+offset_bottom = 78.0
 diamond_mode = true
 
 [node name="P1Frame2HpRow" type="Control" parent="P1Hud" unique_id=1749780638]
 texture_filter = 1
 anchors_preset = 0
 offset_left = 706.0
-offset_top = 76.0
+offset_top = 80.0
 offset_right = 794.0
-offset_bottom = 106.0
+offset_bottom = 108.0
 mouse_filter = 2
 script = ExtResource("24_reservehp")
-heart_sheet = ExtResource("13_heart")
 
 [node name="P1ActiveName" type="Label" parent="P1Hud" unique_id=1930000001]
 layout_mode = 0
@@ -453,47 +450,47 @@ extra_modulate = Color(0.85, 0.82, 0.74, 1)
 preview_cur = 10.0
 
 [node name="P2Frame0" parent="P2Hud" unique_id=1770616061 instance=ExtResource("3_hero_frame")]
-offset_left = 1818.0
-offset_top = 8.0
-offset_right = 1890.0
-offset_bottom = 80.0
+offset_left = 1814.0
+offset_top = 4.0
+offset_right = 1894.0
+offset_bottom = 84.0
 diamond_mode = true
 
 [node name="P2Frame1" parent="P2Hud" unique_id=1621653890 instance=ExtResource("3_hero_frame")]
-offset_left = 1070.0
-offset_top = 6.0
-offset_right = 1138.0
-offset_bottom = 74.0
+offset_left = 1066.0
+offset_top = 2.0
+offset_right = 1142.0
+offset_bottom = 78.0
 diamond_mode = true
 
 [node name="P2Frame1HpRow" type="Control" parent="P2Hud" unique_id=757910723]
 texture_filter = 1
 anchors_preset = 0
 offset_left = 1060.0
-offset_top = 76.0
+offset_top = 80.0
 offset_right = 1148.0
-offset_bottom = 106.0
+offset_bottom = 108.0
 mouse_filter = 2
 script = ExtResource("24_reservehp")
-heart_sheet = ExtResource("13_heart")
+icon_slant = 4.0
 
 [node name="P2Frame2" parent="P2Hud" unique_id=1695379356 instance=ExtResource("3_hero_frame")]
-offset_left = 1150.0
-offset_top = 6.0
-offset_right = 1218.0
-offset_bottom = 74.0
+offset_left = 1146.0
+offset_top = 2.0
+offset_right = 1222.0
+offset_bottom = 78.0
 diamond_mode = true
 
 [node name="P2Frame2HpRow" type="Control" parent="P2Hud" unique_id=1880263533]
 texture_filter = 1
 anchors_preset = 0
 offset_left = 1140.0
-offset_top = 76.0
+offset_top = 80.0
 offset_right = 1228.0
-offset_bottom = 106.0
+offset_bottom = 108.0
 mouse_filter = 2
 script = ExtResource("24_reservehp")
-heart_sheet = ExtResource("13_heart")
+icon_slant = 4.0
 
 [node name="P2ActiveName" type="Label" parent="P2Hud" unique_id=1930000003]
 layout_mode = 0
