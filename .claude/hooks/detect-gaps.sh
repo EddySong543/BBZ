@@ -7,6 +7,10 @@
 # 出错时不退出 (但不要阻断会话)
 set +e
 
+HOOK_DIR=$(cd -- "${BASH_SOURCE[0]%/*}" 2>/dev/null && pwd)
+. "$HOOK_DIR/hook-common.sh"
+hook_enter_project || exit 0
+
 echo "=== 正在检查文档缺口 ==="
 
 # --- 检查 0: 新项目检测 (建议运行 /start) ---

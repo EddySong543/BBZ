@@ -5,6 +5,10 @@
 # 输入格式 (SubagentStart):
 # { "agent_id": "agent-abc123", "agent_name": "game-designer", ... }
 
+HOOK_DIR=$(cd -- "${BASH_SOURCE[0]%/*}" 2>/dev/null && pwd)
+. "$HOOK_DIR/hook-common.sh"
+hook_enter_project || exit 0
+
 INPUT=$(cat)
 
 # 解析代理(Agent)名称 -- 优先使用 jq，退回使用 grep

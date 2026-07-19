@@ -2,6 +2,10 @@
 # Claude Code PreCompact 钩子: 在上下文压缩之前转储会话状态
 # 此输出在压缩之前出现在对话中，确保关键状态能在摘要过程中保留。
 
+HOOK_DIR=$(cd -- "${BASH_SOURCE[0]%/*}" 2>/dev/null && pwd)
+. "$HOOK_DIR/hook-common.sh"
+hook_enter_project || exit 0
+
 echo "=== 压缩前的会话状态 ==="
 echo "时间戳: $(date)"
 

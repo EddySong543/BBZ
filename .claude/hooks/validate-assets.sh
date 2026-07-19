@@ -3,6 +3,10 @@
 # 检查 assets/ 目录中文件的命名规范
 # 退出码 0 = 成功 (非阻断，PostToolUse 无法阻断)
 
+HOOK_DIR=$(cd -- "${BASH_SOURCE[0]%/*}" 2>/dev/null && pwd)
+. "$HOOK_DIR/hook-common.sh"
+hook_enter_project || exit 0
+
 INPUT=$(cat)
 
 if command -v jq >/dev/null 2>&1; then

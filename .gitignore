@@ -50,6 +50,7 @@ Desktop.ini
 CLAUDE.local.md
 production/session-logs/
 production/session-state/*.md
+production/session-state/.*
 
 # === Editor workspace / 本机元数据（per-machine·不入库·2026-07-02 C9）===
 *.code-workspace

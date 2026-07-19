@@ -44,6 +44,7 @@ const INTRO_IMG := Vector2(884.0, 300.0)
 
 var _levels: Array = []
 var _progress := StoryProgress.new()
+var progress_path := StoryProgress.SAVE_PATH   # 探针可在入树前改为隔离路径；正式运行保持默认。
 var _intro_layer: Control = null   # 简介浮层（开着时非空·ui_cancel 可关）
 var _book_layer: Control = null    # 卷轴实体（入场上浮层）
 var _result_panel: Control = null  # 结算浮层骨架（懒建复用·2026-07-17）
@@ -55,7 +56,7 @@ var _result_level: Dictionary = {} # 结算对应关卡（再战钮重开用）
 func _ready() -> void:
 	_build_book()
 	_setup_top()
-	_progress.load_from_disk()
+	_progress.load_from_disk(progress_path)
 	_levels = StoryCatalog.load_levels()
 	_consume_battle_result()
 	_build_columns()
@@ -231,7 +232,7 @@ func _consume_battle_result() -> void:
 	var outcome: String = String(r.get("outcome", ""))
 	if outcome == "win":
 		_progress.mark_cleared(String(lv["id"]))
-		_progress.save_to_disk()
+		_progress.save_to_disk(progress_path)
 	_show_result_panel.call_deferred(lv, outcome)
 
 

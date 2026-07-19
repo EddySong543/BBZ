@@ -4,7 +4,7 @@ extends Node
 ## 亮宣纸/暗夜两块衬底上（1×/2×/4× 三档），截图自检形状与双衬底可见性。实机手感=Eddy F6。
 ## 带窗口跑：godot --path . res://tools/cursor_preview.tscn
 
-const OUT := "C:/Users/Edzzz/AppData/Local/Temp/claude/D--Game-BoBoZan-Claude-Code-Game-Studios-cn-localization/6e0b7c09-95ef-4eec-aff5-b75e12a43c22/scratchpad/cursor_preview.png"
+const ProbeOutput := preload("res://tools/probe_output.gd")
 const BACKDROP := preload("res://assets/ui/item_codex_backdrop.png")
 
 
@@ -43,6 +43,7 @@ func _ready() -> void:
 
 	await get_tree().create_timer(0.4, true, false, true).timeout
 	await RenderingServer.frame_post_draw
-	get_viewport().get_texture().get_image().save_png(OUT)
-	print("saved: ", OUT)
+	var out := ProbeOutput.path("cursor_preview.png")
+	get_viewport().get_texture().get_image().save_png(out)
+	print("saved: ", out)
 	get_tree().quit()

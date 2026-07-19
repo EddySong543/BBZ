@@ -6,6 +6,10 @@
 # 输入格式 (PreToolUse for Bash):
 # { "tool_name": "Bash", "tool_input": { "command": "git push origin main" } }
 
+HOOK_DIR=$(cd -- "${BASH_SOURCE[0]%/*}" 2>/dev/null && pwd)
+. "$HOOK_DIR/hook-common.sh"
+hook_enter_project || exit 0
+
 INPUT=$(cat)
 
 # 解析命令 -- 优先使用 jq，退回使用 grep

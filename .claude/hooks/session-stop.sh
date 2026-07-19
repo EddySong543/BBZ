@@ -1,40 +1,57 @@
 #!/bin/bash
-# Claude Code Stop 钩子: Claude 完成时记录会话摘要
-# 记录本次工作内容用于审计追踪和冲刺跟踪
+# Claude Code Stop hook: append one compact record for each distinct project state.
+# It deliberately never copies the complete active.md into the history log.
 
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-SESSION_LOG_DIR="production/session-logs"
+set +e
 
-mkdir -p "$SESSION_LOG_DIR" 2>/dev/null
+HOOK_DIR=$(cd -- "${BASH_SOURCE[0]%/*}" 2>/dev/null && pwd)
+. "$HOOK_DIR/hook-common.sh"
+hook_enter_project || exit 0
 
-RECENT_COMMITS=$(git log --oneline --since="8 hours ago" 2>/dev/null)
-MODIFIED_FILES=$(git diff --name-only 2>/dev/null)
+STATE_DIR="production/session-state"
+LOG_DIR="production/session-logs"
+LOCK_DIR="$STATE_DIR/.session-stop.lock"
+FINGERPRINT_FILE="$STATE_DIR/.last-session-fingerprint"
+LOG_FILE="$LOG_DIR/session-log.md"
 
-STATE_FILE="production/session-state/active.md"
-if [ -f "$STATE_FILE" ]; then
-    {
-        echo "## 已归档的会话状态: $TIMESTAMP"
-        cat "$STATE_FILE"
-        echo "---"
-        echo ""
-    } >> "$SESSION_LOG_DIR/session-log.md" 2>/dev/null
-    # rm "$STATE_FILE" 2>/dev/null  # 2026-05-19 Eddy 决议：保留便利贴，仅归档不删除
+mkdir -p "$STATE_DIR" "$LOG_DIR" 2>/dev/null
+
+# Atomic mkdir prevents recursive or concurrent Stop hooks from writing repeatedly.
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+    exit 0
+fi
+trap 'rmdir "$LOCK_DIR" 2>/dev/null' EXIT INT TERM
+
+BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+HEAD_COMMIT=$(git rev-parse --short HEAD 2>/dev/null)
+WORKTREE=$(git status --porcelain=v1 2>/dev/null)
+STATE_HASH="none"
+if [ -f "$STATE_DIR/active.md" ]; then
+    STATE_HASH=$(hook_hash_stream < "$STATE_DIR/active.md")
 fi
 
-if [ -n "$RECENT_COMMITS" ] || [ -n "$MODIFIED_FILES" ]; then
-    {
-        echo "## 会话结束: $TIMESTAMP"
-        if [ -n "$RECENT_COMMITS" ]; then
-            echo "### 提交"
-            echo "$RECENT_COMMITS"
-        fi
-        if [ -n "$MODIFIED_FILES" ]; then
-            echo "### 未提交的变更"
-            echo "$MODIFIED_FILES"
-        fi
-        echo "---"
-        echo ""
-    } >> "$SESSION_LOG_DIR/session-log.md" 2>/dev/null
+FINGERPRINT=$(printf '%s\n%s\n%s\n%s\n' "$BRANCH" "$HEAD_COMMIT" "$WORKTREE" "$STATE_HASH" | hook_hash_stream)
+PREVIOUS=""
+[ -f "$FINGERPRINT_FILE" ] && PREVIOUS=$(tr -d '\r\n' < "$FINGERPRINT_FILE")
+
+if [ "$FINGERPRINT" = "$PREVIOUS" ]; then
+    exit 0
 fi
 
+TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S %z')
+{
+    echo "## Session state: $TIMESTAMP"
+    echo "- Branch: ${BRANCH:-unknown}"
+    echo "- HEAD: ${HEAD_COMMIT:-unknown}"
+    if [ -n "$WORKTREE" ]; then
+        echo "- Working tree:"
+        printf '%s\n' "$WORKTREE" | sed 's/^/  - `/' | sed 's/$/`/'
+    else
+        echo "- Working tree: clean"
+    fi
+    echo "- Active state hash: $STATE_HASH"
+    echo ""
+} >> "$LOG_FILE" 2>/dev/null
+
+printf '%s\n' "$FINGERPRINT" > "$FINGERPRINT_FILE" 2>/dev/null
 exit 0

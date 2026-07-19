@@ -4,9 +4,9 @@ extends Node
 ##   godot --path . res://tools/tip_probe.tscn
 ## 状态注入式（⚠warp_mouse 会被物理鼠标覆盖·见 godot-ui-render-quirks）：
 ##   直接调 battle_screen 的提示函数 → 三截图：①攒按钮提示 ②道具槽提示 ③3选1 最长描述卡。
-## 输出到 session scratchpad（不落仓库目录）。
+## 输出：统一探针目录（默认 user://probe-output，可由命令行覆盖）。
 
-const OUT_DIR := "C:/Users/Edzzz/AppData/Local/Temp/claude/D--Game-BoBoZan-Claude-Code-Game-Studios-cn-localization/ce241ba4-b053-41bc-b841-ba00c18ed717/scratchpad/"
+const ProbeOutput := preload("res://tools/probe_output.gd")
 const DraftPopup := preload("res://src/ui/components/item_draft_popup.gd")
 
 
@@ -17,12 +17,12 @@ func _ready() -> void:
 	# ① 攒按钮提示
 	s._on_tip_enter(s.btn_charge, s._action_tip.bind(ActionDef.Action.CHARGE))
 	await RenderingServer.frame_post_draw
-	get_viewport().get_texture().get_image().save_png(OUT_DIR + "tip_btn.png")
+	get_viewport().get_texture().get_image().save_png(ProbeOutput.path("tip_btn.png"))
 	print("saved: tip_btn.png")
 	# ② 道具槽 0 提示（回合 1 = 未解锁态）
 	s._on_item_slot_hovered(0)
 	await RenderingServer.frame_post_draw
-	get_viewport().get_texture().get_image().save_png(OUT_DIR + "tip_slot.png")
+	get_viewport().get_texture().get_image().save_png(ProbeOutput.path("tip_slot.png"))
 	print("saved: tip_slot.png")
 	s._hide_tip()
 	# ③ 3选1 弹窗 = 全目录描述最长的 3 件（验换行不溢出）
@@ -33,6 +33,6 @@ func _ready() -> void:
 	popup.setup([pool[0], pool[1], pool[2]], true, "换行探针（最长描述×3）")
 	await RenderingServer.frame_post_draw
 	await RenderingServer.frame_post_draw
-	get_viewport().get_texture().get_image().save_png(OUT_DIR + "tip_draft.png")
+	get_viewport().get_texture().get_image().save_png(ProbeOutput.path("tip_draft.png"))
 	print("saved: tip_draft.png")
 	get_tree().quit()

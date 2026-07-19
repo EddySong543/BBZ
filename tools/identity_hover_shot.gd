@@ -4,9 +4,9 @@ extends Node
 ##   godot --path . res://tools/identity_hover_shot.tscn
 ## 合成 mouse_entered 信号触发悬停反馈（⛔warp_mouse 不可靠·[[godot-ui-render-quirks]]）：
 ## 金晕外环显形 + ButtonJuice 轻放大。两张：常态 / 悬停态。
-## 输出：当前 session scratchpad（⛔别堆 BoBoZan 目录）。
+## 输出：统一探针目录（默认 user://probe-output，可由命令行覆盖）。
 
-const OUT_DIR := "C:/Users/Edzzz/AppData/Local/Temp/claude/D--Game-BoBoZan-Claude-Code-Game-Studios-cn-localization/282e3476-65b7-4cc5-8a0d-809b70f6f3f5/scratchpad/"
+const ProbeOutput := preload("res://tools/probe_output.gd")
 
 
 func _ready() -> void:
@@ -16,16 +16,17 @@ func _ready() -> void:
 	menu.mock_match_seconds = 999.0
 	add_child(menu)
 	await get_tree().create_timer(1.8).timeout   # 等发牌入场动画走完
-	await _shot(OUT_DIR + "identity_idle.png")
+	await _shot("identity_idle.png")
 
 	var btn := menu.get_node("UI/IdentityButton") as Button
 	btn.mouse_entered.emit()                     # 合成悬停：金晕环 + juice 放大
 	await get_tree().create_timer(0.3).timeout
-	await _shot(OUT_DIR + "identity_hover.png")
+	await _shot("identity_hover.png")
 	get_tree().quit()
 
 
-func _shot(path: String) -> void:
+func _shot(file_name: String) -> void:
 	await RenderingServer.frame_post_draw
+	var path := ProbeOutput.path(file_name)
 	get_viewport().get_texture().get_image().save_png(path)
 	print("saved: ", path)

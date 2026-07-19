@@ -2,6 +2,13 @@
 # Claude Code SessionStart 钩子: 在会话开始时加载项目上下文
 # 输出 Claude 在会话开始时看到的上下文信息
 
+HOOK_DIR=$(cd -- "${BASH_SOURCE[0]%/*}" 2>/dev/null && pwd)
+. "$HOOK_DIR/hook-common.sh"
+hook_enter_project || exit 0
+
+# A killed Stop hook may leave a stale lock. Locks older than two minutes are safe to clear.
+find "production/session-state" -maxdepth 1 -type d -name '.session-stop.lock' -mmin +2 -exec rmdir {} \; 2>/dev/null
+
 echo "=== Claude Code Game Studios — 会话上下文 ==="
 
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)

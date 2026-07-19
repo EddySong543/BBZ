@@ -5,23 +5,25 @@ extends Node
 ##   godot --path . res://tools/story_probe.tscn
 ## ⚠ 不点「开战」按钮/不等回程转场（TransitionManager 换场景会把探针根释放）——
 ##   交接与回程两步直接调私有/读总线断言，转场前把战斗屏收走。
-## 输出：D:/Game/BoBoZan/story_select.png / story_intro.png / story_battle_end.png / story_cleared.png
-## 存档卫生：探针前后删 user://story_progress.cfg（不污染本机进度）。
+## 输出：统一探针目录。故事进度写入独立探针存档，不接触真实进度。
 
-const OUT_DIR := "D:/Game/BoBoZan/"
-const SAVE_FILE := "user://story_progress.cfg"
+const ProbeOutput := preload("res://tools/probe_output.gd")
+
+var _probe_save_file := ""
 
 
 func _ready() -> void:
 	var fails: Array[String] = []
-	_wipe_save()
+	_probe_save_file = ProbeOutput.path("story_progress_probe.cfg")
+	_wipe_probe_save()
 
 	# —— ① 选关屏：四列出齐·main_01 可点·main_02 带锁 ——
 	var s: Node = load("res://src/ui/story_screen.tscn").instantiate()
+	s.progress_path = _probe_save_file
 	add_child(s)
 	await _rt(1.0)
 	await RenderingServer.frame_post_draw
-	get_viewport().get_texture().get_image().save_png(OUT_DIR + "story_select.png")
+	get_viewport().get_texture().get_image().save_png(ProbeOutput.path("story_select.png"))
 	var b1 := s.find_child("Level_main_01", true, false) as Button
 	var b2 := s.find_child("Level_main_02", true, false) as Button
 	if b1 == null or b1.disabled:
@@ -34,7 +36,7 @@ func _ready() -> void:
 		b1.pressed.emit()
 	await _rt(0.35)
 	await RenderingServer.frame_post_draw
-	get_viewport().get_texture().get_image().save_png(OUT_DIR + "story_intro.png")
+	get_viewport().get_texture().get_image().save_png(ProbeOutput.path("story_intro.png"))
 	if s.find_child("IntroPanel", true, false) == null:
 		fails.append("②简介浮层未弹出")
 
@@ -74,7 +76,7 @@ func _ready() -> void:
 			break
 		await _rt(0.25)
 	await RenderingServer.frame_post_draw
-	get_viewport().get_texture().get_image().save_png(OUT_DIR + "story_battle_end.png")
+	get_viewport().get_texture().get_image().save_png(ProbeOutput.path("story_battle_end.png"))
 	if not got_result:
 		fails.append("④战斗结束未写回 story_result")
 	elif String(BattleSetup.story_result.get("outcome", "")) != "win" \
@@ -86,10 +88,11 @@ func _ready() -> void:
 
 	# —— ⑤ 回程消费：新选关屏吃掉 story_result → main_01 打 ✓·main_02 解锁·总线自清 ——
 	var s2: Node = load("res://src/ui/story_screen.tscn").instantiate()
+	s2.progress_path = _probe_save_file
 	add_child(s2)
 	await _rt(1.0)
 	await RenderingServer.frame_post_draw
-	get_viewport().get_texture().get_image().save_png(OUT_DIR + "story_cleared.png")
+	get_viewport().get_texture().get_image().save_png(ProbeOutput.path("story_cleared.png"))
 	if not BattleSetup.story_result.is_empty():
 		fails.append("⑤story_result 消费后未自清")
 	var c1 := s2.find_child("Level_main_01", true, false) as Button
@@ -99,16 +102,15 @@ func _ready() -> void:
 	if c2 == null or c2.disabled:
 		fails.append("⑤main_02 未随通关解锁")
 
-	_wipe_save()
+	_wipe_probe_save()
 	print("STORY_PROBE: %s" % ("PASS" if fails.is_empty() else "FAIL " + str(fails)))
 	get_tree().quit()
 
 
-## 删探针进度存档（前=保证从零开始·后=不污染本机进度）。
-func _wipe_save() -> void:
-	var gp := ProjectSettings.globalize_path(SAVE_FILE)
-	if FileAccess.file_exists(SAVE_FILE):
-		DirAccess.remove_absolute(gp)
+## 只删探针专用进度（前=保证从零开始·后=不留测试数据）。
+func _wipe_probe_save() -> void:
+	if FileAccess.file_exists(_probe_save_file):
+		DirAccess.remove_absolute(_probe_save_file)
 
 
 ## 真实时长等待（ignore_time_scale：hitstop/慢放不拖探针节奏）。
