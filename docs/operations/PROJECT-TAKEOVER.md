@@ -80,6 +80,12 @@ PowerShell 全量测试命令：
 
 Codex 自动验证时使用 `Start-Process -Wait -WindowStyle Hidden` 启动 Godot，以便可靠等待独立进程并取得退出码和日志；手动运行仍可使用前述 PowerShell `&` 模板。
 
+### 2026-07-19 Godot孤儿进程事故与永久修复
+
+另一对话曾执行 `godot.windows.opt.tools.64.exe --path <项目> --editor`，其父进程退出后留下无窗口孤儿进程 PID 16456。该进程持续占用约2.5GB私有内存，最终触发Windows应用程序错误：指令读取地址 `0x58` 失败。
+
+处置：确认命令行、父进程已消失和无窗口后终止该孤儿进程。此后Codex不得直接自动化启动Godot，统一使用 `tools/run_godot.ps1`。启动器负责绝对路径、模式参数、等待、日志、超时清理和崩溃对话框抑制；项目根 `AGENTS.md` 会让后续对话自动继承此规则。
+
 ## Session 收尾约定
 
 当 Eddy 说“结束本次 Session：总结、检查、测试、commit 并 push”时：

@@ -18,6 +18,19 @@
 
 ## 标准启动方式
 
+Codex及无人值守任务统一使用：
+
+```powershell
+& .\tools\run_godot.ps1 -Mode Import
+& .\tools\run_godot.ps1 -Mode Test
+& .\tools\run_godot.ps1 -Mode Tool -Target 'res://tools/xxx.gd'
+& .\tools\run_godot.ps1 -Mode Probe -Target 'res://tools/xxx_probe.tscn'
+```
+
+禁止Codex直接启动常驻 `--editor`。统一启动器会等待自己启动的Godot进程，超时只清理该进程，并将崩溃转为退出码和日志，避免Windows应用程序错误框永久卡住。
+
+以下直接命令只供人工排障理解；自动化不得绕过统一启动器。
+
 Godot 可执行文件：
 
 ```text
