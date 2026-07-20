@@ -33,6 +33,7 @@ const DIM_COLOR := {
 ##   双层 = 暗格底 canvas_ui_item_cell_bg（稀有度暗底 + 中心高亮 + 传说金底图）+ 稀有度像素框 canvas_ui_pixel_frame。
 ##   与 item_gallery_screen 完全同源（像素框 + 暗格 + 居中图标 + 全圆角）。jelly 仅保留给右上「升」角标。
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")        # 点选金晕外环用（框本体全走回纹贴图）
+const FRAME_PALETTE_SHADER := preload("res://assets/shaders/canvas_ui_item_frame_palette.gdshader")
 const ITEM_FRAME_TEX := {   # 三阶回纹框（2026-07-13 与图鉴同源同款贴图）
 	1: preload("res://assets/ui/item_frame_t1.png"),
 	2: preload("res://assets/ui/item_frame_t2.png"),
@@ -41,11 +42,23 @@ const ITEM_FRAME_TEX := {   # 三阶回纹框（2026-07-13 与图鉴同源同款
 # 格底内外色（2026-07-13 与图鉴同源定版：四角=深饱和阶色·中心=略浅阶色·传说走 gold_bottom）。
 const CELL_FILL_T := {1: Color("#6E9BD2"), 2: Color("#9A7FD0")}
 const CELL_CENTER_T := {1: Color("#88AEDE"), 2: Color("#B098E0")}
+const FRAME_SHADOW_T := {
+	1: Color("#102C4A"), 2: Color("#2A1246"), 3: Color("#4A2F08"),
+}
+const FRAME_MID_T := {
+	1: Color("#4A86C2"), 2: Color("#8050BC"), 3: Color("#C78F27"),
+}
+const FRAME_HIGHLIGHT_T := {
+	1: Color("#B9D9F2"), 2: Color("#D6B1F2"), 3: Color("#F7DE9A"),
+}
 const CELL_BG_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")     # 暗格底：圆角 + 稀有度暗底 + 中心高亮 + 传说金底图
 const JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")          # 仅「升」角标用
 const LEGENDARY_BG := preload("res://assets/ui/gold_bottom.png")                            # 传说道具金云纹背景（Eddy 美术·与图鉴同源）
 const LEGENDARY_BG_TINT := Color(1.0, 1.0, 1.0, 1.0)
 const FRAME_EDGE_OUTER := Color(0.16, 0.10, 0.06)   # 框外轮廓=深咖（与图鉴同）
+const FRAME_ART_SIZE := Vector2(87.25, 87.25)        # 新图透明边较宽：放大至实际金属外沿贴合 68px 槽位
+const FRAME_ART_OFFSET := Vector2(-9.6, -10.0)       # 由 alpha 外接框 (138,143)-(1116,1112) 对齐槽位
+const CELL_INSET := 6.0                              # 新框内孔约 56px；格底只铺在内孔下方，绝不露到框外
 const CELL_CORNER := 0.18                            # 圆角（格底与框一致·与图鉴同·全圆角无方角）
 const CELL_GRID := 23.0    # 像素格数（= 图鉴 BOX/6）。用「格数」而非 SLOT_W/6 → 边框按比例随框缩放、不会在小框上变粗（2026-06-28 Eddy：去掉过厚棕边·与图鉴完全一致）
 const EDGE_OUTER := Color(0.11, 0.09, 0.075)    # 统一暗轮廓（暖黑·与暖色UI同温·任何色相都干净）
@@ -127,6 +140,7 @@ var _cell_mats: Array[ShaderMaterial] = []     # refresh 重设 fill_color / cen
 var _frames: Array[ColorRect] = []             # 每槽点选金晕外环（pixel_frame·外扩金边·仅点选显示）
 var _frame_mats: Array[ShaderMaterial] = []    # 金晕材质（金色在 _ready 一次性设定）
 var _tex_frames: Array[TextureRect] = []       # 每槽回纹阶框贴图（有道具时替换 shader 框·与图鉴同款）
+var _tex_frame_mats: Array[ShaderMaterial] = [] # 新框明暗母版按阶级重映射为蓝 / 紫 / 金
 var _icons: Array[TextureRect] = []            # 道具图标层（缺图隐藏 → 回退文字·零回归）
 var _icon_cache := {}                          # id → Texture2D / null（避免每帧 load/exists）
 var _labels: Array[Label] = []                 # 仅缺图回退道具名（状态文字 2026-07-13 全退役）
@@ -174,6 +188,20 @@ func _make_frame_material() -> ShaderMaterial:
 	return m
 
 
+func _make_texture_frame_material() -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = FRAME_PALETTE_SHADER
+	_set_texture_frame_palette(m, 1)
+	return m
+
+
+func _set_texture_frame_palette(m: ShaderMaterial, tier: int) -> void:
+	var key := clampi(tier, 1, 3)
+	m.set_shader_parameter("shadow_color", FRAME_SHADOW_T[key])
+	m.set_shader_parameter("mid_color", FRAME_MID_T[key])
+	m.set_shader_parameter("highlight_color", FRAME_HIGHLIGHT_T[key])
+
+
 func _ready() -> void:
 	custom_minimum_size = Vector2(SLOT_W * 3 + GAP * 2, SLOT_H)
 	# 根容器不拦截点击：只让每个槽的按钮(STOP)接收（否则上层 HUD 容器会吞点击）。
@@ -183,8 +211,8 @@ func _ready() -> void:
 		# 暗格底（cell_bg）：稀有度暗底 + 中心高亮 + 传说金底图；颜色由 refresh 设。
 		var cell := ColorRect.new()
 		cell.color = Color.WHITE   # shader 乘 COLOR，须白
-		cell.position = base
-		cell.size = Vector2(SLOT_W, SLOT_H)
+		cell.position = base + Vector2(CELL_INSET, CELL_INSET)
+		cell.size = Vector2(SLOT_W - CELL_INSET * 2.0, SLOT_H - CELL_INSET * 2.0)
 		var cmat := _make_cell_material()
 		cell.material = cmat
 		cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -206,8 +234,10 @@ func _ready() -> void:
 		var tframe := TextureRect.new()
 		tframe.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		tframe.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		tframe.position = base
-		tframe.size = Vector2(SLOT_W, SLOT_H)
+		tframe.position = base + FRAME_ART_OFFSET
+		tframe.size = FRAME_ART_SIZE
+		var tfmat := _make_texture_frame_material()
+		tframe.material = tfmat
 		tframe.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		tframe.visible = false
 		add_child(tframe)
@@ -272,6 +302,7 @@ func _ready() -> void:
 		_frames.append(frame)
 		_frame_mats.append(fmat)
 		_tex_frames.append(tframe)
+		_tex_frame_mats.append(tfmat)
 		_icons.append(icon)
 		_labels.append(lbl)
 		_buttons.append(btn)
@@ -543,6 +574,7 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 		# 框应用：全状态=回纹贴图框（有道具=阶框/无道具=暖骨中性框）；点选叠金晕外环+框身提金（入场 pop 一次）。
 		_tex_frames[i].visible = true
 		_tex_frames[i].texture = frame_tex
+		_set_texture_frame_palette(_tex_frame_mats[i], cur_tier)
 		_tex_frames[i].modulate = STAGED_TINT if staged_now else frame_mod
 		_frames[i].visible = staged_now
 		if staged_now and _prev_staged[i] != true:

@@ -26,9 +26,22 @@ const TIER_FRAME := {   # 图标阶框（图鉴格同款回纹阶框·128 原生
 # 格底（=item_gallery_screen 同源配方·2026-07-14 Eddy：抽卡格底须与图鉴一致）：
 # 四角=深饱和阶色·中心=略浅阶色·传说=gold_bottom 金云纹贴图（只换框色）。
 const CELL_BG_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")
+const FRAME_PALETTE_SHADER := preload("res://assets/shaders/canvas_ui_item_frame_palette.gdshader")
 const LEGENDARY_BG := preload("res://assets/ui/gold_bottom.png")
 const CELL_FILL := {1: Color("#6E9BD2"), 2: Color("#9A7FD0")}
 const CELL_CENTER := {1: Color("#88AEDE"), 2: Color("#B098E0")}
+const FRAME_SHADOW := {
+	1: Color("#102C4A"), 2: Color("#2A1246"), 3: Color("#4A2F08"),
+}
+const FRAME_MID := {
+	1: Color("#4A86C2"), 2: Color("#8050BC"), 3: Color("#C78F27"),
+}
+const FRAME_HIGHLIGHT := {
+	1: Color("#B9D9F2"), 2: Color("#D6B1F2"), 3: Color("#F7DE9A"),
+}
+const FRAME_ART_SCALE := 87.25 / 68.0
+const FRAME_OFFSET_RATIO := Vector2(-9.6 / 68.0, -10.0 / 68.0)
+const CELL_INSET_RATIO := 6.0 / 68.0
 const TIER_INK := {   # 卡名墨色三阶（=item_gallery_screen.TIER_INK 同源·稀有度不染卡面）
 	1: Color("34608F"), 2: Color("6B3D96"), 3: Color("8F6A1E"),
 }
@@ -36,6 +49,16 @@ const INK := Color(0.24, 0.19, 0.12)  # 墨字（亮纸主文字·与战斗悬�
 
 var _can_cancel := true
 var _done := false   # 防重复 resolve（连点 / ESC 抢答）
+
+
+func _make_tier_frame_material(tier: int) -> ShaderMaterial:
+	var key := clampi(tier, 1, 3)
+	var m := ShaderMaterial.new()
+	m.shader = FRAME_PALETTE_SHADER
+	m.set_shader_parameter("shadow_color", FRAME_SHADOW[key])
+	m.set_shader_parameter("mid_color", FRAME_MID[key])
+	m.set_shader_parameter("highlight_color", FRAME_HIGHLIGHT[key])
+	return m
 
 
 func setup(options: Array, can_cancel: bool = true, title_text: String = "抽取道具（3 选 1）") -> void:
@@ -132,17 +155,21 @@ func _build_card(item: ItemData, pos: Vector2, idx: int) -> void:
 
 	if tex != null:
 		# 格底（图鉴格同配方：四角深阶色+中心略浅·传说=gold_bottom）——铺在阶框下。
+		var slot_rect := Rect2(Vector2(CARD_W * 0.5 - 64.0, 92.0), Vector2(128.0, 128.0))
+		var cell_inset := slot_rect.size.x * CELL_INSET_RATIO
 		var cell := ColorRect.new()
+		cell.name = "ItemCell"
 		cell.color = Color.WHITE
-		cell.position = Vector2(CARD_W * 0.5 - 64.0, 92.0)
-		cell.size = Vector2(128.0, 128.0)
+		cell.position = slot_rect.position + Vector2.ONE * cell_inset
+		cell.size = slot_rect.size - Vector2.ONE * cell_inset * 2.0
 		cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var cm := ShaderMaterial.new()
 		cm.shader = CELL_BG_SHADER
 		cm.set_shader_parameter("fill_color", CELL_FILL.get(tier, CELL_FILL[1]))
 		cm.set_shader_parameter("inner_color", CELL_CENTER.get(tier, CELL_CENTER[1]))
 		cm.set_shader_parameter("center_glow", 1.0)
-		cm.set_shader_parameter("corner_radius", 0.18)
+		# 新框的阶梯角套本身就是遮罩；旧圆角会二次挖空内孔四角，亮纸上形成白缝。
+		cm.set_shader_parameter("corner_radius", 0.0)
 		cm.set_shader_parameter("pixel_grid", 128.0 / 6.0)
 		if tier == 3:
 			cm.set_shader_parameter("use_tex", 1.0)
@@ -151,12 +178,15 @@ func _build_card(item: ItemData, pos: Vector2, idx: int) -> void:
 		cm.set_shader_parameter("cloud_on", 0.0)
 		cell.material = cm
 		card.add_child(cell)
-		# 阶框+图标（图鉴格同语言·128 阶框原生尺寸不缩放）。
+		# 阶框+图标：补偿新素材透明边，使金属外沿仍与 128px 图标槽对齐。
 		var frame := TextureRect.new()
-		frame.texture = TIER_FRAME.get(tier, TIER_FRAME[1])
-		frame.position = Vector2(CARD_W * 0.5 - 64.0, 92.0)
-		frame.size = Vector2(128.0, 128.0)
+		frame.name = "ItemFrame"
 		frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		frame.stretch_mode = TextureRect.STRETCH_SCALE
+		frame.texture = TIER_FRAME.get(tier, TIER_FRAME[1])
+		frame.position = slot_rect.position + slot_rect.size * FRAME_OFFSET_RATIO
+		frame.size = slot_rect.size * FRAME_ART_SCALE
+		frame.material = _make_tier_frame_material(tier)
 		frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card.add_child(frame)

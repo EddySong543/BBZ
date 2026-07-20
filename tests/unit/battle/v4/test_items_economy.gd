@@ -222,6 +222,32 @@ func test_slot_row_staged_highlight() -> void:
 	assert_eq(row._icons[0].position.y, ItemSlotRow.ICON_INSET, "取消点选 = 图标回弹")
 
 
+func test_slot_row_new_frame_palette_and_inner_mask_fit() -> void:
+	var b := _battle_ready(20)
+	var row := ItemSlotRow.new()
+	add_child_autofree(row)
+	assert_eq(row._tex_frames[0].position, ItemSlotRow.FRAME_ART_OFFSET,
+			"新外框透明边补偿后贴合槽位")
+	assert_eq(row._tex_frames[0].size, ItemSlotRow.FRAME_ART_SIZE,
+			"新外框按素材实际外沿放大")
+	assert_eq(row._cells[0].position, Vector2.ONE * ItemSlotRow.CELL_INSET,
+			"格底从新框内孔起点开始")
+	assert_eq(row._cells[0].size,
+			Vector2(ItemSlotRow.SLOT_W, ItemSlotRow.SLOT_H) - Vector2.ONE * ItemSlotRow.CELL_INSET * 2.0,
+			"格底尺寸被限制在新框内孔")
+	var tier_items := ["t1_feibiao", "t2_feibiao", "t3_longxi"]
+	for tier in range(1, 4):
+		b.slots[0][0]["item"] = ItemCatalog.make(tier_items[tier - 1])
+		row.refresh(b, 0)
+		var mat: ShaderMaterial = row._tex_frame_mats[0]
+		assert_eq(mat.get_shader_parameter("shadow_color"), ItemSlotRow.FRAME_SHADOW_T[tier],
+				"第%d阶外框暗部色" % tier)
+		assert_eq(mat.get_shader_parameter("mid_color"), ItemSlotRow.FRAME_MID_T[tier],
+				"第%d阶外框主色" % tier)
+		assert_eq(mat.get_shader_parameter("highlight_color"), ItemSlotRow.FRAME_HIGHLIGHT_T[tier],
+				"第%d阶外框高光色" % tier)
+
+
 func test_draft_popup_resolves_choice_once() -> void:
 	var popup := ItemDraftPopup.new()
 	add_child_autofree(popup)
@@ -235,6 +261,29 @@ func test_draft_popup_resolves_choice_once() -> void:
 	popup._resolve(0)                    # 二次抢答应被去抖忽略
 	assert_eq(calls[1], 1, "返回选中 index")
 	assert_eq(calls[0], 1, "去抖：只 resolve 一次")
+
+
+func test_draft_popup_new_frame_size_position_and_palette() -> void:
+	var popup := ItemDraftPopup.new()
+	add_child_autofree(popup)
+	popup.setup([ItemCatalog.make("t2_feibiao")], false, "升级道具（3 选 1）")
+	var frame := popup.find_child("ItemFrame", true, false) as TextureRect
+	var cell := popup.find_child("ItemCell", true, false) as ColorRect
+	var slot_pos := Vector2(ItemDraftPopup.CARD_W * 0.5 - 64.0, 92.0)
+	var slot_size := Vector2(128.0, 128.0)
+	var inset := slot_size.x * ItemDraftPopup.CELL_INSET_RATIO
+	assert_eq(frame.position, slot_pos + slot_size * ItemDraftPopup.FRAME_OFFSET_RATIO,
+			"升级三选一外框位置补偿透明边")
+	assert_eq(frame.size, slot_size * ItemDraftPopup.FRAME_ART_SCALE,
+			"升级三选一外框按新素材放大")
+	assert_eq(cell.position, slot_pos + Vector2.ONE * inset,
+			"升级三选一格底限制在内孔起点")
+	assert_eq(cell.size, slot_size - Vector2.ONE * inset * 2.0,
+			"升级三选一格底限制在内孔尺寸")
+	assert_eq((cell.material as ShaderMaterial).get_shader_parameter("corner_radius"), 0.0,
+			"升级三选一格底取消旧圆角，填充色覆盖四角")
+	assert_eq((frame.material as ShaderMaterial).get_shader_parameter("mid_color"),
+			ItemDraftPopup.FRAME_MID[2], "升级三选一稀有框恢复紫色")
 
 
 func test_battle_screen_script_compiles_with_m3_wiring() -> void:

@@ -16,6 +16,7 @@ extends Control
 const PLAQUE_TEX := preload("res://assets/ui/ui_plaque.png")                              # 悬挂牌匾(GPT 米色回纹匾·320×62·9-slice 边距 50/20·2026-07-13)
 const CELL_BG_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")   # 格底：圆角+渐变（v5 中性深炭）
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")      # 选中金晕外环（与战斗道具栏点选同语言·2026-07-14）
+const FRAME_PALETTE_SHADER := preload("res://assets/shaders/canvas_ui_item_frame_palette.gdshader")
 const LEGENDARY_BG := preload("res://assets/ui/gold_bottom.png")                          # 传说道具金云纹格底(Eddy 美术)
 const SCROLL_TEX := preload("res://assets/ui/item_codex_scroll.png")                      # 整屏手卷卷轴(GPT 出图·2026-07-13 二版·1672×941=16:9·棋盘格假透明已转真 alpha=img_checker_to_alpha)
 const BACKDROP_TEX := preload("res://assets/ui/item_codex_backdrop.png")                  # 衬底=宣纸淡墨山水(GPT 出图·2026-07-13 Eddy 选 A 修订版·下缘远山+顶部一线远峰·中部留白)
@@ -61,6 +62,18 @@ const INK_DIM := Color(0.48, 0.41, 0.28)       # 淡墨（次级/划线/注记�
 # 传说不走此表（格底=gold_bottom 金云纹美术·只换框色）。
 const CELL_FILL := {1: Color("#6E9BD2"), 2: Color("#9A7FD0")}     # 四角=深饱和阶色（比框 8FB8E4/BFA0E8 深）
 const CELL_CENTER := {1: Color("#88AEDE"), 2: Color("#B098E0")}   # 中心=略浅阶色（仍≤框亮度·层次感）
+const FRAME_SHADOW := {
+	1: Color("#102C4A"), 2: Color("#2A1246"), 3: Color("#4A2F08"),
+}
+const FRAME_MID := {
+	1: Color("#4A86C2"), 2: Color("#8050BC"), 3: Color("#C78F27"),
+}
+const FRAME_HIGHLIGHT := {
+	1: Color("#B9D9F2"), 2: Color("#D6B1F2"), 3: Color("#F7DE9A"),
+}
+const FRAME_ART_SCALE := 87.25 / 68.0
+const FRAME_OFFSET_RATIO := Vector2(-9.6 / 68.0, -10.0 / 68.0)
+const CELL_INSET_RATIO := 6.0 / 68.0
 
 # 维度 → 语义色（与战斗动作按钮/抽卡同源·详情维度章用）。
 const DIM_COLOR := {
@@ -111,6 +124,7 @@ var _d_icon: TextureRect
 var _d_icon_fallback: Label
 var _d_cell_mat: ShaderMaterial     # 右页大图鉴格底材质（稀有度色/传说金底按选中件重设·2026-07-14）
 var _d_frame: TextureRect           # 右页大回纹阶框（128 源 ×2=256 整数放大·2026-07-14）
+var _d_frame_mat: ShaderMaterial    # 新 item_frame 明暗母版的蓝 / 紫 / 金阶色映射
 var _d_name: Label
 var _d_name_banner: NinePatchRect   # 小卷轴横幅（原双 ColorRect 稀有度色条退役·2026-07-13）
 var _d_tier_edge: ColorRect
@@ -394,6 +408,20 @@ func _build_pool() -> void:
 	pool_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
+func _make_tier_frame_material(tier: int) -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = FRAME_PALETTE_SHADER
+	_set_tier_frame_palette(m, tier)
+	return m
+
+
+func _set_tier_frame_palette(m: ShaderMaterial, tier: int) -> void:
+	var key := clampi(tier, 1, 3)
+	m.set_shader_parameter("shadow_color", FRAME_SHADOW[key])
+	m.set_shader_parameter("mid_color", FRAME_MID[key])
+	m.set_shader_parameter("highlight_color", FRAME_HIGHLIGHT[key])
+
+
 ## 单件道具卡（深炭格衬亮页·回纹阶框=蓝/紫/金·图标自己跳）。选中=金框由 _select 刷。
 func _make_item_card(item: ItemData, idx: int) -> Button:
 	var card := Button.new()
@@ -425,17 +453,20 @@ func _make_item_card(item: ItemData, idx: int) -> Button:
 	ring.visible = false
 	card.add_child(ring)
 	# 格底：深炭中性格（ref15——亮页上的暗格·彩色图标自己跳）；传说铺金云纹美术。
+	var slot_rect := Rect2(Vector2.ZERO, Vector2(BOX, BOX))
+	var cell_inset := BOX * CELL_INSET_RATIO
 	var cell := ColorRect.new()
 	cell.color = Color.WHITE
-	cell.position = Vector2.ZERO
-	cell.size = Vector2(BOX, BOX)
+	cell.position = slot_rect.position + Vector2.ONE * cell_inset
+	cell.size = slot_rect.size - Vector2.ONE * cell_inset * 2.0
 	cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var cm := ShaderMaterial.new()
 	cm.shader = CELL_BG_SHADER
 	cm.set_shader_parameter("fill_color", CELL_FILL.get(item.tier, CELL_FILL[1]))
 	cm.set_shader_parameter("inner_color", CELL_CENTER.get(item.tier, CELL_CENTER[1]))
 	cm.set_shader_parameter("center_glow", 1.0)
-	cm.set_shader_parameter("corner_radius", 0.18)
+	# 新框的阶梯角套本身完成遮挡；格底保持方形并延伸到角套下，避免四角露纸。
+	cm.set_shader_parameter("corner_radius", 0.0)
 	cm.set_shader_parameter("pixel_grid", BOX / 6.0)
 	if item.tier == 3:
 		cm.set_shader_parameter("use_tex", 1.0)
@@ -450,8 +481,9 @@ func _make_item_card(item: ItemData, idx: int) -> Button:
 	frame.texture = ITEM_FRAME_TEX[item.tier]
 	frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	frame.position = Vector2.ZERO
-	frame.size = Vector2(BOX, BOX)
+	frame.position = slot_rect.position + slot_rect.size * FRAME_OFFSET_RATIO
+	frame.size = slot_rect.size * FRAME_ART_SCALE
+	frame.material = _make_tier_frame_material(item.tier)
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(frame)
 	# 图标（居中于暗格）
@@ -516,17 +548,18 @@ func _build_detail_panel() -> void:
 
 	# ── ② 大号图鉴格：与左页格完全同语言（格底 shader+回纹阶框贴图）·128px 框源 ×2=256 整数放大保像素 ──
 	var cell_r := Rect2(px + (PAGE_R.size.x - 256.0) * 0.5, py + 164, 256.0, 256.0)
+	var cell_inset := cell_r.size.x * CELL_INSET_RATIO
 	var cell := ColorRect.new()
 	cell.color = Color.WHITE
-	cell.position = cell_r.position
-	cell.size = cell_r.size
+	cell.position = cell_r.position + Vector2.ONE * cell_inset
+	cell.size = cell_r.size - Vector2.ONE * cell_inset * 2.0
 	cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_d_cell_mat = ShaderMaterial.new()
 	_d_cell_mat.shader = CELL_BG_SHADER
 	_d_cell_mat.set_shader_parameter("fill_color", CELL_FILL[1])
 	_d_cell_mat.set_shader_parameter("inner_color", CELL_CENTER[1])
 	_d_cell_mat.set_shader_parameter("center_glow", 1.0)
-	_d_cell_mat.set_shader_parameter("corner_radius", 0.18)
+	_d_cell_mat.set_shader_parameter("corner_radius", 0.0)
 	_d_cell_mat.set_shader_parameter("pixel_grid", 256.0 / 6.0)   # 像素粒径 6px=与左页格同比
 	_d_cell_mat.set_shader_parameter("cloud_on", 0.0)
 	_d_cell_mat.set_shader_parameter("bg_tex", LEGENDARY_BG)      # 传说金底常驻·use_tex 按选中件切
@@ -537,8 +570,10 @@ func _build_detail_panel() -> void:
 	_d_frame.texture = ITEM_FRAME_TEX[1]
 	_d_frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_d_frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_d_frame.position = cell_r.position
-	_d_frame.size = cell_r.size
+	_d_frame.position = cell_r.position + cell_r.size * FRAME_OFFSET_RATIO
+	_d_frame.size = cell_r.size * FRAME_ART_SCALE
+	_d_frame_mat = _make_tier_frame_material(1)
+	_d_frame.material = _d_frame_mat
 	_d_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	detail_area.add_child(_d_frame)
 
@@ -633,6 +668,7 @@ func _select(idx: int) -> void:
 		_d_icon_fallback.visible = true
 	# 右页大格跟随稀有度（材质持久·三参数每次重设：普通/稀有=色对·传说=金底图）
 	_d_frame.texture = ITEM_FRAME_TEX[it.tier]
+	_set_tier_frame_palette(_d_frame_mat, it.tier)
 	_d_cell_mat.set_shader_parameter("fill_color", CELL_FILL.get(it.tier, CELL_FILL[1]))
 	_d_cell_mat.set_shader_parameter("inner_color", CELL_CENTER.get(it.tier, CELL_CENTER[1]))
 	_d_cell_mat.set_shader_parameter("use_tex", 1.0 if it.tier == 3 else 0.0)

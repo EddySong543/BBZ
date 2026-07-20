@@ -10,3 +10,7 @@ func test_bp_screen_compiles() -> void:
 
 func test_hero_gallery_screen_compiles() -> void:
 	assert_not_null(load("res://src/ui/hero_gallery_screen.gd"), "hero_gallery_screen.gd 编译通过")
+
+
+func test_item_gallery_screen_compiles() -> void:
+	assert_not_null(load("res://src/ui/item_gallery_screen.gd"), "item_gallery_screen.gd 编译通过")
