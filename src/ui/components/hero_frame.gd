@@ -405,6 +405,9 @@ func _layout_diamond_portrait() -> void:
 		m.set_shader_parameter("dia_half_px", frame_size * 0.5)
 		m.set_shader_parameter("inset_px", diamond_stroke_px + diamond_rim_px)   # 亮边+压边两圈都要让出来
 		m.set_shader_parameter("top_slack_px", diamond_top_slack_px)
+		# TextureRect.flip_h 会翻转传给 CanvasItem shader 的 UV；遮罩几何必须反翻回来，
+		# 才能让 P2 成为 P1 的严格水平镜像，而不是拿未翻转坐标裁一张已翻转头像。
+		m.set_shader_parameter("flip_h", flip_h)
 
 
 func set_hp(_hp: int, _max_hp: int) -> void:

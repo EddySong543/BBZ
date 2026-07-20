@@ -21,11 +21,7 @@ const LEGENDARY_BG := preload("res://assets/ui/gold_bottom.png")                
 const SCROLL_TEX := preload("res://assets/ui/item_codex_scroll.png")                      # 整屏手卷卷轴(GPT 出图·2026-07-13 二版·1672×941=16:9·棋盘格假透明已转真 alpha=img_checker_to_alpha)
 const BACKDROP_TEX := preload("res://assets/ui/item_codex_backdrop.png")                  # 衬底=宣纸淡墨山水(GPT 出图·2026-07-13 Eddy 选 A 修订版·下缘远山+顶部一线远峰·中部留白)
 const INK_CLOUDS_SHADER := preload("res://assets/shaders/canvas_ui_ink_clouds.gdshader")  # 衬底像素墨云旗 v2(上下环绕带·整像素步进流动·2026-07-13 重做)
-const ITEM_FRAME_TEX := {   # 三阶回纹框(头像框素材同源换色·img_recolor·2026-07-13·三提亮="太灰"再进一档)
-	1: preload("res://assets/ui/item_frame_t1.png"),   # 普通=亮青空蓝 #8FB8E4(78A2CE→再亮)
-	2: preload("res://assets/ui/item_frame_t2.png"),   # 稀有=亮藕紫 #BFA0E8(A98BD8→再亮)
-	3: preload("res://assets/ui/item_frame_t3.png"),   # 传说=亮鎏金 #F0C468(E4B75C→再亮)
-}
+const ITEM_FRAME_TEX := preload("res://assets/ui/item_frame.png")   # 单一明暗母版；蓝/紫/金由 palette shader 映射
 const TAB_CLOUD_TEX := {   # 三阶祥云页签(GPT 双端云头横幅·240×56·img_recolor 同三阶色·2026-07-13)
 	1: preload("res://assets/ui/tab_cloud_t1.png"),
 	2: preload("res://assets/ui/tab_cloud_t2.png"),
@@ -73,7 +69,8 @@ const FRAME_HIGHLIGHT := {
 }
 const FRAME_ART_SCALE := 87.25 / 68.0
 const FRAME_OFFSET_RATIO := Vector2(-9.6 / 68.0, -10.0 / 68.0)
-const CELL_INSET_RATIO := 6.0 / 68.0
+# 新框实际内沿约为 5.7/68；用 5.5px 轻微压到框身下，避免放大后顶部露出纸色细缝。
+const CELL_INSET_RATIO := 5.5 / 68.0
 
 # 维度 → 语义色（与战斗动作按钮/抽卡同源·详情维度章用）。
 const DIM_COLOR := {
@@ -167,7 +164,7 @@ func _build_book() -> void:
 	else:
 		# 衬底=宣纸淡墨山水（Eddy 选 A 修订版：GPT 静态图+像素墨云动效·仅主菜单直开挂）。
 		# ⚠ 独立静态层，不进 _book_layer——入场动画整层上浮+淡入，背景不该跟着飞。
-		# 木桌 shader 留档 assets/shaders/canvas_ui_wood_desk.gdshader（旧 B 方案·未挂）。
+		# 旧木桌 B 方案及其未挂载 shader 已按资产清理批退役。
 		var backdrop := TextureRect.new()
 		backdrop.name = "Backdrop"
 		backdrop.texture = BACKDROP_TEX
@@ -478,7 +475,7 @@ func _make_item_card(item: ItemData, idx: int) -> Button:
 	# 回纹阶框（2026-07-13 换皮：头像框素材同源换色三阶变体·原稀有度像素框 shader 退役）
 	var frame := TextureRect.new()
 	frame.name = "Frame"   # 选中提亮要取（2026-07-14）
-	frame.texture = ITEM_FRAME_TEX[item.tier]
+	frame.texture = ITEM_FRAME_TEX
 	frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	frame.position = slot_rect.position + slot_rect.size * FRAME_OFFSET_RATIO
@@ -567,7 +564,7 @@ func _build_detail_panel() -> void:
 	cell.material = _d_cell_mat
 	detail_area.add_child(cell)
 	_d_frame = TextureRect.new()
-	_d_frame.texture = ITEM_FRAME_TEX[1]
+	_d_frame.texture = ITEM_FRAME_TEX
 	_d_frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_d_frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_d_frame.position = cell_r.position + cell_r.size * FRAME_OFFSET_RATIO
@@ -667,7 +664,6 @@ func _select(idx: int) -> void:
 		_d_icon_fallback.text = tr(it.item_name)
 		_d_icon_fallback.visible = true
 	# 右页大格跟随稀有度（材质持久·三参数每次重设：普通/稀有=色对·传说=金底图）
-	_d_frame.texture = ITEM_FRAME_TEX[it.tier]
 	_set_tier_frame_palette(_d_frame_mat, it.tier)
 	_d_cell_mat.set_shader_parameter("fill_color", CELL_FILL.get(it.tier, CELL_FILL[1]))
 	_d_cell_mat.set_shader_parameter("inner_color", CELL_CENTER.get(it.tier, CELL_CENTER[1]))

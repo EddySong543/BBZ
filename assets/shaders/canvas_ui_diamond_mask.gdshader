@@ -9,6 +9,7 @@ uniform vec2 node_size_px = vec2(72.0, 72.0);    // 本节点像素尺寸
 uniform vec2 dia_center_px = vec2(36.0, 36.0);   // 菱形中心（本节点局部像素坐标）
 uniform vec2 dia_half_px = vec2(36.0, 36.0);     // 菱形半宽/半高
 uniform float inset_px = 3.0;                    // 内缩：留出描边环不被头像盖住
+uniform bool flip_h = false;                     // TextureRect.flip_h 后把遮罩坐标反翻，保持敌我严格镜像
 // 横对角线**以上**的收口：**负数 = 完全不收**（默认·ref10 原意：上半头像盖过上半框）。
 // ≥0 则把菱形顶点往上拉长这么多像素再收口（0=上下一样收死）。
 // ⚠只加在 y 半轴、x 半轴不动 → 中线处上下宽度相等，不会在腰上豁出一个台阶。
@@ -16,7 +17,11 @@ uniform float top_slack_px = -1.0;
 
 void fragment() {
 	vec4 c = texture(TEXTURE, UV);
-	vec2 p = UV * node_size_px - dia_center_px;
+	vec2 local_px = UV * node_size_px;
+	if (flip_h) {
+		local_px.x = node_size_px.x - local_px.x;
+	}
+	vec2 p = local_px - dia_center_px;
 	vec2 h = max(dia_half_px - inset_px, vec2(1.0));
 	bool clip = true;
 	if (p.y <= 0.0) {

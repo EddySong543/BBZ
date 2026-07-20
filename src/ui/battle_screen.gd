@@ -627,6 +627,10 @@ func _connect_frame_signals() -> void:
 	# 出战位（索引 0）不可点（不能换成自己）。
 	# 敌方替补框（索引 1 / 2）：平时点击无响应（回调内 gate），仅 h21 调虎离山选目标态可点（见 _on_enemy_frame_input）。
 	for fi in [1, 2]:
+		# 头像框换皮只能改绘制，不能拿走成熟的主动换人入口；在调用侧显式锁住输入属性，
+		# 避免组件/场景重制时把 Panel 的 mouse_filter 一并改掉后出现“看得见但点不到”。
+		p1_frames[fi].mouse_filter = Control.MOUSE_FILTER_STOP
+		p1_frames[fi].mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		p1_frames[fi].gui_input.connect(_on_reserve_frame_input.bind(fi))
 		p2_frames[fi].gui_input.connect(_on_enemy_frame_input.bind(fi))
 

@@ -417,9 +417,9 @@ centered vertically, front view, flat, on a fully transparent background
 
 ## ③ 抽卡衬纸 v1「悬停框竖版亲戚」（F 件·✅ 已落位 2026-07-14·一次过）
 
-> **落位实录**：白底→checker_to_alpha→裁 (16,14,1052,1420)→÷4=**263×355**→assets/ui/item_draft_card.png（定尺寸展示不吃 9-slice·CARD_W/H 常量跟随实寸改）；item_draft_popup 重构=jelly 稀有度芯片/DIM_COLOR/_make_card_jelly 死码全清→纸卡贴图+卡名 TIER_INK 三阶+图标套 item_frame_t1/2/3 阶框（128 原生尺寸）+**格底=图鉴同配方**（CELL_BG_SHADER 四角深阶色/中心略浅/传说 gold_bottom·Eddy 补正"抽卡格底须与图鉴一致"）+分隔墨线+描述墨字直书（scrim/白字描边退役）+取消钮穿导航钮皮；tip_draft 截图目检过·GUT 376 绿；源档=art_src/ui/item_draft_card.png。
+> **落位实录**：白底→checker_to_alpha→裁→规格化为 **263×355**→assets/ui/item_draft_card.png（定尺寸展示不吃 9-slice·CARD_W/H 常量跟随实寸改）；item_draft_popup 重构=jelly 稀有度芯片/DIM_COLOR/_make_card_jelly 死码全清→纸卡贴图+卡名 TIER_INK 三阶+图标套 `item_frame.png` 单一母版（蓝/紫/金由 palette shader 映射）+**格底=图鉴同配方**（CELL_BG_SHADER 四角深阶色/中心略浅/传说 gold_bottom·Eddy 补正"抽卡格底须与图鉴一致"）+分隔墨线+描述墨字直书（scrim/白字描边退役）+取消钮穿导航钮皮；tip_draft 截图目检过·GUT 376 绿；源档=art_src/ui/item_draft_card.png。
 
-设计（§15 范式·2026-07-14）：3选1 抽卡 240×320 卡面换纸——**深框浅芯构成竖版化**（近黑框+奶油纸+巧克力内线+四角回纹钩=悬停框 v11 已过同款·两者同为"浮在战场上的纸面件"）。**资产稀有度中性一张图**（⛔整图染·§10）：稀有度=卡名墨色三阶 TIER_INK（34608F/6B3D96/8F6A1E·图鉴小卷轴同规）+图标外套现役 item_frame_t1/2/3 阶框（引擎侧复用）；描述暗底 scrim 退役=墨字直书纸面。
+设计（§15 范式·2026-07-14）：3选1 抽卡 240×320 卡面换纸——**深框浅芯构成竖版化**（近黑框+奶油纸+巧克力内线+四角回纹钩=悬停框 v11 已过同款·两者同为"浮在战场上的纸面件"）。**资产稀有度中性一张图**（⛔整图染·§10）：稀有度=卡名墨色三阶 TIER_INK（34608F/6B3D96/8F6A1E·图鉴小卷轴同规）+图标外套现役 `item_frame.png` 母版并由 shader 映射三阶颜色；描述暗底 scrim 退役=墨字直书纸面。
 参考图=`assets/art_src/ui/ui_tooltip.png` 单参考（取：框色框重+内线回纹角形制+纸色纸纹；弃：横版比例与小尺寸）。
 落位管线：出图 1024×1792 竖版→转透明→量边界→k=round(w/240) 裁整除→÷k（**最终尺寸就近浮动·item_draft_popup CARD_W/H 常量跟随实量改**·卡是定尺寸展示不吃 9-slice 拉伸）→ _build_card jelly 芯片退役换贴图+pop 动画保留；引擎侧配套=名字染 TIER_INK/图标阶框/描述墨字（落位批一起做）。
 

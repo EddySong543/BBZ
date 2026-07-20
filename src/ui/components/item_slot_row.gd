@@ -34,11 +34,7 @@ const DIM_COLOR := {
 ##   与 item_gallery_screen 完全同源（像素框 + 暗格 + 居中图标 + 全圆角）。jelly 仅保留给右上「升」角标。
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")        # 点选金晕外环用（框本体全走回纹贴图）
 const FRAME_PALETTE_SHADER := preload("res://assets/shaders/canvas_ui_item_frame_palette.gdshader")
-const ITEM_FRAME_TEX := {   # 三阶回纹框（2026-07-13 与图鉴同源同款贴图）
-	1: preload("res://assets/ui/item_frame_t1.png"),
-	2: preload("res://assets/ui/item_frame_t2.png"),
-	3: preload("res://assets/ui/item_frame_t3.png"),
-}
+const ITEM_FRAME_TEX := preload("res://assets/ui/item_frame.png")   # 单一明暗母版；三阶颜色由 palette shader 生成
 # 格底内外色（2026-07-13 与图鉴同源定版：四角=深饱和阶色·中心=略浅阶色·传说走 gold_bottom）。
 const CELL_FILL_T := {1: Color("#6E9BD2"), 2: Color("#9A7FD0")}
 const CELL_CENTER_T := {1: Color("#88AEDE"), 2: Color("#B098E0")}
@@ -80,7 +76,6 @@ const EMPTY_EDGE := Color(0.43, 0.42, 0.41)
 # ── 无文字状态语言（2026-07-13 重做·Eddy 批 B+A 方案）：状态=回纹框+小配饰+动效·文字全退役 ──
 # 无道具态外框=图鉴 t1 回纹框（2026-07-17 Eddy：道具框外框须与道具图鉴一致——旧 hero_avatar_frame
 # 是英雄族素材·道具行里穿错家族衣服；抽卡池 T1-only → 空/可抽格穿 t1 蓝语义也通·各态压暗沿用 frame_mod）。
-const NEUTRAL_FRAME_TEX := preload("res://assets/ui/item_frame_t1.png")
 const SEAL_PAPER := Color("#E8DCC0")            # 封条纸面（米色封印语言·与匾/签同族）
 const SEAL_EDGE_INK := Color(0.23, 0.17, 0.12)  # 封条描边
 const SEAL_PIP_INK := Color(0.45, 0.34, 0.23)   # 封条圆点（剩余回合数）
@@ -490,7 +485,7 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 		var locked_item := false           # 有道具但冷却锁中
 		var anim := ""                     # ambient 动效键：cta（锦囊浮+框金呼吸）/ upN（升箭跳+升阶呼吸）/ 空
 		var cur_tier := 1                  # 当前道具阶（upN 动效键用）
-		var frame_tex: Texture2D = NEUTRAL_FRAME_TEX   # 全状态统一回纹框：无道具=暖骨中性
+		var frame_tex: Texture2D = ITEM_FRAME_TEX   # 全状态统一框母版；无道具=暖骨中性
 		var frame_mod := Color.WHITE
 		_seals[i].visible = false
 		_mini_seals[i].visible = false
@@ -521,7 +516,6 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 				legend = has_item and item.tier >= 3        # 传说 → 格底用 gold_bottom 金底图
 				if has_item:
 					glow = 0.0 if legend else 1.0
-					frame_tex = ITEM_FRAME_TEX.get(item.tier, ITEM_FRAME_TEX[1])
 				var tier_key: int = item.tier if item != null else 1
 				cur_tier = tier_key
 				var c_out: Color = CELL_FILL_T.get(tier_key, CELL_FILL_T[1])

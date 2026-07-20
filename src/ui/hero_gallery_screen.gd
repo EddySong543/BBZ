@@ -2,21 +2,21 @@ extends Control
 
 ## 英雄图鉴（2026-07-15 回纹卷轴换装：整屏套用道具图鉴模板——任务B）。
 ## 模板=item_gallery_screen（宣纸山水衬底+墨云带+整屏手卷+牌匾贴形投影+右页单列主轴+金晕选中），
-## 英雄内容适配：左页=回纹头像框网格（HeroFrame·道具图鉴同几何）；右页=384 大展示格（头像框资产
-## ×3 整数放大·内放 idle 动画）+ No./❤生命/主被动章行 + 技能名 + 描述墨字。
+## 英雄内容适配：左页=新版简约几何框头像网格；右页=同款 384 大展示格（内放 idle 动画）
+## + No./❤生命/主被动章行 + 技能名 + 描述墨字。
 ## 旧 v4「暖深底+鎏金浮雕」外壳（酒红书页/凹陷展板/铆钉/宝石/书脊/收集徽章/行亮条）全退役。
 ## 选中=金晕外环+轻暖提亮（战斗点选/道具图鉴同语言·亮纸深金档）——⛔不用 HeroFrame.is_selected
 ## （那是战斗换人的冷亮蓝白语言·压在宣纸上打架；组件本体是战斗共用件不动）。
 ## ⚠ 装饰节点必须 mouse_filter=IGNORE——否则吞点击（返回失效·v1 踩过坑）。
 
-const HERO_FRAME_SCENE := preload("res://src/ui/components/hero_frame.tscn")   # 回纹头像框（网格格子）
-const AVATAR_FRAME_TEX := preload("res://assets/ui/hero_avatar_frame.png")     # 右页大展示格框（128px 暖骨回纹·×3 整数放大）
+const ITEM_FRAME_TEX := preload("res://assets/ui/item_frame.png")              # 英雄图鉴统一使用新版简约几何框
 const PLAQUE_TEX := preload("res://assets/ui/ui_plaque.png")                   # 悬挂牌匾（320×62·9-slice·三挂点共用）
 const SCROLL_TEX := preload("res://assets/ui/item_codex_scroll.png")           # 整屏手卷（道具图鉴同源·1672×941 拉伸满屏）
 const BACKDROP_TEX := preload("res://assets/ui/item_codex_backdrop.png")       # 衬底=宣纸淡墨山水（道具图鉴同源）
 const INK_CLOUDS_SHADER := preload("res://assets/shaders/canvas_ui_ink_clouds.gdshader")
 const CELL_BG_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")   # 选中金晕外环
+const FRAME_PALETTE_SHADER := preload("res://assets/shaders/canvas_ui_item_frame_palette.gdshader")
 const BANNER_TEX := preload("res://assets/ui/ui_banner_scroll.png")            # 英雄名小卷轴横幅（右页）
 const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")            # 返回钮=导航钮同皮
 const NAV_PLATE_MARGIN_X := 22   # v14（main_menu 同值）
@@ -56,10 +56,16 @@ const ROW_Y0 := 236.0
 const CELL := 384.0
 const CELL_FILL := Color("221c15")     # 格底四角=暖深（比框深·HeroFrame 内衬同族）
 const CELL_CENTER := Color("2e2720")   # 格底中心=略浅暖深（层次感·仍暗于框）
+const FRAME_SHADOW := Color("3A2410")
+const FRAME_MID := Color("A4773D")
+const FRAME_HIGHLIGHT := Color("F0D9A2")
+const FRAME_ART_SCALE := 87.25 / 68.0
+const FRAME_OFFSET_RATIO := Vector2(-9.6 / 68.0, -10.0 / 68.0)
+const CELL_INSET_RATIO := 5.5 / 68.0
 
 var all_heroes: Array[HeroData] = []
 var card_cards: Array[Button] = []        # 格子点击壳（入场动画/ButtonJuice 挂这层）
-var card_frames: Array[HeroFrame] = []    # 回纹头像框（探针 gallery_click_probe 锁 mouse_filter）
+var card_frames: Array[Control] = []      # 图鉴专用头像根节点（不再实例化旧 HeroFrame）
 var _sel_idx: int = -1
 var _sel_tweens: Array[Tween] = []        # 选中动效 tween（pop+呼吸·换选先 kill 全部）
 var _pop_tween: Tween                     # 右页展示落位微弹
@@ -251,8 +257,17 @@ func _rect(parent: Control, r: Rect2, col: Color) -> ColorRect:
 	return rect
 
 
+func _make_gallery_frame_material() -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = FRAME_PALETTE_SHADER
+	m.set_shader_parameter("shadow_color", FRAME_SHADOW)
+	m.set_shader_parameter("mid_color", FRAME_MID)
+	m.set_shader_parameter("highlight_color", FRAME_HIGHLIGHT)
+	return m
+
+
 # ============================================================
-# 左页网格：章头 + 回纹头像框 6×4（一次建好·英雄无分阶）
+# 左页网格：章头 + 新版简约几何头像框 6×4（一次建好·英雄无分阶）
 # ============================================================
 
 func _build_pool() -> void:
@@ -301,11 +316,50 @@ func _build_pool() -> void:
 		ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		ring.visible = false
 		card.add_child(ring)
-		# 回纹头像框（HeroFrame 组件·中性暖骨·无阵营语义）
-		var frame := HERO_FRAME_SCENE.instantiate() as HeroFrame
-		frame.frame_size = Vector2(BOX, BOX)
-		frame.portrait_path = h.portrait_path
+		# 图鉴专用头像：填充 → 头像 → 新框。完全不实例化旧 HeroFrame，避免旧框层残留。
+		var frame := Control.new()
+		frame.name = "HeroPortraitFrame"
+		frame.size = Vector2(BOX, BOX)
+		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card.add_child(frame)
+		var cell_inset := BOX * CELL_INSET_RATIO
+		var thumb_cell := ColorRect.new()
+		thumb_cell.name = "HeroThumbCell"
+		thumb_cell.color = Color.WHITE
+		thumb_cell.position = Vector2.ONE * cell_inset
+		thumb_cell.size = Vector2(BOX, BOX) - Vector2.ONE * cell_inset * 2.0
+		thumb_cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var thumb_cell_mat := ShaderMaterial.new()
+		thumb_cell_mat.shader = CELL_BG_SHADER
+		thumb_cell_mat.set_shader_parameter("fill_color", CELL_FILL)
+		thumb_cell_mat.set_shader_parameter("inner_color", CELL_CENTER)
+		thumb_cell_mat.set_shader_parameter("center_glow", 1.0)
+		thumb_cell_mat.set_shader_parameter("corner_radius", 0.0)
+		thumb_cell_mat.set_shader_parameter("pixel_grid", BOX / 6.0)
+		thumb_cell_mat.set_shader_parameter("cloud_on", 0.0)
+		thumb_cell.material = thumb_cell_mat
+		frame.add_child(thumb_cell)
+		var portrait := TextureRect.new()
+		portrait.name = "HeroPortrait"
+		portrait.texture = load(h.portrait_path) if ResourceLoader.exists(h.portrait_path) else null
+		portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		portrait.position = thumb_cell.position
+		portrait.size = thumb_cell.size
+		portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		frame.add_child(portrait)
+		var gallery_frame := TextureRect.new()
+		gallery_frame.name = "GalleryItemFrame"
+		gallery_frame.texture = ITEM_FRAME_TEX
+		gallery_frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		gallery_frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		gallery_frame.stretch_mode = TextureRect.STRETCH_SCALE
+		gallery_frame.position = Vector2(BOX, BOX) * FRAME_OFFSET_RATIO
+		gallery_frame.size = Vector2(BOX, BOX) * FRAME_ART_SCALE
+		gallery_frame.material = _make_gallery_frame_material()
+		gallery_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		frame.add_child(gallery_frame)
 		# 框下名字（亮页墨字直读·泥金+描边退役）
 		var name_lbl := Label.new()
 		name_lbl.text = tr(h.hero_name)
@@ -322,9 +376,6 @@ func _build_pool() -> void:
 		bj.name = "ButtonJuice"
 		card.add_child(bj)
 		pool_area.add_child(card)
-		# ⚠ 必须在入树【后】设 IGNORE：HeroFrame._ready(入树时才跑)会把 mouse_filter 设回 STOP——
-		#   入树前设置会被覆盖 → 框区吞点击（2026-07-13 实修·探针 gallery_click_probe 锁行为）。
-		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card_cards.append(card)
 		card_frames.append(frame)
 	pool_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -357,19 +408,21 @@ func _build_detail_panel() -> void:
 	_d_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_d_name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
-	# ── ② 大展示格：格底 shader（暖深·比框深一档）+ 暖骨回纹框（128×3=384 整数放大）+ idle 动画 ──
+	# ── ② 大展示格：暖深格底 + 新版简约几何框 + idle 动画 ──
 	var cell_r := Rect2(px + (PAGE_R.size.x - CELL) * 0.5, py + 140, CELL, CELL)
+	var cell_inset := cell_r.size.x * CELL_INSET_RATIO
 	var cell := ColorRect.new()
+	cell.name = "HeroDetailCell"
 	cell.color = Color.WHITE
-	cell.position = cell_r.position
-	cell.size = cell_r.size
+	cell.position = cell_r.position + Vector2.ONE * cell_inset
+	cell.size = cell_r.size - Vector2.ONE * cell_inset * 2.0
 	cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var cm := ShaderMaterial.new()
 	cm.shader = CELL_BG_SHADER
 	cm.set_shader_parameter("fill_color", CELL_FILL)
 	cm.set_shader_parameter("inner_color", CELL_CENTER)
 	cm.set_shader_parameter("center_glow", 1.0)
-	cm.set_shader_parameter("corner_radius", 0.18)
+	cm.set_shader_parameter("corner_radius", 0.0)
 	cm.set_shader_parameter("pixel_grid", CELL / 6.0)   # 像素粒径 6px=与左页格同比
 	cm.set_shader_parameter("cloud_on", 0.0)
 	cell.material = cm
@@ -391,11 +444,14 @@ func _build_detail_panel() -> void:
 	_d_fallback.visible = false
 	detail_area.add_child(_d_fallback)
 	var frame := TextureRect.new()
-	frame.texture = AVATAR_FRAME_TEX
+	frame.name = "HeroDetailItemFrame"
+	frame.texture = ITEM_FRAME_TEX
 	frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	frame.position = cell_r.position
-	frame.size = cell_r.size
+	frame.stretch_mode = TextureRect.STRETCH_SCALE
+	frame.position = cell_r.position + cell_r.size * FRAME_OFFSET_RATIO
+	frame.size = cell_r.size * FRAME_ART_SCALE
+	frame.material = _make_gallery_frame_material()
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	detail_area.add_child(frame)
 
@@ -509,7 +565,7 @@ func _select(idx: int) -> void:
 
 
 ## 选中动效（道具图鉴同参）：金晕环收拢 pop（0.14s）→ 安静呼吸（2.6s 循环·图鉴动效拨杆=低）。
-func _play_select_fx(card: Button, frame: HeroFrame) -> void:
+func _play_select_fx(card: Button, frame: Control) -> void:
 	var ring := card.get_node("SelRing") as ColorRect
 	frame.modulate = SEL_TINT   # 轻暖提亮（乘色不压蓝通道·⛔is_selected 冷蓝白=战斗换人语言）
 	var end_pos := Vector2(-RING_PAD, -RING_PAD)

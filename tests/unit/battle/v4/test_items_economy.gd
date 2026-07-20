@@ -217,7 +217,7 @@ func test_slot_row_staged_highlight() -> void:
 	# 取消点选 → 金晕隐藏 + 图标回弹，回纹阶框一直在。
 	row.refresh(b, 0, [])
 	assert_true(row._tex_frames[0].visible, "取消点选 = 回纹阶框仍在")
-	assert_eq(row._tex_frames[0].texture, ItemSlotRow.ITEM_FRAME_TEX[b.slot_item(0, 0).tier], "贴图框 = 对应稀有度阶框")
+	assert_eq(row._tex_frames[0].texture, ItemSlotRow.ITEM_FRAME_TEX, "三阶共享同一框母版")
 	assert_false(row._frames[0].visible, "金晕外环隐藏")
 	assert_eq(row._icons[0].position.y, ItemSlotRow.ICON_INSET, "取消点选 = 图标回弹")
 

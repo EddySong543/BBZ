@@ -157,9 +157,9 @@ shader_parameter/rim_px = 1.5
 
 [sub_resource type="ShaderMaterial" id="JellySpecial"]
 shader = ExtResource("21_jelly")
-shader_parameter/fill_top = Color(0.29, 0.25, 0.21, 1)
-shader_parameter/fill_bottom = Color(0.2, 0.17, 0.14, 1)
-shader_parameter/edge_inner = Color(0.9098, 0.7765, 0.4392, 1)
+shader_parameter/fill_top = Color(0.49, 0.32, 0.67, 1)
+shader_parameter/fill_bottom = Color(0.35, 0.23, 0.48, 1)
+shader_parameter/edge_inner = Color(0.7, 0.58, 0.82, 1)
 shader_parameter/edge_outer = Color(0.1, 0.09, 0.11, 1)
 shader_parameter/fill_alpha = 1.0
 shader_parameter/pixel_grid = 38.0

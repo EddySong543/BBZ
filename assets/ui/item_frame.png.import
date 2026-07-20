@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cwf8u5dytqinw"
-path="res://.godot/imported/scene1_subRooftop.png-30bb36b863a18609043a52f4cf08c695.ctex"
+uid="uid://84wmbgdlqwp1"
+path="res://.godot/imported/item_frame.png-ecdbc706cbfe9eea3c96868d0f965f9d.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/scenes/scene1/scene1_subRooftop.png"
-dest_files=["res://.godot/imported/scene1_subRooftop.png-30bb36b863a18609043a52f4cf08c695.ctex"]
+source_file="res://assets/ui/item_frame.png"
+dest_files=["res://.godot/imported/item_frame.png-ecdbc706cbfe9eea3c96868d0f965f9d.ctex"]
 
 [params]
 

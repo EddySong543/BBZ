@@ -3,7 +3,7 @@ extends Control
 
 ## 道具 3 选 1 弹窗（抽取 / 升级·M3）：模态全屏暗幕 + 居中候选卡。
 ## 卡面 = 纸卡贴图（2026-07-14 卡衬纸落位：悬停框族语竖版=近黑框+奶油纸+回纹角·jelly 稀有度色芯片退役）。
-## 稀有度表达：卡名墨色三阶 TIER_INK（图鉴同源·⛔整卡染色）+ 图标外套 item_frame_t1/2/3 阶框；
+## 稀有度表达：卡名墨色三阶 TIER_INK（图鉴同源·⛔整卡染色）+ 单一 item_frame 母版运行时换色；
 ## 描述=墨字直书纸面（暗衬 scrim / 白字描边随亮纸退役）。
 ## 用法：实例化 → add_child（覆盖在 battle_screen 上）→ setup(options, can_cancel, title)
 ##   → `var choice: int = await popup.resolved`（返回选中 index；-1 = 取消）→ 调用方 queue_free。
@@ -18,11 +18,7 @@ const SCREEN_H := 1080.0
 
 const CARD_TEX := preload("res://assets/ui/item_draft_card.png")     # 纸卡衬纸（悬停框族语竖版）
 const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")  # 取消钮底板（全游戏导航一个语言）
-const TIER_FRAME := {   # 图标阶框（图鉴格同款回纹阶框·128 原生尺寸）
-	1: preload("res://assets/ui/item_frame_t1.png"),
-	2: preload("res://assets/ui/item_frame_t2.png"),
-	3: preload("res://assets/ui/item_frame_t3.png"),
-}
+const ITEM_FRAME_TEX := preload("res://assets/ui/item_frame.png")   # 图鉴同款单一明暗母版
 # 格底（=item_gallery_screen 同源配方·2026-07-14 Eddy：抽卡格底须与图鉴一致）：
 # 四角=深饱和阶色·中心=略浅阶色·传说=gold_bottom 金云纹贴图（只换框色）。
 const CELL_BG_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")
@@ -183,7 +179,7 @@ func _build_card(item: ItemData, pos: Vector2, idx: int) -> void:
 		frame.name = "ItemFrame"
 		frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		frame.stretch_mode = TextureRect.STRETCH_SCALE
-		frame.texture = TIER_FRAME.get(tier, TIER_FRAME[1])
+		frame.texture = ITEM_FRAME_TEX
 		frame.position = slot_rect.position + slot_rect.size * FRAME_OFFSET_RATIO
 		frame.size = slot_rect.size * FRAME_ART_SCALE
 		frame.material = _make_tier_frame_material(tier)

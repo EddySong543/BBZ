@@ -6,9 +6,7 @@ extends SceneTree
 ## 输出：D:/Game/BoBoZan/crop_battle_items_p1/p2.png（仓库外）
 
 const TEXES: Array[String] = [
-	"res://assets/ui/item_frame_t1.png",
-	"res://assets/ui/item_frame_t2.png",
-	"res://assets/ui/item_frame_t3.png",
+	"res://assets/ui/item_frame.png",
 	"res://assets/ui/hero_avatar_frame.png",
 ]
 
