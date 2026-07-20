@@ -311,9 +311,13 @@ mouse_filter = 2
 anchors_preset = 0
 offset_left = 124.0
 offset_top = 28.0
-offset_right = 684.0
-offset_bottom = 40.0
-slant = -4.0
+offset_right = 544.0
+offset_bottom = 37.0
+cell_w = 38.0
+cell_h = 9.0
+gap = 3.0
+slant = -3.0
+band_bottom = 1.0
 wave_idle = true
 wave_speed_by_hp = true
 
@@ -331,7 +335,7 @@ fps = 18.0
 idle_rest_min = 4.0
 idle_rest_max = 9.0
 pip_size = 38.0
-spacing = 4.2
+spacing = 3.0
 per_row_cap = 10
 row_spacing = -20.0
 show_empty = false
@@ -346,36 +350,36 @@ offset_bottom = 84.0
 diamond_mode = true
 
 [node name="P1Frame1" parent="P1Hud" unique_id=1566007647 instance=ExtResource("3_hero_frame")]
-offset_left = 792.0
+offset_left = 672.0
 offset_top = 2.0
-offset_right = 868.0
+offset_right = 748.0
 offset_bottom = 78.0
 diamond_mode = true
 
 [node name="P1Frame1HpRow" type="Control" parent="P1Hud" unique_id=1327412840]
 texture_filter = 1
 anchors_preset = 0
-offset_left = 786.0
+offset_left = 666.0
 offset_top = 80.0
-offset_right = 874.0
+offset_right = 754.0
 offset_bottom = 108.0
 mouse_filter = 2
 script = ExtResource("24_reservehp")
 preview_shield = 2.0
 
 [node name="P1Frame2" parent="P1Hud" unique_id=1208252427 instance=ExtResource("3_hero_frame")]
-offset_left = 712.0
+offset_left = 592.0
 offset_top = 2.0
-offset_right = 788.0
+offset_right = 668.0
 offset_bottom = 78.0
 diamond_mode = true
 
 [node name="P1Frame2HpRow" type="Control" parent="P1Hud" unique_id=1749780638]
 texture_filter = 1
 anchors_preset = 0
-offset_left = 706.0
+offset_left = 586.0
 offset_top = 80.0
-offset_right = 794.0
+offset_right = 674.0
 offset_bottom = 108.0
 mouse_filter = 2
 script = ExtResource("24_reservehp")
@@ -421,8 +425,13 @@ mouse_filter = 2
 anchors_preset = 0
 offset_left = 1796.0
 offset_top = 28.0
-offset_right = 2356.0
-offset_bottom = 40.0
+offset_right = 2216.0
+offset_bottom = 37.0
+cell_w = 38.0
+cell_h = 9.0
+gap = 3.0
+slant = 3.0
+band_bottom = 1.0
 right_to_left = true
 wave_idle = true
 wave_speed_by_hp = true
@@ -441,7 +450,7 @@ fps = 18.0
 idle_rest_min = 4.0
 idle_rest_max = 9.0
 pip_size = 38.0
-spacing = 4.0
+spacing = 3.0
 right_to_left = true
 per_row_cap = 10
 row_spacing = -20.0
@@ -457,36 +466,36 @@ offset_bottom = 84.0
 diamond_mode = true
 
 [node name="P2Frame1" parent="P2Hud" unique_id=1621653890 instance=ExtResource("3_hero_frame")]
-offset_left = 1066.0
+offset_left = 1186.0
 offset_top = 2.0
-offset_right = 1142.0
+offset_right = 1262.0
 offset_bottom = 78.0
 diamond_mode = true
 
 [node name="P2Frame1HpRow" type="Control" parent="P2Hud" unique_id=757910723]
 texture_filter = 1
 anchors_preset = 0
-offset_left = 1060.0
+offset_left = 1180.0
 offset_top = 80.0
-offset_right = 1148.0
+offset_right = 1268.0
 offset_bottom = 108.0
 mouse_filter = 2
 script = ExtResource("24_reservehp")
 icon_slant = 4.0
 
 [node name="P2Frame2" parent="P2Hud" unique_id=1695379356 instance=ExtResource("3_hero_frame")]
-offset_left = 1146.0
+offset_left = 1266.0
 offset_top = 2.0
-offset_right = 1222.0
+offset_right = 1342.0
 offset_bottom = 78.0
 diamond_mode = true
 
 [node name="P2Frame2HpRow" type="Control" parent="P2Hud" unique_id=1880263533]
 texture_filter = 1
 anchors_preset = 0
-offset_left = 1140.0
+offset_left = 1260.0
 offset_top = 80.0
-offset_right = 1228.0
+offset_right = 1348.0
 offset_bottom = 108.0
 mouse_filter = 2
 script = ExtResource("24_reservehp")
@@ -551,9 +560,9 @@ horizontal_alignment = 1
 visible = false
 layout_mode = 0
 offset_left = 460.0
-offset_top = 418.0
+offset_top = 438.0
 offset_right = 1460.0
-offset_bottom = 502.0
+offset_bottom = 522.0
 horizontal_alignment = 1
 vertical_alignment = 1
 

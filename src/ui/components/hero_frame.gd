@@ -169,6 +169,7 @@ var _inner_fx: ColorRect
 var _switch_label: Label   # 主动换人：armed 时盖在立绘上显示「切换」二字（任务5）
 var _sel_tween: Tween      # 选中弹跳动画（选择动作时的 pop）
 var _diamond: ColorRect    # 菱形外框（diamond_mode 懒建）
+var _active_corners: ActiveCornerOrnaments   # 出战位三点护角（左/右/下；顶部让给越框立绘）
 var _death_cross: DeathCross   # 阵亡红✕（懒建·is_dead 才出现）
 static var _cache: Dictionary = {}
 
@@ -264,7 +265,14 @@ func _refresh_style() -> void:
 		var enemy := player_color.r > player_color.b
 		dm.set_shader_parameter("stroke_color", Color("#d24a44") if enemy else Color(0.93, 0.89, 0.78))
 		dm.set_shader_parameter("fill_color", fill)
+		# 备选位不加新装饰，只把下半边从 0.72 提到 0.80，避免深色背景上沉成一根细暗线。
+		dm.set_shader_parameter("edge_bottom_mul", 0.72 if is_active else 0.80)
 		_diamond.modulate = frame_mod
+
+	if _active_corners != null:
+		_active_corners.visible = diamond_mode and is_active
+		_active_corners.modulate = frame_mod
+		_active_corners.queue_redraw()
 
 	if _portrait:
 		if is_dead:
@@ -339,6 +347,16 @@ func _apply_diamond_mode() -> void:
 			m.set_shader_parameter("stroke_px", diamond_stroke_px)
 			m.set_shader_parameter("rim_px", diamond_rim_px)
 			m.set_shader_parameter("inner_rim_px", diamond_inner_rim_px)
+
+	if diamond_mode and _active_corners == null:
+		_active_corners = ActiveCornerOrnaments.new()
+		_active_corners.name = "ActiveCornerOrnaments"
+		_active_corners.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		_active_corners.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_active_corners)   # 盖在立绘/基础框之上；只占三个未被遮住的尖角
+	if _active_corners != null:
+		_active_corners.visible = diamond_mode and is_active
+		_active_corners.queue_redraw()
 
 	if _portrait == null:
 		return
@@ -419,6 +437,49 @@ func set_switch_prompt(on: bool, label_text: String = "切换") -> void:
 			_refresh_portrait()
 	# armed ≠ selected（任务5修订）：仅显示「切换」二字 + 隐立绘，不自动高亮；
 	# 选中高亮/选择动画由调用方再点一次时通过 is_selected 触发。
+
+
+## 当前出战菱形框的三点护角：在左/右/下尖端外侧各画一枚独立 V 形角饰。
+## 角饰与原框留缝，不覆盖或替换原有描边；顶部不画，保留立绘越框的开放轮廓。
+## 纯绘制子节点，不引入贴图，也不会影响复用 HeroFrame 的 BP/图鉴等非 diamond_mode 场景。
+class ActiveCornerOrnaments extends Control:
+	const DARK := Color("#2a170d")
+	const GOLD := Color("#e1aa42")
+	const DARK_WIDTH := 5.0
+	const GOLD_WIDTH := 3.0
+	const OUTSET := 2.0
+	const ARM := 10.0
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		resized.connect(queue_redraw)
+
+	func _draw() -> void:
+		if size.x <= 0.0 or size.y <= 0.0:
+			return
+		var cx := size.x * 0.5
+		var cy := size.y * 0.5
+		# 三枚连续折线全部位于原菱形之外：原框颜色、材质和连续轮廓不会被改写。
+		_draw_chevron(PackedVector2Array([
+			Vector2(ARM - OUTSET, cy - ARM),
+			Vector2(-OUTSET, cy),
+			Vector2(ARM - OUTSET, cy + ARM),
+		]))
+		_draw_chevron(PackedVector2Array([
+			Vector2(size.x - ARM + OUTSET, cy - ARM),
+			Vector2(size.x + OUTSET, cy),
+			Vector2(size.x - ARM + OUTSET, cy + ARM),
+		]))
+		_draw_chevron(PackedVector2Array([
+			Vector2(cx - ARM, size.y - ARM + OUTSET),
+			Vector2(cx, size.y + OUTSET),
+			Vector2(cx + ARM, size.y - ARM + OUTSET),
+		]))
+
+	func _draw_chevron(points: PackedVector2Array) -> void:
+		# 一条连续 V：暗色只作外轮廓，暖金是唯一主体，不再切段或添加“固定块”。
+		draw_polyline(points, DARK, DARK_WIDTH, false)
+		draw_polyline(points, GOLD, GOLD_WIDTH, false)
 
 
 ## 阵亡红✕：两道像素台阶粗斜杠（近黑衬底 + 阵亡红主体），与 hero_card.BanMark 同源画法

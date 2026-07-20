@@ -51,6 +51,7 @@ func _ready() -> void:
 		f.position = Vector2.ZERO
 		f.player_color = Color("#3f86c8") if i < 4 else Color("#d24a44")
 		f.diamond_mode = true
+		f.is_active = true
 		f.diamond_portrait_px = PORTRAIT * float(tune["scale"])
 		f.diamond_portrait_rise = RISE + float(tune["y"])
 		f.diamond_portrait_shift_x = float(tune["x"])

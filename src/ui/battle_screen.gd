@@ -93,6 +93,8 @@ const DEBUG_BUTTONS := true
 # _build_debug_buttons 双门（联机禁用+is_debug_build）之后才执行=开发期照常·发行包可剥离。
 const BattleCodexOverlay := preload("res://src/ui/components/battle_codex_overlay.gd")   # 图鉴浮层（同上·preload 引用）
 const ProfileStore := preload("res://src/core/player_profile.gd")   # 个人资料战绩计数（同上·preload 引用）
+const RoundLabelOrnamentsComponent := preload("res://src/ui/components/round_label_ornaments.gd")
+const CentralTurnCueComponent := preload("res://src/ui/components/central_turn_cue.gd")
 ## 出战血条＝斜切分段条（2026-07-18 取代心形 IconPipRow）。走 preload 常量当类型：
 ## 新 class_name 在 headless/GUT 首跑可能尚未注册（踩过·见 memory godot-headless-classname-preload）。
 const HpSlantBarScript := preload("res://src/ui/components/hp_slant_bar.gd")
@@ -111,6 +113,8 @@ const DEFEAT_FALL_TIME := 0.7   # defeat 帧表标准时长（import_hero_batch 
 # 回合时限阶梯（2026-07-11 Eddy 定·由少到多·台阶绑道具解锁节奏）：回合 1-2 纯动作选择 10s →
 # 回合 3 起道具经济开动（3/4/5 逐格解锁）15s → 回合 6 起组合决策期（看描述/算对方）20s 封顶。
 const TURN_TIME_STEPS: Array = [[5, 20], [2, 15], [0, 10]]   # [起始回合(0-based), 秒]·降序查表
+const COUNTDOWN_COLOR := Color(0.95, 0.91, 0.8)
+const COUNTDOWN_ALERT_COLOR := Color("#e5443c")   # 与战斗 HUD 血量红同源，末 3 秒及归零状态使用。
 
 enum State { TURN_INTRO, PLAYER_SELECT, RESOLVING, HERO_SELECT, GAME_OVER }
 
@@ -126,6 +130,8 @@ const AI := 1       # 对手 AI
 @onready var status_label: Label = $StatusLabel
 @onready var event_label: Label = $EventLabel
 @onready var big_turn_label: Label = $BigTurnLabel
+var _round_ornaments
+var _central_turn_cue
 
 # 出战角色名(每回合随出战英雄更新) + 玩家名(我方=资料档案真名·对手=场景占位值·联机对手名待协议捎带)。
 @onready var p1_active_name: Label = $P1Hud/P1ActiveName
@@ -558,24 +564,30 @@ func _init_buttons() -> void:
 	_set_cost_pips(btn_big_defend, ActionDef.BASE_ACTION_DEF[A.BIG_DEFEND]["cost"])
 	_set_cost_pips(btn_defend, ActionDef.BASE_ACTION_DEF[A.DEFEND]["cost"], true)   # 防=0 费也显示（Eddy 2026-07-13·与其他按钮一致）
 
-	# 顶部常驻回合数(原倒计时位)·紧凑。加粗（Eddy 2026-07-18）：走 FontVariation 描粗
-	# 而非换字重——Ark Pixel 只有一个字重；base 仍取 f16（32=16 整 2 倍·像素不糊）。
+	# 顶部中央仅承担倒计时：沿用原回合标的加粗米色字形与两侧极简装饰。
 	var turn_bold := FontVariation.new()
 	turn_bold.base_font = FontManager.f16
 	turn_bold.variation_embolden = 0.6
 	timer_label.add_theme_font_override("font", turn_bold)
-	timer_label.add_theme_font_size_override("font_size", 32)
-	timer_label.add_theme_color_override("font_color", Color(0.95, 0.91, 0.8))   # 暖米白（压暗背景）
+	timer_label.add_theme_font_size_override("font_size", 44)
+	timer_label.add_theme_color_override("font_color", COUNTDOWN_COLOR)
 	timer_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
 	timer_label.add_theme_constant_override("outline_size", 4)
+	# 仅在文字两侧补：近文字金色菱形 → 小间隔 → 向外水平金线。无底板、无折角、无动态。
+	_round_ornaments = RoundLabelOrnamentsComponent.new()
+	_round_ornaments.name = "RoundLabelOrnaments"
+	timer_label.add_child(_round_ornaments)
+	_round_ornaments.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	FontManager.apply(status_label, 44)
 	status_label.add_theme_color_override("font_color", Color(0.95, 0.91, 0.8))   # 暖米白
 	status_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
 	status_label.add_theme_constant_override("outline_size", 5)
-	FontManager.apply(big_turn_label, 72)   # 中间「回合开始」横幅 + 倒计时（72=12×6 整数倍·清晰）
-	big_turn_label.add_theme_color_override("font_color", Color(0.95, 0.91, 0.8))   # 暖米白
-	big_turn_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))   # 巨月做底后中央文字必须深描边
-	big_turn_label.add_theme_constant_override("outline_size", 6)
+	# 中央只显示一秒「回合开始」宣告；倒计时统一移到顶部。
+	big_turn_label.text = ""
+	_central_turn_cue = CentralTurnCueComponent.new()
+	_central_turn_cue.name = "CentralTurnCue"
+	big_turn_label.add_child(_central_turn_cue)
+	_central_turn_cue.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	event_label.visible = false
 	# 备选血量/护甲：ReserveHpRow 自绘单个斜切符号 + 数字，配色/居中均由组件处理。
 
@@ -660,14 +672,15 @@ func _show_turn_intro() -> void:
 	if _pve:
 		_pved.pick_turn()   # 远征：怪物回合开始即定招·明牌概率表先于玩家选择亮出（GDD 明牌博弈系）
 
-	# 顶部中间：持续显示回合数（每回合更新，整局常驻）。「回合」与数字间留一空格，避免拥挤。
-	timer_label.text = tr("回合 %d") % (battle.turn_number + 1)
+	# 新回合是倒计时唯一的刷新点；此前结算/换人阶段保持的 0 在这里恢复为完整时限。
+	timer_seconds = _turn_time_limit()
+	_update_timer_label()
 	timer_label.visible = true
 
-	# 中间：先「回合开始」横幅，随后(进入选择)在同一位置转为倒计时（无底板）
-	big_turn_label.text = tr("回合开始")
+	# 中间只做回合开场宣告，不再承载倒计时。
+	_central_turn_cue.show_turn_start(tr("回合开始"))
 	big_turn_label.visible = true
-	await get_tree().create_timer(1.0).timeout
+	await get_tree().create_timer(1.4).timeout
 	_start_player_select()
 
 
@@ -696,7 +709,8 @@ func _turn_time_limit() -> int:
 
 func _start_timer() -> void:
 	timer_seconds = _turn_time_limit()
-	big_turn_label.visible = true   # 中间显示倒计时（接续「回合开始」横幅）
+	big_turn_label.visible = false
+	timer_label.visible = true
 	_update_timer_label()
 	game_timer.start(1.0)
 
@@ -711,8 +725,18 @@ func _on_timer_tick() -> void:
 
 
 func _update_timer_label() -> void:
-	# 倒计时显示在中间(big_turn_label)；顶部 timer_label 常驻回合数不动。
-	big_turn_label.text = "%d" % maxi(timer_seconds, 0)
+	# 倒计时只显示在顶部；末 3 秒与归零状态使用 HUD 血量红，装饰仍保持米色。
+	timer_label.text = str(maxi(timer_seconds, 0))
+	timer_label.add_theme_color_override(
+		"font_color", COUNTDOWN_ALERT_COLOR if timer_seconds <= 3 else COUNTDOWN_COLOR)
+	_round_ornaments.refresh()
+
+
+func _hold_timer_at_zero() -> void:
+	# 结算、死亡换人等非选招阶段仍保留顶部信息位，统一停在红色 0，直到新回合刷新。
+	timer_seconds = 0
+	_update_timer_label()
+	timer_label.visible = true
 
 
 func _on_circle_pressed(action: int, btn: Button) -> void:
@@ -745,6 +769,7 @@ func _on_confirm_pressed() -> void:
 	if state != State.PLAYER_SELECT:
 		return
 	game_timer.stop()
+	_hold_timer_at_zero()
 
 	# 联机（M1）：本地不落子——payload 交服务器权威结算·镜像等 resolve 快照上镜
 	if _net:
@@ -908,6 +933,7 @@ func _net_play_resolution(msg: Dictionary) -> void:
 	game_timer.stop()
 	_set_buttons_active(false)
 	big_turn_label.visible = false
+	_hold_timer_at_zero()
 	status_label.visible = false
 	var active_before: Array[int] = [battle.active_index[0], battle.active_index[1]]
 	var hp_before: Array[float] = [
@@ -948,6 +974,7 @@ func _net_resume_death_switch() -> void:
 func _net_death_switch() -> void:
 	state = State.HERO_SELECT
 	_set_buttons_active(false)
+	_hold_timer_at_zero()
 	status_label.visible = false
 	var reserves: Array = []
 	for slot in battle.living_reserves(PLAYER):
@@ -978,6 +1005,7 @@ func _net_game_over(w: int) -> void:
 	state = State.GAME_OVER
 	ProfileStore.record_result("net", _profile_outcome(w))   # 个人资料战绩（联机·w 已翻转为本端视角）
 	game_timer.stop()
+	_hold_timer_at_zero()
 	_set_buttons_active(false)
 	var msg := tr("平局")
 	var col := Color("#dddddd")
@@ -1110,7 +1138,8 @@ func _ai_pick(side: int) -> void:
 func _resolve() -> void:
 	state = State.RESOLVING
 	_set_buttons_active(false)
-	big_turn_label.visible = false   # 收起中间倒计时（顶部回合数保留）
+	big_turn_label.visible = false
+	_hold_timer_at_zero()
 	status_label.visible = false
 
 	# 结算前的出战槽（= UI 已知的"谁在场上"·上一帧就渲染着·非引擎完整状态·联机客户端同样持有）。
@@ -1353,6 +1382,7 @@ func _eclipse_commit(moon: CanvasItem, emat: ShaderMaterial, halo_mat: ShaderMat
 func _show_death_switch_selection(player: int) -> void:
 	state = State.HERO_SELECT
 	_set_buttons_active(false)
+	_hold_timer_at_zero()
 	status_label.visible = false   # 不在屏幕中间显示「英雄阵亡」，只保留换人界面
 
 	var reserves: Array = []
@@ -2125,6 +2155,9 @@ func _update_single_frame(frame: HeroFrame, hp_row, player: int, slot: int, is_a
 	frame.diamond_portrait_rise = base_rise + float(portrait_tune.get("y", 0.0)) * base_portrait_px / PORTRAIT_ACTIVE_PX
 	frame.diamond_portrait_shift_x = float(portrait_tune.get("x", 0.0)) * base_portrait_px / PORTRAIT_ACTIVE_PX
 	frame.diamond_stroke_px = BATTLE_DIAMOND_STROKE_PX
+	# 备选框只加结构重量：外暗轮廓 +1px、内暗线 +0.5px；主色带/尺寸/头像构图均不变。
+	frame.diamond_rim_px = 2.0 if is_active else 3.0
+	frame.diamond_inner_rim_px = 1.5 if is_active else 2.0
 	# 放在所有几何参数之后赋值：换贴图时一次性按最终框宽/抬升重新布局。
 	frame.portrait_path = _battle_portrait_path(h)
 

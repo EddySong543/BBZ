@@ -14,6 +14,7 @@ uniform vec4 rim_color : source_color = vec4(0.1, 0.09, 0.11, 1.0);
 uniform float rim_px = 2.0;
 // 亮边内侧的连续暗描边；宽度从 stroke_px 内部分走，不增加框总厚度。
 uniform float inner_rim_px = 1.5;
+uniform float edge_bottom_mul : hint_range(0.5, 1.0) = 0.72;
 uniform float noise_amt : hint_range(0.0, 0.3) = 0.08;
 uniform float wear : hint_range(0.0, 0.5) = 0.16;
 uniform float texture_pixel_px : hint_range(1.0, 4.0) = 2.0;
@@ -50,7 +51,7 @@ void fragment() {
 		c = rim_color;                         // 最外：近黑压边
 	} else if (d > 1.0 - rim_d - stroke_d + inner_d) {
 		// 阵营亮边：上亮下暗 + 2px 像素颗粒；少量磨损格只轻压暗，不打断轮廓。
-		vec3 edge = stroke_color.rgb * mix(1.10, 0.72, vertical);
+		vec3 edge = stroke_color.rgb * mix(1.10, edge_bottom_mul, vertical);
 		edge *= 1.0 + (grain - 0.5) * noise_amt;
 		float wear_dot = step(0.84, hash(cell + vec2(5.1, 2.7)));
 		edge *= 1.0 - wear * wear_dot;
