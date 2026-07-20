@@ -100,3 +100,25 @@ Codex 自动验证时使用 `Start-Process -Wait -WindowStyle Hidden` 启动 God
 6. 汇报提交哈希、测试结果及仍未提交的工作区文件。
 
 未经上述明确指令，不自动 commit 或 push。
+
+## 2026-07-20 对话收尾补充
+
+### Git 不再重复排障
+
+Windows Codex 沙箱用户与仓库所有者不同会触发 `detected dubious ownership`。固定使用一次性参数，不修改仓库所有权：
+
+```powershell
+$Repo = 'D:\Game\BoBoZan\Claude-Code-Game-Studios-cn-localization'
+git -c safe.directory=$Repo -C $Repo status -sb
+```
+
+仓库使用 HTTPS 远程和 Windows Git Credential Manager。除非 Git 明确报告认证失败，否则不得要求 Eddy 重交 Token、安装 GitHub 插件或重新登录。用户明确说 `commit+push` 后，精确暂存本任务文件、检查缓存区、中文提交、核对远程并直接推送 `origin/main`。完整命令与失败保护见根 `AGENTS.md`。
+
+2026-07-20 收尾实证：首次 push 返回 `Recv failure: Connection was reset`，一次性 HTTP/1.1 重试返回 `Failed to connect to github.com port 443`。这是网络不可达，不是 Credential Manager 或仓库权限问题；四个提交完整保留在本地 `main`，网络恢复后只需重跑 `git push origin main`。
+
+### Godot 崩溃复核结论
+
+- 2026-07-20 前一次 `0x0000000000000058` 读内存弹窗没有留下对应的新 dump 或 WER 事件，不能定位到具体 Godot 原生函数。
+- 现存 2026-07-04 dump 对应 Godot 4.7.0 的 `0xc0000005`，不能直接证明 4.7.1 本次弹窗的根因。
+- 4.7.1 重新打开后，用户 F6 正常退出；自动 GUT 438/438、1607 断言通过；当日没有 NVIDIA Display/device-lost 事件。
+- 若再次出现，保留弹窗和进程，立即读取对应 PID、WER 和新 dump；不得先关闭用户 Godot。
