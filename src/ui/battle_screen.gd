@@ -102,6 +102,11 @@ const HpSlantBarScript := preload("res://src/ui/components/hp_slant_bar.gd")
 ## 各动画相位等待（秒），可在 Inspector 调。
 @export var anim_phase_duration: float = 1.0
 @export var action_phase_duration: float = 0.6
+## 仅供独立战斗场景变体显式覆盖背景舞台；默认空值始终保留 Scene1。
+@export var stage_scene_override: PackedScene
+## 不同舞台可显式提供自己的全屏调色；默认空值继续使用 Scene1 的夜景后期。
+@export var post_fx_material_override: ShaderMaterial
+var _stage_override_applied: bool = false
 ## 死亡节拍 v3（2026-07-18 Eddy 批 A 方案·倒地后在地时长定 2s）：
 ## 致命定格 0.2 → 倒地 0.7 → 落地宣告（尘+轻震+遗体褪色 0.4）→ 静躺 1.6 → 消散换人。
 ## death_lie_duration = 从 defeat 起播到允许消散的保底总时长（0.7 倒地 + 2.0 在地）。
@@ -290,6 +295,44 @@ const COL_DMG_BURN := Color(1.0, 0.58, 0.22)      # 延迟伤害到期（妖火/
 # ============================================================
 # 生命周期
 # ============================================================
+
+func _enter_tree() -> void:
+	if post_fx_material_override != null:
+		var post_fx_node := get_node_or_null("PostFX") as ColorRect
+		if post_fx_node != null:
+			post_fx_node.material = post_fx_material_override
+
+	if _stage_override_applied or stage_scene_override == null:
+		return
+
+	var old_stage := get_node_or_null("Stage") as BattleStage
+	if old_stage == null:
+		push_error("BattleScreen: missing Stage node")
+		return
+
+	var replacement_node: Node = stage_scene_override.instantiate()
+	if not replacement_node is BattleStage:
+		replacement_node.free()
+		push_error("BattleScreen: stage override must instantiate BattleStage")
+		return
+
+	var replacement_stage := replacement_node as BattleStage
+	var stage_index: int = old_stage.get_index()
+	var stage_pointer_parallax: bool = old_stage.pointer_parallax
+	var stage_demo_click_shake: bool = old_stage.demo_click_shake
+	var stage_mouse_filter := old_stage.mouse_filter
+
+	remove_child(old_stage)
+	old_stage.free()
+	replacement_stage.name = "Stage"
+	replacement_stage.pointer_parallax = stage_pointer_parallax
+	replacement_stage.demo_click_shake = stage_demo_click_shake
+	replacement_stage.mouse_filter = stage_mouse_filter
+	add_child(replacement_stage)
+	move_child(replacement_stage, stage_index)
+	replacement_stage.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_stage_override_applied = true
+
 
 func _ready() -> void:
 	_ai_rng.randomize()   # 任务 B：AI 道具抽取随机种子

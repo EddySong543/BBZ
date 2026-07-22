@@ -1,0 +1,31 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/ui/components/item_avatar_frame.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/ui/item_frame.png" id="2_frame"]
+
+[node name="ItemAvatarFrame" type="Control"]
+layout_mode = 0
+offset_right = 84.0
+offset_bottom = 84.0
+mouse_filter = 0
+script = ExtResource("1_script")
+
+[node name="Cell" type="ColorRect" parent="."]
+layout_mode = 0
+mouse_filter = 2
+color = Color(1, 1, 1, 1)
+
+[node name="Portrait" type="TextureRect" parent="."]
+texture_filter = 1
+layout_mode = 0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="Frame" type="TextureRect" parent="."]
+texture_filter = 1
+layout_mode = 0
+mouse_filter = 2
+texture = ExtResource("2_frame")
+expand_mode = 1
+stretch_mode = 0

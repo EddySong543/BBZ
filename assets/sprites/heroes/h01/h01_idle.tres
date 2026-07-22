@@ -1,8 +1,8 @@
-[gd_resource type="SpriteFrames" format=3]
+[gd_resource type="SpriteFrames" format=3 uid="uid://c1ept8j72tmlh"]
 
-[ext_resource type="Texture2D" path="res://assets/sprites/heroes/h01/h01_attack.png" id="1_mloeo"]
-[ext_resource type="Texture2D" path="res://assets/sprites/heroes/h01/h01_idle.png" id="1_s0s2r"]
-[ext_resource type="Texture2D" path="res://assets/sprites/heroes/h01/h01_defeat.png" id="2_eiqq6"]
+[ext_resource type="Texture2D" uid="uid://cbvtitmyeci3i" path="res://assets/sprites/heroes/h01/h01_attack.png" id="1_mloeo"]
+[ext_resource type="Texture2D" uid="uid://65s8mvh6n5kx" path="res://assets/sprites/heroes/h01/h01_idle.png" id="1_s0s2r"]
+[ext_resource type="Texture2D" uid="uid://dy6j8hjbg60ac" path="res://assets/sprites/heroes/h01/h01_defeat.png" id="2_eiqq6"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_xmlt8"]
 atlas = ExtResource("1_mloeo")

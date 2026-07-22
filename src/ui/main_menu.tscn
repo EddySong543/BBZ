@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://hq4i5dkrj42d" path="res://src/ui/main_menu.gd" id="1_menu"]
 [ext_resource type="PackedScene" uid="uid://ddiu7ck5le8p3" path="res://src/ui/scenes/menu_background.tscn" id="2_bg"]
 [ext_resource type="Script" path="res://src/ui/components/mode_card.gd" id="3_modecard"]
-[ext_resource type="PackedScene" uid="uid://bhfrm000000000001" path="res://src/ui/components/hero_frame.tscn" id="4_heroframe"]
+[ext_resource type="PackedScene" path="res://src/ui/components/item_avatar_frame.tscn" id="4_avatarframe"]
 
 [node name="MainMenu" type="Control"]
 layout_mode = 3
@@ -36,7 +36,7 @@ offset_right = 340.0
 offset_bottom = 124.0
 flat = true
 
-[node name="AvatarFrame" parent="UI/IdentityButton" instance=ExtResource("4_heroframe")]
+[node name="AvatarFrame" parent="UI/IdentityButton" instance=ExtResource("4_avatarframe")]
 offset_right = 84.0
 offset_bottom = 84.0
 mouse_filter = 2

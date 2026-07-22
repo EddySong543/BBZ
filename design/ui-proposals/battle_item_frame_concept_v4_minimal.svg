@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" shape-rendering="crispEdges">
+  <rect width="1600" height="900" fill="#08111f"/>
+
+  <!-- Large construction preview: square, ivory border, four plain L-shaped corner caps. -->
+  <g fill="#f2e8cc">
+    <rect x="534" y="104" width="532" height="12"/>
+    <rect x="534" y="624" width="532" height="12"/>
+    <rect x="534" y="104" width="12" height="532"/>
+    <rect x="1054" y="104" width="12" height="532"/>
+
+    <rect x="522" y="92" width="84" height="24"/>
+    <rect x="522" y="92" width="24" height="84"/>
+    <rect x="994" y="92" width="84" height="24"/>
+    <rect x="1054" y="92" width="24" height="84"/>
+    <rect x="522" y="624" width="84" height="24"/>
+    <rect x="522" y="564" width="24" height="84"/>
+    <rect x="994" y="624" width="84" height="24"/>
+    <rect x="1054" y="564" width="24" height="84"/>
+  </g>
+
+  <!-- Small near-game-scale previews. Each is the same 68x68 construction enlarged 2x. -->
+  <g transform="translate(506 714) scale(2)" fill="#f2e8cc">
+    <path d="M0 0h68v3H0zM0 65h68v3H0zM0 0h3v68H0zM65 0h3v68h-3z"/>
+    <path d="M0 0h11v5H0zM0 0h5v11H0zM57 0h11v5H57zM63 0h5v11h-5zM0 63h11v5H0zM0 57h5v11H0zM57 63h11v5H57zM63 57h5v11h-5z"/>
+  </g>
+  <g transform="translate(732 714) scale(2)" fill="#f2e8cc">
+    <path d="M0 0h68v3H0zM0 65h68v3H0zM0 0h3v68H0zM65 0h3v68h-3z"/>
+    <path d="M0 0h11v5H0zM0 0h5v11H0zM57 0h11v5H57zM63 0h5v11h-5zM0 63h11v5H0zM0 57h5v11H0zM57 63h11v5H57zM63 57h5v11h-5z"/>
+  </g>
+  <g transform="translate(958 714) scale(2)" fill="#f2e8cc">
+    <path d="M0 0h68v3H0zM0 65h68v3H0zM0 0h3v68H0zM65 0h3v68h-3z"/>
+    <path d="M0 0h11v5H0zM0 0h5v11H0zM57 0h11v5H57zM63 0h5v11h-5zM0 63h11v5H0zM0 57h5v11H0zM57 63h11v5H57zM63 57h5v11h-5z"/>
+  </g>
+</svg>

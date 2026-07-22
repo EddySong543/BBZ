@@ -10,7 +10,6 @@
 [ext_resource type="Texture2D" uid="uid://cs6rtnmt7nn3" path="res://assets/scenes/scene1/scene1_mountain.png" id="12_mtntex"]
 [ext_resource type="Texture2D" uid="uid://nb106ifrsave" path="res://assets/scenes/scene1/scene1_frontRooftop1.png" id="13_front1"]
 [ext_resource type="Texture2D" uid="uid://bgybtupsa42ml" path="res://assets/scenes/scene1/Scene1_frontRooftop2.png" id="14_front2"]
-[ext_resource type="Shader" uid="uid://8nr5wbxavv34" path="res://assets/shaders/canvas_fx_edge_soften.gdshader" id="16_edgesoft"]
 [ext_resource type="Shader" uid="uid://u0mpca3l8lig" path="res://assets/shaders/canvas_fx_moonlight.gdshader" id="17_moonlight"]
 [ext_resource type="Shader" uid="uid://ds1lag0nmchpk" path="res://assets/shaders/canvas_fx_box_blur.gdshader" id="20_boxblur"]
 [ext_resource type="Shader" uid="uid://c5j24min87cl7" path="res://assets/shaders/canvas_env_fog_band.gdshader" id="22_fogband"]
@@ -19,8 +18,8 @@
 [ext_resource type="Texture2D" uid="uid://cfg0t5cp3j4un" path="res://assets/scenes/scene1/scene1_cloud_bank.png" id="25_cloudbank"]
 [ext_resource type="Texture2D" uid="uid://b4k1jnims1r4g" path="res://assets/scenes/scene1/scene1_cloud2.png" id="28_cloud2"]
 [ext_resource type="Shader" uid="uid://bqm3unqvn44w4" path="res://assets/shaders/canvas_fx_cloud_night.gdshader" id="32_cloudnight"]
-[ext_resource type="Shader" path="res://assets/shaders/canvas_env_aurora.gdshader" id="33_aurora"]
-[ext_resource type="Shader" path="res://assets/shaders/canvas_env_eclipse.gdshader" id="34_eclipse"]
+[ext_resource type="Shader" uid="uid://dnupmvywe72c3" path="res://assets/shaders/canvas_env_aurora.gdshader" id="33_aurora"]
+[ext_resource type="Shader" uid="uid://cv83tnyft8xbi" path="res://assets/shaders/canvas_env_eclipse.gdshader" id="34_eclipse"]
 
 [sub_resource type="ShaderMaterial" id="SkyMat"]
 shader = ExtResource("3_sky")
@@ -62,6 +61,25 @@ shader_parameter/sky_bottom = 0.5
 shader_parameter/sky_fade = 0.14
 shader_parameter/top_concentration = 0.5
 shader_parameter/pixel_grid = 800.0
+
+[sub_resource type="ShaderMaterial" id="AuroraMat"]
+shader = ExtResource("33_aurora")
+shader_parameter/size_px = Vector2(2016, 400)
+shader_parameter/base_y = 140.0
+shader_parameter/amp1 = 46.0
+shader_parameter/amp2 = 22.0
+shader_parameter/freq1 = 0.0021
+shader_parameter/freq2 = 0.0057
+shader_parameter/thickness = 62.0
+shader_parameter/soft_up = 2.2
+shader_parameter/soft_down = 0.8
+shader_parameter/color_a = Color(0.3, 0.95, 0.72, 1)
+shader_parameter/color_b = Color(0.58, 0.42, 1, 1)
+shader_parameter/intensity = 0.26
+shader_parameter/streak_scale = 0.045
+shader_parameter/streak_strength = 0.5
+shader_parameter/drift_speed = 0.012
+shader_parameter/grain_px = 3.0
 
 [sub_resource type="ShaderMaterial" id="MoonHaloMat"]
 shader = ExtResource("6_halo")
@@ -115,10 +133,6 @@ shader_parameter/lum_hi = 0.3
 shader_parameter/lit_gamma = 1.5
 shader_parameter/alpha_max = 0.95
 
-[sub_resource type="ShaderMaterial" id="EdgeSoftenMat"]
-shader = ExtResource("16_edgesoft")
-shader_parameter/edge_blur = 1.50000007125
-
 [sub_resource type="ShaderMaterial" id="MtnFarFocusMat"]
 shader = ExtResource("20_boxblur")
 shader_parameter/blur_amount = 0.64
@@ -137,6 +151,55 @@ shader_parameter/blur_amount = 0.7
 shader_parameter/silhouette = 0.0
 shader_parameter/brightness = 1.0
 
+[sub_resource type="ShaderMaterial" id="HazeMat"]
+shader = ExtResource("10_haze")
+shader_parameter/haze_color = Color(0.16, 0.22, 0.34, 1)
+shader_parameter/haze_top = 0.42
+shader_parameter/haze_bottom = 0.66
+shader_parameter/haze_intensity = 0.5
+shader_parameter/noise_scale = 3.0
+shader_parameter/noise_amount = 0.55
+shader_parameter/edge_wobble = 0.06
+shader_parameter/flow_speed = 0.02
+
+[sub_resource type="CanvasItemMaterial" id="EmberBlend"]
+blend_mode = 1
+
+[sub_resource type="Gradient" id="DustDot"]
+offsets = PackedFloat32Array(0, 0.55, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0.8, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture2D" id="DustTex"]
+gradient = SubResource("DustDot")
+width = 8
+height = 8
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[sub_resource type="Gradient" id="DustLife"]
+offsets = PackedFloat32Array(0, 0.2, 0.8, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="DustRamp"]
+gradient = SubResource("DustLife")
+
+[sub_resource type="ParticleProcessMaterial" id="EmberFarMat"]
+emission_shape = 3
+emission_box_extents = Vector3(900, 130, 1)
+direction = Vector3(0, -1, 0)
+spread = 20.0
+initial_velocity_min = 2.0
+initial_velocity_max = 6.0
+gravity = Vector3(0, -2, 0)
+scale_min = 0.22
+scale_max = 0.65
+color = Color(0.85, 0.91, 1, 0.38)
+color_ramp = SubResource("DustRamp")
+turbulence_enabled = true
+turbulence_noise_strength = 1.6
+turbulence_noise_scale = 1.1
+
 [sub_resource type="ShaderMaterial" id="RfLFocusMat"]
 shader = ExtResource("20_boxblur")
 shader_parameter/blur_amount = 0.7
@@ -148,17 +211,6 @@ shader = ExtResource("20_boxblur")
 shader_parameter/blur_amount = 0.4
 shader_parameter/silhouette = 0.0
 shader_parameter/brightness = 1.0
-
-[sub_resource type="ShaderMaterial" id="HazeMat"]
-shader = ExtResource("10_haze")
-shader_parameter/haze_color = Color(0.16, 0.22, 0.34, 1)
-shader_parameter/haze_top = 0.42
-shader_parameter/haze_bottom = 0.66
-shader_parameter/haze_intensity = 0.5
-shader_parameter/noise_scale = 3.0
-shader_parameter/noise_amount = 0.55
-shader_parameter/edge_wobble = 0.06
-shader_parameter/flow_speed = 0.02
 
 [sub_resource type="ShaderMaterial" id="RooftopMoonMat"]
 shader = ExtResource("17_moonlight")
@@ -235,25 +287,6 @@ shader_parameter/tail_fade = Vector2(400, 480)
 shader_parameter/flow_speed = 0.008
 shader_parameter/grain_px = 3.0
 
-[sub_resource type="ShaderMaterial" id="AuroraMat"]
-shader = ExtResource("33_aurora")
-shader_parameter/size_px = Vector2(2016, 400)
-shader_parameter/base_y = 140.0
-shader_parameter/amp1 = 46.0
-shader_parameter/amp2 = 22.0
-shader_parameter/freq1 = 0.0021
-shader_parameter/freq2 = 0.0057
-shader_parameter/thickness = 62.0
-shader_parameter/soft_up = 2.2
-shader_parameter/soft_down = 0.8
-shader_parameter/color_a = Color(0.3, 0.95, 0.72, 1)
-shader_parameter/color_b = Color(0.58, 0.42, 1, 1)
-shader_parameter/intensity = 0.26
-shader_parameter/streak_scale = 0.045
-shader_parameter/streak_strength = 0.5
-shader_parameter/drift_speed = 0.012
-shader_parameter/grain_px = 3.0
-
 [sub_resource type="ShaderMaterial" id="RfMat1"]
 shader = ExtResource("20_boxblur")
 shader_parameter/blur_amount = 1.8
@@ -285,25 +318,6 @@ shader_parameter/alpha_max = 0.1
 shader_parameter/drift_speed = 0.01
 shader_parameter/scale_x = 2.0
 
-[sub_resource type="Gradient" id="DustDot"]
-offsets = PackedFloat32Array(0, 0.55, 1)
-colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0.8, 1, 1, 1, 0)
-
-[sub_resource type="GradientTexture2D" id="DustTex"]
-gradient = SubResource("DustDot")
-width = 8
-height = 8
-fill = 1
-fill_from = Vector2(0.5, 0.5)
-fill_to = Vector2(1, 0.5)
-
-[sub_resource type="Gradient" id="DustLife"]
-offsets = PackedFloat32Array(0, 0.2, 0.8, 1)
-colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
-
-[sub_resource type="GradientTexture1D" id="DustRamp"]
-gradient = SubResource("DustLife")
-
 [sub_resource type="ParticleProcessMaterial" id="MoonDustMat"]
 emission_shape = 3
 emission_box_extents = Vector3(480, 340, 1)
@@ -320,9 +334,6 @@ turbulence_enabled = true
 turbulence_noise_strength = 1.5
 turbulence_noise_scale = 1.0
 
-[sub_resource type="CanvasItemMaterial" id="EmberBlend"]
-blend_mode = 1
-
 [sub_resource type="ParticleProcessMaterial" id="EmberMat"]
 emission_shape = 3
 emission_box_extents = Vector3(920, 120, 1)
@@ -338,22 +349,6 @@ color_ramp = SubResource("DustRamp")
 turbulence_enabled = true
 turbulence_noise_strength = 2.6
 turbulence_noise_scale = 1.4
-
-[sub_resource type="ParticleProcessMaterial" id="EmberFarMat"]
-emission_shape = 3
-emission_box_extents = Vector3(900, 130, 1)
-direction = Vector3(0, -1, 0)
-spread = 20.0
-initial_velocity_min = 2.0
-initial_velocity_max = 6.0
-gravity = Vector3(0, -2, 0)
-scale_min = 0.22
-scale_max = 0.65
-color = Color(0.85, 0.91, 1, 0.38)
-color_ramp = SubResource("DustRamp")
-turbulence_enabled = true
-turbulence_noise_strength = 1.6
-turbulence_noise_scale = 1.1
 
 [sub_resource type="ParticleProcessMaterial" id="EmberNearMat"]
 emission_shape = 3

@@ -2,6 +2,7 @@ extends GutTest
 
 const HeroGalleryScreen := preload("res://src/ui/hero_gallery_screen.gd")
 const ItemGalleryScreen := preload("res://src/ui/item_gallery_screen.gd")
+const ItemAvatarFrameScript := preload("res://src/ui/components/item_avatar_frame.gd")
 
 ## 回归守卫：关键 screen 脚本在含 autoload 的 GUT 环境能编译。
 ## （裸 --check-only 无 autoload（FontManager 等）会误报，故用 GUT 环境 load 触发编译。）
@@ -40,6 +41,40 @@ func test_battle_reserve_avatar_click_still_arms_active_switch() -> void:
 	assert_true(screen.p1_frames[1].get_node("SwitchPrompt").visible,
 			"主动换人态继续显示切换提示")
 	BattleSetup.reset()
+
+
+func test_death_switch_uses_item_frame_and_slant_hp() -> void:
+	var packed := load("res://src/ui/components/death_switch_overlay.tscn") as PackedScene
+	var overlay := packed.instantiate()
+	add_child_autofree(overlay)
+	var hero := load("res://assets/data/heroes/h01.tres") as HeroData
+	overlay.show_selection(0, [[1, hero, 4.5]])
+	var avatar := overlay.find_child("ItemAvatarFrame", true, false)
+	var hp_row := overlay.find_child("HpRow", true, false)
+	assert_not_null(avatar, "被迫换人头像使用新版 item_frame 组件")
+	assert_eq(avatar.get_script(), ItemAvatarFrameScript, "被迫换人不再实例化旧 HeroFrame")
+	assert_not_null(hp_row, "被迫换人使用平行四边形+数字血量")
+	assert_true(hp_row is ReserveHpRow, "血量展示复用现役 ReserveHpRow")
+	watch_signals(overlay)
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	avatar.gui_input.emit(click)
+	assert_signal_emitted_with_parameters(overlay, "selection_made", [1])
+	overlay._counting = false
+	overlay.set_process(false)
+
+
+func test_main_menu_profile_avatar_uses_item_frame() -> void:
+	var packed := load("res://src/ui/main_menu.tscn") as PackedScene
+	var menu := packed.instantiate()
+	add_child_autofree(menu)
+	var avatar := menu.get_node("UI/IdentityButton/AvatarFrame")
+	assert_eq(avatar.get_script(), ItemAvatarFrameScript,
+			"主菜单个人资料头像使用新版 item_frame 组件")
+	assert_null(avatar.get_node_or_null("Bg"), "主菜单头像不存在旧 HeroFrame 边框层")
+	assert_eq(avatar.mouse_filter, Control.MOUSE_FILTER_IGNORE,
+			"头像区域继续把点击交给个人资料入口按钮")
 
 
 func test_hero_gallery_uses_new_item_frame_geometry() -> void:

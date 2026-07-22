@@ -4,7 +4,7 @@ extends Control
 ## 背景 = 单色对波波流（继承 boot 胜方色·亮主调恒定，⛔降明度=脏）。
 ## 中央 = 三张命运牌（ModeCard）：故事(过去) / 匹配对战(现在·稍大) / 爬塔(未来)。
 ##   高亮(金框)+放大 = 悬停/焦点专属效果（ModeCard 内实现），不属于某张固定的牌。
-## 边缘件：顶左身份带(头像框+名字+段位占位=资料入口) / 顶右设置(icon锚位) /
+## 边缘件：顶左身份带(新版 item_frame 头像+名字+段位占位=资料入口) / 顶右设置(icon锚位) /
 ##   底坞 英雄(图鉴·已实装)|道具(图鉴·已实装 2026-06-26)|商店(icon锚位+字·未来收集层入口；小队已删 2026-06-12)。
 ## 现仅「匹配对战」接入实际流程（→ bp_screen → 战斗），其余占位（点击弹"敬请期待"）。
 ## ⚠️ 历史否决（勿再走）：海面化 / 星空压暗 / 中央大物或留白 / 公告卡 / 今日一抽（第七轮裁掉）。
@@ -109,17 +109,16 @@ func _build_vignette() -> void:
 	move_child(vig, 1)   # Background(0) < Vignette(1) < UI(2)
 
 
-## 顶左身份带：头像框(HeroFrame)+名字+段位占位，整体=资料入口（Epic 项⑥·2026-07-16 接真跳转）。
+## 顶左身份带：新版 item_frame 头像+名字+段位占位，整体=资料入口。
 ## 可点性三重反馈（Eddy 反馈"分不清能不能点"）：整带 ButtonJuice（悬停轻放大+手型金晕指针）
 ## + 悬停头像金晕外环（全游戏点选同语言·暗波底=淡金档）。
 func _setup_identity() -> void:
 	var btn: Button = $UI/IdentityButton
 	for s in ["normal", "hover", "pressed", "focus", "disabled"]:
 		btn.add_theme_stylebox_override(s, StyleBoxEmpty.new())
-	var avatar := $UI/IdentityButton/AvatarFrame as HeroFrame
+	var avatar := $UI/IdentityButton/AvatarFrame as ItemAvatarFrame
 	avatar.portrait_path = ProfileStore.avatar_portrait_path()   # 资料存档选的头像英雄（缺图回落 h01）
-	# ⚠ HeroFrame._ready 会把 mouse_filter 设回 STOP（组件默认）→ 头像区吞点击=
-	#   "点名字有用点头像没反应"的病根。子节点已全 ready，此处强制放行给整带按钮。
+	# ItemAvatarFrame 默认独立接收输入；身份带由父 Button 统一响应，故显式放行。
 	avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var name_lbl: Label = $UI/IdentityButton/NameLabel
 	FontManager.apply(name_lbl, 26)
