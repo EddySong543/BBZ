@@ -62,6 +62,10 @@ uniform vec4 mist_color : source_color = vec4(0.72, 0.84, 0.80, 1.0);
 uniform vec4 ripple_shadow_color : source_color = vec4(0.09, 0.24, 0.27, 1.0);
 uniform float body_alpha : hint_range(0.0, 1.0) = 0.88;
 uniform float mist_alpha : hint_range(0.0, 1.0) = 0.16;
+uniform float core_width_ratio : hint_range(0.1, 0.8) = 0.34;
+uniform float core_light_strength : hint_range(0.0, 0.6) = 0.20;
+uniform float edge_shadow_start : hint_range(0.4, 0.95) = 0.72;
+uniform float edge_shadow_strength : hint_range(0.0, 0.8) = 0.52;
 group_uniforms;
 
 
@@ -202,9 +206,15 @@ void fragment() {
 			hash21(vec2(lane + 47.0, floor(
 					(px.y - flow_time * fall_speed_px * 0.9)
 					/ max(streak_period_px * 0.55, 1.0)))));
+	float core_band = (1.0 - step(core_width_ratio, norm_x))
+			* mix(0.72, 1.0, step(
+					0.44,
+					hash21(vec2(section_row, floor(lane * 0.25) + 307.0))));
+	float edge_band = smoothstep(edge_shadow_start, 1.0, norm_x);
 
 	vec3 water = deep_color.rgb;
 	water = mix(water, mid_color.rgb, 0.54 + long_streak * 0.14);
+	water = mix(water, light_color.rgb, core_band * core_light_strength);
 	water = mix(water, light_color.rgb, long_streak * 0.28);
 	water = mix(water, foam_color.rgb, white_thread * 0.54);
 	water = mix(
@@ -212,7 +222,7 @@ void fragment() {
 			light_color.rgb,
 			mouth_vertical * 0.62 + rare_cross_join * 0.30);
 	water = mix(water, foam_color.rgb, top_lip_segments * 0.60);
-	water = mix(water, deep_color.rgb, step(0.82, norm_x) * 0.46);
+	water = mix(water, deep_color.rgb, edge_band * edge_shadow_strength);
 
 	float alpha = body * body_alpha;
 	alpha *= 1.0 - moving_gap * flow_gap_strength;

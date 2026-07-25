@@ -64,6 +64,12 @@ group_uniforms shore;
 uniform vec4 shore_dark : source_color = vec4(0.055, 0.13, 0.14, 1.0);
 uniform vec4 shore_light : source_color = vec4(0.55, 0.72, 0.63, 1.0);
 uniform float shore_px : hint_range(1.0, 8.0) = 3.0;
+uniform float shore_cluster_spacing_px : hint_range(24.0, 180.0) = 84.0;
+uniform float shore_cluster_density : hint_range(0.0, 0.7) = 0.24;
+uniform float shore_cluster_cycle_sec : hint_range(2.0, 12.0) = 5.2;
+uniform float shore_cluster_drift_px : hint_range(-12.0, 12.0) = 4.0;
+uniform float shore_foam_strength : hint_range(0.0, 1.0) = 0.42;
+uniform float shore_shadow_strength : hint_range(0.0, 1.0) = 0.66;
 group_uniforms;
 
 
@@ -167,11 +173,45 @@ void fragment() {
 	float glint = ripple_line * glint_active * smoothstep(0.04, 0.18, quv.y) * (1.0 - smoothstep(0.48, 0.78, quv.y));
 	col = mix(col, glint_color.rgb, glint * 0.82);
 
-	// 岸边先暗后亮：比一整条白色泡沫线更像静水贴岸。
+	// 岸边保留稳定暗接触线；亮色只在低密度短簇中错拍出现和消散。
+	// 每簇以稳定 cell hash 决定长度与起点，避免整条白边或逐像素闪烁。
 	float shore_dark_mask = 1.0 - step((shore_px + px_size) / size_px.y, quv.y);
-	float shore_light_mask = 1.0 - step(shore_px / size_px.y, quv.y);
-	col = mix(col, shore_dark.rgb, shore_dark_mask * 0.72);
-	col = mix(col, shore_light.rgb, shore_light_mask * 0.62);
+	float shore_drift = floor(
+			t * shore_cluster_drift_px / max(px_size, 1.0)) * px_size;
+	float shore_shifted_x = px.x + shore_drift;
+	float shore_cluster_id = floor(
+			shore_shifted_x / max(shore_cluster_spacing_px, 1.0));
+	float shore_cluster_x = mod(
+			shore_shifted_x, max(shore_cluster_spacing_px, 1.0));
+	float shore_seed = hash21(vec2(shore_cluster_id, 181.0));
+	float shore_cluster_active = step(1.0 - shore_cluster_density, shore_seed);
+	float shore_cluster_length = mix(
+			shore_cluster_spacing_px * 0.18,
+			shore_cluster_spacing_px * 0.58,
+			hash21(vec2(shore_cluster_id, 223.0)));
+	float shore_cluster_start = hash21(
+			vec2(shore_cluster_id, 269.0)
+	) * max(shore_cluster_spacing_px - shore_cluster_length, 1.0);
+	float shore_cluster_segment = step(
+			shore_cluster_start, shore_cluster_x
+	) * step(
+			shore_cluster_x, shore_cluster_start + shore_cluster_length);
+	float shore_cluster_phase = fract(
+			t / max(shore_cluster_cycle_sec, 0.001)
+			+ hash21(vec2(shore_cluster_id, 307.0)));
+	float shore_cluster_life = (1.0 - step(0.68, shore_cluster_phase))
+			* (1.0 - shore_cluster_phase / 0.68);
+	float shore_chunk = floor(shore_cluster_x / max(px_size * 3.0, 1.0));
+	float shore_cluster_break = step(
+			0.28, hash21(vec2(shore_cluster_id, shore_chunk + 353.0)));
+	float shore_cluster = shore_cluster_active
+			* shore_cluster_segment
+			* shore_cluster_life
+			* shore_cluster_break;
+	float shore_cluster_bright = shore_cluster
+			* (1.0 - step(shore_px / size_px.y, quv.y));
+	col = mix(col, shore_dark.rgb, shore_dark_mask * shore_shadow_strength);
+	col = mix(col, shore_light.rgb, shore_cluster_bright * shore_foam_strength);
 
 	COLOR = vec4(col, 1.0);
 }

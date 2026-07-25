@@ -110,7 +110,7 @@ fill_amount = 0.16
 [node name="AnimatedSprite2D" parent="P1CharDisplay/SubViewport" parent_id_path=PackedInt32Array(1642938575, 1325957388) index="1" unique_id=1622338484]
 material = SubResource("ShaderMaterial_8x02m")
 scale = Vector2(2, 2)
-frame_progress = 0.49842435
+frame_progress = 0.70843256
 
 [node name="P2CharDisplay" parent="." index="6" unique_id=915119977]
 rim_color = Color(0.72, 0.86, 0.78, 1)
@@ -128,7 +128,7 @@ metadata/_edit_lock_ = true
 [node name="AnimatedSprite2D" parent="P2CharDisplay/SubViewport" parent_id_path=PackedInt32Array(915119977, 1325957388) index="1" unique_id=1622338484]
 material = SubResource("ShaderMaterial_djd32")
 scale = Vector2(2, 2)
-frame_progress = 0.49842435
+frame_progress = 0.70843256
 
 [node name="ForeDust" parent="." index="7" unique_id=844619574]
 metadata/_edit_lock_ = true
