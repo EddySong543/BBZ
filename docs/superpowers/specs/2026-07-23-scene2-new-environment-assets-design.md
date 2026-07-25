@@ -12,7 +12,7 @@
 - `midmountain.png`
 - `farmountain.png`
 
-Scene2 继续使用独立的 `battle_screen_scene2.tscn`。角色素材、角色尺寸、战斗逻辑、UI、P0 角色倒影与 Scene2 专属角色环境光不变；默认 Scene1 不变。
+Scene2 继续使用独立的 `battle_screen2.tscn`。角色素材、角色尺寸、战斗逻辑、UI、P0 角色倒影与 Scene2 专属角色环境光不变；`battle_screen1.tscn` 的 Scene1 不变。
 
 ## 素材清理
 
@@ -90,5 +90,5 @@ Scene2 相关顺序调整为：
 4. Far/Mid Mountain 是两个独立节点，层级和视差正确，不遮盖 UI 或角色。
 5. 新山体中央谷口继续给三段瀑布留出通道。
 6. Scene2 的角色几何与既有测试契约不变。
-7. 默认 `battle_screen.tscn` 仍加载 Scene1；Scene2 独立入口运行正常。
+7. `battle_screen1.tscn` 加载 Scene1；`battle_screen2.tscn` 独立入口运行正常。
 8. Godot 全量测试通过，并分别生成 Scene1、Scene2 运行时截图。

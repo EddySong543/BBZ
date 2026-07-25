@@ -4,7 +4,7 @@ shader_type canvas_item;
 // Scene2 近景河流：分层水平切片倒影。
 // 设计重点不是连续液化，而是以远细近粗的像素行拼出透视：每条水带拥有稳定的
 // 色值、横移速度和相位，倒影被切成可读的水平块；稀疏水线沿各自深度横移。
-// 节点之前绘制的山、瀑布、岸台会进入倒影，角色保持不反射。
+// 节点之前绘制的山、瀑布、岸台进入屏幕倒影；角色由两张实时 ViewportTexture 独立接入。
 // =============================================================
 
 uniform sampler2D screen_tex : hint_screen_texture, filter_nearest;
@@ -25,6 +25,22 @@ uniform float slice_shift_px : hint_range(0.0, 30.0) = 12.0;
 uniform float slice_speed : hint_range(0.0, 2.0) = 0.24;
 uniform float breakup_px : hint_range(8.0, 128.0) = 54.0;
 uniform float breakup_strength : hint_range(0.0, 1.0) = 0.34;
+group_uniforms;
+
+group_uniforms character_reflection;
+uniform sampler2D p1_reflection_tex : filter_nearest, repeat_disable;
+uniform sampler2D p2_reflection_tex : filter_nearest, repeat_disable;
+// x/y/w/h in screen pixels. BattleScreen updates these after character and camera motion.
+uniform vec4 p1_reflection_rect = vec4(0.0);
+uniform vec4 p2_reflection_rect = vec4(0.0);
+uniform float p1_reflection_foot_y = 0.0;
+uniform float p2_reflection_foot_y = 0.0;
+uniform float character_waterline_y = 0.0;
+uniform float character_reflection_strength : hint_range(0.0, 1.0) = 0.0;
+uniform float character_reflection_vertical_scale : hint_range(0.5, 2.0) = 1.05;
+uniform float character_reflection_saturation : hint_range(0.0, 1.0) = 0.5;
+uniform vec4 character_reflection_tint : source_color = vec4(0.68, 0.84, 0.80, 1.0);
+uniform float character_reflection_fade_start : hint_range(0.0, 1.0) = 0.42;
 group_uniforms;
 
 group_uniforms water;
@@ -54,6 +70,14 @@ group_uniforms;
 float hash21(vec2 p) {
 	p = mod(p, vec2(511.0, 257.0));
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+
+float reflection_rect_mask(vec2 point_px, vec4 rect_px) {
+	vec2 lower = step(rect_px.xy, point_px);
+	vec2 upper = step(point_px, rect_px.xy + rect_px.zw);
+	float valid_size = step(1.0, rect_px.z) * step(1.0, rect_px.w);
+	return lower.x * lower.y * upper.x * upper.y * valid_size;
 }
 
 
@@ -96,6 +120,32 @@ void fragment() {
 	water_base *= row_tone;
 	float refl_mix = refl_strength * (1.0 - 0.58 * depth);
 	vec3 col = mix(water_base, refl * mix(1.02, 0.72, depth), refl_mix);
+
+	// 角色在 Stage 之后绘制，无法进入 hint_screen_texture；这里独立采样两个现有
+	// CharacterDisplay ViewportTexture。脚底对齐水线，再沿水深反向读取角色，河面本身即裁切区。
+	vec2 screen_pos_px = suv * screen_px;
+	float char_depth_px = max(screen_pos_px.y - character_waterline_y, 0.0);
+	float char_depth_norm = clamp(char_depth_px / max(size_px.y, 1.0), 0.0, 1.0);
+	float char_sample_x = screen_pos_px.x + band_shift + block_shift;
+	float char_scale = max(character_reflection_vertical_scale, 0.001);
+
+	vec2 p1_source_px = vec2(char_sample_x, p1_reflection_foot_y - char_depth_px / char_scale);
+	vec2 p2_source_px = vec2(char_sample_x, p2_reflection_foot_y - char_depth_px / char_scale);
+	vec2 p1_uv = (p1_source_px - p1_reflection_rect.xy) / max(p1_reflection_rect.zw, vec2(1.0));
+	vec2 p2_uv = (p2_source_px - p2_reflection_rect.xy) / max(p2_reflection_rect.zw, vec2(1.0));
+	float below_water = step(character_waterline_y, screen_pos_px.y);
+	float p1_inside = reflection_rect_mask(p1_source_px, p1_reflection_rect) * below_water;
+	float p2_inside = reflection_rect_mask(p2_source_px, p2_reflection_rect) * below_water;
+	vec4 p1_sample = texture(p1_reflection_tex, clamp(p1_uv, vec2(0.0), vec2(1.0))) * p1_inside;
+	vec4 p2_sample = texture(p2_reflection_tex, clamp(p2_uv, vec2(0.0), vec2(1.0))) * p2_inside;
+	vec4 char_sample = p1_sample + p2_sample * (1.0 - p1_sample.a);
+	float char_luma = dot(char_sample.rgb, vec3(0.299, 0.587, 0.114));
+	vec3 char_refl = mix(vec3(char_luma), char_sample.rgb, character_reflection_saturation);
+	char_refl *= character_reflection_tint.rgb;
+	char_refl = floor(char_refl * refl_levels + 0.5) / refl_levels;
+	float char_fade = 1.0 - smoothstep(character_reflection_fade_start, 1.0, char_depth_norm);
+	float char_mix = char_sample.a * character_reflection_strength * char_fade * (1.0 - 0.22 * depth);
+	col = mix(col, char_refl, char_mix);
 
 	// 水线是成组横向短线：随深度变长、变稀，并以不同速度横移，持续多帧。
 	float ripple_row_h = mix(6.0, 12.0, depth);

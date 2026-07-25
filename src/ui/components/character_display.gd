@@ -370,6 +370,15 @@ func _apply_idle_speed() -> void:
 	_sprite.sprite_frames.set_animation_speed("idle", fps)
 
 
+## 返回当前角色已经在使用的实时渲染纹理。
+## 河面倒影只读取这张 ViewportTexture，不创建第二套角色节点，因而天然同步换人、受击和动作帧。
+func get_render_texture() -> Texture2D:
+	for child in get_children():
+		if child is SubViewport:
+			return (child as SubViewport).get_texture()
+	return null
+
+
 ## 把当前光照 export 参数应用到角色 shader（_ready 后建立 / Inspector 实时调用）。
 func _apply_light() -> void:
 	if not _sprite or _sprite.material == null:

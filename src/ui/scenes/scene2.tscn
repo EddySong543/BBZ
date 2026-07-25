@@ -1,19 +1,22 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://cs7yr6dmj3tme"]
 
 [ext_resource type="Script" uid="uid://di0qh6ki88n6e" path="res://src/ui/components/battle_stage.gd" id="1_stage"]
-[ext_resource type="Texture2D" path="res://assets/scenes/scene2/scene2_sky.png" id="2_sky"]
-[ext_resource type="Shader" path="res://assets/shaders/canvas_env_moon_halo.gdshader" id="3_halo"]
-[ext_resource type="Shader" uid="uid://ds1lag0nmchpk" path="res://assets/shaders/canvas_fx_box_blur.gdshader" id="4_blur"]
-[ext_resource type="Shader" path="res://assets/shaders/canvas_env_horizon_haze.gdshader" id="5_haze"]
-[ext_resource type="Shader" path="res://assets/shaders/canvas_env_fog_band.gdshader" id="6_fog"]
-[ext_resource type="Shader" path="res://assets/shaders/canvas_env_pixel_river.gdshader" id="7_river"]
-[ext_resource type="Texture2D" path="res://assets/scenes/scene2/scene2_stone_bridge.png" id="8_bridge"]
-[ext_resource type="Shader" path="res://assets/shaders/canvas_env_pixel_waterfall.gdshader" id="9_waterfall"]
-[ext_resource type="Texture2D" path="res://assets/scenes/scene2/scene2_mountain_gate.png" id="10_mountain_gate"]
-[ext_resource type="Texture2D" path="res://assets/scenes/scene2/scene2_mountain_left.png" id="11_mountain_left"]
-[ext_resource type="Texture2D" path="res://assets/scenes/scene2/scene2_blossom_tree.png" id="12_blossom_tree"]
-[ext_resource type="Texture2D" uid="uid://cs6rtnmt7nn3" path="res://assets/scenes/scene1/scene1_mountain.png" id="13_mountain_far"]
-[ext_resource type="Shader" path="res://assets/shaders/canvas_env_scene2_sky_grade.gdshader" id="14_sky_grade"]
+[ext_resource type="Texture2D" uid="uid://wnai518rl6ea" path="res://assets/scenes/scene2/scene2_sky.png" id="2_sky"]
+[ext_resource type="Shader" uid="uid://dpaogff5yo8xt" path="res://assets/shaders/canvas_env_moon_halo.gdshader" id="3_halo"]
+[ext_resource type="Shader" uid="uid://coh7sfy7jmc26" path="res://assets/shaders/canvas_env_horizon_haze.gdshader" id="5_haze"]
+[ext_resource type="Shader" uid="uid://c5j24min87cl7" path="res://assets/shaders/canvas_env_fog_band.gdshader" id="6_fog"]
+[ext_resource type="Shader" uid="uid://b8m84o0qcs318" path="res://assets/shaders/canvas_env_pixel_river.gdshader" id="7_river"]
+[ext_resource type="Texture2D" uid="uid://cpkox422n2q8r" path="res://assets/scenes/scene2/scene2_stone_bridge.png" id="8_bridge"]
+[ext_resource type="Shader" uid="uid://ca3maxsm3tpf" path="res://assets/shaders/canvas_env_pixel_waterfall.gdshader" id="9_waterfall"]
+[ext_resource type="Texture2D" uid="uid://db2jx37e6l7ac" path="res://assets/scenes/scene2/scene2_mountain_right.png" id="10_mountain_right"]
+[ext_resource type="Texture2D" uid="uid://cydph10gjhs65" path="res://assets/scenes/scene2/scene2_mountain_left.png" id="11_mountain_left"]
+[ext_resource type="Texture2D" uid="uid://dlqn6npmiuxq" path="res://assets/scenes/scene2/scene2_blossom_tree.png" id="12_blossom_tree"]
+[ext_resource type="Texture2D" uid="uid://borh5rs1i8x6a" path="res://assets/scenes/scene2/scene2_far_mountain.png" id="13_far_mountain"]
+[ext_resource type="Texture2D" uid="uid://bc4350jrfnplg" path="res://assets/scenes/scene2/scene2_mid_mountain.png" id="13_mid_mountain"]
+[ext_resource type="Shader" uid="uid://c0nikox78y2mo" path="res://assets/shaders/canvas_env_scene2_sky_grade.gdshader" id="14_sky_grade"]
+[ext_resource type="Shader" uid="uid://wu5juw6frubv" path="res://assets/shaders/canvas_env_scene2_depth_grade.gdshader" id="15_depth_grade"]
+[ext_resource type="Texture2D" uid="uid://dy1xu3r2xt33o" path="res://assets/scenes/scene2/scene2_cloud_bank.png" id="16_cloud_bank"]
+[ext_resource type="Texture2D" uid="uid://d13vqug3n25pe" path="res://assets/scenes/scene2/scene2_cloud_tower.png" id="17_cloud_tower"]
 
 [sub_resource type="ShaderMaterial" id="SkyGradeMat"]
 shader = ExtResource("14_sky_grade")
@@ -24,36 +27,6 @@ shader_parameter/wash_strength = 0.32
 shader_parameter/contrast = 0.86
 shader_parameter/lift = 0.07
 shader_parameter/palette_steps = 48.0
-
-[sub_resource type="ShaderMaterial" id="FarMountainBackMat"]
-shader = ExtResource("4_blur")
-shader_parameter/blur_amount = 0.92
-shader_parameter/silhouette = 1.0
-shader_parameter/brightness = 1.0
-
-[sub_resource type="ShaderMaterial" id="FarMountainMidMat"]
-shader = ExtResource("4_blur")
-shader_parameter/blur_amount = 0.74
-shader_parameter/silhouette = 0.98
-shader_parameter/brightness = 1.0
-
-[sub_resource type="ShaderMaterial" id="FarMountainNearMat"]
-shader = ExtResource("4_blur")
-shader_parameter/blur_amount = 0.54
-shader_parameter/silhouette = 0.94
-shader_parameter/brightness = 1.0
-
-[sub_resource type="ShaderMaterial" id="MountainGateMat"]
-shader = ExtResource("4_blur")
-shader_parameter/blur_amount = 0.52
-shader_parameter/silhouette = 0.0
-shader_parameter/brightness = 1.0
-
-[sub_resource type="ShaderMaterial" id="MountainLeftMat"]
-shader = ExtResource("4_blur")
-shader_parameter/blur_amount = 0.08
-shader_parameter/silhouette = 0.0
-shader_parameter/brightness = 1.0
 
 [sub_resource type="ShaderMaterial" id="ValleyGlowMat"]
 shader = ExtResource("3_halo")
@@ -68,6 +41,116 @@ shader_parameter/glow_falloff = 2.2
 shader_parameter/flicker_amount = 0.03
 shader_parameter/flicker_speed = 0.5
 
+[sub_resource type="ShaderMaterial" id="CloudFarMat"]
+shader = ExtResource("15_depth_grade")
+shader_parameter/saturation = 0.42
+shader_parameter/contrast = 0.72
+shader_parameter/brightness = 0.94
+shader_parameter/atmosphere_color = Color(0.65, 0.77, 0.8, 1)
+shader_parameter/atmosphere_strength = 0.34
+shader_parameter/quiet_center = Vector2(0.5, 0.5)
+shader_parameter/quiet_radius = Vector2(0.2, 0.2)
+shader_parameter/quiet_strength = 0.0
+shader_parameter/quiet_color = Color(0.72, 0.76, 0.72, 1)
+shader_parameter/quiet_saturation = 0.35
+shader_parameter/quiet_contrast = 0.5
+shader_parameter/quiet_lift = 0.0
+
+[sub_resource type="ShaderMaterial" id="CloudMidMat"]
+shader = ExtResource("15_depth_grade")
+shader_parameter/saturation = 0.55
+shader_parameter/contrast = 0.78
+shader_parameter/brightness = 0.94
+shader_parameter/atmosphere_color = Color(0.68, 0.78, 0.8, 1)
+shader_parameter/atmosphere_strength = 0.26
+shader_parameter/quiet_center = Vector2(0.5, 0.5)
+shader_parameter/quiet_radius = Vector2(0.2, 0.2)
+shader_parameter/quiet_strength = 0.0
+shader_parameter/quiet_color = Color(0.72, 0.76, 0.72, 1)
+shader_parameter/quiet_saturation = 0.35
+shader_parameter/quiet_contrast = 0.5
+shader_parameter/quiet_lift = 0.0
+
+[sub_resource type="ShaderMaterial" id="WaterfallLeftMat"]
+shader = ExtResource("9_waterfall")
+shader_parameter/size_px = Vector2(720, 1216)
+shader_parameter/render_part = 0
+shader_parameter/px_size = 4.0
+shader_parameter/center_x = 0.5
+shader_parameter/top_y = 0.08
+shader_parameter/bottom_y = 0.86
+shader_parameter/top_half_width_px = 72.0
+shader_parameter/bottom_half_width_px = 118.0
+shader_parameter/bend_px = 12.0
+shader_parameter/edge_step_px = 24.0
+shader_parameter/edge_wobble_px = 14.0
+shader_parameter/section_height_px = 96.0
+shader_parameter/section_width_wobble_px = 18.0
+shader_parameter/section_center_wobble_px = 12.0
+shader_parameter/anim_fps = 6.0
+shader_parameter/fall_speed_px = 96.0
+shader_parameter/lane_width_px = 8.0
+shader_parameter/streak_period_px = 96.0
+shader_parameter/streak_length_px = 34.0
+shader_parameter/mouth_depth_px = 72.0
+shader_parameter/mouth_highlight_density = 0.34
+shader_parameter/cross_join_density = 0.06
+shader_parameter/flow_highlight_density = 0.18
+shader_parameter/flow_gap_strength = 0.18
+shader_parameter/edge_drop_density = 0.03
+shader_parameter/splash_fps = 6.0
+shader_parameter/splash_cycle_a = 19.0
+shader_parameter/splash_cycle_b = 23.0
+shader_parameter/splash_cycle_c = 29.0
+shader_parameter/splash_active_ratio = 0.58
+shader_parameter/splash_reach_px = 112.0
+shader_parameter/splash_height_px = 54.0
+shader_parameter/entry_white_height_px = 34.0
+shader_parameter/impact_mist_strength = 0.12
+shader_parameter/ripple_period_sec = 5.6
+shader_parameter/ripple_reach_px = 210.0
+shader_parameter/ripple_thickness_px = 4.0
+shader_parameter/ripple_segment_density = 0.32
+shader_parameter/ripple_shadow_strength = 0.3
+shader_parameter/deep_color = Color(0.24, 0.48, 0.52, 0.94)
+shader_parameter/mid_color = Color(0.44, 0.68, 0.68, 0.96)
+shader_parameter/light_color = Color(0.72, 0.86, 0.8, 1)
+shader_parameter/foam_color = Color(0.97, 0.96, 0.86, 1)
+shader_parameter/mist_color = Color(0.72, 0.84, 0.8, 1)
+shader_parameter/ripple_shadow_color = Color(0.09, 0.24, 0.27, 1)
+shader_parameter/body_alpha = 0.84
+shader_parameter/mist_alpha = 0.1
+
+[sub_resource type="ShaderMaterial" id="MountainRightMat"]
+shader = ExtResource("15_depth_grade")
+shader_parameter/saturation = 0.72
+shader_parameter/contrast = 0.82
+shader_parameter/brightness = 0.94
+shader_parameter/atmosphere_color = Color(0.62, 0.73, 0.73, 1)
+shader_parameter/atmosphere_strength = 0.26
+shader_parameter/quiet_center = Vector2(0.5, 0.5)
+shader_parameter/quiet_radius = Vector2(0.2, 0.2)
+shader_parameter/quiet_strength = 0.0
+shader_parameter/quiet_color = Color(0.72, 0.76, 0.72, 1)
+shader_parameter/quiet_saturation = 0.35
+shader_parameter/quiet_contrast = 0.5
+shader_parameter/quiet_lift = 0.0
+
+[sub_resource type="ShaderMaterial" id="MountainLeftMat"]
+shader = ExtResource("15_depth_grade")
+shader_parameter/saturation = 0.88
+shader_parameter/contrast = 0.92
+shader_parameter/brightness = 0.97
+shader_parameter/atmosphere_color = Color(0.65, 0.72, 0.68, 1)
+shader_parameter/atmosphere_strength = 0.08
+shader_parameter/quiet_center = Vector2(0.5, 0.5)
+shader_parameter/quiet_radius = Vector2(0.2, 0.2)
+shader_parameter/quiet_strength = 0.0
+shader_parameter/quiet_color = Color(0.72, 0.76, 0.72, 1)
+shader_parameter/quiet_saturation = 0.35
+shader_parameter/quiet_contrast = 0.5
+shader_parameter/quiet_lift = 0.0
+
 [sub_resource type="ShaderMaterial" id="HazeMat"]
 shader = ExtResource("5_haze")
 shader_parameter/haze_color = Color(0.67, 0.76, 0.77, 1)
@@ -78,135 +161,6 @@ shader_parameter/noise_scale = 3.0
 shader_parameter/noise_amount = 0.55
 shader_parameter/edge_wobble = 0.06
 shader_parameter/flow_speed = 0.02
-
-[sub_resource type="ShaderMaterial" id="WaterfallUpperMat"]
-shader = ExtResource("9_waterfall")
-shader_parameter/size_px = Vector2(560, 700)
-shader_parameter/px_size = 5.0
-shader_parameter/center_x = 0.58
-shader_parameter/top_y = -0.05
-shader_parameter/bottom_y = 0.86
-shader_parameter/top_half_width_px = 32.0
-shader_parameter/bottom_half_width_px = 46.0
-shader_parameter/bend_px = -16.0
-shader_parameter/edge_step_px = 25.0
-shader_parameter/edge_wobble_px = 7.0
-shader_parameter/impact_reach_px = 160.0
-shader_parameter/lip_jitter_px = 15.0
-shader_parameter/source_mist_strength = 0.52
-shader_parameter/impact_mist_strength = 0.4
-shader_parameter/foam_height_px = 22.0
-shader_parameter/anim_fps = 6.0
-shader_parameter/fall_speed_px = 82.0
-shader_parameter/ribbon_width_px = 10.0
-shader_parameter/flow_cell_px = 24.0
-shader_parameter/veil_gap_strength = 0.3
-shader_parameter/edge_drop_density = 0.04
-shader_parameter/deep_color = Color(0.32, 0.58, 0.62, 0.86)
-shader_parameter/mid_color = Color(0.54, 0.78, 0.76, 0.92)
-shader_parameter/light_color = Color(0.82, 0.94, 0.89, 0.98)
-shader_parameter/foam_color = Color(0.96, 0.95, 0.86, 1)
-shader_parameter/mist_color = Color(0.78, 0.89, 0.83, 1)
-shader_parameter/body_alpha = 0.78
-shader_parameter/mist_alpha = 0.18
-
-[sub_resource type="ShaderMaterial" id="WaterfallMiddleMat"]
-shader = ExtResource("9_waterfall")
-shader_parameter/size_px = Vector2(520, 360)
-shader_parameter/px_size = 4.0
-shader_parameter/center_x = 0.55
-shader_parameter/top_y = 0.04
-shader_parameter/bottom_y = 0.86
-shader_parameter/top_half_width_px = 34.0
-shader_parameter/bottom_half_width_px = 52.0
-shader_parameter/bend_px = -18.0
-shader_parameter/edge_step_px = 20.0
-shader_parameter/edge_wobble_px = 8.0
-shader_parameter/impact_reach_px = 150.0
-shader_parameter/lip_jitter_px = 13.0
-shader_parameter/source_mist_strength = 0.28
-shader_parameter/impact_mist_strength = 0.45
-shader_parameter/foam_height_px = 26.0
-shader_parameter/anim_fps = 7.0
-shader_parameter/fall_speed_px = 100.0
-shader_parameter/ribbon_width_px = 10.0
-shader_parameter/flow_cell_px = 22.0
-shader_parameter/veil_gap_strength = 0.27
-shader_parameter/edge_drop_density = 0.06
-shader_parameter/deep_color = Color(0.26, 0.58, 0.62, 0.92)
-shader_parameter/mid_color = Color(0.5, 0.78, 0.75, 0.96)
-shader_parameter/light_color = Color(0.84, 0.95, 0.88, 1)
-shader_parameter/foam_color = Color(0.96, 0.95, 0.86, 1)
-shader_parameter/mist_color = Color(0.76, 0.87, 0.81, 1)
-shader_parameter/body_alpha = 0.84
-shader_parameter/mist_alpha = 0.22
-
-[sub_resource type="ShaderMaterial" id="WaterfallLowerMat"]
-shader = ExtResource("9_waterfall")
-shader_parameter/size_px = Vector2(560, 300)
-shader_parameter/px_size = 4.0
-shader_parameter/center_x = 0.59
-shader_parameter/top_y = 0.04
-shader_parameter/bottom_y = 0.86
-shader_parameter/top_half_width_px = 40.0
-shader_parameter/bottom_half_width_px = 70.0
-shader_parameter/bend_px = -8.0
-shader_parameter/edge_step_px = 20.0
-shader_parameter/edge_wobble_px = 9.0
-shader_parameter/impact_reach_px = 100.0
-shader_parameter/lip_jitter_px = 14.0
-shader_parameter/source_mist_strength = 0.24
-shader_parameter/impact_mist_strength = 0.55
-shader_parameter/foam_height_px = 32.0
-shader_parameter/anim_fps = 8.0
-shader_parameter/fall_speed_px = 112.0
-shader_parameter/ribbon_width_px = 10.0
-shader_parameter/flow_cell_px = 20.0
-shader_parameter/veil_gap_strength = 0.24
-shader_parameter/edge_drop_density = 0.08
-shader_parameter/deep_color = Color(0.2, 0.55, 0.6, 0.94)
-shader_parameter/mid_color = Color(0.48, 0.78, 0.76, 0.98)
-shader_parameter/light_color = Color(0.85, 0.96, 0.9, 1)
-shader_parameter/foam_color = Color(0.96, 0.95, 0.86, 1)
-shader_parameter/mist_color = Color(0.78, 0.89, 0.83, 1)
-shader_parameter/body_alpha = 0.9
-shader_parameter/mist_alpha = 0.24
-
-[sub_resource type="ShaderMaterial" id="RiverMat"]
-shader = ExtResource("7_river")
-shader_parameter/size_px = Vector2(2016, 205)
-shader_parameter/screen_px = Vector2(1920, 1080)
-shader_parameter/px_size = 3.0
-shader_parameter/stretch = 2.15
-shader_parameter/refl_strength = 0.7
-shader_parameter/refl_levels = 7.0
-shader_parameter/slice_px_far = 3.0
-shader_parameter/slice_px_near = 8.0
-shader_parameter/slice_shift_px = 12.0
-shader_parameter/slice_speed = 0.24
-shader_parameter/breakup_px = 54.0
-shader_parameter/breakup_strength = 0.34
-shader_parameter/surface_color = Color(0.29, 0.46, 0.46, 1)
-shader_parameter/shallow_color = Color(0.17, 0.33, 0.35, 1)
-shader_parameter/deep_color = Color(0.055, 0.12, 0.145, 1)
-shader_parameter/depth_curve = 1.25
-shader_parameter/row_contrast = 0.09
-shader_parameter/anim_fps = 8.0
-shader_parameter/ripple_speed_px = 20.0
-shader_parameter/ripple_density = 0.23
-shader_parameter/ripple_color = Color(0.54, 0.72, 0.66, 1)
-shader_parameter/glint_density = 0.065
-shader_parameter/glint_color = Color(0.96, 0.92, 0.76, 1)
-shader_parameter/shore_dark = Color(0.055, 0.13, 0.14, 1)
-shader_parameter/shore_light = Color(0.55, 0.72, 0.63, 1)
-shader_parameter/shore_px = 3.0
-
-[sub_resource type="ShaderMaterial" id="FogFrontMat"]
-shader = ExtResource("6_fog")
-shader_parameter/fog_color = Color(0.72, 0.79, 0.78, 1)
-shader_parameter/alpha_max = 0.06
-shader_parameter/drift_speed = 0.012
-shader_parameter/scale_x = 2.0
 
 [sub_resource type="Gradient" id="PetalDot"]
 offsets = PackedFloat32Array(0, 0.55, 1)
@@ -243,6 +197,102 @@ turbulence_enabled = true
 turbulence_noise_strength = 1.2
 turbulence_noise_scale = 0.9
 
+[sub_resource type="ShaderMaterial" id="RiverMat"]
+shader = ExtResource("7_river")
+shader_parameter/size_px = Vector2(2016, 217.0915)
+shader_parameter/screen_px = Vector2(1920, 1080)
+shader_parameter/px_size = 3.0
+shader_parameter/stretch = 2.15
+shader_parameter/refl_strength = 0.7
+shader_parameter/refl_levels = 7.0
+shader_parameter/slice_px_far = 3.0
+shader_parameter/slice_px_near = 8.0
+shader_parameter/slice_shift_px = 12.0
+shader_parameter/slice_speed = 0.24
+shader_parameter/breakup_px = 54.0
+shader_parameter/breakup_strength = 0.34
+shader_parameter/p1_reflection_rect = Vector4(0, 0, 0, 0)
+shader_parameter/p2_reflection_rect = Vector4(0, 0, 0, 0)
+shader_parameter/p1_reflection_foot_y = 0.0
+shader_parameter/p2_reflection_foot_y = 0.0
+shader_parameter/character_waterline_y = 0.0
+shader_parameter/character_reflection_strength = 0.58
+shader_parameter/character_reflection_vertical_scale = 1.05
+shader_parameter/character_reflection_saturation = 0.52
+shader_parameter/character_reflection_tint = Color(0.68, 0.84, 0.8, 1)
+shader_parameter/character_reflection_fade_start = 0.42
+shader_parameter/surface_color = Color(0.29, 0.46, 0.46, 1)
+shader_parameter/shallow_color = Color(0.17, 0.33, 0.35, 1)
+shader_parameter/deep_color = Color(0.055, 0.12, 0.145, 1)
+shader_parameter/depth_curve = 1.25
+shader_parameter/row_contrast = 0.09
+shader_parameter/anim_fps = 8.0
+shader_parameter/ripple_speed_px = 20.0
+shader_parameter/ripple_density = 0.23
+shader_parameter/ripple_color = Color(0.54, 0.72, 0.66, 1)
+shader_parameter/glint_density = 0.065
+shader_parameter/glint_color = Color(0.96, 0.92, 0.76, 1)
+shader_parameter/shore_dark = Color(0.055, 0.13, 0.14, 1)
+shader_parameter/shore_light = Color(0.55, 0.72, 0.63, 1)
+shader_parameter/shore_px = 3.0
+
+[sub_resource type="ShaderMaterial" id="WaterfallImpactMat"]
+shader = ExtResource("9_waterfall")
+shader_parameter/size_px = Vector2(720, 1216)
+shader_parameter/render_part = 1
+shader_parameter/px_size = 4.0
+shader_parameter/center_x = 0.5
+shader_parameter/top_y = 0.08
+shader_parameter/bottom_y = 0.86
+shader_parameter/top_half_width_px = 72.0
+shader_parameter/bottom_half_width_px = 118.0
+shader_parameter/bend_px = 12.0
+shader_parameter/edge_step_px = 24.0
+shader_parameter/edge_wobble_px = 14.0
+shader_parameter/section_height_px = 96.0
+shader_parameter/section_width_wobble_px = 18.0
+shader_parameter/section_center_wobble_px = 12.0
+shader_parameter/anim_fps = 6.0
+shader_parameter/fall_speed_px = 96.0
+shader_parameter/lane_width_px = 8.0
+shader_parameter/streak_period_px = 96.0
+shader_parameter/streak_length_px = 34.0
+shader_parameter/mouth_depth_px = 72.0
+shader_parameter/mouth_highlight_density = 0.34
+shader_parameter/cross_join_density = 0.06
+shader_parameter/flow_highlight_density = 0.18
+shader_parameter/flow_gap_strength = 0.18
+shader_parameter/edge_drop_density = 0.03
+shader_parameter/splash_fps = 6.0
+shader_parameter/splash_cycle_a = 19.0
+shader_parameter/splash_cycle_b = 23.0
+shader_parameter/splash_cycle_c = 29.0
+shader_parameter/splash_active_ratio = 0.58
+shader_parameter/splash_reach_px = 112.0
+shader_parameter/splash_height_px = 54.0
+shader_parameter/entry_white_height_px = 34.0
+shader_parameter/impact_mist_strength = 0.12
+shader_parameter/ripple_period_sec = 5.6
+shader_parameter/ripple_reach_px = 210.0
+shader_parameter/ripple_thickness_px = 4.0
+shader_parameter/ripple_segment_density = 0.32
+shader_parameter/ripple_shadow_strength = 0.3
+shader_parameter/deep_color = Color(0.24, 0.48, 0.52, 0.94)
+shader_parameter/mid_color = Color(0.44, 0.68, 0.68, 0.96)
+shader_parameter/light_color = Color(0.72, 0.86, 0.8, 1)
+shader_parameter/foam_color = Color(0.97, 0.96, 0.86, 1)
+shader_parameter/mist_color = Color(0.72, 0.84, 0.8, 1)
+shader_parameter/ripple_shadow_color = Color(0.09, 0.24, 0.27, 1)
+shader_parameter/body_alpha = 0.84
+shader_parameter/mist_alpha = 0.1
+
+[sub_resource type="ShaderMaterial" id="FogFrontMat"]
+shader = ExtResource("6_fog")
+shader_parameter/fog_color = Color(0.72, 0.79, 0.78, 1)
+shader_parameter/alpha_max = 0.06
+shader_parameter/drift_speed = 0.012
+shader_parameter/scale_x = 2.0
+
 [sub_resource type="ParticleProcessMaterial" id="PetalNearMat"]
 emission_shape = 3
 emission_box_extents = Vector3(1000, 560, 1)
@@ -259,7 +309,7 @@ turbulence_enabled = true
 turbulence_noise_strength = 2.2
 turbulence_noise_scale = 1.3
 
-[node name="Scene2" type="Control"]
+[node name="Scene2" type="Control" unique_id=1429874328]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -268,7 +318,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_stage")
 
-[node name="Sky" type="TextureRect" parent="."]
+[node name="Sky" type="TextureRect" parent="." unique_id=1442831736]
 texture_filter = 1
 material = SubResource("SkyGradeMat")
 layout_mode = 0
@@ -281,7 +331,7 @@ texture = ExtResource("2_sky")
 expand_mode = 1
 metadata/parallax_factor = 0.0
 
-[node name="ValleyGlow" type="ColorRect" parent="."]
+[node name="ValleyGlow" type="ColorRect" parent="." unique_id=241875214]
 material = SubResource("ValleyGlowMat")
 layout_mode = 1
 anchors_preset = 15
@@ -293,99 +343,106 @@ mouse_filter = 2
 color = Color(0, 0, 0, 0)
 metadata/parallax_factor = 0.08
 
-[node name="FarMountainBack" type="TextureRect" parent="."]
+[node name="CloudFar" type="TextureRect" parent="." unique_id=915937751]
+self_modulate = Color(0.82, 0.9, 0.92, 0.24)
 texture_filter = 1
-self_modulate = Color(0.64, 0.75, 0.78, 0.18)
-material = SubResource("FarMountainBackMat")
+material = SubResource("CloudFarMat")
 layout_mode = 0
-offset_left = 180.0
-offset_top = 370.0
-offset_right = 2080.0
-offset_bottom = 900.0
+offset_left = 199.0
+offset_top = -80.0
+offset_right = 1720.0
+offset_bottom = 939.0
 mouse_filter = 2
-texture = ExtResource("13_mountain_far")
+texture = ExtResource("16_cloud_bank")
+expand_mode = 1
+metadata/parallax_factor = 0.02
+metadata/_edit_lock_ = true
+
+[node name="FarMountain" type="TextureRect" parent="." unique_id=180199560]
+self_modulate = Color(0.8, 0.9, 0.94, 0.62)
+texture_filter = 1
+layout_mode = 0
+offset_left = 269.0
+offset_top = 281.0
+offset_right = 1877.0
+offset_bottom = 789.0
+mouse_filter = 2
+texture = ExtResource("13_far_mountain")
 expand_mode = 1
 metadata/parallax_factor = 0.04
+metadata/_edit_lock_ = true
 
-[node name="FarMountainMid" type="TextureRect" parent="."]
+[node name="CloudMid" type="TextureRect" parent="." unique_id=549651714]
+self_modulate = Color(0.84, 0.9, 0.92, 0.22)
 texture_filter = 1
-self_modulate = Color(0.5, 0.66, 0.71, 0.26)
-material = SubResource("FarMountainMidMat")
+material = SubResource("CloudMidMat")
 layout_mode = 0
-offset_left = -460.0
-offset_top = 420.0
-offset_right = 1260.0
-offset_bottom = 920.0
+offset_left = 350.0
+offset_top = 50.0
+offset_right = 1863.0
+offset_bottom = 536.0
 mouse_filter = 2
-texture = ExtResource("13_mountain_far")
+texture = ExtResource("17_cloud_tower")
+expand_mode = 1
+metadata/parallax_factor = 0.06
+metadata/_edit_lock_ = true
+
+[node name="MidMountain" type="TextureRect" parent="." unique_id=1453616768]
+self_modulate = Color(0.76, 0.82, 0.9, 0.72)
+texture_filter = 1
+layout_mode = 0
+offset_left = -53.0
+offset_top = 124.0
+offset_right = 1973.0
+offset_bottom = 876.0
+mouse_filter = 2
+texture = ExtResource("13_mid_mountain")
 expand_mode = 1
 metadata/parallax_factor = 0.08
+metadata/_edit_lock_ = true
 
-[node name="FarMountainNear" type="TextureRect" parent="."]
-texture_filter = 1
-self_modulate = Color(0.44, 0.6, 0.65, 0.34)
-material = SubResource("FarMountainNearMat")
-layout_mode = 0
-offset_left = 360.0
-offset_top = 500.0
-offset_right = 1740.0
-offset_bottom = 930.0
-mouse_filter = 2
-texture = ExtResource("13_mountain_far")
-expand_mode = 1
-metadata/parallax_factor = 0.12
-
-[node name="WaterfallUpper" type="ColorRect" parent="."]
-material = SubResource("WaterfallUpperMat")
-layout_mode = 0
-offset_left = 800.0
-offset_top = -48.0
-offset_right = 1360.0
-offset_bottom = 652.0
-mouse_filter = 2
-color = Color(0, 0, 0, 0)
-metadata/parallax_factor = 0.12
-
-[node name="MountainGate" type="TextureRect" parent="."]
-texture_filter = 1
-self_modulate = Color(0.78, 0.88, 0.9, 0.82)
-material = SubResource("MountainGateMat")
-layout_mode = 0
-offset_left = 790.0
-offset_top = 60.0
-offset_right = 1375.0
-offset_bottom = 822.0
-mouse_filter = 2
-texture = ExtResource("10_mountain_gate")
-expand_mode = 1
-metadata/parallax_factor = 0.13
-
-[node name="WaterfallMiddle" type="ColorRect" parent="."]
-material = SubResource("WaterfallMiddleMat")
-layout_mode = 0
-offset_left = 800.0
-offset_top = 420.0
-offset_right = 1320.0
-offset_bottom = 780.0
-mouse_filter = 2
-color = Color(0, 0, 0, 0)
-metadata/parallax_factor = 0.22
-
-[node name="MountainLeft" type="TextureRect" parent="."]
-texture_filter = 1
-self_modulate = Color(0.9, 0.94, 0.88, 1)
-material = SubResource("MountainLeftMat")
+[node name="WaterfallLeft" type="ColorRect" parent="." unique_id=1153043618]
+material = SubResource("WaterfallLeftMat")
 layout_mode = 0
 offset_left = -80.0
-offset_top = -10.0
-offset_right = 448.0
-offset_bottom = 830.0
+offset_top = -96.0
+offset_right = 640.0
+offset_bottom = 1120.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+metadata/parallax_factor = 0.18
+metadata/_edit_lock_ = true
+
+[node name="MountainRight" type="TextureRect" parent="." unique_id=538937722]
+self_modulate = Color(0.9, 0.94, 0.9, 0.92)
+texture_filter = 1
+material = SubResource("MountainRightMat")
+layout_mode = 0
+offset_left = 1792.0
+offset_top = -70.0
+offset_right = 2423.0
+offset_bottom = 931.0
+mouse_filter = 2
+texture = ExtResource("10_mountain_right")
+expand_mode = 1
+metadata/parallax_factor = 0.24
+
+[node name="MountainLeft" type="TextureRect" parent="." unique_id=382036763]
+self_modulate = Color(0.94, 0.96, 0.92, 0.96)
+texture_filter = 1
+material = SubResource("MountainLeftMat")
+layout_mode = 0
+offset_left = -30.0
+offset_top = -12.0
+offset_right = 374.16666
+offset_bottom = 721.3333
+scale = Vector2(1.2, 1.2)
 mouse_filter = 2
 texture = ExtResource("11_mountain_left")
 expand_mode = 1
-metadata/parallax_factor = 0.26
+metadata/parallax_factor = 0.24
 
-[node name="HorizonHaze" type="ColorRect" parent="."]
+[node name="HorizonHaze" type="ColorRect" parent="." unique_id=1497906305]
 material = SubResource("HazeMat")
 layout_mode = 1
 anchors_preset = 15
@@ -396,8 +453,9 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(0, 0, 0, 0)
 metadata/parallax_factor = 0.38
+metadata/_edit_lock_ = true
 
-[node name="PetalFar" type="GPUParticles2D" parent="."]
+[node name="PetalFar" type="GPUParticles2D" parent="." unique_id=1545083655]
 position = Vector2(960, 560)
 amount = 26
 texture = SubResource("PetalTex")
@@ -406,76 +464,88 @@ preprocess = 10.0
 local_coords = true
 process_material = SubResource("PetalFarMat")
 metadata/parallax_factor = 0.48
+metadata/_edit_lock_ = true
 
-[node name="BlossomTree" type="TextureRect" parent="."]
-texture_filter = 1
-self_modulate = Color(0.92, 0.94, 0.9, 0.96)
+[node name="DistantWater" type="ColorRect" parent="." unique_id=1613996257]
+visible = false
 layout_mode = 0
-offset_left = 1240.0
-offset_top = 296.0
-offset_right = 2020.0
-offset_bottom = 756.0
+offset_left = -48.0
+offset_top = 845.0
+offset_right = 1968.0
+offset_bottom = 910.0
+mouse_filter = 2
+color = Color(0.32, 0.44, 0.46, 1)
+metadata/parallax_factor = 0.72
+metadata/_edit_lock_ = true
+
+[node name="BlossomTree" type="TextureRect" parent="." unique_id=2042747557]
+self_modulate = Color(0.92, 0.94, 0.9, 0.92)
+texture_filter = 1
+layout_mode = 0
+offset_left = 1044.0
+offset_top = 199.0
+offset_right = 2032.0
+offset_bottom = 733.0
 mouse_filter = 2
 texture = ExtResource("12_blossom_tree")
 expand_mode = 1
 metadata/parallax_factor = 0.48
+metadata/_edit_lock_ = true
 
-[node name="WaterfallLower" type="ColorRect" parent="."]
-material = SubResource("WaterfallLowerMat")
-layout_mode = 0
-offset_left = 580.0
-offset_top = 620.0
-offset_right = 1140.0
-offset_bottom = 920.0
-mouse_filter = 2
-color = Color(0, 0, 0, 0)
-metadata/parallax_factor = 0.42
-
-[node name="DistantWater" type="ColorRect" parent="."]
-layout_mode = 0
-offset_left = -48.0
-offset_top = 795.0
-offset_right = 1968.0
-offset_bottom = 870.0
-mouse_filter = 2
-color = Color(0.32, 0.44, 0.46, 1)
-metadata/parallax_factor = 0.72
-
-[node name="StoneBridge" type="TextureRect" parent="."]
+[node name="StoneBridge" type="TextureRect" parent="." unique_id=902533153]
+self_modulate = Color(0.9, 0.9, 0.9, 1)
 texture_filter = 1
 layout_mode = 0
-offset_left = -50.0
-offset_top = 650.0
-offset_right = 1970.0
-offset_bottom = 1119.0
+offset_left = -38.0
+offset_top = 685.0
+offset_right = 1960.998
+offset_bottom = 1069.9988
 mouse_filter = 2
 texture = ExtResource("8_bridge")
 expand_mode = 1
+flip_h = true
 metadata/parallax_factor = 1.0
+metadata/p1_support_source = Vector2(186, 9)
+metadata/p2_support_source = Vector2(49, 5)
+metadata/_edit_lock_ = true
 
-[node name="River" type="ColorRect" parent="."]
+[node name="River" type="ColorRect" parent="." unique_id=2137317883]
 material = SubResource("RiverMat")
 layout_mode = 0
 offset_left = -48.0
-offset_top = 870.0
+offset_top = 867.46
 offset_right = 1968.0
-offset_bottom = 1075.0
+offset_bottom = 1084.5515
 mouse_filter = 2
 color = Color(0, 0, 0, 0)
 metadata/parallax_factor = 1.18
+metadata/_edit_lock_ = true
 
-[node name="FogFront" type="ColorRect" parent="."]
+[node name="WaterfallImpactLeft" type="ColorRect" parent="." unique_id=1166628567]
+material = SubResource("WaterfallImpactMat")
+layout_mode = 0
+offset_left = -80.0
+offset_top = -96.0
+offset_right = 640.0
+offset_bottom = 1120.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+metadata/parallax_factor = 0.18
+metadata/_edit_lock_ = true
+
+[node name="FogFront" type="ColorRect" parent="." unique_id=1843815292]
 material = SubResource("FogFrontMat")
 layout_mode = 0
 offset_left = -80.0
-offset_top = 870.0
+offset_top = 910.0
 offset_right = 2000.0
-offset_bottom = 1030.0
+offset_bottom = 1070.0
 mouse_filter = 2
 color = Color(0, 0, 0, 0)
 metadata/parallax_factor = 1.5
+metadata/_edit_lock_ = true
 
-[node name="PetalNear" type="GPUParticles2D" parent="."]
+[node name="PetalNear" type="GPUParticles2D" parent="." unique_id=1399044524]
 position = Vector2(960, 640)
 amount = 9
 texture = SubResource("PetalTex")
@@ -484,3 +554,4 @@ preprocess = 7.0
 local_coords = true
 process_material = SubResource("PetalNearMat")
 metadata/parallax_factor = 1.45
+metadata/_edit_lock_ = true

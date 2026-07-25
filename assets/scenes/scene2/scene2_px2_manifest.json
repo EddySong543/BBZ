@@ -1,0 +1,45 @@
+{
+  "schema": "bbz.scene2-px2.v1",
+  "logical_pixel_scale": 2,
+  "filter": "nearest",
+  "resampling": "premultiplied-box",
+  "dither": "none",
+  "assets": [
+    {
+      "source": "assets/scenes/scene2/scene2_mountain_gate.png",
+      "output": "assets/scenes/scene2/scene2_mountain_gate_px2.png",
+      "width": 293,
+      "height": 381,
+      "palette_colors": 48,
+      "alpha_threshold": 96,
+      "logical_size": [
+        293,
+        381
+      ],
+      "display_size": [
+        586,
+        762
+      ],
+      "source_sha256": "0d9581fb5758d391f5f978302ce2b0488633dbe9584b962a837e2eb2c47862cd",
+      "output_sha256": "f1b7a32da171466252fff5f88461311fc63dd65974ac1ef0baf359576de454b7"
+    },
+    {
+      "source": "assets/scenes/scene2/scene2_mountain_left.png",
+      "output": "assets/scenes/scene2/scene2_mountain_left_px2.png",
+      "width": 264,
+      "height": 420,
+      "palette_colors": 48,
+      "alpha_threshold": 96,
+      "logical_size": [
+        264,
+        420
+      ],
+      "display_size": [
+        528,
+        840
+      ],
+      "source_sha256": "9795c4ff641c85212ade2494429769ae4df60b1dabe7bc1f6655e3a6661e2c30",
+      "output_sha256": "1445bbe22e2f9f60af0053dd03b1da44228490994a2e267d64752d1a2057310d"
+    }
+  ]
+}
