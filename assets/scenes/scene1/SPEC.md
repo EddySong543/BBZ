@@ -15,6 +15,8 @@
 | `FarRooftops` | `Scene1_FarRooftops.png` | 0.18 | 远处屋脊/塔尖剪影，雾化 | ⬜ 未做 |
 | `MidRooftops` | `Scene1_MidRooftops.png` | 0.32 | 近一层飞檐/灯笼/旗幡剪影（越近越暗） | ⬜ 未做 |
 | `Rooftop` | `Scene1_Rooftop.png` | 1.0 同步 | **两人脚下的瓦屋脊台面**（角色站其上） | ✅ 已接入（400×160） |
+| `BambooLeft` | `scene1_bamboo_left.png` | 1.25 | 左侧近景竹丛，2× 整数显示，夜景植被调色 | ✅ 已接入 |
+| `BambooRight` | `scene1_bamboo_right.png` | 1.25 | 右侧近景竹丛，2× 整数显示，夜景植被调色 | ✅ 已接入 |
 | `Foreground`(可选) | `Scene1_Foreground.png` | 1.15 | 飘叶/浮尘/近景檐角虚焦（少量即可） | ⬜ 未做 |
 
 > 加新层 = 在 `scene1.tscn` 里加一个 TextureRect 子节点、设 `metadata/parallax_factor`、拖图。
@@ -40,6 +42,20 @@
 - 天空：`only midnight sky gradient deep indigo to black, subtle stars, no buildings, no moon, seamless`
 - 明月：`only a full moon with soft glow, transparent background, isolated`
 - 屋脊台面：`only east-asian tiled roof ridge top surface, side view, transparent background, no sky`
+
+## 竹林三级景深（2026-07-23）
+
+Scene1 复用 `scene1_bamboo_left.png` 与 `scene1_bamboo_right.png`，不制作额外烘焙背景：
+
+| 景深 | 节点 | 视差 | 处理 |
+|---|---|---:|---|
+| 远景 | `BambooFarLeft`、`BambooFarRight` | 0.34 | 分别使用 `scene1_bamboo_far_left.png`、`scene1_bamboo_far_right.png`；每张只实例化一次，低透明、低饱和、1.2 纹理像素离散失焦，并由 `HorizonHaze` 再次压低对比 |
+| 主框景 | `BambooLeft`、`BambooRight` | 1.25 | 完全不透明、最近邻、无失焦、等比整数缩放、靛蓝阴影补色与朝向月亮的单侧边缘光 |
+
+四个节点均使用 `canvas_env_night_foliage.gdshader`。两张远竹 PNG 的棋盘格背景
+已经烘焙进 RGB，因此仅远竹材质启用 `background_key_strength = 1` 剔除高亮中性色；
+主竹保持 `0`。主竹可以在 Godot 中继续移动，但调整尺寸时必须保持源宽高比：
+左竹 `1:2`，右竹 `1:4`，否则像素会横纵变形。
 
 ## 生成器去处
 

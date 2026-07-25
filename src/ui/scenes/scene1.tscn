@@ -20,6 +20,11 @@
 [ext_resource type="Shader" uid="uid://bqm3unqvn44w4" path="res://assets/shaders/canvas_fx_cloud_night.gdshader" id="32_cloudnight"]
 [ext_resource type="Shader" uid="uid://dnupmvywe72c3" path="res://assets/shaders/canvas_env_aurora.gdshader" id="33_aurora"]
 [ext_resource type="Shader" uid="uid://cv83tnyft8xbi" path="res://assets/shaders/canvas_env_eclipse.gdshader" id="34_eclipse"]
+[ext_resource type="Texture2D" uid="uid://880jkry46xe5" path="res://assets/scenes/scene1/scene1_bamboo_left.png" id="35_bamboo_left"]
+[ext_resource type="Texture2D" uid="uid://cbgllfb40h8kr" path="res://assets/scenes/scene1/scene1_bamboo_right.png" id="36_bamboo_right"]
+[ext_resource type="Shader" uid="uid://42gb8epy0ibb" path="res://assets/shaders/canvas_env_night_foliage.gdshader" id="37_foliage"]
+[ext_resource type="Texture2D" uid="uid://duss4na41xb0p" path="res://assets/scenes/scene1/scene1_bamboo_far_left.png" id="38_bamboo_far_left"]
+[ext_resource type="Texture2D" uid="uid://dngi341uaiyt2" path="res://assets/scenes/scene1/scene1_bamboo_far_right.png" id="39_bamboo_far_right"]
 
 [sub_resource type="ShaderMaterial" id="SkyMat"]
 shader = ExtResource("3_sky")
@@ -151,6 +156,46 @@ shader_parameter/blur_amount = 0.7
 shader_parameter/silhouette = 0.0
 shader_parameter/brightness = 1.0
 
+[sub_resource type="ShaderMaterial" id="BambooFarLeftMat"]
+resource_local_to_scene = true
+shader = ExtResource("37_foliage")
+shader_parameter/night_tint = Color(0.24, 0.36, 0.62, 1)
+shader_parameter/tint_strength = 1.0
+shader_parameter/saturation = 0.2
+shader_parameter/brightness = 0.110000005225
+shader_parameter/alpha_scale = 1.0
+shader_parameter/blur_amount = 4.0
+shader_parameter/shadow_tint = Color(0.09, 0.13, 0.24, 1)
+shader_parameter/shadow_lift = 0.18
+shader_parameter/rim_tint = Color(0.42, 0.62, 0.94, 1)
+shader_parameter/rim_strength = 1.0
+shader_parameter/rim_side = 1.0
+shader_parameter/rim_width = 4.0
+shader_parameter/background_key_strength = 1.0
+shader_parameter/background_key_luma_min = 0.86
+shader_parameter/background_key_luma_max = 0.95
+shader_parameter/background_key_chroma_max = 0.08
+
+[sub_resource type="ShaderMaterial" id="BambooFarRightMat"]
+resource_local_to_scene = true
+shader = ExtResource("37_foliage")
+shader_parameter/night_tint = Color(0.24, 0.36, 0.62, 1)
+shader_parameter/tint_strength = 1.0
+shader_parameter/saturation = 0.3590000170525
+shader_parameter/brightness = 0.2170000103075
+shader_parameter/alpha_scale = 0.8550000406125
+shader_parameter/blur_amount = 4.0
+shader_parameter/shadow_tint = Color(0.09, 0.13, 0.24, 1)
+shader_parameter/shadow_lift = 0.18
+shader_parameter/rim_tint = Color(0.42, 0.62, 0.94, 1)
+shader_parameter/rim_strength = 1.0
+shader_parameter/rim_side = -1.0
+shader_parameter/rim_width = 4.0
+shader_parameter/background_key_strength = 1.0
+shader_parameter/background_key_luma_min = 0.86
+shader_parameter/background_key_luma_max = 0.95
+shader_parameter/background_key_chroma_max = 0.08
+
 [sub_resource type="ShaderMaterial" id="HazeMat"]
 shader = ExtResource("10_haze")
 shader_parameter/haze_color = Color(0.16, 0.22, 0.34, 1)
@@ -205,6 +250,46 @@ shader = ExtResource("20_boxblur")
 shader_parameter/blur_amount = 0.7
 shader_parameter/silhouette = 0.0
 shader_parameter/brightness = 1.0
+
+[sub_resource type="ShaderMaterial" id="BambooLeftMat"]
+resource_local_to_scene = true
+shader = ExtResource("37_foliage")
+shader_parameter/night_tint = Color(0.34, 0.5, 0.8, 1)
+shader_parameter/tint_strength = 0.72
+shader_parameter/saturation = 0.32
+shader_parameter/brightness = 0.76
+shader_parameter/alpha_scale = 1.0
+shader_parameter/blur_amount = 0.0
+shader_parameter/shadow_tint = Color(0.065, 0.09, 0.17, 1)
+shader_parameter/shadow_lift = 0.38
+shader_parameter/rim_tint = Color(0.42, 0.66, 1, 1)
+shader_parameter/rim_strength = 0.22
+shader_parameter/rim_side = 1.0
+shader_parameter/rim_width = 2.0
+shader_parameter/background_key_strength = 0.0
+shader_parameter/background_key_luma_min = 0.86
+shader_parameter/background_key_luma_max = 0.95
+shader_parameter/background_key_chroma_max = 0.08
+
+[sub_resource type="ShaderMaterial" id="BambooRightMat"]
+resource_local_to_scene = true
+shader = ExtResource("37_foliage")
+shader_parameter/night_tint = Color(0.34, 0.5, 0.8, 1)
+shader_parameter/tint_strength = 0.72
+shader_parameter/saturation = 0.32
+shader_parameter/brightness = 0.72
+shader_parameter/alpha_scale = 1.0
+shader_parameter/blur_amount = 0.0
+shader_parameter/shadow_tint = Color(0.065, 0.09, 0.17, 1)
+shader_parameter/shadow_lift = 0.38
+shader_parameter/rim_tint = Color(0.42, 0.66, 1, 1)
+shader_parameter/rim_strength = 0.22
+shader_parameter/rim_side = -1.0
+shader_parameter/rim_width = 2.0
+shader_parameter/background_key_strength = 0.0
+shader_parameter/background_key_luma_min = 0.86
+shader_parameter/background_key_luma_max = 0.95
+shader_parameter/background_key_chroma_max = 0.08
 
 [sub_resource type="ShaderMaterial" id="RfRFocusMat"]
 shader = ExtResource("20_boxblur")
@@ -531,6 +616,32 @@ expand_mode = 1
 metadata/parallax_factor = 0.28
 metadata/_edit_lock_ = true
 
+[node name="BambooFarLeft" type="TextureRect" parent="." unique_id=1165918192]
+texture_filter = 2
+material = SubResource("BambooFarLeftMat")
+layout_mode = 0
+offset_left = -832.0
+offset_top = 3.0
+offset_right = 187.94897
+offset_bottom = 903.0
+mouse_filter = 2
+texture = ExtResource("38_bamboo_far_left")
+expand_mode = 1
+metadata/parallax_factor = 0.34
+
+[node name="BambooFarRight" type="TextureRect" parent="." unique_id=2078880936]
+texture_filter = 2
+material = SubResource("BambooFarRightMat")
+layout_mode = 0
+offset_left = 1727.0
+offset_top = 1.0
+offset_right = 2400.913
+offset_bottom = 901.0
+mouse_filter = 2
+texture = ExtResource("39_bamboo_far_right")
+expand_mode = 1
+metadata/parallax_factor = 0.34
+
 [node name="HorizonHaze" type="ColorRect" parent="." unique_id=1841776131]
 material = SubResource("HazeMat")
 layout_mode = 1
@@ -570,6 +681,32 @@ expand_mode = 1
 flip_h = true
 metadata/parallax_factor = 0.85
 metadata/_edit_lock_ = true
+
+[node name="BambooLeft" type="TextureRect" parent="." unique_id=1099596771]
+texture_filter = 1
+material = SubResource("BambooLeftMat")
+layout_mode = 0
+offset_left = -273.0
+offset_top = -66.0
+offset_right = 239.0
+offset_bottom = 958.0
+mouse_filter = 2
+texture = ExtResource("35_bamboo_left")
+expand_mode = 1
+metadata/parallax_factor = 1.25
+
+[node name="BambooRight" type="TextureRect" parent="." unique_id=1499657434]
+texture_filter = 1
+material = SubResource("BambooRightMat")
+layout_mode = 0
+offset_left = 1640.0
+offset_top = -340.0
+offset_right = 2080.0
+offset_bottom = 1172.0
+mouse_filter = 2
+texture = ExtResource("36_bamboo_right")
+expand_mode = 1
+metadata/parallax_factor = 1.25
 
 [node name="RooftopR" type="TextureRect" parent="." unique_id=50263200]
 self_modulate = Color(0.46, 0.53, 0.7, 1)
