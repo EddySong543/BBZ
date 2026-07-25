@@ -37,7 +37,9 @@ PowerShell 全量测试命令：
 接管开始时有一组未完成的 Battle UI 修改。它们不属于接管任务，接管整理不得覆盖、回滚、提交或擅自删除：
 
 - `src/ui/battle_screen.gd`
-- `src/ui/battle_screen.tscn`
+- `src/ui/battle_screen_base.tscn`（共享组合）
+- `src/ui/battle_screen1.tscn`（Scene1 正式入口）
+- `src/ui/battle_screen2.tscn`（Scene2 独立入口）
 - `src/ui/components/death_switch_overlay.gd`
 - `src/ui/components/hero_frame.gd`
 - `src/ui/components/hp_slant_bar.gd`

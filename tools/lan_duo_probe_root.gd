@@ -82,7 +82,7 @@ func _die(msg: String) -> void:
 
 ## 转场幸存者：挂树根 → 等真战斗屏就位 → 断言双端「玩家0=自己」→ 截图 → 打标记退出。
 class Survivor extends Node:
-	const BATTLE_PATH := "res://src/ui/battle_screen.tscn"
+	const BATTLE_PATH := "res://src/ui/battle_screen1.tscn"
 
 	var role := ""
 	var shot := ""

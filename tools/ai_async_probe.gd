@@ -7,7 +7,7 @@ extends Node
 
 
 func _ready() -> void:
-	var s: Node = load("res://src/ui/battle_screen.tscn").instantiate()
+	var s: Node = load("res://src/ui/battle_screen1.tscn").instantiate()
 	add_child(s)
 	await get_tree().create_timer(2.5).timeout   # 进选择态 + 首次预想启动
 

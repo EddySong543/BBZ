@@ -18,7 +18,7 @@ func _ready() -> void:
 		{"name": "游侠·占位", "hp": 10, "hp_max": 10},
 	]
 	BattleSetup.pve_equipment = ["t1_feibiao", "t1_jiudun"]
-	var screen := (load("res://src/ui/battle_screen.tscn") as PackedScene).instantiate()
+	var screen := (load("res://src/ui/battle_screen1.tscn") as PackedScene).instantiate()
 	add_child(screen)
 	await get_tree().create_timer(3.2).timeout   # 等入场动画+回合开始横幅过去（明牌已挂出）
 	await _shot(OUT)

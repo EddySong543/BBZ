@@ -8,7 +8,7 @@ extends Control
 ## 会话经 BattleSetup.net_session 交接给 battle_screen（其退场时负责 close+置空）。BP 博弈联机化=后续。
 
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
-const BATTLE_SCENE := "res://src/ui/battle_screen.tscn"
+const BATTLE_SCENE := "res://src/ui/battle_screen1.tscn"
 const HERO_DATA_DIR := "res://assets/data/heroes/"
 const NetSession := preload("res://src/net/net_session.gd")
 const NetProtocol := preload("res://src/net/net_protocol.gd")

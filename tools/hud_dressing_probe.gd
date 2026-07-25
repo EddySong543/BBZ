@@ -8,7 +8,7 @@ extends Node
 func _ready() -> void:
 	get_window().size = Vector2i(1920, 1080)
 	get_window().position = Vector2i(0, 0)
-	var s: Node = (load("res://src/ui/battle_screen.tscn") as PackedScene).instantiate()
+	var s: Node = (load("res://src/ui/battle_screen1.tscn") as PackedScene).instantiate()
 	add_child(s)
 	await get_tree().create_timer(0.6).timeout
 	await _snap("D:/Game/BoBoZan/hud_intro.png")

@@ -1,3 +1,4 @@
+@tool
 class_name HeroFrame
 extends Panel
 
@@ -531,6 +532,9 @@ class DeathCross extends Control:
 ## 选择弹跳动画：选中=带 overshoot 放大(像底部按钮 ButtonJuice)；取消=回弹归位。
 func _play_select_pop(on: bool) -> void:
 	pivot_offset = size * 0.5
+	if Engine.is_editor_hint():
+		scale = Vector2.ONE * 1.12 if on else Vector2.ONE
+		return
 	if _sel_tween and _sel_tween.is_valid():
 		_sel_tween.kill()
 	_sel_tween = create_tween()

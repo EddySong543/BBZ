@@ -11,7 +11,7 @@ const DraftPopup := preload("res://src/ui/components/item_draft_popup.gd")
 
 
 func _ready() -> void:
-	var s: Node = load("res://src/ui/battle_screen.tscn").instantiate()
+	var s: Node = load("res://src/ui/battle_screen1.tscn").instantiate()
 	add_child(s)
 	await get_tree().create_timer(2.2).timeout
 	# ① 攒按钮提示

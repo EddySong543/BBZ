@@ -12,7 +12,7 @@ func _ready() -> void:
 	# （踩过：P2 侧裁图全黑）。scene2_shot_runner 同款处理。
 	get_window().size = Vector2i(1920, 1080)
 	get_window().position = Vector2i(0, 0)
-	var s: Node = load("res://src/ui/battle_screen.tscn").instantiate()
+	var s: Node = load("res://src/ui/battle_screen1.tscn").instantiate()
 	add_child(s)
 	await get_tree().create_timer(2.2).timeout   # 等进入选择态（按钮 + 道具栏可见）
 	await RenderingServer.frame_post_draw

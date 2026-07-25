@@ -56,7 +56,7 @@ func _ready() -> void:
 	await _rt(0.1)
 
 	# —— ④ 真战斗：注入敌方残血 + 我方满能 → 大波速胜 → story_result 写回 ——
-	var b: Node = load("res://src/ui/battle_screen.tscn").instantiate()
+	var b: Node = load("res://src/ui/battle_screen1.tscn").instantiate()
 	add_child(b)
 	await _rt(2.2)   # 等进入选择态
 	if not bool(b._story):

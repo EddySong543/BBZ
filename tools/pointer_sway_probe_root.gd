@@ -11,7 +11,7 @@ const OUT_R := "D:/Game/BoBoZan/pointer_sway_right.png"
 
 
 func _ready() -> void:
-	var s: Node = load("res://src/ui/battle_screen.tscn").instantiate()
+	var s: Node = load("res://src/ui/battle_screen1.tscn").instantiate()
 	add_child(s)
 	await get_tree().create_timer(2.2).timeout   # 等进入选择态
 	# 直接注入偏移状态而非 warp 鼠标：物理鼠标的移动事件会覆盖 warp（跑探针时人手碰鼠标

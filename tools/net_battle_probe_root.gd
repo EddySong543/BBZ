@@ -66,7 +66,7 @@ func _ready() -> void:
 
 	# —— 拉起真战斗屏（联机模式·加入方视角）——
 	BattleSetup.net_session = ses
-	var s: Node = load("res://src/ui/battle_screen.tscn").instantiate()
+	var s: Node = load("res://src/ui/battle_screen1.tscn").instantiate()
 	add_child(s)
 	await _rt(2.4)   # 回合开场 → 选择态（探针持续 _process 泵房主侧）
 	# 翻转断言：自己队（屏幕玩家0位）= 加入方阵容 h02

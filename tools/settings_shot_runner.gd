@@ -9,7 +9,7 @@ const ProbeOutput := preload("res://tools/probe_output.gd")
 
 
 func _ready() -> void:
-	var s: Node = load("res://src/ui/battle_screen.tscn").instantiate()
+	var s: Node = load("res://src/ui/battle_screen1.tscn").instantiate()
 	add_child(s)
 	await get_tree().create_timer(2.2).timeout
 	await RenderingServer.frame_post_draw

@@ -11,7 +11,7 @@ const OUT_END := "D:/Game/BoBoZan/finisher_end.png"
 
 
 func _ready() -> void:
-	var s: Node = load("res://src/ui/battle_screen.tscn").instantiate()
+	var s: Node = load("res://src/ui/battle_screen1.tscn").instantiate()
 	add_child(s)
 	await get_tree().create_timer(2.2, true, false, true).timeout   # 等进入选择态
 	s._play_finisher([0, 4], true, false)

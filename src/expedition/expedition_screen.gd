@@ -1097,7 +1097,7 @@ func _enter_real_battle(c: Vector2i, is_wanderer: bool) -> void:
 	BattleSetup.expedition_state = {"map": map, "bp": bp, "pending": pending, "log": log_lines,
 		"seed": seed_value, "tile": c, "wanderer": is_wanderer, "flee_from": pending_flee_from,
 		"hero_portrait": hero_portrait_path}
-	TransitionManager.transition_to("res://src/ui/battle_screen.tscn")
+	TransitionManager.transition_to("res://src/ui/battle_screen1.tscn")
 
 
 func _after_battle(report: Dictionary) -> void:

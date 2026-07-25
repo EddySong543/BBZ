@@ -10,7 +10,7 @@ extends Control
 ## UI 只读进度对象与关卡表，不持有战斗状态；关卡内容全数据驱动（levels.json）。
 
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
-const BATTLE_SCENE := "res://src/ui/battle_screen.tscn"
+const BATTLE_SCENE := "res://src/ui/battle_screen1.tscn"
 const HERO_DATA_DIR := "res://assets/data/heroes/"
 const StoryCatalog := preload("res://src/story/story_catalog.gd")
 const StoryProgress := preload("res://src/story/story_progress.gd")

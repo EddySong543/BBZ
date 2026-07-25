@@ -720,7 +720,7 @@ func _start_battle() -> void:
 	BattleSetup.p1_heroes = p1_lineup
 	BattleSetup.p2_heroes = p2_lineup
 	# 波幕转场（2A）：胜方色波卷入 → 切 battle → 波退去揭幕（battle 多风格 scene 通用）
-	TransitionManager.transition_to("res://src/ui/battle_screen.tscn")
+	TransitionManager.transition_to("res://src/ui/battle_screen1.tscn")
 
 
 # ============================================================

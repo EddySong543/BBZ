@@ -10,7 +10,7 @@ const OUT := "D:/Game/BoBoZan/"
 
 
 func _ready() -> void:
-	var s: Node = load("res://src/ui/battle_screen.tscn").instantiate()
+	var s: Node = load("res://src/ui/battle_screen1.tscn").instantiate()
 	add_child(s)
 	await get_tree().create_timer(2.2).timeout
 	# 真死状态模拟（2026-07-18 站立 idle 回归修）：把 P2 出战位 HP 置 0 → 结算尾的

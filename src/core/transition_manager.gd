@@ -7,7 +7,7 @@ extends CanvasLayer
 ## 颜色与推进方向继承 boot 对波胜方（BootResult），与菜单/BP 波流背景同语系。
 ##
 ## 用法（公共 API）：
-##   TransitionManager.transition_to("res://src/ui/battle_screen.tscn")
+##   TransitionManager.transition_to("res://src/ui/battle_screen1.tscn")
 ##   # 即发即忘；转场期间波幕拦截输入防连点，重复调用被忽略（is_busy() 可查）。
 
 const WAVE_SHADER := preload("res://assets/shaders/canvas_transition_wave.gdshader")

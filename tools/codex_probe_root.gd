@@ -10,7 +10,7 @@ const OUT_ITEM := "D:/Game/BoBoZan/codex_shot_3_item.png"
 
 
 func _ready() -> void:
-	var s: Node = load("res://src/ui/battle_screen.tscn").instantiate()
+	var s: Node = load("res://src/ui/battle_screen1.tscn").instantiate()
 	add_child(s)
 	await get_tree().create_timer(2.2).timeout   # 等进入选择态
 	await _snap(OUT_BTN)

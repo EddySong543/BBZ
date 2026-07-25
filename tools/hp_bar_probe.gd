@@ -16,7 +16,7 @@ var _battle: Variant
 
 
 func _ready() -> void:
-	_screen = load("res://src/ui/battle_screen.tscn").instantiate()
+	_screen = load("res://src/ui/battle_screen1.tscn").instantiate()
 	add_child(_screen)
 	await get_tree().create_timer(2.2).timeout
 	_battle = _screen.get("battle")

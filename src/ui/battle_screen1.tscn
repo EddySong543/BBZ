@@ -1,0 +1,54 @@
+[gd_scene format=3 uid="uid://cugfrgv3ia0ap"]
+
+[ext_resource type="PackedScene" uid="uid://bn0rjf1qjld17" path="res://src/ui/battle_screen_base.tscn" id="1_base"]
+[ext_resource type="PackedScene" uid="uid://cscn1rftp00a" path="res://src/ui/scenes/scene1.tscn" id="2_scene1"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_r54sr"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_hy7mk"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_we7sp"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_qwbnm"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_xami6"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_1i8qo"]
+
+[node name="BattleScreen1" unique_id=148182646 instance=ExtResource("1_base")]
+
+[node name="Stage" parent="StageSlot" parent_id_path=PackedInt32Array(924300025) index="0" unique_id=1509533957 instance=ExtResource("2_scene1")]
+layout_mode = 1
+mouse_filter = 2
+pointer_parallax = true
+demo_click_shake = false
+
+[node name="P1Frame0" parent="P1Hud" parent_id_path=PackedInt32Array(1074064709) index="2" unique_id=2129820687]
+offset_right = 98.0
+offset_bottom = 76.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_r54sr")
+
+[node name="P1Frame1" parent="P1Hud" parent_id_path=PackedInt32Array(1074064709) index="3" unique_id=1566007647]
+offset_right = 744.0
+offset_bottom = 74.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_hy7mk")
+
+[node name="P1Frame2" parent="P1Hud" parent_id_path=PackedInt32Array(1074064709) index="5" unique_id=1208252427]
+offset_right = 664.0
+offset_bottom = 74.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_we7sp")
+
+[node name="P2Frame0" parent="P2Hud" parent_id_path=PackedInt32Array(1758094651) index="2" unique_id=1770616061]
+offset_right = 1886.0
+offset_bottom = 76.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_qwbnm")
+
+[node name="P2Frame1" parent="P2Hud" parent_id_path=PackedInt32Array(1758094651) index="3" unique_id=1621653890]
+offset_right = 1258.0
+offset_bottom = 74.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_xami6")
+
+[node name="P2Frame2" parent="P2Hud" parent_id_path=PackedInt32Array(1758094651) index="5" unique_id=1695379356]
+offset_right = 1338.0
+offset_bottom = 74.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_1i8qo")

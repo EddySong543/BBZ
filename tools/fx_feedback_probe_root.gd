@@ -12,7 +12,7 @@ const OUT_DIR := "D:/Game/BoBoZan/"
 
 
 func _ready() -> void:
-	var s: Node = load("res://src/ui/battle_screen.tscn").instantiate()
+	var s: Node = load("res://src/ui/battle_screen1.tscn").instantiate()
 	add_child(s)
 	await _rt(2.2)   # 等进入选择态
 	var fails: Array[String] = []

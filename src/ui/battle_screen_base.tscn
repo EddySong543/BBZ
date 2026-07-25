@@ -6,7 +6,6 @@
 [ext_resource type="PackedScene" uid="uid://b1iconpiprow0" path="res://src/ui/components/icon_pip_row.tscn" id="4_piprow"]
 [ext_resource type="PackedScene" path="res://src/ui/components/hp_slant_bar.tscn" id="5_hpbar"]
 [ext_resource type="PackedScene" path="res://src/ui/components/death_switch_overlay.tscn" id="6_death"]
-[ext_resource type="PackedScene" uid="uid://cscn1rftp00a" path="res://src/ui/scenes/scene1.tscn" id="7_stage"]
 [ext_resource type="Shader" uid="uid://dnycv6j3wn0ot" path="res://assets/shaders/post_fx_color_grade.gdshader" id="8_postfx"]
 [ext_resource type="PackedScene" uid="uid://bforedustcmp" path="res://src/ui/components/fore_dust.tscn" id="12_foredust"]
 [ext_resource type="Texture2D" uid="uid://dmk21cawlx7uf" path="res://assets/ui/icons/energy_idle.png" id="14_coin"]
@@ -187,7 +186,7 @@ shader_parameter/wear = 0.24
 shader_parameter/solid_rim = true
 shader_parameter/rim_px = 1.5
 
-[node name="BattleScreen" type="Control" unique_id=1618077294]
+[node name="BattleScreenBase" type="Control" unique_id=1618077294]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -196,11 +195,14 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_battle_gd")
 
-[node name="Stage" parent="." unique_id=924300025 instance=ExtResource("7_stage")]
+[node name="StageSlot" type="Control" parent="." unique_id=924300025]
 layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 mouse_filter = 2
-pointer_parallax = true
-demo_click_shake = false
 
 [node name="FinisherGrab" type="BackBufferCopy" parent="." unique_id=2109875562]
 copy_mode = 0

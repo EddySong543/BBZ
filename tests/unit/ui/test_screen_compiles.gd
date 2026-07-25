@@ -28,7 +28,7 @@ func test_item_gallery_fill_overdraws_new_frame_inner_edge() -> void:
 func test_battle_reserve_avatar_click_still_arms_active_switch() -> void:
 	# 头像框换皮是纯视觉改动；己方替补框的成熟主动换人入口必须继续可点。
 	BattleSetup.reset()
-	var packed := load("res://src/ui/battle_screen.tscn") as PackedScene
+	var packed := load("res://src/ui/battle_screen1.tscn") as PackedScene
 	var screen := packed.instantiate()
 	add_child_autofree(screen)
 	await get_tree().process_frame

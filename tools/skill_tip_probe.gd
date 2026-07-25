@@ -13,7 +13,7 @@ const OUT_TIP_P2_ITEM := "D:/Game/BoBoZan/skill_info_tip_p2_item.png"
 
 
 func _ready() -> void:
-	var s: Node = load("res://src/ui/battle_screen.tscn").instantiate()
+	var s: Node = load("res://src/ui/battle_screen1.tscn").instantiate()
 	add_child(s)
 	await get_tree().create_timer(2.2).timeout
 	await _snap(OUT_DEFAULT)

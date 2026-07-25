@@ -1,6 +1,7 @@
 extends Control
 
-## 1920x1080. 布局在 battle_screen.tscn 可视化编辑（保留，勿动节点）。
+## 1920x1080. 共用布局在 battle_screen_base.tscn 可视化编辑；
+## battle_screen1.tscn / battle_screen2.tscn 只组合各自舞台与环境参数。
 ## v4 引擎（BattleCore）+ 同时盲选 vs AI（决策 B1）。
 ## 你 = P0（下），对手 = P1（上，AI）。玩家选动作 → 确认 → AI 后台选 → 同时结算。
 ##
@@ -9,7 +10,7 @@ extends Control
 const A := ActionDef.Action
 const ACTIVE := ActionDef.ACTIVE
 
-# 动作按钮"能量消耗"金币（1 能量 1 球）= battle_screen.tscn 内每个按钮下的 CostPips 节点，
+# 动作按钮"能量消耗"金币（1 能量 1 球）= battle_screen_base.tscn 内每个按钮下的 CostPips 节点，
 # 位置/大小/间距在 Godot 编辑器里可视化调整（可视化设计·任务2）；代码只在运行时填入数量。
 
 const SCREEN_W := 1920.0
@@ -24,7 +25,7 @@ const TOP_UI_DROP := 26.0   # 顶部 UI 整体下移量（2026-06-28 Eddy：44�
 const BUBBLE_HEAD_RISE := 102.0  # 出招气泡锚点：角色显示容器「中心」上移此值（越大气泡越高·够高才不压角色·随立绘 2.0x 同步 2026-07-11）
 const BUBBLE_SIDE_X := 91.0      # 出招气泡水平偏移：己方(P0)放头「右上」/ 敌方(P1)镜像「左上」（越大越往外侧·够大才不和角色重合·随立绘 2.0x 同步）
 
-## 顶部头像框尺寸。出战 / 替补。**摆位一律在 battle_screen.tscn 里定**（offset_* 已按本尺寸摆好），
+## 顶部头像框尺寸。出战 / 替补。**摆位一律在 battle_screen_base.tscn 里定**（offset_* 已按本尺寸摆好），
 ## 代码只负责把尺寸喂给 HeroFrame —— 旧 _enlarge_frames「按基准差量偏移」的代偿已退役。
 ## 尺寸线：72/68（2026-07-17 缩小批）→ **80/76（2026-07-18 Eddy「只要微微放大」·92/84 一版判过大回调）**。
 const FRAME_ACTIVE_SIZE := 80.0
@@ -78,7 +79,7 @@ const BATTLE_PORTRAIT_TUNING := {
 	"h22": {"scale": 1.02, "x": 0.0, "y": 2.0},   # 水平不动，仅轻微上提脸部
 }
 
-## 默认阵容 fallback：直接打开 battle_screen.tscn(F6) 测试用，BattleSetup 为空时启用。
+## 默认阵容 fallback：直接打开 battle_screen1.tscn(F6) 测试用，BattleSetup 为空时启用。
 const HERO_DATA_DIR := "res://assets/data/heroes/"
 const DEFAULT_P0 := ["h01", "h05", "h06"]   # 子鼠 / 辰龙 / 巳蛇（首发 12 生肖）
 const DEFAULT_P1 := ["h02", "h09", "h12"]   # 丑牛 / 申猴 / 亥猪（首发 12 生肖）
@@ -102,11 +103,11 @@ const HpSlantBarScript := preload("res://src/ui/components/hp_slant_bar.gd")
 ## 各动画相位等待（秒），可在 Inspector 调。
 @export var anim_phase_duration: float = 1.0
 @export var action_phase_duration: float = 0.6
-## 仅供独立战斗场景变体显式覆盖背景舞台；默认空值始终保留 Scene1。
-@export var stage_scene_override: PackedScene
-## 不同舞台可显式提供自己的全屏调色；默认空值继续使用 Scene1 的夜景后期。
-@export var post_fx_material_override: ShaderMaterial
-var _stage_override_applied: bool = false
+## 独立场景变体可把现有角色 SubViewport 送入指定水面；默认关闭，Scene1 不改变。
+@export var character_reflections_enabled: bool = false
+@export var character_reflection_receiver_path: NodePath = ^"River"
+## 当前角色素材的脚底在 768px SubViewport 中约为 63.5%；作为镜像与水线相接的锚点。
+@export_range(0.0, 1.0, 0.001) var character_reflection_foot_ratio: float = 0.635
 ## 死亡节拍 v3（2026-07-18 Eddy 批 A 方案·倒地后在地时长定 2s）：
 ## 致命定格 0.2 → 倒地 0.7 → 落地宣告（尘+轻震+遗体褪色 0.4）→ 静躺 1.6 → 消散换人。
 ## death_lie_duration = 从 defeat 起播到允许消散的保底总时长（0.7 倒地 + 2.0 在地）。
@@ -130,7 +131,7 @@ var timer_seconds: int = 0
 const PLAYER := 0   # 本地玩家固定 P0
 const AI := 1       # 对手 AI
 
-# ---- @onready: battle_screen.tscn 内预置节点（布局保留，路径勿改）----
+# ---- @onready: battle_screen_base.tscn 内预置节点（布局保留，路径勿改）----
 @onready var timer_label: Label = $TimerLabel
 @onready var status_label: Label = $StatusLabel
 @onready var event_label: Label = $EventLabel
@@ -171,7 +172,7 @@ var _codex_overlay: Control = null    # 战斗内图鉴浮层（懒创建·关�
 @onready var buttons_ctrl: Control = $Buttons
 @onready var _death_switch_overlay: DeathSwitchOverlay = $DeathSwitchOverlay
 @onready var game_timer: Timer = $GameTimer
-@onready var stage: BattleStage = $Stage   # 多层视差舞台：受击震屏走 stage.shake 按 parallax_factor 分层（见 battle_stage.gd）
+@onready var stage: BattleStage = $StageSlot/Stage   # 入口场景静态挂载；编辑器预览与运行时一致
 # 终结演出背景虚化幕（Stage 之后·WorldGroup 之前 → 只糊背景不糊双雄）。平时 veil 隐藏 +
 # grab DISABLED = 零成本；仅 _play_finisher 期间开启。
 @onready var finisher_grab: BackBufferCopy = $FinisherGrab
@@ -276,6 +277,8 @@ var _time_scale_base: float = 1.0   # hitstop 恢复的目标速度（终结演�
 var _fin_impact_tweens: Array[Tween] = []   # 终结命中的 punch/下沉 tween（慢放中跑不完·归位前必须 kill 防写回放大值）
 var _act_focus_active: bool = false   # 执行动作期间镜头是否在偏焦（保留位·当前由 set_focus 直接驱动）
 var _world: Control = null    # P2b：立绘+阴影的 dolly 组（运行期归组·与背景同对焦点统一推近）
+var _character_reflection_receiver: Control = null
+var _character_reflection_material: ShaderMaterial = null
 
 
 # ---- 演出原语库（2026-07-17 拆分批①）：飘字/斩击/火花/尘/能量粒/冲击帧+对象池 全家
@@ -295,44 +298,6 @@ const COL_DMG_BURN := Color(1.0, 0.58, 0.22)      # 延迟伤害到期（妖火/
 # ============================================================
 # 生命周期
 # ============================================================
-
-func _enter_tree() -> void:
-	if post_fx_material_override != null:
-		var post_fx_node := get_node_or_null("PostFX") as ColorRect
-		if post_fx_node != null:
-			post_fx_node.material = post_fx_material_override
-
-	if _stage_override_applied or stage_scene_override == null:
-		return
-
-	var old_stage := get_node_or_null("Stage") as BattleStage
-	if old_stage == null:
-		push_error("BattleScreen: missing Stage node")
-		return
-
-	var replacement_node: Node = stage_scene_override.instantiate()
-	if not replacement_node is BattleStage:
-		replacement_node.free()
-		push_error("BattleScreen: stage override must instantiate BattleStage")
-		return
-
-	var replacement_stage := replacement_node as BattleStage
-	var stage_index: int = old_stage.get_index()
-	var stage_pointer_parallax: bool = old_stage.pointer_parallax
-	var stage_demo_click_shake: bool = old_stage.demo_click_shake
-	var stage_mouse_filter := old_stage.mouse_filter
-
-	remove_child(old_stage)
-	old_stage.free()
-	replacement_stage.name = "Stage"
-	replacement_stage.pointer_parallax = stage_pointer_parallax
-	replacement_stage.demo_click_shake = stage_demo_click_shake
-	replacement_stage.mouse_filter = stage_mouse_filter
-	add_child(replacement_stage)
-	move_child(replacement_stage, stage_index)
-	replacement_stage.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_stage_override_applied = true
-
 
 func _ready() -> void:
 	_ai_rng.randomize()   # 任务 B：AI 道具抽取随机种子
@@ -406,6 +371,7 @@ func _ready() -> void:
 	# 建筑保持完全静止（去 idle 呼吸·Eddy 2026-06-21）；纵深感只在受击 shake 时由 stage 分层体现。
 	stage.idle_drift = false
 	_setup_world_group()   # P2b：立绘+阴影归入 dolly 组，随镜头推近与背景统一移动（须在 home 缓存后）
+	_setup_character_reflections()
 	for f in p2_frames:
 		f.flip_h = true
 
@@ -468,7 +434,7 @@ func _nudge_top_ui_down() -> void:
 			(n as Control).position.y += TOP_UI_DROP
 
 
-## BattleSetup 有阵容就用，否则用默认（直接跑 battle_screen.tscn 测试）。
+## BattleSetup 有阵容就用，否则用默认（直接跑 battle_screen1.tscn 测试）。
 func _resolve_team(setup_heroes: Array, fallback_ids: Array) -> Array:
 	if setup_heroes != null and not setup_heroes.is_empty():
 		return setup_heroes
@@ -495,7 +461,7 @@ func _init_buttons() -> void:
 	btn_special.pressed.connect(_on_circle_pressed.bind(ACTIVE, btn_special))
 	btn_confirm.pressed.connect(_on_confirm_pressed)
 
-	# 攒/波/大波/防/大防 用 HoverIcon 美术图标（节点在 battle_screen.tscn 内，编辑器可见可调）；
+	# 攒/波/大波/防/大防 用 HoverIcon 美术图标（节点在 battle_screen_base.tscn 内，编辑器可见可调）；
 	# 技能按钮显示「技能」二字（详细说明仍放 tooltip，见 _layout_circles）。位置/尺寸由 .tscn 决定。
 	btn_special.text = tr("技能")
 	btn_confirm.text = tr("结束")
@@ -634,7 +600,7 @@ func _init_buttons() -> void:
 	event_label.visible = false
 	# 备选血量/护甲：ReserveHpRow 自绘单个斜切符号 + 数字，配色/居中均由组件处理。
 
-	# 出战角色名 / 玩家 id 的字体·字号·颜色·描边·玩家id文本 全部在 battle_screen.tscn 设置
+	# 出战角色名 / 玩家 id 的字体·字号·颜色·描边·玩家id文本 全部在 battle_screen_base.tscn 设置
 	# （像素字体 ttf 直接引用·import 已关 AA → 编辑器所见即所得，可在 Inspector 手调位置/大小）。
 	# 代码只负责把角色名文本随出战英雄更新（见 _update_hero_frames）。
 
@@ -663,6 +629,78 @@ func _setup_world_group() -> void:
 	move_child(_world, finisher_veil.get_index() + 1)
 	for n in [p1_shadow, p2_shadow, p1_char_display, p2_char_display]:
 		n.reparent(_world, true)   # keep_global_transform → 静止画面一像素不变
+
+
+## 为启用该功能的场景变体创建独享河面材质，并绑定现有角色的实时 SubViewportTexture。
+## 材质必须逐实例复制，否则同时存在两个 BattleScreen 时会互相覆盖纹理句柄。
+func _setup_character_reflections() -> void:
+	_character_reflection_receiver = null
+	_character_reflection_material = null
+	if not character_reflections_enabled:
+		return
+
+	var receiver := stage.get_node_or_null(character_reflection_receiver_path) as Control
+	if receiver == null:
+		push_warning("BattleScreen: character reflection receiver not found: %s" % character_reflection_receiver_path)
+		return
+	var source_material := receiver.material as ShaderMaterial
+	if source_material == null:
+		push_warning("BattleScreen: character reflection receiver requires a ShaderMaterial")
+		return
+
+	var instance_material := source_material.duplicate() as ShaderMaterial
+	receiver.material = instance_material
+	_character_reflection_receiver = receiver
+	_character_reflection_material = instance_material
+	instance_material.set_shader_parameter("p1_reflection_tex", p1_char_display.get_render_texture())
+	instance_material.set_shader_parameter("p2_reflection_tex", p2_char_display.get_render_texture())
+	instance_material.set_shader_parameter("screen_px", get_viewport_rect().size)
+	_update_character_reflections()
+
+
+func _control_screen_rect(control: Control) -> Rect2:
+	var xform := control.get_global_transform_with_canvas()
+	var corners: Array[Vector2] = [
+		xform * Vector2.ZERO,
+		xform * Vector2(control.size.x, 0.0),
+		xform * control.size,
+		xform * Vector2(0.0, control.size.y),
+	]
+	var min_point := corners[0]
+	var max_point := corners[0]
+	for point in corners:
+		min_point = min_point.min(point)
+		max_point = max_point.max(point)
+	return Rect2(min_point, max_point - min_point)
+
+
+## 角色和 WorldGroup 会在动作、镜头推近与鼠标视差中移动，因此每帧只同步少量屏幕空间参数。
+## 倒影本身仍由河面 shader 裁切、切片和衰减，不参与角色交互或战斗状态。
+func _update_character_reflections() -> void:
+	if _character_reflection_material == null or _character_reflection_receiver == null:
+		return
+
+	var p1_rect := _control_screen_rect(p1_char_display)
+	var p2_rect := _control_screen_rect(p2_char_display)
+	var p1_xform := p1_char_display.get_global_transform_with_canvas()
+	var p2_xform := p2_char_display.get_global_transform_with_canvas()
+	var p1_foot := p1_xform * Vector2(
+		p1_char_display.size.x * 0.5,
+		p1_char_display.size.y * character_reflection_foot_ratio)
+	var p2_foot := p2_xform * Vector2(
+		p2_char_display.size.x * 0.5,
+		p2_char_display.size.y * character_reflection_foot_ratio)
+	var river_xform := _character_reflection_receiver.get_global_transform_with_canvas()
+	var river_left := river_xform * Vector2.ZERO
+	var river_right := river_xform * Vector2(_character_reflection_receiver.size.x, 0.0)
+
+	_character_reflection_material.set_shader_parameter(
+		"p1_reflection_rect", Vector4(p1_rect.position.x, p1_rect.position.y, p1_rect.size.x, p1_rect.size.y))
+	_character_reflection_material.set_shader_parameter(
+		"p2_reflection_rect", Vector4(p2_rect.position.x, p2_rect.position.y, p2_rect.size.x, p2_rect.size.y))
+	_character_reflection_material.set_shader_parameter("p1_reflection_foot_y", p1_foot.y)
+	_character_reflection_material.set_shader_parameter("p2_reflection_foot_y", p2_foot.y)
+	_character_reflection_material.set_shader_parameter("character_waterline_y", minf(river_left.y, river_right.y))
 
 
 func _connect_frame_signals() -> void:
@@ -1802,7 +1840,7 @@ func _btn_action(btn: Button) -> int:
 
 
 ## 填入动作按钮的能量消耗 = 一个金币 + 内嵌数字（= bp 血量同款 IconBadge）。
-## CostPips 节点已在 battle_screen.tscn 内预置（编辑器可视化摆位/调大小·统一以 BtnAttack 为准），
+## CostPips 节点已在 battle_screen_base.tscn 内预置（编辑器可视化摆位/调大小·统一以 BtnAttack 为准），
 ## 代码只填数字·不再创建/定位。show_zero=0 费也显示（防按钮·Eddy 2026-07-13：与其他按钮一致）。
 func _set_cost_pips(btn: Button, cost: int, show_zero: bool = false) -> void:
 	var badge := btn.get_node_or_null("CostPips") as IconBadge
@@ -2176,7 +2214,7 @@ func _update_hero_frames() -> void:
 ## 出战位(is_active)：只画头像，血量/护盾由上方大血条显示 → 替补血量行隐藏。
 ## 待选位：头像 + 单个平行四边形血量符号 + 数字；有护盾时追加银灰符号 + 数字。
 ## 内容按真实文本宽度整体居中，整数和半点数都不会偏轴。
-## hp_row 在 index 0(出战位) 为 null；摆位/大小在 battle_screen.tscn 调，代码只填值。
+## hp_row 在 index 0(出战位) 为 null；摆位/大小在 battle_screen_base.tscn 调，代码只填值。
 func _update_single_frame(frame: HeroFrame, hp_row, player: int, slot: int, is_active: bool, pcolor: Color) -> void:
 	if slot < 0 or slot >= battle.heroes[player].size():
 		frame.visible = false
@@ -2708,6 +2746,7 @@ func _process(_delta: float) -> void:
 		_world.scale = Vector2.ONE * gd
 		# 鼠标视差：角色组加上地面层同款平移（stage.pointer_ground_offset）→ 与脚下屋脊零滑动。
 		_world.position = stage.focal() * (1.0 - gd) + stage.pointer_ground_offset()
+	_update_character_reflections()
 
 
 ## A3：阴影随角色动作变形。

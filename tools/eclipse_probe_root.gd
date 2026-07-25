@@ -16,7 +16,7 @@ func _ready() -> void:
 	BattleSetup.p1_heroes = BattleCore.overtime_roster(team_a, 0)
 	BattleSetup.p2_heroes = BattleCore.overtime_roster(team_b, 0)
 	BattleSetup.overtime = true
-	var s: Node = load("res://src/ui/battle_screen.tscn").instantiate()
+	var s: Node = load("res://src/ui/battle_screen1.tscn").instantiate()
 	add_child(s)
 	await get_tree().create_timer(0.8).timeout   # 裂缝挂住期（0.3 静置+0.22 裂缝伸展后）
 	await RenderingServer.frame_post_draw
