@@ -25,7 +25,9 @@
 **Files:**
 - Read: `assets/import/hero/h01.png`
 - Read: `assets/sprites/heroes/h01/h01.png`
+- Read: `design/references/boot_h01_pose_guide.png`
 - Read: `design/boot-h01-master-prompt.md`
+- Read: `design/boot-h01-midjourney-v81-prompt.md`
 - Create externally, then place: `assets/import/boot/h01_master_candidates/boot_h01_master_candidate_01.png`
 - Create externally, then place: `assets/import/boot/h01_master_candidates/boot_h01_master_candidate_02.png`
 - Create externally, then place: `assets/import/boot/h01_master_candidates/boot_h01_master_candidate_03.png`
@@ -37,7 +39,15 @@
 
 - [ ] **Step 1: Upload the references in the fixed order**
 
-Upload `assets/import/hero/h01.png` first and `assets/sprites/heroes/h01/h01.png` second. Do not attach `Zan_idle.png`, because its hand pose conflicts with the approved vertical hand placement.
+For GPT Image 2, upload `assets/import/hero/h01.png` first and
+`assets/sprites/heroes/h01/h01.png` second.
+
+For Midjourney V8.1, use `assets/import/hero/h01.png` and
+`design/references/boot_h01_pose_guide.png` as Image Prompts, then use
+`assets/sprites/heroes/h01/h01.png` as the Style Reference.
+
+Do not attach `Zan_idle.png`, because its hand pose conflicts with the approved
+vertical hand placement.
 
 - [ ] **Step 2: Generate one high-quality batch**
 
@@ -104,4 +114,3 @@ Confirm the upper palm is horizontal directly above the chest gap, the lower pal
 - [ ] **Step 4: Stop before processing**
 
 Do not run PixelLab, cut animation layers, create the gold sphere, or modify `boot_screen.gd` in this phase. Those actions begin only after the master source passes visual review.
-
