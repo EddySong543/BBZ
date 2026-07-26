@@ -35,6 +35,25 @@ uniform float aspect = 19.3;          // rect 宽高比 W/H
 uniform vec2 pixel_grid = vec2(900.0, 47.0);   // 粗像素格（rect 尺寸/3px）
 
 
+uniform float row_count : hint_range(2.0, 4.0, 1.0) = 2.0;
+uniform float isolated_len_cap : hint_range(0.5, 2.5, 0.05) = 0.78;
+uniform float isolated_forced_stride : hint_range(2.0, 4.0, 1.0) = 3.0;
+uniform float isolated_break_stride : hint_range(0.0, 8.0, 1.0) = 0.0;
+uniform float lobe_profile : hint_range(0.0, 1.0, 1.0) = 0.0;
+uniform float lobe_height_scale : hint_range(0.35, 1.25, 0.05) = 1.0;
+uniform float lobe_shape_variation : hint_range(0.0, 1.0, 0.05) = 0.0;
+uniform float lobe_min_step_px : hint_range(1.0, 3.0, 1.0) = 1.0;
+uniform float continuous_bob_scale : hint_range(0.0, 0.8, 0.05) = 0.6;
+uniform float pattern_offset = 0.0;
+uniform float bank_valley_center : hint_range(0.0, 1.0, 0.01) = 0.5;
+uniform float bank_valley_width : hint_range(0.05, 0.5, 0.01) = 0.25;
+uniform float bank_valley_depth : hint_range(0.0, 0.3, 0.01) = 0.0;
+uniform float bank_valley_steps : hint_range(2.0, 8.0, 1.0) = 4.0;
+uniform float bank_valley_peak_scale : hint_range(0.2, 1.0, 0.05) = 1.0;
+uniform float bank_side_rise : hint_range(0.0, 0.25, 0.01) = 0.0;
+uniform float bank_join_height : hint_range(0.0, 0.3, 0.01) = 0.0;
+uniform float bank_join_variation : hint_range(0.0, 0.08, 0.005) = 0.0;
+
 float hash(vec2 p) {
 	p = mod(p, 289.0);   // ⚠入口取模压量级——sid×31 级大数会让 sin 精度劣化·随机失真（碎齿率失控教训）
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -46,9 +65,10 @@ float hash(vec2 p) {
 float banner_rows(float cu_c, float cv_c, float sid, float cx, float len, float base_v, float q) {
 	float has = step(0.05, len);   // ⚠无旗（len=0）必须整体归零——最小宽度保底曾把空格撑成 4 列幽灵云（单格云病根）
 	float c = 0.0;
-	for (int k = 0; k < 2; k++) {
+	for (int k = 0; k < 4; k++) {
 		float fk = float(k);
-		float w = max(floor(len * mix(1.0, 0.58, fk) / q) * q, q * 4.0);   // 宽度对齐格·最少 4 列
+		float active_row = step(fk + 0.5, row_count);
+		float w = max(floor(len * pow(0.58, fk) / q) * q, q * 4.0);   // 宽度对齐格·逐层收窄
 		float x0 = floor((cx + fk * 0.1 * len - w * 0.5) / q) * q;
 		float in_x = step(x0, cu_c) * step(cu_c, x0 + w);
 		float y_bot = base_v - row_h * fk;
@@ -65,47 +85,231 @@ float banner_rows(float cu_c, float cv_c, float sid, float cx, float len, float 
 		// 顶层碎齿：只挖内区（距端 ≥2 子块）→ 不与拖尾相邻成孤块
 		float notch = fk * step(2.0, edge_d)
 				* step(hash(vec2(sid * 17.0 + sub_id, 3.1)), 0.08);
-		c = max(c, in_x * in_y * (1.0 - min(1.0, erode_end + notch)));
+		c = max(c, in_x * in_y
+				* (1.0 - min(1.0, erode_end + notch)) * active_row);
 	}
 	return c * has;
 }
 
 
+// Scene2 可选云丘轮廓：保留 Scene1 的格点流动与分布，只把旗状矩形
+// 换成宽底、阶梯化上缘。默认关闭，因此 Scene1 原有外观不受影响。
+float lobe_rows(
+		float cu_c,
+		float cv_c,
+		float cx,
+		float len,
+		float base_v,
+		float q,
+		float qy,
+		float sid,
+		float height_scale) {
+	float has = step(0.05, len);
+	float width = max(floor(len / q) * q, q * 6.0);
+	float center = floor(cx / q) * q + q * 0.5;
+	float half_width = max(width * 0.5, q * 3.0);
+	float shape_q = q * max(lobe_min_step_px, 1.0);
+	float shape_cu = floor(cu_c / shape_q) * shape_q + shape_q * 0.5;
+	float nx = abs(shape_cu - center) / half_width;
+	float variant = floor(hash(vec2(sid, 101.7)) * 3.0);
+	float variant_a = 1.0 - step(0.5, variant);
+	float variant_c = step(1.5, variant);
+	float variant_b = 1.0 - variant_a - variant_c;
+	float center_shift_variant = -0.16 * variant_a
+			+ 0.02 * variant_b + 0.16 * variant_c;
+	float center_shift = center_shift_variant * lobe_shape_variation;
+	float left_shift = mix(
+			mix(0.26, 0.4, hash(vec2(sid, 71.3))),
+			0.24 * variant_a + 0.38 * variant_b + 0.3 * variant_c,
+			lobe_shape_variation);
+	float right_shift = mix(
+			mix(0.24, 0.38, hash(vec2(sid, 83.1))),
+			0.38 * variant_a + 0.27 * variant_b + 0.22 * variant_c,
+			lobe_shape_variation);
+	float left_width = mix(
+			mix(0.3, 0.44, hash(vec2(sid, 17.9))),
+			0.5 * variant_a + 0.31 * variant_b + 0.38 * variant_c,
+			lobe_shape_variation);
+	float right_width = mix(
+			mix(0.3, 0.46, hash(vec2(sid, 29.7))),
+			0.3 * variant_a + 0.42 * variant_b + 0.52 * variant_c,
+			lobe_shape_variation);
+	float left_nx = abs(
+			shape_cu - (center - half_width * left_shift)
+	) / (half_width * left_width);
+	float right_nx = abs(
+			shape_cu - (center + half_width * right_shift)
+	) / (half_width * right_width);
+	float center_width = mix(
+			0.42,
+			0.34 * variant_a + 0.5 * variant_b + 0.3 * variant_c,
+			lobe_shape_variation);
+	float center_nx = abs(
+			shape_cu - (center + half_width * center_shift)
+	) / (half_width * center_width);
+	float main_arch = sqrt(max(1.0 - nx * nx, 0.0)) * 0.5;
+	float center_arch = sqrt(max(1.0 - center_nx * center_nx, 0.0))
+			* mix(
+					mix(0.8, 0.96, hash(vec2(sid, 61.7))),
+					0.68 * variant_a + 1.0 * variant_b + 0.76 * variant_c,
+					lobe_shape_variation);
+	float left_arch = sqrt(max(1.0 - left_nx * left_nx, 0.0))
+			* mix(
+					mix(0.74, 0.9, hash(vec2(sid, 37.5))),
+					1.0 * variant_a + 0.62 * variant_b + 0.58 * variant_c,
+					lobe_shape_variation);
+	float right_arch = sqrt(max(1.0 - right_nx * right_nx, 0.0))
+			* mix(
+					mix(0.78, 0.98, hash(vec2(sid, 49.3))),
+					0.58 * variant_a + 0.78 * variant_b + 1.0 * variant_c,
+					lobe_shape_variation);
+	float arch = max(max(main_arch, center_arch), max(left_arch, right_arch));
+	arch *= mix(
+			1.0,
+			mix(0.78, 1.12, hash(vec2(sid, 113.9))),
+			lobe_shape_variation);
+	float arch_step = floor(arch * 16.0 + 0.5) / 16.0;
+	float top_v = base_v - row_h * (
+			0.12 + arch_step * 2.25 * height_scale);
+	top_v = floor(top_v / qy) * qy;
+	float inside_x = step(nx, 1.0);
+	float inside_y = step(top_v, cv_c) * step(cv_c, base_v);
+	return inside_x * inside_y * has;
+}
+
+
 // 流动雾旗（簇状分布 + 结构保底 + 呼吸 + 量化缓漂/起伏）。
-float banner(float cu_c, float cv_c, float id, float t, float h_units) {
+float banner(
+		float cu_c,
+		float cv_c,
+		float id,
+		float t,
+		float h_units,
+		float base_offset) {
 	float sid = id + seed * 97.0;
 	float cluster_on = step(hash(vec2(floor(id / 3.0) + seed * 13.0, 41.7)), keep);
-	// 结构保底：每第 3 格必出一条旗（随流照滚）→ 屏幕中部任何时刻必有云·开局不空
+	// 结构保底：按材质设定的跨度必出一条旗（随流照滚）→ 屏幕中部任何时刻必有云。
 	// （⚠常驻钉死旗方案已否——不随流的云读作"卡住"·2026-07-10 Eddy 报）
-	float forced = step(abs(mod(id, 3.0) - 1.0), 0.01) * mode_isolated;
+	float forced_stride = max(isolated_forced_stride, 2.0);
+	float forced_phase = floor(forced_stride * 0.5);
+	float forced = step(
+			abs(mod(id, forced_stride) - forced_phase),
+			0.01
+	) * mode_isolated;
 	float on = max(cluster_on * step(hash(vec2(sid, 5.13)), 0.85), forced);
+	float break_enabled = step(1.5, isolated_break_stride) * mode_isolated;
+	float break_stride = max(isolated_break_stride, 2.0);
+	float scheduled_break = step(
+			abs(mod(id + floor(seed), break_stride)),
+			0.01
+	) * break_enabled;
+	on *= 1.0 - scheduled_break;
 	// 旗长下限抬高（0.35→0.5·拖尾后仍有主体）·长短混排
 	float len = cloud_size * (0.5 + 0.95 * hash(vec2(sid, 2.2))) * on;
 	// 间隙保证（孤立模式·Eddy 2026-07-10）：旗长封顶 0.78 格 + 落位抖动只用剩余空隙的一半
 	// → 相邻旗最小间隙 ≥0.18 格（~50-60px）·雾墙模式不封顶（要互相搭接成整条）
-	len = min(len, mix(9.0, 0.78, mode_isolated));
+	len = min(len, mix(9.0, isolated_len_cap, mode_isolated));
 	float q = cells / pixel_grid.x;
 	float sway = floor(sin(t * sway_speed + id * 2.17) * 0.02 / q + 0.5) * q;
 	float jit = (hash(vec2(sid, 9.7)) - 0.5)
 			* mix(0.3, max(1.0 - len - 0.22, 0.0), mode_isolated);
 	float cx = id + 0.5 + jit + sway;
 	float qy = h_units / pixel_grid.y;
-	float bob = floor((1.0 - mode_isolated) * sin(t * 0.4 + id * 1.9) * row_h * 0.6 / qy + 0.5) * qy;
-	float base_v = h_units * base_frac + bob;
+	float bob = floor(
+			(1.0 - mode_isolated) * sin(t * 0.4 + id * 1.9)
+					* row_h * continuous_bob_scale / qy + 0.5
+	) * qy;
+	float base_v = h_units * base_frac + bob + base_offset;
+	float valley_ratio = clamp(
+			base_offset / max(bank_valley_depth * h_units, 0.0001),
+			0.0,
+			1.0
+	) * (1.0 - mode_isolated);
+	float height_scale = lobe_height_scale * mix(
+			1.0,
+			bank_valley_peak_scale,
+			valley_ratio);
 	// 呼吸只给孤立旗——雾墙内旗互相搭接·各旗呼吸相位不同会在搭接边出"明暗脉动竖缝"（max 并集台阶）
 	float breath = 1.0 - breath_amount * mode_isolated * (0.5 + 0.5 * sin(t * breath_speed + id * 2.9));
-	return banner_rows(cu_c, cv_c, sid, cx, len, base_v, q) * breath;
+	float stepped_rows = banner_rows(cu_c, cv_c, sid, cx, len, base_v, q);
+	float cloud_lobe = lobe_rows(
+			cu_c, cv_c, cx, len, base_v, q, qy, sid, height_scale);
+	return mix(stepped_rows, cloud_lobe, lobe_profile) * breath;
 }
 
 
 // 全场覆盖：邻格三旗取并；雾墙模式再并上基线以下连体实身。
-float smoke_cover(float cu_c, float cv_c, float t, float h_units) {
+float bank_valley_offset(float screen_u, float h_units) {
+	float valley = 1.0 - clamp(
+			abs(screen_u - bank_valley_center)
+					/ max(bank_valley_width, 0.001),
+			0.0,
+			1.0);
+	float steps = max(bank_valley_steps, 1.0);
+	float stepped_valley = floor(valley * steps + 0.5) / steps;
+	float side_span = mix(
+			max(bank_valley_center, 0.001),
+			max(1.0 - bank_valley_center, 0.001),
+			step(bank_valley_center, screen_u));
+	float side_distance = clamp(
+			abs(screen_u - bank_valley_center) / side_span,
+			0.0,
+			1.0);
+	float stepped_side = floor(
+			pow(side_distance, 0.75) * steps + 0.5
+	) / steps;
+	return (
+			stepped_valley * bank_valley_depth
+					- stepped_side * bank_side_rise
+	) * h_units
+			* (1.0 - mode_isolated);
+}
+
+
+float bank_join_top(
+		float screen_u,
+		float h_units,
+		float valley_offset,
+		float qy) {
+	float contour_id = floor(screen_u * cells * 1.5);
+	float contour_random = floor(
+			hash(vec2(contour_id + seed * 11.0, 127.3)) * 3.0
+	) - 1.0;
+	float contour_offset = contour_random * bank_join_variation * h_units;
+	float top_v = h_units * (base_frac - bank_join_height)
+			+ valley_offset + contour_offset;
+	return floor(top_v / qy) * qy;
+}
+
+
+float smoke_cover(
+		float cu_c,
+		float cv_c,
+		float t,
+		float h_units,
+		float screen_u) {
 	float c = 0.0;
+	float valley_offset = bank_valley_offset(screen_u, h_units);
 	for (int i = -1; i <= 1; i++) {
-		c = max(c, banner(cu_c, cv_c, floor(cu_c) + float(i), t, h_units));
+		c = max(c, banner(
+				cu_c,
+				cv_c,
+				floor(cu_c) + float(i),
+				t,
+				h_units,
+				valley_offset));
 	}
-	float solid = step(h_units * base_frac, cv_c) * (1.0 - mode_isolated);
-	return max(c, solid);
+	float solid = step(
+			h_units * base_frac + valley_offset,
+			cv_c
+	) * (1.0 - mode_isolated);
+	float join_enabled = step(0.001, bank_join_height)
+			* (1.0 - mode_isolated);
+	float joined_shoulder = step(
+			bank_join_top(screen_u, h_units, valley_offset, h_units / pixel_grid.y),
+			cv_c
+	) * join_enabled;
+	return max(max(c, solid), joined_shoulder);
 }
 
 
@@ -116,13 +320,14 @@ void fragment() {
 	float qy_f = (cells / aspect) / pixel_grid.y;
 	// 整像素流动步进 + 半像素中心采样（根治闪烁的两把锁）
 	float flow_t = floor(t * flow_speed * cells / qx) * qx;
-	float cu_c = uvq.x * cells + qx * 0.5 + flow_t;     // 流动列中心
+	float cu_c = uvq.x * cells + qx * 0.5 + flow_t + pattern_offset;     // 流动列中心
 	float cv_c = uvq.y * cells / aspect + qy_f * 0.5;   // 行中心
 	float h_units = cells / aspect;
 
-	float cover = smoke_cover(cu_c, cv_c, t, h_units);
+	float cover = smoke_cover(cu_c, cv_c, t, h_units, uvq.x);
 	// 月光缘：本像素在雾内、其上 edge_h 处在雾外 = 顶面暴露 → 一线脆亮
-	float cover_up = smoke_cover(cu_c, cv_c - edge_h, t, h_units);
+	float cover_up = smoke_cover(
+			cu_c, cv_c - edge_h, t, h_units, uvq.x);
 	float lit = cover * (1.0 - min(cover_up, 1.0));
 
 	// F 体内两档明度横向流纹：不同行相位错开滚动（只染体色·月光缘不受染）

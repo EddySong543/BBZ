@@ -219,8 +219,15 @@ func test_scene2_uses_formal_environment_assets_and_depth_layers() -> void:
 	if stage.has_node("MountainLeft") and stage.has_node("MountainRight"):
 		assert_true((stage.get_node("MountainLeft") as TextureRect).visible)
 		assert_true((stage.get_node("MountainRight") as TextureRect).visible)
-	assert_null((stage.get_node("BlossomTree") as TextureRect).material,
-			"The replacement tree must display its authored palette without the rejected quiet-zone grade")
+	var tree_material := (stage.get_node("BlossomTree") as TextureRect).material \
+			as ShaderMaterial
+	assert_not_null(tree_material,
+			"The replacement tree needs its motion-only sway material")
+	if tree_material != null and tree_material.shader != null:
+		assert_ne(
+				tree_material.shader.resource_path,
+				"res://assets/shaders/canvas_env_scene2_depth_grade.gdshader",
+				"The tree must display its authored palette without the rejected quiet-zone grade")
 	assert_null((stage.get_node("StoneBridge") as TextureRect).material,
 			"The playable bridge must remain crisp and ungraded")
 
@@ -291,19 +298,16 @@ func test_scene2_uses_one_full_height_waterfall() -> void:
 	add_child_autofree(stage)
 	assert_true(stage.has_node("WaterfallLeft"),
 			"Scene2 must expose one editable full-height waterfall node")
-	assert_true(stage.has_node("WaterfallImpactLeft"),
-			"The waterfall must expose a separate river-surface impact layer")
-	if not stage.has_node("WaterfallLeft") or not stage.has_node("WaterfallImpactLeft"):
+	assert_false(stage.has_node("WaterfallImpactLeft"),
+			"The retired waterfall-impact overlay must stay removed")
+	if not stage.has_node("WaterfallLeft"):
 		return
 
 	var waterfall := stage.get_node("WaterfallLeft") as ColorRect
-	var impact := stage.get_node("WaterfallImpactLeft") as ColorRect
 	var material := waterfall.material as ShaderMaterial
-	var impact_material := impact.material as ShaderMaterial
 	var mid_mountain := stage.get_node("MidMountain") as TextureRect
 	var bridge := stage.get_node("StoneBridge") as TextureRect
 	var river := stage.get_node("River") as ColorRect
-	var fog_front := stage.get_node("FogFront") as ColorRect
 	var scene_source := FileAccess.get_file_as_string(SCENE2_PATH)
 	var shader_source := material.shader.code
 
@@ -313,34 +317,31 @@ func test_scene2_uses_one_full_height_waterfall() -> void:
 	assert_false(scene_source.contains("WaterfallUpperMat"))
 	assert_false(scene_source.contains("WaterfallMiddleMat"))
 	assert_false(scene_source.contains("WaterfallLowerMat"))
-	assert_eq(impact.position, waterfall.position)
-	assert_eq(impact.size, waterfall.size)
 	assert_true(waterfall.visible)
 	assert_lte(waterfall.position.y, 0.0)
 	assert_gte(waterfall.position.y + waterfall.size.y, 1080.0)
-	assert_eq(float(impact.get_meta("parallax_factor")),
-			float(waterfall.get_meta("parallax_factor")))
 	assert_gt(waterfall.get_index(), mid_mountain.get_index())
 	assert_lt(waterfall.get_index(), bridge.get_index())
 	assert_lt(waterfall.get_index(), river.get_index())
-	assert_gt(impact.get_index(), river.get_index(),
-			"The impact foam and ripples must remain visible over the river")
-	assert_lt(impact.get_index(), fog_front.get_index())
 	assert_not_null(material)
-	assert_not_null(impact_material)
 	assert_eq(material.shader.resource_path,
 			"res://assets/shaders/canvas_env_pixel_waterfall.gdshader")
-	assert_eq(impact_material.shader.resource_path, material.shader.resource_path)
 	assert_eq(int(material.get_shader_parameter("render_part")), 0)
-	assert_eq(int(impact_material.get_shader_parameter("render_part")), 1)
 	assert_eq(material.get_shader_parameter("size_px"), waterfall.size)
-	assert_eq(impact_material.get_shader_parameter("size_px"), impact.size)
 	assert_gte(float(material.get_shader_parameter("top_y")), 0.07)
 	assert_lte(float(material.get_shader_parameter("top_y")), 0.10)
 	assert_gte(float(material.get_shader_parameter("bottom_y")), 0.82)
 	assert_lte(float(material.get_shader_parameter("bottom_y")), 0.90)
 	assert_gte(float(material.get_shader_parameter("section_width_wobble_px")), 12.0,
 			"The long fall must vary its silhouette between broad sections")
+	assert_gte(
+			float(material.get_shader_parameter("top_half_width_px")) * 2.0,
+			waterfall.size.x * 0.30,
+			"The waterfall mouth must read as a broad body rather than a thin column")
+	assert_gte(
+			float(material.get_shader_parameter("bottom_half_width_px")) * 2.0,
+			waterfall.size.x * 0.42,
+			"The lower fall must carry enough visible water mass for a monumental silhouette")
 	assert_lte(float(material.get_shader_parameter("px_size")), 4.0,
 			"The waterfall must use a pixel grid close to the 3px river grid")
 	assert_lte(float(material.get_shader_parameter("anim_fps")), 6.0,
@@ -348,54 +349,25 @@ func test_scene2_uses_one_full_height_waterfall() -> void:
 	assert_lte(float(material.get_shader_parameter("fall_speed_px")), 105.0)
 	assert_lte(float(material.get_shader_parameter("mouth_highlight_density")), 0.40)
 	assert_lte(float(material.get_shader_parameter("cross_join_density")), 0.08)
-	assert_lte(float(material.get_shader_parameter("flow_highlight_density")), 0.20)
+	assert_gte(float(material.get_shader_parameter("lane_width_px")), 12.0,
+			"Broad water bands must replace the old dense 8px threads")
+	assert_gte(float(material.get_shader_parameter("streak_period_px")), 120.0)
+	assert_lte(float(material.get_shader_parameter("flow_highlight_density")), 0.12)
+	assert_lte(float(material.get_shader_parameter("flow_gap_strength")), 0.12)
 	assert_lte(float(material.get_shader_parameter("edge_drop_density")), 0.04)
-	assert_lte(float(material.get_shader_parameter("splash_fps")), 6.0)
-	assert_gte(float(material.get_shader_parameter("splash_cycle_a")), 17.0)
-	assert_lte(float(material.get_shader_parameter("impact_mist_strength")), 0.16)
-	assert_gte(float(material.get_shader_parameter("ripple_period_sec")), 5.0,
-			"Impact ripples must move more slowly than the falling water")
-	assert_lte(float(material.get_shader_parameter("ripple_segment_density")), 0.35,
-			"Only a minority of ripple segments may flash at once")
-	assert_lte(float(material.get_shader_parameter("ripple_shadow_strength")), 0.35)
-	assert_ne(material.get_shader_parameter("splash_cycle_a"),
-			material.get_shader_parameter("splash_cycle_b"),
-			"Splash bursts must not land on one unified beat")
-	assert_ne(material.get_shader_parameter("splash_cycle_b"),
-			material.get_shader_parameter("splash_cycle_c"),
-			"Splash bursts must use staggered lifetimes")
-	for shared_parameter: String in [
-		"top_y",
-		"bottom_y",
-		"center_x",
-		"bend_px",
-		"bottom_half_width_px",
-		"ripple_period_sec",
-		"deep_color",
-		"mid_color",
-		"light_color",
-		"foam_color",
-		"core_width_ratio",
-	]:
-		assert_eq(
-				impact_material.get_shader_parameter(shared_parameter),
-				material.get_shader_parameter(shared_parameter),
-				"Body and surface impact layers must stay spatially synchronized")
 	for marker: String in [
 		"mouth_vertical",
 		"rare_cross_join",
 		"top_lip_segments",
-		"splash_phase_a",
-		"splash_phase_b",
-		"splash_phase_c",
-		"entry_white",
-		"ripple_bright",
-		"ripple_shadow",
 	]:
 		assert_true(shader_source.contains(marker),
 				"The waterfall shader must implement %s" % marker)
 	assert_false(shader_source.contains("foam_cycle"),
 			"The old synchronized foam cycle must be removed")
+	assert_true(shader_source.contains("major_streak_density"),
+			"The waterfall must expose one density control for its broad moving water bands")
+	if shader_source.contains("major_streak_density"):
+		assert_lte(float(material.get_shader_parameter("major_streak_density")), 0.55)
 
 
 func test_scene2_waterfall_is_broken_up_by_cloud_veils_and_calm_distant_water() -> void:
@@ -408,8 +380,16 @@ func test_scene2_waterfall_is_broken_up_by_cloud_veils_and_calm_distant_water() 
 		return
 
 	var waterfall := stage.get_node("WaterfallLeft") as ColorRect
-	var upper_cloud := stage.get_node("WaterfallCloudUpper") as TextureRect
-	var lower_cloud := stage.get_node("WaterfallCloudLower") as TextureRect
+	var upper_cloud_node := stage.get_node("WaterfallCloudUpper")
+	var lower_cloud_node := stage.get_node("WaterfallCloudLower")
+	assert_true(upper_cloud_node is ColorRect,
+			"The upper waterfall veil must use Scene1's procedural pixel-cloud ColorRect")
+	assert_true(lower_cloud_node is ColorRect,
+			"The lower waterfall veil must use Scene1's procedural pixel-cloud ColorRect")
+	if not upper_cloud_node is ColorRect or not lower_cloud_node is ColorRect:
+		return
+	var upper_cloud := upper_cloud_node as ColorRect
+	var lower_cloud := lower_cloud_node as ColorRect
 	var left_mountain := stage.get_node("MountainLeft") as TextureRect
 	var right_mountain := stage.get_node("MountainRight") as TextureRect
 	var haze := stage.get_node("HorizonHaze") as ColorRect
@@ -428,10 +408,13 @@ func test_scene2_waterfall_is_broken_up_by_cloud_veils_and_calm_distant_water() 
 			"The lower veil must overlap at least one framing mountain to avoid a flat stack")
 	assert_lt(lower_cloud.get_index(), haze.get_index(),
 			"The lower veil may interleave with the framing mountains but must receive valley haze")
-	for cloud: TextureRect in [upper_cloud, lower_cloud]:
-		assert_eq(cloud.texture.resource_path,
-				"res://assets/scenes/scene2/scene2_cloud_bank.png")
-		assert_eq(cloud.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST)
+	for cloud: ColorRect in [upper_cloud, lower_cloud]:
+		var cloud_material := cloud.material as ShaderMaterial
+		assert_not_null(cloud_material)
+		if cloud_material == null or cloud_material.shader == null:
+			continue
+		assert_eq(cloud_material.shader.resource_path,
+				"res://assets/shaders/canvas_env_dark_smoke.gdshader")
 		assert_gt(cloud.size.x, 0.0)
 		assert_gt(cloud.size.y, 0.0)
 
@@ -475,6 +458,169 @@ func test_scene2_waterfall_is_broken_up_by_cloud_veils_and_calm_distant_water() 
 			"The foreground river must remain the nearest continuous water surface")
 	assert_gte(bridge_bank.size.x, bridge.size.x * 0.95,
 			"The bridge-bank treatment must cover both ends without pinning editor coordinates")
+
+
+func test_scene2_primary_waterfall_veils_reuse_scene1_pixel_cloud_method() -> void:
+	var stage := (load(SCENE2_PATH) as PackedScene).instantiate()
+	add_child_autofree(stage)
+	var scene1 := (load("res://src/ui/scenes/scene1.tscn") as PackedScene).instantiate()
+	add_child_autofree(scene1)
+	var primary_names: Array[String] = [
+		"WaterfallCloudUpper",
+		"WaterfallCloudLower",
+		"WaterfallCloudLower2",
+	]
+	var scene1_shader_path := \
+			"res://assets/shaders/canvas_env_dark_smoke.gdshader"
+	var materials: Array[ShaderMaterial] = []
+	var seeds := {}
+
+	for cloud_name: String in primary_names:
+		assert_true(stage.has_node(cloud_name),
+				"Scene2 needs a primary waterfall veil named %s" % cloud_name)
+		if not stage.has_node(cloud_name):
+			continue
+		var cloud_node := stage.get_node(cloud_name)
+		assert_true(cloud_node is ColorRect,
+				"%s must precisely replace the old cloud texture with a procedural ColorRect"
+				% cloud_name)
+		if not cloud_node is ColorRect:
+			continue
+		var cloud := cloud_node as ColorRect
+		var material := cloud.material as ShaderMaterial
+		assert_not_null(material)
+		if material == null or material.shader == null:
+			continue
+		materials.append(material)
+		assert_eq(material.shader.resource_path, scene1_shader_path)
+		assert_gte(float(material.get_shader_parameter("row_count")), 3.0)
+		if float(material.get_shader_parameter("mode_isolated")) < 0.5:
+			assert_gte(float(material.get_shader_parameter("isolated_len_cap")), 1.0)
+		assert_eq(float(material.get_shader_parameter("lobe_profile")), 1.0)
+		assert_lte(absf(float(material.get_shader_parameter("flow_speed"))), 0.02)
+		assert_lte(float(material.get_shader_parameter("alpha_max")), 0.9)
+		var pixel_grid: Vector2 = material.get_shader_parameter("pixel_grid")
+		assert_gte(pixel_grid.x, 320.0)
+		assert_gte(pixel_grid.y, 24.0)
+		seeds[float(material.get_shader_parameter("seed"))] = true
+
+	assert_eq(materials.size(), primary_names.size())
+	if materials.size() == primary_names.size():
+		assert_ne(materials[0], materials[1],
+				"Upper and lower pixel clouds need independent Scene2 palettes and timing")
+		assert_ne(materials[1], materials[2],
+				"The second lower veil needs its own material instead of repeating the first")
+		assert_eq(float(materials[0].get_shader_parameter("mode_isolated")), 1.0,
+				"The upper veil must remain a sparse group of discrete cloud masses")
+		assert_eq(float(materials[1].get_shader_parameter("mode_isolated")), 0.0,
+				"The lower veil must use Scene1's continuous cloud-wall mode")
+		assert_eq(float(materials[2].get_shader_parameter("mode_isolated")), 0.0,
+				"The lower overlay must remain a continuous cloud-wall layer")
+		assert_gte(absf(float(materials[0].get_shader_parameter("flow_speed"))), 0.005,
+				"The center waterfall clouds must not drift imperceptibly slowly")
+		assert_lte(float(materials[0].get_shader_parameter("isolated_forced_stride")), 2.0,
+				"The upper veil must guarantee a cloud at least every two cells")
+		assert_gt(float(materials[0].get_shader_parameter("isolated_break_stride")), 0.0,
+				"Upper compound groups need scheduled breaks instead of one long strip")
+		assert_gte(float(materials[0].get_shader_parameter("keep")), 0.65,
+				"Optional upper groups must fill the large gaps between guaranteed clouds")
+		assert_gte(float(materials[0].get_shader_parameter("lobe_shape_variation")), 0.5,
+				"Upper groups need the same seeded compound-lobe language as Lower")
+		assert_gt(
+				absf(float(materials[0].get_shader_parameter("flow_speed"))),
+				absf(float(materials[1].get_shader_parameter("flow_speed"))),
+				"Upper clouds must drift faster than the Lower bank")
+		assert_lt(
+				float(materials[1].get_shader_parameter("flow_speed"))
+						* float(materials[2].get_shader_parameter("flow_speed")),
+				0.0,
+				"The two lower cloud banks must drift in opposite directions")
+		for lower_material: ShaderMaterial in [materials[1], materials[2]]:
+			assert_lt(float(lower_material.get_shader_parameter("lobe_height_scale")), 0.8,
+					"Lower cloud peaks must remain compressed")
+			assert_gt(float(lower_material.get_shader_parameter("bank_valley_depth")), 0.0,
+					"The lower bank must dip beneath the waterfall")
+			assert_lt(float(lower_material.get_shader_parameter("bank_valley_peak_scale")), 0.7,
+					"Random peaks must not visually cancel the waterfall-center dip")
+			assert_gt(float(lower_material.get_shader_parameter("bank_side_rise")), 0.0,
+					"The cloud bank must rise toward the left mountain and right blossom tree")
+			assert_gt(float(lower_material.get_shader_parameter("bank_join_height")), 0.0,
+					"The lower bank needs a connected shoulder above its solid baseline")
+			assert_gte(float(lower_material.get_shader_parameter("lobe_min_step_px")), 2.0,
+					"Lower lobe crests must not produce one-pixel-wide vertical spikes")
+			assert_lte(float(lower_material.get_shader_parameter("continuous_bob_scale")), 0.3,
+					"Lower independent bobbing must stay subtle enough to avoid choppy seams")
+		for material: ShaderMaterial in materials:
+			assert_eq(float(material.get_shader_parameter("inner_contrast")), 0.0,
+					"Moving tone blocks must not read as reverse-travelling holes")
+	assert_eq(seeds.size(), primary_names.size(),
+			"Every moving Scene2 cloud layer must use a distinct deterministic distribution")
+
+	for scene1_name: String in ["SmokeRoof", "SmokeRoofNear"]:
+		var scene1_material := scene1.get_node(scene1_name).material as ShaderMaterial
+		assert_eq(scene1_material.shader.resource_path, scene1_shader_path,
+				"Scene2 must reuse the proven Scene1 procedural pixel-cloud method")
+
+	for preserved_name: String in ["CloudFar", "CloudFar2", "CloudMid", "CloudMid2"]:
+		assert_true(stage.has_node(preserved_name),
+				"Replacing the two primary veils must preserve %s" % preserved_name)
+		if not stage.has_node(preserved_name):
+			continue
+		var preserved_cloud := stage.get_node(preserved_name)
+		assert_true(preserved_cloud is TextureRect,
+				"%s must remain an editable texture background layer" % preserved_name)
+		if preserved_cloud is TextureRect:
+			assert_not_null((preserved_cloud as TextureRect).texture)
+
+
+func test_scene2_blossom_tree_moves_masked_branches_not_the_trunk() -> void:
+	var stage := (load(SCENE2_PATH) as PackedScene).instantiate()
+	add_child_autofree(stage)
+	assert_true(stage.has_node("BlossomTree"))
+	if not stage.has_node("BlossomTree"):
+		return
+	var tree := stage.get_node("BlossomTree") as TextureRect
+	var material := tree.material as ShaderMaterial
+	assert_not_null(material)
+	if material == null or material.shader == null:
+		return
+	assert_eq(
+			material.shader.resource_path,
+			"res://assets/shaders/canvas_env_scene2_tree_sway.gdshader")
+	var branch_mask := material.get_shader_parameter("branch_mask") as Texture2D
+	assert_not_null(branch_mask,
+			"Tree sway requires an authored terminal-branch mask")
+	if branch_mask != null:
+		assert_eq(
+				branch_mask.resource_path,
+				"res://assets/scenes/scene2/scene2_blossom_branch_mask.png")
+	var underpaint := material.get_shader_parameter("underpaint_texture") as Texture2D
+	assert_not_null(underpaint,
+			"Moving branches need a separately painted hidden-trunk layer")
+	if underpaint != null:
+		assert_eq(
+				underpaint.resource_path,
+				"res://assets/scenes/scene2/scene2_blossom_underpaint.png")
+	assert_lte(float(material.get_shader_parameter("motion_fps")), 8.0)
+	assert_lte(float(material.get_shader_parameter("max_angle_deg")), 1.0)
+	assert_lte(float(material.get_shader_parameter("bouquet_angle_deg")), 1.5)
+	assert_lt(
+			float(material.get_shader_parameter("bouquet_cycle_sec")),
+			float(material.get_shader_parameter("cycle_sec")),
+			"The hanging blossom needs a lighter rhythm than the large branch groups")
+	var shader_source := material.shader.code
+	assert_true(shader_source.contains("floor(TIME * motion_fps)"),
+			"Tree sway must advance on pixel-art animation frames")
+	assert_true(shader_source.contains("moving_here"),
+			"Only explicitly masked branch pixels may leave the static source")
+	assert_true(shader_source.contains("inverse_rotate_pixel_uv"),
+			"Branches should hinge around fixed attachment points")
+	assert_true(shader_source.contains("bouquet_here"),
+			"The small hanging blossom must have its own encoded motion group")
+	assert_true(shader_source.contains("underpaint_texture"),
+			"Branch attachment gaps must be filled by a real hidden-trunk texture")
+	assert_false(shader_source.contains("1.0 - UV.y"),
+			"The rejected whole-image height ripple must not return")
 
 
 func test_scene2_p2_motion_uses_pixel_cadence_and_petal_flipbook() -> void:

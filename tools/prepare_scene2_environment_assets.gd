@@ -123,6 +123,8 @@ func _prepare_asset(job: Dictionary) -> bool:
 		return false
 
 	var output := image.get_region(used_rect)
+	if output_path.ends_with("scene2_stone_bridge.png"):
+		_cleanup_stone_bridge(output)
 	var error := output.save_png(ProjectSettings.globalize_path(output_path))
 	if error != OK:
 		push_error("Scene2 environment asset could not be saved: %s (%s)" % [output_path, error])
@@ -132,6 +134,134 @@ func _prepare_asset(job: Dictionary) -> bool:
 			"prepared %s -> %s | crop=%s | keyed=%d"
 			% [source_path, output_path, used_rect, keyed_pixels])
 	return true
+
+
+func _cleanup_stone_bridge(image: Image) -> void:
+	# Remove only very dark pixels that still touch the transparent sky above
+	# the walkable top. Two shallow passes clear the old exterior outline
+	# without reaching the authored stone shadows inside the bridge.
+	for _pass: int in 4:
+		var snapshot := image.duplicate() as Image
+		for y: int in mini(13, image.get_height()):
+			for x: int in image.get_width():
+				var color: Color = snapshot.get_pixel(x, y)
+				if color.a <= 0.0 or _luminance(color) >= 0.10:
+					continue
+				if _touches_transparent_exterior(snapshot, x, y):
+					image.set_pixel(x, y, Color.TRANSPARENT)
+
+	# The central opening is intentionally organic, but isolated one-column or
+	# one-row alpha spikes read as extraction damage at 7x nearest scaling.
+	# Regularize only singleton deviations of at most two source pixels.
+	for _pass: int in 2:
+		_regularize_opening_top(image)
+		_regularize_opening_sides(image)
+
+
+func _touches_transparent_exterior(image: Image, x: int, y: int) -> bool:
+	for offset_y: int in range(-1, 1):
+		for offset_x: int in range(-1, 2):
+			if offset_x == 0 and offset_y == 0:
+				continue
+			var pixel := Vector2i(x + offset_x, y + offset_y)
+			if pixel.y < 0:
+				return true
+			if pixel.x < 0 or pixel.x >= image.get_width():
+				continue
+			if image.get_pixelv(pixel).a <= 0.0:
+				return true
+	return false
+
+
+func _regularize_opening_top(image: Image) -> void:
+	var width := image.get_width()
+	var height := image.get_height()
+	var min_x := int(width * 0.28)
+	var max_x := int(width * 0.77)
+	var min_y := int(height * 0.16)
+	var tops := PackedInt32Array()
+	tops.resize(width)
+	tops.fill(-1)
+	for x: int in range(min_x, max_x + 1):
+		for y: int in range(maxi(min_y, 1), height):
+			if image.get_pixel(x, y).a <= 0.0 \
+					and image.get_pixel(x, y - 1).a > 0.0:
+				tops[x] = y
+				break
+
+	for x: int in range(min_x + 1, max_x):
+		var previous := tops[x - 1]
+		var current := tops[x]
+		var following := tops[x + 1]
+		if previous < 0 or current < 0 or previous != following:
+			continue
+		if current == previous or absi(current - previous) > 2:
+			continue
+		_set_opening_top(image, x, current, previous)
+
+
+func _set_opening_top(image: Image, x: int, current: int, target: int) -> void:
+	if target > current:
+		var source := image.get_pixel(x, maxi(current - 1, 0))
+		for y: int in range(current, target):
+			image.set_pixel(x, y, source)
+	else:
+		for y: int in range(target, current):
+			image.set_pixel(x, y, Color.TRANSPARENT)
+
+
+func _regularize_opening_sides(image: Image) -> void:
+	var width := image.get_width()
+	var height := image.get_height()
+	var center_x := width / 2
+	var min_y := int(height * 0.25)
+	var lefts := PackedInt32Array()
+	var rights := PackedInt32Array()
+	lefts.resize(height)
+	rights.resize(height)
+	lefts.fill(-1)
+	rights.fill(-1)
+	for y: int in range(min_y, height):
+		if image.get_pixel(center_x, y).a > 0.0:
+			continue
+		var left := center_x
+		var right := center_x
+		while left > 0 and image.get_pixel(left - 1, y).a <= 0.0:
+			left -= 1
+		while right < width - 1 and image.get_pixel(right + 1, y).a <= 0.0:
+			right += 1
+		lefts[y] = left
+		rights[y] = right
+
+	for y: int in range(min_y + 1, height - 1):
+		if lefts[y - 1] >= 0 and lefts[y - 1] == lefts[y + 1] \
+				and lefts[y] >= 0 and lefts[y] != lefts[y - 1] \
+				and absi(lefts[y] - lefts[y - 1]) <= 2:
+			_set_opening_left(image, y, lefts[y], lefts[y - 1])
+		if rights[y - 1] >= 0 and rights[y - 1] == rights[y + 1] \
+				and rights[y] >= 0 and rights[y] != rights[y - 1] \
+				and absi(rights[y] - rights[y - 1]) <= 2:
+			_set_opening_right(image, y, rights[y], rights[y - 1])
+
+
+func _set_opening_left(image: Image, y: int, current: int, target: int) -> void:
+	if target > current:
+		var source := image.get_pixel(maxi(current - 1, 0), y)
+		for x: int in range(current, target):
+			image.set_pixel(x, y, source)
+	else:
+		for x: int in range(target, current):
+			image.set_pixel(x, y, Color.TRANSPARENT)
+
+
+func _set_opening_right(image: Image, y: int, current: int, target: int) -> void:
+	if target < current:
+		var source := image.get_pixel(mini(current + 1, image.get_width() - 1), y)
+		for x: int in range(target + 1, current + 1):
+			image.set_pixel(x, y, source)
+	else:
+		for x: int in range(current + 1, target + 1):
+			image.set_pixel(x, y, Color.TRANSPARENT)
 
 
 func _key_light_background(

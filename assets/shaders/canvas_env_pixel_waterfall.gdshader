@@ -31,6 +31,7 @@ uniform float streak_length_px : hint_range(8.0, 120.0) = 34.0;
 uniform float mouth_depth_px : hint_range(12.0, 160.0) = 72.0;
 uniform float mouth_highlight_density : hint_range(0.0, 1.0) = 0.34;
 uniform float cross_join_density : hint_range(0.0, 0.5) = 0.06;
+uniform float major_streak_density : hint_range(0.0, 1.0) = 0.48;
 uniform float flow_highlight_density : hint_range(0.0, 1.0) = 0.18;
 uniform float flow_gap_strength : hint_range(0.0, 0.8) = 0.18;
 uniform float edge_drop_density : hint_range(0.0, 0.5) = 0.03;
@@ -194,7 +195,10 @@ void fragment() {
 	float streak_phase = mod(
 			px.y - flow_time * fall_speed_px + lane_seed * streak_period_px,
 			streak_period_px);
-	float long_streak = narrow_lane * (1.0 - step(streak_length_px, streak_phase));
+	float major_streak_lane = step(1.0 - major_streak_density, lane_seed_b);
+	float long_streak = narrow_lane
+			* major_streak_lane
+			* (1.0 - step(streak_length_px, streak_phase));
 	float thread_phase = mod(
 			px.y - flow_time * fall_speed_px * 1.34 + lane_seed_b * streak_period_px,
 			streak_period_px * 0.62);
@@ -210,25 +214,27 @@ void fragment() {
 			* mix(0.72, 1.0, step(
 					0.44,
 					hash21(vec2(section_row, floor(lane * 0.25) + 307.0))));
-	float edge_band = smoothstep(edge_shadow_start, 1.0, norm_x);
+	float edge_band = step(edge_shadow_start, norm_x);
 
-	vec3 water = deep_color.rgb;
-	water = mix(water, mid_color.rgb, 0.54 + long_streak * 0.14);
+	// Large, stable value masses make the fall read as one heavy body of water.
+	// Motion lives in a minority of broad lanes instead of recoloring every
+	// narrow thread independently.
+	vec3 water = mid_color.rgb;
+	water = mix(water, light_color.rgb, long_streak * 0.22);
 	water = mix(water, light_color.rgb, core_band * core_light_strength);
-	water = mix(water, light_color.rgb, long_streak * 0.28);
-	water = mix(water, foam_color.rgb, white_thread * 0.54);
+	water = mix(water, foam_color.rgb, white_thread * 0.30);
 	water = mix(
 			water,
 			light_color.rgb,
-			mouth_vertical * 0.62 + rare_cross_join * 0.30);
-	water = mix(water, foam_color.rgb, top_lip_segments * 0.60);
+			mouth_vertical * 0.38 + rare_cross_join * 0.16);
+	water = mix(water, foam_color.rgb, top_lip_segments * 0.42);
 	water = mix(water, deep_color.rgb, edge_band * edge_shadow_strength);
 
 	float alpha = body * body_alpha;
 	alpha *= 1.0 - moving_gap * flow_gap_strength;
 	float lower_breakup = smoothstep(0.72, 0.98, fy)
 			* step(0.91, hash21(vec2(lane + 19.0, flow_frame * 0.25)));
-	alpha *= 1.0 - lower_breakup * 0.34;
+	alpha *= 1.0 - lower_breakup * 0.18;
 
 	// Sparse droplets live just outside the stable silhouette.
 	float drop_zone = step(1.0, norm_x) * step(norm_x, 1.24) * in_height;
