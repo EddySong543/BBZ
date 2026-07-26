@@ -103,6 +103,11 @@ func _init() -> void:
 			if _is_static_skeleton(point):
 				continue
 			if Geometry2D.is_point_in_polygon(point, hanging_bouquet_region):
+				# Keep the supporting limb behind P2 static. Only the authored
+				# blossom pixels inside this region use the independent bouquet
+				# motion; blue/green-grey wood remains in the base texture.
+				if not _is_blossom_source_color(source.get_pixel(x, y)):
+					continue
 				mask.set_pixel(x, y, HANGING_BOUQUET)
 				counts[3] += 1
 			elif Geometry2D.is_point_in_polygon(point, left_region):
@@ -189,7 +194,8 @@ func _paint_blossom_repairs(source: Image, mask: Image, underpaint: Image) -> vo
 	# is part of the red left-branch group and was the remaining black repair.
 	for y: int in source.get_height():
 		for x: int in source.get_width():
-			if underpaint.get_pixel(x, y).a <= 0.05 \
+			if not _is_blossom_source_color(source.get_pixel(x, y)) \
+					or underpaint.get_pixel(x, y).a <= 0.05 \
 					or not Geometry2D.is_point_in_polygon(
 							Vector2(x + 0.5, y + 0.5),
 							p2_head_blossom_region):
@@ -205,7 +211,8 @@ func _paint_blossom_repairs(source: Image, mask: Image, underpaint: Image) -> vo
 	for y: int in source.get_height():
 		for x: int in source.get_width():
 			var mask_color := mask.get_pixel(x, y)
-			if underpaint.get_pixel(x, y).a <= 0.05 \
+			if not _is_blossom_source_color(source.get_pixel(x, y)) \
+					or underpaint.get_pixel(x, y).a <= 0.05 \
 					or not _is_hanging_bouquet(mask_color):
 				continue
 			var blossom := _find_nearest_blossom(source, x, y)
@@ -218,7 +225,7 @@ func _paint_blossom_repairs(source: Image, mask: Image, underpaint: Image) -> vo
 	# separation reveals pink foliage rather than the scene background.
 	for y: int in range(BLOSSOM_SEAM_RECT.position.y, BLOSSOM_SEAM_RECT.end.y):
 		for x: int in range(BLOSSOM_SEAM_RECT.position.x, BLOSSOM_SEAM_RECT.end.x):
-			if source.get_pixel(x, y).a <= 0.05:
+			if not _is_blossom_source_color(source.get_pixel(x, y)):
 				continue
 			if not _near_mask_group(mask, x, y, true) \
 					or not _near_mask_group(mask, x, y, false):
@@ -283,6 +290,15 @@ func _is_blossom_color(color: Color) -> bool:
 	if color.a <= 0.5 or color.r <= 0.34:
 		return false
 	return color.r >= color.g * 1.16 and color.r >= color.b * 1.06
+
+
+func _is_blossom_source_color(color: Color) -> bool:
+	if color.a <= 0.5:
+		return false
+	# The cluster includes dark magenta shadow pixels that are below the bright
+	# blossom sampling threshold. Red remains dominant in those authored pixels,
+	# while the adjacent trunk palette is blue/green-grey.
+	return color.r > color.g * 1.12 and color.r > color.b * 0.88
 
 
 func _find_nearest_wood(

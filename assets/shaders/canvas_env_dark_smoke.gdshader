@@ -53,6 +53,13 @@ uniform float bank_valley_peak_scale : hint_range(0.2, 1.0, 0.05) = 1.0;
 uniform float bank_side_rise : hint_range(0.0, 0.25, 0.01) = 0.0;
 uniform float bank_join_height : hint_range(0.0, 0.3, 0.01) = 0.0;
 uniform float bank_join_variation : hint_range(0.0, 0.08, 0.005) = 0.0;
+// Scene2-only reflected water light. Defaults to zero so Scene1's shared
+// procedural clouds retain their established appearance.
+uniform vec4 water_reflect_color : source_color = vec4(0.58, 0.73, 0.72, 1.0);
+uniform float water_reflect_strength : hint_range(0.0, 0.35, 0.01) = 0.0;
+uniform float water_reflect_center_x : hint_range(0.0, 1.0, 0.01) = 0.5;
+uniform float water_reflect_half_width : hint_range(0.02, 0.4, 0.01) = 0.12;
+uniform float water_reflect_edge_h : hint_range(0.005, 0.12, 0.005) = 0.03;
 
 float hash(vec2 p) {
 	p = mod(p, 289.0);   // ⚠入口取模压量级——sid×31 级大数会让 sin 精度劣化·随机失真（碎齿率失控教训）
@@ -338,5 +345,24 @@ void fragment() {
 
 	float a = min(cover, 1.0) * alpha_max * fill_color.a;
 	vec3 rgb = mix(body_rgb, lit_color.rgb, clamp(lit, 0.0, 1.0) * lit_strength);
+
+	// water_reflect_underside: a single hard cyan value on the lower edge of
+	// isolated cloud masses near the fall. Continuous cloud banks do not gain
+	// a false glowing outline.
+	float cover_down = smoke_cover(
+			cu_c, cv_c + water_reflect_edge_h, t, h_units, uvq.x);
+	float lower_edge = cover * (1.0 - min(cover_down, 1.0));
+	float reflect_distance = abs(uvq.x - water_reflect_center_x);
+	float reflect_axis = 1.0 - smoothstep(
+			water_reflect_half_width,
+			water_reflect_half_width + 0.05,
+			reflect_distance);
+	float water_reflect_underside = step(
+			0.12,
+			lower_edge * reflect_axis * mode_isolated);
+	rgb = mix(
+			rgb,
+			water_reflect_color.rgb,
+			water_reflect_underside * water_reflect_strength);
 	COLOR = vec4(rgb, a);
 }

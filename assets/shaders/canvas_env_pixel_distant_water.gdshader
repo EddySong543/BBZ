@@ -33,6 +33,18 @@ uniform float line_density : hint_range(0.0, 0.6) = 0.18;
 uniform float line_strength : hint_range(0.0, 0.8) = 0.26;
 group_uniforms;
 
+group_uniforms waterfall_landing;
+uniform float landing_center_x : hint_range(0.0, 1.0) = 0.40;
+uniform float landing_center_y : hint_range(0.0, 1.0) = 0.62;
+uniform float landing_half_width_px : hint_range(24.0, 320.0) = 150.0;
+uniform float landing_half_height_px : hint_range(3.0, 48.0) = 15.0;
+uniform float landing_period_sec : hint_range(3.0, 12.0) = 6.0;
+uniform vec4 landing_light_color : source_color = vec4(0.65, 0.78, 0.76, 1.0);
+uniform vec4 landing_shadow_color : source_color = vec4(0.10, 0.24, 0.29, 1.0);
+uniform float landing_light_strength : hint_range(0.0, 0.5) = 0.0;
+uniform float landing_shadow_strength : hint_range(0.0, 0.4) = 0.0;
+group_uniforms;
+
 
 float hash21(vec2 p) {
 	p = mod(p, vec2(509.0, 251.0));
@@ -78,6 +90,47 @@ void fragment() {
 	float segment = row_line * active * (1.0 - step(segment_length, cell_x));
 	float line_fade = smoothstep(0.08, 0.28, depth) * (1.0 - smoothstep(0.78, 1.0, depth));
 	col = mix(col, highlight_color.rgb, segment * line_fade * line_strength);
+
+	// waterfall_landing_response: a narrow, broken value change inside the
+	// existing far-water channel. It is intentionally not a separate impact
+	// sprite or an expanding ring, so the bridge opening stays quiet.
+	vec2 landing_delta = vec2(
+			(px.x - landing_center_x * size_px.x)
+					/ max(landing_half_width_px, 1.0),
+			(px.y - landing_center_y * size_px.y)
+					/ max(landing_half_height_px, 1.0));
+	float landing_envelope = 1.0 - smoothstep(
+			0.58, 1.0, dot(landing_delta, landing_delta));
+	float landing_phase = 0.5 + 0.5 * sin(
+			t / max(landing_period_sec, 0.001) * TAU);
+	float landing_step = floor(landing_phase * 2.0 + 0.5) * 0.5;
+	float landing_cell_width = 42.0;
+	float landing_cell_id = floor(
+			(px.x - landing_center_x * size_px.x)
+					/ landing_cell_width);
+	float landing_fragment = step(
+			0.28,
+			hash21(vec2(landing_cell_id, 113.0)));
+	float light_row = 1.0 - step(
+			px_size * 1.5,
+			abs(px.y - landing_center_y * size_px.y
+					+ px_size * landing_step));
+	float shadow_row = 1.0 - step(
+			px_size * 1.5,
+			abs(px.y - landing_center_y * size_px.y
+					- px_size * (2.0 + landing_step)));
+	float landing_light = landing_envelope * landing_fragment * (
+			0.38 + light_row * (0.34 + landing_step * 0.28));
+	float landing_shadow = landing_envelope * landing_fragment * shadow_row
+			* (0.72 - landing_step * 0.28);
+	col = mix(
+			col,
+			landing_light_color.rgb,
+			landing_light * landing_light_strength);
+	col = mix(
+			col,
+			landing_shadow_color.rgb,
+			landing_shadow * landing_shadow_strength);
 
 	// Quantize the final palette lightly so the strip stays compatible with
 	// the scene's pixel-art value grouping.
