@@ -127,6 +127,7 @@ void fragment() {
 	quiet_col = mix(quiet_color.rgb, quiet_col, quiet_contrast)
 			+ vec3(quiet_lift);
 	col = mix(col, quiet_col, quiet_mask);
-	COLOR = vec4(clamp(col, vec3(0.0), vec3(1.0)), result.a)
-			* vec4(result.rgb, result.a) * node_modulate;
+	COLOR = vec4(
+			clamp(col, vec3(0.0), vec3(1.0)) * node_modulate.rgb,
+			result.a * node_modulate.a);
 }

@@ -27,9 +27,8 @@
 [ext_resource type="Texture2D" uid="uid://bkvwcoklu2ckc" path="res://assets/scenes/scene2/scene2_blossom_underpaint.png" id="25_tree_underpaint"]
 [ext_resource type="Shader" uid="uid://0y5snesaaroo" path="res://assets/shaders/canvas_env_scene2_mountain_blossom_sway.gdshader" id="26_mountain_blossom_sway"]
 [ext_resource type="Texture2D" uid="uid://1qlaexn2wn4h" path="res://assets/scenes/scene2/scene2_mountain_left_branch_mask.png" id="27_mountain_left_branch_mask"]
-[ext_resource type="Shader" uid="uid://dqddl4m26qhlf" path="res://assets/shaders/canvas_env_scene2_waterfall_ridge.gdshader" id="28_waterfall_ridge"]
-[ext_resource type="Texture2D" uid="uid://bnlc7crvxeckg" path="res://assets/scenes/scene2/scene2_waterfall_ridge_left.png" id="29_waterfall_ridge_left"]
-[ext_resource type="Texture2D" uid="uid://0pngr0tcwprn" path="res://assets/scenes/scene2/scene2_waterfall_ridge_right.png" id="30_waterfall_ridge_right"]
+[ext_resource type="Texture2D" uid="uid://bh6jl6er3487h" path="res://assets/scenes/scene2/scene2_waterfall_ridge.png" id="29_waterfall_ridge"]
+[ext_resource type="Texture2D" uid="uid://51o5vfvj82bl" path="res://assets/scenes/scene2/scene2_waterfall_ridge_contact.png" id="30_waterfall_ridge_contact"]
 
 [sub_resource type="ShaderMaterial" id="SkyGradeMat"]
 shader = ExtResource("14_sky_grade")
@@ -54,13 +53,14 @@ shader_parameter/glow_falloff = 2.2
 shader_parameter/flicker_amount = 0.03
 shader_parameter/flicker_speed = 0.5
 
-[sub_resource type="ShaderMaterial" id="FarMountainMat"]
+[sub_resource type="ShaderMaterial" id="FarMountain4Mat"]
+resource_local_to_scene = true
 shader = ExtResource("15_depth_grade")
-shader_parameter/saturation = 0.36
-shader_parameter/contrast = 0.7
-shader_parameter/brightness = 0.96
+shader_parameter/saturation = 0.18
+shader_parameter/contrast = 0.66
+shader_parameter/brightness = 0.95
 shader_parameter/atmosphere_color = Color(0.68, 0.78, 0.82, 1)
-shader_parameter/atmosphere_strength = 0.24
+shader_parameter/atmosphere_strength = 0.44
 shader_parameter/quiet_center = Vector2(0.5, 0.5)
 shader_parameter/quiet_radius = Vector2(0.2, 0.2)
 shader_parameter/quiet_strength = 0.0
@@ -68,6 +68,44 @@ shader_parameter/quiet_color = Color(0.72, 0.76, 0.72, 1)
 shader_parameter/quiet_saturation = 0.35
 shader_parameter/quiet_contrast = 0.5
 shader_parameter/quiet_lift = 0.0
+shader_parameter/edge_cleanup_strength = 0.0
+shader_parameter/edge_cleanup_luma_min = 0.74
+
+[sub_resource type="ShaderMaterial" id="FarMountain3Mat"]
+resource_local_to_scene = true
+shader = ExtResource("15_depth_grade")
+shader_parameter/saturation = 0.2
+shader_parameter/contrast = 0.68
+shader_parameter/brightness = 0.96
+shader_parameter/atmosphere_color = Color(0.68, 0.78, 0.82, 1)
+shader_parameter/atmosphere_strength = 0.42
+shader_parameter/quiet_center = Vector2(0.5, 0.5)
+shader_parameter/quiet_radius = Vector2(0.2, 0.2)
+shader_parameter/quiet_strength = 0.0
+shader_parameter/quiet_color = Color(0.72, 0.76, 0.72, 1)
+shader_parameter/quiet_saturation = 0.35
+shader_parameter/quiet_contrast = 0.5
+shader_parameter/quiet_lift = 0.0
+shader_parameter/edge_cleanup_strength = 0.0
+shader_parameter/edge_cleanup_luma_min = 0.74
+
+[sub_resource type="ShaderMaterial" id="FarMountain2Mat"]
+resource_local_to_scene = true
+shader = ExtResource("15_depth_grade")
+shader_parameter/saturation = 0.22
+shader_parameter/contrast = 0.7
+shader_parameter/brightness = 0.97
+shader_parameter/atmosphere_color = Color(0.68, 0.78, 0.82, 1)
+shader_parameter/atmosphere_strength = 0.4
+shader_parameter/quiet_center = Vector2(0.5, 0.5)
+shader_parameter/quiet_radius = Vector2(0.2, 0.2)
+shader_parameter/quiet_strength = 0.0
+shader_parameter/quiet_color = Color(0.72, 0.76, 0.72, 1)
+shader_parameter/quiet_saturation = 0.35
+shader_parameter/quiet_contrast = 0.5
+shader_parameter/quiet_lift = 0.0
+shader_parameter/edge_cleanup_strength = 0.0
+shader_parameter/edge_cleanup_luma_min = 0.74
 
 [sub_resource type="ShaderMaterial" id="CloudFarMat"]
 shader = ExtResource("15_depth_grade")
@@ -83,6 +121,8 @@ shader_parameter/quiet_color = Color(0.72, 0.76, 0.72, 1)
 shader_parameter/quiet_saturation = 0.35
 shader_parameter/quiet_contrast = 0.5
 shader_parameter/quiet_lift = 0.0
+shader_parameter/edge_cleanup_strength = 0.0
+shader_parameter/edge_cleanup_luma_min = 0.74
 
 [sub_resource type="ShaderMaterial" id="WaterfallCloudLower2Mat"]
 shader = ExtResource("21_cloud_motion")
@@ -108,13 +148,14 @@ shader_parameter/roll_bands = 3.0
 shader_parameter/edge_depth_px = 10.0
 shader_parameter/core_alpha_threshold = 0.55
 
-[sub_resource type="ShaderMaterial" id="MidMountainMat"]
+[sub_resource type="ShaderMaterial" id="FarMountainMat"]
+resource_local_to_scene = true
 shader = ExtResource("15_depth_grade")
-shader_parameter/saturation = 0.4
-shader_parameter/contrast = 0.78
-shader_parameter/brightness = 0.94
-shader_parameter/atmosphere_color = Color(0.48, 0.7, 0.64, 1)
-shader_parameter/atmosphere_strength = 0.22
+shader_parameter/saturation = 0.24
+shader_parameter/contrast = 0.72
+shader_parameter/brightness = 0.98
+shader_parameter/atmosphere_color = Color(0.68, 0.78, 0.82, 1)
+shader_parameter/atmosphere_strength = 0.38
 shader_parameter/quiet_center = Vector2(0.5, 0.5)
 shader_parameter/quiet_radius = Vector2(0.2, 0.2)
 shader_parameter/quiet_strength = 0.0
@@ -122,40 +163,40 @@ shader_parameter/quiet_color = Color(0.72, 0.76, 0.72, 1)
 shader_parameter/quiet_saturation = 0.35
 shader_parameter/quiet_contrast = 0.5
 shader_parameter/quiet_lift = 0.0
+shader_parameter/edge_cleanup_strength = 0.0
+shader_parameter/edge_cleanup_luma_min = 0.74
 
 [sub_resource type="ShaderMaterial" id="WaterfallLeftMat"]
 shader = ExtResource("9_waterfall")
 shader_parameter/size_px = Vector2(720, 1216)
 shader_parameter/render_part = 0
-shader_parameter/px_size = 3.0
+shader_parameter/px_size = 4.0
 shader_parameter/center_x = 0.5
-shader_parameter/top_y = 0.08
+shader_parameter/top_y = 0.12
 shader_parameter/bottom_y = 0.86
 shader_parameter/top_half_width_px = 112.0
 shader_parameter/bottom_half_width_px = 174.0
-shader_parameter/bend_px = 12.0
-shader_parameter/edge_step_px = 4.0
-shader_parameter/edge_wobble_px = 4.0
+shader_parameter/bend_px = 0.0
+shader_parameter/edge_step_px = 2.0
+shader_parameter/edge_wobble_px = 0.0
 shader_parameter/section_height_px = 48.0
-shader_parameter/section_width_wobble_px = 16.0
-shader_parameter/section_center_wobble_px = 8.0
-shader_parameter/ridge_profile_enabled = 1.0
-shader_parameter/left_top_edge_px = 88.0
-shader_parameter/left_ridge_edge_px = 306.0
-shader_parameter/left_lower_edge_px = 164.0
-shader_parameter/left_ridge_turn = 0.55
-shader_parameter/right_top_edge_px = 540.0
-shader_parameter/right_ridge_edge_px = 602.0
-shader_parameter/right_fan_edge_px = 712.0
-shader_parameter/right_bottom_edge_px = 718.0
-shader_parameter/right_flare_turn = 0.46
-shader_parameter/right_fan_turn = 0.72
+shader_parameter/section_width_wobble_px = 0.0
+shader_parameter/section_center_wobble_px = 0.0
+shader_parameter/vertical_profile_enabled = 1.0
+shader_parameter/left_edge_upper_px = 55.862002653445
+shader_parameter/left_edge_middle_px = 108.27600514311
+shader_parameter/left_edge_lower_px = 210.0
+shader_parameter/right_edge_upper_px = 465.0000049875
+shader_parameter/right_edge_middle_px = 559.82800949183
+shader_parameter/right_edge_lower_px = 600.0
+shader_parameter/vertical_step_one_y = 0.27999999746675996
+shader_parameter/vertical_step_two_y = 0.70999999158071
 shader_parameter/anim_fps = 8.0
 shader_parameter/flow_cycle_frames = 8.0
 shader_parameter/fall_speed_px = 78.0
-shader_parameter/lane_width_px = 16.0
-shader_parameter/streak_period_px = 144.0
-shader_parameter/streak_length_px = 64.0
+shader_parameter/lane_width_px = 8.0
+shader_parameter/streak_period_px = 96.0
+shader_parameter/streak_length_px = 32.0
 shader_parameter/mouth_depth_px = 84.0
 shader_parameter/mouth_highlight_density = 0.22
 shader_parameter/cross_join_density = 0.025
@@ -177,71 +218,32 @@ shader_parameter/ripple_reach_px = 210.0
 shader_parameter/ripple_thickness_px = 4.0
 shader_parameter/ripple_segment_density = 0.32
 shader_parameter/ripple_shadow_strength = 0.3
-shader_parameter/deep_color = Color(0.22, 0.38, 0.43, 1)
-shader_parameter/mid_color = Color(0.36, 0.56, 0.59, 1)
-shader_parameter/light_color = Color(0.55, 0.72, 0.7, 1)
-shader_parameter/foam_color = Color(0.88, 0.94, 0.88, 1)
-shader_parameter/mist_color = Color(0.66, 0.8, 0.8, 1)
-shader_parameter/ripple_shadow_color = Color(0.07, 0.2, 0.24, 1)
+shader_parameter/deep_color = Color(0.055, 0.24, 0.29, 1)
+shader_parameter/mid_color = Color(0.12, 0.46, 0.52, 1)
+shader_parameter/light_color = Color(0.36, 0.67, 0.69, 1)
+shader_parameter/foam_color = Color(0.78, 0.9, 0.85, 1)
+shader_parameter/mist_color = Color(0.48, 0.67, 0.68, 1)
+shader_parameter/ripple_shadow_color = Color(0.06, 0.18, 0.21, 1)
 shader_parameter/body_alpha = 1.0
 shader_parameter/mist_alpha = 0.06
 shader_parameter/core_width_ratio = 0.32
-shader_parameter/core_light_strength = 0.12
-shader_parameter/edge_shadow_start = 0.82
-shader_parameter/edge_shadow_strength = 0.38
-shader_parameter/contact_shadow_width_px = 18.0
-shader_parameter/contact_shadow_strength = 0.32
+shader_parameter/core_light_strength = 0.0
+shader_parameter/edge_shadow_start = 0.9
+shader_parameter/edge_shadow_strength = 0.48
+shader_parameter/contact_shadow_width_px = 32.0
+shader_parameter/contact_shadow_strength = 0.56
 shader_parameter/contact_glint_density = 0.18
-shader_parameter/contact_glint_strength = 0.24
+shader_parameter/contact_glint_strength = 0.16
+shader_parameter/contact_rock_color = Color(0.08, 0.2, 0.24, 1)
+shader_parameter/contact_rock_mix = 0.58
+shader_parameter/contact_notch_depth_px = 6.0
+shader_parameter/contact_notch_density = 0.0
 shader_parameter/cloud_cut_enabled = 1.0
-shader_parameter/cloud_cut_center_y = 0.29
-shader_parameter/cloud_cut_half_height_px = 12.0
+shader_parameter/cloud_cut_center_y = 0.5010000237975
+shader_parameter/cloud_cut_half_height_px = 22.0
 shader_parameter/cloud_cut_cell_px = 18.0
 shader_parameter/cloud_cut_density = 0.82
-shader_parameter/cloud_cut_strength = 0.08
-
-[sub_resource type="ShaderMaterial" id="WaterfallRidgeLeftMat"]
-shader = ExtResource("28_waterfall_ridge")
-shader_parameter/top_color = Color(0.21, 0.32, 0.36, 1)
-shader_parameter/bottom_color = Color(0.2, 0.32, 0.35, 1)
-shader_parameter/atmosphere_color = Color(0.38, 0.49, 0.51, 1)
-shader_parameter/atmosphere_strength = 0.01
-shader_parameter/structure_sample_radius_px = 12.0
-shader_parameter/source_structure_strength = 0.16
-shader_parameter/lower_haze_strength = 0.02
-shader_parameter/opacity = 0.999999977648
-shader_parameter/inner_edge_direction = 1.0
-shader_parameter/inner_reflect_color = Color(0.5, 0.67, 0.67, 1)
-shader_parameter/inner_reflect_strength = 0.12
-shader_parameter/inner_reflect_width_px = 3.0
-shader_parameter/inner_reflect_top = 0.12
-shader_parameter/inner_reflect_bottom = 0.8
-shader_parameter/inner_trim_enabled = 0.0
-
-[sub_resource type="ShaderMaterial" id="WaterfallRidgeRightMat"]
-shader = ExtResource("28_waterfall_ridge")
-shader_parameter/top_color = Color(0.21, 0.32, 0.36, 1)
-shader_parameter/bottom_color = Color(0.2, 0.32, 0.35, 1)
-shader_parameter/atmosphere_color = Color(0.38, 0.49, 0.51, 1)
-shader_parameter/atmosphere_strength = 0.01
-shader_parameter/structure_sample_radius_px = 12.0
-shader_parameter/source_structure_strength = 0.16
-shader_parameter/lower_haze_strength = 0.02
-shader_parameter/opacity = 1.0
-shader_parameter/inner_edge_direction = -1.0
-shader_parameter/inner_reflect_color = Color(0.5, 0.67, 0.67, 1)
-shader_parameter/inner_reflect_strength = 0.1
-shader_parameter/inner_reflect_width_px = 3.0
-shader_parameter/inner_reflect_top = 0.12
-shader_parameter/inner_reflect_bottom = 0.8
-shader_parameter/inner_trim_enabled = 1.0
-shader_parameter/inner_trim_start_y = 0.03
-shader_parameter/inner_trim_base_px = 10.0
-shader_parameter/inner_trim_max_px = 54.0
-shader_parameter/inner_trim_steps = 44.0
-shader_parameter/inner_trim_quantum_px = 1.0
-shader_parameter/inner_trim_lower_start = 0.52
-shader_parameter/inner_trim_lower_extra_px = 8.0
+shader_parameter/cloud_cut_strength = 0.0
 
 [sub_resource type="ShaderMaterial" id="CloudMidMat"]
 shader = ExtResource("15_depth_grade")
@@ -257,6 +259,25 @@ shader_parameter/quiet_color = Color(0.72, 0.76, 0.72, 1)
 shader_parameter/quiet_saturation = 0.35
 shader_parameter/quiet_contrast = 0.5
 shader_parameter/quiet_lift = 0.0
+shader_parameter/edge_cleanup_strength = 0.0
+shader_parameter/edge_cleanup_luma_min = 0.74
+
+[sub_resource type="ShaderMaterial" id="MidMountainMat"]
+shader = ExtResource("15_depth_grade")
+shader_parameter/saturation = 0.28
+shader_parameter/contrast = 0.74
+shader_parameter/brightness = 0.96
+shader_parameter/atmosphere_color = Color(0.42, 0.58, 0.56, 1)
+shader_parameter/atmosphere_strength = 0.34
+shader_parameter/quiet_center = Vector2(0.5, 0.5)
+shader_parameter/quiet_radius = Vector2(0.2, 0.2)
+shader_parameter/quiet_strength = 0.0
+shader_parameter/quiet_color = Color(0.72, 0.76, 0.72, 1)
+shader_parameter/quiet_saturation = 0.35
+shader_parameter/quiet_contrast = 0.5
+shader_parameter/quiet_lift = 0.0
+shader_parameter/edge_cleanup_strength = 1.0
+shader_parameter/edge_cleanup_luma_min = 0.0
 
 [sub_resource type="ShaderMaterial" id="WaterfallCloudUpperMat"]
 shader = ExtResource("22_pixel_cloud")
@@ -305,11 +326,11 @@ shader_parameter/water_reflect_edge_h = 0.03
 
 [sub_resource type="ShaderMaterial" id="MountainRightMat"]
 shader = ExtResource("15_depth_grade")
-shader_parameter/saturation = 0.72
-shader_parameter/contrast = 0.82
-shader_parameter/brightness = 0.94
-shader_parameter/atmosphere_color = Color(0.62, 0.73, 0.73, 1)
-shader_parameter/atmosphere_strength = 0.26
+shader_parameter/saturation = 0.5
+shader_parameter/contrast = 0.8
+shader_parameter/brightness = 0.9
+shader_parameter/atmosphere_color = Color(0.43, 0.54, 0.52, 1)
+shader_parameter/atmosphere_strength = 0.36
 shader_parameter/quiet_center = Vector2(0.5, 0.5)
 shader_parameter/quiet_radius = Vector2(0.2, 0.2)
 shader_parameter/quiet_strength = 0.0
@@ -317,6 +338,8 @@ shader_parameter/quiet_color = Color(0.72, 0.76, 0.72, 1)
 shader_parameter/quiet_saturation = 0.35
 shader_parameter/quiet_contrast = 0.5
 shader_parameter/quiet_lift = 0.0
+shader_parameter/edge_cleanup_strength = 0.0
+shader_parameter/edge_cleanup_luma_min = 0.74
 
 [sub_resource type="ShaderMaterial" id="WaterfallCloudLowerMat"]
 shader = ExtResource("22_pixel_cloud")
@@ -416,9 +439,9 @@ shader_parameter/cycle_sec = 9.5
 shader_parameter/max_angle_deg = 2.2
 shader_parameter/phase_offset = 0.45
 shader_parameter/saturation = 0.88
-shader_parameter/contrast = 0.92
-shader_parameter/brightness = 0.97
-shader_parameter/atmosphere_color = Color(0.65, 0.72, 0.68, 1)
+shader_parameter/contrast = 1.02
+shader_parameter/brightness = 0.94
+shader_parameter/atmosphere_color = Color(0.44, 0.52, 0.48, 1)
 shader_parameter/atmosphere_strength = 0.08
 shader_parameter/quiet_center = Vector2(0.5, 0.5)
 shader_parameter/quiet_radius = Vector2(0.2, 0.2)
@@ -638,9 +661,9 @@ metadata/parallax_factor = 0.08
 metadata/_edit_lock_ = true
 
 [node name="FarMountain4" type="TextureRect" parent="." unique_id=1892634890]
-self_modulate = Color(0.76, 0.88, 0.94, 0.6)
+self_modulate = Color(0.84, 0.91, 0.93, 0.84)
 texture_filter = 1
-material = SubResource("FarMountainMat")
+material = SubResource("FarMountain4Mat")
 layout_mode = 0
 offset_left = 875.0
 offset_top = 105.0
@@ -653,9 +676,9 @@ metadata/parallax_factor = 0.04
 metadata/_edit_lock_ = true
 
 [node name="FarMountain3" type="TextureRect" parent="." unique_id=1538472321]
-self_modulate = Color(0.76, 0.88, 0.94, 0.6)
+self_modulate = Color(0.84, 0.91, 0.93, 0.88)
 texture_filter = 1
-material = SubResource("FarMountainMat")
+material = SubResource("FarMountain3Mat")
 layout_mode = 0
 offset_left = -1022.0
 offset_top = 52.0
@@ -668,9 +691,9 @@ metadata/parallax_factor = 0.04
 metadata/_edit_lock_ = true
 
 [node name="FarMountain2" type="TextureRect" parent="." unique_id=1118898413]
-self_modulate = Color(0.76, 0.88, 0.94, 0.6)
+self_modulate = Color(0.86, 0.92, 0.93, 0.92)
 texture_filter = 1
-material = SubResource("FarMountainMat")
+material = SubResource("FarMountain2Mat")
 layout_mode = 0
 offset_left = 254.0
 offset_top = 91.0
@@ -713,7 +736,7 @@ metadata/parallax_factor = 0.3
 metadata/_edit_lock_ = true
 
 [node name="FarMountain" type="TextureRect" parent="." unique_id=180199560]
-self_modulate = Color(0.76, 0.88, 0.94, 0.6)
+self_modulate = Color(0.88, 0.94, 0.94, 0.96)
 texture_filter = 1
 material = SubResource("FarMountainMat")
 layout_mode = 0
@@ -727,57 +750,38 @@ expand_mode = 1
 metadata/parallax_factor = 0.04
 metadata/_edit_lock_ = true
 
-[node name="MidMountain" type="TextureRect" parent="." unique_id=1453616768]
-self_modulate = Color(0.74, 0.9, 0.8, 0.78)
+[node name="WaterfallRidgeLeft" type="TextureRect" parent="." unique_id=1185322863]
 texture_filter = 1
-material = SubResource("MidMountainMat")
 layout_mode = 0
-offset_left = -149.33
-offset_top = 100.0
-offset_right = 1876.67
-offset_bottom = 852.0
+offset_left = 88.0
+offset_top = -70.0
+offset_right = 984.0
+offset_bottom = 906.0
 mouse_filter = 2
-texture = ExtResource("13_mid_mountain")
+texture = ExtResource("29_waterfall_ridge")
 expand_mode = 1
-metadata/parallax_factor = 0.08
-metadata/_edit_lock_ = true
+metadata/parallax_factor = 0.16
 
 [node name="Waterfall" type="ColorRect" parent="." unique_id=1153043618]
 material = SubResource("WaterfallLeftMat")
 layout_mode = 0
-offset_left = 322.0
-offset_top = -96.0
-offset_right = 1042.0
-offset_bottom = 1120.0
+offset_left = 334.0
+offset_top = -152.0
+offset_right = 1054.0
+offset_bottom = 1064.0
 mouse_filter = 2
 color = Color(0, 0, 0, 0)
 metadata/parallax_factor = 0.18
-metadata/_edit_lock_ = true
 
-[node name="WaterfallRidgeLeft" type="TextureRect" parent="." unique_id=1185322863]
+[node name="WaterfallRidgeContact" type="TextureRect" parent="." unique_id=146865893]
 texture_filter = 1
-material = SubResource("WaterfallRidgeLeftMat")
 layout_mode = 0
-offset_left = 275.0
-offset_top = -1.0
-offset_right = 736.0
-offset_bottom = 708.0
+offset_left = 88.0
+offset_top = -70.0
+offset_right = 984.0
+offset_bottom = 906.0
 mouse_filter = 2
-texture = ExtResource("29_waterfall_ridge_left")
-expand_mode = 1
-metadata/parallax_factor = 0.16
-metadata/_edit_lock_ = true
-
-[node name="WaterfallRidgeRight" type="TextureRect" parent="." unique_id=1707538052]
-texture_filter = 1
-material = SubResource("WaterfallRidgeRightMat")
-layout_mode = 0
-offset_left = 774.0
-offset_top = -6.0
-offset_right = 1206.0
-offset_bottom = 714.0
-mouse_filter = 2
-texture = ExtResource("30_waterfall_ridge_right")
+texture = ExtResource("30_waterfall_ridge_contact")
 expand_mode = 1
 metadata/parallax_factor = 0.16
 metadata/_edit_lock_ = true
@@ -797,6 +801,21 @@ expand_mode = 1
 metadata/parallax_factor = 0.06
 metadata/_edit_lock_ = true
 
+[node name="MidMountain" type="TextureRect" parent="." unique_id=1453616768]
+self_modulate = Color(0.8, 0.92, 0.86, 0.9)
+texture_filter = 1
+material = SubResource("MidMountainMat")
+layout_mode = 0
+offset_left = -149.33
+offset_top = 100.0
+offset_right = 1876.67
+offset_bottom = 852.0
+mouse_filter = 2
+texture = ExtResource("13_mid_mountain")
+expand_mode = 1
+metadata/parallax_factor = 0.08
+metadata/_edit_lock_ = true
+
 [node name="CloudMid2" type="TextureRect" parent="." unique_id=264036609]
 self_modulate = Color(0.82, 0.9, 0.92, 0.28)
 texture_filter = 1
@@ -810,14 +829,15 @@ mouse_filter = 2
 texture = ExtResource("17_cloud_tower")
 expand_mode = 1
 metadata/parallax_factor = 0.06
+metadata/_edit_lock_ = true
 
 [node name="WaterfallCloudUpper" type="ColorRect" parent="." unique_id=967729110]
 material = SubResource("WaterfallCloudUpperMat")
 layout_mode = 0
 offset_left = -120.0
-offset_top = 126.815
+offset_top = 160.625
 offset_right = 1760.0
-offset_bottom = 306.81488
+offset_bottom = 340.62482
 mouse_filter = 2
 metadata/parallax_factor = 0.2
 metadata/_edit_lock_ = true

@@ -215,6 +215,19 @@ func test_scene2_uses_formal_environment_assets_and_depth_layers() -> void:
 			"The far mountain must receive a non-blurring atmospheric grade")
 	assert_not_null((stage.get_node("MidMountain") as TextureRect).material,
 			"The mid mountain must receive a non-blurring atmospheric grade")
+	var far_mountain_materials: Array[Material] = []
+	for far_name: String in [
+		"FarMountain4", "FarMountain3", "FarMountain2", "FarMountain",
+	]:
+		var far_layer := stage.get_node(far_name) as TextureRect
+		assert_not_null(far_layer.material,
+				"%s must expose its own editable depth material" % far_name)
+		if far_layer.material == null:
+			continue
+		for prior_material: Material in far_mountain_materials:
+			assert_ne(far_layer.material, prior_material,
+					"Far-mountain copies must not share one material instance")
+		far_mountain_materials.append(far_layer.material)
 	if stage.has_node("MountainLeft") and stage.has_node("MountainRight"):
 		assert_true((stage.get_node("MountainLeft") as TextureRect).visible)
 		assert_true((stage.get_node("MountainRight") as TextureRect).visible)
@@ -316,8 +329,8 @@ func test_scene2_uses_one_full_height_waterfall() -> void:
 	assert_false(scene_source.contains("WaterfallMiddleMat"))
 	assert_false(scene_source.contains("WaterfallLowerMat"))
 	assert_true(waterfall.visible)
-	assert_lte(waterfall.position.y, 0.0)
-	assert_gte(waterfall.position.y + waterfall.size.y, 1080.0)
+	assert_gt(waterfall.size.y, 720.0,
+			"The authored waterfall must remain a tall background element")
 	assert_lt(waterfall.get_index(), bridge.get_index())
 	assert_lt(waterfall.get_index(), river.get_index())
 	assert_not_null(material)
@@ -325,22 +338,17 @@ func test_scene2_uses_one_full_height_waterfall() -> void:
 			"res://assets/shaders/canvas_env_pixel_waterfall.gdshader")
 	assert_eq(int(material.get_shader_parameter("render_part")), 0)
 	assert_eq(material.get_shader_parameter("size_px"), waterfall.size)
-	assert_gte(float(material.get_shader_parameter("top_y")), 0.07)
-	assert_lte(float(material.get_shader_parameter("top_y")), 0.10)
-	assert_gte(float(material.get_shader_parameter("bottom_y")), 0.82)
-	assert_lte(float(material.get_shader_parameter("bottom_y")), 0.90)
-	assert_gte(float(material.get_shader_parameter("section_width_wobble_px")), 12.0,
-			"The long fall must vary its silhouette between broad sections")
-	assert_gte(
-			float(material.get_shader_parameter("top_half_width_px")) * 2.0,
-			waterfall.size.x * 0.30,
-			"The waterfall mouth must read as a broad body rather than a thin column")
-	assert_gte(
-			float(material.get_shader_parameter("bottom_half_width_px")) * 2.0,
-			waterfall.size.x * 0.42,
-			"The lower fall must carry enough visible water mass for a monumental silhouette")
-	assert_lte(float(material.get_shader_parameter("px_size")), 4.0,
-			"The waterfall must use a pixel grid close to the 3px river grid")
+	assert_lt(
+			float(material.get_shader_parameter("top_y")),
+			float(material.get_shader_parameter("bottom_y")),
+			"The editable waterfall body must retain a valid vertical span")
+	assert_eq(float(material.get_shader_parameter("section_width_wobble_px")), 0.0,
+			"The approved vertical profile must not add random section-width drift")
+	assert_eq(float(material.get_shader_parameter("section_center_wobble_px")), 0.0,
+			"The approved vertical profile must not add random center drift")
+	assert_gt(float(material.get_shader_parameter("px_size")), 0.0)
+	assert_lte(float(material.get_shader_parameter("px_size")), 8.0,
+			"The waterfall pixel grid must remain within its shader's authored range")
 	assert_gte(float(material.get_shader_parameter("anim_fps")), 8.0,
 			"The waterfall must expose all eight ref26-inspired water states clearly")
 	assert_lte(float(material.get_shader_parameter("anim_fps")), 10.0,
@@ -348,52 +356,65 @@ func test_scene2_uses_one_full_height_waterfall() -> void:
 	assert_lte(float(material.get_shader_parameter("fall_speed_px")), 105.0)
 	assert_lte(float(material.get_shader_parameter("mouth_highlight_density")), 0.40)
 	assert_lte(float(material.get_shader_parameter("cross_join_density")), 0.08)
-	assert_gte(float(material.get_shader_parameter("lane_width_px")), 12.0,
-			"Broad water bands must replace the old dense 8px threads")
-	assert_gte(float(material.get_shader_parameter("streak_period_px")), 120.0)
+	assert_gte(float(material.get_shader_parameter("lane_width_px")), 6.0)
+	assert_lte(float(material.get_shader_parameter("lane_width_px")), 10.0,
+			"Ref28-style fine highlights must not return to broad rectangular lanes")
+	assert_gte(float(material.get_shader_parameter("streak_period_px")), 80.0)
+	assert_lte(float(material.get_shader_parameter("streak_period_px")), 110.0)
 	assert_lte(float(material.get_shader_parameter("flow_highlight_density")), 0.12)
 	assert_lte(float(material.get_shader_parameter("flow_gap_strength")), 0.12)
 	assert_gte(float(material.get_shader_parameter("body_alpha")), 0.98,
 			"The waterfall body must remain visually solid behind atmospheric layers")
 	assert_lte(float(material.get_shader_parameter("edge_drop_density")), 0.04)
-	assert_eq(int(material.get_shader_parameter("ridge_profile_enabled")), 1,
-			"Scene2 must use the asymmetric ridge-guided waterfall silhouette")
+	assert_eq(int(material.get_shader_parameter("vertical_profile_enabled")), 1,
+			"Scene2 must use the restrained long-bank pixel-waterfall silhouette")
 	for parameter_name: String in [
-		"left_top_edge_px",
-		"left_ridge_edge_px",
-		"left_lower_edge_px",
-		"left_ridge_turn",
-		"right_top_edge_px",
-		"right_ridge_edge_px",
-		"right_fan_edge_px",
-		"right_bottom_edge_px",
-		"right_flare_turn",
-		"right_fan_turn",
+		"left_edge_upper_px",
+		"left_edge_middle_px",
+		"left_edge_lower_px",
+		"right_edge_upper_px",
+		"right_edge_middle_px",
+		"right_edge_lower_px",
+		"vertical_step_one_y",
+		"vertical_step_two_y",
 	]:
 		assert_not_null(material.get_shader_parameter(parameter_name),
-				"The ridge-guided waterfall must expose %s for art direction"
+				"The vertical waterfall profile must expose %s for art direction"
 				% parameter_name)
 	var top_waterfall_width := (
-			float(material.get_shader_parameter("right_top_edge_px"))
-			- float(material.get_shader_parameter("left_top_edge_px")))
+			float(material.get_shader_parameter("right_edge_upper_px"))
+			- float(material.get_shader_parameter("left_edge_upper_px")))
 	var bottom_waterfall_width := (
-			float(material.get_shader_parameter("right_bottom_edge_px"))
-			- float(material.get_shader_parameter("left_lower_edge_px")))
-	assert_gt(bottom_waterfall_width, top_waterfall_width,
-			"The waterfall basin must be broader than its mouth")
-	assert_gt(
-			float(material.get_shader_parameter("right_fan_edge_px")),
-			float(material.get_shader_parameter("right_ridge_edge_px")),
-			"The lower-right fan must overlap the retreating ridge before impact")
+			float(material.get_shader_parameter("right_edge_lower_px"))
+			- float(material.get_shader_parameter("left_edge_lower_px")))
+	var middle_waterfall_width := (
+			float(material.get_shader_parameter("right_edge_middle_px"))
+			- float(material.get_shader_parameter("left_edge_middle_px")))
+	for waterfall_width: float in [
+		top_waterfall_width,
+		middle_waterfall_width,
+		bottom_waterfall_width,
+	]:
+		assert_gt(waterfall_width, 0.0,
+				"Every editable waterfall tier must retain a valid silhouette")
+	assert_lt(
+			float(material.get_shader_parameter("vertical_step_one_y")),
+			float(material.get_shader_parameter("vertical_step_two_y")),
+			"The waterfall's two deliberate ledges must remain ordered")
 	for marker: String in [
 		"mouth_vertical",
 		"rare_cross_join",
 		"top_lip_segments",
 		"ref26_frame_blocks",
-		"left_ridge_profile",
-		"right_lower_fan",
+		"vertical_profile_steps",
+		"ref28_body_bands",
+		"ref26_vertical_flow",
+		"ref28_source_lip",
+		"ref28_mid_lip",
+		"ref28_lower_lip",
 		"body_shadow_plane",
 		"bank_contact_shadow",
+		"bank_contact_notch",
 		"waterfall_cloud_cut",
 	]:
 		assert_true(shader_source.contains(marker),
@@ -415,71 +436,59 @@ func test_scene2_uses_one_full_height_waterfall() -> void:
 				"The waterfall shader must preserve the reference-style %s motion" % marker)
 
 
-func test_scene2_waterfall_uses_authored_far_ridges_with_cloud_veil_layering() -> void:
+func test_scene2_waterfall_uses_one_unfiltered_authored_backdrop_ridge() -> void:
 	var stage := (load(SCENE2_PATH) as PackedScene).instantiate()
 	add_child_autofree(stage)
 	var waterfall := stage.get_node("Waterfall")
 	var upper_cloud := stage.get_node("WaterfallCloudUpper")
+	assert_true(stage.has_node("WaterfallRidgeLeft"),
+			"Scene2 needs the single authored mountain behind its waterfall")
+	if not stage.has_node("WaterfallRidgeLeft"):
+		return
 
-	var ridge_paths := {
-		"WaterfallRidgeLeft":
-				"res://assets/scenes/scene2/scene2_waterfall_ridge_left.png",
-		"WaterfallRidgeRight":
-				"res://assets/scenes/scene2/scene2_waterfall_ridge_right.png",
-	}
-	for ridge_name: String in ridge_paths:
-		assert_true(stage.has_node(ridge_name),
-				"Scene2 needs an independent authored far ridge named %s" % ridge_name)
-		if not stage.has_node(ridge_name):
-			continue
-		var ridge := stage.get_node(ridge_name) as TextureRect
-		assert_not_null(ridge)
-		if ridge == null:
-			continue
-		var ridge_material := ridge.material as ShaderMaterial
-		assert_not_null(ridge_material)
-		if ridge_material != null and ridge_material.shader != null:
-			assert_true(ridge_material.shader.code.contains("inner_edge_reflection"),
-					"%s must derive reflected light from its authored inner edge"
-					% ridge_name)
-			assert_gt(float(ridge_material.get_shader_parameter(
-					"inner_reflect_strength")), 0.0,
-					"%s needs a restrained waterfall-facing reflected value"
-					% ridge_name)
-			assert_true(ridge_material.shader.code.contains(
-					"inner_edge_step_trim"),
-					"The ridge shader must support reversible pixel-step silhouette trimming")
-			if ridge_name == "WaterfallRidgeRight":
-				assert_eq(int(ridge_material.get_shader_parameter(
-						"inner_trim_enabled")), 1,
-						"The right ridge must release the lower waterfall opening")
-				assert_gte(float(ridge_material.get_shader_parameter(
-						"inner_trim_max_px")), 48.0,
-						"The lower-right opening needs a visible broad-pixel retreat")
-				assert_gte(float(ridge_material.get_shader_parameter(
-						"inner_trim_steps")), 24.0,
-						"The right ridge contour must use fine source-pixel steps")
-				assert_lte(float(ridge_material.get_shader_parameter(
-						"inner_trim_quantum_px")), 1.0,
-						"The right ridge must not return to oversized contour blocks")
-				assert_gte(float(ridge_material.get_shader_parameter(
-						"inner_trim_lower_start")), 0.45,
-						"The additional retreat must stay in the lower ridge")
-				assert_gt(float(ridge_material.get_shader_parameter(
-						"inner_trim_lower_extra_px")), 0.0,
-						"The lower ridge must release extra waterfall width")
-		assert_eq(ridge.texture.resource_path, String(ridge_paths[ridge_name]),
-				"%s must use its dedicated distant waterfall-ridge art" % ridge_name)
-		var ridge_image := Image.load_from_file(ProjectSettings.globalize_path(
-				String(ridge_paths[ridge_name])))
-		assert_not_null(ridge_image)
-		if ridge_image != null:
-			assert_ne(ridge_image.detect_alpha(), Image.ALPHA_NONE,
-					"%s must retain a true transparent background" % ridge_name)
-		assert_lt(waterfall.get_index(), ridge.get_index(),
-				"The authored ridges must occlude the waterfall banks instead of showing through the water")
-		assert_lt(ridge.get_index(), upper_cloud.get_index(),
-				"The authored far ridges must frame the water while remaining behind its cloud veil")
+	var ridge := stage.get_node("WaterfallRidgeLeft") as TextureRect
+	assert_null(ridge.material,
+			"The approved ridge must retain its authored pixels without the removed blur-grade shader")
+	assert_eq(ridge.texture.resource_path,
+			"res://assets/scenes/scene2/scene2_waterfall_ridge.png")
+	var ridge_image := Image.load_from_file(ProjectSettings.globalize_path(
+			ridge.texture.resource_path))
+	assert_not_null(ridge_image)
+	if ridge_image != null:
+		assert_ne(ridge_image.detect_alpha(), Image.ALPHA_NONE,
+				"The authored backdrop ridge must retain a true transparent background")
+	assert_lt(ridge.get_index(), waterfall.get_index(),
+			"The new mountain is an independent backdrop behind the waterfall")
+	assert_true(stage.has_node("WaterfallRidgeContact"),
+			"The single ridge must expose authored foreground contact pixels")
+	if stage.has_node("WaterfallRidgeContact"):
+		var contact := stage.get_node("WaterfallRidgeContact") as TextureRect
+		assert_eq(contact.texture.resource_path,
+				"res://assets/scenes/scene2/scene2_waterfall_ridge_contact.png")
+		assert_eq(contact.position, ridge.position,
+				"Ridge contact must share the source ridge origin exactly")
+		assert_eq(contact.size, ridge.size,
+				"Ridge contact must share the source ridge scale exactly")
+		var contact_image := Image.load_from_file(ProjectSettings.globalize_path(
+				contact.texture.resource_path))
+		assert_not_null(contact_image)
+		if contact_image != null and ridge_image != null:
+			assert_eq(contact_image.get_size(), ridge_image.get_size())
+			assert_ne(contact_image.detect_alpha(), Image.ALPHA_NONE,
+					"Ridge contact must remain a sparse true-alpha pixel slice")
+			var ridge_scale := ridge.size / Vector2(ridge_image.get_size())
+			assert_almost_eq(ridge_scale.x, ridge_scale.y, 0.001,
+					"Ridge pixels must not be stretched differently on each axis")
+			assert_almost_eq(ridge_scale.x, roundf(ridge_scale.x), 0.001,
+					"Ridge contact must use an integer pixel-art display scale")
+		assert_lt(waterfall.get_index(), contact.get_index(),
+				"Authored ridge contact pixels must interlock in front of the water")
+		assert_lt(contact.get_index(), upper_cloud.get_index(),
+				"Waterfall cloud veil must remain above the ridge contact slice")
+	assert_lt(waterfall.get_index(), upper_cloud.get_index(),
+			"The waterfall cloud veil must stay in front of the water")
+	assert_false(stage.has_node("WaterfallRidgeRight"),
+			"Scene2 now uses exactly one authored waterfall mountain")
 
 
 func test_scene2_waterfall_is_broken_up_by_cloud_veils_and_calm_distant_water() -> void:
@@ -762,9 +771,10 @@ func test_scene2_p2_motion_uses_pixel_cadence_and_petal_flipbook() -> void:
 
 	assert_eq(float(waterfall_material.get_shader_parameter("anim_fps")), 8.0)
 	assert_eq(float(river_material.get_shader_parameter("anim_fps")), 8.0)
-	assert_lte(float(river_material.get_shader_parameter("px_size")),
-			float(waterfall_material.get_shader_parameter("px_size")),
-			"Near water and background fall must stay on compatible hard pixel grids")
+	for material: ShaderMaterial in [waterfall_material, river_material]:
+		assert_gt(float(material.get_shader_parameter("px_size")), 0.0)
+		assert_lte(float(material.get_shader_parameter("px_size")), 8.0,
+				"Animated water must stay on an explicit hard-pixel grid")
 
 	for particles: GPUParticles2D in [petal_far, petal_near]:
 		assert_not_null(particles.texture)

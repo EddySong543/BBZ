@@ -20,17 +20,15 @@ uniform float edge_wobble_px : hint_range(0.0, 28.0) = 14.0;
 uniform float section_height_px : hint_range(24.0, 192.0) = 96.0;
 uniform float section_width_wobble_px : hint_range(0.0, 40.0) = 18.0;
 uniform float section_center_wobble_px : hint_range(0.0, 32.0) = 12.0;
-uniform float ridge_profile_enabled : hint_range(0.0, 1.0, 1.0) = 1.0;
-uniform float left_top_edge_px : hint_range(0.0, 360.0) = 88.0;
-uniform float left_ridge_edge_px : hint_range(0.0, 420.0) = 306.0;
-uniform float left_lower_edge_px : hint_range(0.0, 420.0) = 164.0;
-uniform float left_ridge_turn : hint_range(0.1, 0.9, 0.01) = 0.55;
-uniform float right_top_edge_px : hint_range(360.0, 720.0) = 540.0;
-uniform float right_ridge_edge_px : hint_range(360.0, 720.0) = 602.0;
-uniform float right_fan_edge_px : hint_range(360.0, 720.0) = 712.0;
-uniform float right_bottom_edge_px : hint_range(360.0, 720.0) = 718.0;
-uniform float right_flare_turn : hint_range(0.1, 0.9, 0.01) = 0.46;
-uniform float right_fan_turn : hint_range(0.1, 0.95, 0.01) = 0.72;
+uniform float vertical_profile_enabled : hint_range(0.0, 1.0, 1.0) = 1.0;
+uniform float left_edge_upper_px : hint_range(0.0, 360.0) = 132.0;
+uniform float left_edge_middle_px : hint_range(0.0, 360.0) = 138.0;
+uniform float left_edge_lower_px : hint_range(0.0, 360.0) = 120.0;
+uniform float right_edge_upper_px : hint_range(360.0, 720.0) = 588.0;
+uniform float right_edge_middle_px : hint_range(360.0, 720.0) = 594.0;
+uniform float right_edge_lower_px : hint_range(360.0, 720.0) = 624.0;
+uniform float vertical_step_one_y : hint_range(0.1, 0.8, 0.01) = 0.36;
+uniform float vertical_step_two_y : hint_range(0.2, 0.95, 0.01) = 0.72;
 group_uniforms;
 
 group_uniforms mouth_and_flow;
@@ -86,6 +84,10 @@ uniform float contact_shadow_width_px : hint_range(3.0, 36.0, 1.0) = 18.0;
 uniform float contact_shadow_strength : hint_range(0.0, 0.8, 0.01) = 0.32;
 uniform float contact_glint_density : hint_range(0.0, 0.6, 0.01) = 0.18;
 uniform float contact_glint_strength : hint_range(0.0, 0.6, 0.01) = 0.24;
+uniform vec4 contact_rock_color : source_color = vec4(0.08, 0.20, 0.24, 1.0);
+uniform float contact_rock_mix : hint_range(0.0, 0.8, 0.01) = 0.42;
+uniform float contact_notch_depth_px : hint_range(0.0, 16.0, 1.0) = 6.0;
+uniform float contact_notch_density : hint_range(0.0, 0.5, 0.01) = 0.16;
 group_uniforms;
 
 group_uniforms cloud_occlusion;
@@ -170,7 +172,16 @@ void fragment() {
 	float fall_span = max(bottom_y - top_y, 0.001);
 	float fy = clamp((quv.y - top_y) / fall_span, 0.0, 1.0);
 	float end_center = center_x + bend_px / size_px.x;
-	float local_top_y = top_y;
+	float source_lip_cell = floor(
+			(px.x - left_edge_upper_px) / max(px_size * 4.0, 1.0));
+	float source_lip_jitter_px = (
+			floor(hash21(vec2(source_lip_cell, 1301.0)) * 3.0) - 1.0
+	) * px_size;
+	float source_lip_horizontal = (
+			step(left_edge_upper_px, px.x)
+			* step(px.x, right_edge_upper_px));
+	float local_top_y = top_y + (
+			source_lip_jitter_px * source_lip_horizontal / size_px.y);
 	float local_bottom_y = bottom_y;
 	float in_height = step(local_top_y, quv.y) * step(quv.y, local_bottom_y);
 
@@ -184,72 +195,28 @@ void fragment() {
 			(section_start_y / size_px.y - top_y) / fall_span,
 			0.0,
 			1.0);
-	float left_bank_step = floor(
-			hash21(vec2(section_row, 41.0)) * 3.0) - 1.0;
-	float right_bank_step = floor(
-			hash21(vec2(section_row, 79.0)) * 3.0) - 1.0;
 	float edge_quantum = max(edge_step_px, px_size);
 	float left_edge_px;
 	float right_edge_px;
-	if (ridge_profile_enabled > 0.5) {
-		// The left_ridge_profile follows the authored left cliff: it advances
-		// into the fall until the ridge ends, then opens again behind the lower
-		// cloud veil. The right_lower_fan keeps the approved mouth intact,
-		// follows the ridge through the middle, then accelerates outward near
-		// the basin so the impact end is the broadest part of the water body.
-		float turn = clamp(left_ridge_turn, 0.1, 0.9);
-		if (section_fy <= turn) {
-			float left_t = pow(clamp(section_fy / turn, 0.0, 1.0), 0.86);
-			left_edge_px = mix(left_top_edge_px, left_ridge_edge_px, left_t);
+	float first_profile_step = clamp(vertical_step_one_y, 0.1, 0.8);
+	float second_profile_step = clamp(
+			vertical_step_two_y,
+			first_profile_step + 0.05,
+			0.95);
+	if (vertical_profile_enabled > 0.5) {
+		// vertical_profile_steps: professional pixel waterfalls read as long,
+		// calm vertical banks. The whole fall owns only two deliberate ledges;
+		// no per-row noise or ridge-following curve can saw through the outline.
+		if (fy < first_profile_step) {
+			left_edge_px = left_edge_upper_px;
+			right_edge_px = right_edge_upper_px;
+		} else if (fy < second_profile_step) {
+			left_edge_px = left_edge_middle_px;
+			right_edge_px = right_edge_middle_px;
 		} else {
-			float lower_t = pow(
-					clamp((section_fy - turn) / (1.0 - turn), 0.0, 1.0),
-					0.78);
-			left_edge_px = mix(
-					left_ridge_edge_px,
-					left_lower_edge_px,
-					lower_t);
+			left_edge_px = left_edge_lower_px;
+			right_edge_px = right_edge_lower_px;
 		}
-		float right_turn = clamp(right_flare_turn, 0.1, 0.9);
-		float fan_turn = clamp(
-				right_fan_turn,
-				right_turn + 0.01,
-				0.95);
-		if (section_fy <= right_turn) {
-			float right_ridge_t = pow(
-					clamp(section_fy / right_turn, 0.0, 1.0),
-					1.08);
-			right_edge_px = mix(
-					right_top_edge_px,
-					right_ridge_edge_px,
-					right_ridge_t);
-		} else if (section_fy <= fan_turn) {
-			float right_lower_t = pow(
-					clamp(
-							(section_fy - right_turn)
-									/ (fan_turn - right_turn),
-							0.0,
-							1.0),
-					1.50);
-			right_edge_px = mix(
-					right_ridge_edge_px,
-					right_fan_edge_px,
-					right_lower_t);
-		} else {
-			float right_entry_t = pow(
-					clamp(
-							(section_fy - fan_turn)
-									/ (1.0 - fan_turn),
-							0.0,
-							1.0),
-					1.08);
-			right_edge_px = mix(
-					right_fan_edge_px,
-					right_bottom_edge_px,
-					right_entry_t);
-		}
-		left_edge_px += left_bank_step * edge_wobble_px * 0.25;
-		right_edge_px += right_bank_step * edge_wobble_px * 0.25;
 	} else {
 		float section_center_step = floor(
 				hash21(vec2(section_row, 173.0)) * 3.0) - 1.0;
@@ -317,10 +284,28 @@ void fragment() {
 			* step(norm_x, 0.78);
 	float top_lip_cell = floor(
 			(local_x_px + half_width_px) / max(px_size * 4.0, 1.0));
+	// ref28_source_lip: small stepped foam cells describe water folding over
+	// the rock edge without creating one perfectly straight white ruler.
 	float top_lip_segments = mouth_zone
-			* (1.0 - step(px_size * 2.0, mouth_distance))
-			* step(0.34, hash21(vec2(top_lip_cell, 251.0)))
+			* (1.0 - step(px_size * 3.0, mouth_distance))
+			* step(0.22, hash21(vec2(top_lip_cell, 251.0)))
 			* step(norm_x, 0.9);
+	// A restrained travelling highlight makes the source edge visibly turn
+	// over without scrolling the entire horizontal line in unison.
+	float top_lip_motion_frame = floor(flow_cycle_frame * 0.5);
+	float top_lip_travel = mouth_zone
+			* (1.0 - step(px_size * 1.15, mouth_distance))
+			* (1.0 - step(
+					1.0,
+					mod(top_lip_cell + 56.0 - top_lip_motion_frame, 7.0)))
+			* step(norm_x, 0.92);
+	float top_lip_hanging = mouth_zone
+			* step(px_size * 1.0, mouth_distance)
+			* (1.0 - step(px_size * 4.5, mouth_distance))
+			* (1.0 - step(
+					1.0,
+					mod(top_lip_cell + 59.0 - top_lip_motion_frame, 9.0)))
+			* step(norm_x, 0.88);
 	// ref26_frame_blocks: the source highlight is redrawn as two or three
 	// opaque blocks in every one of the eight states. This copies the visual
 	// method of the reference without copying its tiny sprite geometry.
@@ -348,9 +333,9 @@ void fragment() {
 	) * step(0.34, mouth_seed_b);
 	float mouth_cap = max(mouth_block_a, max(mouth_block_b, mouth_block_c));
 
-	// Three wide vertical masses replace the former field of independent
-	// narrow lanes. Their x offsets and segment phases change only on the
-	// eight explicit frames, matching ref26's sparse flipbook cadence.
+	// Narrow falling accents animate inside stable ref28-style vertical value
+	// bands. Fixed pixel widths keep them from turning into the former large
+	// rectangular tiles when the lower curtain becomes wider.
 	float body_width_px = max(right_edge_px - left_edge_px, px_size * 2.0);
 	float body_u = clamp((px.x - left_edge_px) / body_width_px, 0.0, 1.0);
 	float ribbon_shift_a = (
@@ -362,47 +347,85 @@ void fragment() {
 	float ribbon_shift_c = (
 			floor(hash21(vec2(flow_cycle_frame, 593.0)) * 3.0) - 1.0
 	) * px_size * 2.0;
+	float ribbon_shift_d = (
+			floor(hash21(vec2(flow_cycle_frame, 617.0)) * 3.0) - 1.0
+	) * px_size;
+	float ribbon_shift_e = (
+			floor(hash21(vec2(flow_cycle_frame, 659.0)) * 3.0) - 1.0
+	) * px_size;
 	float ribbon_x_a = mix(left_edge_px, right_edge_px, 0.24) + ribbon_shift_a;
 	float ribbon_x_b = mix(left_edge_px, right_edge_px, 0.52) + ribbon_shift_b;
 	float ribbon_x_c = mix(left_edge_px, right_edge_px, 0.78) + ribbon_shift_c;
+	float ribbon_x_d = mix(left_edge_px, right_edge_px, 0.38) + ribbon_shift_d;
+	float ribbon_x_e = mix(left_edge_px, right_edge_px, 0.67) + ribbon_shift_e;
 	float ribbon_fall = flow_cycle_frame * px_size * 4.0;
 	float ribbon_a = (
-			1.0 - step(body_width_px * 0.038, abs(px.x - ribbon_x_a))
+			1.0 - step(px_size, abs(px.x - ribbon_x_a))
 	) * (
 			1.0 - step(
 					streak_length_px * 0.95,
 					mod(px.y - ribbon_fall + 18.0, streak_period_px))
 	);
 	float ribbon_b = (
-			1.0 - step(body_width_px * 0.046, abs(px.x - ribbon_x_b))
+			1.0 - step(px_size * 1.5, abs(px.x - ribbon_x_b))
 	) * (
 			1.0 - step(
 					streak_length_px * 1.30,
 					mod(px.y - ribbon_fall + 82.0, streak_period_px * 1.18))
 	);
 	float ribbon_c = (
-			1.0 - step(body_width_px * 0.032, abs(px.x - ribbon_x_c))
+			1.0 - step(px_size, abs(px.x - ribbon_x_c))
 	) * (
 			1.0 - step(
 					streak_length_px * 0.82,
 					mod(px.y - ribbon_fall + 43.0, streak_period_px * 0.86))
 	);
-	float long_streak = max(ribbon_a, max(ribbon_b, ribbon_c)) * body;
+	float ribbon_d = (
+			1.0 - step(px_size * 0.72, abs(px.x - ribbon_x_d))
+	) * (
+			1.0 - step(
+					streak_length_px * 0.62,
+					mod(px.y - ribbon_fall + 118.0, streak_period_px * 1.36))
+	);
+	float ribbon_e = (
+			1.0 - step(px_size * 0.72, abs(px.x - ribbon_x_e))
+	) * (
+			1.0 - step(
+					streak_length_px * 0.72,
+					mod(px.y - ribbon_fall + 61.0, streak_period_px * 1.52))
+	);
+	// ref26_vertical_flow: five deliberately placed falling ribbons reproduce
+	// the reference's calm solid water mass and sparse moving vertical accents.
+	float long_streak = max(
+			max(ribbon_a, ribbon_b),
+			max(ribbon_c, max(ribbon_d, ribbon_e))) * body;
 	float thread_phase = mod(
 			px.y - flow_time * fall_speed_px * 1.34 + lane_seed_b * streak_period_px,
 			streak_period_px * 0.62);
 	float white_thread = (1.0 - step(lane_width_px * 0.18, lane_center))
 			* (1.0 - step(streak_length_px * 0.46, thread_phase))
 			* step(1.0 - flow_highlight_density, lane_seed);
-	// P1-A: the body is built from three continuous value planes. The planes
-	// follow the authored banks from top to bottom and never turn into random
-	// square patches; motion remains confined to the three segmented ribbons.
-	float left_shadow_plane = 1.0 - step(0.19, body_u);
-	float right_shadow_plane = step(0.78, body_u);
-	float body_shadow_plane = max(left_shadow_plane, right_shadow_plane * 0.86);
-	float body_light_plane = step(0.31, body_u) * step(body_u, 0.67);
-	float side_light_plane = step(0.16, body_u) * step(body_u, 0.28);
-	float core_plane = (1.0 - step(core_width_ratio, norm_x));
+	// ref28_body_bands: a limited four-value palette is arranged into stable
+	// vertical water ribbons. The bands survive from frame to frame; animation
+	// only moves a few thin highlights downward through them.
+	float outer_shadow = (
+			(1.0 - step(0.075, body_u))
+			+ step(0.925, body_u));
+	float dark_band_a = step(0.16, body_u) * step(body_u, 0.29);
+	float dark_band_b = step(0.53, body_u) * step(body_u, 0.64);
+	float bright_band_a = step(0.09, body_u) * step(body_u, 0.15);
+	float bright_band_b = step(0.34, body_u) * step(body_u, 0.43);
+	float bright_band_c = step(0.69, body_u) * step(body_u, 0.78);
+	float body_shadow_plane = clamp(
+			outer_shadow + dark_band_a * 0.52 + dark_band_b * 0.42,
+			0.0,
+			1.0);
+	float body_light_plane = clamp(
+			bright_band_a * 0.70
+			+ bright_band_b
+			+ bright_band_c * 0.76,
+			0.0,
+			1.0);
 	float edge_band = step(edge_shadow_start, norm_x);
 	float bank_distance_px = min(
 			px.x - left_edge_px,
@@ -410,8 +433,16 @@ void fragment() {
 	float bank_contact_shadow = body * (
 			1.0 - step(contact_shadow_width_px, bank_distance_px));
 	float bank_side = step(center_px, px.x);
+	float right_middle_bank = bank_contact_shadow
+			* bank_side
+			* step(first_profile_step, fy)
+			* (1.0 - step(second_profile_step, fy));
+	// Use the unbounded quantized flow clock rather than the eight-frame
+	// cycle index. Both the contact glints and the broad deep-water segments
+	// keep travelling downward instead of restarting inside the visible tier.
+	float bank_contact_scroll_px = flow_time * px_size * anim_fps;
 	float bank_contact_row = floor(
-			(px.y - flow_cycle_frame * px_size) / max(px_size * 9.0, 1.0));
+			(px.y - bank_contact_scroll_px) / max(px_size * 9.0, 1.0));
 	float bank_contact_gate = step(
 			1.0 - contact_glint_density,
 			hash21(vec2(
@@ -422,23 +453,45 @@ void fragment() {
 					px_size * 1.25,
 					abs(bank_distance_px - px_size * 1.5)))
 			* bank_contact_gate;
+	float bank_deep_flow_phase = mod(
+			px.y - bank_contact_scroll_px,
+			max(px_size * 18.0, 1.0));
+	float bank_deep_flow = right_middle_bank
+			* (1.0 - step(px_size * 7.0, bank_deep_flow_phase));
+	// Small, stable rock bites expose the authored ridge below the outermost
+	// water pixels. They interlock the two silhouettes without a blur/filter.
+	float contact_notch_row = floor(
+			max(px.y - top_px, 0.0) / max(px_size * 4.0, 1.0));
+	float contact_notch_seed = hash21(vec2(
+			floor(contact_notch_row * 0.5),
+			mix(1091.0, 1151.0, bank_side)));
+	float contact_notch_gate = step(
+			1.0 - contact_notch_density,
+			contact_notch_seed);
+	float contact_notch_depth = contact_notch_depth_px * mix(
+			0.55,
+			1.0,
+			hash21(vec2(contact_notch_row, 1187.0)));
+	float bank_contact_notch = body
+			* (1.0 - step(contact_notch_depth, bank_distance_px))
+			* contact_notch_gate;
 
-	// Large, stable value masses make the fall read as one heavy body of water.
-	// Motion lives in a minority of broad lanes instead of recoloring every
-	// narrow thread independently.
+	// Stable water mass first, then a small set of authored moving folds. This
+	// keeps the body opaque and dimensional without procedural rain noise.
 	vec3 water = mid_color.rgb;
-	water = mix(water, deep_color.rgb, body_shadow_plane * 0.28);
-	water = mix(water, light_color.rgb, body_light_plane * 0.08);
-	water = mix(water, light_color.rgb, side_light_plane * 0.045);
-	water = mix(water, light_color.rgb, long_streak * 0.28);
-	water = mix(water, light_color.rgb, core_plane * core_light_strength);
-	water = mix(water, foam_color.rgb, white_thread * 0.18);
+	water = mix(water, deep_color.rgb, body_shadow_plane * 0.52);
+	water = mix(water, light_color.rgb, body_light_plane * 0.28);
+	water = mix(water, light_color.rgb, long_streak * 0.42);
+	water = mix(water, foam_color.rgb, white_thread * 0.10);
+	water = mix(water, deep_color.rgb, fy * 0.075);
 	water = mix(
 			water,
 			light_color.rgb,
 			mouth_vertical * 0.38 + rare_cross_join * 0.16);
-	water = mix(water, foam_color.rgb, top_lip_segments * 0.42);
-	water = mix(water, foam_color.rgb, mouth_cap * 0.68);
+	water = mix(water, foam_color.rgb, top_lip_segments * 0.78);
+	water = mix(water, foam_color.rgb, top_lip_travel * 0.92);
+	water = mix(water, light_color.rgb, top_lip_hanging * 0.62);
+	water = mix(water, foam_color.rgb, mouth_cap * 0.55);
 	water = mix(water, deep_color.rgb, edge_band * edge_shadow_strength);
 	water = mix(
 			water,
@@ -446,10 +499,249 @@ void fragment() {
 			bank_contact_shadow * contact_shadow_strength);
 	water = mix(
 			water,
+			contact_rock_color.rgb,
+			bank_contact_shadow * contact_rock_mix);
+	// The middle right contact is still a dark water band, but no longer a
+	// static rectangle: a quiet mid-tone base exposes deep segments travelling
+	// continuously down the fall.
+	water = mix(water, mid_color.rgb, right_middle_bank * 0.24);
+	water = mix(water, deep_color.rgb, bank_deep_flow * 0.62);
+	water = mix(
+			water,
 			light_color.rgb,
 			bank_contact_glint * contact_glint_strength);
 
-	float alpha = body * body_alpha;
+	float alpha = body * body_alpha * (1.0 - bank_contact_notch);
+
+	// ref28_mid_lip: the upper fall sits left of the lower fall. A thin,
+	// broken white fold marks the water crossing the intermediate ledge and
+	// visually carries it toward the right without becoming a thick platform.
+	float mid_lip_y_px = (
+			top_y + first_profile_step * fall_span) * size_px.y;
+	float mid_lip_left_px = left_edge_middle_px - px_size * 2.0;
+	float mid_lip_right_px = right_edge_middle_px + px_size * 3.0;
+	float mid_lip_cell = floor(
+			(px.x - mid_lip_left_px) / max(px_size * 4.0, 1.0));
+	float mid_lip_jitter = (
+			floor(hash21(vec2(mid_lip_cell, 1361.0)) * 3.0) - 1.0
+	) * px_size;
+	float mid_lip_segment = step(
+			0.16,
+			hash21(vec2(mid_lip_cell, 1409.0)));
+	float mid_lip_base = (
+			1.0 - step(
+					px_size * 1.5,
+					abs(px.y - mid_lip_y_px - mid_lip_jitter))
+	) * step(mid_lip_left_px, px.x) * step(px.x, mid_lip_right_px)
+			* mid_lip_segment;
+	float mid_lip_motion_frame = floor(flow_cycle_frame * 0.5);
+	float mid_lip_travel = mid_lip_base * (
+			1.0 - step(
+					1.0,
+					mod(mid_lip_cell + 64.0 - mid_lip_motion_frame, 7.0)));
+	// Sparse white stems stay attached to the first ledge and grow down over
+	// four pixel rows before shrinking again. This restores the same readable
+	// turnover motion used by the source lip without replacing the existing
+	// horizontal base or travelling highlight.
+	float mid_lip_hanging_seed = hash21(vec2(mid_lip_cell, 1481.0));
+	float mid_lip_hanging_phase = mod(
+			flow_cycle_frame + floor(mid_lip_hanging_seed * 8.0),
+			8.0);
+	float mid_lip_hanging_cells = 1.0 + min(
+			mid_lip_hanging_phase,
+			7.0 - mid_lip_hanging_phase);
+	float mid_lip_hanging_stem = 1.0 - step(
+			px_size * 0.55,
+			abs(
+					mod(px.x - mid_lip_left_px, px_size * 4.0)
+					- px_size * 1.5));
+	float mid_lip_hanging = step(
+			0.86,
+			mid_lip_hanging_seed
+	) * mid_lip_hanging_stem
+			* step(mid_lip_left_px, px.x)
+			* step(px.x, mid_lip_right_px)
+			* step(mid_lip_y_px + px_size * 0.5, px.y)
+			* (1.0 - step(
+					mid_lip_y_px
+							+ px_size * (mid_lip_hanging_cells + 0.5),
+					px.y));
+	// Keep the approved horizontal lip motion, but remove only the short
+	// vertical cell that restarted halfway through its fall.
+	float mid_lip_drop = 0.0;
+	float mid_lip_left_shelf = step(
+			min(left_edge_upper_px, left_edge_middle_px) - px_size,
+			px.x) * step(
+			px.x,
+			max(left_edge_upper_px, left_edge_middle_px) + px_size);
+	float mid_lip_right_shelf = step(
+			min(right_edge_upper_px, right_edge_middle_px) - px_size,
+			px.x) * step(
+			px.x,
+			max(right_edge_upper_px, right_edge_middle_px) + px_size);
+	float mid_lip_rock = max(mid_lip_left_shelf, mid_lip_right_shelf)
+			* step(mid_lip_y_px + px_size * 1.5, px.y)
+			* (1.0 - step(mid_lip_y_px + px_size * 4.0, px.y));
+	// A single opaque water row closes the right shoulder. The former broad
+	// gap-fill rectangle rose above this row and read as a cyan block pasted
+	// over the ridge, so the authored shelf is now the only water seam.
+	float mid_lip_right_seam = mid_lip_right_shelf
+			* (1.0 - step(
+					px_size * 0.75,
+					abs(px.y - mid_lip_y_px)));
+	// The marked opening is only the two exposed screen pixels between the
+	// scaled ridge edge and the water. One quantized shader column behind the
+	// opaque ridge closes exactly that slit; the ridge masks its left half.
+	float mid_lip_right_gap_fill = step(
+			right_edge_upper_px + px_size * 3.0,
+			px.x) * step(
+			px.x,
+			right_edge_upper_px + px_size * 5.0
+	) * step(
+			mid_lip_y_px - px_size * 2.0,
+			px.y
+	) * step(
+			px.y,
+			mid_lip_y_px);
+	// One quantized cell at the ridge junction belongs to the vertical rock
+	// face. Keep it static and rock-colored instead of letting the travelling
+	// lip or the blue gap patch flash across it.
+	float mid_lip_right_rock_restore = step(
+			right_edge_upper_px + px_size * 3.0,
+			px.x) * step(
+			px.x,
+			right_edge_upper_px + px_size * 6.0
+	) * step(
+			mid_lip_y_px,
+			px.y
+	) * step(
+			px.y,
+			mid_lip_y_px + px_size * 2.0);
+	mid_lip_travel *= 1.0 - mid_lip_right_rock_restore;
+	mid_lip_hanging *= 1.0 - mid_lip_right_rock_restore;
+	float mid_lip_gap_water = mid_lip_right_gap_fill
+			* (1.0 - mid_lip_right_rock_restore);
+	water = mix(water, contact_rock_color.rgb, mid_lip_rock * 0.88);
+	vec3 mid_lip_neighbor_blue = vec3(71.0, 140.0, 148.0) / 255.0;
+	water = mix(water, mid_color.rgb, mid_lip_right_seam * 0.68);
+	water = mix(water, light_color.rgb, mid_lip_base * 0.66);
+	water = mix(water, foam_color.rgb, mid_lip_travel * 0.92);
+	water = mix(water, foam_color.rgb, mid_lip_hanging * 0.90);
+	water = mix(water, light_color.rgb, mid_lip_drop * 0.78);
+	// Apply the sampled neighboring blue last so lip highlights cannot tint
+	// the repaired cells into a visibly different color.
+	water = mix(water, mid_lip_neighbor_blue, mid_lip_gap_water);
+	// Sampled from the immediately adjacent opaque ridge cell. Using the
+	// ridge's own blue-black value keeps the repaired diagonal step from
+	// reading as either pale water or a generic green contact shadow.
+	vec3 mid_lip_ridge_neighbor = vec3(30.0, 59.0, 91.0) / 255.0;
+	water = mix(water, mid_lip_ridge_neighbor, mid_lip_right_rock_restore);
+	alpha = max(alpha, mid_lip_rock * 0.96);
+	alpha = max(alpha, mid_lip_gap_water);
+	alpha = max(alpha, mid_lip_right_rock_restore);
+	alpha = max(alpha, mid_lip_right_seam);
+	alpha = max(alpha, mid_lip_base * 0.96);
+	alpha = max(alpha, mid_lip_hanging * 0.96);
+	alpha = max(alpha, mid_lip_drop * 0.90);
+
+	// ref28_lower_lip: the second terrain step now owns a complete fold rather
+	// than silently switching silhouettes. Its base remains stable while short
+	// foam glints and hanging cells travel across the edge on the water cycle.
+	float lower_lip_y_px = (
+			top_y + second_profile_step * fall_span) * size_px.y;
+	float lower_lip_left_px = min(
+			left_edge_middle_px,
+			left_edge_lower_px) - px_size * 2.0;
+	float lower_lip_right_px = max(
+			right_edge_middle_px,
+			right_edge_lower_px) + px_size * 3.0;
+	float lower_lip_cell = floor(
+			(px.x - lower_lip_left_px) / max(px_size * 4.0, 1.0));
+	float lower_lip_jitter = (
+			floor(hash21(vec2(lower_lip_cell, 1453.0)) * 2.0)
+	) * px_size;
+	float lower_lip_span = step(lower_lip_left_px, px.x)
+			* step(px.x, lower_lip_right_px);
+	float lower_lip_base = (
+			1.0 - step(
+					px_size * 1.65,
+					abs(px.y - lower_lip_y_px - lower_lip_jitter))
+	) * lower_lip_span;
+	float lower_lip_motion_frame = floor(flow_cycle_frame * 0.5);
+	float lower_lip_travel = lower_lip_base * (
+			1.0 - step(
+					1.0,
+					mod(lower_lip_cell + 80.0 - lower_lip_motion_frame, 6.0)));
+	float lower_lip_drop_gate = 1.0 - step(
+			1.0,
+			mod(lower_lip_cell + 86.0 - flow_cycle_frame, 8.0));
+	float lower_lip_drop_height = px_size * (
+			2.0 + mod(lower_lip_cell + flow_cycle_frame, 3.0));
+	float lower_lip_drop = lower_lip_span
+			* step(lower_lip_y_px + px_size, px.y)
+			* (1.0 - step(
+					lower_lip_y_px + px_size + lower_lip_drop_height,
+					px.y))
+			* lower_lip_drop_gate;
+	// A second independent set of thin white stems grows from the lower ledge.
+	// It is additive to the approved base, travelling glint, and drop cells.
+	float lower_lip_hanging_seed = hash21(vec2(lower_lip_cell, 1549.0));
+	float lower_lip_hanging_phase = mod(
+			flow_cycle_frame + floor(lower_lip_hanging_seed * 8.0) + 2.0,
+			8.0);
+	float lower_lip_hanging_cells = 1.0 + min(
+			lower_lip_hanging_phase,
+			7.0 - lower_lip_hanging_phase);
+	float lower_lip_hanging_stem = 1.0 - step(
+			px_size * 0.55,
+			abs(
+					mod(px.x - lower_lip_left_px, px_size * 4.0)
+					- px_size * 2.5));
+	float lower_lip_hanging = step(
+			0.86,
+			lower_lip_hanging_seed
+	) * lower_lip_hanging_stem
+			* lower_lip_span
+			* step(lower_lip_y_px + px_size * 0.5, px.y)
+			* (1.0 - step(
+					lower_lip_y_px
+							+ px_size * (lower_lip_hanging_cells + 0.5),
+					px.y));
+	// The authored lip extends slightly beyond the lower water body. Remove
+	// only its outermost six-cell cluster: its base, travelling highlight,
+	// and hanging cell combined into the circled flashing right angle.
+	float lower_lip_outer_right_cleanup = step(
+			right_edge_lower_px - px_size * 6.0,
+			px.x);
+	lower_lip_base *= 1.0 - lower_lip_outer_right_cleanup;
+	lower_lip_travel *= 1.0 - lower_lip_outer_right_cleanup;
+	lower_lip_drop *= 1.0 - lower_lip_outer_right_cleanup;
+	lower_lip_hanging *= 1.0 - lower_lip_outer_right_cleanup;
+	float lower_lip_left_shelf = step(
+			min(left_edge_middle_px, left_edge_lower_px) - px_size,
+			px.x) * step(
+			px.x,
+			max(left_edge_middle_px, left_edge_lower_px) + px_size);
+	float lower_lip_right_shelf = step(
+			min(right_edge_middle_px, right_edge_lower_px) - px_size,
+			px.x) * step(
+			px.x,
+			max(right_edge_middle_px, right_edge_lower_px) + px_size);
+	float lower_lip_rock = max(
+			lower_lip_left_shelf,
+			lower_lip_right_shelf)
+			* (1.0 - step(
+					px_size * 1.5,
+					abs(px.y - lower_lip_y_px - px_size * 3.0)));
+	water = mix(water, contact_rock_color.rgb, lower_lip_rock * 0.92);
+	water = mix(water, light_color.rgb, lower_lip_base * 0.82);
+	water = mix(water, foam_color.rgb, lower_lip_travel * 0.96);
+	water = mix(water, light_color.rgb, lower_lip_drop * 0.82);
+	water = mix(water, foam_color.rgb, lower_lip_hanging * 0.90);
+	alpha = max(alpha, lower_lip_rock * 0.96);
+	alpha = max(alpha, lower_lip_base * 0.98);
+	alpha = max(alpha, lower_lip_drop * 0.92);
+	alpha = max(alpha, lower_lip_hanging * 0.96);
 
 	// Sparse droplets live just outside the stable silhouette.
 	float drop_zone = step(1.0, norm_x) * step(norm_x, 1.24) * in_height;
