@@ -539,32 +539,60 @@ void fragment() {
 			1.0 - step(
 					1.0,
 					mod(mid_lip_cell + 64.0 - mid_lip_motion_frame, 7.0)));
-	// Sparse white stems stay attached to the first ledge and grow down over
-	// four pixel rows before shrinking again. This restores the same readable
-	// turnover motion used by the source lip without replacing the existing
-	// horizontal base or travelling highlight.
-	float mid_lip_hanging_seed = hash21(vec2(mid_lip_cell, 1481.0));
-	float mid_lip_hanging_phase = mod(
-			flow_cycle_frame + floor(mid_lip_hanging_seed * 8.0),
+	// The first ledge reuses the source lip's construction language: each
+	// active fold owns a short foam head, a wider pale turnover sheet, and a
+	// narrow white core. All three share the ledge's authored jitter, so no
+	// vertical stem can float below a missing horizontal pixel.
+	float mid_fold_seed = hash21(vec2(mid_lip_cell, 1481.0));
+	float mid_fold_shape_seed = hash21(vec2(mid_lip_cell, 1499.0));
+	float mid_fold_phase = mod(
+			flow_cycle_frame + floor(mid_fold_seed * 8.0),
 			8.0);
-	float mid_lip_hanging_cells = 1.0 + min(
-			mid_lip_hanging_phase,
-			7.0 - mid_lip_hanging_phase);
-	float mid_lip_hanging_stem = 1.0 - step(
-			px_size * 0.55,
-			abs(
-					mod(px.x - mid_lip_left_px, px_size * 4.0)
-					- px_size * 1.5));
-	float mid_lip_hanging = step(
-			0.86,
-			mid_lip_hanging_seed
-	) * mid_lip_hanging_stem
-			* step(mid_lip_left_px, px.x)
-			* step(px.x, mid_lip_right_px)
-			* step(mid_lip_y_px + px_size * 0.5, px.y)
+	float mid_fold_growth = min(mid_fold_phase, 7.0 - mid_fold_phase);
+	float mid_fold_slot = floor(
+			mod(
+					max(px.x - mid_lip_left_px, 0.0),
+					px_size * 4.0)
+			/ px_size);
+	float mid_fold_head_width = 2.0 + floor(mid_fold_shape_seed * 2.0);
+	float mid_fold_head_start = floor(
+			hash21(vec2(mid_lip_cell, 1511.0))
+			* (5.0 - mid_fold_head_width));
+	float mid_fold_tail_width = 1.0 + floor(
+			hash21(vec2(mid_lip_cell, 1523.0)) * 2.0);
+	float mid_fold_tail_start = mid_fold_head_start + floor(
+			(mid_fold_head_width - mid_fold_tail_width)
+			* hash21(vec2(mid_lip_cell, 1531.0)));
+	float mid_fold_gate = step(0.78, mid_fold_seed) * mid_lip_segment;
+	float mid_fold_span = step(mid_lip_left_px, px.x)
+			* step(px.x, mid_lip_right_px);
+	float mid_fold_head_x = step(mid_fold_head_start, mid_fold_slot)
+			* step(
+					mid_fold_slot,
+					mid_fold_head_start + mid_fold_head_width - 1.0);
+	float mid_fold_tail_x = step(mid_fold_tail_start, mid_fold_slot)
+			* step(
+					mid_fold_slot,
+					mid_fold_tail_start + mid_fold_tail_width - 1.0);
+	float mid_fold_anchor_y = mid_lip_y_px + mid_lip_jitter;
+	float mid_lip_fold_head = mid_fold_gate
+			* mid_fold_span
+			* mid_fold_head_x
 			* (1.0 - step(
-					mid_lip_y_px
-							+ px_size * (mid_lip_hanging_cells + 0.5),
+					px_size * 1.15,
+					abs(px.y - mid_fold_anchor_y)));
+	float mid_lip_fold_tail = mid_fold_gate
+			* mid_fold_span
+			* mid_fold_tail_x
+			* step(mid_fold_anchor_y + px_size * 0.5, px.y)
+			* (1.0 - step(
+					mid_fold_anchor_y
+							+ px_size * (mid_fold_growth + 1.5),
+					px.y));
+	float mid_lip_fold_core = mid_lip_fold_tail
+			* (1.0 - step(
+					mid_fold_anchor_y
+							+ px_size * (min(mid_fold_growth, 1.0) + 1.5),
 					px.y));
 	// Keep the approved horizontal lip motion, but remove only the short
 	// vertical cell that restarted halfway through its fall.
@@ -618,15 +646,19 @@ void fragment() {
 			px.y,
 			mid_lip_y_px + px_size * 2.0);
 	mid_lip_travel *= 1.0 - mid_lip_right_rock_restore;
-	mid_lip_hanging *= 1.0 - mid_lip_right_rock_restore;
+	mid_lip_fold_head *= 1.0 - mid_lip_right_rock_restore;
+	mid_lip_fold_tail *= 1.0 - mid_lip_right_rock_restore;
+	mid_lip_fold_core *= 1.0 - mid_lip_right_rock_restore;
 	float mid_lip_gap_water = mid_lip_right_gap_fill
 			* (1.0 - mid_lip_right_rock_restore);
 	water = mix(water, contact_rock_color.rgb, mid_lip_rock * 0.88);
 	vec3 mid_lip_neighbor_blue = vec3(71.0, 140.0, 148.0) / 255.0;
 	water = mix(water, mid_color.rgb, mid_lip_right_seam * 0.68);
 	water = mix(water, light_color.rgb, mid_lip_base * 0.66);
+	water = mix(water, foam_color.rgb, mid_lip_fold_head * 0.86);
 	water = mix(water, foam_color.rgb, mid_lip_travel * 0.92);
-	water = mix(water, foam_color.rgb, mid_lip_hanging * 0.90);
+	water = mix(water, light_color.rgb, mid_lip_fold_tail * 0.76);
+	water = mix(water, foam_color.rgb, mid_lip_fold_core * 0.84);
 	water = mix(water, light_color.rgb, mid_lip_drop * 0.78);
 	// Apply the sampled neighboring blue last so lip highlights cannot tint
 	// the repaired cells into a visibly different color.
@@ -641,7 +673,8 @@ void fragment() {
 	alpha = max(alpha, mid_lip_right_rock_restore);
 	alpha = max(alpha, mid_lip_right_seam);
 	alpha = max(alpha, mid_lip_base * 0.96);
-	alpha = max(alpha, mid_lip_hanging * 0.96);
+	alpha = max(alpha, mid_lip_fold_head * 0.98);
+	alpha = max(alpha, mid_lip_fold_tail * 0.94);
 	alpha = max(alpha, mid_lip_drop * 0.90);
 
 	// ref28_lower_lip: the second terrain step now owns a complete fold rather
@@ -683,29 +716,65 @@ void fragment() {
 					lower_lip_y_px + px_size + lower_lip_drop_height,
 					px.y))
 			* lower_lip_drop_gate;
-	// A second independent set of thin white stems grows from the lower ledge.
-	// It is additive to the approved base, travelling glint, and drop cells.
-	float lower_lip_hanging_seed = hash21(vec2(lower_lip_cell, 1549.0));
-	float lower_lip_hanging_phase = mod(
-			flow_cycle_frame + floor(lower_lip_hanging_seed * 8.0) + 2.0,
+	// The lower ledge uses the same foam-head / pale-sheet / white-core stack,
+	// but different seeds and timing keep the two falls from mirroring each
+	// other. The existing base, travel glint, and drop cells remain intact.
+	float lower_fold_seed = hash21(vec2(lower_lip_cell, 1549.0));
+	float lower_fold_shape_seed = hash21(vec2(lower_lip_cell, 1567.0));
+	float lower_fold_phase = mod(
+			flow_cycle_frame + floor(lower_fold_seed * 8.0) + 2.0,
 			8.0);
-	float lower_lip_hanging_cells = 1.0 + min(
-			lower_lip_hanging_phase,
-			7.0 - lower_lip_hanging_phase);
-	float lower_lip_hanging_stem = 1.0 - step(
-			px_size * 0.55,
-			abs(
-					mod(px.x - lower_lip_left_px, px_size * 4.0)
-					- px_size * 2.5));
-	float lower_lip_hanging = step(
-			0.86,
-			lower_lip_hanging_seed
-	) * lower_lip_hanging_stem
+	float lower_fold_growth = min(
+			lower_fold_phase,
+			7.0 - lower_fold_phase);
+	float lower_fold_slot = floor(
+			mod(
+					max(px.x - lower_lip_left_px, 0.0),
+					px_size * 4.0)
+			/ px_size);
+	float lower_fold_head_width = 2.0 + floor(
+			lower_fold_shape_seed * 2.0);
+	float lower_fold_head_start = floor(
+			hash21(vec2(lower_lip_cell, 1579.0))
+			* (5.0 - lower_fold_head_width));
+	float lower_fold_tail_width = 1.0 + floor(
+			hash21(vec2(lower_lip_cell, 1597.0)) * 2.0);
+	float lower_fold_tail_start = lower_fold_head_start + floor(
+			(lower_fold_head_width - lower_fold_tail_width)
+			* hash21(vec2(lower_lip_cell, 1601.0)));
+	float lower_fold_gate = step(0.80, lower_fold_seed);
+	float lower_fold_head_x = step(
+			lower_fold_head_start,
+			lower_fold_slot
+	) * step(
+			lower_fold_slot,
+			lower_fold_head_start + lower_fold_head_width - 1.0);
+	float lower_fold_tail_x = step(
+			lower_fold_tail_start,
+			lower_fold_slot
+	) * step(
+			lower_fold_slot,
+			lower_fold_tail_start + lower_fold_tail_width - 1.0);
+	float lower_fold_anchor_y = lower_lip_y_px + lower_lip_jitter;
+	float lower_lip_fold_head = lower_fold_gate
 			* lower_lip_span
-			* step(lower_lip_y_px + px_size * 0.5, px.y)
+			* lower_fold_head_x
 			* (1.0 - step(
-					lower_lip_y_px
-							+ px_size * (lower_lip_hanging_cells + 0.5),
+					px_size * 1.15,
+					abs(px.y - lower_fold_anchor_y)));
+	float lower_lip_fold_tail = lower_fold_gate
+			* lower_lip_span
+			* lower_fold_tail_x
+			* step(lower_fold_anchor_y + px_size * 0.5, px.y)
+			* (1.0 - step(
+					lower_fold_anchor_y
+							+ px_size * (lower_fold_growth + 1.5),
+					px.y));
+	float lower_lip_fold_core = lower_lip_fold_tail
+			* (1.0 - step(
+					lower_fold_anchor_y
+							+ px_size
+									* (min(lower_fold_growth, 1.0) + 1.5),
 					px.y));
 	// The authored lip extends slightly beyond the lower water body. Remove
 	// only its outermost six-cell cluster: its base, travelling highlight,
@@ -716,7 +785,9 @@ void fragment() {
 	lower_lip_base *= 1.0 - lower_lip_outer_right_cleanup;
 	lower_lip_travel *= 1.0 - lower_lip_outer_right_cleanup;
 	lower_lip_drop *= 1.0 - lower_lip_outer_right_cleanup;
-	lower_lip_hanging *= 1.0 - lower_lip_outer_right_cleanup;
+	lower_lip_fold_head *= 1.0 - lower_lip_outer_right_cleanup;
+	lower_lip_fold_tail *= 1.0 - lower_lip_outer_right_cleanup;
+	lower_lip_fold_core *= 1.0 - lower_lip_outer_right_cleanup;
 	float lower_lip_left_shelf = step(
 			min(left_edge_middle_px, left_edge_lower_px) - px_size,
 			px.x) * step(
@@ -735,13 +806,16 @@ void fragment() {
 					abs(px.y - lower_lip_y_px - px_size * 3.0)));
 	water = mix(water, contact_rock_color.rgb, lower_lip_rock * 0.92);
 	water = mix(water, light_color.rgb, lower_lip_base * 0.82);
+	water = mix(water, foam_color.rgb, lower_lip_fold_head * 0.88);
 	water = mix(water, foam_color.rgb, lower_lip_travel * 0.96);
 	water = mix(water, light_color.rgb, lower_lip_drop * 0.82);
-	water = mix(water, foam_color.rgb, lower_lip_hanging * 0.90);
+	water = mix(water, light_color.rgb, lower_lip_fold_tail * 0.78);
+	water = mix(water, foam_color.rgb, lower_lip_fold_core * 0.86);
 	alpha = max(alpha, lower_lip_rock * 0.96);
 	alpha = max(alpha, lower_lip_base * 0.98);
 	alpha = max(alpha, lower_lip_drop * 0.92);
-	alpha = max(alpha, lower_lip_hanging * 0.96);
+	alpha = max(alpha, lower_lip_fold_head * 0.98);
+	alpha = max(alpha, lower_lip_fold_tail * 0.94);
 
 	// Sparse droplets live just outside the stable silhouette.
 	float drop_zone = step(1.0, norm_x) * step(norm_x, 1.24) * in_height;

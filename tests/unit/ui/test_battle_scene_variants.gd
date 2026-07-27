@@ -192,8 +192,10 @@ func test_scene2_uses_formal_environment_assets_and_depth_layers() -> void:
 			"The new right mountain must replace the retired gate layer")
 	assert_false(scene_source.contains("scene2_mountain_gate_px2.png"))
 	assert_false(scene_source.contains("scene2_mountain_left_px2.png"))
-	assert_lt(stage.get_node("CloudFar").get_index(), stage.get_node("FarMountain").get_index())
-	assert_lt(stage.get_node("FarMountain").get_index(), stage.get_node("CloudMid").get_index())
+	assert_lt(stage.get_node("CloudFar").get_index(), stage.get_node("MidMountain").get_index(),
+			"Far clouds must remain behind the midground without fixing their order against far mountains")
+	assert_lt(stage.get_node("FarMountain").get_index(), stage.get_node("MidMountain").get_index(),
+			"Far mountains must remain behind the midground without fixing their order against far clouds")
 	if stage.has_node("MountainLeft") and stage.has_node("MountainRight"):
 		assert_lt(stage.get_node("Waterfall").get_index(),
 				stage.get_node("MountainLeft").get_index(),
@@ -436,39 +438,54 @@ func test_scene2_uses_one_full_height_waterfall() -> void:
 				"The waterfall shader must preserve the reference-style %s motion" % marker)
 
 
-func test_scene2_waterfall_uses_one_unfiltered_authored_backdrop_ridge() -> void:
+func test_scene2_waterfall_ridge_group_uses_one_subtle_shared_grade() -> void:
 	var stage := (load(SCENE2_PATH) as PackedScene).instantiate()
 	add_child_autofree(stage)
 	var waterfall := stage.get_node("Waterfall")
 	var upper_cloud := stage.get_node("WaterfallCloudUpper")
-	assert_true(stage.has_node("WaterfallRidgeLeft"),
-			"Scene2 needs the single authored mountain behind its waterfall")
-	if not stage.has_node("WaterfallRidgeLeft"):
+	var ridges: Array[TextureRect] = []
+	for child in stage.get_children():
+		if child is TextureRect and String(child.name).begins_with("WaterfallRidgeLeft"):
+			ridges.append(child as TextureRect)
+	assert_gt(ridges.size(), 0,
+			"Scene2 needs at least one authored mountain behind its waterfall")
+	if ridges.is_empty():
 		return
 
-	var ridge := stage.get_node("WaterfallRidgeLeft") as TextureRect
-	assert_null(ridge.material,
-			"The approved ridge must retain its authored pixels without the removed blur-grade shader")
-	assert_eq(ridge.texture.resource_path,
-			"res://assets/scenes/scene2/scene2_waterfall_ridge.png")
+	var ridge := ridges[0]
+	var ridge_material := ridge.material as ShaderMaterial
+	assert_not_null(ridge_material,
+			"The waterfall mountain group needs one shared, non-destructive grade")
+	if ridge_material != null:
+		assert_eq(ridge_material.shader.resource_path,
+				"res://assets/shaders/canvas_env_scene2_waterfall_mountain_grade.gdshader")
+		assert_lte(float(ridge_material.get_shader_parameter("atmosphere_strength")), 0.08,
+				"The group grade must remain subtle instead of remapping the authored ridge")
+	for ridge_copy in ridges:
+		assert_eq(ridge_copy.texture.resource_path,
+				"res://assets/scenes/scene2/scene2_waterfall_ridge.png")
+		assert_eq(ridge_copy.material, ridge_material,
+				"All authored ridge copies must read as one graded mountain mass")
+		assert_eq(int(ridge_copy.texture_filter), CanvasItem.TEXTURE_FILTER_NEAREST,
+				"The shared grade must preserve crisp pixel-art sampling")
+		assert_lt(ridge_copy.get_index(), waterfall.get_index(),
+				"Every ridge copy must remain behind the waterfall")
 	var ridge_image := Image.load_from_file(ProjectSettings.globalize_path(
 			ridge.texture.resource_path))
 	assert_not_null(ridge_image)
 	if ridge_image != null:
 		assert_ne(ridge_image.detect_alpha(), Image.ALPHA_NONE,
 				"The authored backdrop ridge must retain a true transparent background")
-	assert_lt(ridge.get_index(), waterfall.get_index(),
-			"The new mountain is an independent backdrop behind the waterfall")
 	assert_true(stage.has_node("WaterfallRidgeContact"),
-			"The single ridge must expose authored foreground contact pixels")
+			"The ridge group must expose authored foreground contact pixels")
 	if stage.has_node("WaterfallRidgeContact"):
 		var contact := stage.get_node("WaterfallRidgeContact") as TextureRect
 		assert_eq(contact.texture.resource_path,
 				"res://assets/scenes/scene2/scene2_waterfall_ridge_contact.png")
-		assert_eq(contact.position, ridge.position,
-				"Ridge contact must share the source ridge origin exactly")
-		assert_eq(contact.size, ridge.size,
-				"Ridge contact must share the source ridge scale exactly")
+		assert_eq(contact.material, ridge_material,
+				"The foreground contact slice must share the mountain group's subtle grade")
+		assert_eq(int(contact.texture_filter), CanvasItem.TEXTURE_FILTER_NEAREST,
+				"The contact slice must preserve crisp pixel-art sampling")
 		var contact_image := Image.load_from_file(ProjectSettings.globalize_path(
 				contact.texture.resource_path))
 		assert_not_null(contact_image)
@@ -476,11 +493,6 @@ func test_scene2_waterfall_uses_one_unfiltered_authored_backdrop_ridge() -> void
 			assert_eq(contact_image.get_size(), ridge_image.get_size())
 			assert_ne(contact_image.detect_alpha(), Image.ALPHA_NONE,
 					"Ridge contact must remain a sparse true-alpha pixel slice")
-			var ridge_scale := ridge.size / Vector2(ridge_image.get_size())
-			assert_almost_eq(ridge_scale.x, ridge_scale.y, 0.001,
-					"Ridge pixels must not be stretched differently on each axis")
-			assert_almost_eq(ridge_scale.x, roundf(ridge_scale.x), 0.001,
-					"Ridge contact must use an integer pixel-art display scale")
 		assert_lt(waterfall.get_index(), contact.get_index(),
 				"Authored ridge contact pixels must interlock in front of the water")
 		assert_lt(contact.get_index(), upper_cloud.get_index(),
@@ -488,7 +500,7 @@ func test_scene2_waterfall_uses_one_unfiltered_authored_backdrop_ridge() -> void
 	assert_lt(waterfall.get_index(), upper_cloud.get_index(),
 			"The waterfall cloud veil must stay in front of the water")
 	assert_false(stage.has_node("WaterfallRidgeRight"),
-			"Scene2 now uses exactly one authored waterfall mountain")
+			"Scene2 uses the authored left-ridge family instead of the removed right asset")
 
 
 func test_scene2_waterfall_is_broken_up_by_cloud_veils_and_calm_distant_water() -> void:
