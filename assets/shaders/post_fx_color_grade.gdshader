@@ -76,15 +76,21 @@ void fragment() {
 	vec2 duv = clamp(SCREEN_UV + cen * r2 * barrel_amount * edge_t, vec2(0.0), vec2(1.0));
 
 	// 1) 边缘径向模糊：离中心越远越糊（中心保持清晰，聚焦）
-	float bw = smoothstep(edge_blur_start, 1.0, dist) * edge_blur_amount;
-	vec2 bpx = SCREEN_PIXEL_SIZE * bw * 2.5;
-	// 把模糊采样中心收进屏内 bpx → 上下左右 4 个偏移采样都不越界(不再夹到单个暗边缘像素 → 消除残留小黑块)
-	vec2 sdv = clamp(duv, bpx, vec2(1.0) - bpx);
-	vec3 col = texture(screen_tex, sdv).rgb * 0.4;
-	col += texture(screen_tex, sdv + vec2(bpx.x, 0.0)).rgb * 0.15;
-	col += texture(screen_tex, sdv - vec2(bpx.x, 0.0)).rgb * 0.15;
-	col += texture(screen_tex, sdv + vec2(0.0, bpx.y)).rgb * 0.15;
-	col += texture(screen_tex, sdv - vec2(0.0, bpx.y)).rgb * 0.15;
+	vec3 col;
+	if (edge_blur_amount <= 0.0001) {
+		// Uniform-coherent fast path: Scene2 avoids four identical full-screen reads.
+		col = texture(screen_tex, duv).rgb;
+	} else {
+		float bw = smoothstep(edge_blur_start, 1.0, dist) * edge_blur_amount;
+		vec2 bpx = SCREEN_PIXEL_SIZE * bw * 2.5;
+		// 把模糊采样中心收进屏内 bpx → 上下左右 4 个偏移采样都不越界(不再夹到单个暗边缘像素 → 消除残留小黑块)
+		vec2 sdv = clamp(duv, bpx, vec2(1.0) - bpx);
+		col = texture(screen_tex, sdv).rgb * 0.4;
+		col += texture(screen_tex, sdv + vec2(bpx.x, 0.0)).rgb * 0.15;
+		col += texture(screen_tex, sdv - vec2(bpx.x, 0.0)).rgb * 0.15;
+		col += texture(screen_tex, sdv + vec2(0.0, bpx.y)).rgb * 0.15;
+		col += texture(screen_tex, sdv - vec2(0.0, bpx.y)).rgb * 0.15;
+	}
 
 	// 2) 亮度 → 对比(绕 0.5) → 饱和(绕 luma)
 	col *= brightness;
@@ -110,19 +116,22 @@ void fragment() {
 	// 7) 冲击帧（impact frame·Eddy 2026-07-10 定 A/A/A：二值化墨黑纸白 + 受击点锯齿炸开 + 正负反转）
 	//    结构：受击点周围一团锯齿毛边"白炸开"（区内低阈→大片纸白·角色成黑剪影），
 	//    区外高阈→大片墨黑只留高光 → 黑场中央一记白炸，剪影分明。无动态分支（step/mix）。
-	vec2 iuv = floor(SCREEN_UV / (SCREEN_PIXEL_SIZE * impact_px)) * SCREEN_PIXEL_SIZE * impact_px;  // 毛边走粗像素格
-	vec2 idv = iuv - impact_center;
-	idv.x *= SCREEN_PIXEL_SIZE.y / max(SCREEN_PIXEL_SIZE.x, 1e-6);   // 宽高比校正 → 等距圆
-	float iang = atan(idv.y, idv.x);
-	// 毛边：粗齿 + 碎齿两层角度噪声抖动炸开半径 → 手绘撕裂边
-	float jag = hash(vec2(floor(iang * impact_jag_freq), 7.31)) * 0.7
-			+ hash(vec2(floor(iang * impact_jag_freq * 3.0), 3.17)) * 0.3;
-	float irad = impact_burst_radius + (jag - 0.5) * 2.0 * impact_jag;
-	float burst = 1.0 - step(irad, length(idv));                     // 1=炸开区内
-	float ilum = dot(col, vec3(0.299, 0.587, 0.114));
-	float ibw = step(mix(impact_th_out, impact_th_in, burst), ilum); // 区内低阈纸白 / 区外高阈墨黑
-	ibw = mix(ibw, 1.0 - ibw, impact_invert);                        // 负片一闪（PV 张力）
-	col = mix(col, vec3(ibw * impact_white), impact_strength);       // 纸白压亮度上限（不刺眼·黑不受影响）
+	if (impact_strength > 0.0001) {
+		// Uniform-coherent fast path skips this block during normal battle rendering.
+		vec2 iuv = floor(SCREEN_UV / (SCREEN_PIXEL_SIZE * impact_px)) * SCREEN_PIXEL_SIZE * impact_px;  // 毛边走粗像素格
+		vec2 idv = iuv - impact_center;
+		idv.x *= SCREEN_PIXEL_SIZE.y / max(SCREEN_PIXEL_SIZE.x, 1e-6);   // 宽高比校正 → 等距圆
+		float iang = atan(idv.y, idv.x);
+		// 毛边：粗齿 + 碎齿两层角度噪声抖动炸开半径 → 手绘撕裂边
+		float jag = hash(vec2(floor(iang * impact_jag_freq), 7.31)) * 0.7
+				+ hash(vec2(floor(iang * impact_jag_freq * 3.0), 3.17)) * 0.3;
+		float irad = impact_burst_radius + (jag - 0.5) * 2.0 * impact_jag;
+		float burst = 1.0 - step(irad, length(idv));                     // 1=炸开区内
+		float ilum = dot(col, vec3(0.299, 0.587, 0.114));
+		float ibw = step(mix(impact_th_out, impact_th_in, burst), ilum); // 区内低阈纸白 / 区外高阈墨黑
+		ibw = mix(ibw, 1.0 - ibw, impact_invert);                        // 负片一闪（PV 张力）
+		col = mix(col, vec3(ibw * impact_white), impact_strength);       // 纸白压亮度上限（不刺眼·黑不受影响）
+	}
 
 	COLOR = vec4(col, 1.0);
 }

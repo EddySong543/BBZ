@@ -160,7 +160,6 @@ func test_scene2_uses_formal_environment_assets_and_depth_layers() -> void:
 	var scene_source := FileAccess.get_file_as_string(SCENE2_PATH)
 	var contract := {
 		"CloudFar": "res://assets/scenes/scene2/scene2_cloud_bank.png",
-		"FarMountain": "res://assets/scenes/scene2/scene2_far_mountain.png",
 		"CloudMid": "res://assets/scenes/scene2/scene2_cloud_tower.png",
 		"MidMountain": "res://assets/scenes/scene2/scene2_mid_mountain.png",
 		"MountainLeft": "res://assets/scenes/scene2/scene2_mountain_left.png",
@@ -192,10 +191,6 @@ func test_scene2_uses_formal_environment_assets_and_depth_layers() -> void:
 			"The new right mountain must replace the retired gate layer")
 	assert_false(scene_source.contains("scene2_mountain_gate_px2.png"))
 	assert_false(scene_source.contains("scene2_mountain_left_px2.png"))
-	assert_lt(stage.get_node("CloudFar").get_index(), stage.get_node("MidMountain").get_index(),
-			"Far clouds must remain behind the midground without fixing their order against far mountains")
-	assert_lt(stage.get_node("FarMountain").get_index(), stage.get_node("MidMountain").get_index(),
-			"Far mountains must remain behind the midground without fixing their order against far clouds")
 	if stage.has_node("MountainLeft") and stage.has_node("MountainRight"):
 		assert_lt(stage.get_node("Waterfall").get_index(),
 				stage.get_node("MountainLeft").get_index(),
@@ -213,17 +208,23 @@ func test_scene2_uses_formal_environment_assets_and_depth_layers() -> void:
 			"The far cloud bank must receive the Scene2 atmospheric grade")
 	assert_not_null((stage.get_node("CloudMid") as TextureRect).material,
 			"The mid cloud tower must receive the Scene2 atmospheric grade")
-	assert_not_null((stage.get_node("FarMountain") as TextureRect).material,
-			"The far mountain must receive a non-blurring atmospheric grade")
 	assert_not_null((stage.get_node("MidMountain") as TextureRect).material,
 			"The mid mountain must receive a non-blurring atmospheric grade")
+	var far_mountain_path := "res://assets/scenes/scene2/scene2_far_mountain.png"
+	var far_layers: Array[TextureRect] = []
+	for child: Node in stage.get_children():
+		if child is not TextureRect:
+			continue
+		var texture_rect := child as TextureRect
+		if texture_rect.texture != null \
+				and texture_rect.texture.resource_path == far_mountain_path:
+			far_layers.append(texture_rect)
+	assert_gt(far_layers.size(), 0,
+			"Scene2 must retain at least one editable far-mountain layer")
 	var far_mountain_materials: Array[Material] = []
-	for far_name: String in [
-		"FarMountain4", "FarMountain3", "FarMountain2", "FarMountain",
-	]:
-		var far_layer := stage.get_node(far_name) as TextureRect
+	for far_layer: TextureRect in far_layers:
 		assert_not_null(far_layer.material,
-				"%s must expose its own editable depth material" % far_name)
+				"%s must expose its own editable depth material" % far_layer.name)
 		if far_layer.material == null:
 			continue
 		for prior_material: Material in far_mountain_materials:
@@ -242,19 +243,35 @@ func test_scene2_uses_formal_environment_assets_and_depth_layers() -> void:
 				tree_material.shader.resource_path,
 				"res://assets/shaders/canvas_env_scene2_depth_grade.gdshader",
 				"The tree must display its authored palette without the rejected quiet-zone grade")
-	assert_null((stage.get_node("StoneBridge") as TextureRect).material,
-			"The playable bridge must remain crisp and ungraded")
+	var bridge := stage.get_node("StoneBridge") as TextureRect
+	var bridge_material := bridge.material as ShaderMaterial
+	assert_not_null(bridge_material,
+			"The playable bridge needs a local receiving-light material")
+	if bridge_material != null:
+		assert_eq(bridge_material.shader.resource_path,
+				"res://assets/shaders/canvas_env_scene2_bridge_light.gdshader")
+	assert_eq(bridge.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST,
+			"Receiving light must preserve crisp nearest-neighbour bridge pixels")
 
 
 func test_scene2_p1_depth_grades_follow_relative_atmospheric_hierarchy() -> void:
 	var stage := (load(SCENE2_PATH) as PackedScene).instantiate()
 	add_child_autofree(stage)
-	var graded_layers := [
+	var graded_layers: Array[TextureRect] = [
 		stage.get_node("CloudFar") as TextureRect,
-		stage.get_node("FarMountain") as TextureRect,
 		stage.get_node("CloudMid") as TextureRect,
 		stage.get_node("MidMountain") as TextureRect,
 	]
+	var far_mountain_path := "res://assets/scenes/scene2/scene2_far_mountain.png"
+	var far_mountains: Array[TextureRect] = []
+	for child: Node in stage.get_children():
+		if child is not TextureRect:
+			continue
+		var texture_rect := child as TextureRect
+		if texture_rect.texture != null \
+				and texture_rect.texture.resource_path == far_mountain_path:
+			far_mountains.append(texture_rect)
+			graded_layers.append(texture_rect)
 	for layer: TextureRect in graded_layers:
 		var material := layer.material as ShaderMaterial
 		assert_not_null(material,
@@ -266,22 +283,23 @@ func test_scene2_p1_depth_grades_follow_relative_atmospheric_hierarchy() -> void
 		assert_eq(layer.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST,
 				"Depth grading must not replace nearest-neighbour pixel edges")
 
-	var far_mountain_material := (
-			(stage.get_node("FarMountain") as TextureRect).material as ShaderMaterial)
 	var mid_mountain_material := (
 			(stage.get_node("MidMountain") as TextureRect).material as ShaderMaterial)
-	assert_lte(
-			float(far_mountain_material.get_shader_parameter("saturation")),
-			float(mid_mountain_material.get_shader_parameter("saturation")),
-			"Far geometry must be less saturated than mid geometry")
-	assert_lte(
-			float(far_mountain_material.get_shader_parameter("contrast")),
-			float(mid_mountain_material.get_shader_parameter("contrast")),
-			"Far geometry must be lower contrast than mid geometry")
-	assert_gte(
-			float(far_mountain_material.get_shader_parameter("atmosphere_strength")),
-			float(mid_mountain_material.get_shader_parameter("atmosphere_strength")),
-			"Far geometry must carry more atmospheric wash than mid geometry")
+	assert_gt(far_mountains.size(), 0)
+	for far_mountain: TextureRect in far_mountains:
+		var far_material := far_mountain.material as ShaderMaterial
+		assert_lte(
+				float(far_material.get_shader_parameter("saturation")),
+				float(mid_mountain_material.get_shader_parameter("saturation")),
+				"Far geometry must be less saturated than mid geometry")
+		assert_lte(
+				float(far_material.get_shader_parameter("contrast")),
+				float(mid_mountain_material.get_shader_parameter("contrast")),
+				"Far geometry must be lower contrast than mid geometry")
+		assert_gte(
+				float(far_material.get_shader_parameter("atmosphere_strength")),
+				float(mid_mountain_material.get_shader_parameter("atmosphere_strength")),
+				"Far geometry must carry more atmospheric wash than mid geometry")
 
 
 func test_scene2_new_framing_mountains_have_true_alpha() -> void:
@@ -770,56 +788,102 @@ func test_scene2_blossom_tree_moves_masked_branches_not_the_trunk() -> void:
 			"The rejected whole-image height ripple must not return")
 
 
-func test_scene2_p2_motion_uses_pixel_cadence_and_petal_flipbook() -> void:
+func test_scene2_p1_reuses_scene1_particle_profiles_without_petals() -> void:
+	var scene1 := (load(SCENE1_PATH) as PackedScene).instantiate()
 	var stage := (load(SCENE2_PATH) as PackedScene).instantiate()
+	add_child_autofree(scene1)
 	add_child_autofree(stage)
+	var scene_source := FileAccess.get_file_as_string(SCENE2_PATH)
 	var waterfall := stage.get_node("Waterfall") as ColorRect
 	var river := stage.get_node("River") as ColorRect
 	var waterfall_material := waterfall.material as ShaderMaterial
 	var river_material := river.material as ShaderMaterial
-	var petal_far := stage.get_node("PetalFar") as GPUParticles2D
-	var petal_near := stage.get_node("PetalNear") as GPUParticles2D
-	var petal_path := "res://assets/scenes/scene2/scene2_petal_atlas.png"
 
 	assert_eq(float(waterfall_material.get_shader_parameter("anim_fps")), 8.0)
-	assert_eq(float(river_material.get_shader_parameter("anim_fps")), 8.0)
+	assert_lt(
+			float(river_material.get_shader_parameter("anim_fps")),
+			float(waterfall_material.get_shader_parameter("anim_fps")),
+			"Scene2 P2 keeps the waterfall as the leading environmental motion")
 	for material: ShaderMaterial in [waterfall_material, river_material]:
 		assert_gt(float(material.get_shader_parameter("px_size")), 0.0)
 		assert_lte(float(material.get_shader_parameter("px_size")), 8.0,
 				"Animated water must stay on an explicit hard-pixel grid")
 
-	for particles: GPUParticles2D in [petal_far, petal_near]:
-		assert_not_null(particles.texture)
-		if particles.texture == null:
-			continue
-		assert_eq(particles.texture.resource_path, petal_path)
-		assert_eq(particles.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST)
-		assert_eq(particles.fixed_fps, 12)
-		assert_false(particles.interpolate,
-				"Pixel petals must not smooth movement between 12fps simulation steps")
-		assert_false(particles.fract_delta,
-				"Pixel petals must not add fractional movement between fixed steps")
+	assert_false(stage.has_node("PetalFar"),
+			"Distant petals read as blurry background damage and must remain removed")
+	assert_false(stage.has_node("PetalMid"),
+			"Scene2 uses one intentional foreground petal layer instead of particle clutter")
+	assert_false(stage.has_node("PetalNear"))
+	assert_false(scene_source.contains("Petal"),
+			"Scene2 must remove the rejected petal system instead of hiding it")
 
-		var draw_material := particles.material as CanvasItemMaterial
-		var process_material := particles.process_material as ParticleProcessMaterial
-		assert_not_null(draw_material)
-		assert_not_null(process_material)
-		if draw_material == null or process_material == null:
+	var profile_pairs := {
+		"PollenFar": "EmberFar",
+		"ValleyDust": "MoonDust",
+		"GroundPollen": "GroundEmber",
+		"PollenNear": "EmberNear",
+	}
+	for scene2_name: String in profile_pairs:
+		var scene1_name: String = profile_pairs[scene2_name]
+		assert_true(stage.has_node(scene2_name))
+		if not stage.has_node(scene2_name):
 			continue
-		assert_true(draw_material.particles_animation)
-		assert_eq(draw_material.particles_anim_h_frames, 4)
-		assert_eq(draw_material.particles_anim_v_frames, 1)
-		assert_true(draw_material.particles_anim_loop)
-		assert_gt(process_material.anim_speed_min, 0.0)
-		assert_eq(process_material.anim_speed_min, process_material.anim_speed_max)
-		assert_gt(process_material.anim_offset_max, process_material.anim_offset_min,
-				"Petals must begin on staggered flutter frames")
+		var scene2_particles := stage.get_node(scene2_name) as GPUParticles2D
+		var scene1_particles := scene1.get_node(scene1_name) as GPUParticles2D
+		var scene2_process := scene2_particles.process_material as ParticleProcessMaterial
+		var scene1_process := scene1_particles.process_material as ParticleProcessMaterial
+		var scene2_texture := scene2_particles.texture as GradientTexture2D
 
-	var atlas := Image.load_from_file(ProjectSettings.globalize_path(petal_path))
-	assert_not_null(atlas)
-	if atlas != null:
-		assert_eq(atlas.get_size(), Vector2i(64, 16))
-		assert_ne(atlas.detect_alpha(), Image.ALPHA_NONE)
+		assert_not_null(scene2_texture)
+		if scene2_texture != null:
+			assert_eq(scene2_texture.get_width(), 8)
+			assert_eq(scene2_texture.get_height(), 8)
+		assert_not_null(scene2_texture.gradient)
+		assert_eq(scene2_texture.fill, GradientTexture2D.FILL_RADIAL)
+		assert_eq(scene2_texture.fill_from, Vector2(0.5, 0.5))
+		assert_eq(scene2_texture.fill_to, Vector2(1.0, 0.5))
+		assert_eq(scene2_particles.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST)
+		assert_lte(scene2_particles.amount, scene1_particles.amount,
+				"Scene2 keeps Scene1's particle method with a calmer count budget")
+		assert_between(
+				scene2_particles.lifetime,
+				scene1_particles.lifetime * 0.8,
+				scene1_particles.lifetime * 1.5,
+				"Longer sparse lifetimes may replace dense constant emission")
+		assert_gte(scene2_particles.randomness, 0.5,
+				"Scene2 staggers particle emission instead of synchronizing it")
+		assert_eq(scene2_particles.preprocess, scene1_particles.preprocess)
+		assert_eq(
+				float(scene2_particles.get_meta("parallax_factor")),
+				float(scene1_particles.get_meta("parallax_factor")))
+		assert_not_null(scene2_process)
+		assert_not_null(scene1_process)
+		if scene2_process == null or scene1_process == null:
+			continue
+		assert_eq(scene2_process.emission_shape, scene1_process.emission_shape)
+		assert_eq(scene2_process.emission_box_extents, scene1_process.emission_box_extents)
+		assert_eq(scene2_process.spread, scene1_process.spread)
+		assert_gt(scene2_process.initial_velocity_min, 0.0)
+		assert_lte(
+				scene2_process.initial_velocity_min,
+				scene1_process.initial_velocity_min,
+				"Scene2 particles remain subordinate to the waterfall")
+		assert_lte(
+				scene2_process.initial_velocity_max,
+				scene1_process.initial_velocity_max,
+				"Scene2 particles remain subordinate to the waterfall")
+		assert_eq(scene2_process.scale_min, scene1_process.scale_min)
+		assert_eq(scene2_process.scale_max, scene1_process.scale_max)
+		assert_eq(
+				scene2_process.turbulence_noise_strength,
+				scene1_process.turbulence_noise_strength)
+		assert_eq(
+				scene2_process.turbulence_noise_scale,
+				scene1_process.turbulence_noise_scale)
+		assert_ne(scene2_process.direction, scene1_process.direction,
+				"Scene2 must adapt the copied particle direction to the valley wind")
+		assert_ne(scene2_process.color, scene1_process.color,
+				"Scene2 must adapt the copied particle color to the peach-blossom palette")
 
 
 func test_scene2_p2_river_uses_restrained_shoreline_foam_clusters() -> void:
@@ -945,6 +1009,15 @@ func test_scene2_binds_live_character_textures_to_the_river() -> void:
 	if river_material != null:
 		assert_not_null(river_material.get_shader_parameter("p1_reflection_tex"))
 		assert_not_null(river_material.get_shader_parameter("p2_reflection_tex"))
+		assert_between(
+				float(river_material.get_shader_parameter("character_reflection_strength")),
+				0.60,
+				0.75,
+				"Character reflections must remain visible without overpowering the river")
+		assert_lte(
+				float(river_material.get_shader_parameter("character_reflection_saturation")),
+				0.45,
+				"Character reflections need the river's restrained jade palette")
 		var p1_rect: Vector4 = river_material.get_shader_parameter("p1_reflection_rect")
 		var p2_rect: Vector4 = river_material.get_shader_parameter("p2_reflection_rect")
 		assert_gt(p1_rect.z, 0.0)
@@ -961,26 +1034,78 @@ func test_scene2_binds_live_character_textures_to_the_river() -> void:
 	BattleSetup.reset()
 
 
-func test_scene2_uses_its_own_jade_daylight_character_grade() -> void:
+func test_scene2_characters_preserve_authored_pixels_with_only_a_thin_warm_rim() -> void:
 	var screen := (load(BATTLE2_PATH) as PackedScene).instantiate()
 	var p1 := screen.get_node("P1CharDisplay") as CharacterDisplay
 	var p2 := screen.get_node("P2CharDisplay") as CharacterDisplay
 
 	for character in [p1, p2]:
-		assert_eq(character.rim_color, Color(0.72, 0.86, 0.78, 1.0))
-		assert_eq(character.shadow_tint, Color(0.48, 0.61, 0.57, 1.0))
-		assert_eq(character.fill_color, Color(0.72, 0.83, 0.74, 1.0))
 		assert_eq(character.light_dir, Vector2(1.0, -0.8))
-		assert_eq(character.rim_strength, 0.68)
-		assert_eq(character.rim_width, 3.5)
-		assert_eq(character.backlight, 0.16)
-		assert_eq(character.warmth_amount, 0.18)
-		assert_eq(character.fill_amount, 0.16)
-	assert_eq(screen.get_node("P1Shadow").self_modulate,
-			Color(0.25, 0.38, 0.35, 0.72))
-	assert_eq(screen.get_node("P2Shadow").self_modulate,
-			Color(0.25, 0.38, 0.35, 0.72))
+		assert_gt(character.rim_strength, 0.0)
+		assert_lte(character.rim_strength, 0.2)
+		assert_eq(character.rim_width, 1.0)
+		assert_eq(character.backlight, 0.0)
+		assert_eq(character.warmth_amount, 0.0)
+		assert_eq(character.fill_amount, 0.0)
+
+	var p1_sprite := screen.get_node("P1CharDisplay/SubViewport/AnimatedSprite2D") as AnimatedSprite2D
+	var p2_sprite := screen.get_node("P2CharDisplay/SubViewport/AnimatedSprite2D") as AnimatedSprite2D
+	for sprite in [p1_sprite, p2_sprite]:
+		var material := sprite.material as ShaderMaterial
+		assert_not_null(material)
+		if material == null:
+			continue
+		assert_eq(material.shader.resource_path,
+				"res://assets/shaders/canvas_env_scene2_character_light.gdshader")
+		assert_eq(float(material.get_shader_parameter("source_saturation")), 1.0)
+		assert_eq(float(material.get_shader_parameter("source_contrast")), 1.0)
+		assert_gt(float(material.get_shader_parameter("rim_strength")), 0.0)
+		assert_lte(float(material.get_shader_parameter("rim_strength")), 0.2)
+		assert_eq(float(material.get_shader_parameter("rim_width")), 1.0)
+		assert_eq(float(material.get_shader_parameter("backlight")), 0.0)
+		assert_eq(float(material.get_shader_parameter("warmth_amount")), 0.0)
+		assert_eq(float(material.get_shader_parameter("fill_amount")), 0.0)
+		assert_eq(float(material.get_shader_parameter("water_bounce_amount")), 0.0)
+		assert_true(material.shader.code.contains("node_modulate"),
+				"Scene2 must not multiply the authored character texture twice")
+		assert_true(material.shader.code.contains("flash_amount"),
+				"Neutral Scene2 character rendering must preserve combat hit feedback")
+
+	var p1_shadow := screen.get_node("P1Shadow") as TextureRect
+	var p2_shadow := screen.get_node("P2Shadow") as TextureRect
+	for shadow in [p1_shadow, p2_shadow]:
+		var material := shadow.material as ShaderMaterial
+		assert_not_null(material)
+		if material != null:
+			assert_eq(material.shader.resource_path,
+					"res://assets/shaders/canvas_env_scene2_character_contact_shadow.gdshader")
+			assert_gt(float(material.get_shader_parameter("tail_strength")), 0.0)
+		assert_eq(shadow.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST)
+		assert_lt(shadow.size.y, 48.0,
+				"Bridge contact shadows must stay compact instead of reading as soft floor decals")
+		assert_lt(shadow.get_index(), p1.get_index(),
+				"Contact shadows must remain behind both live characters")
 	screen.free()
+
+
+func test_scene2_postfx_skips_disabled_blur_and_inactive_impact_work() -> void:
+	var scene1 := (load(BATTLE1_PATH) as PackedScene).instantiate()
+	var scene2 := (load(BATTLE2_PATH) as PackedScene).instantiate()
+	var scene1_material := scene1.get_node("PostFX").material as ShaderMaterial
+	var scene2_material := scene2.get_node("PostFX").material as ShaderMaterial
+	var shader_source := scene2_material.shader.code
+
+	assert_gt(float(scene1_material.get_shader_parameter("edge_blur_amount")), 0.0,
+			"Scene1 must retain its authored five-tap edge blur")
+	assert_eq(float(scene2_material.get_shader_parameter("edge_blur_amount")), 0.0,
+			"Scene2 opts into the single-sample post-process path")
+	assert_true(shader_source.contains("if (edge_blur_amount <= 0.0001)"),
+			"Disabled edge blur must avoid four redundant full-screen texture samples")
+	assert_true(shader_source.contains("if (impact_strength > 0.0001)"),
+			"Inactive impact frames must skip their full-screen hash and atan work")
+
+	scene1.free()
+	scene2.free()
 
 
 func test_battle_avatar_frames_use_editor_safe_diamond_preview() -> void:

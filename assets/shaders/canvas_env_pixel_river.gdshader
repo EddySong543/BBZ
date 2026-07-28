@@ -72,10 +72,86 @@ uniform float shore_foam_strength : hint_range(0.0, 1.0) = 0.42;
 uniform float shore_shadow_strength : hint_range(0.0, 1.0) = 0.66;
 group_uniforms;
 
+group_uniforms daylight_receiver;
+uniform vec4 daylight_color : source_color = vec4(1.0, 0.86, 0.58, 1.0);
+uniform vec4 tree_shadow_color : source_color = vec4(0.12, 0.25, 0.27, 1.0);
+uniform float daylight_strength : hint_range(0.0, 0.35, 0.01) = 0.0;
+uniform float daylight_shadow_strength : hint_range(0.0, 0.35, 0.01) = 0.0;
+uniform float tree_shadow_strength : hint_range(0.0, 0.35, 0.01) = 0.0;
+uniform float daylight_center_x : hint_range(0.0, 1.0, 0.01) = 0.48;
+uniform float daylight_half_width : hint_range(0.05, 0.45, 0.01) = 0.18;
+uniform float tree_shadow_center_x : hint_range(0.0, 1.0, 0.01) = 0.79;
+uniform float tree_shadow_half_width : hint_range(0.05, 0.45, 0.01) = 0.24;
+uniform vec2 scene_light_source_uv = vec2(0.90, -0.08);
+uniform vec2 scene_light_target_uv = vec2(0.47, 0.78);
+uniform float scene_light_top_width : hint_range(0.02, 0.3, 0.01) = 0.10;
+uniform float scene_light_bottom_width : hint_range(0.1, 0.6, 0.01) = 0.40;
+uniform vec2 scene_light_pool_center = vec2(0.63, 0.28);
+uniform vec2 scene_light_pool_radius = vec2(0.56, 0.40);
+group_uniforms;
+
+group_uniforms focus_hierarchy;
+uniform vec2 focus_quiet_center_a = vec2(0.25, 0.89);
+uniform vec2 focus_quiet_center_b = vec2(0.735, 0.89);
+uniform vec2 focus_quiet_radius = vec2(0.14, 0.15);
+uniform float focus_quiet_strength : hint_range(0.0, 0.6, 0.01) = 0.0;
+uniform float ui_quiet_top_y : hint_range(0.65, 1.0, 0.01) = 0.85;
+uniform float ui_quiet_strength : hint_range(0.0, 0.6, 0.01) = 0.0;
+group_uniforms;
+
 
 float hash21(vec2 p) {
 	p = mod(p, vec2(511.0, 257.0));
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+
+float scene2_light_field(vec2 screen_uv) {
+	vec2 grid = vec2(480.0, 270.0);
+	vec2 suv = (floor(screen_uv * grid) + vec2(0.5)) / grid;
+	vec2 axis = scene_light_target_uv - scene_light_source_uv;
+	float raw_along = dot(suv - scene_light_source_uv, axis)
+			/ max(dot(axis, axis), 0.0001);
+	float along = clamp(raw_along, 0.0, 1.0);
+	vec2 center = scene_light_source_uv + axis * along;
+	vec2 normal = normalize(vec2(-axis.y, axis.x));
+	float width = mix(scene_light_top_width, scene_light_bottom_width, along);
+	float row_break = (
+			fract(floor(suv.y * 72.0) * 0.6180339) - 0.5) * 0.014;
+	float across = abs(dot(suv - center, normal));
+	float cone = 1.0 - smoothstep(
+			width + row_break,
+			width + row_break + 0.045,
+			across);
+	float reach = smoothstep(-0.08, 0.04, raw_along)
+			* (1.0 - smoothstep(0.86, 1.08, raw_along));
+	vec2 pool_delta = (suv - scene_light_pool_center)
+			/ max(scene_light_pool_radius, vec2(0.001));
+	float upper_pool = 1.0 - smoothstep(0.70, 1.0, length(pool_delta));
+	float field = max(cone * reach, upper_pool * 0.35);
+	field *= 1.0 - smoothstep(0.78, 0.98, suv.y);
+	return floor(clamp(field, 0.0, 1.0) * 4.0 + 0.5) / 4.0;
+}
+
+
+float river_focus_quiet(vec2 screen_uv) {
+	vec2 stepped_uv = (
+			floor(screen_uv * vec2(480.0, 270.0)) + vec2(0.5)
+	) / vec2(480.0, 270.0);
+	vec2 delta_a = (stepped_uv - focus_quiet_center_a)
+			/ max(focus_quiet_radius, vec2(0.001));
+	vec2 delta_b = (stepped_uv - focus_quiet_center_b)
+			/ max(focus_quiet_radius, vec2(0.001));
+	float character_quiet = max(
+			1.0 - smoothstep(0.56, 1.0, length(delta_a)),
+			1.0 - smoothstep(0.56, 1.0, length(delta_b))
+	) * focus_quiet_strength;
+	float ui_quiet = smoothstep(
+			ui_quiet_top_y,
+			min(ui_quiet_top_y + 0.10, 1.0),
+			stepped_uv.y
+	) * ui_quiet_strength;
+	return clamp(max(character_quiet, ui_quiet), 0.0, 0.65);
 }
 
 
@@ -166,11 +242,16 @@ void fragment() {
 	float ripple_active = step(1.0 - ripple_density, ripple_hash) * step(ripple_local, ripple_len);
 	float ripple_line = step(mod(px.y, ripple_row_h), px_size) * ripple_active;
 	float ripple_fade = smoothstep(0.03, 0.14, quv.y) * (1.0 - smoothstep(0.72, 1.0, quv.y));
-	col = mix(col, ripple_color.rgb, ripple_line * ripple_fade * 0.46);
+	float focus_quiet = river_focus_quiet(SCREEN_UV);
+	col = mix(
+			col,
+			ripple_color.rgb,
+			ripple_line * ripple_fade * 0.46 * (1.0 - focus_quiet));
 
 	// 金白高光只占少量长线中的一部分，不再全屏随机闪烁。
 	float glint_active = step(1.0 - glint_density, hash21(vec2(ripple_cell + 47.0, ripple_row + floor(t * 0.5))));
 	float glint = ripple_line * glint_active * smoothstep(0.04, 0.18, quv.y) * (1.0 - smoothstep(0.48, 0.78, quv.y));
+	glint *= 1.0 - focus_quiet;
 	col = mix(col, glint_color.rgb, glint * 0.82);
 
 	// 岸边保留稳定暗接触线；亮色只在低密度短簇中错拍出现和消散。
@@ -213,5 +294,37 @@ void fragment() {
 	col = mix(col, shore_dark.rgb, shore_dark_mask * shore_shadow_strength);
 	col = mix(col, shore_light.rgb, shore_cluster_bright * shore_foam_strength);
 
+	// The river receives the same upper-right source as the solid scenery.
+	// Reflection is carried only by existing ripple rows, while the tree's
+	// broad shadow suppresses light on the right without becoming a flat decal.
+	float daylight_axis = scene2_light_field(SCREEN_UV);
+	float daylight_break = mix(
+			0.42,
+			1.0,
+			step(0.44, hash21(vec2(ripple_cell + 401.0, band_id + 37.0))));
+	float daylight_receiver = daylight_axis
+			* daylight_break
+			* mix(0.62, 1.0, ripple_line)
+			* (1.0 - depth * 0.48);
+	col *= 1.0 + daylight_receiver * daylight_strength * 0.16;
+	col += daylight_color.rgb
+			* daylight_receiver * daylight_strength * 0.12;
+	float field_shadow = (1.0 - daylight_axis)
+			* mix(0.35, 1.0, smoothstep(0.0, 0.75, depth));
+	col = mix(
+			col,
+			col * tree_shadow_color.rgb,
+			field_shadow * daylight_shadow_strength);
+
+	float tree_shadow_axis = 1.0 - smoothstep(
+			tree_shadow_half_width,
+			tree_shadow_half_width + 0.08,
+			abs(quv.x - tree_shadow_center_x));
+	float tree_shadow_depth = tree_shadow_axis
+			* mix(0.55, 1.0, smoothstep(0.0, 0.62, depth));
+	col = mix(
+			col,
+			col * tree_shadow_color.rgb,
+			tree_shadow_depth * tree_shadow_strength);
 	COLOR = vec4(col, 1.0);
 }

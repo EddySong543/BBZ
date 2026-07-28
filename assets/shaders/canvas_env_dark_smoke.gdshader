@@ -60,10 +60,51 @@ uniform float water_reflect_strength : hint_range(0.0, 0.35, 0.01) = 0.0;
 uniform float water_reflect_center_x : hint_range(0.0, 1.0, 0.01) = 0.5;
 uniform float water_reflect_half_width : hint_range(0.02, 0.4, 0.01) = 0.12;
 uniform float water_reflect_edge_h : hint_range(0.005, 0.12, 0.005) = 0.03;
+// Scene2 enables this receiver response; Scene1 materials keep both strengths
+// at zero and therefore retain their established moonlit cloud appearance.
+uniform vec2 directional_light_dir = vec2(1.0, -0.8);
+uniform vec4 directional_light_color : source_color = vec4(1.0, 0.88, 0.68, 1.0);
+uniform vec4 directional_shadow_color : source_color = vec4(0.24, 0.37, 0.38, 1.0);
+uniform float directional_light_strength : hint_range(0.0, 0.5, 0.01) = 0.0;
+uniform float directional_shadow_strength : hint_range(0.0, 0.3, 0.01) = 0.0;
+uniform vec2 scene_light_source_uv = vec2(0.90, -0.08);
+uniform vec2 scene_light_target_uv = vec2(0.47, 0.78);
+uniform float scene_light_top_width : hint_range(0.02, 0.3, 0.01) = 0.10;
+uniform float scene_light_bottom_width : hint_range(0.1, 0.6, 0.01) = 0.40;
+uniform vec2 scene_light_pool_center = vec2(0.63, 0.28);
+uniform vec2 scene_light_pool_radius = vec2(0.56, 0.40);
 
 float hash(vec2 p) {
 	p = mod(p, 289.0);   // ⚠入口取模压量级——sid×31 级大数会让 sin 精度劣化·随机失真（碎齿率失控教训）
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+
+float scene2_light_field(vec2 screen_uv) {
+	vec2 grid = vec2(480.0, 270.0);
+	vec2 suv = (floor(screen_uv * grid) + vec2(0.5)) / grid;
+	vec2 axis = scene_light_target_uv - scene_light_source_uv;
+	float raw_along = dot(suv - scene_light_source_uv, axis)
+			/ max(dot(axis, axis), 0.0001);
+	float along = clamp(raw_along, 0.0, 1.0);
+	vec2 center = scene_light_source_uv + axis * along;
+	vec2 normal = normalize(vec2(-axis.y, axis.x));
+	float width = mix(scene_light_top_width, scene_light_bottom_width, along);
+	float row_break = (
+			fract(floor(suv.y * 72.0) * 0.6180339) - 0.5) * 0.014;
+	float across = abs(dot(suv - center, normal));
+	float cone = 1.0 - smoothstep(
+			width + row_break,
+			width + row_break + 0.045,
+			across);
+	float reach = smoothstep(-0.08, 0.04, raw_along)
+			* (1.0 - smoothstep(0.86, 1.08, raw_along));
+	vec2 pool_delta = (suv - scene_light_pool_center)
+			/ max(scene_light_pool_radius, vec2(0.001));
+	float upper_pool = 1.0 - smoothstep(0.70, 1.0, length(pool_delta));
+	float field = max(cone * reach, upper_pool * 0.35);
+	field *= 1.0 - smoothstep(0.78, 0.98, suv.y);
+	return floor(clamp(field, 0.0, 1.0) * 4.0 + 0.5) / 4.0;
 }
 
 
@@ -364,5 +405,16 @@ void fragment() {
 			rgb,
 			water_reflect_color.rgb,
 			water_reflect_underside * water_reflect_strength);
+	float facing = scene2_light_field(SCREEN_UV);
+	float receiver_light = cover
+			* (0.28 + lit * 0.72)
+			* facing;
+	float receiver_shadow = cover * (1.0 - facing) * (1.0 - lit * 0.65);
+	rgb += directional_light_color.rgb
+			* receiver_light * directional_light_strength * 0.18;
+	rgb = mix(
+			rgb,
+			rgb * directional_shadow_color.rgb,
+			receiver_shadow * directional_shadow_strength);
 	COLOR = vec4(rgb, a);
 }

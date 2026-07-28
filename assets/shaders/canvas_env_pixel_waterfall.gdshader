@@ -99,10 +99,92 @@ uniform float cloud_cut_density : hint_range(0.0, 1.0, 0.01) = 0.70;
 uniform float cloud_cut_strength : hint_range(0.0, 1.0, 0.01) = 0.78;
 group_uniforms;
 
+group_uniforms daylight_receiver;
+uniform vec2 daylight_dir = vec2(1.0, -0.8);
+uniform vec4 daylight_color : source_color = vec4(1.0, 0.91, 0.72, 1.0);
+uniform vec4 daylight_shadow_color : source_color = vec4(0.14, 0.31, 0.34, 1.0);
+uniform float daylight_strength : hint_range(0.0, 0.3, 0.01) = 0.0;
+uniform float daylight_shadow_strength : hint_range(0.0, 0.2, 0.01) = 0.0;
+uniform vec2 scene_light_source_uv = vec2(0.90, -0.08);
+uniform vec2 scene_light_target_uv = vec2(0.47, 0.78);
+uniform float scene_light_top_width : hint_range(0.02, 0.3, 0.01) = 0.10;
+uniform float scene_light_bottom_width : hint_range(0.1, 0.6, 0.01) = 0.40;
+uniform vec2 scene_light_pool_center = vec2(0.63, 0.28);
+uniform vec2 scene_light_pool_radius = vec2(0.56, 0.40);
+group_uniforms;
+
+group_uniforms focus_hierarchy;
+uniform float scene_saturation : hint_range(0.75, 1.05, 0.01) = 1.0;
+uniform float scene_contrast : hint_range(0.85, 1.05, 0.01) = 1.0;
+uniform vec2 focus_quiet_center_a = vec2(0.25, 0.61);
+uniform vec2 focus_quiet_center_b = vec2(0.735, 0.61);
+uniform vec2 focus_quiet_radius = vec2(0.115, 0.17);
+uniform float focus_quiet_strength : hint_range(0.0, 1.0, 0.01) = 0.0;
+uniform float focus_quiet_saturation : hint_range(0.85, 1.0, 0.01) = 0.97;
+uniform float focus_quiet_contrast : hint_range(0.75, 1.0, 0.01) = 0.90;
+group_uniforms;
+
 
 float hash21(vec2 p) {
 	p = mod(p, vec2(509.0, 263.0));
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+
+float scene2_light_field(vec2 screen_uv) {
+	vec2 grid = vec2(480.0, 270.0);
+	vec2 suv = (floor(screen_uv * grid) + vec2(0.5)) / grid;
+	vec2 axis = scene_light_target_uv - scene_light_source_uv;
+	float raw_along = dot(suv - scene_light_source_uv, axis)
+			/ max(dot(axis, axis), 0.0001);
+	float along = clamp(raw_along, 0.0, 1.0);
+	vec2 center = scene_light_source_uv + axis * along;
+	vec2 normal = normalize(vec2(-axis.y, axis.x));
+	float width = mix(scene_light_top_width, scene_light_bottom_width, along);
+	float row_break = (
+			fract(floor(suv.y * 72.0) * 0.6180339) - 0.5) * 0.014;
+	float across = abs(dot(suv - center, normal));
+	float cone = 1.0 - smoothstep(
+			width + row_break,
+			width + row_break + 0.045,
+			across);
+	float reach = smoothstep(-0.08, 0.04, raw_along)
+			* (1.0 - smoothstep(0.86, 1.08, raw_along));
+	vec2 pool_delta = (suv - scene_light_pool_center)
+			/ max(scene_light_pool_radius, vec2(0.001));
+	float upper_pool = 1.0 - smoothstep(0.70, 1.0, length(pool_delta));
+	float field = max(cone * reach, upper_pool * 0.35);
+	field *= 1.0 - smoothstep(0.78, 0.98, suv.y);
+	return floor(clamp(field, 0.0, 1.0) * 4.0 + 0.5) / 4.0;
+}
+
+
+float focus_quiet_mask(vec2 screen_uv) {
+	vec2 stepped_uv = (
+			floor(screen_uv * vec2(480.0, 270.0)) + vec2(0.5)
+	) / vec2(480.0, 270.0);
+	vec2 delta_a = (stepped_uv - focus_quiet_center_a)
+			/ max(focus_quiet_radius, vec2(0.001));
+	vec2 delta_b = (stepped_uv - focus_quiet_center_b)
+			/ max(focus_quiet_radius, vec2(0.001));
+	float mask_a = 1.0 - smoothstep(0.58, 1.0, length(delta_a));
+	float mask_b = 1.0 - smoothstep(0.58, 1.0, length(delta_b));
+	return max(mask_a, mask_b) * focus_quiet_strength;
+}
+
+
+vec3 apply_focus_grade(vec3 color, vec2 screen_uv) {
+	float source_luma = dot(color, vec3(0.299, 0.587, 0.114));
+	vec3 scene_color = mix(vec3(source_luma), color, scene_saturation);
+	scene_color = (scene_color - vec3(0.5)) * scene_contrast + vec3(0.5);
+	float quiet = focus_quiet_mask(screen_uv);
+	float quiet_luma = dot(scene_color, vec3(0.299, 0.587, 0.114));
+	vec3 quiet_color = mix(
+			vec3(quiet_luma), scene_color, focus_quiet_saturation);
+	quiet_color = (
+			quiet_color - vec3(0.5)
+	) * focus_quiet_contrast + vec3(0.5);
+	return mix(scene_color, quiet_color, quiet);
 }
 
 
@@ -948,9 +1030,37 @@ void fragment() {
 	alpha = max(alpha, ripple_shadow * 0.32);
 	alpha = max(alpha, ripple_bright * 0.46);
 
+	// Scene1-style receiver response: authored bright water planes and foam
+	// accept the right-top daylight; deep lanes remain intact. This changes
+	// color only and never touches the approved waterfall silhouette or timing.
+	float receiver_facing = scene2_light_field(SCREEN_UV);
+	float body_luma = dot(body_water, vec3(0.299, 0.587, 0.114));
+	float body_light = smoothstep(0.24, 0.76, body_luma)
+			* mix(0.42, 1.0, receiver_facing);
+	float body_shadow = (1.0 - receiver_facing)
+			* (1.0 - smoothstep(0.10, 0.58, body_luma));
+	body_water *= 1.0 + body_light * daylight_strength;
+	body_water += daylight_color.rgb * body_light * daylight_strength * 0.13;
+	body_water = mix(
+			body_water,
+			body_water * daylight_shadow_color.rgb,
+			body_shadow * daylight_shadow_strength);
+
+	float impact_luma = dot(water, vec3(0.299, 0.587, 0.114));
+	float impact_light = smoothstep(0.28, 0.76, impact_luma)
+			* mix(0.48, 1.0, receiver_facing);
+	water *= 1.0 + impact_light * daylight_strength;
+	water += daylight_color.rgb * impact_light * daylight_strength * 0.12;
+	body_water = apply_focus_grade(body_water, SCREEN_UV);
+	water = apply_focus_grade(water, SCREEN_UV);
+
 	if (render_part == 0) {
-		COLOR = vec4(body_water, clamp(body_output_alpha, 0.0, 1.0));
+		COLOR = vec4(
+				clamp(body_water, vec3(0.0), vec3(1.0)),
+				clamp(body_output_alpha, 0.0, 1.0));
 	} else {
-		COLOR = vec4(water, clamp(alpha, 0.0, 1.0));
+		COLOR = vec4(
+				clamp(water, vec3(0.0), vec3(1.0)),
+				clamp(alpha, 0.0, 1.0));
 	}
 }
