@@ -116,6 +116,20 @@ extends Control
 		col_shield_bottom = v
 		queue_redraw()
 
+@export_group("Battle HUD 定向阴影")
+@export var bottom_shadow_enabled := false:
+	set(v):
+		bottom_shadow_enabled = v
+		queue_redraw()
+@export var bottom_shadow_offset := Vector2(2.0, 4.0):
+	set(v):
+		bottom_shadow_offset = v
+		queue_redraw()
+@export var bottom_shadow_color := Color(0.02, 0.012, 0.008, 0.34):
+	set(v):
+		bottom_shadow_color = v
+		queue_redraw()
+
 # ── 波纹律动（沿用心条同名旋钮）────────────────────────
 @export_group("波纹律动")
 ## 开启=一道亮波沿块序依次扫过（绘制方向天然镜像：LTR 左→右、RTL 右→左）。
@@ -266,6 +280,12 @@ func _draw() -> void:
 	_slot_count = total
 	_ensure_slots(total)
 
+	# 整条斜切轮廓先落一层轻量定向阴影，保留格间暗缝而不增加模糊矩形底板。
+	if bottom_shadow_enabled:
+		draw_colored_polygon(
+				_offset_polygon(_backing_quad(total), bottom_shadow_offset),
+				bottom_shadow_color)
+
 	# ① 长平行四边形暗底：格与格之间的缝、外框都由它露出 → "拼贴成一条"的读法
 	draw_colored_polygon(_backing_quad(total), col_backing)
 
@@ -382,6 +402,13 @@ func _backing_quad(total: int) -> PackedVector2Array:
 	return PackedVector2Array([
 		Vector2(left - p + sa, y0), Vector2(right + p + sa, y0),
 		Vector2(right + p + sb, y1), Vector2(left - p + sb, y1)])
+
+
+func _offset_polygon(points: PackedVector2Array, offset: Vector2) -> PackedVector2Array:
+	var shifted := PackedVector2Array()
+	for point in points:
+		shifted.append(point + offset)
+	return shifted
 
 
 func _shift(y: float) -> float:

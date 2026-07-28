@@ -48,6 +48,20 @@ extends Control
 @export var backing_color: Color = Color(0.04, 0.03, 0.06, 0.95)
 @export var number_outline: Color = Color(0.04, 0.03, 0.06, 0.95)
 
+@export_group("Battle HUD 定向阴影")
+@export var bottom_shadow_enabled := false:
+	set(v):
+		bottom_shadow_enabled = v
+		queue_redraw()
+@export var bottom_shadow_offset := Vector2(1.5, 3.0):
+	set(v):
+		bottom_shadow_offset = v
+		queue_redraw()
+@export var bottom_shadow_color := Color(0.02, 0.012, 0.008, 0.30):
+	set(v):
+		bottom_shadow_color = v
+		queue_redraw()
+
 @export_group("编辑器预览")
 @export var preview_hp: float = 4.5:
 	set(v):
@@ -122,6 +136,13 @@ func _draw_segment(x: float, cy: float, text: String, fill: Color, top: Color,
 		bottom: Color, text_color: Color) -> float:
 	var y := cy - icon_h * 0.5
 	var p := icon_border
+	if bottom_shadow_enabled:
+		draw_colored_polygon(_quad(
+				x - p + bottom_shadow_offset.x,
+				y - p + bottom_shadow_offset.y,
+				icon_w + p * 2.0,
+				icon_h + p * 2.0,
+				icon_slant), bottom_shadow_color)
 	draw_colored_polygon(_quad(x - p, y - p, icon_w + p * 2.0,
 		icon_h + p * 2.0, icon_slant), backing_color)
 	draw_colored_polygon(_quad(x, y, icon_w, icon_h, icon_slant), fill)

@@ -110,6 +110,12 @@ const TXT_BRIGHT := Color(0.98, 0.96, 0.9)      # 可抽/可补/就绪/✓用（
 const TXT_DIM := Color(0.78, 0.74, 0.66)        # 锁/待抽/锁中（静默电报·暖灰退后）
 const TXT_FAINT := Color(0.62, 0.58, 0.50)      # 空格（最弱）
 
+@export_group("Battle HUD 定向阴影")
+@export var bottom_shadow_enabled := false
+@export var bottom_shadow_offset := Vector2(2.0, 4.0)
+@export var bottom_shadow_color := Color(0.02, 0.012, 0.008, 0.34)
+@export_group("")
+
 ## interactive：本地玩家行可点击。hoverable：非交互行也发悬停信号（P2 敌方道具查看·
 ## 2026-07-17 Eddy）——点击/右键升级仍被 interactive 门控，悬停只读无副作用。
 var interactive := false:
@@ -134,6 +140,7 @@ var _cells: Array[ColorRect] = []              # 每槽暗格底（cell_bg：稀
 var _cell_mats: Array[ShaderMaterial] = []     # refresh 重设 fill_color / center_glow / use_tex
 var _frames: Array[ColorRect] = []             # 每槽点选金晕外环（pixel_frame·外扩金边·仅点选显示）
 var _frame_mats: Array[ShaderMaterial] = []    # 金晕材质（金色在 _ready 一次性设定）
+var _bottom_shadows: Array[TextureRect] = []   # Battle HUD opt-in：贴合回纹框 alpha 的轻量定向阴影
 var _tex_frames: Array[TextureRect] = []       # 每槽回纹阶框贴图（有道具时替换 shader 框·与图鉴同款）
 var _tex_frame_mats: Array[ShaderMaterial] = [] # 新框明暗母版按阶级重映射为蓝 / 紫 / 金
 var _icons: Array[TextureRect] = []            # 道具图标层（缺图隐藏 → 回退文字·零回归）
@@ -190,6 +197,20 @@ func _make_texture_frame_material() -> ShaderMaterial:
 	return m
 
 
+func _make_bottom_shadow_material() -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = FRAME_PALETTE_SHADER
+	var opaque_shadow := Color(
+			bottom_shadow_color.r,
+			bottom_shadow_color.g,
+			bottom_shadow_color.b,
+			1.0)
+	material.set_shader_parameter("shadow_color", opaque_shadow)
+	material.set_shader_parameter("mid_color", opaque_shadow)
+	material.set_shader_parameter("highlight_color", opaque_shadow)
+	return material
+
+
 func _set_texture_frame_palette(m: ShaderMaterial, tier: int) -> void:
 	var key := clampi(tier, 1, 3)
 	m.set_shader_parameter("shadow_color", FRAME_SHADOW_T[key])
@@ -203,6 +224,19 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	for i in range(3):
 		var base := Vector2(i * (SLOT_W + GAP), 0.0)
+		# 与回纹框完全同 alpha 轮廓的定向阴影；先于格底和框体加入，不产生矩形黑底。
+		var bottom_shadow := TextureRect.new()
+		bottom_shadow.name = "BottomShadow%d" % i
+		bottom_shadow.texture = ITEM_FRAME_TEX
+		bottom_shadow.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		bottom_shadow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		bottom_shadow.position = base + FRAME_ART_OFFSET + bottom_shadow_offset
+		bottom_shadow.size = FRAME_ART_SIZE
+		bottom_shadow.material = _make_bottom_shadow_material()
+		bottom_shadow.self_modulate = Color(1.0, 1.0, 1.0, bottom_shadow_color.a)
+		bottom_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bottom_shadow.visible = bottom_shadow_enabled
+		add_child(bottom_shadow)
 		# 暗格底（cell_bg）：稀有度暗底 + 中心高亮 + 传说金底图；颜色由 refresh 设。
 		var cell := ColorRect.new()
 		cell.color = Color.WHITE   # shader 乘 COLOR，须白
@@ -296,6 +330,7 @@ func _ready() -> void:
 		_cell_mats.append(cmat)
 		_frames.append(frame)
 		_frame_mats.append(fmat)
+		_bottom_shadows.append(bottom_shadow)
 		_tex_frames.append(tframe)
 		_tex_frame_mats.append(tfmat)
 		_icons.append(icon)

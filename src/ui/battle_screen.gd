@@ -47,6 +47,10 @@ const PORTRAIT_BENCH_RISE := 11.0
 ## battle_screen 顶部菱形头像框专用描边；HeroFrame 默认值仍供其他界面沿用。
 ## 亮边 4px → 6px，近黑外压边保持 2px，增强小尺寸 HUD 上的轮廓辨识度。
 const BATTLE_DIAMOND_STROKE_PX := 6.0
+## UI 与中央「回合开始」同方向的定向下投影：横向只偏 3px，纵向落 6px。
+## 只增加层级分离，不扩大点击区域，也不参与按钮配色。
+const UI_BOTTOM_SHADOW_OFFSET := Vector2(3.0, 6.0)
+const UI_BOTTOM_SHADOW_COLOR := Color(0.02, 0.012, 0.008, 0.52)
 
 ## 这 8 位英雄的旧 portrait 是从头部中段截出的截图，头饰/耳朵已在源文件里被裁掉。
 ## 战斗顶部单独改用手动裁好的 battle portrait；图鉴、BP 等其他构图不受影响。
@@ -119,8 +123,21 @@ const DEFEAT_FALL_TIME := 0.7   # defeat 帧表标准时长（import_hero_batch 
 # 回合时限阶梯（2026-07-11 Eddy 定·由少到多·台阶绑道具解锁节奏）：回合 1-2 纯动作选择 10s →
 # 回合 3 起道具经济开动（3/4/5 逐格解锁）15s → 回合 6 起组合决策期（看描述/算对方）20s 封顶。
 const TURN_TIME_STEPS: Array = [[5, 20], [2, 15], [0, 10]]   # [起始回合(0-based), 秒]·降序查表
-const COUNTDOWN_COLOR := Color(0.95, 0.91, 0.8)
-const COUNTDOWN_ALERT_COLOR := Color("#e5443c")   # 与战斗 HUD 血量红同源，末 3 秒及归零状态使用。
+const COUNTDOWN_WARNING_3_COLOR := Color("#f1c21b")   # IBM Carbon Yellow 30
+const COUNTDOWN_WARNING_2_COLOR := Color("#ff832b")   # IBM Carbon Orange 40
+const COUNTDOWN_WARNING_1_COLOR := Color("#da1e28")   # IBM Carbon Red 60
+const COUNTDOWN_ALERT_OUTLINE_COLOR := Color(0.07, 0.04, 0.02, 0.86)
+
+@export_group("Top Countdown Theme")
+@export var countdown_normal_color: Color = Color("#f2e8cc")
+@export var countdown_outline_color: Color = Color(0.0, 0.0, 0.0, 0.8)
+@export_range(0, 8, 1) var countdown_outline_size: int = 4
+@export var countdown_shadow_color: Color = Color(0.0, 0.0, 0.0, 0.60)
+@export_range(-8, 8, 1) var countdown_shadow_offset_x: int = 3
+@export_range(-8, 8, 1) var countdown_shadow_offset_y: int = 3
+@export var countdown_ornament_color: Color = Color("#f2e8cc")
+@export var countdown_ornament_underlay_color: Color = Color(0.07, 0.04, 0.02, 0.88)
+@export_range(0.0, 6.0, 0.5) var countdown_ornament_underlay_width: float = 3.0
 
 enum State { TURN_INTRO, PLAYER_SELECT, RESOLVING, HERO_SELECT, GAME_OVER }
 
@@ -564,6 +581,11 @@ func _init_buttons() -> void:
 	btn_codex.pressed.connect(_on_codex_pressed)
 	buttons_ctrl.add_child(btn_codex)
 
+	# 顶部倒计时/回合开始已有右下定向阴影；底部按钮同步这套层级语言。
+	# 阴影是按钮子节点，会跟随现有 hover/selected 缩放，但不改变点击矩形。
+	for button: Button in action_btn_list + [btn_confirm, btn_codex, btn_jifeng]:
+		_attach_button_bottom_shadow(button)
+
 	# 镜头偏焦改由「执行动作」触发（见 _play_battle_anims）：波/大波→右聚敌、防/大防→左聚己、其余回正。
 	# 旧「hover 底部按钮 → 推近」已取消（2026-06-23 Eddy）。
 
@@ -579,14 +601,21 @@ func _init_buttons() -> void:
 	turn_bold.variation_embolden = 0.6
 	timer_label.add_theme_font_override("font", turn_bold)
 	timer_label.add_theme_font_size_override("font_size", 44)
-	timer_label.add_theme_color_override("font_color", COUNTDOWN_COLOR)
-	timer_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
-	timer_label.add_theme_constant_override("outline_size", 4)
+	timer_label.add_theme_color_override("font_color", countdown_normal_color)
+	timer_label.add_theme_color_override("font_outline_color", countdown_outline_color)
+	timer_label.add_theme_constant_override("outline_size", countdown_outline_size)
+	timer_label.add_theme_color_override("font_shadow_color", countdown_shadow_color)
+	timer_label.add_theme_constant_override("shadow_offset_x", countdown_shadow_offset_x)
+	timer_label.add_theme_constant_override("shadow_offset_y", countdown_shadow_offset_y)
 	# 仅在文字两侧补：近文字金色菱形 → 小间隔 → 向外水平金线。无底板、无折角、无动态。
 	_round_ornaments = RoundLabelOrnamentsComponent.new()
 	_round_ornaments.name = "RoundLabelOrnaments"
 	timer_label.add_child(_round_ornaments)
 	_round_ornaments.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_round_ornaments.configure(
+		countdown_ornament_color,
+		countdown_ornament_underlay_color,
+		countdown_ornament_underlay_width)
 	FontManager.apply(status_label, 44)
 	status_label.add_theme_color_override("font_color", Color(0.95, 0.91, 0.8))   # 暖米白
 	status_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
@@ -809,12 +838,31 @@ func _on_timer_tick() -> void:
 			_on_confirm_pressed()
 
 
+func _countdown_color_for_seconds(seconds_left: int) -> Color:
+	match seconds_left:
+		3:
+			return COUNTDOWN_WARNING_3_COLOR
+		2:
+			return COUNTDOWN_WARNING_2_COLOR
+		1, 0:
+			return COUNTDOWN_WARNING_1_COLOR
+		_:
+			return COUNTDOWN_WARNING_1_COLOR if seconds_left < 0 else countdown_normal_color
+
+
 func _update_timer_label() -> void:
-	# 倒计时只显示在顶部；末 3 秒与归零状态使用 HUD 血量红，装饰仍保持米色。
+	# 倒计时只显示在顶部；末 3 秒按黄→橙→红推进，装饰同步从中央向外染色。
 	timer_label.text = str(maxi(timer_seconds, 0))
+	var countdown_color := _countdown_color_for_seconds(timer_seconds)
+	var is_alert := timer_seconds <= 3
+	timer_label.add_theme_color_override("font_color", countdown_color)
 	timer_label.add_theme_color_override(
-		"font_color", COUNTDOWN_ALERT_COLOR if timer_seconds <= 3 else COUNTDOWN_COLOR)
-	_round_ornaments.refresh()
+		"font_outline_color",
+		COUNTDOWN_ALERT_OUTLINE_COLOR if is_alert else countdown_outline_color)
+	timer_label.add_theme_constant_override(
+		"outline_size", max(countdown_outline_size, 3) if is_alert else countdown_outline_size)
+	if _round_ornaments != null:
+		_round_ornaments.set_warning_state(timer_seconds, countdown_color)
 
 
 func _hold_timer_at_zero() -> void:
@@ -1737,6 +1785,55 @@ func _reset_button_styles() -> void:
 	_clear_enemy_targets()   # 退出 h21 敌方目标选择态
 
 
+## 为果冻按钮复制同一轮廓作为深色下投影；没有果冻 Bg 的疾风钮使用同尺寸圆角面。
+## 阴影位于按钮内部树序最底且 mouse_filter=IGNORE，不改变原点击、hover、disabled 行为。
+func _attach_button_bottom_shadow(btn: Button) -> void:
+	if btn == null or btn.get_node_or_null("BottomShadow") != null:
+		return
+
+	var source_bg := btn.get_node_or_null("Bg") as ColorRect
+	var shadow: Control
+	if source_bg != null and source_bg.material is ShaderMaterial:
+		var shadow_rect := ColorRect.new()
+		shadow_rect.color = Color.WHITE
+		var material := (source_bg.material as ShaderMaterial).duplicate() as ShaderMaterial
+		var opaque_shadow := Color(
+				UI_BOTTOM_SHADOW_COLOR.r,
+				UI_BOTTOM_SHADOW_COLOR.g,
+				UI_BOTTOM_SHADOW_COLOR.b,
+				1.0)
+		for parameter in ["fill_top", "fill_bottom", "edge_inner", "edge_outer"]:
+			material.set_shader_parameter(parameter, opaque_shadow)
+		material.set_shader_parameter("fill_alpha", 1.0)
+		material.set_shader_parameter("noise_amt", 0.0)
+		material.set_shader_parameter("wear", 0.0)
+		shadow_rect.material = material
+		shadow = shadow_rect
+	else:
+		var shadow_panel := Panel.new()
+		var box := StyleBoxFlat.new()
+		box.bg_color = Color(
+				UI_BOTTOM_SHADOW_COLOR.r,
+				UI_BOTTOM_SHADOW_COLOR.g,
+				UI_BOTTOM_SHADOW_COLOR.b,
+				1.0)
+		box.set_corner_radius_all(10)
+		shadow_panel.add_theme_stylebox_override("panel", box)
+		shadow = shadow_panel
+
+	shadow.name = "BottomShadow"
+	shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shadow.show_behind_parent = true
+	shadow.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	shadow.offset_left = UI_BOTTOM_SHADOW_OFFSET.x
+	shadow.offset_top = UI_BOTTOM_SHADOW_OFFSET.y
+	shadow.offset_right = UI_BOTTOM_SHADOW_OFFSET.x
+	shadow.offset_bottom = UI_BOTTOM_SHADOW_OFFSET.y
+	shadow.self_modulate = Color(1.0, 1.0, 1.0, UI_BOTTOM_SHADOW_COLOR.a)
+	btn.add_child(shadow)
+	btn.move_child(shadow, 0)
+
+
 ## 给按钮挂 ButtonJuice 交互手感组件（幂等：已挂则跳过）。
 func _attach_button_juice(btn: BaseButton) -> void:
 	if btn.get_node_or_null("ButtonJuice") == null:
@@ -1860,12 +1957,14 @@ func _build_item_rows() -> void:
 	p1_item_row = ItemSlotRow.new()
 	p1_item_row.position = ITEM_ROW_POS_P1
 	p1_item_row.scale = Vector2.ONE * ITEM_ROW_SCALE
+	p1_item_row.bottom_shadow_enabled = true
 	p1_item_row.interactive = true   # M3：本地玩家行可点击
 	p1_item_row.slot_clicked.connect(_on_p1_slot_clicked)
 	p1_item_row.slot_upgrade_clicked.connect(_on_p1_slot_upgrade)   # C：升级角标
 	p1_hud.add_child(p1_item_row)
 	p2_item_row = ItemSlotRow.new()   # P2 = AI·道具-blind（ADR D9）→ 仅显示
 	p2_item_row.scale = Vector2.ONE * ITEM_ROW_SCALE
+	p2_item_row.bottom_shadow_enabled = true
 	# 右贴镜像 P1：P2 右内边距 = P1 左内边距(28) → 与右侧 P2 框组对齐(修敌方道具行偏左)。
 	# 镜像宽度按缩放后的实显宽算（否则 P2 行会向内缩进一截）。
 	var row_w := (ItemSlotRow.SLOT_W * 3.0 + ItemSlotRow.GAP * 2.0) * ITEM_ROW_SCALE

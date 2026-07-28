@@ -37,6 +37,8 @@ const FILL_TOP: Array[Color] = [Color(0.92, 0.87, 0.70), Color(0.92, 0.87, 0.70)
 const FILL_BOTTOM: Array[Color] = [Color(0.76, 0.68, 0.50), Color(0.76, 0.68, 0.50)]
 const EDGE_INNER: Array[Color] = [Color(0.43, 0.63, 0.88), Color(0.88, 0.52, 0.42)]
 const EDGE_OUTER := Color(0.1, 0.09, 0.11)
+const BOTTOM_SHADOW_OFFSET := Vector2(3.0, 6.0)
+const BOTTOM_SHADOW_COLOR := Color(0.02, 0.012, 0.008, 0.52)
 const PIP_ON := Color("ffd86a")                  # 当前英雄=亮金（就绪金同源）
 const PIP_OFF := Color(0.45, 0.41, 0.35, 0.9)    # 其余=暖灰（钮外落在暗夜景上·暗点会隐形）
 
@@ -62,6 +64,19 @@ func _ready() -> void:
 		btn.size = Vector2(BTN, BTN)
 		for st in ["normal", "hover", "pressed", "disabled", "focus"]:
 			btn.add_theme_stylebox_override(st, StyleBoxEmpty.new())
+		var shadow := ColorRect.new()
+		shadow.name = "BottomShadow"
+		shadow.color = Color.WHITE
+		shadow.material = _make_shadow_jelly()
+		shadow.show_behind_parent = true
+		shadow.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		shadow.offset_left = BOTTOM_SHADOW_OFFSET.x
+		shadow.offset_top = BOTTOM_SHADOW_OFFSET.y
+		shadow.offset_right = BOTTOM_SHADOW_OFFSET.x
+		shadow.offset_bottom = BOTTOM_SHADOW_OFFSET.y
+		shadow.self_modulate = Color(1.0, 1.0, 1.0, BOTTOM_SHADOW_COLOR.a)
+		shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		btn.add_child(shadow)
 		var bg := ColorRect.new()
 		bg.name = "Bg"
 		bg.material = _make_jelly(side)
@@ -112,6 +127,30 @@ func _make_jelly(side: int) -> ShaderMaterial:
 	m.set_shader_parameter("solid_rim", true)
 	m.set_shader_parameter("rim_px", 1.5)
 	return m
+
+
+func _make_shadow_jelly() -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = JELLY_SHADER
+	var opaque_shadow := Color(
+			BOTTOM_SHADOW_COLOR.r,
+			BOTTOM_SHADOW_COLOR.g,
+			BOTTOM_SHADOW_COLOR.b,
+			1.0)
+	material.set_shader_parameter("fill_top", opaque_shadow)
+	material.set_shader_parameter("fill_bottom", opaque_shadow)
+	material.set_shader_parameter("edge_inner", opaque_shadow)
+	material.set_shader_parameter("edge_outer", opaque_shadow)
+	material.set_shader_parameter("fill_alpha", 1.0)
+	material.set_shader_parameter("pixel_grid", 38.0)
+	material.set_shader_parameter("corner", 0.22)
+	material.set_shader_parameter("edge_px", 2.0)
+	material.set_shader_parameter("aspect", 1.0)
+	material.set_shader_parameter("noise_amt", 0.0)
+	material.set_shader_parameter("wear", 0.0)
+	material.set_shader_parameter("solid_rim", true)
+	material.set_shader_parameter("rim_px", 1.5)
+	return material
 
 
 ## 每次战斗状态刷新调用：未悬停且无回落缓冲的侧跟随出战英雄；

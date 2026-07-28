@@ -162,6 +162,27 @@ const FRAME_TEX_ENEMY := preload("res://assets/ui/hero_avatar_frame_enemy.png") 
 		if is_node_ready() and diamond_mode:
 			_layout_diamond_portrait()
 
+## 战斗 HUD 可选的定向下投影。默认关闭，避免影响 BP、图鉴和换人浮窗等复用场景。
+@export_group("Bottom Shadow")
+@export var bottom_shadow_enabled := false:
+	set(v):
+		bottom_shadow_enabled = v
+		if is_node_ready():
+			_refresh_bottom_shadow()
+
+@export var bottom_shadow_color := Color(0.055, 0.038, 0.024, 0.40):
+	set(v):
+		bottom_shadow_color = v
+		if is_node_ready():
+			_refresh_bottom_shadow()
+
+@export var bottom_shadow_offset := Vector2(2.0, 4.0):
+	set(v):
+		bottom_shadow_offset = v
+		if is_node_ready():
+			_refresh_bottom_shadow()
+@export_group("")
+
 var _portrait: TextureRect
 var _name_label: Label
 var _bg: TextureRect          # 贴图边框（2026-07-13 换皮·原 shader ColorRect）
@@ -170,6 +191,7 @@ var _inner_fx: ColorRect
 var _switch_label: Label   # 主动换人：armed 时盖在立绘上显示「切换」二字（任务5）
 var _sel_tween: Tween      # 选中弹跳动画（选择动作时的 pop）
 var _diamond: ColorRect    # 菱形外框（diamond_mode 懒建）
+var _bottom_shadow: ColorRect   # 战斗 HUD 专用定向下投影（opt-in）
 var _active_corners: ActiveCornerOrnaments   # 出战位三点护角（左/右/下；顶部让给越框立绘）
 var _death_cross: DeathCross   # 阵亡红✕（懒建·is_dead 才出现）
 static var _cache: Dictionary = {}
@@ -321,6 +343,7 @@ func _sync_diamond_geometry() -> void:
 		m.set_shader_parameter("stroke_px", diamond_stroke_px)
 		m.set_shader_parameter("rim_px", diamond_rim_px)
 		m.set_shader_parameter("inner_rim_px", diamond_inner_rim_px)
+	_refresh_bottom_shadow()
 	_layout_diamond_portrait()
 
 ## 切换菱形/方框两套外观。方框三层（回纹框 Bg / 内阴影 InnerFX / 底色 BgFill）整组隐藏，
@@ -349,6 +372,8 @@ func _apply_diamond_mode() -> void:
 			m.set_shader_parameter("rim_px", diamond_rim_px)
 			m.set_shader_parameter("inner_rim_px", diamond_inner_rim_px)
 
+	_refresh_bottom_shadow()
+
 	if diamond_mode and _active_corners == null:
 		_active_corners = ActiveCornerOrnaments.new()
 		_active_corners.name = "ActiveCornerOrnaments"
@@ -376,6 +401,49 @@ func _apply_diamond_mode() -> void:
 		_layout_diamond_portrait()
 	# 关闭分支不复原 material/几何：本组件所有非菱形用法都从未开过菱形模式，
 	# 运行时来回切换没有用例（真需要时再补，别为假设写代码）。
+
+
+## 用与菱形框相同的像素轮廓绘制深色副本，主要向下偏移。
+## 它跟随 HeroFrame 的选择缩放，但不参与鼠标命中，也不改头像/边框本体。
+func _refresh_bottom_shadow() -> void:
+	if not bottom_shadow_enabled or not diamond_mode:
+		if _bottom_shadow != null:
+			_bottom_shadow.visible = false
+		return
+
+	if _bottom_shadow == null:
+		_bottom_shadow = ColorRect.new()
+		_bottom_shadow.name = "BottomShadow"
+		_bottom_shadow.color = Color.WHITE
+		_bottom_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var shadow_material := ShaderMaterial.new()
+		shadow_material.shader = DIAMOND_FRAME_SHADER
+		_bottom_shadow.material = shadow_material
+		add_child(_bottom_shadow)
+
+	var shadow_rgb := Color(
+			bottom_shadow_color.r,
+			bottom_shadow_color.g,
+			bottom_shadow_color.b,
+			1.0)
+	var material := _bottom_shadow.material as ShaderMaterial
+	material.set_shader_parameter("fill_color", shadow_rgb)
+	material.set_shader_parameter("stroke_color", shadow_rgb)
+	material.set_shader_parameter("rim_color", shadow_rgb)
+	material.set_shader_parameter("stroke_px", diamond_stroke_px)
+	material.set_shader_parameter("rim_px", diamond_rim_px)
+	material.set_shader_parameter("inner_rim_px", diamond_inner_rim_px)
+	material.set_shader_parameter("edge_bottom_mul", 1.0)
+	material.set_shader_parameter("noise_amt", 0.0)
+	material.set_shader_parameter("wear", 0.0)
+	material.set_shader_parameter("size_px", frame_size)
+
+	_bottom_shadow.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_bottom_shadow.position = bottom_shadow_offset
+	_bottom_shadow.size = frame_size
+	_bottom_shadow.self_modulate = Color(1.0, 1.0, 1.0, bottom_shadow_color.a)
+	_bottom_shadow.visible = true
+	move_child(_bottom_shadow, 0)
 
 
 ## 头像摆位：**底边对齐框底**的正方形，边长 = frame × zoom（再按 rise 上移）。

@@ -16,6 +16,12 @@
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_1i8qo"]
 
 [node name="BattleScreen1" unique_id=148182646 instance=ExtResource("1_base")]
+countdown_normal_color = Color(0.94902, 0.909804, 0.8, 1)
+countdown_outline_color = Color(0, 0, 0, 0.8)
+countdown_outline_size = 4
+countdown_ornament_color = Color(0.94902, 0.909804, 0.8, 1)
+countdown_ornament_underlay_color = Color(0.07, 0.04, 0.02, 0.88)
+countdown_ornament_underlay_width = 3.0
 
 [node name="Stage" parent="StageSlot" parent_id_path=PackedInt32Array(924300025) index="0" unique_id=1509533957 instance=ExtResource("2_scene1")]
 layout_mode = 1

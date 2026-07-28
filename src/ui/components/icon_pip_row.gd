@@ -109,6 +109,20 @@ extends Control
 		extra_modulate = v
 		queue_redraw()
 
+@export_group("Battle HUD 定向阴影")
+@export var bottom_shadow_enabled := false:
+	set(v):
+		bottom_shadow_enabled = v
+		queue_redraw()
+@export var bottom_shadow_offset := Vector2(2.0, 4.0):
+	set(v):
+		bottom_shadow_offset = v
+		queue_redraw()
+@export var bottom_shadow_color := Color(0.02, 0.012, 0.008, 0.32):
+	set(v):
+		bottom_shadow_color = v
+		queue_redraw()
+
 @export_group("低血闪烁")
 ## 开启=剩余血量（满心/半心）在低血时红色呼吸闪烁（血条用；金币/标记关）。
 @export var low_hp_flash: bool = false
@@ -292,6 +306,11 @@ func _draw() -> void:
 	_slot_count = maxi(filled + empties, extra_slots)
 	_ensure_slots(_slot_count)
 
+	# 每个槽只画一次第 0 帧轮廓阴影；血量/空槽/护盾覆盖不会重复叠黑。
+	if bottom_shadow_enabled:
+		for shadow_index in range(_slot_count):
+			_draw_pip_shadow(shadow_index)
+
 	# 剩余血量爱心的颜色：低血时红色脉动（仅满/半心，空心不变）。
 	# 节奏与血条波浪一致：用同一 _wave_time 时钟·每个波循环红光脉动一次(峰值对齐波起点)；
 	# 无波纹(wave_idle=false)时回退独立正弦呼吸。
@@ -365,6 +384,28 @@ func _draw_pip(index: int, fill: float, mod: Color, animate: bool, tex: Texture2
 			src.size.x *= 0.5
 			dst.size.x *= 0.5
 	draw_texture_rect_region(t, dst, src, mod)
+
+
+func _draw_pip_shadow(index: int) -> void:
+	if sheet == null:
+		return
+	var step := pip_size + spacing
+	var col := index
+	var row := 0
+	if per_row_cap > 0:
+		col = index % per_row_cap
+		row = index / per_row_cap
+	var x := col * step
+	if right_to_left:
+		x = -step * float(col + 1) + spacing
+	var y := row * (pip_size + row_spacing)
+	var frame_w := sheet.get_width() / hframes
+	var frame_h := sheet.get_height() / vframes
+	var source := Rect2(0.0, 0.0, frame_w, frame_h)
+	var destination := Rect2(
+			Vector2(x, y) + bottom_shadow_offset,
+			Vector2(pip_size, pip_size))
+	draw_texture_rect_region(sheet, destination, source, bottom_shadow_color)
 
 
 ## 生成去色版心形纹理：护盾用它 × 银灰 extra_modulate 得到真银灰

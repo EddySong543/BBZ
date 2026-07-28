@@ -322,6 +322,7 @@ slant = -3.0
 band_bottom = 1.0
 wave_idle = true
 wave_speed_by_hp = true
+bottom_shadow_enabled = true
 
 [node name="P1CoinRow" parent="P1Hud" unique_id=1966048575 instance=ExtResource("4_piprow")]
 texture_filter = 1
@@ -343,6 +344,7 @@ row_spacing = -20.0
 show_empty = false
 extra_modulate = Color(0.85, 0.82, 0.74, 1)
 preview_cur = 10.865
+bottom_shadow_enabled = true
 
 [node name="P1Frame0" parent="P1Hud" unique_id=2129820687 instance=ExtResource("3_hero_frame")]
 offset_left = 26.0
@@ -350,6 +352,7 @@ offset_top = 4.0
 offset_right = 106.0
 offset_bottom = 84.0
 diamond_mode = true
+bottom_shadow_enabled = true
 
 [node name="P1Frame1" parent="P1Hud" unique_id=1566007647 instance=ExtResource("3_hero_frame")]
 offset_left = 672.0
@@ -357,6 +360,7 @@ offset_top = 2.0
 offset_right = 748.0
 offset_bottom = 78.0
 diamond_mode = true
+bottom_shadow_enabled = true
 
 [node name="P1Frame1HpRow" type="Control" parent="P1Hud" unique_id=1327412840]
 texture_filter = 1
@@ -368,6 +372,7 @@ offset_bottom = 108.0
 mouse_filter = 2
 script = ExtResource("24_reservehp")
 preview_shield = 2.0
+bottom_shadow_enabled = true
 
 [node name="P1Frame2" parent="P1Hud" unique_id=1208252427 instance=ExtResource("3_hero_frame")]
 offset_left = 592.0
@@ -375,6 +380,7 @@ offset_top = 2.0
 offset_right = 668.0
 offset_bottom = 78.0
 diamond_mode = true
+bottom_shadow_enabled = true
 
 [node name="P1Frame2HpRow" type="Control" parent="P1Hud" unique_id=1749780638]
 texture_filter = 1
@@ -385,6 +391,7 @@ offset_right = 674.0
 offset_bottom = 108.0
 mouse_filter = 2
 script = ExtResource("24_reservehp")
+bottom_shadow_enabled = true
 
 [node name="P1ActiveName" type="Label" parent="P1Hud" unique_id=1930000001]
 layout_mode = 0
@@ -437,6 +444,7 @@ band_bottom = 1.0
 right_to_left = true
 wave_idle = true
 wave_speed_by_hp = true
+bottom_shadow_enabled = true
 
 [node name="P2CoinRow" parent="P2Hud" unique_id=1708577516 instance=ExtResource("4_piprow")]
 texture_filter = 1
@@ -459,6 +467,7 @@ row_spacing = -20.0
 show_empty = false
 extra_modulate = Color(0.85, 0.82, 0.74, 1)
 preview_cur = 10.0
+bottom_shadow_enabled = true
 
 [node name="P2Frame0" parent="P2Hud" unique_id=1770616061 instance=ExtResource("3_hero_frame")]
 offset_left = 1814.0
@@ -466,6 +475,7 @@ offset_top = 4.0
 offset_right = 1894.0
 offset_bottom = 84.0
 diamond_mode = true
+bottom_shadow_enabled = true
 
 [node name="P2Frame1" parent="P2Hud" unique_id=1621653890 instance=ExtResource("3_hero_frame")]
 offset_left = 1186.0
@@ -473,6 +483,7 @@ offset_top = 2.0
 offset_right = 1262.0
 offset_bottom = 78.0
 diamond_mode = true
+bottom_shadow_enabled = true
 
 [node name="P2Frame1HpRow" type="Control" parent="P2Hud" unique_id=757910723]
 texture_filter = 1
@@ -484,6 +495,7 @@ offset_bottom = 108.0
 mouse_filter = 2
 script = ExtResource("24_reservehp")
 icon_slant = 4.0
+bottom_shadow_enabled = true
 
 [node name="P2Frame2" parent="P2Hud" unique_id=1695379356 instance=ExtResource("3_hero_frame")]
 offset_left = 1266.0
@@ -491,6 +503,7 @@ offset_top = 2.0
 offset_right = 1342.0
 offset_bottom = 78.0
 diamond_mode = true
+bottom_shadow_enabled = true
 
 [node name="P2Frame2HpRow" type="Control" parent="P2Hud" unique_id=1880263533]
 texture_filter = 1
@@ -502,6 +515,7 @@ offset_bottom = 108.0
 mouse_filter = 2
 script = ExtResource("24_reservehp")
 icon_slant = 4.0
+bottom_shadow_enabled = true
 
 [node name="P2ActiveName" type="Label" parent="P2Hud" unique_id=1930000003]
 layout_mode = 0
