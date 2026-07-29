@@ -4,9 +4,9 @@ extends SceneTree
 ##   godot --path . -s tools/item_frame_preview.gd
 ## 摆出 出战头像框(72) + 替补头像框(68) + 道具行(58 锐角芯片·多种槽态)，截一帧。
 ## 自检：道具框是否「明显小于头像框」+「锐角芯片」一眼区分于「圆角立绘框」。
-## 输出：D:/Game/BoBoZan/item_frame_preview.png（仓库外）
+## 输出：D:/Game/BoBoZan/_probe_output/item_frame_preview.png（仓库外）
 
-const OUT_PATH := "D:/Game/BoBoZan/item_frame_preview.png"
+const OUT_PATH := "D:/Game/BoBoZan/_probe_output/item_frame_preview.png"
 const HERO_FRAME := preload("res://src/ui/components/hero_frame.tscn")
 
 

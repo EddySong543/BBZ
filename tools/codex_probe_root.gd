@@ -4,9 +4,9 @@ extends Node
 ##   godot --path . res://tools/codex_probe.tscn
 ## 三连拍（仓库外）：①图鉴钮落位 ②浮层·英雄图鉴页 ③浮层·道具图鉴页。
 
-const OUT_BTN := "D:/Game/BoBoZan/codex_shot_1_btn.png"
-const OUT_HERO := "D:/Game/BoBoZan/codex_shot_2_hero.png"
-const OUT_ITEM := "D:/Game/BoBoZan/codex_shot_3_item.png"
+const OUT_BTN := "D:/Game/BoBoZan/_probe_output/codex_shot_1_btn.png"
+const OUT_HERO := "D:/Game/BoBoZan/_probe_output/codex_shot_2_hero.png"
+const OUT_ITEM := "D:/Game/BoBoZan/_probe_output/codex_shot_3_item.png"
 
 
 func _ready() -> void:

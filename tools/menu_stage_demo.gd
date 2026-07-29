@@ -4,9 +4,9 @@ extends SceneTree
 ##   godot --path . -s tools/menu_stage_demo.gd
 ## 全屏波流背景（现状）+ 舞台板（battle screen 框语言：深描边/浅锡灰主边/深板岩填充/
 ## 蓝红四角宝石）+ 三段分区 + 王冠水印。截图后退出。
-## 输出：D:/Game/BoBoZan/menu_stage_demo.png
+## 输出：D:/Game/BoBoZan/_probe_output/menu_stage_demo.png
 
-const OUT_PATH := "D:/Game/BoBoZan/menu_stage_demo.png"
+const OUT_PATH := "D:/Game/BoBoZan/_probe_output/menu_stage_demo.png"
 const FRAME_SHADER := "res://assets/shaders/canvas_ui_pixel_frame.gdshader"
 
 # 板位（a-A 正中偏大·按钮未来进板）：x 460-1460，y 150-860

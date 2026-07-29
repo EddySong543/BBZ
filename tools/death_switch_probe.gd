@@ -4,9 +4,9 @@ extends Node
 ## _death_switch_transition(1)（不动 battle 状态·同英雄重入场——验证
 ## 「遗体消散 → 透明期换装 → 落点入场+尘」三拍视觉·秒切退役）。
 ##   godot --path . res://tools/death_switch_probe.tscn
-## 输出：D:/Game/BoBoZan/dswitch_lying/dissolve/enter/done.png（仓库外·勿入库）
+## 输出：D:/Game/BoBoZan/_probe_output/dswitch_lying/dissolve/enter/done.png（仓库外·勿入库）
 
-const OUT := "D:/Game/BoBoZan/"
+const OUT := "D:/Game/BoBoZan/_probe_output/"
 
 
 func _ready() -> void:

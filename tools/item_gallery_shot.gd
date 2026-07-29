@@ -11,13 +11,13 @@ func _ready() -> void:
 	var g := (load("res://src/ui/item_gallery_screen.tscn") as PackedScene).instantiate()
 	add_child(g)
 	await get_tree().create_timer(1.6).timeout
-	await _shot("D:/Game/BoBoZan/item_gallery.png")          # 普通(tier1)
+	await _shot("D:/Game/BoBoZan/_probe_output/item_gallery.png")          # 普通(tier1)
 	g._select_tier(2)
 	await get_tree().create_timer(0.6).timeout
-	await _shot("D:/Game/BoBoZan/item_gallery_t2.png")       # 稀有(tier2)
+	await _shot("D:/Game/BoBoZan/_probe_output/item_gallery_t2.png")       # 稀有(tier2)
 	g._select_tier(3)
 	await get_tree().create_timer(0.6).timeout
-	await _shot("D:/Game/BoBoZan/item_gallery_t3.png")       # 传说(tier3)
+	await _shot("D:/Game/BoBoZan/_probe_output/item_gallery_t3.png")       # 传说(tier3)
 	get_tree().quit()
 
 

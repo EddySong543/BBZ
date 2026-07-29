@@ -2,11 +2,11 @@ extends Node
 
 ## battle_screen 菱形头像框全英雄校准探针。
 ##   godot --path . res://tools/diamond_probe.tscn
-## 输出：D:/Game/BoBoZan/diamond_probe.png（仓库外·勿入库）
+## 输出：D:/Game/BoBoZan/_probe_output/diamond_probe.png（仓库外·勿入库）
 ## 当前覆盖 8 张手裁 battle portrait，并复现正式 HUD 的逐英雄 scale/x 校准与材质参数。
 
 const FrameScene := preload("res://src/ui/components/hero_frame.tscn")
-const OUT := "D:/Game/BoBoZan/diamond_probe.png"
+const OUT := "D:/Game/BoBoZan/_probe_output/diamond_probe.png"
 const FRAME := 80.0
 const PORTRAIT := 82.8
 const RISE := 12.0

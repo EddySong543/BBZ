@@ -8,7 +8,7 @@ extends Node
 const MapState := preload("res://src/expedition/expedition_map_state.gd")
 const Backpack := preload("res://src/expedition/expedition_backpack_state.gd")
 
-const OUT := "D:/Game/BoBoZan/pve_return.png"
+const OUT := "D:/Game/BoBoZan/_probe_output/pve_return.png"
 
 
 func _ready() -> void:

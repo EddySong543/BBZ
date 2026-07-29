@@ -2,9 +2,9 @@ extends Node
 
 ## 战斗界面整屏截图器（作为主场景跑 → 正常加载 autoload·配色落地自检）：
 ##   godot --path . res://tools/battle_shot.tscn
-## 输出：D:/Game/BoBoZan/battle_screen_shot.png（仓库外）
+## 输出：D:/Game/BoBoZan/_probe_output/battle_screen_shot.png（仓库外）
 
-const OUT := "D:/Game/BoBoZan/battle_screen_shot.png"
+const OUT := "D:/Game/BoBoZan/_probe_output/battle_screen_shot.png"
 
 
 func _ready() -> void:

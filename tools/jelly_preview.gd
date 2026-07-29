@@ -6,7 +6,7 @@ extends Node
 ## 输出单张对比 PNG 到 scratchpad，供裁剪比对。
 
 const SHADER := "res://assets/shaders/canvas_button_jelly.gdshader"
-const OUT := "D:/Game/BoBoZan/jelly_compare.png"
+const OUT := "D:/Game/BoBoZan/_probe_output/jelly_compare.png"
 
 # 大波红配色（取自 JellyDaBo）
 const FILL_TOP := Color(0.8471, 0.2863, 0.1804, 1)

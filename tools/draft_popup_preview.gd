@@ -2,9 +2,9 @@ extends SceneTree
 
 ## 道具 3 选 1 弹窗预览（B1·jelly 卡自检）：godot --path . -s tools/draft_popup_preview.gd
 ## 摆 3 张不同维度的候选卡（进攻红/防御蓝/能量金）→ 截一帧看 jelly 卡 + 文字可读性。
-## 输出：D:/Game/BoBoZan/draft_popup_preview.png（仓库外）
+## 输出：D:/Game/BoBoZan/_probe_output/draft_popup_preview.png（仓库外）
 
-const OUT := "D:/Game/BoBoZan/draft_popup_preview.png"
+const OUT := "D:/Game/BoBoZan/_probe_output/draft_popup_preview.png"
 const POPUP := preload("res://src/ui/components/item_draft_popup.gd")
 
 

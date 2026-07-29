@@ -4,10 +4,10 @@ extends Node
 ## 两张截图（特效在飞 / 连打后）+ 池状态断言打印（预分配数/复用/归池/time_scale 复位）。
 ## 带窗口跑（主场景模式·autoload 正常注册）：
 ##   godot --path . res://tools/pooled_fx_probe.tscn
-## 输出：D:/Game/BoBoZan/pooled_fx_mid.png / pooled_fx_after.png（仓库外）
+## 输出：D:/Game/BoBoZan/_probe_output/pooled_fx_mid.png / pooled_fx_after.png（仓库外）
 
-const OUT_MID := "D:/Game/BoBoZan/pooled_fx_mid.png"
-const OUT_AFTER := "D:/Game/BoBoZan/pooled_fx_after.png"
+const OUT_MID := "D:/Game/BoBoZan/_probe_output/pooled_fx_mid.png"
+const OUT_AFTER := "D:/Game/BoBoZan/_probe_output/pooled_fx_after.png"
 
 
 func _ready() -> void:

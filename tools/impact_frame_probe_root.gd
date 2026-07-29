@@ -3,10 +3,10 @@ extends Node
 ## 冲击帧概念稿探针：boot 战斗屏 → 直接驱动 PostFX impact_* 参数定格 → 正片/负片各一张截图。
 ## （真实演出是 0.15s 硬切三段·截图探针把两段定格下来供 F6 静看形态/阈值/毛边。）
 ##   godot --path . res://tools/impact_frame_probe.tscn
-## 输出：D:/Game/BoBoZan/impact_pos.png / impact_neg.png（仓库外）
+## 输出：D:/Game/BoBoZan/_probe_output/impact_pos.png / impact_neg.png（仓库外）
 
-const OUT_POS := "D:/Game/BoBoZan/impact_pos.png"
-const OUT_NEG := "D:/Game/BoBoZan/impact_neg.png"
+const OUT_POS := "D:/Game/BoBoZan/_probe_output/impact_pos.png"
+const OUT_NEG := "D:/Game/BoBoZan/_probe_output/impact_neg.png"
 
 
 func _ready() -> void:

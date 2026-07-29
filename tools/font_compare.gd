@@ -3,9 +3,9 @@ extends SceneTree
 ## 标题三字体对比图生成器（开发调试用）：
 ##   godot --path . -s tools/font_compare.gd
 ## 渲染「波波攒之王」三个字体版本（含标题配色 + 黑描边）→ 截图保存后自动退出。
-## 输出：D:/Game/BoBoZan/font_compare.png（仓库外，避免被 Godot 导入系统收编）
+## 输出：D:/Game/BoBoZan/_probe_output/font_compare.png（仓库外，避免被 Godot 导入系统收编）
 
-const OUT_PATH := "D:/Game/BoBoZan/font_compare.png"
+const OUT_PATH := "D:/Game/BoBoZan/_probe_output/font_compare.png"
 const TITLE := "波波攒之王"
 const ROWS: Array = [
 	# [说明, 字体路径, 显示尺寸(整数倍), 描边(=1字体像素)]

@@ -4,12 +4,12 @@ extends Node
 ##   godot --path . res://tools/skill_tip_probe.tscn
 ## 三截：①默认态整屏（双钮+pip） ②己方钮悬停浮层 ③敌方钮翻页到第 2 人后的悬停浮层。
 ## 悬停走状态注入（直接调 _on_enter/_cycle·⛔warp_mouse——探针铁律）。
-## 输出：D:/Game/BoBoZan/skill_info_*.png（仓库外·勿入库）
+## 输出：D:/Game/BoBoZan/_probe_output/skill_info_*.png（仓库外·勿入库）
 
-const OUT_DEFAULT := "D:/Game/BoBoZan/skill_info_default.png"
-const OUT_TIP_OWN := "D:/Game/BoBoZan/skill_info_tip_own.png"
-const OUT_TIP_ENEMY := "D:/Game/BoBoZan/skill_info_tip_enemy.png"
-const OUT_TIP_P2_ITEM := "D:/Game/BoBoZan/skill_info_tip_p2_item.png"
+const OUT_DEFAULT := "D:/Game/BoBoZan/_probe_output/skill_info_default.png"
+const OUT_TIP_OWN := "D:/Game/BoBoZan/_probe_output/skill_info_tip_own.png"
+const OUT_TIP_ENEMY := "D:/Game/BoBoZan/_probe_output/skill_info_tip_enemy.png"
+const OUT_TIP_P2_ITEM := "D:/Game/BoBoZan/_probe_output/skill_info_tip_p2_item.png"
 
 
 func _ready() -> void:

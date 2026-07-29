@@ -6,9 +6,9 @@ extends SceneTree
 ##   ① 动作按钮按【功能语义】分色（攻红/防蓝/攒金/技紫/结束绿），复用 jelly 外形
 ##   ② 道具栏从锐角→【圆角芯片】+ 状态/维度分色（与按钮同语言）
 ##   ③ 场景无关性自检：同一组按钮叠在 浅底 / 深底 上，证明 UI 自带对比、不靠场景
-## 输出：D:/Game/BoBoZan/ui_palette_demo.png（仓库外）
+## 输出：D:/Game/BoBoZan/_probe_output/ui_palette_demo.png（仓库外）
 
-const OUT_PATH := "D:/Game/BoBoZan/ui_palette_demo.png"
+const OUT_PATH := "D:/Game/BoBoZan/_probe_output/ui_palette_demo.png"
 const JELLY := preload("res://assets/shaders/canvas_button_jelly.gdshader")
 
 const EDGE_OUTER := Color(0.10, 0.09, 0.11)   # 统一暗轮廓（中性·任何色相都干净）

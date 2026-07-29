@@ -3,9 +3,9 @@ extends SceneTree
 ## 标题 logo 静态预览（开发调试用）：
 ##   godot --path . -s tools/title_preview.gd
 ## 跑完整入场动画后截图保存 → 自检王冠对齐 / 渐变 / 描边投影。
-## 输出：D:/Game/BoBoZan/title_preview.png（仓库外）
+## 输出：D:/Game/BoBoZan/_probe_output/title_preview.png（仓库外）
 
-const OUT_PATH := "D:/Game/BoBoZan/title_preview.png"
+const OUT_PATH := "D:/Game/BoBoZan/_probe_output/title_preview.png"
 
 
 func _initialize() -> void:

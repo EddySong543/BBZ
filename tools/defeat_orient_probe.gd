@@ -4,7 +4,7 @@ extends SceneTree
 ## 「原样」与「水平翻转」两种假设各算一次差异分，翻转分显著更低 = 表是镜像的（GPT 出反了）。
 ## 差异分 = 两帧 alpha 掩模的不重合像素数（对齐各自 bbox 中心后）。另存 h17 并排放大图供目检。
 ##   godot --headless --path . --script res://tools/defeat_orient_probe.gd
-## 输出：逐英雄判定行 + D:/Game/BoBoZan/h17_orient_check.png
+## 输出：逐英雄判定行 + D:/Game/BoBoZan/_probe_output/h17_orient_check.png
 
 const IMPORT_DIR := "res://assets/import/"
 const DST := "res://assets/sprites/heroes/"
@@ -97,8 +97,8 @@ func _save_compare(i0: Image, d0: Image, dflip: Image) -> void:
 	out.blit_rect_mask(d0, d0, Rect2i(0, 0, CELL, CELL), Vector2i(CELL, 0))
 	out.blit_rect_mask(dflip, dflip, Rect2i(0, 0, CELL, CELL), Vector2i(CELL * 2, 0))
 	out.resize(CELL * 6, CELL * 2, Image.INTERPOLATE_NEAREST)
-	out.save_png("D:/Game/BoBoZan/h17_orient_check.png")
-	print("saved: D:/Game/BoBoZan/h17_orient_check.png")
+	out.save_png("D:/Game/BoBoZan/_probe_output/h17_orient_check.png")
+	print("saved: D:/Game/BoBoZan/_probe_output/h17_orient_check.png")
 	# 末排四帧 2× 放大（倒地姿态细节目检）
 	var sheet := Image.load_from_file(ProjectSettings.globalize_path(IMPORT_DIR + "h17_defeat.png"))
 	if sheet != null:
@@ -111,5 +111,5 @@ func strip2x(strip: Image) -> void:
 	bg.fill(Color(0.12, 0.12, 0.14, 1.0))
 	bg.blit_rect_mask(strip, strip, Rect2i(0, 0, strip.get_width(), strip.get_height()), Vector2i.ZERO)
 	bg.resize(strip.get_width() * 2, strip.get_height() * 2, Image.INTERPOLATE_NEAREST)
-	bg.save_png("D:/Game/BoBoZan/h17_lastrow.png")
-	print("saved: D:/Game/BoBoZan/h17_lastrow.png")
+	bg.save_png("D:/Game/BoBoZan/_probe_output/h17_lastrow.png")
+	print("saved: D:/Game/BoBoZan/_probe_output/h17_lastrow.png")

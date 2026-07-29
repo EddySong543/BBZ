@@ -4,9 +4,9 @@ extends Node
 ## 视角翻转全链路（快照/事件/动作/胜负）+ 提交→服务器结算→事件流动画→回合推进。
 ## 同进程拓扑：房间+房主 bot（环回·全程攒）在探针里·battle_screen 经 ENet 连 127.0.0.1。
 ## 带窗口跑：godot --path . res://tools/net_battle_probe.tscn
-## 输出：D:/Game/BoBoZan/net_battle_select.png / net_battle_turn2.png
+## 输出：D:/Game/BoBoZan/_probe_output/net_battle_select.png / net_battle_turn2.png
 
-const OUT_DIR := "D:/Game/BoBoZan/"
+const OUT_DIR := "D:/Game/BoBoZan/_probe_output/"
 const NetTransport := preload("res://src/net/net_transport.gd")
 const NetProtocol := preload("res://src/net/net_protocol.gd")
 const MatchRoom := preload("res://src/net/match_room.gd")

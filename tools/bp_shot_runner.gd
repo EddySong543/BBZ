@@ -12,24 +12,24 @@ func _ready() -> void:
 	var bp := (load("res://src/ui/bp_screen.tscn") as PackedScene).instantiate()
 	add_child(bp)
 	await get_tree().create_timer(2.6).timeout      # 开桌入场完毕（含 C1 翻牌扫过）
-	await _shot("D:/Game/BoBoZan/bp_cur_pool.png")
+	await _shot("D:/Game/BoBoZan/_probe_output/bp_cur_pool.png")
 
 	# 选 2 张已知有效的（12 生肖内）看手牌区
 	bp._on_card_clicked(2)
 	await get_tree().create_timer(0.4).timeout
 	bp._on_card_clicked(7)
 	await get_tree().create_timer(0.6).timeout
-	await _shot("D:/Game/BoBoZan/bp_cur_hand.png")
+	await _shot("D:/Game/BoBoZan/_probe_output/bp_cur_hand.png")
 
 	# 第 3 张 → 确认钮就绪态（金呼吸脉冲·2026-07-16 换导航皮后补验）
 	bp._on_card_clicked(10)
 	await get_tree().create_timer(0.6).timeout
-	await _shot("D:/Game/BoBoZan/bp_cur_ready.png")
+	await _shot("D:/Game/BoBoZan/_probe_output/bp_cur_ready.png")
 
 	# 确认 → 出战亮相仪式（3v3 对扣翻开对峙 + 开始战斗钮）
 	bp._on_confirm()
 	await get_tree().create_timer(3.2).timeout
-	await _shot("D:/Game/BoBoZan/bp_cur_reveal.png")
+	await _shot("D:/Game/BoBoZan/_probe_output/bp_cur_reveal.png")
 	get_tree().quit()
 
 

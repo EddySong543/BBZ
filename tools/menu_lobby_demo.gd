@@ -5,10 +5,10 @@ extends SceneTree
 ## 四区：顶栏身份带 / 左轨内容卡×2（公告+今日英雄·真文案） / 右下对战区
 ## （爬塔·故事各一行 + 匹配对战金钮） / 底栏收集坞。
 ## 背景 = 波流 + 玄夜场域档色带（降疲劳·demo 内字符串替换 ramp，不改真 shader）。
-## 输出：D:/Game/BoBoZan/menu_lobby_blue.png + menu_lobby_red.png
+## 输出：D:/Game/BoBoZan/_probe_output/menu_lobby_blue.png + menu_lobby_red.png
 
-const OUT_BLUE := "D:/Game/BoBoZan/menu_lobby_blue.png"
-const OUT_RED := "D:/Game/BoBoZan/menu_lobby_red.png"
+const OUT_BLUE := "D:/Game/BoBoZan/_probe_output/menu_lobby_blue.png"
+const OUT_RED := "D:/Game/BoBoZan/_probe_output/menu_lobby_red.png"
 
 const WAVE_SHADER_PATH := "res://assets/shaders/canvas_env_wave_flow.gdshader"
 const FRAME_SHADER := "res://assets/shaders/canvas_ui_pixel_frame.gdshader"

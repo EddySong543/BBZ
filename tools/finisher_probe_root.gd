@@ -3,11 +3,11 @@ extends Node
 ## 终结演出探针（带窗口跑）：进战斗屏后直接调用 _play_finisher（P1 斩杀 P2·伤 2HP），
 ## 两个时间点截屏——命中前后（虚化幕满强度·双雄拉出·慢放中）与恢复后（画面应回原样）。
 ##   godot --path . res://tools/finisher_probe.tscn
-## 输出：D:/Game/BoBoZan/finisher_mid.png / finisher_end.png（仓库外）
+## 输出：D:/Game/BoBoZan/_probe_output/finisher_mid.png / finisher_end.png（仓库外）
 ## ⚠ 采样计时全用 ignore_time_scale（演出中全场慢放·普通 timer 会被拉长）。
 
-const OUT_MID := "D:/Game/BoBoZan/finisher_mid.png"
-const OUT_END := "D:/Game/BoBoZan/finisher_end.png"
+const OUT_MID := "D:/Game/BoBoZan/_probe_output/finisher_mid.png"
+const OUT_END := "D:/Game/BoBoZan/_probe_output/finisher_end.png"
 
 
 func _ready() -> void:

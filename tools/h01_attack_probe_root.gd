@@ -3,11 +3,11 @@ extends Node
 ## h01 攻击动画对位探针（带窗口跑）：左=idle 基准·右=attack 播放中，
 ## 两个时间点截屏 → 目检 128→256 放大后帧对位（脚底/身位应与 idle 一致）。
 ##   godot --path . res://tools/h01_attack_probe.tscn
-## 输出：D:/Game/BoBoZan/h01_attack_mid.png / h01_attack_late.png（仓库外）
+## 输出：D:/Game/BoBoZan/_probe_output/h01_attack_mid.png / h01_attack_late.png（仓库外）
 
 const FRAMES := "res://assets/sprites/heroes/h01/h01_idle.tres"
-const OUT_MID := "D:/Game/BoBoZan/h01_attack_mid.png"
-const OUT_LATE := "D:/Game/BoBoZan/h01_attack_late.png"
+const OUT_MID := "D:/Game/BoBoZan/_probe_output/h01_attack_mid.png"
+const OUT_LATE := "D:/Game/BoBoZan/_probe_output/h01_attack_late.png"
 
 
 func _ready() -> void:

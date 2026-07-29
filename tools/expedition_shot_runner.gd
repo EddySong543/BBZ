@@ -8,12 +8,12 @@ extends Node
 
 const HeroDataScript := preload("res://src/battle/hero_data.gd")
 
-const OUT_SELECT := "D:/Game/BoBoZan/exped_select.png"
-const OUT_IDLE := "D:/Game/BoBoZan/exped_idle.png"
-const OUT_WALK := "D:/Game/BoBoZan/exped_walk.png"
-const OUT_BACKPACK := "D:/Game/BoBoZan/exped_backpack.png"
-const OUT_DIALOG := "D:/Game/BoBoZan/exped_dialog.png"
-const OUT_DEATH := "D:/Game/BoBoZan/exped_death.png"
+const OUT_SELECT := "D:/Game/BoBoZan/_probe_output/exped_select.png"
+const OUT_IDLE := "D:/Game/BoBoZan/_probe_output/exped_idle.png"
+const OUT_WALK := "D:/Game/BoBoZan/_probe_output/exped_walk.png"
+const OUT_BACKPACK := "D:/Game/BoBoZan/_probe_output/exped_backpack.png"
+const OUT_DIALOG := "D:/Game/BoBoZan/_probe_output/exped_dialog.png"
+const OUT_DEATH := "D:/Game/BoBoZan/_probe_output/exped_death.png"
 
 const WALK_KEYS: Array = [KEY_D, KEY_D, KEY_S, KEY_D, KEY_D, KEY_S, KEY_D, KEY_W, KEY_D, KEY_D]
 

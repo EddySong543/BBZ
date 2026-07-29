@@ -4,10 +4,10 @@ extends Node
 ##   godot --path . res://tools/pointer_sway_probe.tscn
 ## 流程：进战斗屏 → 鼠标 warp 左缘停 1s → 打印各层 position/scale + 截图 →
 ##       warp 右缘停 1s → 同上。数字对比验证分层错动方向/幅度，截图供目视。
-## 输出：D:/Game/BoBoZan/pointer_sway_{left,right}.png（仓库外）
+## 输出：D:/Game/BoBoZan/_probe_output/pointer_sway_{left,right}.png（仓库外）
 
-const OUT_L := "D:/Game/BoBoZan/pointer_sway_left.png"
-const OUT_R := "D:/Game/BoBoZan/pointer_sway_right.png"
+const OUT_L := "D:/Game/BoBoZan/_probe_output/pointer_sway_left.png"
+const OUT_R := "D:/Game/BoBoZan/_probe_output/pointer_sway_right.png"
 
 
 func _ready() -> void:

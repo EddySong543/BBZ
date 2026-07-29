@@ -6,9 +6,9 @@ extends Node
 ## 回合① 我防 vs 敌波 → 被挡（银灰「被挡」+钢蓝火花+轻震）
 ## 回合② 双方攒 → 能量金粒飞向 HUD 金币行
 ## 回合③ 敌大波(穿防) vs 我防 → 靛紫穿透伤害飘字
-## 输出：D:/Game/BoBoZan/fx_block.png / fx_charge.png / fx_pierce.png（仓库外）
+## 输出：D:/Game/BoBoZan/_probe_output/fx_block.png / fx_charge.png / fx_pierce.png（仓库外）
 
-const OUT_DIR := "D:/Game/BoBoZan/"
+const OUT_DIR := "D:/Game/BoBoZan/_probe_output/"
 
 
 func _ready() -> void:

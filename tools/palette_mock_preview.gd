@@ -4,9 +4,9 @@ extends SceneTree
 ##   godot --path . -s tools/palette_mock_preview.gd   （⚠须带窗口）
 ## 行1=现行 9 色相 / 行2=四色版（攻红防蓝各两档+攒金+结束绿·紫裁=技能墨金·情报/图鉴中性纸）
 ## / 行3=三色版（再裁绿·结束=纸身朱墨）。仅概念稿·不动战斗屏任何文件。
-## 输出：D:/Game/BoBoZan/palette_mock.png
+## 输出：D:/Game/BoBoZan/_probe_output/palette_mock.png
 
-const OUT := "D:/Game/BoBoZan/palette_mock.png"
+const OUT := "D:/Game/BoBoZan/_probe_output/palette_mock.png"
 const JELLY := preload("res://assets/shaders/canvas_button_jelly.gdshader")
 const FONT_PATH := "res://assets/font/ark-pixel-12px-proportional-zh_cn.ttf"
 const BTN := 108.0

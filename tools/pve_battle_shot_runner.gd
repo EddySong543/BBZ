@@ -5,7 +5,7 @@ extends Node
 ## 模拟 expedition_screen 的交接：设 BattleSetup pve_* → 实例化 battle_screen → 截图
 ## （验：明牌概率表 / 脱离按钮 / 队伍 HP 带入 / 怪物名+血量 / 装备道具入槽）。
 
-const OUT := "D:/Game/BoBoZan/pve_battle.png"
+const OUT := "D:/Game/BoBoZan/_probe_output/pve_battle.png"
 
 
 func _ready() -> void:

@@ -4,9 +4,9 @@ extends SceneTree
 ##   godot --path . -s tools/menu_preview.gd
 ## -s 模式不加载 autoload → 手动以同名节点补 FontManager / TransitionManager，
 ## 等入场动画落定后截图保存退出。
-## 输出：D:/Game/BoBoZan/menu_preview.png（仓库外）
+## 输出：D:/Game/BoBoZan/_probe_output/menu_preview.png（仓库外）
 
-const OUT_PATH := "D:/Game/BoBoZan/menu_preview.png"
+const OUT_PATH := "D:/Game/BoBoZan/_probe_output/menu_preview.png"
 const AUTOLOADS: Array = [
 	["FontManager", "res://src/core/font_manager.gd"],
 	["TransitionManager", "res://src/core/transition_manager.gd"],

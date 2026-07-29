@@ -5,10 +5,10 @@ extends Node
 ## 拍「倒地中段（慢放中）」+「演出结束末帧（躺地停帧）」共四张。
 ##   godot --path . res://tools/defeat_probe.tscn                       （默认 h01/h02）
 ##   godot --path . res://tools/defeat_probe.tscn -- --p1 h04 --p2 h17  （批量验收指定出战）
-## 输出：D:/Game/BoBoZan/defeat_<p2>_mid/end.png + defeat_<p1>_mid/end.png（仓库外）
+## 输出：D:/Game/BoBoZan/_probe_output/defeat_<p2>_mid/end.png + defeat_<p1>_mid/end.png（仓库外）
 ## 断言：受害方 CharacterDisplay 有 defeat 动画且演出后停在末帧（非循环）+不变灰（modulate 白）。
 
-const OUT_DIR := "D:/Game/BoBoZan/"
+const OUT_DIR := "D:/Game/BoBoZan/_probe_output/"
 
 
 func _ready() -> void:

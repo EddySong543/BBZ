@@ -1,6 +1,6 @@
 extends Node
 
-const OUT := "D:/Game/BoBoZan/battle_scene2_shot.png"
+const OUT := "D:/Game/BoBoZan/_probe_output/battle_scene2_shot.png"
 
 
 func _ready() -> void:

@@ -6,9 +6,9 @@ extends Node
 ## 回合① 敌带毒 2 层+印记 → 我波命中 → 「毒爆」「印记」注解（0.14s 错时逐条弹）
 ## 回合② 我带 2.0 护盾 → 敌波被全吸 → 「护盾-1」注解（无伤害字·血没少但有交代）
 ## 回合③ 我背 1.0 到期延迟伤害 → 出招拍余烬橙「-1」（引擎直写 HP 的旧账·原先完全隐形）
-## 输出：D:/Game/BoBoZan/event_tags_poison.png / _shield.png / _burn.png（仓库外）
+## 输出：D:/Game/BoBoZan/_probe_output/event_tags_poison.png / _shield.png / _burn.png（仓库外）
 
-const OUT_DIR := "D:/Game/BoBoZan/"
+const OUT_DIR := "D:/Game/BoBoZan/_probe_output/"
 
 
 func _ready() -> void:

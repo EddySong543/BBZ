@@ -2,10 +2,10 @@ extends SceneTree
 
 ## 转场波幕静帧预览（v3 波列体自检）：progress=0.55 盖屏中段 + 揭幕段 1.45 各截一帧。
 ##   godot --path . -s tools/transition_wave_preview.gd   （⚠须带窗口·headless 卡 frame_post_draw）
-## 输出：D:/Game/BoBoZan/transition_wave_*.png（仓库外·勿入库）
+## 输出：D:/Game/BoBoZan/_probe_output/transition_wave_*.png（仓库外·勿入库）
 
-const OUT_COVER := "D:/Game/BoBoZan/transition_wave_cover.png"
-const OUT_REVEAL := "D:/Game/BoBoZan/transition_wave_reveal.png"
+const OUT_COVER := "D:/Game/BoBoZan/_probe_output/transition_wave_cover.png"
+const OUT_REVEAL := "D:/Game/BoBoZan/_probe_output/transition_wave_reveal.png"
 const SHADER := preload("res://assets/shaders/canvas_transition_wave.gdshader")
 
 

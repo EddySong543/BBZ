@@ -4,10 +4,10 @@ extends Node
 ##   godot --path . res://tools/menu_shot_runner.tscn
 ## 输出：常态 + ModeMatch 悬停态（金框+放大）两张。
 
-const OUT_IDLE := "D:/Game/BoBoZan/menu_real_idle.png"
-const OUT_HOVER := "D:/Game/BoBoZan/menu_real_hover.png"
-const OUT_SEARCH := "D:/Game/BoBoZan/menu_real_searching.png"
-const OUT_CANCEL := "D:/Game/BoBoZan/menu_real_cancelled.png"
+const OUT_IDLE := "D:/Game/BoBoZan/_probe_output/menu_real_idle.png"
+const OUT_HOVER := "D:/Game/BoBoZan/_probe_output/menu_real_hover.png"
+const OUT_SEARCH := "D:/Game/BoBoZan/_probe_output/menu_real_searching.png"
+const OUT_CANCEL := "D:/Game/BoBoZan/_probe_output/menu_real_cancelled.png"
 
 
 func _ready() -> void:

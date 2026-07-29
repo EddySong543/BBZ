@@ -4,9 +4,9 @@ extends Node
 ## 半点值 → _update_all 刷新 → 逐态抓帧，把 P1(LTR)/P2(RTL) 两条血条裁切放大上下拼一张。
 ## 覆盖：满血 / 掉血露空槽 / 半点(奇数半点=末尾少一小块) / 护盾银灰覆盖 / 低血警示闪。
 ##   godot --path . res://tools/hp_bar_probe.tscn
-## 输出：D:/Game/BoBoZan/hpbar_*.png（仓库外·勿入库）
+## 输出：D:/Game/BoBoZan/_probe_output/hpbar_*.png（仓库外·勿入库）
 
-const OUT := "D:/Game/BoBoZan/"
+const OUT := "D:/Game/BoBoZan/_probe_output/"
 const ZOOM := 4
 const CROP_P1 := Rect2i(105, 22, 470, 50)     # P1 血条带（左起·宽度按满盾 10 格 416px 留够）
 const CROP_P2 := Rect2i(1345, 22, 470, 50)    # P2 血条带（右起·与 P1 关于屏幕中线对称）

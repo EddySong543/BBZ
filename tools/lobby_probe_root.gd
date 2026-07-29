@@ -1,9 +1,9 @@
 extends Node
 
 ## 联机大厅探针（M2b·2026-07-12）：拉起大厅屏 → 断言 24 英雄选人格+默认预选 3 人 → 截图。
-## 带窗口跑：godot --path . res://tools/lobby_probe.tscn → D:/Game/BoBoZan/net_lobby.png
+## 带窗口跑：godot --path . res://tools/lobby_probe.tscn → D:/Game/BoBoZan/_probe_output/net_lobby.png
 
-const OUT_DIR := "D:/Game/BoBoZan/"
+const OUT_DIR := "D:/Game/BoBoZan/_probe_output/"
 
 
 func _ready() -> void:
