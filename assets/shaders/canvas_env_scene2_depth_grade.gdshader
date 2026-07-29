@@ -26,6 +26,12 @@ uniform float receiver_light_strength : hint_range(0.0, 0.4, 0.01) = 0.0;
 uniform float receiver_shadow_strength : hint_range(0.0, 0.3, 0.01) = 0.0;
 uniform float receiver_rim_strength : hint_range(0.0, 0.5, 0.01) = 0.0;
 uniform float receiver_rim_width : hint_range(1.0, 4.0, 1.0) = 1.0;
+uniform vec4 horizon_warm_color : source_color = vec4(0.88, 0.56, 0.44, 1.0);
+uniform float horizon_warm_strength : hint_range(0.0, 0.4, 0.01) = 0.0;
+uniform float horizon_warm_start : hint_range(0.0, 1.0, 0.01) = 0.45;
+uniform float horizon_warm_end : hint_range(0.0, 1.0, 0.01) = 0.9;
+uniform float horizon_warm_center_x : hint_range(0.0, 1.0, 0.01) = 0.5;
+uniform float horizon_warm_half_width : hint_range(0.1, 1.0, 0.01) = 0.7;
 uniform vec2 scene_light_source_uv = vec2(0.90, -0.08);
 uniform vec2 scene_light_target_uv = vec2(0.47, 0.78);
 uniform float scene_light_top_width : hint_range(0.02, 0.3, 0.01) = 0.10;
@@ -113,5 +119,17 @@ void fragment() {
 	float toward_light_alpha = texture(TEXTURE, UV + rim_offset).a;
 	float light_rim = max(tex.a - toward_light_alpha, 0.0);
 	col += light_color.rgb * light_rim * receiver_rim_strength;
+	float horizon_vertical = smoothstep(
+			horizon_warm_start,
+			max(horizon_warm_end, horizon_warm_start + 0.001),
+			SCREEN_UV.y);
+	float horizon_distance = abs(SCREEN_UV.x - horizon_warm_center_x);
+	float horizon_horizontal = 1.0 - smoothstep(
+			horizon_warm_half_width,
+			horizon_warm_half_width + 0.16,
+			horizon_distance);
+	float horizon_warmth = horizon_vertical * horizon_horizontal
+			* horizon_warm_strength;
+	col = mix(col, horizon_warm_color.rgb, horizon_warmth);
 	COLOR = vec4(clamp(col, vec3(0.0), vec3(1.0)), cleaned_alpha) * COLOR;
 }

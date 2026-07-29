@@ -3,7 +3,7 @@ extends SceneTree
 ## one cropped true-alpha texture. Both waterfall-side nodes reuse this asset
 ## with independent materials and transforms.
 
-const SOURCE_PATH := "res://assets/import/ridge.png"
+const SOURCE_PATH := "res://assets/art_src/scenes/scene2/scene2_waterfall_ridge.png"
 const OUTPUT_PATH := "res://assets/scenes/scene2/scene2_waterfall_ridge.png"
 const EXPECTED_SIZE := Vector2i(112, 122)
 const LUMINANCE_THRESHOLD := 0.90

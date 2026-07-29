@@ -54,20 +54,20 @@
 
 | 优先级 | 文件名 | 建议尺寸 | 透明 | 内容与接口要求 |
 |---|---|---:|:---:|---|
-| Done | `scene2_sky.png` | 576×324 | 否 | 从暂存区归档；以 Nearest 拉伸到 1920×1080，并保留舞台震屏余量 |
-| Done | `scene2_mountain_left.png` | 122×194 | 是 | 从新 `leftmountain.png` 清除浅色背景并裁切；左侧瀑布岩壁和桃枝框景 |
-| Done | `scene2_mountain_right.png` | 140×235 | 是 | 从 `rightmountain.png` 清除深色外底并保留内部岩缝；右侧桃树后山壁 |
-| Done | `scene2_blossom_tree.png` | 208×125 | 是 | 从新 `blossomtree.png` 清除白底并裁切；右侧角色后方桃树 |
-| Done | `scene2_stone_bridge.png` | 237×55 | 是 | 从替换后的 `stone bridge.png` 提取有色前景，删除外部黑色描边，并以 3px 闭合保护桥石内部黑色阴影；正式战斗站立层 |
-| Done | `scene2_mid_mountain.png` | 1672×752 | 是 | 从 `midmountain.png` 清除烘焙棋盘格并裁切；中远景峡谷 |
-| Done | `scene2_far_mountain.png` | 1608×508 | 是 | 从 `farmountain.png` 清除烘焙棋盘格并裁切；最远景青蓝山影 |
-| Done | `scene2_cloud_bank.png` | 1521×1019 | 是 | 从 `cloud2.png` 按真实 Alpha 裁切；天空最远层横向云海，低对比、低透明度 |
-| Done | `scene2_cloud_tower.png` | 1513×486 | 是 | 从 `cloud.png` 按真实 Alpha 裁切；远山与中山之间的云峰层，避免遮挡战斗主体 |
+| Done | `scene2_sky.png` | 576×324 | 否 | 原图归档于 `assets/art_src/scenes/scene2/scene2_sky.png`；以 Nearest 拉伸到 1920×1080，并保留舞台震屏余量 |
+| Done | `scene2_mountain_left.png` | 122×194 | 是 | 从同名归档原图清除浅色背景并裁切；左侧瀑布岩壁和桃枝框景 |
+| Done | `scene2_mountain_right.png` | 140×235 | 是 | 从同名归档原图清除深色外底并保留内部岩缝；右侧桃树后山壁 |
+| Done | `scene2_blossom_tree.png` | 208×125 | 是 | 从同名归档原图清除白底并裁切；右侧角色后方桃树 |
+| Done | `scene2_stone_bridge.png` | 237×55 | 是 | 从同名归档原图提取有色前景，删除外部黑色描边，并以 3px 闭合保护桥石内部黑色阴影；正式战斗站立层 |
+| Done | `scene2_mid_mountain.png` | 1672×752 | 是 | 从同名归档原图清除烘焙棋盘格并裁切；中远景峡谷 |
+| Done | `scene2_far_mountain.png` | 1608×508 | 是 | 从同名归档原图清除烘焙棋盘格并裁切；最远景青蓝山影 |
+| Done | `scene2_cloud_bank.png` | 1521×1019 | 是 | 从同名归档原图按真实 Alpha 裁切；天空最远层横向云海，低对比、低透明度 |
+| Done | `scene2_cloud_tower.png` | 1513×486 | 是 | 从同名归档原图按真实 Alpha 裁切；远山与中山之间的云峰层，避免遮挡战斗主体 |
 | P1 | `scene2_waterfall_mask_left.png` | 720×1216 | 是 | 可选的单瀑布轮廓蒙版：白/灰水体、透明背景，顶部和底部均接画外/河面；只定义连续水帘边缘，不要山、桥、雾或前景河面 |
 | Done | `scene2_petal_atlas.png` | 64×16 | 是 | 4 个 16×16 单格桃瓣姿态，轮廓清晰、灰粉低饱和；由可复现 Godot 工具生成，不带发光和阴影底色 |
 | Optional | `scene2_water_ripple_atlas.png` | 256×32 | 是 | 后续如需纯手绘替换，可提供 4 帧×64×32 横向水线图集；当前 P2 已由 8fps 程序短泡沫簇完成岸线节奏 |
 
-9 项主构图素材已经接入；`assets/import/` 中的新原图保持不变。后续单瀑布蒙版、花瓣和水线图集属于增强层，当前代码版本在它们导入前可独立运行。
+9 项主构图素材已经接入；确认采用的原图统一按成品名归档在 `assets/art_src/scenes/scene2/`，`assets/import/` 只保留尚未确认的候选素材。后续单瀑布蒙版、花瓣和水线图集属于增强层，当前代码版本在它们导入前可独立运行。
 
 ### 新环境素材运行时规范
 

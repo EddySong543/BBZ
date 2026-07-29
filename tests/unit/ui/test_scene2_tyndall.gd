@@ -51,7 +51,6 @@ func test_scene2_receivers_share_one_visible_screen_space_light_field() -> void:
 		"MountainRight",
 		"WaterfallCloudLower",
 		"MountainLeft",
-		"BlossomTree",
 		"StoneBridge",
 		"River",
 	]
@@ -84,17 +83,15 @@ func test_scene1_remains_free_of_scene2_tyndall_layers() -> void:
 func test_scene2_focus_hierarchy_uses_local_restrained_grading() -> void:
 	var stage := (load(SCENE2_PATH) as PackedScene).instantiate()
 	var waterfall_material := stage.get_node("Waterfall").material as ShaderMaterial
-	var tree_material := stage.get_node("BlossomTree").material as ShaderMaterial
 	var river_material := stage.get_node("River").material as ShaderMaterial
 	var ridge_material := stage.get_node("WaterfallRidgeLeft").material as ShaderMaterial
 	var bridge_material := stage.get_node("StoneBridge").material as ShaderMaterial
 
-	for material in [waterfall_material, tree_material]:
-		assert_gt(float(material.get_shader_parameter("focus_quiet_strength")), 0.0)
-		assert_lte(float(material.get_shader_parameter("focus_quiet_strength")), 0.8,
-				"Character rest zones must stay local and restrained")
-		assert_gte(float(material.get_shader_parameter("focus_quiet_saturation")), 0.9,
-				"Rest zones must not turn the bright sanctuary gray")
+	assert_gt(float(waterfall_material.get_shader_parameter("focus_quiet_strength")), 0.0)
+	assert_lte(float(waterfall_material.get_shader_parameter("focus_quiet_strength")), 0.8,
+			"Character rest zones must stay local and restrained")
+	assert_gte(float(waterfall_material.get_shader_parameter("focus_quiet_saturation")), 0.9,
+			"Rest zones must not turn the bright sanctuary gray")
 
 	assert_between(
 			float(river_material.get_shader_parameter("focus_quiet_strength")),
@@ -127,14 +124,18 @@ func test_scene2_p1_limits_large_highlights_without_extra_fullscreen_work() -> v
 	assert_lte(float(ridge_material.get_shader_parameter("brightness")), 0.98)
 	assert_gte(float(ridge_material.get_shader_parameter("saturation")), 0.8,
 			"The waterfall mountain keeps color instead of becoming gray")
-	assert_lte(float(tree_material.get_shader_parameter("receiver_light_strength")), 0.2)
-	assert_lte(float(tree_material.get_shader_parameter("receiver_rim_strength")), 0.16)
+	assert_true(tree_material.shader.code.contains("underpaint_texture"),
+			"The approved branch-gap underpaint must remain")
+	assert_true(tree_material.shader.code.contains("inverse_rotate_pixel_uv"),
+			"The approved local branch sway must remain")
+	assert_false(tree_material.shader.code.contains("scene2_light_field"),
+			"The blossom tree must not receive the muddy screen-space light field")
+	assert_false(tree_material.shader.code.contains("receiver_shadow_strength"),
+			"The blossom tree must not reintroduce the gray-brown receiver shadow")
 	assert_lt(
 			float(far_material.get_shader_parameter("contrast")),
 			float(mid_material.get_shader_parameter("contrast")),
 			"Far scenery must remain quieter than the middle plane")
-	assert_gte(float(tree_material.get_shader_parameter("focus_quiet_saturation")), 0.9,
-			"Pink blossom hue must survive the focus pass")
 	stage.free()
 
 

@@ -6,14 +6,14 @@ extends SceneTree
 
 const JOBS: Array[Dictionary] = [
 	{
-		"source": "res://assets/import/blossomtree.png",
+		"source": "res://assets/art_src/scenes/scene2/scene2_blossom_tree.png",
 		"output": "res://assets/scenes/scene2/scene2_blossom_tree.png",
 		"luminance_threshold": 0.90,
 		"chroma_threshold": 0.06,
 		"expected_size": Vector2i(208, 125),
 	},
 	{
-		"source": "res://assets/import/stone bridge.png",
+		"source": "res://assets/art_src/scenes/scene2/scene2_stone_bridge.png",
 		"output": "res://assets/scenes/scene2/scene2_stone_bridge.png",
 		"key_mode": "interior_shadow",
 		"foreground_luminance_min": 0.04,
@@ -23,40 +23,40 @@ const JOBS: Array[Dictionary] = [
 		"expected_size": Vector2i(237, 55),
 	},
 	{
-		"source": "res://assets/import/cloud2.png",
+		"source": "res://assets/art_src/scenes/scene2/scene2_cloud_bank.png",
 		"output": "res://assets/scenes/scene2/scene2_cloud_bank.png",
 		"key_mode": "alpha_crop",
 		"expected_size": Vector2i(1521, 1019),
 	},
 	{
-		"source": "res://assets/import/cloud.png",
+		"source": "res://assets/art_src/scenes/scene2/scene2_cloud_tower.png",
 		"output": "res://assets/scenes/scene2/scene2_cloud_tower.png",
 		"key_mode": "alpha_crop",
 		"expected_size": Vector2i(1513, 486),
 	},
 	{
-		"source": "res://assets/import/midmountain.png",
+		"source": "res://assets/art_src/scenes/scene2/scene2_mid_mountain.png",
 		"output": "res://assets/scenes/scene2/scene2_mid_mountain.png",
 		"luminance_threshold": 0.70,
 		"chroma_threshold": 0.08,
 		"expected_size": Vector2i(1672, 752),
 	},
 	{
-		"source": "res://assets/import/farmountain.png",
+		"source": "res://assets/art_src/scenes/scene2/scene2_far_mountain.png",
 		"output": "res://assets/scenes/scene2/scene2_far_mountain.png",
 		"luminance_threshold": 0.70,
 		"chroma_threshold": 0.08,
 		"expected_size": Vector2i(1608, 508),
 	},
 	{
-		"source": "res://assets/import/leftmountain.png",
+		"source": "res://assets/art_src/scenes/scene2/scene2_mountain_left.png",
 		"output": "res://assets/scenes/scene2/scene2_mountain_left.png",
 		"luminance_threshold": 0.86,
 		"chroma_threshold": 0.08,
 		"expected_size": Vector2i(122, 194),
 	},
 	{
-		"source": "res://assets/import/rightmountain.png",
+		"source": "res://assets/art_src/scenes/scene2/scene2_mountain_right.png",
 		"output": "res://assets/scenes/scene2/scene2_mountain_right.png",
 		"key_mode": "interior_shadow",
 		"foreground_luminance_min": 0.04,

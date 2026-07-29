@@ -14,73 +14,12 @@ uniform float max_angle_deg : hint_range(0.0, 1.5, 0.05) = 0.75;
 uniform float bouquet_cycle_sec : hint_range(3.0, 10.0, 0.25) = 5.75;
 uniform float bouquet_angle_deg : hint_range(0.0, 2.0, 0.05) = 1.25;
 uniform float phase_offset = 0.7;
-uniform vec2 light_dir = vec2(1.0, -0.8);
-uniform vec4 light_color : source_color = vec4(1.0, 0.78, 0.58, 1.0);
-uniform vec4 shadow_color : source_color = vec4(0.19, 0.28, 0.27, 1.0);
-uniform float receiver_light_strength : hint_range(0.0, 0.4, 0.01) = 0.13;
-uniform float receiver_shadow_strength : hint_range(0.0, 0.25, 0.01) = 0.055;
-uniform float receiver_rim_strength : hint_range(0.0, 0.5, 0.01) = 0.16;
-uniform float receiver_rim_width : hint_range(1.0, 3.0, 1.0) = 1.0;
-uniform vec2 scene_light_source_uv = vec2(0.90, -0.08);
-uniform vec2 scene_light_target_uv = vec2(0.47, 0.78);
-uniform float scene_light_top_width : hint_range(0.02, 0.3, 0.01) = 0.10;
-uniform float scene_light_bottom_width : hint_range(0.1, 0.6, 0.01) = 0.40;
-uniform vec2 scene_light_pool_center = vec2(0.63, 0.28);
-uniform vec2 scene_light_pool_radius = vec2(0.56, 0.40);
-uniform vec2 focus_quiet_center_a = vec2(0.25, 0.61);
-uniform vec2 focus_quiet_center_b = vec2(0.735, 0.61);
-uniform vec2 focus_quiet_radius = vec2(0.115, 0.17);
-uniform float focus_quiet_strength : hint_range(0.0, 1.0, 0.01) = 0.0;
-uniform float focus_quiet_saturation : hint_range(0.85, 1.0, 0.01) = 0.98;
-uniform float focus_quiet_contrast : hint_range(0.75, 1.0, 0.01) = 0.90;
 
 varying vec4 node_modulate;
 
 
 void vertex() {
 	node_modulate = COLOR;
-}
-
-
-float scene2_light_field(vec2 screen_uv) {
-	vec2 grid = vec2(480.0, 270.0);
-	vec2 suv = (floor(screen_uv * grid) + vec2(0.5)) / grid;
-	vec2 axis = scene_light_target_uv - scene_light_source_uv;
-	float raw_along = dot(suv - scene_light_source_uv, axis)
-			/ max(dot(axis, axis), 0.0001);
-	float along = clamp(raw_along, 0.0, 1.0);
-	vec2 center = scene_light_source_uv + axis * along;
-	vec2 normal = normalize(vec2(-axis.y, axis.x));
-	float width = mix(scene_light_top_width, scene_light_bottom_width, along);
-	float row_break = (
-			fract(floor(suv.y * 72.0) * 0.6180339) - 0.5) * 0.014;
-	float across = abs(dot(suv - center, normal));
-	float cone = 1.0 - smoothstep(
-			width + row_break,
-			width + row_break + 0.045,
-			across);
-	float reach = smoothstep(-0.08, 0.04, raw_along)
-			* (1.0 - smoothstep(0.86, 1.08, raw_along));
-	vec2 pool_delta = (suv - scene_light_pool_center)
-			/ max(scene_light_pool_radius, vec2(0.001));
-	float upper_pool = 1.0 - smoothstep(0.70, 1.0, length(pool_delta));
-	float field = max(cone * reach, upper_pool * 0.35);
-	field *= 1.0 - smoothstep(0.78, 0.98, suv.y);
-	return floor(clamp(field, 0.0, 1.0) * 4.0 + 0.5) / 4.0;
-}
-
-
-float focus_quiet_mask(vec2 screen_uv) {
-	vec2 stepped_uv = (
-			floor(screen_uv * vec2(480.0, 270.0)) + vec2(0.5)
-	) / vec2(480.0, 270.0);
-	vec2 delta_a = (stepped_uv - focus_quiet_center_a)
-			/ max(focus_quiet_radius, vec2(0.001));
-	vec2 delta_b = (stepped_uv - focus_quiet_center_b)
-			/ max(focus_quiet_radius, vec2(0.001));
-	float mask_a = 1.0 - smoothstep(0.58, 1.0, length(delta_a));
-	float mask_b = 1.0 - smoothstep(0.58, 1.0, length(delta_b));
-	return max(mask_a, mask_b) * focus_quiet_strength;
 }
 
 
@@ -190,33 +129,5 @@ void fragment() {
 	if (result.a > 0.0) {
 		result.rgb /= result.a;
 	}
-	vec2 direction = normalize(light_dir);
-	vec2 pixel_uv = (
-			floor(UV / TEXTURE_PIXEL_SIZE) + vec2(0.5)) * TEXTURE_PIXEL_SIZE;
-	float luma = dot(result.rgb, vec3(0.299, 0.587, 0.114));
-	float facing = scene2_light_field(SCREEN_UV);
-	float petal_plane = smoothstep(0.20, 0.78, luma);
-	float light_mask = petal_plane * facing;
-	float shadow_mask = (1.0 - facing) * (1.0 - petal_plane * 0.68);
-	result.rgb *= 1.0 + light_mask * receiver_light_strength;
-	result.rgb += light_color.rgb
-			* light_mask * receiver_light_strength * 0.14;
-	result.rgb = mix(
-			result.rgb,
-			result.rgb * shadow_color.rgb,
-			shadow_mask * receiver_shadow_strength);
-	float toward_light_alpha = texture(
-			TEXTURE,
-			UV + direction * TEXTURE_PIXEL_SIZE * receiver_rim_width).a;
-	float light_rim = max(result.a - toward_light_alpha, 0.0);
-	result.rgb += light_color.rgb * light_rim * receiver_rim_strength;
-	float focus_quiet = focus_quiet_mask(SCREEN_UV);
-	float focus_luma = dot(result.rgb, vec3(0.299, 0.587, 0.114));
-	vec3 quiet_color = mix(
-			vec3(focus_luma), result.rgb, focus_quiet_saturation);
-	quiet_color = (
-			quiet_color - vec3(0.5)
-	) * focus_quiet_contrast + vec3(0.5);
-	result.rgb = mix(result.rgb, quiet_color, focus_quiet);
 	COLOR = result * node_modulate;
 }

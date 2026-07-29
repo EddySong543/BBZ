@@ -14,6 +14,10 @@ uniform float contrast : hint_range(0.5, 1.25, 0.01) = 1.0;
 uniform float brightness : hint_range(0.5, 1.25, 0.01) = 1.0;
 uniform vec4 atmosphere_color : source_color = vec4(0.62, 0.73, 0.73, 1.0);
 uniform float atmosphere_strength : hint_range(0.0, 0.5, 0.01) = 0.0;
+uniform vec4 green_neutral_color : source_color = vec4(0.54, 0.58, 0.61, 1.0);
+uniform float green_neutralize_strength : hint_range(0.0, 1.0, 0.01) = 0.0;
+uniform vec4 rock_neutral_color : source_color = vec4(0.54, 0.57, 0.60, 1.0);
+uniform float rock_neutralize_strength : hint_range(0.0, 1.0, 0.01) = 0.0;
 uniform vec2 quiet_center = vec2(0.5);
 uniform vec2 quiet_radius = vec2(0.2);
 uniform float quiet_strength : hint_range(0.0, 1.0, 0.01) = 0.0;
@@ -155,6 +159,34 @@ void fragment() {
 	vec3 col = mix(vec3(luma), result.rgb, saturation);
 	col = (col - vec3(0.5)) * contrast + vec3(0.5);
 	col *= brightness;
+	float green_excess = result.g - max(result.r * 0.92, result.b);
+	float source_chroma = max(result.r, max(result.g, result.b))
+			- min(result.r, min(result.g, result.b));
+	float green_mask = smoothstep(0.015, 0.10, green_excess)
+			* smoothstep(0.025, 0.16, source_chroma);
+	float graded_luma = dot(col, vec3(0.299, 0.587, 0.114));
+	float neutral_luma = max(
+			dot(green_neutral_color.rgb, vec3(0.299, 0.587, 0.114)),
+			0.001);
+	vec3 neutral_green = green_neutral_color.rgb
+			* (graded_luma / neutral_luma);
+	col = mix(
+			col,
+			neutral_green,
+			green_mask * green_neutralize_strength);
+	float protected_blossom = smoothstep(
+			0.10,
+			0.22,
+			result.r - max(result.g, result.b));
+	float rock_luma = max(
+			dot(rock_neutral_color.rgb, vec3(0.299, 0.587, 0.114)),
+			0.001);
+	vec3 neutral_rock = rock_neutral_color.rgb
+			* (dot(col, vec3(0.299, 0.587, 0.114)) / rock_luma);
+	col = mix(
+			col,
+			neutral_rock,
+			(1.0 - protected_blossom) * rock_neutralize_strength);
 	col = mix(col, atmosphere_color.rgb, atmosphere_strength);
 
 	vec2 pixel_uv = (

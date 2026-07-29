@@ -68,6 +68,23 @@ var p2_head_blossom_region := PackedVector2Array([
 	Vector2(72, 83),
 	Vector2(74, 73),
 ])
+# Preserve the authored opening between the upper blossoms and the highlighted
+# load-bearing branch. The hidden-trunk pass used to bridge this extraction gap
+# with dark wood even though the source art is transparent there.
+var upper_branch_gap_clear_region := PackedVector2Array([
+	Vector2(119, 67),
+	Vector2(123, 59),
+	Vector2(136, 57),
+	Vector2(145, 63),
+	Vector2(148, 65),
+	Vector2(148, 69),
+	Vector2(145, 72),
+	Vector2(140, 76),
+	Vector2(131, 76),
+	Vector2(124, 73),
+	Vector2(121, 71),
+	Vector2(119, 70),
+])
 
 # The radius on each segment is intentionally generous: an occasional static
 # blossom beside the wood is preferable to making the load-bearing trunk swim.
@@ -185,7 +202,19 @@ func _build_underpaint(source: Image, mask: Image) -> Image:
 				underpaint.set_pixel(x, y, nearest_wood)
 
 	_paint_blossom_repairs(source, mask, underpaint)
+	_clear_upper_branch_gap(source, underpaint)
 	return underpaint
+
+
+func _clear_upper_branch_gap(source: Image, underpaint: Image) -> void:
+	for y: int in range(57, 77):
+		for x: int in range(119, 149):
+			var point := Vector2(x + 0.5, y + 0.5)
+			if source.get_pixel(x, y).a > 0.05 \
+					or not Geometry2D.is_point_in_polygon(
+							point, upper_branch_gap_clear_region):
+				continue
+			underpaint.set_pixel(x, y, Color.TRANSPARENT)
 
 
 func _paint_blossom_repairs(source: Image, mask: Image, underpaint: Image) -> void:
