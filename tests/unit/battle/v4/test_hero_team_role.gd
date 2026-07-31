@@ -28,8 +28,8 @@ func test_h02_published_data_matches_approved_redesign() -> void:
 	assert_eq(h.max_hp, 7, "牛金生命保持 7")
 	assert_eq(h.skill_description, "山河借骨回天法", "牛金应使用已定稿技能名")
 	assert_eq(h.skill_detail,
-		"牛金【牛】挡下「波」或「大波」后，我方下次「波」升级为「大波」。",
-		"牛金描述应准确表达挡招后团队波升级")
+		"牛金【牛】成功防御时，我方下一次「波」升级为「大波」。",
+		"牛金短文案应使用统一的成功防御术语")
 
 
 func test_h03_published_data_matches_approved_redesign() -> void:
@@ -38,8 +38,8 @@ func test_h03_published_data_matches_approved_redesign() -> void:
 	assert_eq(h.max_hp, 5, "尾火生命应为 5")
 	assert_eq(h.skill_description, "白额雷音", "尾火应使用已定稿技能名")
 	assert_eq(h.skill_detail,
-		"双方均使用「波」或「大波」时，尾火【虎】优先攻击；若击杀敌方出战英雄，取消其此次攻击。",
-		"尾火描述应准确表达基础攻击对攻先制与致死断招")
+		"双方同时攻击时，尾火【虎】的攻击优先结算。",
+		"尾火短文案应使用统一的攻击术语")
 
 
 func test_h04_published_data_matches_approved_redesign() -> void:
@@ -49,8 +49,8 @@ func test_h04_published_data_matches_approved_redesign() -> void:
 	assert_eq(h.team_role, "进攻", "房日的新主定位应为进攻")
 	assert_eq(h.skill_description, "十方无次第", "房日应使用已定稿技能名")
 	assert_eq(h.skill_detail,
-		"房日【兔】的「波」和「大波」可以指定任一敌方英雄。",
-		"房日描述应准确表达基础攻击自由选敌")
+		"房日【兔】的攻击可以指定任意一名敌方英雄。",
+		"房日短文案应使用统一的攻击术语")
 
 
 func test_hero_data_launch_pool_all_have_valid_team_role() -> void:

@@ -138,20 +138,6 @@ float moving_flow_intensity(
 }
 
 
-float sample_energy(
-		sampler2D source_texture,
-		vec2 source_uv,
-		vec2 texel_offset,
-		vec2 texel_size
-) {
-	vec2 sample_uv = clamp(
-			source_uv + texel_offset * texel_size,
-			vec2(0.0),
-			vec2(1.0));
-	return energy_mask(texture(source_texture, sample_uv));
-}
-
-
 float square_fragment(
 		vec2 source_pixel,
 		vec2 center,
@@ -249,16 +235,22 @@ void fragment() {
 				&& flow_intensity > 0.001
 		) {
 			float adjacent_energy = max(
-					sample_energy(
+					energy_mask(texture(
 							TEXTURE,
-							source_uv,
-							vec2(0.0, -1.0),
-							TEXTURE_PIXEL_SIZE),
-					sample_energy(
+							clamp(
+									source_uv
+									+ vec2(0.0, -1.0)
+									* TEXTURE_PIXEL_SIZE,
+									vec2(0.0),
+									vec2(1.0)))),
+					energy_mask(texture(
 							TEXTURE,
-							source_uv,
-							vec2(0.0, -2.0),
-							TEXTURE_PIXEL_SIZE));
+							clamp(
+									source_uv
+									+ vec2(0.0, -2.0)
+									* TEXTURE_PIXEL_SIZE,
+									vec2(0.0),
+									vec2(1.0)))));
 			vec3 engraved_shadow = mix(
 					structure_color.rgb,
 					energy_color.rgb,

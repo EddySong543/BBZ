@@ -27,22 +27,6 @@ const TITLE_TEXTURE_SIZE := 252.0
 const TITLE_FLOW_START_PIXELS: Array[float] = [63.5, 45.5, 45.5]
 const TITLE_FLOW_END_PIXELS: Array[float] = [224.5, 224.5, 215.5]
 const TITLE_FRAGMENT_ORIGIN_Y_PIXELS: Array[float] = [78.5, 78.5, 90.5]
-const TITLE_PULSE_STRENGTH := 0.70
-const TITLE_GLOW_STRENGTH := 0.65
-const TITLE_GLOW_OFFSETS: Array[Vector2i] = [
-	Vector2i(-1, -1),
-	Vector2i(0, -1),
-	Vector2i(1, -1),
-	Vector2i(-1, 0),
-	Vector2i(1, 0),
-	Vector2i(-1, 1),
-	Vector2i(0, 1),
-	Vector2i(1, 1),
-	Vector2i(-2, 0),
-	Vector2i(2, 0),
-	Vector2i(0, -2),
-	Vector2i(0, 2),
-]
 
 
 class TransitionObserver extends Node:
@@ -152,14 +136,16 @@ func _count_pixels_near(
 	return count
 
 
-func _energy_pulse_metrics(
+func _energy_flow_metrics(
 		baseline: Image,
-		pulse_image: Image,
+		flow_image: Image,
 		bounds: Rect2i,
-) -> Vector3:
+) -> Vector4:
 	var energy_pixel_count := 0
 	var changed_pixel_count := 0
 	var total_rgb_difference := 0.0
+	var weighted_x_total := 0.0
+	var centroid_weight := 0.0
 	var energy_tolerance_squared := 0.08 * 0.08
 	for y: int in range(bounds.position.y, bounds.end.y):
 		for x: int in range(bounds.position.x, bounds.end.x):
@@ -172,21 +158,27 @@ func _energy_pulse_metrics(
 			):
 				continue
 			energy_pixel_count += 1
-			var pulse_pixel := pulse_image.get_pixel(x, y)
+			var flow_pixel := flow_image.get_pixel(x, y)
 			var rgb_difference := (
-				absf(baseline_pixel.r - pulse_pixel.r)
-				+ absf(baseline_pixel.g - pulse_pixel.g)
-				+ absf(baseline_pixel.b - pulse_pixel.b)
+				absf(baseline_pixel.r - flow_pixel.r)
+				+ absf(baseline_pixel.g - flow_pixel.g)
+				+ absf(baseline_pixel.b - flow_pixel.b)
 			)
 			total_rgb_difference += rgb_difference
-			if rgb_difference >= 0.04:
+			if rgb_difference >= 0.02:
 				changed_pixel_count += 1
+				weighted_x_total += float(x) * rgb_difference
+				centroid_weight += rgb_difference
 	if energy_pixel_count == 0:
-		return Vector3.ZERO
-	return Vector3(
+		return Vector4.ZERO
+	var changed_centroid_x := 0.0
+	if centroid_weight > 0.0:
+		changed_centroid_x = weighted_x_total / centroid_weight
+	return Vector4(
 		float(energy_pixel_count),
 		float(changed_pixel_count) / float(energy_pixel_count),
-		total_rgb_difference / float(energy_pixel_count))
+		total_rgb_difference / float(energy_pixel_count),
+		changed_centroid_x)
 
 
 func _is_baseline_energy_pixel(color: Color) -> bool:
@@ -196,13 +188,13 @@ func _is_baseline_energy_pixel(color: Color) -> bool:
 	)
 
 
-func _has_energy_neighbor(
+func _has_energy_above(
 		baseline: Image,
 		position: Vector2i,
 		bounds: Rect2i,
 ) -> bool:
-	for offset: Vector2i in TITLE_GLOW_OFFSETS:
-		var neighbor := position + offset
+	for distance: int in range(1, 5):
+		var neighbor := position + Vector2i(0, -distance)
 		if not bounds.has_point(neighbor):
 			continue
 		if _is_baseline_energy_pixel(
@@ -212,42 +204,100 @@ func _has_energy_neighbor(
 	return false
 
 
-func _energy_glow_metrics(
+func _structure_tint_metrics(
 		baseline: Image,
-		pulse_image: Image,
+		flow_image: Image,
 		bounds: Rect2i,
-) -> Vector3:
-	var halo_pixel_count := 0
+) -> Vector4:
+	var structure_pixel_count := 0
 	var changed_pixel_count := 0
 	var total_rgb_difference := 0.0
+	var weighted_x_total := 0.0
+	var centroid_weight := 0.0
+	var structure_tolerance_squared := 0.08 * 0.08
 	for y: int in range(bounds.position.y, bounds.end.y):
 		for x: int in range(bounds.position.x, bounds.end.x):
 			var position := Vector2i(x, y)
 			var baseline_pixel := baseline.get_pixel(x, y)
 			if (
-				_is_baseline_energy_pixel(baseline_pixel)
-				or not _has_energy_neighbor(
+				_color_distance_squared(
+					baseline_pixel,
+					TITLE_STRUCTURE_COLOR)
+				> structure_tolerance_squared
+				or not _has_energy_above(
 					baseline,
 					position,
 					bounds)
 			):
 				continue
-			halo_pixel_count += 1
-			var pulse_pixel := pulse_image.get_pixel(x, y)
+			structure_pixel_count += 1
+			var flow_pixel := flow_image.get_pixel(x, y)
 			var rgb_difference := (
-				absf(baseline_pixel.r - pulse_pixel.r)
-				+ absf(baseline_pixel.g - pulse_pixel.g)
-				+ absf(baseline_pixel.b - pulse_pixel.b)
+				absf(baseline_pixel.r - flow_pixel.r)
+				+ absf(baseline_pixel.g - flow_pixel.g)
+				+ absf(baseline_pixel.b - flow_pixel.b)
 			)
 			total_rgb_difference += rgb_difference
-			if rgb_difference >= 0.04:
+			if rgb_difference >= 0.004:
 				changed_pixel_count += 1
-	if halo_pixel_count == 0:
-		return Vector3.ZERO
-	return Vector3(
-		float(halo_pixel_count),
-		float(changed_pixel_count) / float(halo_pixel_count),
-		total_rgb_difference / float(halo_pixel_count))
+				weighted_x_total += float(x) * rgb_difference
+				centroid_weight += rgb_difference
+	if structure_pixel_count == 0:
+		return Vector4.ZERO
+	var changed_centroid_x := 0.0
+	if centroid_weight > 0.0:
+		changed_centroid_x = weighted_x_total / centroid_weight
+	return Vector4(
+		float(structure_pixel_count),
+		float(changed_pixel_count) / float(structure_pixel_count),
+		total_rgb_difference / float(structure_pixel_count),
+		changed_centroid_x)
+
+
+func _rightmost_energy_x(baseline: Image, bounds: Rect2i) -> int:
+	var rightmost := bounds.position.x
+	for y: int in range(bounds.position.y, bounds.end.y):
+		for x: int in range(bounds.position.x, bounds.end.x):
+			if _is_baseline_energy_pixel(baseline.get_pixel(x, y)):
+				rightmost = maxi(rightmost, x)
+	return rightmost
+
+
+func _fragment_release_metrics(
+		baseline: Image,
+		release_image: Image,
+		bounds: Rect2i,
+) -> Vector2:
+	var rightmost_energy := _rightmost_energy_x(baseline, bounds)
+	var changed_background_count := 0
+	var total_rgb_difference := 0.0
+	var background_tolerance_squared := 0.025 * 0.025
+	var background_color := Color(0.004, 0.003, 0.009, 1.0)
+	for y: int in range(bounds.position.y, bounds.end.y):
+		for x: int in range(rightmost_energy + 1, bounds.end.x):
+			var baseline_pixel := baseline.get_pixel(x, y)
+			if (
+				_color_distance_squared(
+					baseline_pixel,
+					background_color)
+				> background_tolerance_squared
+			):
+				continue
+			var release_pixel := release_image.get_pixel(x, y)
+			var rgb_difference := (
+				absf(baseline_pixel.r - release_pixel.r)
+				+ absf(baseline_pixel.g - release_pixel.g)
+				+ absf(baseline_pixel.b - release_pixel.b)
+			)
+			if rgb_difference < 0.04:
+				continue
+			changed_background_count += 1
+			total_rgb_difference += rgb_difference
+	if changed_background_count == 0:
+		return Vector2.ZERO
+	return Vector2(
+		float(changed_background_count),
+		total_rgb_difference / float(changed_background_count))
 
 
 func _ready() -> void:
@@ -383,8 +433,6 @@ func _ready() -> void:
 			TITLE_FLOW_DURATION_SECONDS / TITLE_FLOW_PERIOD_SECONDS)
 	var normalized_release_duration := (
 			TITLE_RELEASE_DURATION_SECONDS / TITLE_FLOW_PERIOD_SECONDS)
-	var normalized_rise := normalized_flow_duration
-	var normalized_hold := 0.0
 	if (
 			not _materials_match_palette(
 				title_materials,
@@ -498,7 +546,7 @@ func _ready() -> void:
 		return
 
 	var phase_before_swap := float(
-			title_column.call(&"current_pulse_phase"))
+			title_column.call(&"current_flow_phase"))
 	title_column.call(
 		&"apply_palette",
 		TITLE_TEST_FACE_COLOR,
@@ -516,23 +564,29 @@ func _ready() -> void:
 		return
 	await get_tree().create_timer(0.08).timeout
 	var phase_after_swap := float(
-			title_column.call(&"current_pulse_phase"))
+			title_column.call(&"current_flow_phase"))
 	if absf(phase_after_swap - phase_before_swap) < 0.001:
-		push_error("Boot title pulse stopped after the runtime palette swap.")
+		push_error(
+			"Boot title engraving flow stopped after the runtime palette swap.")
 		get_tree().quit(1)
 		return
 	for shader_material: ShaderMaterial in title_materials:
 		if not is_equal_approx(
-			float(shader_material.get_shader_parameter(&"pulse_phase")),
+			float(shader_material.get_shader_parameter(&"flow_phase")),
 			phase_after_swap,
 		):
-			push_error("Boot title pulse phase did not reach every glyph.")
+			push_error("Boot title flow phase did not reach every glyph.")
 			get_tree().quit(1)
 			return
 
-	for shader_material: ShaderMaterial in title_materials:
-		shader_material.set_shader_parameter(&"pulse_strength", 0.0)
-		shader_material.set_shader_parameter(&"glow_strength", 0.0)
+	var title_phase_tween := title_column.get("_phase_tween") as Tween
+	if title_phase_tween == null or not title_phase_tween.is_valid():
+		push_error(
+			"Boot title engraving-flow tween was not available for probing.")
+		get_tree().quit(1)
+		return
+	title_phase_tween.pause()
+	title_column.call(&"_set_flow_phase", 0.5)
 	await RenderingServer.frame_post_draw
 	var palette_image := get_viewport().get_texture().get_image()
 	var title_nodes: Array[TextureRect] = [
@@ -591,131 +645,124 @@ func _ready() -> void:
 		push_error("Boot title default palette was not restored.")
 		get_tree().quit(1)
 		return
-	for shader_material: ShaderMaterial in title_materials:
-		shader_material.set_shader_parameter(
-			&"pulse_strength",
-			TITLE_PULSE_STRENGTH)
-		shader_material.set_shader_parameter(
-			&"glow_strength",
-			TITLE_GLOW_STRENGTH)
-
-	var title_phase_tween := title_column.get("_phase_tween") as Tween
-	if title_phase_tween == null or not title_phase_tween.is_valid():
-		push_error("Boot title pulse tween was not available for render probing.")
-		get_tree().quit(1)
-		return
-	title_phase_tween.pause()
-	title_column.call(&"_set_pulse_phase", 0.0)
+	title_column.call(&"_set_flow_phase", 0.5)
 	await RenderingServer.frame_post_draw
-	var pulse_baseline := get_viewport().get_texture().get_image()
-	var pulse_bounds: Array[Rect2i] = []
+	var flow_baseline := get_viewport().get_texture().get_image()
+	var flow_bounds: Array[Rect2i] = []
 	for title_node: TextureRect in title_nodes:
-		pulse_bounds.append(
-			_control_image_bounds(title_node, pulse_baseline, 374))
+		flow_bounds.append(
+			_control_image_bounds(title_node, flow_baseline, 428))
 
-	var pulse_phases: Array[float] = [
-		normalized_rise + normalized_hold * 0.5,
-		normalized_stagger + normalized_rise + normalized_hold * 0.5,
-		normalized_stagger * 2.0 + normalized_rise + normalized_hold * 0.5,
-	]
-	var pulse_metrics: Array[Array] = []
-	var glow_metrics: Array[Array] = []
-	for pulse_phase: float in pulse_phases:
-		title_column.call(&"_set_pulse_phase", pulse_phase)
+	var energy_early_metrics: Array[Vector4] = []
+	var energy_late_metrics: Array[Vector4] = []
+	var structure_early_metrics: Array[Vector4] = []
+	var structure_late_metrics: Array[Vector4] = []
+	var fragment_metrics: Array[Vector2] = []
+	for index: int in title_nodes.size():
+		var glyph_delay := float(index) * normalized_stagger
+		var early_phase := glyph_delay + normalized_flow_duration * 0.25
+		var late_phase := glyph_delay + normalized_flow_duration * 0.75
+		var release_phase := (
+				glyph_delay
+				+ normalized_flow_duration
+				+ normalized_release_duration * 0.45)
+
+		title_column.call(&"_set_flow_phase", early_phase)
 		await RenderingServer.frame_post_draw
-		var pulse_image := get_viewport().get_texture().get_image()
-		var glyph_metrics: Array[Vector3] = []
-		var glyph_glow_metrics: Array[Vector3] = []
-		for bounds: Rect2i in pulse_bounds:
-			glyph_metrics.append(
-				_energy_pulse_metrics(
-					pulse_baseline,
-					pulse_image,
-					bounds))
-			glyph_glow_metrics.append(
-				_energy_glow_metrics(
-					pulse_baseline,
-					pulse_image,
-					bounds))
-		pulse_metrics.append(glyph_metrics)
-		glow_metrics.append(glyph_glow_metrics)
+		var early_image := get_viewport().get_texture().get_image()
+		energy_early_metrics.append(
+			_energy_flow_metrics(
+				flow_baseline,
+				early_image,
+				flow_bounds[index]))
+		structure_early_metrics.append(
+			_structure_tint_metrics(
+				flow_baseline,
+				early_image,
+				flow_bounds[index]))
+
+		title_column.call(&"_set_flow_phase", late_phase)
+		await RenderingServer.frame_post_draw
+		var late_image := get_viewport().get_texture().get_image()
+		energy_late_metrics.append(
+			_energy_flow_metrics(
+				flow_baseline,
+				late_image,
+				flow_bounds[index]))
+		structure_late_metrics.append(
+			_structure_tint_metrics(
+				flow_baseline,
+				late_image,
+				flow_bounds[index]))
+
+		title_column.call(&"_set_flow_phase", release_phase)
+		await RenderingServer.frame_post_draw
+		var release_image := get_viewport().get_texture().get_image()
+		fragment_metrics.append(
+			_fragment_release_metrics(
+				flow_baseline,
+				release_image,
+				flow_bounds[index]))
+
 	print(
-		"BOOT_TITLE_PULSE_RENDER: bottom=%s middle=%s top=%s"
-		% [
-			pulse_metrics[0],
-			pulse_metrics[1],
-			pulse_metrics[2],
-		])
+		"BOOT_TITLE_FLOW_RENDER: early=%s late=%s"
+		% [energy_early_metrics, energy_late_metrics])
 	print(
-		"BOOT_TITLE_GLOW_RENDER: bottom=%s middle=%s top=%s"
-		% [
-			glow_metrics[0],
-			glow_metrics[1],
-			glow_metrics[2],
-		])
-	var bottom_peak: Vector3 = pulse_metrics[0][0]
-	var middle_during_bottom_peak: Vector3 = pulse_metrics[0][1]
-	var top_during_bottom_peak: Vector3 = pulse_metrics[0][2]
-	var middle_peak: Vector3 = pulse_metrics[1][1]
-	var top_during_middle_peak: Vector3 = pulse_metrics[1][2]
-	var top_peak: Vector3 = pulse_metrics[2][2]
-	var bottom_glow_peak: Vector3 = glow_metrics[0][0]
-	var middle_glow_during_bottom_peak: Vector3 = glow_metrics[0][1]
-	var top_glow_during_bottom_peak: Vector3 = glow_metrics[0][2]
-	var middle_glow_peak: Vector3 = glow_metrics[1][1]
-	var top_glow_during_middle_peak: Vector3 = glow_metrics[1][2]
-	var top_glow_peak: Vector3 = glow_metrics[2][2]
-	if (
-		bottom_peak.x < 100.0
-		or middle_peak.x < 100.0
-		or top_peak.x < 100.0
-		or bottom_peak.y < 0.90
-		or bottom_peak.z < 0.60
-		or middle_peak.y < 0.90
-		or middle_peak.z < 0.60
-		or top_peak.y < 0.90
-		or top_peak.z < 0.60
-		or bottom_peak.z - middle_during_bottom_peak.z < 0.40
-		or middle_peak.z - top_during_middle_peak.z < 0.40
-		or top_during_bottom_peak.y > 0.01
-		or top_during_bottom_peak.z > 0.002
-	):
-		push_error(
-			"Boot title rendered pulse does not travel bottom to middle to top.")
-		get_tree().quit(1)
-		return
-	if (
-		bottom_glow_peak.x < 100.0
-		or middle_glow_peak.x < 100.0
-		or top_glow_peak.x < 100.0
-		or bottom_glow_peak.y < 0.40
-		or bottom_glow_peak.z < 0.20
-		or middle_glow_peak.y < 0.40
-		or middle_glow_peak.z < 0.20
-		or top_glow_peak.y < 0.40
-		or top_glow_peak.z < 0.20
-		or (
-			bottom_glow_peak.z
-			- middle_glow_during_bottom_peak.z
-			< 0.12
-		)
-		or (
-			middle_glow_peak.z
-			- top_glow_during_middle_peak.z
-			< 0.12
-		)
-		or top_glow_during_bottom_peak.y > 0.01
-		or top_glow_during_bottom_peak.z > 0.002
-	):
-		push_error(
-			"Boot title rendered energy halo is missing or mistimed.")
-		get_tree().quit(1)
-		return
+		"BOOT_TITLE_STRUCTURE_RENDER: early=%s late=%s"
+		% [structure_early_metrics, structure_late_metrics])
+	print("BOOT_TITLE_FRAGMENT_RENDER: %s" % [fragment_metrics])
+
+	for index: int in title_nodes.size():
+		var early_energy := energy_early_metrics[index]
+		var late_energy := energy_late_metrics[index]
+		if (
+			early_energy.x < 50.0
+			or late_energy.x < 50.0
+			or early_energy.y < 0.04
+			or late_energy.y < 0.04
+			or early_energy.z < 0.015
+			or late_energy.z < 0.015
+			or late_energy.w - early_energy.w < 40.0
+		):
+			push_error(
+				"Boot title energy head does not travel left-to-right on %s."
+				% title_nodes[index].name)
+			get_tree().quit(1)
+			return
+
+		var early_structure := structure_early_metrics[index]
+		var late_structure := structure_late_metrics[index]
+		var peak_structure := early_structure
+		var matching_energy := early_energy
+		if late_structure.y > early_structure.y:
+			peak_structure = late_structure
+			matching_energy = late_energy
+		if (
+			peak_structure.x < 8.0
+			or peak_structure.y < 0.02
+			or peak_structure.z < 0.001
+			or absf(peak_structure.w - matching_energy.w) > 25.0
+		):
+			push_error(
+				"Boot title structure tint is missing or detached on %s."
+				% title_nodes[index].name)
+			get_tree().quit(1)
+			return
+
+		var glyph_fragments := fragment_metrics[index]
+		if glyph_fragments.x < 4.0 or glyph_fragments.y < 0.08:
+			push_error(
+				"Boot title endpoint fragments were not rendered on %s."
+				% title_nodes[index].name)
+			get_tree().quit(1)
+			return
+
 	title_phase_tween.play()
 
 	print("BOOT_TITLE_PALETTE_SWAP_OK")
-	print("BOOT_TITLE_PULSE_SEQUENCE_OK")
-	print("BOOT_TITLE_GLOW_OK")
+	print("BOOT_TITLE_FLOW_OK")
+	print("BOOT_TITLE_STRUCTURE_TINT_OK")
+	print("BOOT_TITLE_FRAGMENT_RELEASE_OK")
 	await get_tree().create_timer(0.75).timeout
 	await RenderingServer.frame_post_draw
 
