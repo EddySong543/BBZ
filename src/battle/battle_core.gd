@@ -50,12 +50,13 @@ var selected_action: Array[int] = [-1, -1]
 var _switch_to: Array[int] = [-1, -1]               # SWITCH 动作的目标槽位
 var _forced_pull: Array[int] = [-1, -1]             # 枭阳 h21【调虎离山】：_forced_pull[受害方]=被强制揪上场的替补槽（execute_active 设·resolve Phase 2.7 执行后清）
 var _active_target: Array[int] = [-1, -1]           # 主动技玩家指定目标槽（枭阳 h21 揪敌方哪个替补·-1=未指定→execute_active 随机选·resolve 末清）
+var _attack_target: Array[int] = [-1, -1]           # 基础攻击显式敌方目标槽（房日 h04【十方无次第】；-1=标准攻击结算时出战位）
 var pending_death_switch: Array[bool] = [false, false]  # 出战阵亡待玩家选替补上场
 var _death_processed: Array = [[], []]              # 每槽位死亡 hook 是否已触发（防重复）
 var _shuchao_procs: Array[int] = [0, 0]             # 本回合各方已计入的 combo proc 数（鼠潮 h13·仅计数·2026-07-01 去每回合封顶）
 var _double: Array[bool] = [false, false]           # 本回合各方是否"附加同种动作再做一次"（疾风 h16·选择阶段设·resolve 末重置）
 var _killer: Array = [[], []]                       # _killer[player][slot]=直接攻击致死该英雄的攻击方;-1=非攻击致死。on_kill 只对直接攻击触发(防 splash/AOE 连锁)
-var _last_action: Array[int] = [-1, -1]             # 上回合双方动作（传说级雪球·惯性件读取；h04 敌方重复动作产能比对·Phase 5.7）
+var _last_action: Array[int] = [-1, -1]             # 上回合双方动作（传说级雪球·惯性件读取）
 
 # === 道具状态（ADR-003）===
 var items: Array = [[], []]                  # items[player] = Array[ItemData]：持有/可用的道具（经济系统前由 give_item 直接给）
@@ -73,6 +74,7 @@ var overtime_mode: bool = false           # 加时赛局（create_overtime / app
 var action_lock_turn: Array[int] = [-1, -1]     # 烛阴 h17【阖眸成夜】v5（锁招）：该回合号时此玩家只能使用 action_locked（-1=无锁）
 var action_locked: Array[int] = [-1, -1]        # 被锁定动作（ActionDef.Action 或 ActionDef.ACTIVE·=施放拍对手用过的动作·不可执行时兜底只能攒）
 var pierce_next_attack: Array[bool] = [false, false]   # 毕方 h22【焚天火兆】v3：该方下一次动作攻击穿大防（全队资源·不过期·兑现/落空即消·2026-07-06 批④）
+var upgrade_next_wave: Array[bool] = [false, false]     # 牛金 h02【山河借骨回天法】：挡下波/大波后，该方下一次波按大波结算
 
 var rng := RandomNumberGenerator.new()    # 可 seed (§D7)：联机/录像/测试可复现
 var _skills: Array = [[], []]             # _skills[player][slot]: HeroSkill 或 null
@@ -81,9 +83,9 @@ var _skills: Array = [[], []]             # _skills[player][slot]: HeroSkill 或
 ## 随实装逐个加入。swap 后此表与 v3 _HERO_SKILL_SCRIPTS 合并/替换。
 const _HERO_SKILL_SCRIPTS := {
 	"h01": preload("res://src/battle/skills/h01_dunshu.gd"),
-	"h02": preload("res://src/battle/skills/h02_xiejin.gd"),
-	"h03": preload("res://src/battle/skills/h03_lianpu.gd"),
-	"h04": preload("res://src/battle/skills/h04_jiaotu.gd"),
+	"h02": preload("res://src/battle/skills/h02_jiegu.gd"),
+	"h03": preload("res://src/battle/skills/h03_leiyin.gd"),
+	"h04": preload("res://src/battle/skills/h04_wucidi.gd"),
 	"h05": preload("res://src/battle/skills/h05_liejia.gd"),
 	"h06": preload("res://src/battle/skills/h06_cuidu.gd"),
 	"h07": preload("res://src/battle/skills/h07_dangxian.gd"),
@@ -139,6 +141,7 @@ func setup(p1_heroes: Array, p2_heroes: Array, seed_value: int = 0) -> void:
 	_switch_to = [-1, -1]
 	_forced_pull = [-1, -1]
 	_active_target = [-1, -1]
+	_attack_target = [-1, -1]
 	pending_death_switch = [false, false]
 	_shuchao_procs = [0, 0]
 	_double = [false, false]
@@ -153,6 +156,8 @@ func setup(p1_heroes: Array, p2_heroes: Array, seed_value: int = 0) -> void:
 	turn_number = 0
 	game_over = false
 	winner = WINNER_UNDECIDED
+	pierce_next_attack = [false, false]
+	upgrade_next_wave = [false, false]
 
 	_build_skills()
 	_validate_skills()
@@ -194,7 +199,7 @@ func _validate_skills() -> void:
 func hp_display(half: int) -> float:
 	return float(half) / float(HP_UNIT)
 
-## 统一能量获得入口：应用出战英雄的 energy_gain_bonus（虚日囤鼠 = 每次 +0.5 能），clamp 到 MAX。
+## 统一能量获得入口：应用出战英雄的 energy_gain_bonus（虚日【步虚无有乡】= 每次 +0.5 能），clamp 到 MAX。
 ## boostable=false 的来源不吃加成（2026-07-04 Eddy 批：被动 +1 能/回合 = 白给收入不加成——
 ##   虚日站场挂机躺赚 0.5/回合的通胀漏洞；只有主动来源（攒/转化/combo/道具）吃加成）。
 func _gain_energy(player: int, amount: int, boostable: bool = true) -> void:
@@ -208,7 +213,7 @@ func _gain_energy(player: int, amount: int, boostable: bool = true) -> void:
 
 
 ## 玄冥 h13【鼠潮】：player 队触发一次 combo 效果时，引擎在该结算点调本函数。
-## 在场（含替补·存活）有鼠潮型英雄 → 团队能量 +其 combo_proc_energy()（走 _gain_energy·享囤鼠叠加）。
+## 在场（含替补·存活）有鼠潮型英雄 → 团队能量 +其 combo_proc_energy()（走 _gain_energy·享步虚无有乡叠加）。
 ## 无鼠潮 = no-op。（2026-07-01 Eddy 去每回合封顶·combo→能量回路刹车移除；_shuchao_procs 仅留计数。）
 func note_combo_proc(player: int) -> void:
 	var amt := 0
@@ -235,6 +240,10 @@ func request_forced_pull(victim_player: int, slot: int) -> void:
 ## 技能组件用：读 player 本回合为主动技指定的目标槽（-1=未指定）。resolve 末统一清。
 func active_target(player: int) -> int:
 	return _active_target[player]
+
+## UI / 测试只读：player 本回合基础攻击显式指定的敌方槽（-1=标准出战位）。
+func attack_target(player: int) -> int:
+	return _attack_target[player]
 
 ## UI 只读：取指定槽位的 HeroSkill（不暴露 _skills 私有容器）。
 func get_skill(player: int, slot: int) -> HeroSkill:
@@ -274,6 +283,14 @@ func living_reserves(player: int) -> Array[int]:
 	var result: Array[int] = []
 	for i in range(hp[player].size()):
 		if hp[player][i] > 0 and i != active_index[player]:
+			result.append(i)
+	return result
+
+
+func living_heroes(player: int) -> Array[int]:
+	var result: Array[int] = []
+	for i in range(hp[player].size()):
+		if hp[player][i] > 0:
 			result.append(i)
 	return result
 
@@ -367,11 +384,32 @@ func _locked_action_doable(player: int) -> bool:
 	return usable_energy(player) >= _get_cost(player, a)
 
 
-func select_action(player: int, action: int) -> bool:
+## target = 房日基础攻击显式指定的敌方英雄槽；-1 保持标准“攻击结算时出战位”语义。
+func select_action(player: int, action: int, target: int = -1) -> bool:
 	if not can_afford(player, action):
 		return false
+	if target < -1:
+		return false
+	if target >= 0:
+		if not ActionDef.is_attack(action) or not can_target_any_enemy_with_base_attack(player):
+			return false
+		var foe: int = 1 - player
+		if target >= hp[foe].size() or hp[foe][target] <= 0:
+			return false
 	selected_action[player] = action
+	_attack_target[player] = target if ActionDef.is_attack(action) else -1
+	_switch_to[player] = -1
+	_active_target[player] = -1
 	return true
+
+
+## 当前出战英雄是否提供基础攻击自由选敌（存活、未沉默、组件明确授权）。
+func can_target_any_enemy_with_base_attack(player: int) -> bool:
+	var slot: int = active_index[player]
+	if slot < 0 or slot >= hp[player].size() or hp[player][slot] <= 0:
+		return false
+	var sk: HeroSkill = _eff_skill(player, slot)
+	return sk != null and sk.can_target_any_enemy_with_base_attack()
 
 
 ## 统一回血入口（妖火：施加的下回合禁回血）。返回实际回复量（半点）。
@@ -410,6 +448,8 @@ func select_active(player: int, target: int = -1) -> bool:
 		return false
 	selected_action[player] = ActionDef.ACTIVE
 	_active_target[player] = target
+	_attack_target[player] = -1
+	_switch_to[player] = -1
 	return true
 
 
@@ -423,6 +463,8 @@ func select_switch(player: int, target_slot: int) -> bool:
 		return false
 	selected_action[player] = ActionDef.Action.SWITCH
 	_switch_to[player] = target_slot
+	_attack_target[player] = -1
+	_active_target[player] = -1
 	return true
 
 
@@ -949,6 +991,7 @@ func clone() -> BattleCore:
 	c._switch_to = _switch_to.duplicate()
 	c._forced_pull = _forced_pull.duplicate()
 	c._active_target = _active_target.duplicate()
+	c._attack_target = _attack_target.duplicate()
 	c.pending_death_switch = pending_death_switch.duplicate()
 	c._death_processed = _death_processed.duplicate(true)
 	c._shuchao_procs = _shuchao_procs.duplicate()
@@ -968,6 +1011,7 @@ func clone() -> BattleCore:
 	c.action_lock_turn = action_lock_turn.duplicate()
 	c.action_locked = action_locked.duplicate()
 	c.pierce_next_attack = pierce_next_attack.duplicate()
+	c.upgrade_next_wave = upgrade_next_wave.duplicate()
 	c.pve_no_econ = pve_no_econ
 	c.rng = RandomNumberGenerator.new()
 	c.rng.seed = rng.seed
@@ -1000,16 +1044,17 @@ func clone() -> BattleCore:
 #       b.select_action(0, ...)                           # 恢复后战局含随机流逐位一致，直接续打
 # 行为锁定：tests/unit/battle/v4/test_battle_snapshot.gd
 
-const SNAPSHOT_VERSION := 1
+const SNAPSHOT_VERSION := 4
 const HERO_RES_DIR := "res://assets/data/heroes/"
 ## 快照必需键（2026-07-17 终审修复·schema 门）：⚠新增引擎状态字段的"三处同步"升级为四处——
 ## clone() / to_snapshot()+from_snapshot() / 本表 / 快照测试。
 const SNAP_REQUIRED_KEYS: Array[String] = ["v", "heroes", "active_index", "energy", "hp", "max_hp",
 	"shield", "pending_damage", "statuses", "selected_action", "switch_to", "forced_pull",
-	"active_target", "pending_death_switch", "death_processed", "shuchao_procs", "double", "killer",
+	"active_target", "attack_target", "pending_death_switch", "death_processed", "shuchao_procs", "double", "killer",
 	"last_action", "items", "item_uses", "info_distortion", "item_buffs", "imod", "relics", "slots",
 	"turn_number", "game_over", "winner", "overtime_mode", "action_lock_turn", "action_locked",
-	"pierce_next_attack", "pve_no_econ", "rng_seed", "rng_state"]
+	"pierce_next_attack", "upgrade_next_wave",
+	"pve_no_econ", "rng_seed", "rng_state"]
 
 
 ## 导出全量战局快照（纯数据·与本局零共享·JSON 安全）。
@@ -1028,6 +1073,7 @@ func to_snapshot() -> Dictionary:
 		switch_to = _switch_to.duplicate(),
 		forced_pull = _forced_pull.duplicate(),
 		active_target = _active_target.duplicate(),
+		attack_target = _attack_target.duplicate(),
 		pending_death_switch = pending_death_switch.duplicate(),
 		death_processed = _death_processed.duplicate(true),
 		shuchao_procs = _shuchao_procs.duplicate(),
@@ -1048,6 +1094,7 @@ func to_snapshot() -> Dictionary:
 		action_lock_turn = action_lock_turn.duplicate(),
 		action_locked = action_locked.duplicate(),
 		pierce_next_attack = pierce_next_attack.duplicate(),
+		upgrade_next_wave = upgrade_next_wave.duplicate(),
 		pve_no_econ = pve_no_econ,
 		rng_seed = str(rng.seed),
 		rng_state = str(rng.state),
@@ -1080,6 +1127,7 @@ func from_snapshot(d: Dictionary) -> bool:
 	_switch_to.assign(s["switch_to"])
 	_forced_pull.assign(s["forced_pull"])
 	_active_target.assign(s["active_target"])
+	_attack_target.assign(s["attack_target"])
 	pending_death_switch.assign(s["pending_death_switch"])
 	_death_processed = s["death_processed"]
 	_shuchao_procs.assign(s["shuchao_procs"])
@@ -1104,6 +1152,7 @@ func from_snapshot(d: Dictionary) -> bool:
 	action_lock_turn.assign(s["action_lock_turn"])
 	action_locked.assign(s["action_locked"])
 	pierce_next_attack.assign(s["pierce_next_attack"])
+	upgrade_next_wave.assign(s["upgrade_next_wave"])
 	pve_no_econ = bool(s["pve_no_econ"])
 	rng = RandomNumberGenerator.new()
 	rng.seed = String(s["rng_seed"]).to_int()    # ⚠ 先 seed 后 state（设 seed 会重置 state）
@@ -1223,14 +1272,18 @@ static func _snap_unpack_slots(arr: Array) -> Array:
 
 
 ## 枚举该玩家当前所有合法动作。返回 Array[{action:int, target:int}]，
-## target 于 SWITCH=己方替补槽、于带敌方目标的 ACTIVE（枭阳 h21）=敌方替补槽，其余 -1。
+## target 于 SWITCH=己方替补槽、房日基础攻击=任一存活敌方槽、带目标 ACTIVE（枭阳 h21）=敌方替补槽，其余 -1。
 ## CHARGE 恒合法 → 列表非空。
 func legal_actions(player: int) -> Array:
 	var out: Array = []
 	for a in [ActionDef.Action.CHARGE, ActionDef.Action.ATTACK, ActionDef.Action.DEFEND,
 			ActionDef.Action.BIG_ATTACK, ActionDef.Action.BIG_DEFEND]:
 		if can_afford(player, a):
-			out.append({action = a, target = -1})
+			if ActionDef.is_attack(a) and can_target_any_enemy_with_base_attack(player):
+				for enemy_slot in living_heroes(1 - player):
+					out.append({action = a, target = enemy_slot})
+			else:
+				out.append({action = a, target = -1})
 	if can_afford(player, ActionDef.Action.SWITCH):
 		for t in living_reserves(player):
 			out.append({action = ActionDef.Action.SWITCH, target = t})
@@ -1254,7 +1307,7 @@ func apply_choice(player: int, choice: Dictionary) -> bool:
 		return select_active(player, int(choice.get("target", -1)))
 	if a == ActionDef.Action.SWITCH:
 		return select_switch(player, int(choice["target"]))
-	var ok: bool = select_action(player, a)
+	var ok: bool = select_action(player, a, int(choice.get("target", -1)))
 	if ok and bool(choice.get("double", false)):
 		select_double(player, true)   # 疾风：附加同种动作（select_double 内部 can_double 校验·不合法则忽略）
 	return ok
@@ -1417,26 +1470,43 @@ func resolve() -> Dictionary:
 					hitlists[p].append(ih)
 		# 2) 动作攻击（基础 / 攻击型主动技）+ 道具修正器（先手·赌徒+ / 香蕉皮- / 破盾咒穿透 / 赌徒落空）
 		var nullified: bool = bool(item_mod(p, "atk_nullify", false))
-		# 焚天火兆 h22 v3：攻击落空（草人 atk_nullify）也交掉火兆——反制链保留（2026-07-06 批④）。
+		var wave_upgraded: bool = a[p] == ActionDef.Action.ATTACK and upgrade_next_wave[p]
+		# 待兑现穿透：攻击落空（草人 atk_nullify）同样交掉对应机会，保留反制链。
 		if nullified and (ActionDef.is_attack(a[p]) or a[p] == ActionDef.ACTIVE) and pierce_next_attack[p]:
 			pierce_next_attack[p] = false
+		if nullified and wave_upgraded:
+			upgrade_next_wave[p] = false
 		if not nullified and ActionDef.is_attack(a[p]):
-			var dmg: int = maxi(_calc_outgoing(p, a[p]) + int(item_mod(p, "atk_bonus", 0)) - int(item_mod(p, "atk_penalty", 0)), 0)
+			# 山河借骨回天法：原选招始终保留为「波」（费用/历史/道具检查均读 a[p]）；
+			# 只把本次 hit 的伤害、有效类型与基础穿透提升到「大波」。
+			var damage_action: int = ActionDef.Action.BIG_ATTACK if wave_upgraded else a[p]
+			var dmg: int = maxi(_calc_outgoing(p, damage_action) + int(item_mod(p, "atk_bonus", 0)) - int(item_mod(p, "atk_penalty", 0)), 0)
 			dmg *= maxi(1, int(item_mod(p, "atk_mult", 1)))
 			var kind: int = a[p]
-			var pen: int = ActionDef.base_penetration(a[p])
 			var ksk: HeroSkill = _skills[p][aslot]
 			if ksk != null:
 				kind = ksk.override_attack_kind(a[p], self, p, aslot)
+			if wave_upgraded:
+				kind = ActionDef.Action.BIG_ATTACK
+			var pen: int = ActionDef.base_penetration(kind)
+			if ksk != null:
 				pen = ksk.attack_penetration(ActionDef.base_penetration(kind), a[p], self, p, aslot)
 			var ipen: int = int(item_mod(p, "atk_pen", -1))
 			if ipen >= 0:
 				pen = ipen
+			if wave_upgraded:
+				pen = maxi(pen, ActionDef.Pen.PIERCE_DEF)
+				upgrade_next_wave[p] = false
 			if pierce_next_attack[p]:
 				pen = maxi(pen, ActionDef.Pen.PIERCE_BIGDEF)   # 火兆兑现（Pen 枚举有序·真伤不降档）
 				pierce_next_attack[p] = false                  # 兑现即消（疾风双发复制 hit=两段同穿）
 			if dmg > 0:
-				var hit := {damage = dmg, kind = kind, pen = pen, riders = item_mod(p, "riders", []), action = true, active = false, src_slot = aslot}
+				# 十方无次第：目标只在出手者此刻仍是有效房日时生效；被沉默/动作前被换下则回到标准出战位。
+				var target_slot: int = -1
+				if ksk != null and ksk.can_target_any_enemy_with_base_attack():
+					target_slot = _attack_target[p]
+				var hit := {damage = dmg, kind = kind, pen = pen, riders = item_mod(p, "riders", []),
+					action = true, active = false, src_slot = aslot, target_slot = target_slot}
 				hitlists[p].append(hit)
 				if _double[p] and a[p] in DOUBLEABLE_ACTIONS:   # 疾风：附加同一攻击再打一次
 					hitlists[p].append(hit.duplicate(true))
@@ -1461,19 +1531,64 @@ func resolve() -> Dictionary:
 				for ih2 in use_h2["data"].effect.hits(self, p, int(use_h2["target"]), use_h2["data"]):
 					hitlists[p].append(ih2)
 	# 施加：值已对快照算好 → 跨玩家同时；己方 hit-list 按序施加（动作前道具 → 动作 → 动作后道具）。
-	# 归因钉快照槽（src_slot·2026-07-17 审计修复）：先施加方可触发后施加方的护主换人
-	# （active_index 中途变）——on-hit/主动技回调必须归出招英雄，否则先后手不对称。
+	# 白额雷音：仅双方原选招均为基础攻击、且仅一方对攻优先级更高时，拆出双方基础 action hit：
+	#   动作前道具照常 → 优先基础攻击 → 若实际击杀敌方攻击英雄则跳过其全部基础 action hit → 动作后道具照常。
+	# 同优先级（含 h03 镜像）回退原同步独立结算；攻击型主动技/道具不参与，也永不被断招。
+	var clash_groups: Array = [
+		{pre = [], action = [], post = []},
+		{pre = [], action = [], post = []},
+	]
 	for p in [0, 1]:
-		for h in hitlists[p]:
-			var riders: Array = h.get("riders", [])
-			var hsrc: String = "action" if bool(h.get("action", false)) else "item"
-			var sslot: int = int(h.get("src_slot", -1))
-			var dealt: int = _apply_damage(1 - p, int(h["damage"]), p, int(h["kind"]), int(h["pen"]), a[1 - p], events, riders, hsrc, sslot)
-			if bool(h.get("active", false)):
-				var sk_slot: int = sslot if sslot >= 0 else active_index[p]
-				var sk2: HeroSkill = _skills[p][sk_slot]
-				if sk2 != null and sk2.active_is_attack():
-					sk2.on_active_attack_resolved(self, p, sk_slot, dealt)
+		var seen_base_action := false
+		for hit in hitlists[p]:
+			if bool(hit.get("action", false)) and not bool(hit.get("active", false)):
+				clash_groups[p]["action"].append(hit)
+				seen_base_action = true
+			elif not seen_base_action:
+				clash_groups[p]["pre"].append(hit)
+			else:
+				clash_groups[p]["post"].append(hit)
+
+	var clash_first := -1
+	if ActionDef.is_attack(a[0]) and ActionDef.is_attack(a[1]) \
+			and not clash_groups[0]["action"].is_empty() and not clash_groups[1]["action"].is_empty():
+		var clash_priority: Array[int] = [0, 0]
+		for p in [0, 1]:
+			var source_slot: int = int(clash_groups[p]["action"][0].get("src_slot", active_index[p]))
+			var source_skill: HeroSkill = _skills[p][source_slot]
+			if source_skill != null:
+				clash_priority[p] = source_skill.base_attack_clash_priority()
+		if clash_priority[0] != clash_priority[1]:
+			clash_first = 0 if clash_priority[0] > clash_priority[1] else 1
+
+	if clash_first >= 0:
+		for p in [0, 1]:
+			for hit in clash_groups[p]["pre"]:
+				_apply_resolve_hit(p, hit, a, events)
+
+		var clash_other: int = 1 - clash_first
+		var other_source_slot: int = int(clash_groups[clash_other]["action"][0].get(
+			"src_slot", active_index[clash_other]))
+		var other_was_alive: bool = hp[clash_other][other_source_slot] > 0
+		for hit in clash_groups[clash_first]["action"]:
+			_apply_resolve_hit(clash_first, hit, a, events)
+
+		var other_attack_cancelled: bool = other_was_alive and hp[clash_other][other_source_slot] <= 0
+		if other_attack_cancelled:
+			events.append({id = "base_attack_cancelled", player = clash_other})
+		else:
+			for hit in clash_groups[clash_other]["action"]:
+				_apply_resolve_hit(clash_other, hit, a, events)
+
+		for p in [0, 1]:
+			for hit in clash_groups[p]["post"]:
+				_apply_resolve_hit(p, hit, a, events)
+	else:
+		# 归因钉快照槽（src_slot·2026-07-17 审计修复）：先施加方可触发后施加方的护主换人
+		# （active_index 中途变）——on-hit/主动技回调必须归出招英雄，否则先后手不对称。
+		for p in [0, 1]:
+			for hit in hitlists[p]:
+				_apply_resolve_hit(p, hit, a, events)
 
 	# Phase 5: 死亡结算 + 强制切换 + 胜负
 	_resolve_deaths(a, events)
@@ -1502,22 +1617,6 @@ func resolve() -> Dictionary:
 					if got > 0:
 						events.append({id = "muyang_heal", player = p, slot = s, amount = got})
 
-	# Phase 5.7: 敌方重复动作产能（房日 h04【玉魄乘隙】·重做 2026-07-04）——房日【出战】(存活) 且
-	#   敌方本回合动作与其上回合相同 → 己方团队能量 +enemy_repeat_energy 半能。
-	#   逐回合判定（敌方换动作即断供）；第 1 回合无上回合(_last_action=-1)不触发；
-	#   被迫动作（力竭强制攒 / 被锁切换后连防等）也算重复；道具不是动作、不参与比对。
-	#   沉默自动失效（Phase 0.3 已把 _skills 置 null、Phase 6 末才还原）。
-	for p in [0, 1]:
-		var foe: int = 1 - p
-		if _last_action[foe] >= 0 and a[foe] == _last_action[foe]:
-			var ract: int = active_index[p]
-			var rsk: HeroSkill = _skills[p][ract]
-			if hp[p][ract] > 0 and rsk != null:
-				var rgain: int = rsk.enemy_repeat_energy()
-				if rgain > 0:
-					_gain_energy(p, rgain)
-					events.append({id = "repeat_energy", player = p, amount = rgain})
-
 	# Phase 6: cleanup
 	# 遗物·Phase 6：每回合末 tick（产出/计数/充能；读 selected_action 判断本回合是否攻击）。
 	#   返回 false 的遗物移除（碎/耗尽）。在被动能量前结算，故遗物产能也享受不到/不影响被动。
@@ -1529,7 +1628,7 @@ func resolve() -> Dictionary:
 		relics[p] = kept_relics
 	# 被动能量 +1/回合（A2 引入·2026-06-24 去除·2026-07-03 恢复——sim 实锤攒-only 下最优解=互龟死锁）。
 	for p in [0, 1]:
-		_gain_energy(p, ActionDef.PASSIVE_ENERGY_GAIN, false)   # 被动收入不吃囤鼠加成（2026-07-04）
+		_gain_energy(p, ActionDef.PASSIVE_ENERGY_GAIN, false)   # 回合被动能量不吃步虚无有乡加成（2026-07-04）
 	# 沉默还原 + 递减时长（烛阴 h17【镇压】；只递减本回合生效过的，见 Phase 0.3）。
 	for sw in _silenced_swap:
 		_skills[sw[0]][sw[1]] = sw[2]
@@ -1552,8 +1651,8 @@ func resolve() -> Dictionary:
 		# UI 演出全靠这两个事件驱动（A3a），缺了=血条突跳、无掉血/死亡演出（"零特判"注释不实）。
 		# 不走 _apply_damage（骤死=无视防御/护盾/on-hit·语义就是直扣），只补事件落账。
 		if drain > 0:
-			events.append({id = "damage_taken", player = 0, amount = drain, src = "overtime", pen = ActionDef.Pen.TRUE_DMG})
-			events.append({id = "damage_taken", player = 1, amount = drain, src = "overtime", pen = ActionDef.Pen.TRUE_DMG})
+			events.append({id = "damage_taken", player = 0, slot = oa, amount = drain, src = "overtime", pen = ActionDef.Pen.TRUE_DMG})
+			events.append({id = "damage_taken", player = 1, slot = ob, amount = drain, src = "overtime", pen = ActionDef.Pen.TRUE_DMG})
 		if hp[0][oa] <= 0:
 			events.append({id = "hero_died", player = 0, slot = oa})
 		if hp[1][ob] <= 0:
@@ -1582,6 +1681,7 @@ func resolve() -> Dictionary:
 	selected_action = [-1, -1]
 	_switch_to = [-1, -1]
 	_active_target = [-1, -1]
+	_attack_target = [-1, -1]
 	_double = [false, false]
 	item_uses = [[], []]
 	return result
@@ -1701,6 +1801,32 @@ func _find_lethal_guardian(player: int) -> int:
 	return -1
 
 
+## resolve Phase 3+4 的单条 hit 公共施加器：保留伤害来源、出手槽快照与攻击型主动技回调。
+func _apply_resolve_hit(attacker_player: int, hit: Dictionary, actions: Array[int], events: Array) -> int:
+	var riders: Array = hit.get("riders", [])
+	var source: String = "action" if bool(hit.get("action", false)) else "item"
+	var source_slot: int = int(hit.get("src_slot", -1))
+	var target_slot: int = int(hit.get("target_slot", -1))
+	var dealt: int = _apply_damage(
+		1 - attacker_player,
+		int(hit["damage"]),
+		attacker_player,
+		int(hit["kind"]),
+		int(hit["pen"]),
+		actions[1 - attacker_player],
+		events,
+		riders,
+		source,
+		source_slot,
+		target_slot)
+	if bool(hit.get("active", false)):
+		var skill_slot: int = source_slot if source_slot >= 0 else active_index[attacker_player]
+		var skill: HeroSkill = _skills[attacker_player][skill_slot]
+		if skill != null and skill.active_is_attack():
+			skill.on_active_attack_resolved(self, attacker_player, skill_slot, dealt)
+	return dealt
+
+
 ## 计算 player 本次攻击的造成伤害（半点）。
 ## 出伤 = 基础 → 出战英雄 modify_outgoing_damage → 全队 modify_team_outgoing_damage（团队层 buff）。
 func _calc_outgoing(player: int, action: int) -> int:
@@ -1740,12 +1866,19 @@ func damage_immune(player: int) -> bool:
 	return int(item_mod(player, "damage_immune", 0)) > 0
 
 
-func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_action: int, pen: int, def_action: int, events: Array, item_riders: Array = [], src: String = "action", attacker_slot: int = -1) -> int:
+func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_action: int, pen: int,
+		def_action: int, events: Array, item_riders: Array = [], src: String = "action",
+		attacker_slot: int = -1, target_slot: int = -1) -> int:
 	var slot: int = active_index[target_player]
+	if target_slot >= 0:
+		if target_slot >= hp[target_player].size() or hp[target_player][target_slot] <= 0:
+			events.append({id = "attack_target_unavailable", player = target_player, slot = target_slot})
+			return 0
+		slot = target_slot
 
 	# 周天罡气：无敌方本回合所有指向性伤害事件整个不发生（含附带 on-hit·同"落空"语义）
 	if damage_immune(target_player):
-		events.append({id = "damage_immune", player = target_player})
+		events.append({id = "damage_immune", player = target_player, slot = slot})
 		return 0
 
 	# Stage B4: 防御动作门（大防挡全部；防挡波，不挡大波/穿防攻击）
@@ -1754,7 +1887,7 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 	if broken > 0 and def_action in ActionDef.DEFEND_ACTIONS:
 		set_status(target_player, slot, "broken_armor", broken - 1)
 		eff_def = ActionDef.Action.DEFEND if def_action == ActionDef.Action.BIG_DEFEND else -1
-		events.append({id = "armor_broken", player = target_player})
+		events.append({id = "armor_broken", player = target_player, slot = slot})
 	# 噬心钉：持有者无法防御（其防/大防完全失效）
 	if int(item_mod(target_player, "self_no_defend", 0)) > 0 and def_action in ActionDef.DEFEND_ACTIONS:
 		eff_def = -1
@@ -1770,7 +1903,8 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 	else:
 		blocked = eff_def == ActionDef.Action.BIG_DEFEND or eff_def == ActionDef.Action.DEFEND
 	if blocked:
-		events.append({id = ("big_defend_block" if eff_def == ActionDef.Action.BIG_DEFEND else "defend_block"), player = target_player, kind = atk_action, src = src})
+		events.append({id = ("big_defend_block" if eff_def == ActionDef.Action.BIG_DEFEND else "defend_block"),
+			player = target_player, slot = slot, kind = atk_action, src = src})
 		# 魔力源泉：防御成功 → +能量（每回合一次）
 		var be: int = int(item_mod(target_player, "block_energy", 0))
 		if be > 0:
@@ -1783,7 +1917,7 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 			_heal(target_player, slot, bh)
 		var dsk: HeroSkill = _skills[target_player][slot]
 		if dsk != null:
-			dsk.on_block(self, target_player, slot, attacker_player, atk_action, raw)
+			dsk.on_block(self, target_player, slot, attacker_player, atk_action, def_action, raw, src)
 		return 0
 
 	var dmg := raw
@@ -1795,20 +1929,20 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		for relic in relics[attacker_player]:
 			dmg += relic["data"].effect.relic_poison_detonate_bonus(self, attacker_player, relic["data"], relic["state"])
 		statuses[target_player][slot].erase("poison")
-		events.append({id = "poison_detonate", player = target_player, layers = poison})
+		events.append({id = "poison_detonate", player = target_player, slot = slot, layers = poison})
 		note_combo_proc(attacker_player)   # 鼠潮：毒爆 = 一次 combo proc
 	# 猎物印记（易伤）：本回合下次受击 +N（消耗）
 	var marked: int = int(get_status(target_player, slot, "marked", 0))
 	if marked > 0:
 		dmg += marked
 		statuses[target_player][slot].erase("marked")
-		events.append({id = "marked_hit", player = target_player, amount = marked})
+		events.append({id = "marked_hit", player = target_player, slot = slot, amount = marked})
 		note_combo_proc(attacker_player)   # 鼠潮：易伤消费 = 一次 combo proc
 	# 罪已昭（触邪 h20·持续易伤）：被印敌方出战英雄受到的伤害 +N（不消耗·换下场清；附印那次由触邪 on_deal_hit 记 proc）
 	var vuln: int = int(get_status(target_player, slot, "vuln", 0))
 	if vuln > 0:
 		dmg += vuln
-		events.append({id = "vuln_hit", player = target_player, amount = vuln})
+		events.append({id = "vuln_hit", player = target_player, slot = slot, amount = vuln})
 
 	# Stage B5: 受伤 hook（平减；沉默 h15 时跳过）
 	var skill: HeroSkill = _skills[target_player][slot]
@@ -1821,7 +1955,7 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		var absorbed: int = mini(shield[target_player][slot], dmg)
 		shield[target_player][slot] -= absorbed
 		dmg -= absorbed
-		events.append({id = "shield_absorb", player = target_player, amount = absorbed})
+		events.append({id = "shield_absorb", player = target_player, slot = slot, amount = absorbed})
 
 	# 巫毒娃娃：替身吃下这一次伤害（吸收上限 = 娃娃 HP，溢出穿过；挨一下即碎）
 	var decoy: int = int(get_status(target_player, slot, "decoy_hp", 0))
@@ -1829,7 +1963,7 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		var eaten: int = mini(decoy, dmg)
 		dmg -= eaten
 		statuses[target_player][slot].erase("decoy_hp")
-		events.append({id = "decoy_absorb", player = target_player, amount = eaten})
+		events.append({id = "decoy_absorb", player = target_player, slot = slot, amount = eaten})
 
 	# Stage B9: 落 HP（半点）
 	# 护主（天狗 h23·顶替承伤）：出战将死 + 替补有存活天狗(每局<HUZHU_CAP) → 天狗立刻登场顶替，
@@ -1839,18 +1973,18 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		var guard: int = _find_lethal_guardian(target_player)
 		if guard >= 0:
 			set_status(target_player, guard, "huzhu_uses", int(get_status(target_player, guard, "huzhu_uses", 0)) + 1)
-			events.append({id = "lethal_rescue", player = target_player, guardian = guard})
+			events.append({id = "lethal_rescue", player = target_player, slot = slot, guardian = guard})
 			_perform_switch(target_player, slot, guard, events)
 			slot = active_index[target_player]   # 出战改为天狗·本次伤害改落天狗身上
 			# 2026-07-04 Eddy 批③①：御凶登场带 1.0 护盾且【垫住当下这一击】——主护盾段(B6)已跑过、
 			# 此处按同套规则（真伤/穿甲不吸）手动结算这次吸收；天狗替补席攒的旧护盾一并参与。
 			shield[target_player][slot] += HUZHU_SHIELD
-			events.append({id = "huzhu_shield", player = target_player, amount = HUZHU_SHIELD})
+			events.append({id = "huzhu_shield", player = target_player, slot = slot, amount = HUZHU_SHIELD})
 			if dmg > 0 and pen != ActionDef.Pen.TRUE_DMG and not bool(item_mod(attacker_player, "pierce_armor", false)) and shield[target_player][slot] > 0:
 				var gabsorb: int = mini(shield[target_player][slot], dmg)
 				shield[target_player][slot] -= gabsorb
 				dmg -= gabsorb
-				events.append({id = "shield_absorb", player = target_player, amount = gabsorb})
+				events.append({id = "shield_absorb", player = target_player, slot = slot, amount = gabsorb})
 			# 御凶登场反击（2026-07-05 批③·Eddy 批 C 案·同日定普通伤害非真伤）：天狗扑咬攻击者 1.0——
 			#   走管线打击（可喂剑气/引爆毒·普通档=对方护盾可吸收）；救场变"救场+复仇"。
 			if not damage_immune(attacker_player):
@@ -1862,14 +1996,14 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 	if dmg > 0 and dmg >= hp[target_player][slot] and slot == active_index[target_player] and int(get_status(target_player, slot, "huanhun_ready", 0)) > 0:
 		set_status(target_player, slot, "huanhun_ready", 0)
 		dmg = maxi(0, hp[target_player][slot] - 1)
-		events.append({id = "huanhun_revive", player = target_player})
+		events.append({id = "huanhun_revive", player = target_player, slot = slot})
 
 	var dealt: int = 0
 	if dmg > 0:
 		hp[target_player][slot] -= dmg
 		dealt = dmg
 		# pen 档位随事件外发（Pen 枚举有序）：UI 按档位给伤害飘字分级配色（普通/穿透/真伤）·纯增量字段不影响旧读者。
-		events.append({id = "damage_taken", player = target_player, amount = dmg, src = src, pen = pen})
+		events.append({id = "damage_taken", player = target_player, slot = slot, amount = dmg, src = src, pen = pen})
 		var dsk2: HeroSkill = _skills[target_player][slot]
 		if dsk2 != null:
 			dsk2.on_self_damaged(self, target_player, slot, dealt, attacker_player)
@@ -1937,7 +2071,7 @@ func _resolve_deaths(_a: Array[int], events: Array) -> void:
 				events.append({id = "hero_died", player = p, slot = slot})
 				# 饕餮（并封 h24）：任一英雄阵亡(敌我皆可) → 在场(含替补·存活)的并封 → 其【团队】+能，
 				#   且并封【自己】回血（2026-07-04 双头分食优化：一头吞魂产能·一头食肉回血）。
-				#   扫双方存活英雄(死者已 hp≤0 自动不计=尸不自食)；能量走 _gain_energy 享囤鼠叠加、
+				#   扫双方存活英雄(死者已 hp≤0 自动不计=尸不自食)；能量走 _gain_energy 享步虚无有乡叠加、
 				#   回血走 _heal（尊重禁回血·封顶 max_hp·替补席也回）。
 				for pp in [0, 1]:
 					var feast: int = 0

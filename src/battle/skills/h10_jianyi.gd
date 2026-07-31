@@ -2,7 +2,7 @@ extends HeroSkill
 
 ## h10 昴日【金乌淬锋】· 状态（主动技：拔剑一闪）
 ## 己方任一攻击命中敌方 → 鸡 +1 层剑气（公开、跨回合、cap 4；存 鸡 自己 slot 的 "jianqi"）。
-##   （on_team_deal_hit 对全队触发，但只有鸡 override → 只有鸡 slot 累积；虎双段 → +2。）
+##   （on_team_deal_hit 对全队触发，但只有鸡 override → 只有鸡 slot 累积；道具额外命中可让同次攻击多攒。）
 ## 拔剑一闪 = 出战时攻击型主动技（费 2 能·2026-07-05 平衡：1→2 能·510 局验收卷 63.6% 仍全场第二·
 ##   2 能后满层账面（3 血穿大防）仍优于大波（3 能 2 血穿防）→ 保引擎身份不掉入"有技能不用"区；
 ##   下一刀若仍 >60% 走效率端（穿透阈值/每层伤害），⛔不再加费——3 能=比肩大波·引擎身份消失）：
@@ -16,7 +16,7 @@ func on_team_deal_hit(battle: BattleCore, player: int, slot: int, _attacker_slot
 	if j >= CAP:
 		return   # 剑气已满 → 不再累积 → 不算 combo proc
 	battle.set_status(player, slot, "jianqi", j + 1)
-	battle.note_combo_proc(player)   # 鼠潮：攒剑意 = 一次 combo proc（虎双段 → 两次）
+	battle.note_combo_proc(player)   # 鼠潮：每攒 1 层剑意 = 一次 combo proc（额外命中可触发多次）
 
 
 func has_active() -> bool:

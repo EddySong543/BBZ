@@ -1,0 +1,38 @@
+[gd_scene format=3 uid="uid://rlxhrwwir4wb"]
+
+[node name="BootRemasterIdlePreview" unique_id=425259093]
+
+[node name="Title" parent="." index="2"]
+anchors_preset = 0
+
+[node name="WaveLeft" parent="Title" index="0"]
+offset_left = -101.0
+offset_top = 16.0
+offset_right = 579.0
+offset_bottom = 436.0
+
+[node name="WaveCenter" parent="Title" index="1"]
+offset_left = 607.0
+offset_top = -58.0
+offset_right = 1287.0
+offset_bottom = 462.0
+
+[node name="ZanRight" parent="Title" index="2"]
+offset_left = 1355.0
+offset_top = 24.0
+offset_right = 2035.0
+offset_bottom = 444.0
+
+[node name="Character" parent="." index="5"]
+offset_left = 428.0
+offset_top = 178.0
+offset_right = 1501.0
+offset_bottom = 1716.0
+metadata/_edit_lock_ = true
+
+[node name="HandMote" parent="." index="6"]
+modulate = Color(1, 1, 1, 0.8309427)
+offset_left = 884.0
+offset_top = 616.0
+offset_right = 1010.0
+offset_bottom = 744.0

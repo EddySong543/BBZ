@@ -263,8 +263,9 @@ var _double_armed: bool = false   # 本回合是否 armed「附加同种动作�
 # ---- 主动换人（任务5）：点替补框→框内显「切换」(armed)→再次点=选择(动画)→「结束」提交 ----
 var _armed_switch_frame: int = -1   # 当前 armed 的替补框索引（1 / 2），-1=无
 var _switch_selected: bool = false  # armed 框是否已进入"选择"态（高亮·待「结束」提交）
-var _enemy_targeting: bool = false  # h21 调虎离山：是否处于"选敌方替补揪目标"态（选中该主动技后）
-var _enemy_target_pick: int = -1    # 已点选的敌方替补槽（-1=未选→提交时引擎随机揪）
+var _enemy_targeting: bool = false  # 是否处于敌方英雄目标选择态（h21 主动技 / h04 基础攻击）
+var _enemy_target_action: int = -1  # 触发目标选择的动作；ACTIVE=h21，波/大波=h04
+var _enemy_target_pick: int = -1    # 已点选的敌方英雄槽（h21 未选=-1；h04 默认当前出战位）
 
 # ---- juice ----
 # 受击震屏基幅（实际位移 = 基幅 × 各层 parallax_factor·见 scene1.tscn / battle_stage.gd）。
@@ -735,13 +736,16 @@ func _update_character_reflections() -> void:
 func _connect_frame_signals() -> void:
 	# 主动换人：点击己方替补头像（索引 1 / 2）→ 头像下浮现「切换」小按钮（见 _on_reserve_frame_input）。
 	# 出战位（索引 0）不可点（不能换成自己）。
-	# 敌方替补框（索引 1 / 2）：平时点击无响应（回调内 gate），仅 h21 调虎离山选目标态可点（见 _on_enemy_frame_input）。
+	# 敌方三个头像框：平时点击无响应（回调内 gate）；h21 只接替补，h04 波/大波可接任一存活英雄。
 	for fi in [1, 2]:
 		# 头像框换皮只能改绘制，不能拿走成熟的主动换人入口；在调用侧显式锁住输入属性，
 		# 避免组件/场景重制时把 Panel 的 mouse_filter 一并改掉后出现“看得见但点不到”。
 		p1_frames[fi].mouse_filter = Control.MOUSE_FILTER_STOP
 		p1_frames[fi].mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		p1_frames[fi].gui_input.connect(_on_reserve_frame_input.bind(fi))
+	for fi in [0, 1, 2]:
+		p2_frames[fi].mouse_filter = Control.MOUSE_FILTER_STOP
+		p2_frames[fi].mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		p2_frames[fi].gui_input.connect(_on_enemy_frame_input.bind(fi))
 
 
@@ -893,8 +897,8 @@ func _on_circle_pressed(action: int, btn: Button) -> void:
 	selected_btn = btn
 	_set_btn_selected(btn, true)
 	_set_confirm_active(true)
-	if action == ACTIVE:
-		_maybe_arm_enemy_targets()   # 需指定敌方替补的主动技（h21 调虎离山）→ 点亮敌方存活替补框
+	if action == ACTIVE or ActionDef.is_attack(action):
+		_maybe_arm_enemy_targets(action)
 	_refresh_jifeng()   # 新选的动作是否可双 → 更新疾风开关
 
 
@@ -915,7 +919,8 @@ func _on_confirm_pressed() -> void:
 	elif selected_action == A.SWITCH and selected_switch >= 0:
 		battle.select_switch(PLAYER, selected_switch)
 	elif selected_action >= 0:
-		battle.select_action(PLAYER, selected_action)
+		battle.select_action(PLAYER, selected_action,
+			_enemy_target_pick if ActionDef.is_attack(selected_action) else -1)
 		if _double_armed and battle.can_double(PLAYER):
 			battle.select_double(PLAYER, true)   # 疾风：附加同种动作随主动作一起盲选提交
 	else:
@@ -928,7 +933,7 @@ func _on_confirm_pressed() -> void:
 
 	# AI 选择（远征 PvE：怪物驾驶员已在回合开始定招·明牌承诺=所见即所打）
 	if _pve:
-		if _pved.choice.is_empty() or not battle.select_action(AI, int(_pved.choice["action"])):
+		if _pved.choice.is_empty() or not battle.apply_choice(AI, _pved.choice):
 			battle.select_action(AI, A.CHARGE)
 	elif not _ai_pick_precomputed():
 		_ai_pick(AI)   # 任务G 兜底：预想未命中（状态变过/没来得及想）→ 原同步路径
@@ -1043,6 +1048,10 @@ func _net_submit_turn() -> void:
 		target = selected_switch
 	elif selected_action >= 0:
 		action = selected_action
+		if ActionDef.is_attack(action) and battle.can_target_any_enemy_with_base_attack(PLAYER):
+			target = _enemy_target_pick
+			if target < 0:
+				target = battle.active_index[AI]
 	var dbl: bool = _double_armed and battle.can_double(PLAYER)
 	BattleSetup.net_session.client.submit(action, target, selected_item_slots.duplicate(), dbl)
 	selected_item_slots.clear()
@@ -1296,53 +1305,79 @@ func _resolve() -> void:
 func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Array[float]) -> void:
 	# 动画所需信息全部【从事件流派生】——不再 diff 结算后的引擎完整状态，
 	# 联机（服务器权威·客户端只收 events）下同样可行。A3a（2026-07-02）：死亡判定由血量 diff 改吃 hero_died。
-	#   damage_taken 累加受伤量；hero_died（槽 == 结算前出战槽）= 该方出战英雄阵亡。
+	#   damage_taken 按目标槽累加；当前出战位走中央角色演出，替补位走对应头像框演出。
+	var display_slots: Array[int] = [battle.active_index[0], battle.active_index[1]]
 	var dmg: Array[int] = [0, 0]
+	var reserve_hits: Array[Dictionary] = [{}, {}]   # slot → {amount, pen}，防替补受击误打中央角色
+	var reserve_blocks: Array[Dictionary] = [{}, {}] # slot → 是否挡下大波，防替补格挡误播到中央角色
 	var dead: Array[bool] = [false, false]
 	var pen_max: Array[int] = [0, 0]        # ⑧ 本拍最高穿透档（damage_taken.pen·Pen 枚举有序 → 取最高档配色）
 	var blocked: Array[bool] = [false, false]     # ② 该方本拍挡下过攻击（player=防守方）
 	var block_big_atk: Array[bool] = [false, false]  # ② 挡下的是不是大波（演出隆重度）
-	var egain: Array[int] = [0, 0]          # ③ 本拍能量获得（半能单位·charge_gain/repeat_energy/taotie_feast 累加）
+	var egain: Array[int] = [0, 0]          # ③ 本拍能量获得（半能单位·charge_gain/taotie_feast 累加）
 	# A3b 事件注解飘字：伤害数字解释不了的时刻逐条标出（每项={text,col,可选 size/y/outline/pr}）。
 	#   tags=命中拍弹出；pre_tags=出招拍弹出（力竭/定身/到期延迟伤害——都发生在动作揭示时刻）。
 	#   替补席事件（牧羊/饕餮回血、替补位延迟伤害）不在角色身位飘字——replay 到 HUD 替补行=后续候选。
 	var tags: Array = [[], []]
 	var pre_tags: Array = [[], []]
+	var cancelled_attacks: Array[bool] = [false, false]
 	for ev in r.get("events", []):
 		var p: int = int(ev.get("player", 0))
+		var event_slot: int = int(ev.get("slot", display_slots[p]))
+		var on_display: bool = event_slot == display_slots[p]
 		match ev.get("id", ""):
 			"damage_taken":
-				dmg[p] += int(ev.get("amount", 0))
-				pen_max[p] = maxi(pen_max[p], int(ev.get("pen", 0)))
+				if on_display:
+					dmg[p] += int(ev.get("amount", 0))
+					pen_max[p] = maxi(pen_max[p], int(ev.get("pen", 0)))
+				else:
+					var reserve_hit: Dictionary = reserve_hits[p].get(event_slot, {amount = 0, pen = 0})
+					reserve_hit["amount"] = int(reserve_hit["amount"]) + int(ev.get("amount", 0))
+					reserve_hit["pen"] = maxi(int(reserve_hit["pen"]), int(ev.get("pen", 0)))
+					reserve_hits[p][event_slot] = reserve_hit
 			"hero_died":
-				if int(ev.get("slot", -1)) == active_before[p]:
+				if event_slot == display_slots[p]:
 					dead[p] = true
 			"defend_block", "big_defend_block":
-				blocked[p] = true
-				if int(ev.get("kind", -1)) == A.BIG_ATTACK:
-					block_big_atk[p] = true
-			"charge_gain", "repeat_energy", "taotie_feast":
+				var blocked_big: bool = int(ev.get("kind", -1)) == A.BIG_ATTACK
+				if on_display:
+					blocked[p] = true
+					if blocked_big:
+						block_big_atk[p] = true
+				else:
+					reserve_blocks[p][event_slot] = bool(reserve_blocks[p].get(event_slot, false)) or blocked_big
+			"charge_gain", "taotie_feast":
 				egain[p] += int(ev.get("amount", 0))
 			"poison_detonate":
-				tags[p].append({text = tr("毒爆"), col = COL_TAG_POISON})
+				if on_display:
+					tags[p].append({text = tr("毒爆"), col = COL_TAG_POISON})
 			"marked_hit":
-				tags[p].append({text = tr("印记"), col = COL_TAG_AMP})
+				if on_display:
+					tags[p].append({text = tr("印记"), col = COL_TAG_AMP})
 			"vuln_hit":
-				tags[p].append({text = tr("易伤"), col = COL_TAG_AMP})
+				if on_display:
+					tags[p].append({text = tr("易伤"), col = COL_TAG_AMP})
 			"shield_absorb":
-				tags[p].append({text = tr("护盾-%s") % _fmt_hp(float(ev.get("amount", 0)) / 2.0), col = COL_TAG_ABSORB})
+				if on_display:
+					tags[p].append({text = tr("护盾-%s") % _fmt_hp(float(ev.get("amount", 0)) / 2.0), col = COL_TAG_ABSORB})
 			"decoy_absorb":
-				tags[p].append({text = tr("替身-%s") % _fmt_hp(float(ev.get("amount", 0)) / 2.0), col = COL_TAG_ABSORB})
+				if on_display:
+					tags[p].append({text = tr("替身-%s") % _fmt_hp(float(ev.get("amount", 0)) / 2.0), col = COL_TAG_ABSORB})
 			"damage_immune":
-				tags[p].append({text = tr("免疫"), col = COL_TAG_SAVE, pr = 0})
+				if on_display:
+					tags[p].append({text = tr("免疫"), col = COL_TAG_SAVE, pr = 0})
 			"armor_broken":
-				tags[p].append({text = tr("破甲"), col = COL_TAG_BREAK})
+				if on_display:
+					tags[p].append({text = tr("破甲"), col = COL_TAG_BREAK})
 			"lethal_rescue":
 				tags[p].append({text = tr("护主"), col = COL_TAG_SAVE, pr = 0})
 			"huzhu_counter":
 				tags[1 - p].append({text = tr("反击"), col = COL_TAG_BREAK})   # 反击伤害落在攻击方身上→标注也放那侧
 			"huanhun_revive":
 				tags[p].append({text = tr("还魂"), col = COL_TAG_SAVE, pr = 0})
+			"base_attack_cancelled":
+				cancelled_attacks[p] = true
+				tags[p].append({text = tr("断招"), col = COL_TAG_BREAK, pr = 0})
 			"exhausted":
 				pre_tags[p].append({text = tr("力竭"), col = BattleFxScript.COL_BLOCK_TEXT})
 			"switch_locked":
@@ -1362,9 +1397,13 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 
 	# 头顶招式圆圈（揭示双方盲选出招）→ 消失 → 再播打斗动画
 	await _show_action_indicators(r.get("p1_action", -1), r.get("p2_action", -1))
-	await _play_battle_anims(r.get("p1_action", -1), r.get("p2_action", -1), dmg, dead,
+	var anim_actions: Array[int] = [int(r.get("p1_action", -1)), int(r.get("p2_action", -1))]
+	for p in 2:
+		if cancelled_attacks[p]:
+			anim_actions[p] = -1
+	await _play_battle_anims(anim_actions[0], anim_actions[1], dmg, dead,
 		{pen = pen_max, blocked = blocked, block_big = block_big_atk, egain = egain, healed = healed,
-			tags = tags, pre_tags = pre_tags})
+			tags = tags, pre_tags = pre_tags, reserve_hits = reserve_hits, reserve_blocks = reserve_blocks})
 	_update_all()
 
 
@@ -1647,23 +1686,33 @@ func _clear_action_selection_full() -> void:
 
 
 # ============================================================
-# h21 枭阳【调虎离山】：选敌方替补揪目标（方案1·敌方替补框亮）
+# 敌方英雄目标选择：h21【调虎离山】与 h04【十方无次第】共用头像框入口
 # ============================================================
 
-## 选中"需指定敌方替补"的主动技（h21）后：点亮敌方存活替补框、进入选目标态。
-func _maybe_arm_enemy_targets() -> void:
+## h21：只点敌方存活替补，未选时保留技能默认；h04：波/大波可点任一存活敌方，默认锁当前出战位。
+func _maybe_arm_enemy_targets(action: int) -> void:
 	var sk: HeroSkill = battle.get_skill(PLAYER, battle.active_index[PLAYER])
-	if sk == null or not sk.active_needs_enemy_target():
+	var include_active := false
+	var prompt := ""
+	if action == ACTIVE and sk != null and sk.active_needs_enemy_target():
+		prompt = tr("揪")
+	elif ActionDef.is_attack(action) and battle.can_target_any_enemy_with_base_attack(PLAYER):
+		include_active = true
+		prompt = tr("攻")
+	else:
 		return
 	_enemy_targeting = true
-	_enemy_target_pick = -1
-	for fi in [1, 2]:
+	_enemy_target_action = action
+	_enemy_target_pick = battle.active_index[AI] if include_active else -1
+	for fi in [0, 1, 2]:
 		var slot: int = p2_frame_slots[fi]
-		if slot >= 0 and slot != battle.active_index[AI] and battle.hp[AI][slot] > 0:
-			p2_frames[fi].set_switch_prompt(true, tr("揪"))   # 敌方存活替补：盖「揪」提示（文字/样式待 F6 调）
+		if slot >= 0 and battle.hp[AI][slot] > 0 \
+				and (include_active or slot != battle.active_index[AI]):
+			p2_frames[fi].set_switch_prompt(true, prompt)
+			p2_frames[fi].is_selected = slot == _enemy_target_pick
 
 
-## 敌方替补框点击（仅 h21 选目标态响应；平时 gate 掉 → 无副作用）：点存活敌方替补 → 设/换/取消揪目标。
+## 敌方头像框点击：h21 排除出战位且允许取消；h04 包含出战位并始终保持一个明确目标。
 func _on_enemy_frame_input(event: InputEvent, frame_idx: int) -> void:
 	if state != State.PLAYER_SELECT or not _enemy_targeting:
 		return
@@ -1671,26 +1720,30 @@ func _on_enemy_frame_input(event: InputEvent, frame_idx: int) -> void:
 	if mb == null or not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT:
 		return
 	var slot: int = p2_frame_slots[frame_idx]
-	if slot < 0 or slot == battle.active_index[AI] or battle.hp[AI][slot] <= 0:
-		return   # 出战位 / 空位 / 阵亡 → 不可揪
+	var is_attack_targeting := ActionDef.is_attack(_enemy_target_action)
+	if slot < 0 or battle.hp[AI][slot] <= 0 \
+			or (not is_attack_targeting and slot == battle.active_index[AI]):
+		return
 	if _enemy_target_pick == slot:
-		_enemy_target_pick = -1                    # 点已选 = 取消（回未选 → 提交走随机）
-		p2_frames[frame_idx].is_selected = false
+		if not is_attack_targeting:
+			_enemy_target_pick = -1                # h21 点已选 = 取消（提交走技能默认）
+			p2_frames[frame_idx].is_selected = false
 	else:
-		for fj in [1, 2]:
+		for fj in [0, 1, 2]:
 			p2_frames[fj].is_selected = false      # 单选：先清旧选中
 		_enemy_target_pick = slot
 		p2_frames[frame_idx].is_selected = true
 
 
-## 退出敌方目标选择态：清高亮 + 提示 + 记录（幂等·非 h21 态调用是 no-op）。
+## 退出敌方目标选择态：清高亮 + 提示 + 记录（幂等）。
 func _clear_enemy_targets() -> void:
 	if not _enemy_targeting and _enemy_target_pick < 0:
 		return
-	for fi in [1, 2]:
+	for fi in [0, 1, 2]:
 		p2_frames[fi].is_selected = false
 		p2_frames[fi].set_switch_prompt(false)
 	_enemy_targeting = false
+	_enemy_target_action = -1
 	_enemy_target_pick = -1
 
 
@@ -1706,7 +1759,7 @@ func _clear_enemy_targets() -> void:
 func _set_buttons_active(active: bool, dim_inactive: bool = true) -> void:
 	if not active:
 		_disarm_switch()   # 离开选择阶段 → 退出 armed「切换」态
-		_clear_enemy_targets()   # 离开选择阶段 → 退出 h21 敌方目标选择态
+		_clear_enemy_targets()   # 离开选择阶段 → 退出敌方英雄目标选择态
 		if btn_jifeng:
 			btn_jifeng.visible = false   # 结算/过场：藏疾风开关
 	# 底部 UI 始终可见。
@@ -2488,6 +2541,15 @@ func _on_debug_hit_fx(player: int, dmg_half: int) -> void:
 ## A 方案 juice：出招（攻击前冲 / 防御蓝闪沉身 / 攒上浮黄闪）→ 命中（白闪 + 斩击光
 ## + 伤害数字 + 震屏）。dmg/dead 为 [p0, p1]。无逐帧 attack/hit 动画，全靠代码表现。
 func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionary = {}) -> void:
+	var reserve_hits: Array = fx.get("reserve_hits", [{}, {}])
+	var reserve_blocks: Array = fx.get("reserve_blocks", [{}, {}])
+	var reserve_hit: Array[bool] = [
+		not (reserve_hits[0] as Dictionary).is_empty(),
+		not (reserve_hits[1] as Dictionary).is_empty()]
+	var reserve_dmg: Array[int] = [0, 0]
+	for p in 2:
+		for hit_data in (reserve_hits[p] as Dictionary).values():
+			reserve_dmg[p] += int((hit_data as Dictionary).get("amount", 0))
 	# 执行动作 → 镜头聚焦"冲突落点"（Eddy 2026-07-09 镜头规格）：双方都进攻=居中放大对撞（配震屏）；
 	# 仅对方进攻=偏左聚受击的己方；仅己方进攻=偏右聚受击的敌方；双方都未进攻=不推近。
 	var p1_off := _is_offense(a0, int(dmg[1]), bool(dead[1]))
@@ -2517,8 +2579,8 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 			_fx._fly_energy_motes(p, int(egain[p]))
 	# P3：仅"大波且确实打中（伤害/击杀）"时镜头前推蓄势，峰值正好落在 0.45*phase 后的命中瞬间，
 	# 与 stage.shake() + _hitstop 合拍（被挡的大波无 impact → 不触发，避免推近落空）。
-	var big_lands := (a0 == A.BIG_ATTACK and (int(dmg[1]) > 0 or bool(dead[1]))) \
-		or (a1 == A.BIG_ATTACK and (int(dmg[0]) > 0 or bool(dead[0])))
+	var big_lands := (a0 == A.BIG_ATTACK and (int(dmg[1]) > 0 or reserve_dmg[1] > 0 or bool(dead[1]))) \
+		or (a1 == A.BIG_ATTACK and (int(dmg[0]) > 0 or reserve_dmg[0] > 0 or bool(dead[0])))
 	if big_lands:
 		_big_attack_punch()
 	await get_tree().create_timer(action_phase_duration * 0.45).timeout
@@ -2531,6 +2593,12 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 	if int(dmg[0]) > 0 or bool(dead[0]):
 		_impact(0, int(dmg[0]), int(pen[0]))
 		any = true
+	for p in 2:
+		for slot_variant in (reserve_hits[p] as Dictionary):
+			var hit_data: Dictionary = reserve_hits[p][slot_variant]
+			_impact_reserve_slot(p, int(slot_variant), int(hit_data.get("amount", 0)),
+				int(hit_data.get("pen", 0)))
+			any = true
 	# ② 被挡拍（与命中同拍）：防守方盾感反馈——钢蓝火花+「被挡」飘字；大防挡大波更隆重。
 	var blocked: Array = fx.get("blocked", [false, false])
 	var block_big: Array = fx.get("block_big", [false, false])
@@ -2538,6 +2606,10 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 	for p in 2:
 		if bool(blocked[p]):
 			_fx._block_fx(p, bool(block_big[p]))
+			any_block = true
+		for slot_variant in (reserve_blocks[p] as Dictionary):
+			_impact_reserve_slot(p, int(slot_variant), 0, ActionDef.Pen.NORMAL, true,
+				bool(reserve_blocks[p][slot_variant]))
 			any_block = true
 	# ③ 治疗飘字（命中拍后微错开·避免与 -N 叠死）
 	var healed: Array = fx.get("healed", [0.0, 0.0])
@@ -2549,8 +2621,8 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 	for p in 2:
 		_fx._pop_tags(p, tags[p])
 	# ⑤ 方向性后坐：单侧受击=镜头朝受击方踢一脚（P0 左=-1/P1 右=+1）；双方同拍受击=对撞抵消不偏向。
-	var hit0 := int(dmg[0]) > 0 or bool(dead[0])
-	var hit1 := int(dmg[1]) > 0 or bool(dead[1])
+	var hit0 := int(dmg[0]) > 0 or reserve_hit[0] or bool(dead[0])
+	var hit1 := int(dmg[1]) > 0 or reserve_hit[1] or bool(dead[1])
 	var lethal := bool(dead[0]) or bool(dead[1])
 	if any:
 		var kick := (1.0 if hit1 else 0.0) - (1.0 if hit0 else 0.0)
@@ -2558,7 +2630,10 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 		stage.shake(SHAKE_BIG if (lethal or a0 == A.BIG_ATTACK or a1 == A.BIG_ATTACK) else SHAKE_HIT, kick)
 	elif any_block:
 		# 没打进也有"接触感"：轻震朝防守方踢（力被盾接住的方向感）
-		var bkick := (1.0 if bool(blocked[1]) else 0.0) - (1.0 if bool(blocked[0]) else 0.0)
+		var blocked_side: Array[bool] = [
+			bool(blocked[0]) or not (reserve_blocks[0] as Dictionary).is_empty(),
+			bool(blocked[1]) or not (reserve_blocks[1] as Dictionary).is_empty()]
+		var bkick := (1.0 if blocked_side[1] else 0.0) - (1.0 if blocked_side[0] else 0.0)
 		stage.shake(SHAKE_BLOCK, bkick)
 	# ①② 死亡节拍 v3（2026-07-18 Eddy 批 A 方案）：致命一击加重定格（盖过 _impact 常规档·
 	# token 后发覆盖），按真实时长等冻结放开 → 倒地独享一拍起播，不再被命中特效淹没。
@@ -2810,6 +2885,59 @@ func _impact(target_player: int, dmg_half: int, pen: int = 0) -> void:
 	if dmg_half > 0:
 		_fx._pop_damage(target_player, float(dmg_half) / 2.0, pen)
 	_hitstop(0.075 if big else 0.045)                 # c：命中定格（不 await，自管恢复）
+
+
+## 十方无次第命中或被挡时的替补局部反馈：只震对应头像框，不把结果错误演到中央出战角色身上。
+func _impact_reserve_slot(target_player: int, target_slot: int, dmg_half: int, pen: int = 0,
+		blocked: bool = false, blocked_big: bool = false) -> void:
+	var frames: Array[HeroFrame] = p1_frames if target_player == PLAYER else p2_frames
+	var frame_slots: Array[int] = p1_frame_slots if target_player == PLAYER else p2_frame_slots
+	var frame_idx: int = frame_slots.find(target_slot)
+	if frame_idx < 0 or frame_idx >= frames.size():
+		return
+	var frame: HeroFrame = frames[frame_idx]
+	if not frame.visible:
+		return
+
+	var base_modulate: Color = frame.modulate
+	var base_scale: Vector2 = frame.scale
+	frame.pivot_offset = frame.size * 0.5
+	var pulse := create_tween()
+	pulse.set_parallel(true)
+	var pulse_color := Color(0.62, 0.86, 1.45) if blocked else Color(1.55, 0.58, 0.50)
+	var pulse_scale := 1.10 if blocked_big else 1.08
+	pulse.tween_property(frame, "modulate", pulse_color, 0.08)
+	pulse.tween_property(frame, "scale", base_scale * pulse_scale, 0.08).set_trans(Tween.TRANS_BACK)
+	pulse.chain().set_parallel(true)
+	pulse.tween_property(frame, "modulate", base_modulate, 0.20)
+	pulse.tween_property(frame, "scale", base_scale, 0.20).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+	if dmg_half <= 0 and not blocked:
+		return
+	var damage_label := Label.new()
+	damage_label.name = "ReserveBlock" if blocked else "ReserveDamage"
+	damage_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	damage_label.text = tr("挡") if blocked else "-%s" % _fmt_hp(float(dmg_half) / 2.0)
+	damage_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	damage_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	damage_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	damage_label.z_index = 100
+	FontManager.apply(damage_label, 24)
+	var damage_color := BattleFxScript.COL_BLOCK_TEXT if blocked \
+		else (BattleFxScript.COL_DMG_BIG if dmg_half >= 4 else BattleFxScript.COL_DMG_SMALL)
+	if not blocked and pen == ActionDef.Pen.TRUE_DMG:
+		damage_color = BattleFxScript.COL_DMG_TRUE
+	elif not blocked and pen in [ActionDef.Pen.PIERCE_DEF, ActionDef.Pen.PIERCE_BIGDEF]:
+		damage_color = BattleFxScript.COL_DMG_PIERCE
+	damage_label.add_theme_color_override("font_color", damage_color)
+	damage_label.add_theme_color_override("font_outline_color", Color(0.12, 0.03, 0.02, 0.95))
+	damage_label.add_theme_constant_override("outline_size", 5)
+	frame.add_child(damage_label)
+	var float_up := create_tween()
+	float_up.set_parallel(true)
+	float_up.tween_property(damage_label, "position:y", -24.0, 0.42).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	float_up.tween_property(damage_label, "modulate:a", 0.0, 0.42).set_delay(0.12)
+	float_up.chain().tween_callback(damage_label.queue_free)
 
 
 

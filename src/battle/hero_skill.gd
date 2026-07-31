@@ -107,7 +107,19 @@ func attack_penetration(base_pen: int, _action: int, _battle: BattleCore, _playe
 	return base_pen
 
 
-## 本英雄一次攻击算作几次"命中"（on-hit 触发次数）。默认 1。尾火连扑返回 2（整体挡下、落地双 proc）。
+## 双方均使用基础攻击时的对攻优先级。仅唯一较高值先结算；同值保持同步独立结算。
+## 优先攻击实际击杀敌方攻击英雄后，引擎取消敌方本次基础攻击。默认 0。
+func base_attack_clash_priority() -> int:
+	return 0
+
+
+## 本英雄【出战、存活、未沉默】时，其基础「波 / 大波」是否可显式指定任一存活敌方英雄。
+## 默认 false；房日 h04【十方无次第】返回 true。目标选择与合法性由 BattleCore 统一收口。
+func can_target_any_enemy_with_base_attack() -> bool:
+	return false
+
+
+## 本英雄一次攻击算作几次"命中"（on-hit 触发次数）。默认 1。
 func hit_count(_action: int, _battle: BattleCore, _player: int, _slot: int) -> int:
 	return 1
 
@@ -124,9 +136,13 @@ func on_team_deal_hit(_battle: BattleCore, _player: int, _slot: int, _attacker_s
 	pass
 
 
-## 本英雄（出战）成功防御挡下一次攻击时触发（raw = 被挡攻击的伤害半点）。
-## 牛金（卸力反震：反弹被挡伤害的 50% 给攻击者）。
-func on_block(_battle: BattleCore, _player: int, _slot: int, _attacker_player: int, _attack_action: int, _raw: int) -> void:
+## 本英雄（出战）成功防御挡下一次攻击时触发。
+## attack_action / defense_action = 防御门所见的有效攻击类型 / 防守方原始选择（有效类型可能不同于攻击方原选招）；
+## raw = 被挡伤害半点；
+## src = "action"（基础或主动攻击）/ "item"（道具 hit）。
+## 牛金（挡招蓄团队强化波）/ 蚩尤（反弹被挡伤害的 50%）。
+func on_block(_battle: BattleCore, _player: int, _slot: int, _attacker_player: int,
+		_attack_action: int, _defense_action: int, _raw: int, _src: String) -> void:
 	pass
 
 
@@ -136,7 +152,7 @@ func on_self_damaged(_battle: BattleCore, _player: int, _slot: int, _dealt: int,
 	pass
 
 
-## 本英雄（出战时）给己方每次"获得能量"事件的额外加成（半能）。虚日囤鼠 override 返 1 半能（= 每次得能 +0.5）。
+## 本英雄（出战时）给己方每次"获得能量"事件的额外加成（半能）。虚日【步虚无有乡】override 返 1 半能（= 每次得能 +0.5）。
 func energy_gain_bonus(_battle: BattleCore, _player: int, _slot: int) -> int:
 	return 0
 
@@ -146,14 +162,6 @@ func energy_gain_bonus(_battle: BattleCore, _player: int, _slot: int) -> int:
 ## 默认 false；天狗 override。
 func is_lethal_guardian() -> bool:
 	return false
-
-
-## 「敌方重复动作产能」型（房日 h04【玉魄乘隙】·重做 2026-07-04）：本英雄【出战】(存活·未沉默) 时，
-## 敌方本回合动作与其上回合相同 → 己方【团队】能量 +本值（半能）。逐回合判定：敌方换动作立即断供；
-## 第 1 回合无上回合不触发；被迫动作也算重复。引擎在 resolve Phase 5.7 比对 _last_action 入账。
-## 默认 0（不产出）；房日 override 返回 1（= +0.5 能/次）。设计=连击奖励原语反向装到敌方（反龟杠杆）。
-func enemy_repeat_energy() -> int:
-	return 0
 
 
 ## 「牧养 / 休养生息」型（光版鬼金 h08）：本英雄在场（含替补·存活）时，你方退到【替补席】的存活英雄

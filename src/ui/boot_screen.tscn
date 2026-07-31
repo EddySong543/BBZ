@@ -1,43 +1,88 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene format=3 uid="uid://dfmalrmurrvaj"]
 
-[ext_resource type="Shader" path="res://assets/shaders/canvas_boot_wave_clash.gdshader" id="1"]
-[ext_resource type="Script" path="res://src/ui/boot_screen.gd" id="2"]
+[ext_resource type="Script" uid="uid://bf0uf4pe7gxj7" path="res://src/ui/boot_screen.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://dv7vuv6m258ew" path="res://src/ui/components/boot_character_idle.tscn" id="2_character"]
+[ext_resource type="Texture2D" uid="uid://c7c1bj3hiffqu" path="res://assets/ui/boot/title_bo_top.png" id="3_bo_top"]
+[ext_resource type="Texture2D" uid="uid://srppixk6tsqq" path="res://assets/ui/boot/title_bo_middle.png" id="4_bo_middle"]
+[ext_resource type="Texture2D" uid="uid://u64yxf1lqakw" path="res://assets/ui/boot/title_zan_bottom.png" id="5_zan_bottom"]
+[ext_resource type="Shader" uid="uid://bgdyem7t1ncxj" path="res://assets/shaders/canvas_boot_title_perspective.gdshader" id="6_title_shader"]
+[ext_resource type="Script" path="res://src/ui/components/boot_title_controller.gd" id="7_title_controller"]
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_1"]
-shader = ExtResource("1")
-shader_parameter/clash_pos = 0.5
-shader_parameter/aspect = 1.777
-shader_parameter/cells_x = 64.0
-shader_parameter/intensity = 1.0
-shader_parameter/pulse_l_x = 0.0
-shader_parameter/pulse_r_x = 1.0
-shader_parameter/pulse_amp = 1.0
-shader_parameter/center_amp = 0.0
-shader_parameter/wave_amp = 0.10
-shader_parameter/phase_l = 0.0
-shader_parameter/phase_r = 0.25
-shader_parameter/wave_time = 0.0
-shader_parameter/levels = 40
-shader_parameter/dither_amt = 1.0
-shader_parameter/hit_flash = 0.0
-shader_parameter/burst = 0.0
-shader_parameter/shake = Vector2(0, 0)
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_bo_top"]
+shader = ExtResource("6_title_shader")
+shader_parameter/perspective_strength = 0.26
+shader_parameter/edge_padding = 0.04
 
-[node name="BootScreen" type="Control"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_bo_middle"]
+shader = ExtResource("6_title_shader")
+shader_parameter/perspective_strength = 0.26
+shader_parameter/edge_padding = 0.04
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_zan_bottom"]
+shader = ExtResource("6_title_shader")
+shader_parameter/perspective_strength = 0.26
+shader_parameter/edge_padding = 0.04
+
+[node name="BootScreen" type="Control" unique_id=30656907]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("2")
+script = ExtResource("1_script")
 
-[node name="Wave" type="ColorRect" parent="."]
-material = SubResource("ShaderMaterial_1")
+[node name="Background" type="ColorRect" parent="." unique_id=1035413834]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0, 0, 0, 1)
+mouse_filter = 2
+color = Color(0.004, 0.003, 0.009, 1)
+
+[node name="TitleColumn" type="Control" parent="." unique_id=1774752000]
+anchors_preset = 0
+offset_left = 176.0
+offset_top = 146.0
+offset_right = 428.0
+offset_bottom = 934.0
+mouse_filter = 2
+script = ExtResource("7_title_controller")
+
+[node name="BoTop" type="TextureRect" parent="TitleColumn" unique_id=866388521]
+texture_filter = 1
+material = SubResource("ShaderMaterial_bo_top")
+layout_mode = 0
+offset_right = 252.0
+offset_bottom = 252.0
+mouse_filter = 2
+texture = ExtResource("3_bo_top")
+
+[node name="BoMiddle" type="TextureRect" parent="TitleColumn" unique_id=1501713029]
+texture_filter = 1
+material = SubResource("ShaderMaterial_bo_middle")
+layout_mode = 0
+offset_top = 268.0
+offset_right = 252.0
+offset_bottom = 520.0
+mouse_filter = 2
+texture = ExtResource("4_bo_middle")
+
+[node name="ZanBottom" type="TextureRect" parent="TitleColumn" unique_id=1880100326]
+texture_filter = 1
+material = SubResource("ShaderMaterial_zan_bottom")
+layout_mode = 0
+offset_top = 536.0
+offset_right = 252.0
+offset_bottom = 788.0
+mouse_filter = 2
+texture = ExtResource("5_zan_bottom")
+
+[node name="Character" parent="." unique_id=1898497878 instance=ExtResource("2_character")]
+layout_mode = 0
+offset_left = 374.99994
+offset_top = 32.0
+offset_right = 2052.9402
+offset_bottom = 1046.42

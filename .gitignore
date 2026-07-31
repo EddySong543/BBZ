@@ -90,6 +90,7 @@ export_presets.cfg
 *.temp
 *.cache
 *.log
+.superpowers/
 __pycache__/
 *.pyc
 node_modules/

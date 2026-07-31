@@ -2,9 +2,20 @@
 
 [ext_resource type="PackedScene" uid="uid://bn0rjf1qjld17" path="res://src/ui/battle_screen_base.tscn" id="1_base"]
 [ext_resource type="PackedScene" uid="uid://cs7yr6dmj3tme" path="res://src/ui/scenes/scene2.tscn" id="2_scene2"]
-[ext_resource type="Shader" path="res://assets/shaders/canvas_env_scene2_character_light.gdshader" id="3_5lo6j"]
+[ext_resource type="Shader" uid="uid://coh6cpqnfcar5" path="res://assets/shaders/canvas_env_scene2_character_light.gdshader" id="3_5lo6j"]
 [ext_resource type="Shader" uid="uid://dnycv6j3wn0ot" path="res://assets/shaders/post_fx_color_grade.gdshader" id="3_postfx"]
-[ext_resource type="Shader" path="res://assets/shaders/canvas_env_scene2_character_contact_shadow.gdshader" id="4_contact_shadow"]
+[ext_resource type="Shader" uid="uid://b3bjvf1k4trq8" path="res://assets/shaders/canvas_env_scene2_character_contact_shadow.gdshader" id="4_contact_shadow"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_aytjt"]
+resource_local_to_scene = true
+shader = ExtResource("4_contact_shadow")
+shader_parameter/shadow_color = Color(0.07, 0.16, 0.13, 0.62)
+shader_parameter/grid_cells = Vector2(40, 10)
+shader_parameter/alpha_levels = 4.0
+shader_parameter/core_strength = 0.16
+shader_parameter/contact_center_x = 0.56
+shader_parameter/tail_offset_x = -0.14
+shader_parameter/tail_strength = 0.18
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_8x02m"]
 shader = ExtResource("3_5lo6j")
@@ -46,17 +57,6 @@ shader_parameter/water_bounce_color = Color(0.42, 0.67, 0.59, 1)
 shader_parameter/water_bounce_amount = 0.0
 shader_parameter/water_bounce_start = 0.6
 
-[sub_resource type="ShaderMaterial" id="Scene2ContactShadowMat"]
-resource_local_to_scene = true
-shader = ExtResource("4_contact_shadow")
-shader_parameter/shadow_color = Color(0.07, 0.16, 0.13, 0.62)
-shader_parameter/grid_cells = Vector2(40, 10)
-shader_parameter/alpha_levels = 4.0
-shader_parameter/core_strength = 0.16
-shader_parameter/contact_center_x = 0.56
-shader_parameter/tail_offset_x = -0.14
-shader_parameter/tail_strength = 0.18
-
 [sub_resource type="ShaderMaterial" id="Scene2PostFXMat"]
 shader = ExtResource("3_postfx")
 shader_parameter/barrel_amount = 0.08
@@ -88,26 +88,22 @@ shader_parameter/impact_th_in = 0.13
 shader_parameter/impact_white = 0.86
 shader_parameter/impact_px = 3.0
 
-[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_5lo6j"]
-
-[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_8x02m"]
-
-[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_djd32"]
-
-[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_aytjt"]
-
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_hufmf"]
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_cq5pn"]
 
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_xdnfl"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_foqsq"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_or1rk"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_bv1oh"]
+
 [node name="BattleScreen2" unique_id=1117429460 instance=ExtResource("1_base")]
 character_reflections_enabled = true
 countdown_normal_color = Color(0.94902, 0.909804, 0.8, 1)
-countdown_outline_color = Color(0, 0, 0, 0.8)
-countdown_outline_size = 4
 countdown_ornament_color = Color(0.94902, 0.909804, 0.8, 1)
-countdown_ornament_underlay_color = Color(0.07, 0.04, 0.02, 0.88)
-countdown_ornament_underlay_width = 3.0
 
 [node name="Stage" parent="StageSlot" parent_id_path=PackedInt32Array(924300025) index="0" unique_id=1571872299 instance=ExtResource("2_scene2")]
 layout_mode = 1
@@ -117,7 +113,7 @@ demo_click_shake = false
 
 [node name="P1Shadow" parent="." index="3" unique_id=329774492]
 texture_filter = 1
-material = SubResource("Scene2ContactShadowMat")
+material = SubResource("ShaderMaterial_aytjt")
 offset_left = 414.0
 offset_top = 738.0
 offset_right = 546.0
@@ -127,7 +123,7 @@ pivot_offset = Vector2(66, 16)
 
 [node name="P2Shadow" parent="." index="4" unique_id=1318395873]
 texture_filter = 1
-material = SubResource("Scene2ContactShadowMat")
+material = SubResource("ShaderMaterial_aytjt")
 offset_left = 1374.0
 offset_top = 738.0
 offset_right = 1506.0
@@ -150,7 +146,7 @@ fill_amount = 0.0
 [node name="AnimatedSprite2D" parent="P1CharDisplay/SubViewport" parent_id_path=PackedInt32Array(1642938575, 1325957388) index="1" unique_id=1622338484]
 material = SubResource("ShaderMaterial_8x02m")
 scale = Vector2(2, 2)
-frame_progress = 0.81640154
+frame_progress = 0.33594528
 
 [node name="P2CharDisplay" parent="." index="6" unique_id=915119977]
 rim_color = Color(0.96, 0.82, 0.58, 1)
@@ -168,7 +164,7 @@ metadata/_edit_lock_ = true
 [node name="AnimatedSprite2D" parent="P2CharDisplay/SubViewport" parent_id_path=PackedInt32Array(915119977, 1325957388) index="1" unique_id=1622338484]
 material = SubResource("ShaderMaterial_djd32")
 scale = Vector2(2, 2)
-frame_progress = 0.81640154
+frame_progress = 0.33594528
 
 [node name="ForeDust" parent="." index="7" unique_id=844619574]
 metadata/_edit_lock_ = true
@@ -189,17 +185,17 @@ metadata/_edit_lock_ = true
 [node name="P1Frame0" parent="P1Hud" index="2" unique_id=2129820687]
 offset_right = 98.0
 offset_bottom = 76.0
-theme_override_styles/panel = SubResource("StyleBoxEmpty_5lo6j")
+theme_override_styles/panel = SubResource("StyleBoxEmpty_hufmf")
 
 [node name="P1Frame1" parent="P1Hud" index="3" unique_id=1566007647]
 offset_right = 744.0
 offset_bottom = 74.0
-theme_override_styles/panel = SubResource("StyleBoxEmpty_8x02m")
+theme_override_styles/panel = SubResource("StyleBoxEmpty_cq5pn")
 
 [node name="P1Frame2" parent="P1Hud" index="5" unique_id=1208252427]
 offset_right = 664.0
 offset_bottom = 74.0
-theme_override_styles/panel = SubResource("StyleBoxEmpty_djd32")
+theme_override_styles/panel = SubResource("StyleBoxEmpty_xdnfl")
 
 [node name="P2Hud" parent="." index="12" unique_id=1758094651]
 metadata/_edit_lock_ = true
@@ -207,17 +203,17 @@ metadata/_edit_lock_ = true
 [node name="P2Frame0" parent="P2Hud" index="2" unique_id=1770616061]
 offset_right = 1886.0
 offset_bottom = 76.0
-theme_override_styles/panel = SubResource("StyleBoxEmpty_aytjt")
+theme_override_styles/panel = SubResource("StyleBoxEmpty_foqsq")
 
 [node name="P2Frame1" parent="P2Hud" index="3" unique_id=1621653890]
 offset_right = 1258.0
 offset_bottom = 74.0
-theme_override_styles/panel = SubResource("StyleBoxEmpty_hufmf")
+theme_override_styles/panel = SubResource("StyleBoxEmpty_or1rk")
 
 [node name="P2Frame2" parent="P2Hud" index="5" unique_id=1695379356]
 offset_right = 1338.0
 offset_bottom = 74.0
-theme_override_styles/panel = SubResource("StyleBoxEmpty_cq5pn")
+theme_override_styles/panel = SubResource("StyleBoxEmpty_bv1oh")
 
 [node name="TimerLabel" parent="." index="13" unique_id=2111037196]
 metadata/_edit_lock_ = true

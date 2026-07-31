@@ -90,14 +90,14 @@ func test_h13_shuchao_whiteboard_attack_grants_nothing() -> void:
 
 
 func test_h13_shuchao_no_cap_per_turn() -> void:
-	# 一回合 4 个 proc 事件（毒爆 + 易伤 + 鸡剑意×2[虎双段]）→ 无封顶 → 4 次全计入(2.0 能)
-	var b := _battle_team(["h03", "h13", "h10"], 5, 8)   # 虎出战(hc=2) + 暗鼠替补 + 鸡替补
+	# 一回合 4 个 proc 事件（毒爆 + 易伤 + 龙破甲 + 鸡剑意）→ 无封顶 → 4 次全计入(2.0 能)
+	var b := _battle_team(["h05", "h13", "h10"], 5, 8)   # 龙出战 + 暗鼠替补 + 鸡替补
 	b.set_status(1, 0, "poison", 1)   # 敌出战预置毒(待引爆)
 	b.set_status(1, 0, "marked", 1)   # 敌出战预置易伤
-	b.select_action(0, ActionDef.Action.ATTACK)   # 虎波
+	b.select_action(0, ActionDef.Action.ATTACK)   # 龙波
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(b._shuchao_procs[0], 4, "4 个 proc 事件(毒爆/易伤/鸡剑意×2) → 无封顶·全计 4 次(旧封顶 3)")
+	assert_eq(b._shuchao_procs[0], 4, "4 个 proc 事件(毒爆/易伤/龙破甲/鸡剑意) → 无封顶·全计 4 次(旧封顶 3)")
 
 
 # ---- h14 蚩尤 卸力反震（防/大防挡下 → 反弹所挡 50% 真伤·批③起走管线打击喂原语）----
@@ -339,13 +339,13 @@ func test_silence_status_disables_unique_and_decrements() -> void:
 	b.select_action(0, ActionDef.Action.CHARGE)
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(b.energy[1], 8 + 4, "沉默中：攒+2 +被动+2（囤鼠加成失效）")
+	assert_eq(b.energy[1], 8 + 4, "沉默中：攒+2 +被动+2（步虚无有乡加成失效）")
 	assert_eq(int(b.get_status(1, 0, "silenced", 0)), 0, "沉默递减到期")
 	var before: int = b.energy[1]
 	b.select_action(0, ActionDef.Action.CHARGE)
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(b.energy[1] - before, 5, "到期恢复：攒(2+囤鼠1) + 被动 2 = +5")
+	assert_eq(b.energy[1] - before, 5, "到期恢复：攒(2+步虚无有乡1) + 被动 2 = +5")
 
 
 # ---- h18 相柳 缠绕（出战时对手无法主动切换；死亡换人不受影响）----

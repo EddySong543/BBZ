@@ -25,6 +25,11 @@
 [ext_resource type="Shader" uid="uid://42gb8epy0ibb" path="res://assets/shaders/canvas_env_night_foliage.gdshader" id="37_foliage"]
 [ext_resource type="Texture2D" uid="uid://duss4na41xb0p" path="res://assets/scenes/scene1/scene1_bamboo_far_left.png" id="38_bamboo_far_left"]
 [ext_resource type="Texture2D" uid="uid://dngi341uaiyt2" path="res://assets/scenes/scene1/scene1_bamboo_far_right.png" id="39_bamboo_far_right"]
+[ext_resource type="Shader" uid="uid://bbrxa00nu7pus" path="res://assets/shaders/canvas_env_scene1_bamboo_leaf_sway.gdshader" id="40_bamboo_sway"]
+[ext_resource type="Texture2D" uid="uid://f3xddgenudsw" path="res://assets/scenes/scene1/scene1_bamboo_left_leaf_mask.png" id="41_bamboo_left_mask"]
+[ext_resource type="Texture2D" uid="uid://ffe85dmhrg1a" path="res://assets/scenes/scene1/scene1_bamboo_left_underpaint.png" id="42_bamboo_left_underpaint"]
+[ext_resource type="Texture2D" uid="uid://b1dy4xgvojrf8" path="res://assets/scenes/scene1/scene1_bamboo_right_leaf_mask.png" id="43_bamboo_right_mask"]
+[ext_resource type="Texture2D" uid="uid://d3o3pu5o3575i" path="res://assets/scenes/scene1/scene1_bamboo_right_underpaint.png" id="44_bamboo_right_underpaint"]
 
 [sub_resource type="ShaderMaterial" id="SkyMat"]
 shader = ExtResource("3_sky")
@@ -253,43 +258,51 @@ shader_parameter/brightness = 1.0
 
 [sub_resource type="ShaderMaterial" id="BambooLeftMat"]
 resource_local_to_scene = true
-shader = ExtResource("37_foliage")
+shader = ExtResource("40_bamboo_sway")
+shader_parameter/leaf_mask = ExtResource("41_bamboo_left_mask")
+shader_parameter/underpaint_texture = ExtResource("42_bamboo_left_underpaint")
+shader_parameter/red_pivot = Vector2(0.546875, 0.12109375)
+shader_parameter/green_pivot = Vector2(0.734375, 0.19140625)
+shader_parameter/motion_fps = 6.0
+shader_parameter/cycle_sec = 8.5
+shader_parameter/red_angle_deg = 0.8
+shader_parameter/green_angle_deg = 0.95
+shader_parameter/phase_offset = 0.4
 shader_parameter/night_tint = Color(0.34, 0.5, 0.8, 1)
 shader_parameter/tint_strength = 0.72
 shader_parameter/saturation = 0.32
 shader_parameter/brightness = 0.76
 shader_parameter/alpha_scale = 1.0
-shader_parameter/blur_amount = 0.0
 shader_parameter/shadow_tint = Color(0.065, 0.09, 0.17, 1)
 shader_parameter/shadow_lift = 0.38
 shader_parameter/rim_tint = Color(0.42, 0.66, 1, 1)
 shader_parameter/rim_strength = 0.22
 shader_parameter/rim_side = 1.0
 shader_parameter/rim_width = 2.0
-shader_parameter/background_key_strength = 0.0
-shader_parameter/background_key_luma_min = 0.86
-shader_parameter/background_key_luma_max = 0.95
-shader_parameter/background_key_chroma_max = 0.08
 
 [sub_resource type="ShaderMaterial" id="BambooRightMat"]
 resource_local_to_scene = true
-shader = ExtResource("37_foliage")
+shader = ExtResource("40_bamboo_sway")
+shader_parameter/leaf_mask = ExtResource("43_bamboo_right_mask")
+shader_parameter/underpaint_texture = ExtResource("44_bamboo_right_underpaint")
+shader_parameter/red_pivot = Vector2(0.484375, 0.390625)
+shader_parameter/green_pivot = Vector2(0.484375, 0.56640625)
+shader_parameter/motion_fps = 6.0
+shader_parameter/cycle_sec = 8.5
+shader_parameter/red_angle_deg = 0.75
+shader_parameter/green_angle_deg = 0.9
+shader_parameter/phase_offset = 2.6
 shader_parameter/night_tint = Color(0.34, 0.5, 0.8, 1)
 shader_parameter/tint_strength = 0.72
 shader_parameter/saturation = 0.32
 shader_parameter/brightness = 0.72
 shader_parameter/alpha_scale = 1.0
-shader_parameter/blur_amount = 0.0
 shader_parameter/shadow_tint = Color(0.065, 0.09, 0.17, 1)
 shader_parameter/shadow_lift = 0.38
 shader_parameter/rim_tint = Color(0.42, 0.66, 1, 1)
 shader_parameter/rim_strength = 0.22
 shader_parameter/rim_side = -1.0
 shader_parameter/rim_width = 2.0
-shader_parameter/background_key_strength = 0.0
-shader_parameter/background_key_luma_min = 0.86
-shader_parameter/background_key_luma_max = 0.95
-shader_parameter/background_key_chroma_max = 0.08
 
 [sub_resource type="ShaderMaterial" id="RfRFocusMat"]
 shader = ExtResource("20_boxblur")

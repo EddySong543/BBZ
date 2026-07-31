@@ -45,112 +45,585 @@ func _battle_team(p0_ids: Array, hp: int = 5, e: int = 8) -> BattleCore:
 	return b
 
 
+func _battle_teams(p0_ids: Array, p1_ids: Array, hp: int = 5, e: int = 8) -> BattleCore:
+	var p0_team: Array = []
+	var p1_team: Array = []
+	for id in p0_ids:
+		p0_team.append(_hero(id, hp))
+	for id in p1_ids:
+		p1_team.append(_hero(id, hp))
+	var b := BattleCore.new()
+	b.setup(p0_team, p1_team, 555)
+	b.energy = [e, e]
+	return b
+
+
+func _has_event(result: Dictionary, event_id: String, player: int = -1) -> bool:
+	for event in result.get("events", []):
+		if String(event.get("id", "")) == event_id and (player < 0 or int(event.get("player", -1)) == player):
+			return true
+	return false
+
+
 func _resolve(b: BattleCore, a0: int, a1: int) -> void:
 	b.select_action(0, a0)
 	b.select_action(1, a1)
 	b.resolve()
 
 
-# ---- h01 虚日 囤鼠（出战时己方主动来源得能 +0.5 能=+1 半能·2026-07-04 起被动收入不吃加成）----
+# ---- h01 虚日 步虚无有乡（在场时己方主动来源得能 +0.5 能=+1 半能·回合被动能量不吃加成）----
 
 func test_h01_dunshu_adds_half_to_every_energy_gain() -> void:
 	var b := _battle("h01", 5, 8)
 	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.CHARGE)
-	# 虚日：攒(2+囤鼠1) + 被动(2·白给收入不加成·2026-07-04) = +5 半能
-	assert_eq(b.energy[0], 8 + 5, "虚日囤鼠：攒 +3 + 被动 +2（被动不加成）= +5 半能")
+	# 虚日：攒(2+步虚无有乡1) + 被动(2·回合被动能量不加成·2026-07-04) = +5 半能
+	assert_eq(b.energy[0], 8 + 5, "虚日步虚无有乡：攒 +3 + 被动 +2（回合被动能量不加成）= +5 半能")
 	# 对照 plain：攒2 + 被动2 = +4
 	assert_eq(b.energy[1], 8 + 4, "plain 对照：攒 +2 + 被动 +2 = +4 半能")
 
 
-# ---- h02 牛金 卸劲（挨打 → 随机一名存活队友 +0.5HP 护盾·批⑥随机发放·无封顶·自己不获）----
+# ---- h02 牛金 山河借骨回天法（挡下波/大波 → 己方下次波升级为大波）----
 
-func test_h02_xiejin_shields_exactly_one_ally_when_damaged() -> void:
-	# 牛金(出战 HP7)攒(不防)挨对手波 → 恰好一名队友获 1 层盾(随机挑·battle.rng 可复现)；牛金自己不获
-	var b := _battle_team(["h02", "test_p1_1", "test_p1_2"], 7, 8)
-	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.ATTACK)
-	assert_eq(b.hp[0][0], 14 - 2, "牛金挨波 2 半点(没防=诱饵盾)")
-	assert_eq(b.shield[0][1] + b.shield[0][2], 1, "两替补合计恰好 1 层盾(随机单人发放)")
-	assert_eq(b.shield[0][0], 0, "牛金自己不获盾(卸给队友)")
+func test_h02_blocking_wave_upgrades_next_wave_to_big_wave() -> void:
+	var b := _battle_team(["h02", "test_p1_1", "test_p1_2"], 7, 20)
+	_resolve(b, ActionDef.Action.DEFEND, ActionDef.Action.ATTACK)
+	assert_eq(b.hp[0][0], 14, "防挡下波，牛金不受伤")
+	assert_true(b.upgrade_next_wave[0], "成功挡下波后应留下团队升级")
+	b.energy[0] = 6
+	var energy_before: int = b.energy[0]
 
-
-func test_h02_xiejin_shield_goes_to_sole_living_ally() -> void:
-	# 批⑥回归：只剩一名存活队友 → 随机域=1·盾必发给它（死队友不占随机位）
-	var b := _battle_team(["h02", "test_p1_1", "test_p1_2"], 7, 8)
-	b.hp[0][2] = 0   # Arrange：替补2 阵亡
-	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.ATTACK)
-	assert_eq(b.shield[0][1], 1, "唯一存活替补必获盾")
-	assert_eq(b.shield[0][2], 0, "阵亡替补不获盾")
-
-
-func test_h02_xiejin_shield_accumulates_uncapped() -> void:
-	# 连续三回合挨打 → 全队护盾总量无封顶累积(3 半点=1.5HP·分布随机)·2026-07-01 废除封顶
-	var b := _battle_team(["h02", "test_p1_1", "test_p1_2"], 7, 12)
-	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.ATTACK)
-	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.ATTACK)
-	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.ATTACK)
-	assert_eq(b.shield[0][1] + b.shield[0][2], 3, "三次挨打→全队护盾合计 3 半点(1.5HP·无封顶)")
-	assert_eq(b.shield[0][0], 0, "牛金自己始终不获盾")
-
-
-# ---- h03 尾火 连扑（hit_count=2 → 队友 on-hit 翻倍：喂鸡剑气 ×2）----
-
-func test_h03_lianpu_double_hit_feeds_two_jianqi() -> void:
-	# P0 = 虎(出战) + 鸡(替补)；虎命中 → 全队 on-hit 触发 2 次 → 鸡 +2 剑气
-	var b := _battle_team(["h03", "h10", "test_p1_2"], 5, 8)
 	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.CHARGE)
-	assert_eq(int(b.get_status(0, 1, "jianqi", 0)), 2, "虎双段 → 鸡(替补)攒 2 层剑气")
+	assert_eq(b.hp[1][0], 6, "下次波应按大波造成 4 半点伤害")
+	assert_eq(b.energy[0], energy_before, "升级波仍只支付波的 2 半能；回合被动恰好补回")
+	assert_eq(int(b.to_snapshot()["last_action"][0]), ActionDef.Action.ATTACK, "回合历史仍记录为波")
+	assert_false(b.upgrade_next_wave[0], "升级波尝试后立即消费")
 
 
-# ---- h04 房日（重做 2026-07-04：出战时敌方每重复一次上回合动作 → 我方 +0.5 能）----
-# 旧机制（登场护甲保底 + 道具锁 −1）已移除；HP 4→5。
+func test_h02_blocking_big_wave_arms_the_same_wave_upgrade() -> void:
+	var b := _battle_team(["h02", "test_p1_1", "test_p1_2"], 7, 20)
+	_resolve(b, ActionDef.Action.BIG_DEFEND, ActionDef.Action.BIG_ATTACK)
+	assert_eq(b.hp[0][0], 14, "大防挡下大波，牛金不受伤")
 
-func test_h04_repeat_energy_first_turn_no_trigger() -> void:
-	var b := _battle("h04", 5, 8)
-	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND)
-	# 第 1 回合无上回合可比对 → 只有 攒2 + 被动2
-	assert_eq(b.energy[0], 8 + 4, "第 1 回合不触发（无上回合）")
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.CHARGE)
+	assert_eq(b.hp[1][0], 6, "挡下大波后同样升级下一次波，而不是升级大波")
 
-func test_h04_repeat_energy_gains_when_enemy_repeats() -> void:
-	var b := _battle("h04", 5, 8)
-	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND)
-	var e1: int = b.energy[0]
-	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND)   # 敌方重复「防」
-	assert_eq(b.energy[0], e1 + 5, "敌方重复上回合动作 → 攒2+被动2+重复产能1 = +5 半能")
 
-func test_h04_repeat_energy_stops_when_enemy_varies() -> void:
-	var b := _battle("h04", 5, 8)
-	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND)
-	var e1: int = b.energy[0]
-	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.CHARGE)   # 敌方换动作 → 断供
-	assert_eq(b.energy[0], e1 + 4, "敌方换动作 → 只有攒2+被动2、无产能")
+func test_h02_big_defend_blocking_wave_also_arms_upgrade() -> void:
+	var b := _battle_team(["h02", "test_p1_1", "test_p1_2"], 7, 20)
+	_resolve(b, ActionDef.Action.BIG_DEFEND, ActionDef.Action.ATTACK)
 
-func test_h04_repeat_energy_pays_each_consecutive_repeat() -> void:
-	var b := _battle("h04", 5, 0)   # 低起手能量·避免三回合累积撞 MAX_ENERGY=20 半能上限
-	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND)
-	var e1: int = b.energy[0]
-	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND)   # 重复 1 → +1
-	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND)   # 重复 2 → +1
-	assert_eq(b.energy[0], e1 + 10, "连防三回合 → 第 2/3 回合各产能 1（逐回合判定）")
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.DEFEND)
+	assert_eq(b.hp[1][0], 6, "技能只要求挡下攻击；大防挡波也应升级下一次波")
 
-func test_h04_repeat_energy_inactive_from_reserve() -> void:
-	# 房日在替补席 → 光环不生效（出战限定）
-	var b := _battle_team(["test_p1_0", "h04", "test_p1_2"], 5, 8)
-	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND)
-	var e1: int = b.energy[0]
-	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND)   # 敌方重复但房日未出战
-	assert_eq(b.energy[0], e1 + 4, "房日在替补席 → 敌方重复不产能")
 
-func test_h04_repeat_energy_counts_switch_as_action() -> void:
-	# 「动作」含切换：敌方连续两回合切换 = 重复
-	var b := _battle("h04", 5, 8)
-	b.select_action(0, ActionDef.Action.CHARGE)
+func test_h02_failed_defend_against_big_wave_does_not_arm_upgrade() -> void:
+	var b := _battle_team(["h02", "test_p1_1", "test_p1_2"], 7, 20)
+	_resolve(b, ActionDef.Action.DEFEND, ActionDef.Action.BIG_ATTACK)
+	assert_eq(b.hp[0][0], 10, "防挡不住大波")
+
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.DEFEND)
+	assert_eq(b.hp[1][0], 10, "没有成功挡下攻击，就不产生升级")
+
+
+func test_h02_upgrade_survives_switch_and_can_be_used_by_teammate() -> void:
+	var b := _battle_team(["h02", "test_p1_1", "test_p1_2"], 7, 20)
+	_resolve(b, ActionDef.Action.DEFEND, ActionDef.Action.ATTACK)
+
+	b.select_switch(0, 1)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(b.active_index[0], 1, "牛金切下、队友上场")
+
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.DEFEND)
+	assert_eq(b.hp[1][0], 6, "升级属于全队，队友的波按大波伤害并穿防")
+
+
+func test_h02_upgrade_is_consumed_once_by_next_wave() -> void:
+	var b := _battle_team(["h02", "test_p1_1", "test_p1_2"], 7, 20)
+	_resolve(b, ActionDef.Action.DEFEND, ActionDef.Action.ATTACK)
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.DEFEND)
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.DEFEND)
+	assert_eq(b.hp[1][0], 6, "第一发升级波造成 4 半点；第二发普通波重新被防挡下")
+
+
+func test_h02_normal_big_wave_does_not_consume_wave_upgrade() -> void:
+	var b := _battle_team(["h02", "test_p1_1", "test_p1_2"], 7, 20)
+	_resolve(b, ActionDef.Action.DEFEND, ActionDef.Action.ATTACK)
+	_resolve(b, ActionDef.Action.BIG_ATTACK, ActionDef.Action.CHARGE)
+	assert_true(b.upgrade_next_wave[0], "普通大波不消费下一次波升级")
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.DEFEND)
+	assert_eq(b.hp[1][0], 2, "普通大波先打 4 半点但不消费；之后升级波再打 4 半点")
+
+
+func test_h02_upgraded_wave_is_blocked_by_big_defend_and_consumed() -> void:
+	var b := _battle_team(["h02", "test_p1_1", "test_p1_2"], 7, 20)
+	_resolve(b, ActionDef.Action.DEFEND, ActionDef.Action.ATTACK)
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.BIG_DEFEND)
+	assert_false(b.upgrade_next_wave[0], "升级波被大防挡住也会消费")
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.DEFEND)
+	assert_eq(b.hp[1][0], 10, "升级波只到大波档：大防挡住并消费，后续普通波也被防挡住")
+
+
+func test_h02_blocked_item_hit_does_not_arm_upgrade() -> void:
+	var b := _battle_team(["h02", "test_p1_1", "test_p1_2"], 7, 20)
+	var item_index: int = b.give_item(1, ItemCatalog.make("t1_feibiao"))
+	b.use_item(1, item_index)
+	_resolve(b, ActionDef.Action.DEFEND, ActionDef.Action.CHARGE)
+
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.DEFEND)
+	assert_eq(b.hp[1][0], 10, "防挡下道具 hit 不等于挡下波，不得升级后续波")
+
+
+func test_h02_blocked_attack_active_does_not_arm_upgrade() -> void:
+	var p1: Array = [_hero("h02", 7), _hero("test_p1_1"), _hero("test_p1_2")]
+	var p2: Array = [_hero("h10"), _hero("test_p2_1"), _hero("test_p2_2")]
+	var b := BattleCore.new()
+	b.setup(p1, p2, 555)
+	b.energy = [20, 20]
+	b.set_status(1, 0, "jianqi", 1)
+	b.select_action(0, ActionDef.Action.BIG_DEFEND)
+	assert_true(b.select_active(1), "昴日有剑气时可用攻击型主动技")
+	b.resolve()
+	assert_false(b.upgrade_next_wave[0], "挡下攻击型主动技不触发山河借骨回天法")
+
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.DEFEND)
+	assert_eq(b.hp[1][0], 10, "未触发升级时，后续普通波仍被防挡住")
+
+
+func test_h02_upgraded_wave_keeps_wave_identity_for_item_checks() -> void:
+	var b := _battle_team(["h02", "test_p1_1", "test_p1_2"], 7, 20)
+	_resolve(b, ActionDef.Action.DEFEND, ActionDef.Action.ATTACK)
+	b.energy[0] = 6
+	var item_index: int = b.give_item(0, ItemCatalog.make("t2_baolie"))
+	b.use_item(0, item_index)
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.CHARGE)
+	assert_eq(b.energy[0], 6, "爆裂卷轴只认原选招大波，不应给升级波减费")
+	assert_eq(b.hp[1][0], 6, "道具不改选招身份，但升级 hit 仍按大波造成伤害")
+
+
+func test_h02_wave_nullified_by_decoy_still_consumes_upgrade() -> void:
+	var b := _battle_team(["h02", "test_p1_1", "test_p1_2"], 7, 20)
+	_resolve(b, ActionDef.Action.DEFEND, ActionDef.Action.ATTACK)
+
+	var item_index: int = b.give_item(1, ItemCatalog.make("t2_caoren"))
+	b.use_item(1, item_index)
+	b.select_action(0, ActionDef.Action.ATTACK)
 	b.select_switch(1, 1)
 	b.resolve()
-	var e1: int = b.energy[0]
-	b.select_action(0, ActionDef.Action.CHARGE)
-	b.select_switch(1, 0)
+	assert_eq(b.hp[1][1], 10, "替身草人令升级波落空")
+	assert_false(b.upgrade_next_wave[0], "升级波落空仍会消费")
+
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.DEFEND)
+	assert_eq(b.hp[1][1], 10, "落空已经消费升级，下一次普通波被防挡下")
+
+
+func test_h02_upgrade_applies_to_both_h16_double_wave_hits() -> void:
+	var b := _battle_team(["h02", "h16", "test_p1_2"], 7, 20)
+	_resolve(b, ActionDef.Action.DEFEND, ActionDef.Action.ATTACK)
+	b.select_switch(0, 1)
+	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(b.energy[0], e1 + 5, "敌方连续切换（同为切换动作）→ 视为重复、产能 1")
+
+	b.select_action(0, ActionDef.Action.ATTACK)
+	assert_true(b.select_double(0, true), "广寒出战时可把升级波再做一次")
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_eq(b.hp[1][0], 2, "疾风复制同一升级波：两段都按大波各造成 4 半点")
+	assert_false(b.upgrade_next_wave[0], "疾风双段只消费同一个升级状态")
+
+
+func test_h02_upgrade_and_h22_omen_can_resolve_together() -> void:
+	var b := _battle_team(["h02", "h22", "test_p1_2"], 7, 20)
+	_resolve(b, ActionDef.Action.DEFEND, ActionDef.Action.ATTACK)
+	b.select_switch(0, 1)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_true(b.select_active(0), "毕方蓄出焚天火兆")
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+	assert_true(b.upgrade_next_wave[0], "牛金留下的波升级仍在")
+	assert_true(b.pierce_next_attack[0], "毕方留下的穿大防火兆同时存在")
+
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.BIG_DEFEND)
+	assert_eq(b.hp[1][0], 6, "升级提供大波伤害，火兆再让这发升级波穿过大防")
+	assert_false(b.upgrade_next_wave[0], "波升级在这次波上消费")
+	assert_false(b.pierce_next_attack[0], "火兆与升级波在同一次波上各自消费")
+
+
+func test_h02_can_rearm_after_blocking_an_enemy_upgraded_wave() -> void:
+	var p1: Array = [_hero("h02", 7), _hero("test_p1_1"), _hero("test_p1_2")]
+	var p2: Array = [_hero("h02", 7), _hero("test_p2_1"), _hero("test_p2_2")]
+	var b := BattleCore.new()
+	b.setup(p1, p2, 555)
+	b.energy = [20, 20]
+	_resolve(b, ActionDef.Action.DEFEND, ActionDef.Action.ATTACK)
+
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.BIG_DEFEND)
+	assert_false(b.upgrade_next_wave[0], "进攻方升级波已被大防挡住并消费")
+	assert_true(b.upgrade_next_wave[1], "防守方挡下的原选招仍是基础波，应为自己蓄出升级")
+
+	_resolve(b, ActionDef.Action.DEFEND, ActionDef.Action.ATTACK)
+	assert_eq(b.hp[0][0], 10, "防守方蓄出的升级波按大波穿过普通防并造成 4 半点")
+
+
+func test_h02_taking_damage_no_longer_grants_shield() -> void:
+	var b := _battle_team(["h02", "test_p1_1", "test_p1_2"], 7, 20)
+	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.ATTACK)
+	assert_eq(b.shield[0][0] + b.shield[0][1] + b.shield[0][2], 0,
+		"旧版受伤发盾机制应完全移除")
+
+
+# ---- h03 尾火 白额雷音（基础攻击对攻先制；致死则取消敌方基础攻击）----
+
+func test_h03_baieleiyin_no_longer_doubles_on_hit() -> void:
+	var b := _battle_team(["h03", "h10", "test_p1_2"], 5, 8)
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.CHARGE)
+	assert_eq(int(b.get_status(0, 1, "jianqi", 0)), 1,
+		"白额雷音不再拆分命中，鸡只获得 1 层剑气")
+
+
+func test_h03_nonlethal_base_attack_clash_keeps_both_attacks() -> void:
+	for pair in [
+		[ActionDef.Action.ATTACK, ActionDef.Action.ATTACK, 2, 2],
+		[ActionDef.Action.ATTACK, ActionDef.Action.BIG_ATTACK, 4, 2],
+		[ActionDef.Action.BIG_ATTACK, ActionDef.Action.ATTACK, 2, 4],
+		[ActionDef.Action.BIG_ATTACK, ActionDef.Action.BIG_ATTACK, 4, 4],
+	]:
+		var b := _battle("h03", 5, 20)
+		var hp0: int = b.hp[0][0]
+		var hp1: int = b.hp[1][0]
+		b.select_action(0, int(pair[0]))
+		b.select_action(1, int(pair[1]))
+		var result: Dictionary = b.resolve()
+		assert_eq(b.hp[0][0], hp0 - int(pair[2]), "非致死时敌方攻击照常结算")
+		assert_eq(b.hp[1][0], hp1 - int(pair[3]), "尾火攻击照常结算")
+		assert_false(_has_event(result, "base_attack_cancelled"), "非致死不得断招")
+
+
+func test_h03_lethal_base_attack_clash_cancels_from_p1_side_for_all_pairings() -> void:
+	for pair in [
+		[ActionDef.Action.ATTACK, ActionDef.Action.ATTACK],
+		[ActionDef.Action.ATTACK, ActionDef.Action.BIG_ATTACK],
+		[ActionDef.Action.BIG_ATTACK, ActionDef.Action.ATTACK],
+		[ActionDef.Action.BIG_ATTACK, ActionDef.Action.BIG_ATTACK],
+	]:
+		var b := _battle_teams(
+			["test_p0_0", "test_p0_1", "test_p0_2"],
+			["h03", "test_p1_1", "test_p1_2"], 5, 20)
+		b.hp[0][0] = 1
+		var tiger_hp: int = b.hp[1][0]
+		b.select_action(0, int(pair[0]))
+		b.select_action(1, int(pair[1]))
+		var result: Dictionary = b.resolve()
+		assert_lte(b.hp[0][0], 0, "P1 尾火应先击杀敌方攻击英雄")
+		assert_eq(b.hp[1][0], tiger_hp, "致死后敌方基础攻击应被取消")
+		assert_true(_has_event(result, "base_attack_cancelled", 0), "应记录 P0 基础攻击被断")
+
+
+func test_h03_lethal_base_attack_clash_cancels_from_p0_side() -> void:
+	var b := _battle("h03", 5, 20)
+	b.hp[1][0] = 1
+	var tiger_hp: int = b.hp[0][0]
+	b.select_action(0, ActionDef.Action.ATTACK)
+	b.select_action(1, ActionDef.Action.BIG_ATTACK)
+	var result: Dictionary = b.resolve()
+	assert_lte(b.hp[1][0], 0, "P0 尾火应先击杀敌方攻击英雄")
+	assert_eq(b.hp[0][0], tiger_hp, "P0 尾火致死后不受敌方大波反击")
+	assert_true(_has_event(result, "base_attack_cancelled", 1), "应记录 P1 基础攻击被断")
+
+
+func test_h03_mirror_keeps_simultaneous_resolution() -> void:
+	var b := _battle_teams(
+		["h03", "test_p0_1", "test_p0_2"],
+		["h03", "test_p1_1", "test_p1_2"], 5, 20)
+	b.hp[0][0] = 2
+	b.hp[1][0] = 2
+	b.select_action(0, ActionDef.Action.ATTACK)
+	b.select_action(1, ActionDef.Action.ATTACK)
+	var result: Dictionary = b.resolve()
+	assert_lte(b.hp[0][0], 0, "同优先级镜像应保留同步结算")
+	assert_lte(b.hp[1][0], 0, "同优先级镜像应允许同拍双倒")
+	assert_false(_has_event(result, "base_attack_cancelled"), "同优先级不得按玩家座位断招")
+
+
+func test_h03_in_reserve_does_not_grant_team_priority() -> void:
+	var b := _battle_teams(
+		["test_p0_0", "h03", "test_p0_2"],
+		["test_p1_0", "test_p1_1", "test_p1_2"], 5, 20)
+	b.hp[1][0] = 1
+	var p0_hp: int = b.hp[0][0]
+	b.select_action(0, ActionDef.Action.ATTACK)
+	b.select_action(1, ActionDef.Action.ATTACK)
+	var result: Dictionary = b.resolve()
+	assert_eq(b.hp[0][0], p0_hp - 2, "替补尾火不能让出战白板断掉敌方攻击")
+	assert_false(_has_event(result, "base_attack_cancelled"), "替补技能不得触发")
+
+
+func test_h03_shield_prevents_kill_so_enemy_attack_resolves() -> void:
+	var b := _battle("h03", 5, 20)
+	b.hp[1][0] = 1
+	b.shield[1][0] = 2
+	var tiger_hp: int = b.hp[0][0]
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.ATTACK)
+	assert_eq(b.hp[1][0], 1, "护盾吸收后敌方攻击英雄仍存活")
+	assert_eq(b.hp[0][0], tiger_hp - 2, "未实际击杀时敌方攻击照常结算")
+
+
+func test_h03_huanhun_prevents_kill_so_enemy_attack_resolves() -> void:
+	var b := _battle("h03", 5, 20)
+	b.hp[1][0] = 1
+	var item_index: int = b.give_item(1, ItemCatalog.make("t2_huanhundan"))
+	assert_true(b.use_item(1, item_index), "敌方应可使用还魂丹")
+	var tiger_hp: int = b.hp[0][0]
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.ATTACK)
+	assert_eq(b.hp[1][0], 1, "还魂应让敌方攻击英雄保留 0.5 HP")
+	assert_eq(b.hp[0][0], tiger_hp - 2, "还魂成功后敌方攻击照常结算")
+
+
+func test_h03_lethal_priority_cancels_only_base_attack_not_item_hit() -> void:
+	var b := _battle("h03", 5, 20)
+	b.hp[1][0] = 1
+	var item_index: int = b.give_item(1, ItemCatalog.make("t1_feibiao"))
+	assert_true(b.use_item(1, item_index), "敌方应可使用飞镖")
+	var tiger_hp: int = b.hp[0][0]
+	b.select_action(0, ActionDef.Action.ATTACK)
+	b.select_action(1, ActionDef.Action.ATTACK)
+	var result: Dictionary = b.resolve()
+	assert_eq(b.hp[0][0], tiger_hp - 1, "敌方基础攻击被断，但动作前道具伤害仍应结算")
+	assert_true(_has_event(result, "base_attack_cancelled", 1), "敌方基础攻击应被断")
+
+
+func test_h03_own_pre_item_kill_does_not_count_as_skill_kill() -> void:
+	var b := _battle("h03", 5, 20)
+	b.hp[1][0] = 1
+	var item_index: int = b.give_item(0, ItemCatalog.make("t1_feibiao"))
+	assert_true(b.use_item(0, item_index), "尾火应可使用飞镖")
+	var tiger_hp: int = b.hp[0][0]
+	b.select_action(0, ActionDef.Action.ATTACK)
+	b.select_action(1, ActionDef.Action.ATTACK)
+	var result: Dictionary = b.resolve()
+	assert_eq(b.hp[0][0], tiger_hp - 2, "前置道具先击杀不归因于白额雷音，敌方攻击仍应结算")
+	assert_false(_has_event(result, "base_attack_cancelled"), "只有尾火基础攻击实际击杀才能断招")
+
+
+func test_h03_cancelled_wave_still_consumes_team_attack_buffs_and_cost() -> void:
+	var b := _battle_teams(
+		["h03", "test_p0_1", "test_p0_2"],
+		["test_p1_0", "h02", "h22"], 5, 20)
+	b.hp[1][0] = 1
+	b.upgrade_next_wave[1] = true
+	b.pierce_next_attack[1] = true
+	var enemy_energy_before: int = b.energy[1]
+	b.select_action(0, ActionDef.Action.ATTACK)
+	b.select_action(1, ActionDef.Action.ATTACK)
+	var result: Dictionary = b.resolve()
+	assert_true(_has_event(result, "base_attack_cancelled", 1), "敌方强化波应被白额雷音断招")
+	assert_false(b.upgrade_next_wave[1], "牛金留下的波升级在攻击尝试时消费，不因断招返还")
+	assert_false(b.pierce_next_attack[1], "毕方留下的火兆在攻击尝试时消费，不因断招返还")
+	assert_eq(b.energy[1], enemy_energy_before, "波照常付费；回合被动能量只抵消本次波费用")
+	assert_eq(int(b.to_snapshot()["last_action"][1]), ActionDef.Action.ATTACK,
+		"被断招仍记录原本提交的波，不改动作历史")
+
+
+func test_h03_attacks_gain_no_extra_penetration_against_big_defend() -> void:
+	for action in [ActionDef.Action.ATTACK, ActionDef.Action.BIG_ATTACK]:
+		var b := _battle("h03", 5, 20)
+		var enemy_hp: int = b.hp[1][0]
+		b.select_action(0, action)
+		b.select_action(1, ActionDef.Action.BIG_DEFEND)
+		var result: Dictionary = b.resolve()
+		assert_eq(b.hp[1][0], enemy_hp, "白额雷音只改对攻顺序，波和大波仍会被大防挡下")
+		assert_false(_has_event(result, "base_attack_cancelled"), "敌方未使用基础攻击时不能触发断招")
+
+
+func test_h03_lethal_priority_cancels_all_h16_double_attack_hits() -> void:
+	var b := _battle_teams(
+		["h03", "test_p0_1", "test_p0_2"],
+		["h16", "test_p1_1", "test_p1_2"], 5, 20)
+	b.hp[1][0] = 1
+	var tiger_hp: int = b.hp[0][0]
+	assert_true(b.select_action(0, ActionDef.Action.ATTACK))
+	assert_true(b.select_action(1, ActionDef.Action.ATTACK))
+	assert_true(b.select_double(1, true), "敌方广寒应可附加第二次波")
+	var result: Dictionary = b.resolve()
+	assert_eq(b.hp[0][0], tiger_hp, "广寒的两条基础攻击 hit 都应被取消")
+	assert_eq(int(b.get_status(1, 0, "jifeng_uses", 0)), 1, "已提交的疾风次数仍应消费")
+	assert_true(_has_event(result, "base_attack_cancelled", 1), "敌方双波应作为本次基础攻击被断")
+
+
+func test_h03_nonlethal_clash_keeps_both_h16_attack_hits() -> void:
+	var b := _battle_teams(
+		["h03", "test_p0_1", "test_p0_2"],
+		["h16", "test_p1_1", "test_p1_2"], 5, 20)
+	var tiger_hp: int = b.hp[0][0]
+	var enemy_hp: int = b.hp[1][0]
+	assert_true(b.select_action(0, ActionDef.Action.ATTACK))
+	assert_true(b.select_action(1, ActionDef.Action.ATTACK))
+	assert_true(b.select_double(1, true), "敌方广寒应可附加第二次波")
+	var result: Dictionary = b.resolve()
+	assert_eq(b.hp[0][0], tiger_hp - 4, "非致死时广寒的两条基础攻击 hit 都应结算")
+	assert_eq(b.hp[1][0], enemy_hp - 2, "尾火的先击照常造成一次波伤害")
+	assert_false(_has_event(result, "base_attack_cancelled"), "未实际击杀不得取消疾风双波")
+
+
+func test_h03_does_not_cancel_enemy_attack_active() -> void:
+	var b := _battle_teams(
+		["h03", "test_p0_1", "test_p0_2"],
+		["h10", "test_p1_1", "test_p1_2"], 5, 20)
+	b.hp[0][0] = 3
+	b.hp[1][0] = 1
+	b.set_status(1, 0, "jianqi", 1)
+	assert_true(b.select_action(0, ActionDef.Action.ATTACK))
+	assert_true(b.select_active(1), "昴日有剑气时应能通过正式入口提交攻击型主动技")
+	var result: Dictionary = b.resolve()
+	assert_lte(b.hp[1][0], 0, "尾火基础攻击照常击杀敌方")
+	assert_lte(b.hp[0][0], 0, "攻击型主动技不属于基础攻击对攻，仍按同步模型结算")
+	assert_false(_has_event(result, "base_attack_cancelled"), "攻击型主动技不得被白额雷音取消")
+
+
+func test_h03_lethal_guardian_rescue_keeps_enemy_attack() -> void:
+	var b := _battle_teams(
+		["h03", "test_p0_1", "test_p0_2"],
+		["test_p1_0", "h23", "test_p1_2"], 5, 20)
+	b.hp[1][0] = 1
+	var tiger_hp: int = b.hp[0][0]
+	b.select_action(0, ActionDef.Action.ATTACK)
+	b.select_action(1, ActionDef.Action.ATTACK)
+	var result: Dictionary = b.resolve()
+	assert_eq(b.hp[1][0], 1, "天狗护主应救下原攻击英雄")
+	assert_eq(b.hp[0][0], tiger_hp - 4, "原基础攻击与天狗反击均应照常结算")
+	assert_false(_has_event(result, "base_attack_cancelled"), "击中护主天狗不算击杀敌方攻击英雄")
+
+
+# ---- h04 房日 十方无次第（波 / 大波可指定任一存活敌方英雄）----
+
+func test_h04_wave_can_target_enemy_reserve() -> void:
+	var b := _battle("h04", 5, 20)
+	assert_true(b.select_action(0, ActionDef.Action.ATTACK, 1), "房日的波应可指定敌方替补")
+	b.select_action(1, ActionDef.Action.CHARGE)
+	var result: Dictionary = b.resolve()
+
+	assert_eq(b.hp[1][0], 10, "敌方出战位不应受到定向替补的波")
+	assert_eq(b.hp[1][1], 8, "指定替补应受到 1.0 HP 的波伤害")
+	var found_target_event := false
+	for event in result.get("events", []):
+		if String(event.get("id", "")) == "damage_taken" \
+				and int(event.get("player", -1)) == 1 and int(event.get("slot", -1)) == 1:
+			found_target_event = true
+	assert_true(found_target_event, "伤害事件必须携带实际受击替补槽")
+
+
+func test_h04_big_wave_targets_reserve_and_uses_normal_defense_rules() -> void:
+	var b := _battle("h04", 5, 20)
+	assert_true(b.select_action(0, ActionDef.Action.BIG_ATTACK, 2), "房日的大波应可指定敌方替补")
+	b.select_action(1, ActionDef.Action.DEFEND)
+	b.resolve()
+	assert_eq(b.hp[1][0], 10, "普通防被穿时，出战位仍不应替指定目标承伤")
+	assert_eq(b.hp[1][2], 6, "指定替补应承受大波 2.0 HP 伤害")
+
+	var b2 := _battle("h04", 5, 20)
+	assert_true(b2.select_action(0, ActionDef.Action.BIG_ATTACK, 2))
+	b2.select_action(1, ActionDef.Action.BIG_DEFEND)
+	var result: Dictionary = b2.resolve()
+	assert_eq(b2.hp[1][2], 10, "大防仍应挡住指向替补的大波")
+	var found_block := false
+	for event in result.get("events", []):
+		if String(event.get("id", "")) == "big_defend_block" and int(event.get("slot", -1)) == 2:
+			found_block = true
+	assert_true(found_block, "格挡事件必须携带实际受保护的替补槽")
+
+
+func test_h04_target_stays_on_same_hero_when_enemy_switches() -> void:
+	var b := _battle("h04", 5, 20)
+	assert_true(b.select_action(0, ActionDef.Action.ATTACK, 1))
+	assert_true(b.select_switch(1, 2), "敌方应可同拍换到另一名替补")
+	b.resolve()
+
+	assert_eq(b.active_index[1], 2, "敌方已换到槽 2")
+	assert_eq(b.hp[1][1], 8, "房日锁定的是英雄槽 1，不应随敌方换位改目标")
+	assert_eq(b.hp[1][2], 10, "新出战英雄不是已指定目标，不应承伤")
+
+
+func test_h04_killing_reserve_does_not_request_active_death_switch() -> void:
+	var b := _battle("h04", 5, 20)
+	b.hp[1][1] = 1
+	assert_true(b.select_action(0, ActionDef.Action.ATTACK, 1))
+	b.select_action(1, ActionDef.Action.CHARGE)
+	var result: Dictionary = b.resolve()
+
+	assert_lte(b.hp[1][1], 0, "指定替补应被击杀")
+	assert_eq(b.active_index[1], 0, "敌方出战位保持不变")
+	assert_false(b.pending_death_switch[1], "替补阵亡不应要求出战死亡换人")
+	var found_death := false
+	for event in result.get("events", []):
+		if String(event.get("id", "")) == "hero_died" and int(event.get("slot", -1)) == 1:
+			found_death = true
+	assert_true(found_death, "替补阵亡仍须进入统一死亡事件流")
+
+
+func test_h04_does_not_retarget_when_selected_enemy_dies_before_hit() -> void:
+	var b := _battle("h04", 5, 20)
+	b.hp[1][1] = 1
+	b.pending_damage[1][1] = 1
+	assert_true(b.select_action(0, ActionDef.Action.ATTACK, 1))
+	b.select_action(1, ActionDef.Action.CHARGE)
+	var result: Dictionary = b.resolve()
+
+	assert_eq(b.hp[1][0], 10, "指定目标在动作前阵亡后，不得自动改打出战位")
+	assert_eq(b.hp[1][2], 10, "指定目标在动作前阵亡后，不得自动改打其他替补")
+	assert_true(_has_event(result, "attack_target_unavailable", 1), "应记录目标已不可用的落空事件")
+
+
+func test_h04_targeting_requires_active_living_unsilenced_h04() -> void:
+	var plain := _battle("test_plain", 5, 20)
+	assert_false(plain.select_action(0, ActionDef.Action.ATTACK, 1), "普通英雄不能显式指定替补")
+
+	var reserve := _battle_team(["test_p1_0", "h04", "test_p1_2"], 5, 20)
+	assert_false(reserve.select_action(0, ActionDef.Action.ATTACK, 1), "替补席房日不提供团队自由选敌")
+
+	var dead_target := _battle("h04", 5, 20)
+	dead_target.hp[1][1] = 0
+	assert_false(dead_target.select_action(0, ActionDef.Action.ATTACK, 1), "不能指定已阵亡敌方英雄")
+	assert_false(dead_target.select_action(0, ActionDef.Action.ATTACK, 9), "不能指定越界敌方槽")
+
+	var silenced := _battle("h04", 5, 20)
+	silenced.set_status(0, 0, "silenced", 1)
+	assert_false(silenced.select_action(0, ActionDef.Action.ATTACK, 1), "沉默中的房日不能自由选敌")
+
+
+func test_h04_attack_without_explicit_target_keeps_standard_active_targeting() -> void:
+	var b := _battle("h04", 5, 20)
+	assert_true(b.select_action(0, ActionDef.Action.ATTACK), "旧调用未传目标时仍应合法")
+	assert_true(b.select_switch(1, 1))
+	b.resolve()
+
+	assert_eq(b.hp[1][0], 10, "兼容调用不锁旧出战英雄")
+	assert_eq(b.hp[1][1], 8, "未显式指定时仍按标准规则攻击结算时出战位")
+
+
+func test_h04_old_repeat_energy_mechanism_is_removed() -> void:
+	var b := _battle("h04", 5, 0)
+	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.DEFEND)
+	var result: Dictionary
+	b.select_action(0, ActionDef.Action.CHARGE)
+	b.select_action(1, ActionDef.Action.DEFEND)
+	result = b.resolve()
+
+	assert_eq(b.energy[0], 8, "连续两回合攒只获得两次攒能与两次回合被动，不再收重复动作能量")
+	assert_false(_has_event(result, "repeat_energy"), "旧重复动作产能事件应完全退役")
+
+
+func test_h03_can_cancel_h04_attack_even_when_h04_targets_reserve() -> void:
+	var b := _battle_teams(
+		["h04", "test_p0_1", "test_p0_2"],
+		["h03", "test_p1_1", "test_p1_2"], 5, 20)
+	b.hp[0][0] = 1
+	assert_true(b.select_action(0, ActionDef.Action.ATTACK, 1))
+	b.select_action(1, ActionDef.Action.ATTACK)
+	var result: Dictionary = b.resolve()
+
+	assert_eq(b.hp[1][1], 10, "房日的出招英雄被白额雷音击杀后，定向替补的波也应被断")
+	assert_true(_has_event(result, "base_attack_cancelled", 0), "自由目标不能绕过白额雷音断招")
 
 
 # ---- h05 亢金 裂甲（命中 → 给目标破甲）----

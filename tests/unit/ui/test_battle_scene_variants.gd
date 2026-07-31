@@ -2,15 +2,18 @@ extends GutTest
 
 const SCENE1_PATH := "res://src/ui/scenes/scene1.tscn"
 const SCENE2_PATH := "res://src/ui/scenes/scene2.tscn"
+const SCENE3_PATH := "res://src/ui/scenes/scene3.tscn"
 const BATTLE_BASE_PATH := "res://src/ui/battle_screen_base.tscn"
 const BATTLE1_PATH := "res://src/ui/battle_screen1.tscn"
 const BATTLE2_PATH := "res://src/ui/battle_screen2.tscn"
+const BATTLE3_PATH := "res://src/ui/battle_screen3.tscn"
 
 
 func test_battle_screen_entry_names_replace_legacy_paths() -> void:
 	assert_true(ResourceLoader.exists(BATTLE_BASE_PATH))
 	assert_true(ResourceLoader.exists(BATTLE1_PATH))
 	assert_true(ResourceLoader.exists(BATTLE2_PATH))
+	assert_true(ResourceLoader.exists(BATTLE3_PATH))
 	assert_false(ResourceLoader.exists("res://src/ui/battle_screen.tscn"))
 	assert_false(ResourceLoader.exists("res://src/ui/battle_screen_scene2.tscn"))
 
@@ -87,6 +90,644 @@ func test_battle_screen2_statically_uses_scene2() -> void:
 	assert_eq(screen.p1_char_display.get_parent().name, "WorldGroup")
 	assert_eq(screen.p2_char_display.get_parent().name, "WorldGroup")
 	BattleSetup.reset()
+
+
+func test_battle_screen3_statically_uses_scene3() -> void:
+	BattleSetup.reset()
+	var battle_source := FileAccess.get_file_as_string(BATTLE3_PATH)
+	assert_false(battle_source.contains('parent="StageSlot/Stage"'),
+			"BattleScreen3 must not serialize stale overrides for Scene3 child nodes")
+	assert_false(battle_source.contains('[editable path="StageSlot/Stage"]'),
+			"Scene3 composition must be edited only in scene3.tscn")
+	var screen := (load(BATTLE3_PATH) as PackedScene).instantiate()
+	add_child_autofree(screen)
+	await get_tree().process_frame
+
+	assert_eq(screen.stage, screen.get_node("StageSlot/Stage"),
+			"BattleScreen3 must bind the shared BattleScreen stage interface")
+	assert_eq(screen.stage.scene_file_path, SCENE3_PATH,
+			"The independent Scene3 battle variant must load the Scene3 stage")
+	assert_true(screen.stage.pointer_parallax,
+			"Scene3 keeps the mature BattleScreen pointer-parallax contract")
+	assert_false(screen.stage.demo_click_shake,
+			"Scene3 must not keep standalone preview click shake when embedded")
+	assert_not_null(screen.get_node_or_null("WorldGroup"),
+			"Scene3 keeps the mature battle world grouping for characters and shadows")
+	assert_eq(screen.p1_char_display.get_parent().name, "WorldGroup")
+	assert_eq(screen.p2_char_display.get_parent().name, "WorldGroup")
+	BattleSetup.reset()
+
+
+func test_scene3_uses_formal_alpha_assets_and_chain_platform() -> void:
+	var stage := (load(SCENE3_PATH) as PackedScene).instantiate()
+	add_child_autofree(stage)
+	var scene_source := FileAccess.get_file_as_string(SCENE3_PATH)
+	var contract := {
+		"DawnSky": "res://assets/scenes/scene3/scene3_sky1.png",
+		"DawnSkyOverlay": "res://assets/scenes/scene3/scene3_sky2.png",
+		"DistantMountainRangeMid": "res://assets/scenes/scene2/scene2_far_mountain.png",
+		"DistantMountainRangeNear": "res://assets/scenes/scene2/scene2_far_mountain.png",
+		"LeftFarMountain": "res://assets/scenes/scene3/scene3_left_far_mountain.png",
+		"RightFarMountain": "res://assets/scenes/scene3/scene3_right_far_mountain.png",
+		"DawnSun": "res://assets/scenes/scene3/scene3_sun.png",
+		"LeftCliff": "res://assets/scenes/scene3/scene3_left_mountain.png",
+		"RightCliff": "res://assets/scenes/scene3/scene3_right_mountain.png",
+		"MainChain": "res://assets/scenes/scene3/scene3_chain.png",
+	}
+
+	assert_false(scene_source.contains("res://assets/import/"),
+			"Scene3 must not directly reference the temporary import folder")
+	assert_false(scene_source.contains("res://assets/scenes/scene2/scene2_mid_mountain.png"),
+			"Scene3 must not reuse Scene2's deep-purple middle mountain")
+	assert_false(
+			FileAccess.get_file_as_string(SCENE1_PATH).contains("scene3_mid_sword_grave"),
+			"The Scene3 sword grave must not leak into Scene1")
+	assert_false(
+			FileAccess.get_file_as_string(SCENE2_PATH).contains("scene3_mid_sword_grave"),
+			"The Scene3 sword grave must not leak into Scene2")
+	for node_name: String in contract:
+		assert_true(stage.has_node(node_name),
+				"Scene3 must contain %s as an editable authored layer" % node_name)
+		if not stage.has_node(node_name):
+			continue
+		var layer := stage.get_node(node_name) as TextureRect
+		assert_eq(layer.texture.resource_path, contract[node_name])
+		assert_eq(layer.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST,
+				"%s must retain hard pixel edges" % node_name)
+		assert_true(layer.has_meta("parallax_factor"))
+		if node_name not in ["DawnSky", "DawnSkyOverlay"]:
+			assert_not_null(layer.material,
+					"%s must receive the dawn sword-grave material grade" % node_name)
+	var sun := stage.get_node("DawnSun") as TextureRect
+	var sun_material := sun.material as ShaderMaterial
+	assert_eq(
+			sun_material.shader.resource_path,
+			"res://assets/shaders/canvas_env_scene3_sun_grade.gdshader")
+	var sun_mid: Color = sun_material.get_shader_parameter("mid_color")
+	var sun_highlight: Color = sun_material.get_shader_parameter("highlight_color")
+	assert_gt(sun_mid.r - sun_mid.b, 0.3,
+			"The sun midtones must match the warm peach-gold lower sky")
+	assert_gt(sun_mid.g - sun_mid.b, 0.1,
+			"The sun must not collapse back into gray-yellow")
+	assert_gt(sun_highlight.r, sun_highlight.b,
+			"The sun highlight must remain warm instead of gray-white")
+	assert_between(
+			float(sun_material.get_shader_parameter("alpha_scale")),
+			0.65,
+			0.96,
+			"The sun should sit softly inside the cloud sea")
+	assert_gte(
+			float(sun_material.get_shader_parameter("outline_soften_strength")),
+			0.2,
+			"The sun's complete dark ring must dissolve into the horizon atmosphere")
+	assert_lte(
+			float(sun_material.get_shader_parameter("fade_end")),
+			0.58,
+			"The cloud sea must conceal more than half of the oversized sun disc")
+	assert_true(sun_material.shader.code.contains("exposed_edge"),
+			"The sun shader must soften its actual alpha edge rather than flattening all detail")
+	assert_almost_eq(sun.size.x, sun.size.y, 0.1,
+			"The new round sun must not be stretched into the old half-sun rectangle")
+	var cloud_back := stage.get_node("CloudSeaBack") as ColorRect
+	assert_lt(sun.position.y, cloud_back.position.y)
+	assert_gt(sun.position.y + sun.size.y, cloud_back.position.y,
+			"The cloud sea must cross the round sun near its middle")
+	var sun_halo := stage.get_node("SunHalo") as ColorRect
+	var halo_material := sun_halo.material as ShaderMaterial
+	assert_not_null(halo_material,
+			"Scene3 needs the same separate subject-and-halo treatment as Scene1")
+	if halo_material != null and halo_material.shader != null:
+		assert_eq(
+				halo_material.shader.resource_path,
+				"res://assets/shaders/canvas_env_scene3_sun_halo.gdshader")
+		assert_true(halo_material.shader.code.contains("blend_add"),
+				"The sun halo must add light without replacing the sky")
+		var halo_color: Color = halo_material.get_shader_parameter("glow_color")
+		assert_gt(halo_color.r - halo_color.b, 0.25,
+				"The halo must share the lower sky's peach-gold family")
+		assert_lte(float(halo_material.get_shader_parameter("core_size")), 0.18,
+				"The halo core must not reinforce the egg-yolk silhouette")
+		assert_gte(float(halo_material.get_shader_parameter("glow_size")), 0.58,
+				"The low-intensity atmospheric glow needs a broad falloff")
+		assert_lte(float(halo_material.get_shader_parameter("core_intensity")), 0.14)
+		assert_lte(float(halo_material.get_shader_parameter("glow_intensity")), 0.1)
+	assert_true(stage.has_node("SunAtmosphereVeil"),
+			"Scene3 needs a foreground dawn veil crossing the sun disc")
+	if stage.has_node("SunAtmosphereVeil"):
+		var sun_veil := stage.get_node("SunAtmosphereVeil") as ColorRect
+		var veil_material := sun_veil.material as ShaderMaterial
+		assert_not_null(veil_material)
+		if veil_material != null and veil_material.shader != null:
+			assert_eq(
+					veil_material.shader.resource_path,
+					"res://assets/shaders/canvas_env_scene3_sun_veil.gdshader")
+			assert_true(veil_material.shader.code.contains("veil_band"))
+			assert_between(
+					float(veil_material.get_shader_parameter("veil_strength")),
+					0.14,
+					0.3,
+					"The veil must cross the disc visibly without becoming opaque fog")
+	assert_true(stage.has_node("MidSwordGrave"),
+			"Scene3 needs a restrained midground sword-grave silhouette layer")
+	if stage.has_node("MidSwordGrave"):
+		var sword_grave := stage.get_node("MidSwordGrave") as Control
+		assert_eq(sword_grave.position, Vector2.ZERO)
+		assert_eq(sword_grave.size, Vector2(1920, 1080))
+		assert_gt(
+				float(sword_grave.get_meta("parallax_factor")),
+				float(stage.get_node("RightFarMountain").get_meta("parallax_factor")))
+		assert_lt(
+				float(sword_grave.get_meta("parallax_factor")),
+				float(stage.get_node("CloudSeaBack").get_meta("parallax_factor")))
+		assert_gt(sword_grave.get_index(), stage.get_node("RightFarMountain").get_index())
+		assert_lt(sword_grave.get_index(), stage.get_node("SunAtmosphereVeil").get_index())
+		for cluster_name: String in ["LeftCluster", "RightCluster"]:
+			var cluster := sword_grave.get_node(cluster_name) as TextureRect
+			var atlas := cluster.texture as AtlasTexture
+			var sword_grave_material := cluster.material as ShaderMaterial
+			assert_not_null(atlas)
+			if atlas != null and atlas.atlas != null:
+				assert_eq(
+						atlas.atlas.resource_path,
+						"res://assets/scenes/scene3/scene3_mid_sword_grave.png")
+			assert_not_null(sword_grave_material)
+			if sword_grave_material != null and sword_grave_material.shader != null:
+				assert_eq(
+						sword_grave_material.shader.resource_path,
+						"res://assets/shaders/canvas_env_scene3_sword_grave_grade.gdshader")
+				assert_true(sword_grave_material.shader.code.contains("sun_rim"))
+				assert_between(
+						float(sword_grave_material.get_shader_parameter("alpha_scale")),
+						0.45,
+						0.8,
+						"The sword grave must stay behind the playable chain")
+
+	var chain := stage.get_node("MainChain") as TextureRect
+	assert_almost_eq(
+			float(chain.get_meta("parallax_factor")),
+			float(stage.get("ground_parallax")),
+			0.0001,
+			"The battle chain must share the exact character-world parallax")
+	assert_lt(chain.position.y, 720.0)
+	assert_gt(chain.position.y + chain.size.y, 740.0,
+			"The chain platform must sit under the battle stance and contact shadows")
+	assert_true(stage.has_node("ChainFootOccluder"),
+			"Scene3 needs a narrow foreground chain edge to bite over character shoes")
+	if stage.has_node("ChainFootOccluder"):
+		var chain_occluder := stage.get_node("ChainFootOccluder") as TextureRect
+		var occluder_material := chain_occluder.material as ShaderMaterial
+		assert_eq(chain_occluder.texture.resource_path, chain.texture.resource_path)
+		assert_eq(chain_occluder.position, chain.position)
+		assert_eq(chain_occluder.size, chain.size)
+		assert_eq(
+				float(chain_occluder.get_meta("parallax_factor")),
+				float(chain.get_meta("parallax_factor")))
+		assert_gt(chain_occluder.z_index, 0,
+				"The chain foot edge must draw in front of the live characters")
+		assert_not_null(occluder_material)
+		if occluder_material != null and occluder_material.shader != null:
+			assert_eq(
+					occluder_material.shader.resource_path,
+					"res://assets/shaders/canvas_env_scene3_chain_foot_occluder.gdshader")
+			assert_true(occluder_material.shader.code.contains("upper_edge"))
+			assert_true(occluder_material.shader.code.contains("p1_foot_zone"))
+			assert_true(occluder_material.shader.code.contains("p2_foot_zone"))
+	var decorative_chain_names: Array[String] = [
+		"BackgroundChain",
+		"BackgroundChain2",
+		"BackgroundChain3",
+	]
+	var decorative_chains: Array[TextureRect] = []
+	var decorative_materials: Array[ShaderMaterial] = []
+	for chain_name: String in decorative_chain_names:
+		assert_true(stage.has_node(chain_name))
+		if not stage.has_node(chain_name):
+			continue
+		var decorative_chain := stage.get_node(chain_name) as TextureRect
+		var decorative_material := decorative_chain.material as ShaderMaterial
+		decorative_chains.append(decorative_chain)
+		decorative_materials.append(decorative_material)
+		assert_eq(decorative_chain.texture.resource_path, chain.texture.resource_path)
+		assert_not_null(decorative_material,
+				"%s needs its own atmospheric depth material" % chain_name)
+		if decorative_material == null or decorative_material.shader == null:
+			continue
+		assert_ne(decorative_material, chain.material)
+		assert_eq(
+				decorative_material.shader.resource_path,
+				"res://assets/shaders/canvas_env_scene3_chain_depth.gdshader")
+		assert_true(decorative_material.shader.code.contains("atmosphere_strength"))
+		assert_true(decorative_material.shader.code.contains("outline_lift"))
+		var effective_alpha := float(
+				decorative_material.get_shader_parameter("alpha_scale")
+		) * decorative_chain.self_modulate.a
+		assert_lte(
+				effective_alpha,
+				0.62,
+				"%s combined alpha must remain decorative instead of competing with MainChain"
+				% chain_name)
+		assert_gte(
+				float(decorative_material.get_shader_parameter("atmosphere_strength")),
+				0.34,
+				"%s needs visible cloud-depth integration" % chain_name)
+	if decorative_chains.size() == 3:
+		assert_gt(
+				absf(decorative_chains[0].size.x - decorative_chains[1].size.x),
+				64.0,
+				"Far and middle chains need visibly different link scales")
+		assert_gt(
+				absf(decorative_chains[1].size.x - decorative_chains[2].size.x),
+				64.0,
+				"Middle and lower chains need visibly different spans")
+		assert_lt(
+				float(decorative_chains[0].get_meta("parallax_factor")),
+				float(decorative_chains[1].get_meta("parallax_factor")))
+		assert_lt(
+				float(decorative_chains[1].get_meta("parallax_factor")),
+				float(decorative_chains[2].get_meta("parallax_factor")))
+		assert_lt(
+				float(decorative_chains[2].get_meta("parallax_factor")),
+				float(chain.get_meta("parallax_factor")))
+	if decorative_materials.size() == 3:
+		assert_ne(decorative_materials[0], decorative_materials[1])
+		assert_ne(decorative_materials[1], decorative_materials[2])
+	var cloud_materials: Dictionary = {}
+	var cloud_seeds: Dictionary = {}
+	for cloud_name: String in ["CloudSeaBack", "CloudSeaMid", "CloudSeaFront"]:
+		assert_true(stage.has_node(cloud_name),
+				"Scene3 sword-grave valley needs layered lower cloud sea")
+		if not stage.has_node(cloud_name):
+			continue
+		var cloud := stage.get_node(cloud_name) as ColorRect
+		var cloud_material := cloud.material as ShaderMaterial
+		assert_not_null(cloud_material,
+				"%s must use the Scene3 procedural cloud-sea shader" % cloud_name)
+		if cloud_material != null and cloud_material.shader != null:
+			assert_eq(
+					cloud_material.shader.resource_path,
+					"res://assets/shaders/canvas_env_scene3_cloud_sea.gdshader")
+			assert_eq(float(cloud_material.get_shader_parameter("mode_isolated")), 0.0)
+			assert_eq(float(cloud_material.get_shader_parameter("row_count")), 4.0)
+			assert_eq(float(cloud_material.get_shader_parameter("inner_contrast")), 0.0)
+			assert_gt(float(cloud_material.get_shader_parameter("bank_join_height")), 0.0)
+			assert_gt(float(cloud_material.get_shader_parameter("scene3_roll_amount")), 0.0)
+			assert_gt(float(cloud_material.get_shader_parameter("scene3_billow_amount")), 0.0)
+			var local_sun_rim := float(
+					cloud_material.get_shader_parameter("local_sun_rim_strength"))
+			if cloud_name == "CloudSeaBack":
+				assert_gte(local_sun_rim, 0.55,
+						"The rear cloud bank needs a visible local gold lining near the sun")
+				var back_rim_radius: Vector2 = cloud_material.get_shader_parameter(
+						"local_sun_rim_radius")
+				assert_lte(back_rim_radius.x, 0.28,
+						"The gold lining must stay near the sun-cloud contact")
+			if cloud_name == "CloudSeaMid":
+				assert_gt(
+						float(cloud_material.get_shader_parameter("scene3_roll_amount")),
+						0.08,
+						"Scene3 middle cloud roll must read clearly during play")
+				assert_gte(local_sun_rim, 0.3,
+						"The middle cloud bank must catch some moving sunlight")
+				var mid_rim_radius: Vector2 = cloud_material.get_shader_parameter(
+						"local_sun_rim_radius")
+				assert_lte(mid_rim_radius.x, 0.23,
+						"The middle cloud gold edge must not span the whole valley")
+			elif cloud_name == "CloudSeaFront":
+				assert_gt(
+						float(cloud_material.get_shader_parameter("scene3_billow_amount")),
+						0.4,
+						"Scene3 foreground cloud billow must not be imperceptible")
+				assert_eq(local_sun_rim, 0.0,
+						"The foreground cloud bank must not receive a global gold outline")
+			cloud_materials[cloud_name] = cloud_material
+			cloud_seeds[float(cloud_material.get_shader_parameter("seed"))] = true
+		assert_true(cloud.has_meta("parallax_factor"))
+	assert_eq(cloud_seeds.size(), 3,
+			"Scene3 cloud layers need distinct seeds so their silhouettes do not move in lockstep")
+	if cloud_materials.size() == 3:
+		assert_lt(float(cloud_materials["CloudSeaBack"].get_shader_parameter("flow_speed")), 0.0)
+		assert_gt(float(cloud_materials["CloudSeaMid"].get_shader_parameter("flow_speed")), 0.0)
+		assert_lt(float(cloud_materials["CloudSeaFront"].get_shader_parameter("flow_speed")), 0.0)
+	assert_lt(stage.get_node("DawnSkyOverlay").get_index(),
+			stage.get_node("DistantMountainRangeMid").get_index())
+	assert_lt(stage.get_node("DistantMountainRangeMid").get_index(),
+			stage.get_node("DistantMountainRangeNear").get_index())
+	assert_lt(stage.get_node("DistantMountainRangeNear").get_index(),
+			stage.get_node("BackFog").get_index())
+	assert_lt(stage.get_node("BackFog").get_index(),
+			stage.get_node("LeftFarMountain").get_index())
+	assert_lt(stage.get_node("BackFog").get_index(),
+			stage.get_node("RightFarMountain").get_index())
+	assert_lt(stage.get_node("BackgroundChain").get_index(),
+			stage.get_node("LeftFarMountain").get_index())
+	assert_lt(stage.get_node("BackgroundChain2").get_index(),
+			stage.get_node("LeftFarMountain").get_index())
+	assert_lt(stage.get_node("RightCliff").get_index(),
+			stage.get_node("BackgroundChain3").get_index())
+	assert_lt(stage.get_node("BackgroundChain3").get_index(),
+			stage.get_node("CloudSeaFront").get_index())
+	assert_lt(stage.get_node("LeftFarMountain").get_index(),
+			stage.get_node("CloudSeaBack").get_index())
+	assert_lt(stage.get_node("RightFarMountain").get_index(),
+			stage.get_node("CloudSeaBack").get_index())
+	assert_lt(stage.get_node("SunHalo").get_index(),
+			stage.get_node("SunRayField").get_index())
+	assert_lt(stage.get_node("SunRayField").get_index(),
+			stage.get_node("DawnSun").get_index())
+	assert_lt(stage.get_node("DawnSun").get_index(),
+			stage.get_node("RightFarMountain").get_index())
+	assert_lt(stage.get_node("RightFarMountain").get_index(),
+			stage.get_node("MidSwordGrave").get_index())
+	assert_lt(stage.get_node("MidSwordGrave").get_index(),
+			stage.get_node("SunAtmosphereVeil").get_index())
+	assert_lt(stage.get_node("DawnSun").get_index(),
+			stage.get_node("SunAtmosphereVeil").get_index())
+	assert_lt(stage.get_node("SunAtmosphereVeil").get_index(),
+			stage.get_node("CloudSeaBack").get_index())
+	assert_lt(stage.get_node("SunRayField").get_index(),
+			stage.get_node("CloudSeaBack").get_index())
+	assert_lt(
+			float(stage.get_node("DistantMountainRangeMid").get_meta("parallax_factor")),
+			float(stage.get_node("DistantMountainRangeNear").get_meta("parallax_factor")))
+	assert_lt(
+			float(stage.get_node("DistantMountainRangeNear").get_meta("parallax_factor")),
+			float(stage.get_node("LeftFarMountain").get_meta("parallax_factor")))
+	assert_lt(
+			float(stage.get_node("RightFarMountain").get_meta("parallax_factor")),
+			float(stage.get_node("CloudSeaBack").get_meta("parallax_factor")))
+	for far_name: String in [
+		"DistantMountainRangeMid",
+		"DistantMountainRangeNear",
+		"LeftFarMountain",
+		"RightFarMountain",
+	]:
+		var far_material := stage.get_node(far_name).material as ShaderMaterial
+		assert_not_null(far_material)
+		if far_material == null:
+			continue
+		assert_lt(float(far_material.get_shader_parameter("saturation")), 0.4,
+				"%s must read as atmospheric gray rather than cyan" % far_name)
+		var atmosphere: Color = far_material.get_shader_parameter("atmosphere_color")
+		assert_lt(atmosphere.g - atmosphere.r, 0.08,
+				"%s atmosphere must not reinforce a green-cyan cast" % far_name)
+		assert_gt(float(far_material.get_shader_parameter("horizon_warm_strength")), 0.1,
+				"%s needs warm lower-horizon response for the planned rising sun"
+				% far_name)
+	for distant_name: String in [
+		"DistantMountainRangeMid",
+		"DistantMountainRangeNear",
+	]:
+		var distant := stage.get_node(distant_name) as TextureRect
+		var distant_material := distant.material as ShaderMaterial
+		assert_gte(distant.self_modulate.a, 0.68,
+				"%s must not disappear into the sky layer" % distant_name)
+		assert_gte(
+				float(distant_material.get_shader_parameter("contrast")),
+				0.84,
+				"%s needs a readable ridge silhouette" % distant_name)
+		assert_lte(
+				float(distant_material.get_shader_parameter("atmosphere_strength")),
+				0.42,
+				"%s must keep atmospheric depth without becoming sky-colored"
+				% distant_name)
+	var distant_mid := stage.get_node("DistantMountainRangeMid") as TextureRect
+	var distant_near := stage.get_node("DistantMountainRangeNear") as TextureRect
+	assert_lt(distant_mid.self_modulate.a, distant_near.self_modulate.a)
+	assert_lt(
+			float((distant_mid.material as ShaderMaterial).get_shader_parameter("contrast")),
+			float((distant_near.material as ShaderMaterial).get_shader_parameter("contrast")))
+	var right_far_material := stage.get_node("RightFarMountain").material as ShaderMaterial
+	assert_eq(
+			right_far_material.shader.resource_path,
+			"res://assets/shaders/canvas_env_scene3_far_mountain_grade.gdshader")
+	var right_far_source := right_far_material.shader.code
+	assert_true(right_far_source.contains("shadow_palette"))
+	assert_true(right_far_source.contains("midtone_palette"))
+	assert_true(right_far_source.contains("highlight_palette"))
+	assert_false(right_far_source.contains("mix(vec3(luma), tex.rgb"),
+			"RightFarMountain must rebuild its palette instead of retaining source blue")
+	var ray_material := stage.get_node("SunRayField").material as ShaderMaterial
+	assert_not_null(ray_material)
+	if ray_material != null and ray_material.shader != null:
+		assert_eq(
+				ray_material.shader.resource_path,
+				"res://assets/shaders/canvas_env_scene3_sun_rays.gdshader")
+		var ray_source := ray_material.shader.code
+		assert_true(ray_source.contains("cloud_gap_opening"),
+				"Cloud motion must reveal local shaft sources")
+		assert_true(ray_source.contains("rising_shaft"),
+				"Scene3 light must rise through distributed cloud openings")
+		assert_true(ray_source.contains("hidden_sun_center"),
+				"All shafts need one hidden sun direction source")
+		assert_true(ray_source.contains("semicircle_direction"),
+				"Ray directions must spread across the hidden sun's upper semicircle")
+		assert_gte(ray_source.count("rising_shaft("), 7,
+				"The shader needs six candidate shafts plus its helper")
+		assert_false(ray_source.contains("halo"),
+				"The removed sun must not leave a radial halo")
+		assert_false(ray_source.contains("ray_fan"),
+				"Independent cloud openings must not become one solid fan")
+		var hidden_sun_center: Vector2 = ray_material.get_shader_parameter(
+				"hidden_sun_center")
+		assert_between(hidden_sun_center.x, 0.4, 0.6,
+				"The hidden sun direction source must stay near the valley center")
+		assert_gt(hidden_sun_center.y, 0.95,
+				"The hidden sun direction source must stay below the cloud field")
+		assert_between(
+				float(ray_material.get_shader_parameter("shaft_width_scale")),
+				2.0,
+				3.5,
+				"Cloud rays must be substantially broader than the old columns")
+		assert_gte(float(ray_material.get_shader_parameter("outer_feather_px")), 10.0,
+				"Cloud rays need a wide outer bloom for soft sunlight edges")
+		assert_lte(float(ray_material.get_shader_parameter("source_drift")), 0.008,
+				"Cloud openings may breathe but must not sweep across the valley")
+		var mid_material: ShaderMaterial = cloud_materials.get("CloudSeaMid")
+		if mid_material != null:
+			assert_almost_eq(
+					float(ray_material.get_shader_parameter("cloud_roll_speed")),
+					float(mid_material.get_shader_parameter("scene3_roll_speed")),
+					0.0001)
+			assert_almost_eq(
+					float(ray_material.get_shader_parameter("cloud_billow_speed")),
+					float(mid_material.get_shader_parameter("scene3_billow_speed")),
+					0.0001)
+			assert_almost_eq(
+					float(ray_material.get_shader_parameter("cloud_roll_phase")),
+					float(mid_material.get_shader_parameter("scene3_roll_phase")),
+					0.0001)
+			assert_almost_eq(
+					float(ray_material.get_shader_parameter("cloud_billow_phase")),
+					float(mid_material.get_shader_parameter("scene3_billow_phase")),
+					0.0001)
+		assert_between(
+				float(ray_material.get_shader_parameter("ray_intensity")),
+				0.18,
+				0.42,
+				"Cloud shafts must stay visible without becoming searchlights")
+	assert_lt(stage.get_node("CloudSeaBack").get_index(),
+			stage.get_node("MainChain").get_index())
+	assert_lt(stage.get_node("CloudSeaMid").get_index(),
+			stage.get_node("MainChain").get_index())
+	assert_lt(stage.get_node("RightCliff").get_index(),
+			stage.get_node("CloudSeaFront").get_index())
+	assert_lt(stage.get_node("CloudSeaFront").get_index(),
+			stage.get_node("FrontFog").get_index())
+
+	for cliff_name: String in ["LeftCliff", "RightCliff"]:
+		var cliff := stage.get_node(cliff_name) as TextureRect
+		var cliff_material := cliff.material as ShaderMaterial
+		assert_not_null(cliff_material,
+				"%s must retain its Scene3 color grade and local grass motion"
+				% cliff_name)
+		if cliff_material == null or cliff_material.shader == null:
+			continue
+		assert_eq(
+				cliff_material.shader.resource_path,
+				"res://assets/shaders/canvas_env_scene3_cliff_grass_sway.gdshader")
+		assert_true(cliff_material.shader.code.contains("grass_mask"),
+				"%s may animate only explicitly masked grass pixels" % cliff_name)
+		assert_true(cliff_material.shader.code.contains("underpaint_texture"),
+				"%s needs hinge underpaint so moving grass leaves no holes" % cliff_name)
+		assert_true(cliff_material.shader.code.contains("inverse_rotate_pixel_uv"),
+				"%s grass must pivot locally instead of warping the whole cliff"
+				% cliff_name)
+		var grass_mask := cliff_material.get_shader_parameter("grass_mask") as Texture2D
+		var underpaint := cliff_material.get_shader_parameter(
+				"underpaint_texture") as Texture2D
+		assert_not_null(grass_mask)
+		assert_not_null(underpaint)
+		if grass_mask != null:
+			assert_eq(
+					grass_mask.resource_path,
+					"res://assets/scenes/scene3/scene3_%s_cliff_grass_mask.png"
+					% cliff_name.trim_suffix("Cliff").to_snake_case())
+		if underpaint != null:
+			assert_eq(
+					underpaint.resource_path,
+					"res://assets/scenes/scene3/scene3_%s_cliff_grass_underpaint.png"
+					% cliff_name.trim_suffix("Cliff").to_snake_case())
+		assert_between(
+				float(cliff_material.get_shader_parameter("red_angle_deg")),
+				0.5,
+				1.0,
+				"%s grass motion must stay restrained" % cliff_name)
+		assert_between(
+				float(cliff_material.get_shader_parameter("green_angle_deg")),
+				0.5,
+				1.0,
+				"%s secondary grass group must stay restrained" % cliff_name)
+		assert_lte(float(cliff_material.get_shader_parameter("motion_fps")), 6.0,
+				"%s grass motion must retain stepped pixel timing" % cliff_name)
+		assert_gt(float(cliff_material.get_shader_parameter("exposure")), 1.15,
+				"%s needs visible exposure lift instead of the previous near-black grade"
+				% cliff_name)
+		assert_gt(float(cliff_material.get_shader_parameter("midtone_lift")), 0.06,
+				"%s needs a visible midtone lift" % cliff_name)
+		assert_lt(float(cliff_material.get_shader_parameter("shadow_strength")), 0.25,
+				"%s must not crush its lower half back into black" % cliff_name)
+		assert_lt(float(cliff_material.get_shader_parameter("saturation")), 0.7,
+				"%s must neutralize the source asset's green cast" % cliff_name)
+		var cliff_tint: Color = cliff_material.get_shader_parameter("tint_color")
+		assert_gt(cliff_tint.r, cliff_tint.g,
+				"%s needs a warm-neutral stone tint rather than green" % cliff_name)
+	for path: String in [
+		"res://assets/scenes/scene3/scene3_sky2.png",
+		"res://assets/scenes/scene3/scene3_chain.png",
+		"res://assets/scenes/scene3/scene3_left_mountain.png",
+		"res://assets/scenes/scene3/scene3_right_mountain.png",
+		"res://assets/scenes/scene3/scene3_left_far_mountain.png",
+		"res://assets/scenes/scene3/scene3_right_far_mountain.png",
+		"res://assets/scenes/scene3/scene3_sun.png",
+		"res://assets/scenes/scene3/scene3_mid_sword_grave.png",
+	]:
+		var image := Image.load_from_file(ProjectSettings.globalize_path(path))
+		assert_not_null(image)
+		if image == null:
+			continue
+		assert_ne(image.detect_alpha(), Image.ALPHA_NONE,
+				"Scene3 formal assets must carry true alpha after keying their source background")
+	var sword_grave_image := Image.load_from_file(ProjectSettings.globalize_path(
+			"res://assets/scenes/scene3/scene3_mid_sword_grave.png"))
+	assert_not_null(sword_grave_image)
+	if sword_grave_image != null:
+		for corner: Vector2i in [
+			Vector2i(0, 0),
+			Vector2i(sword_grave_image.get_width() - 1, 0),
+			Vector2i(0, sword_grave_image.get_height() - 1),
+			Vector2i(
+					sword_grave_image.get_width() - 1,
+					sword_grave_image.get_height() - 1),
+		]:
+			assert_lte(sword_grave_image.get_pixelv(corner).a, 0.02,
+					"The generated sword-grave layer needs transparent corners")
+		var sampled_pixels := 0
+		var visible_pixels := 0
+		var green_spill_pixels := 0
+		for y in range(0, sword_grave_image.get_height(), 8):
+			for x in range(0, sword_grave_image.get_width(), 8):
+				var sword_pixel := sword_grave_image.get_pixel(x, y)
+				sampled_pixels += 1
+				if sword_pixel.a > 0.2:
+					visible_pixels += 1
+					if (
+							sword_pixel.g > sword_pixel.r + 0.35
+							and sword_pixel.g > sword_pixel.b + 0.35
+					):
+						green_spill_pixels += 1
+		var visible_ratio := float(visible_pixels) / float(maxi(sampled_pixels, 1))
+		assert_between(visible_ratio, 0.002, 0.14,
+				"The sword grave should be sparse silhouettes, not a full painted backdrop")
+		assert_eq(green_spill_pixels, 0,
+				"The chroma-key source must not leave green fringe in the scene asset")
+
+	var sky1 := Image.load_from_file(ProjectSettings.globalize_path(
+			"res://assets/scenes/scene3/scene3_sky1.png"))
+	assert_not_null(sky1)
+	if sky1 != null:
+		var sampled := 0
+		var purple_pixels := 0
+		for y in range(0, int(sky1.get_height() * 0.72), 8):
+			for x in range(0, sky1.get_width(), 8):
+				var color := sky1.get_pixel(x, y)
+				sampled += 1
+				if color.a > 0.0 and color.r > color.g + 0.04 and color.b > color.g + 0.04:
+					purple_pixels += 1
+		assert_eq(purple_pixels, 0,
+				"Scene3 sky1 upper sky must be recolored away from the purple source palette")
+
+
+func test_scene3_chain_grounding_uses_link_occlusion_and_segmented_shadows() -> void:
+	var screen := (load(BATTLE3_PATH) as PackedScene).instantiate()
+	var p1 := screen.get_node("P1CharDisplay") as Control
+	var p2 := screen.get_node("P2CharDisplay") as Control
+	assert_eq(p1.position, Vector2(92, 258),
+			"Scene3 preserves the authored P1 x and ground-authored baseline")
+	assert_eq(p2.position, Vector2(1056, 258),
+			"Scene3 restores both fighters before lowering the playable chain")
+
+	for shadow_name: String in ["P1Shadow", "P2Shadow"]:
+		var shadow := screen.get_node(shadow_name) as TextureRect
+		var shadow_material := shadow.material as ShaderMaterial
+		assert_not_null(shadow_material)
+		if shadow_material == null or shadow_material.shader == null:
+			continue
+		assert_eq(
+				shadow_material.shader.resource_path,
+				"res://assets/shaders/canvas_env_scene3_chain_contact_shadow.gdshader")
+		var shadow_source := shadow_material.shader.code
+		assert_true(shadow_source.contains("left_foot"))
+		assert_true(shadow_source.contains("right_foot"))
+		assert_true(shadow_source.contains("link_break"))
+		assert_lte(shadow.size.y, 32.0,
+				"Chain contact shadows must stay on the narrow link surface")
+		assert_lte(
+				float(shadow_material.get_shader_parameter("shadow_strength")),
+				0.68,
+				"Chain shadows must not read as opaque ground decals")
+		assert_lt(shadow.get_index(), p1.get_index(),
+				"Chain contact shadows must remain behind both live characters")
+	screen.free()
 
 
 func test_scene2_variant_keeps_its_authored_character_geometry() -> void:
@@ -903,6 +1544,35 @@ func test_scene2_p2_river_uses_restrained_shoreline_foam_clusters() -> void:
 	assert_lte(float(material.get_shader_parameter("shore_foam_strength")), 0.55)
 
 
+func test_scene2_river_uses_quiet_directional_flow_parameters() -> void:
+	var stage := (load(SCENE2_PATH) as PackedScene).instantiate()
+	add_child_autofree(stage)
+	var river := stage.get_node("River") as ColorRect
+	var material := river.material as ShaderMaterial
+
+	assert_almost_eq(
+			float(material.get_shader_parameter("slice_shift_px")),
+			5.0, 0.001,
+			"Reflection bands must breathe gently instead of swinging side to side")
+	assert_almost_eq(
+			float(material.get_shader_parameter("slice_speed")),
+			0.11, 0.001)
+	assert_almost_eq(
+			float(material.get_shader_parameter("breakup_strength")),
+			0.20, 0.001)
+	assert_almost_eq(
+			float(material.get_shader_parameter("ripple_speed_px")),
+			8.0, 0.001,
+			"Ripple rows should carry a quiet directional current")
+	assert_almost_eq(
+			float(material.get_shader_parameter("shore_cluster_drift_px")),
+			1.5, 0.001)
+	assert_almost_eq(
+			float(material.get_shader_parameter("anim_fps")),
+			6.0, 0.001,
+			"Calmer motion must not become low-frame-rate stutter")
+
+
 func test_scene1_uses_dedicated_far_bamboo_groves_without_reused_copies() -> void:
 	var stage := (load(SCENE1_PATH) as PackedScene).instantiate()
 	add_child_autofree(stage)
@@ -930,16 +1600,56 @@ func test_scene1_uses_dedicated_far_bamboo_groves_without_reused_copies() -> voi
 		assert_gt(bamboo.size.y, 0.0)
 		assert_eq(float(bamboo.get_meta("parallax_factor")), contract[node_name][2])
 		assert_not_null(bamboo.material)
-		var bamboo_material := bamboo.material as ShaderMaterial
-		assert_eq(bamboo_material.shader.resource_path,
+
+	for far_name in ["BambooFarLeft", "BambooFarRight"]:
+		var far_material := stage.get_node(far_name).material as ShaderMaterial
+		assert_eq(far_material.shader.resource_path,
 				"res://assets/shaders/canvas_env_night_foliage.gdshader")
 
+	var main_masks := {
+		"BambooLeft": [
+			"res://assets/scenes/scene1/scene1_bamboo_left_leaf_mask.png",
+			"res://assets/scenes/scene1/scene1_bamboo_left_underpaint.png"],
+		"BambooRight": [
+			"res://assets/scenes/scene1/scene1_bamboo_right_leaf_mask.png",
+			"res://assets/scenes/scene1/scene1_bamboo_right_underpaint.png"],
+	}
+	var phase_offsets: Array[float] = []
 	for main_name in ["BambooLeft", "BambooRight"]:
 		assert_eq((stage.get_node(main_name) as TextureRect).texture_filter,
 				CanvasItem.TEXTURE_FILTER_NEAREST)
 		var main_material := stage.get_node(main_name).material as ShaderMaterial
+		assert_eq(main_material.shader.resource_path,
+				"res://assets/shaders/canvas_env_scene1_bamboo_leaf_sway.gdshader")
 		assert_almost_eq(float(main_material.get_shader_parameter("alpha_scale")),
 				1.0, 0.001, "Main bamboo must remain fully opaque")
+		var leaf_mask := main_material.get_shader_parameter("leaf_mask") as Texture2D
+		var underpaint := main_material.get_shader_parameter(
+				"underpaint_texture") as Texture2D
+		assert_eq(leaf_mask.resource_path, main_masks[main_name][0])
+		assert_eq(underpaint.resource_path, main_masks[main_name][1])
+		assert_eq(leaf_mask.get_size(), contract[main_name][1],
+				"Leaf masks must stay at source resolution for pixel-stable pivots")
+		assert_eq(underpaint.get_size(), contract[main_name][1])
+		assert_almost_eq(float(main_material.get_shader_parameter("motion_fps")),
+				6.0, 0.001)
+		assert_gte(float(main_material.get_shader_parameter("cycle_sec")), 8.0)
+		assert_between(
+				float(main_material.get_shader_parameter("red_angle_deg")),
+				0.1, 0.85)
+		assert_between(
+				float(main_material.get_shader_parameter("green_angle_deg")),
+				0.1, 1.0)
+		phase_offsets.append(float(
+				main_material.get_shader_parameter("phase_offset")))
+		var shader_source := main_material.shader.code
+		assert_true(shader_source.contains("TIME"))
+		assert_true(shader_source.contains("leaf_mask"))
+		assert_true(shader_source.contains("underpaint_texture"))
+		assert_true(shader_source.contains("inverse_rotate_pixel_uv"))
+
+	assert_ne(phase_offsets[0], phase_offsets[1],
+			"Left and right leaf groups must not sway in lockstep")
 
 	for far_name in ["BambooFarLeft", "BambooFarRight"]:
 		assert_eq((stage.get_node(far_name) as TextureRect).texture_filter,

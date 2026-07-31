@@ -43,6 +43,8 @@ func _midgame() -> BattleCore:
 	b.select_action(0, A.CHARGE)
 	b.select_action(1, A.ATTACK)
 	b.resolve()
+	b.upgrade_next_wave[0] = true
+	b.upgrade_next_wave[1] = true
 	return b
 
 
@@ -100,6 +102,25 @@ func test_battle_core_snapshot_survives_json_wire() -> void:
 	assert_eq_deep(b2.to_snapshot(), b.to_snapshot())
 
 
+func test_snapshot_preserves_h04_selected_attack_target() -> void:
+	var b := BattleCore.new()
+	b.setup([_hero("h04", 5), _hero("test_b", 10), _hero("test_c", 10)],
+		[_hero("test_x", 10), _hero("test_y", 10), _hero("test_z", 10)], SEED)
+	b.energy = [20, 20]
+	assert_true(b.select_action(0, A.BIG_ATTACK, 2))
+
+	var b2 := BattleCore.new()
+	assert_true(b2.from_snapshot(b.to_snapshot()), "带 h04 攻击目标的快照应可恢复")
+	b.select_action(1, A.CHARGE)
+	b2.select_action(1, A.CHARGE)
+	var result1: Dictionary = b.resolve()
+	var result2: Dictionary = b2.resolve()
+
+	assert_eq_deep(result2, result1)
+	assert_eq(b2.hp[1][2], 16, "恢复局的大波应命中槽 2")
+	assert_eq(b2.hp[1][0], 20, "恢复局不应误伤敌方出战位")
+
+
 func test_battle_core_snapshot_rng_stream_continues_identically() -> void:
 	# Arrange
 	var b := _midgame()
@@ -144,9 +165,15 @@ func test_snapshot_malformed_rejected_without_mutation() -> void:
 
 	# Act / Assert：空快照、只带版本、缺 heroes 的半截快照——全拒且状态不变
 	assert_false(b.from_snapshot({}), "空快照应拒")
-	assert_false(b.from_snapshot({v = 1}), "缺必需键应拒")
+	assert_false(b.from_snapshot({v = BattleCore.SNAPSHOT_VERSION}), "缺必需键应拒")
 	var half: Dictionary = before.duplicate(true)
 	half.erase("heroes")
 	assert_false(b.from_snapshot(half), "缺 heroes 应拒")
+	var missing_h02_state: Dictionary = before.duplicate(true)
+	missing_h02_state.erase("upgrade_next_wave")
+	assert_false(b.from_snapshot(missing_h02_state), "缺牛金团队波升级状态应拒")
+	var missing_h04_state: Dictionary = before.duplicate(true)
+	missing_h04_state.erase("attack_target")
+	assert_false(b.from_snapshot(missing_h04_state), "缺房日基础攻击目标状态应拒")
 	assert_false(b.from_snapshot({v = [], heroes = []}), "v 为数组不得炸脚本（类型门）")
 	assert_eq_deep(b.to_snapshot(), before)

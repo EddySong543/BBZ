@@ -1,0 +1,123 @@
+[gd_scene format=3 uid="uid://dv7vuv6m258ew"]
+
+[ext_resource type="Script" uid="uid://0ur5orswexwk" path="res://src/ui/components/boot_character_idle.gd" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://pndk44ds1mdc" path="res://assets/ui/boot/character/boot_char_base.png" id="2_base"]
+[ext_resource type="Texture2D" uid="uid://cag6f43jejbwb" path="res://assets/ui/boot/character/boot_char_hair_left_tips.png" id="3_hair_left"]
+[ext_resource type="Texture2D" uid="uid://cq672cj27tuxo" path="res://assets/ui/boot/character/boot_char_hair_right_tips.png" id="4_hair_right"]
+[ext_resource type="Texture2D" uid="uid://bpned1h6jvhnt" path="res://assets/ui/boot/character/boot_char_hair_front_tips.png" id="5_hair_front"]
+[ext_resource type="Texture2D" uid="uid://dl2v2ksjrtygk" path="res://assets/ui/boot/character/boot_char_fur_right_tips.png" id="6_fur_right"]
+[ext_resource type="Texture2D" path="res://assets/ui/boot/character/boot_char_waist_screen_right.png" id="7_waist_screen_right"]
+[ext_resource type="Shader" uid="uid://cwauqbogivrte" path="res://assets/shaders/canvas_boot_energy_glow.gdshader" id="8_glow_shader"]
+[ext_resource type="Shader" uid="uid://di1qgc8bigspn" path="res://assets/shaders/canvas_boot_energy_star.gdshader" id="9_star_shader"]
+[ext_resource type="Texture2D" path="res://assets/ui/boot/character/boot_char_waist_screen_left.png" id="10_waist_screen_left"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_energy_glow"]
+shader = ExtResource("8_glow_shader")
+shader_parameter/glow_color = Color(1, 0.72, 0.22, 0.34)
+shader_parameter/intensity = 0.78
+shader_parameter/radius = 0.92
+shader_parameter/pulse_amount = 0.06
+shader_parameter/pulse_phase = 0.0
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_energy_star"]
+shader = ExtResource("9_star_shader")
+shader_parameter/core_color = Color(1, 0.96, 0.78, 1)
+shader_parameter/ray_color = Color(1, 0.65, 0.12, 0.9)
+shader_parameter/ring_color = Color(1, 0.78, 0.28, 0.46)
+shader_parameter/intensity = 1.0
+shader_parameter/core_radius = 0.18
+shader_parameter/ray_width = 0.045
+shader_parameter/horizontal_length = 0.94
+shader_parameter/vertical_length = 0.72
+shader_parameter/ray_curve = 0.045
+shader_parameter/ray_pulse_strength = 0.38
+shader_parameter/ray_pulse_width = 0.14
+shader_parameter/ring_strength = 0.42
+shader_parameter/ring_birth_duration = 0.16
+shader_parameter/ring_fade_start = 0.52
+shader_parameter/grid_size = 48.0
+shader_parameter/pulse_amount = 0.055
+shader_parameter/pulse_phase = 0.0
+
+[node name="BootCharacterIdle" type="Control" unique_id=1424163463]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 1677.9402
+offset_bottom = 1014.42
+mouse_filter = 2
+script = ExtResource("1_script")
+
+[node name="Rig" type="Node2D" parent="." unique_id=1713525141]
+position = Vector2(0, 57.48)
+scale = Vector2(5.26, 5.26)
+
+[node name="RearHandEnergyAnchor" type="Marker2D" parent="Rig" unique_id=60187029]
+position = Vector2(112.68, 47.125)
+
+[node name="RearHandGlow" type="ColorRect" parent="Rig/RearHandEnergyAnchor" unique_id=1365815057]
+z_index = -2
+material = SubResource("ShaderMaterial_energy_glow")
+offset_left = -43.84
+offset_top = -43.84
+offset_right = 43.84
+offset_bottom = 43.84
+mouse_filter = 2
+
+[node name="RearHandStar" type="ColorRect" parent="Rig/RearHandEnergyAnchor" unique_id=1494498467]
+z_index = 20
+material = SubResource("ShaderMaterial_energy_star")
+offset_left = -30.14
+offset_top = -30.14
+offset_right = 30.14
+offset_bottom = 30.14
+mouse_filter = 2
+
+[node name="Base" type="Sprite2D" parent="Rig" unique_id=1404843144]
+texture_filter = 1
+texture = ExtResource("2_base")
+centered = false
+
+[node name="WaistScreenRightPivot" type="Node2D" parent="Rig"]
+position = Vector2(183, 91)
+
+[node name="WaistScreenRight" type="Sprite2D" parent="Rig/WaistScreenRightPivot" unique_id=1849971669]
+texture_filter = 1
+position = Vector2(-183, -91)
+texture = ExtResource("7_waist_screen_right")
+centered = false
+
+[node name="WaistScreenLeftPivot" type="Node2D" parent="Rig"]
+position = Vector2(139, 91)
+
+[node name="WaistScreenLeft" type="Sprite2D" parent="Rig/WaistScreenLeftPivot"]
+texture_filter = 1
+position = Vector2(-139, -91)
+texture = ExtResource("10_waist_screen_left")
+centered = false
+
+[node name="FurRightTips" type="Sprite2D" parent="Rig" unique_id=715662368]
+texture_filter = 1
+texture = ExtResource("6_fur_right")
+centered = false
+
+[node name="HairLeftTips" type="Sprite2D" parent="Rig" unique_id=563050165]
+texture_filter = 1
+texture = ExtResource("3_hair_left")
+centered = false
+
+[node name="HairRightTips" type="Sprite2D" parent="Rig" unique_id=625756076]
+texture_filter = 1
+texture = ExtResource("4_hair_right")
+centered = false
+
+[node name="HairFrontTips" type="Sprite2D" parent="Rig" unique_id=1227373915]
+texture_filter = 1
+texture = ExtResource("5_hair_front")
+centered = false
+
+[node name="EnergyAnchor" type="Marker2D" parent="Rig" unique_id=164495250]
+position = Vector2(252, 57)
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1953061808]
+
+[node name="WaistAnimationPlayer" type="AnimationPlayer" parent="."]

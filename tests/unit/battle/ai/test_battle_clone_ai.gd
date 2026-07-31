@@ -66,6 +66,22 @@ func test_clone_state_is_independent() -> void:
 	assert_false(b.info_distortion[0].has("bar"), "原局 info_distortion 不随克隆改动")
 
 
+func test_clone_preserves_h02_team_wave_upgrade_and_keeps_array_independent() -> void:
+	var b := _battle2([["h02", 7], ["t01", 10], ["t02", 10]],
+		[["t10", 10], ["t11", 10], ["t12", 10]])
+	b.upgrade_next_wave[0] = true
+	b.upgrade_next_wave[1] = true
+
+	var c := b.clone()
+	assert_true(c.upgrade_next_wave[0], "克隆体应保留己方下一次波升级")
+	assert_true(c.upgrade_next_wave[1], "克隆体应保留敌方下一次波升级")
+
+	c.upgrade_next_wave[0] = false
+	c.upgrade_next_wave[1] = false
+	assert_true(b.upgrade_next_wave[0], "克隆体消费升级不得污染原局")
+	assert_true(b.upgrade_next_wave[1], "克隆体消费敌方升级不得污染原局")
+
+
 # ---- clone：推演不污染原局 ----
 
 func test_clone_resolve_does_not_mutate_original() -> void:
@@ -146,7 +162,7 @@ func test_legal_actions_includes_available_active() -> void:
 	# Assert
 	assert_true(ACTIVE in _actions_of(b.legal_actions(0)), "可用主动技应在合法动作内")
 
-	# h01 盾枢 纯被动 → 无 ACTIVE
+	# h01 步虚无有乡为纯被动 → 无 ACTIVE
 	var b2 := _battle2([["h01", 4], ["t01", 10], ["t02", 10]], [["t10", 10], ["t11", 10], ["t12", 10]])
 	assert_false(ACTIVE in _actions_of(b2.legal_actions(0)), "纯被动英雄无主动技选项")
 
@@ -163,6 +179,37 @@ func test_legal_actions_enumerates_pull_targets() -> void:
 	assert_true(1 in targets and 2 in targets, "目标 = 敌方替补槽 1 / 2")
 	assert_true(b.apply_choice(0, {action = ACTIVE, target = 2}), "带目标主动 choice 合法")
 	assert_eq(b.active_target(0), 2, "揪目标已登记（execute_active 将定向揪槽 2）")
+
+
+func test_legal_actions_enumerates_h04_attack_targets() -> void:
+	var b := _battle2([["h04", 5], ["t01", 10], ["t02", 10]],
+		[["t10", 10], ["t11", 6], ["t12", 4]], 20)
+	b.hp[1][2] = 0
+	var wave_targets: Array[int] = []
+	var big_wave_targets: Array[int] = []
+	for choice in b.legal_actions(0):
+		if int(choice["action"]) == ATTACK:
+			wave_targets.append(int(choice["target"]))
+		elif int(choice["action"]) == BIG:
+			big_wave_targets.append(int(choice["target"]))
+
+	assert_eq(wave_targets, [0, 1], "波应为每个存活敌方英雄生成独立目标选项")
+	assert_eq(big_wave_targets, [0, 1], "大波应为每个存活敌方英雄生成独立目标选项")
+
+
+func test_h04_attack_target_survives_clone_and_apply_choice() -> void:
+	var b := _battle2([["h04", 5], ["t01", 10], ["t02", 10]],
+		[["t10", 10], ["t11", 6], ["t12", 4]], 20)
+	assert_true(b.apply_choice(0, {action = ATTACK, target = 2}), "h04 带目标基础攻击 choice 合法")
+	var c := b.clone()
+	b.select_action(1, CHARGE)
+	c.select_action(1, CHARGE)
+	var original_result: Dictionary = b.resolve()
+	var clone_result: Dictionary = c.resolve()
+
+	assert_eq_deep(clone_result, original_result)
+	assert_eq(c.hp[1][2], 6, "克隆中的攻击应命中槽 2")
+	assert_eq(c.hp[1][0], 20, "克隆中的敌方出战位不应被误伤")
 
 
 # ---- apply_choice：分派正确 ----

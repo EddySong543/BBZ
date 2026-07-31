@@ -1,171 +1,128 @@
-# Boot Screen H01 主图 Prompt
+# Boot Screen H01 · Image 2 主图 Prompt
 
-## 为什么这一版看起来仍像动漫立绘
+## 当前阶段只做什么
 
-这份 Prompt 生成的是“高清角色源图”，不是最终游戏画面。方案 B 的 HD-2D
-效果来自后续两步：
+这一轮只生成一张“姿势和角色都正确”的高清母图。
 
-1. 用 PixelLab 或等价工具把高清源图做整数倍降采样、调色板量化与像素边缘清理。
-2. 在 Godot 中叠加像素化照明、金球、流水、粒子和景深。
+- 要：H01 身份、正面身体、轻微仰视、胸口空位、上下对齐的双掌。
+- 不要：金球、流光、粒子、标题、场景、像素化、动画。
 
-因此，高清源图保留动漫/厚涂感并不冲突。若要在第一轮就预览更接近最终画面的
-像素混合效果，可同时运行 `design/boot-h01-midjourney-v81-prompt.md` 中的
-Midjourney V8.1 方案。
+最终的 HD-2D 感由后续 PixelLab 像素化、分层和 Godot 特效共同完成。因此，
+这一轮仍带有高清动漫或游戏原画质感是正常的，不需要让 Image 2 同时完成最终效果。
 
-## 第一次出图怎么做
+## 上传图片
 
-1. 优先使用支持多张参考图和对话修改的高质量图像模型。项目现行首选为 GPT Image 2；如果暂时无法使用，也可把同一 Prompt 交给 Rika AI、Midjourney 或其他参考图模型。
-2. 按固定顺序上传两张图：
-   - 图 1：`assets/import/hero/h01.png`
-   - 图 2：`assets/sprites/heroes/h01/h01.png`
-3. 选择竖版高质量输出，建议 1024×1792 或最接近的竖版比例。
-4. 一次生成 4 张候选。
-5. 这一轮不要上传 `assets/ui/icons/Zan_idle.png`，它的手势与本方案不一致。
+开启一个新的 Image 2 对话，只上传下面两张图，顺序不要改变：
 
-## 主 Prompt
+1. `assets/import/hero/h01.png`
+   - 这是“角色参考图”。
+   - 只参考 H01 的脸、发型、围巾、背带、服装和颜色。
+   - 不参考这张图原本的站姿、身体朝向和镜头。
+2. `design/references/boot_h01_pose_guide.png`
+   - 这是“姿势参考图”。
+   - 身体朝向、镜头、双手位置和胸口空位全部以它为准。
 
-```text
-Style anchor: high-detail full-body character key art for an oriental fantasy
-game, painterly digital painting with visible confident brushwork, crisp
-readable silhouette, and large clean color planes suitable for later HD-2D
-pixel reduction. Heroic and restrained, not glossy, not photorealistic, not
-chibi, no cartoon exaggeration. The character is rendered alone on a fully
-transparent background as a PNG with alpha. No text anywhere.
+第一轮不要上传 H01 像素图，也不要上传 `Zan_idle.png`。参考图越多，模型越容易
+把原有站姿和左右抱球手势重新混进来。
 
-Reference use is strict:
+## 第一轮主 Prompt
 
-Image 1 is the identity and costume authority. Keep exactly the same H01
-character: the same asymmetric messy black hair covering one eye, the same
-purple-black high collar scarf, the same crossed chest straps, the same
-layered dark-purple martial robe, wide sleeves, wrapped trousers, boots,
-gloves, body proportions, and painterly design language.
-
-Image 2 is only a secondary pixel-game reference. Take from it only H01's
-compact readable silhouette, simplified value grouping, and dark-purple color
-balance. Do not copy its tiny sprite proportions or its idle pose.
-
-Subject and camera:
-
-Create one full-body H01 standing upright and centered. The torso faces the
-camera almost straight-on. The viewpoint is a restrained 10-to-15-degree low
-angle with a mild wide-lens heroic feeling. Keep the head and hands natural:
-no extreme foreshortening, no giant hands, no distorted face. The head tilts
-slightly downward toward the empty space between the hands. Both feet and all
-robe edges remain completely inside the frame.
-
-Pose lock — this is the most important requirement:
-
-H01 is gathering qi around an INVISIBLE sphere at the CENTER OF THE CHEST.
-Leave one clean circular empty gap at chest level, about the width of the
-character's head and a half.
-
-The upper hand is placed HORIZONTALLY and DIRECTLY ABOVE that empty circular
-gap. Its palm faces straight downward.
-
-The lower hand is placed HORIZONTALLY and DIRECTLY BELOW that empty circular
-gap. Its palm faces straight upward.
-
-The two palms are vertically aligned on the same center line. They form a
-clear top-and-bottom Tai Chi energy-gathering pose. They are NOT diagonal,
-NOT side-by-side, NOT cupping from the left and right, NOT pushing toward the
-viewer, and NOT lifting or holding an object.
-
-Both arms curve naturally inward from the shoulders to support this pose, but
-the palms do not touch the invisible sphere. Keep all fingers anatomically
-correct, clearly separated, and readable. Preserve H01's gloves and hand-wrap
-design while keeping the palm direction unmistakable.
-
-Character adaptation for this Boot Screen:
-
-Keep H01 recognizable, but reduce the number of hanging weapons, knives,
-tools, and belt ornaments around the waist so the chest, hands, and empty
-energy gap stay visually clean. Keep the scarf, crossed straps, layered robe,
-wide sleeves, wrapped legs, and boots.
-
-The face remains mostly in shadow beneath the asymmetric fringe. Show only one
-subtle violet eye and a very thin restrained warm-gold rim light along parts
-of the hair, cheek, upper gloves, and robe edges, as if a future chest-level
-light source will illuminate the character. The dark-purple costume remains
-visible as large controlled value shapes; do not crush the entire character
-into a featureless black silhouette.
-
-Movable-part discipline:
-
-Give the front fringe, rear hair tips, one short scarf tail, sleeve edges, and
-two or three large robe flaps clean separated silhouettes that can later be
-cut into animation layers. Avoid wispy hair strands, tiny tassels, dense
-jewelry, and excessive hanging clutter.
-
-Asset exclusions:
-
-Do not draw the gold sphere.
-Do not draw any visible magic, energy streams, particles, halo, smoke, title,
-letters, environment, floor, cast shadow, weapon, or backdrop.
-Do not paint a black or gray rectangle behind the character.
-Do not crop the head, hands, feet, scarf, sleeves, or robe.
-
-Final self-check:
-
-The result fails if the hands are diagonal.
-The result fails if the upper and lower palms are not vertically aligned.
-The result fails if the empty gap is at the abdomen instead of the chest.
-The result fails if H01 appears to hold, lift, or touch a sphere.
-The result fails if any energy effect, text, background, or weapon is visible.
-The result fails if H01 is no longer recognizable from image 1.
-The result fails if any finger is fused, missing, duplicated, or bent
-unnaturally.
-
-Output one full-body H01 only, centered on a portrait transparent canvas, with
-generous transparent margin around the entire silhouette.
-```
-
-## 纠偏 Prompt：手掌仍然斜着
+直接复制下面整段：
 
 ```text
-Keep exactly this image, character identity, face, costume, camera, lighting,
-framing, and transparent background. Change only the arms and hands.
+请根据我上传的两张参考图，生成一张单人全身角色母图。
 
-Move the upper hand to the exact horizontal center directly above the empty
-chest-level circular gap. Rotate it flat so the palm faces straight down.
+两张参考图的作用必须严格分开：
 
-Move the lower hand to the exact horizontal center directly below the same
-gap. Rotate it flat so the palm faces straight up.
+- 图1只负责角色身份和服装。角色必须是同一个H01：保留不对称的凌乱黑发、
+  遮住一只眼睛的刘海、紫黑色高领围巾、胸前交叉背带、深紫黑色分层武服、
+  宽袖、手套、绑腿和靴子。不要复制图1原本的身体朝向、站姿或镜头。
+- 图2是姿势和构图的最高标准。用H01完整替换图2中的示意人物，但必须准确保留
+  图2的正面身体、轻微仰视、手臂走势、上下手掌位置和胸口圆形空位。
 
-The two palms must share one vertical center line. They must not be diagonal,
-left-and-right, cupped around the sides, or touching an object. Rebuild the
-forearms naturally to connect the corrected hands to the shoulders. Preserve
-H01's gloves and correct five-finger anatomy. Change nothing else.
+最重要的姿势要求：
+
+1. H01站立，肩膀、胸口和腰部正对镜头，不能是三分之四侧身。
+2. 镜头只有轻微仰视，大约10至15度，不要产生巨大的手或严重透视变形。
+3. 在胸口正中央保留一个干净的圆形空位，大小约为角色头部宽度的1.5倍。
+4. 上方的手位于圆形空位正上方，手掌水平放平，掌心垂直朝下。
+5. 下方的手位于圆形空位正下方，手掌水平放平，掌心垂直朝上。
+6. 两只手掌必须位于同一条竖直中心线上，形成在胸口聚气的上下合掌姿势。
+7. 双手不能斜着，不能位于球体左右两侧，不能向镜头伸出，不能托举或触碰物体。
+8. 手臂自然向身体中线弯曲，五指清楚、完整、符合人体结构。
+
+角色低头看向双手之间的胸口空位。脸的大部分隐藏在刘海阴影中，只露出一只较暗的
+紫色眼睛。头发、脸侧、手套和衣服边缘可以有非常细的暖金色轮廓光，但不要出现
+实际光源。
+
+简化腰间杂物，不要武器、刀具、工具和大量挂件。保留围巾、交叉背带、分层长袍、
+宽袖、绑腿和靴子，让双手和胸口空位清楚可见。
+
+画面风格为高清东方幻想游戏角色原画，带克制的动漫设计和厚涂体积，使用清楚的大色块
+和硬朗轮廓，方便之后制作HD-2D像素化版本。现在不要直接画成低分辨率像素小人。
+
+只生成一个角色。角色居中，全身和双脚完整，头发、围巾、袖子和衣摆都不能被裁切。
+背景使用纯净透明背景；如果无法真正生成透明背景，就使用单一均匀的中灰色背景，
+不要地面和投影。
+
+绝对不要生成金色球体、魔法、能量、流光、粒子、烟雾、光环、标题、文字、场景、
+地面、武器或其他人物。
+
+输出一张竖版单人图，不要拼图，不要角色设定表，不要在一张图中放多个候选。
 ```
 
-## 纠偏 Prompt：模型画出了金球或特效
+## 第一轮生成方式
+
+1. 选择竖版，比例使用 `4:7`；如果只能选固定尺寸，就选最接近的竖版高清尺寸。
+2. 每次只生成一张。
+3. 最多独立生成三次。
+4. 三张中先选“身体最正、上下掌最准确”的一张，不要先选脸最好看的。
+5. 找到接近的图后进入同一个对话继续修改，不要重新开一轮从零生成。
+
+## 纠偏 Prompt：姿势正确，但身体仍像原立绘一样侧着
+
+把选中的图片作为当前编辑对象，同时再次附上姿势参考图，然后复制：
 
 ```text
-Keep the character, corrected hands, face, costume, camera, framing, and every
-other detail unchanged. Remove the sphere and remove every magic effect,
-particle, glow cloud, energy ribbon, title, floor, and background. Restore a
-clean fully transparent circular gap between the hands. Keep only the very
-thin warm rim light already painted on H01's edges. Output PNG with alpha.
+保留当前图片中的H01身份、脸、发型、服装、配色、双手姿势、画风、光线、完整构图
+和背景，只修改身体朝向。
+
+将肩膀、胸腔、腰部和骨盆转成正对镜头的正面姿态。左右肩应处于接近相同的远近关系，
+胸口中心线正对相机，不能保持三分之四侧身。严格参考附加姿势图中的正面朝向。
+
+保持10至15度的轻微仰视。不要移动胸口圆形空位，不要改变上下手掌的垂直对齐，
+不要改变手掌朝向，不要改变H01服装和脸。只修正身体朝向，其他内容全部保持不变。
 ```
 
-## 纠偏 Prompt：H01 腰部过于杂乱
+## 纠偏 Prompt：身体正确，但双手仍然斜着
 
 ```text
-Keep H01's face, hair, scarf, crossed chest straps, robe, gloves, corrected
-hands, pose, camera, lighting, and transparent background unchanged. Simplify
-only the waist: remove hanging knives, tools, weapon handles, dense trinkets,
-and most tiny cords. Retain one plain dark belt and two or three broad robe
-layers. The chest-level empty energy gap and both hands must remain completely
-clear. Change nothing else.
+保留当前图片中的H01身份、脸、身体朝向、服装、镜头、光线、构图和背景，只修改双臂
+与双手。
+
+将上方的手移动到胸口圆形空位的正上方，手掌完全水平，掌心垂直朝下。
+将下方的手移动到同一个圆形空位的正下方，手掌完全水平，掌心垂直朝上。
+两只手掌中心必须处于同一条竖直线上。
+
+它们不能斜着，不能位于空位左右两侧，不能朝镜头伸出，不能托住或触碰物体。
+重新连接前臂，使姿势自然。保留原有手套，并生成正确清楚的五指。其他内容不要改变。
 ```
 
-## 选图验收顺序
+## 纠偏 Prompt：出现了球体或能量
 
-不要先挑“脸最好看”的图，按下面顺序检查：
+```text
+保持H01、身体朝向、双手姿势、服装、镜头、光线和构图完全不变。只删除双手之间的
+球体以及全部魔法、光芒、流线、粒子、烟雾和光环，恢复为干净透明的胸口圆形空位。
+不要修改角色的任何部分。
+```
 
-1. 上掌正上、下掌正下，二者垂直对齐。
-2. 球体位置是胸口空位，不是腹部。
-3. H01 发型、围巾、交叉背带和深紫武服仍然可辨认。
-4. 手指正确，双手没有接触或托举任何东西。
-5. 轻仰视不过度，头和手没有夸张变形。
-6. 全身、双脚和衣摆完整。
-7. 背景真正透明，没有文字、球体和特效。
+## 最终验收顺序
+
+1. 肩膀、胸口和腰部正对镜头。
+2. 上掌正上、下掌正下，两掌垂直对齐。
+3. 圆形空位位于胸口，不是腹部。
+4. 双手没有托举、触摸任何球体。
+5. H01 的黑发、围巾、交叉背带和深紫武服仍然清楚。
+6. 五指正确，全身、双脚和衣摆完整。
+7. 没有能量、文字、武器、场景和投影。
+8. 背景透明，或为容易移除的单一中灰色。

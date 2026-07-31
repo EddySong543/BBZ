@@ -1,0 +1,1210 @@
+[gd_scene format=3 uid="uid://04eu3rj4w5rp"]
+
+[ext_resource type="Script" uid="uid://di0qh6ki88n6e" path="res://src/ui/components/battle_stage.gd" id="1_stage"]
+[ext_resource type="Texture2D" uid="uid://bga6bwtttrew7" path="res://assets/scenes/scene3/scene3_sky1.png" id="2_sky1"]
+[ext_resource type="Texture2D" uid="uid://itndnoj3wjv1" path="res://assets/scenes/scene3/scene3_sky2.png" id="3_sky2"]
+[ext_resource type="Shader" uid="uid://dms5ecljflsqy" path="res://assets/shaders/canvas_env_scene3_fog_band.gdshader" id="4_fog"]
+[ext_resource type="Shader" uid="uid://dqsbe5p7lo3y3" path="res://assets/shaders/canvas_env_scene3_asset_grade.gdshader" id="6_asset"]
+[ext_resource type="Texture2D" uid="uid://c1xoxg3xksair" path="res://assets/scenes/scene3/scene3_left_mountain.png" id="7_left"]
+[ext_resource type="Texture2D" uid="uid://cfmf42mvh2l10" path="res://assets/scenes/scene3/scene3_right_mountain.png" id="8_right"]
+[ext_resource type="Texture2D" uid="uid://otolk26d0krq" path="res://assets/scenes/scene3/scene3_chain.png" id="9_chain"]
+[ext_resource type="Shader" uid="uid://dtsk4bu4aqai5" path="res://assets/shaders/canvas_env_scene3_cloud_sea.gdshader" id="10_pixel_cloud"]
+[ext_resource type="Texture2D" uid="uid://cxx78l7uon8rl" path="res://assets/scenes/scene3/scene3_left_far_mountain.png" id="16_left_far"]
+[ext_resource type="Texture2D" uid="uid://calwxp5nay8s7" path="res://assets/scenes/scene3/scene3_right_far_mountain.png" id="17_right_far"]
+[ext_resource type="Texture2D" uid="uid://borh5rs1i8x6a" path="res://assets/scenes/scene2/scene2_far_mountain.png" id="18_scene2_far"]
+[ext_resource type="Shader" uid="uid://wu5juw6frubv" path="res://assets/shaders/canvas_env_scene2_depth_grade.gdshader" id="19_depth_grade"]
+[ext_resource type="Shader" uid="uid://d1pg4o5pi500j" path="res://assets/shaders/canvas_env_scene3_sun_rays.gdshader" id="21_sun_rays"]
+[ext_resource type="Texture2D" uid="uid://d3dig85c1cjfj" path="res://assets/scenes/scene3/scene3_sun.png" id="22_sun"]
+[ext_resource type="Shader" uid="uid://5austc36b5gp" path="res://assets/shaders/canvas_env_scene3_sun_grade.gdshader" id="23_sun_grade"]
+[ext_resource type="Shader" uid="uid://cmxe6ype6wgm6" path="res://assets/shaders/canvas_env_scene3_sun_halo.gdshader" id="24_sun_halo"]
+[ext_resource type="Shader" uid="uid://b7rlr86wbqay" path="res://assets/shaders/canvas_env_scene3_far_mountain_grade.gdshader" id="25_far_mountain_grade"]
+[ext_resource type="Shader" uid="uid://cfi0mv4hiyemn" path="res://assets/shaders/canvas_env_scene3_cliff_grass_sway.gdshader" id="26_cliff_grass_sway"]
+[ext_resource type="Texture2D" uid="uid://cgn4xu6775ukp" path="res://assets/scenes/scene3/scene3_left_cliff_grass_mask.png" id="27_left_grass_mask"]
+[ext_resource type="Texture2D" uid="uid://dw0x0lnajisi8" path="res://assets/scenes/scene3/scene3_left_cliff_grass_underpaint.png" id="28_left_grass_underpaint"]
+[ext_resource type="Texture2D" uid="uid://128ofwyijvdw" path="res://assets/scenes/scene3/scene3_right_cliff_grass_mask.png" id="29_right_grass_mask"]
+[ext_resource type="Texture2D" uid="uid://d25onoaimjnj1" path="res://assets/scenes/scene3/scene3_right_cliff_grass_underpaint.png" id="30_right_grass_underpaint"]
+[ext_resource type="Shader" uid="uid://7nbukk7cvgtd" path="res://assets/shaders/canvas_env_scene3_sun_veil.gdshader" id="31_sun_veil"]
+[ext_resource type="Shader" uid="uid://l1n4kwh41gg3" path="res://assets/shaders/canvas_env_scene3_chain_foot_occluder.gdshader" id="32_chain_foot"]
+[ext_resource type="Shader" uid="uid://306nwae3dadt" path="res://assets/shaders/canvas_env_scene3_chain_depth.gdshader" id="33_chain_depth"]
+[ext_resource type="Texture2D" uid="uid://d34hipb86ois7" path="res://assets/scenes/scene3/scene3_mid_sword_grave.png" id="34_sword_grave"]
+[ext_resource type="Shader" uid="uid://jt0a4ik0mjly" path="res://assets/shaders/canvas_env_scene3_sword_grave_grade.gdshader" id="35_sword_grave_grade"]
+[ext_resource type="Shader" uid="uid://cua5kbjjirrby" path="res://assets/shaders/canvas_env_scene3_sword_glint.gdshader" id="36_sword_glint"]
+[ext_resource type="Shader" uid="uid://3d265upgppmc" path="res://assets/shaders/canvas_env_scene3_distant_mountain_grade.gdshader" id="37_distant_mountain_grade"]
+[ext_resource type="Shader" uid="uid://ctqff5bg7wdco" path="res://assets/shaders/canvas_env_scene3_cloud_floor.gdshader" id="38_cloud_floor"]
+[ext_resource type="Script" uid="uid://i487qwohrja7" path="res://src/ui/components/scene3_flying_fish_school.gd" id="40_flying_fish"]
+
+[sub_resource type="ShaderMaterial" id="DistantMountainMidMat"]
+resource_local_to_scene = true
+shader = ExtResource("37_distant_mountain_grade")
+shader_parameter/saturation = 0.16
+shader_parameter/contrast = 1.02
+shader_parameter/brightness = 0.86
+shader_parameter/atmosphere_color = Color(0.5, 0.49, 0.46, 1)
+shader_parameter/atmosphere_strength = 0.32
+shader_parameter/quiet_center = Vector2(0.5, 0.5)
+shader_parameter/quiet_radius = Vector2(0.2, 0.2)
+shader_parameter/quiet_strength = 0.0
+shader_parameter/quiet_color = Color(0.72, 0.76, 0.72, 1)
+shader_parameter/quiet_saturation = 0.35
+shader_parameter/quiet_contrast = 0.5
+shader_parameter/quiet_lift = 0.0
+shader_parameter/edge_cleanup_strength = 0.96
+shader_parameter/edge_cleanup_luma_min = 0.42
+shader_parameter/edge_alpha_cutoff = 0.1
+shader_parameter/edge_sample_px = 1.0
+shader_parameter/edge_tint_color = Color(0.45, 0.48, 0.46, 1)
+shader_parameter/edge_tint_strength = 0.08
+shader_parameter/edge_erode_strength = 0.96
+shader_parameter/light_dir = Vector2(1, -0.8)
+shader_parameter/light_color = Color(0.96, 0.88, 0.7, 1)
+shader_parameter/shadow_color = Color(0.2, 0.27, 0.27, 1)
+shader_parameter/receiver_light_strength = 0.12
+shader_parameter/receiver_shadow_strength = 0.05
+shader_parameter/receiver_rim_strength = 0.0
+shader_parameter/receiver_rim_width = 1.0
+shader_parameter/horizon_warm_color = Color(0.82, 0.58, 0.48, 1)
+shader_parameter/horizon_warm_strength = 0.18
+shader_parameter/horizon_warm_start = 0.46
+shader_parameter/horizon_warm_end = 0.9
+shader_parameter/horizon_warm_center_x = 0.5
+shader_parameter/horizon_warm_half_width = 0.74
+shader_parameter/scene_light_source_uv = Vector2(0.9, -0.08)
+shader_parameter/scene_light_target_uv = Vector2(0.47, 0.78)
+shader_parameter/scene_light_top_width = 0.1
+shader_parameter/scene_light_bottom_width = 0.4
+shader_parameter/scene_light_pool_center = Vector2(0.63, 0.28)
+shader_parameter/scene_light_pool_radius = Vector2(0.56, 0.4)
+
+[sub_resource type="ShaderMaterial" id="DistantMountainNearMat"]
+resource_local_to_scene = true
+shader = ExtResource("37_distant_mountain_grade")
+shader_parameter/saturation = 0.2
+shader_parameter/contrast = 1.1
+shader_parameter/brightness = 0.84
+shader_parameter/atmosphere_color = Color(0.43, 0.45, 0.42, 1)
+shader_parameter/atmosphere_strength = 0.22
+shader_parameter/quiet_center = Vector2(0.5, 0.5)
+shader_parameter/quiet_radius = Vector2(0.2, 0.2)
+shader_parameter/quiet_strength = 0.0
+shader_parameter/quiet_color = Color(0.72, 0.76, 0.72, 1)
+shader_parameter/quiet_saturation = 0.35
+shader_parameter/quiet_contrast = 0.5
+shader_parameter/quiet_lift = 0.0
+shader_parameter/edge_cleanup_strength = 0.92
+shader_parameter/edge_cleanup_luma_min = 0.42
+shader_parameter/edge_alpha_cutoff = 0.1
+shader_parameter/edge_sample_px = 1.0
+shader_parameter/edge_tint_color = Color(0.4, 0.45, 0.44, 1)
+shader_parameter/edge_tint_strength = 0.08
+shader_parameter/edge_erode_strength = 0.92
+shader_parameter/light_dir = Vector2(1, -0.8)
+shader_parameter/light_color = Color(0.96, 0.86, 0.68, 1)
+shader_parameter/shadow_color = Color(0.17, 0.24, 0.25, 1)
+shader_parameter/receiver_light_strength = 0.16
+shader_parameter/receiver_shadow_strength = 0.06
+shader_parameter/receiver_rim_strength = 0.0
+shader_parameter/receiver_rim_width = 1.0
+shader_parameter/horizon_warm_color = Color(0.8, 0.56, 0.46, 1)
+shader_parameter/horizon_warm_strength = 0.22
+shader_parameter/horizon_warm_start = 0.48
+shader_parameter/horizon_warm_end = 0.9
+shader_parameter/horizon_warm_center_x = 0.5
+shader_parameter/horizon_warm_half_width = 0.76
+shader_parameter/scene_light_source_uv = Vector2(0.9, -0.08)
+shader_parameter/scene_light_target_uv = Vector2(0.47, 0.78)
+shader_parameter/scene_light_top_width = 0.1
+shader_parameter/scene_light_bottom_width = 0.4
+shader_parameter/scene_light_pool_center = Vector2(0.63, 0.28)
+shader_parameter/scene_light_pool_radius = Vector2(0.56, 0.4)
+
+[sub_resource type="ShaderMaterial" id="BackFogMat"]
+shader = ExtResource("4_fog")
+shader_parameter/fog_color = Color(0.72, 0.8, 0.8, 0.32)
+shader_parameter/strength = 0.34
+shader_parameter/flow_speed = -0.03
+shader_parameter/pixel_size = 5.0
+
+[sub_resource type="ShaderMaterial" id="SunHaloMat"]
+resource_local_to_scene = true
+shader = ExtResource("24_sun_halo")
+shader_parameter/sun_screen_pos = Vector2(0.51, 0.796)
+shader_parameter/viewport_aspect = 1.7778
+shader_parameter/core_color = Color(1, 0.73, 0.45, 1)
+shader_parameter/corona_color = Color(1, 0.68, 0.38, 1)
+shader_parameter/glow_color = Color(0.89, 0.63, 0.47, 1)
+shader_parameter/core_size = 0.18
+shader_parameter/corona_size = 0.38
+shader_parameter/glow_size = 0.62
+shader_parameter/core_intensity = 0.14
+shader_parameter/corona_intensity = 0.18
+shader_parameter/glow_intensity = 0.1
+shader_parameter/flicker_amount = 0.01
+shader_parameter/flicker_speed = 0.36
+shader_parameter/breath_cycle_sec = 7.8
+shader_parameter/breath_amount = 0.075
+shader_parameter/corona_drift_speed = 0.38
+
+[sub_resource type="ShaderMaterial" id="SunRayMat"]
+resource_local_to_scene = true
+shader = ExtResource("21_sun_rays")
+shader_parameter/ray_color = Color(0.74, 0.72, 0.66, 1)
+shader_parameter/core_color = Color(0.98, 0.82, 0.58, 1)
+shader_parameter/ray_intensity = 0.36
+shader_parameter/pixel_grid = Vector2(480, 144)
+shader_parameter/hidden_sun_center = Vector2(0.52, 1.06)
+shader_parameter/cloud_line_y = 0.88
+shader_parameter/shaft_width_scale = 2.6
+shader_parameter/inner_feather_px = 7.0
+shader_parameter/outer_feather_px = 18.0
+shader_parameter/source_drift = 0.004
+shader_parameter/cloud_roll_speed = 0.42
+shader_parameter/cloud_billow_speed = 0.82
+shader_parameter/cloud_roll_phase = 2.1
+shader_parameter/cloud_billow_phase = 1.7
+
+[sub_resource type="CanvasItemMaterial" id="SunMoteBlend"]
+blend_mode = 1
+
+[sub_resource type="Gradient" id="SunMoteDotGradient"]
+offsets = PackedFloat32Array(0, 0.5, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0.78, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture2D" id="SunMoteDotTexture"]
+gradient = SubResource("SunMoteDotGradient")
+width = 8
+height = 8
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[sub_resource type="Gradient" id="SunMoteLifeGradient"]
+offsets = PackedFloat32Array(0, 0.22, 0.72, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0.82, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="SunMoteLifeRamp"]
+gradient = SubResource("SunMoteLifeGradient")
+
+[sub_resource type="ParticleProcessMaterial" id="SunMotesFarMat"]
+emission_shape = 3
+emission_box_extents = Vector3(430, 170, 1)
+direction = Vector3(-0.12, -1, 0)
+spread = 18.0
+initial_velocity_min = 2.5
+initial_velocity_max = 5.0
+gravity = Vector3(0.35, -0.7, 0)
+scale_min = 0.5
+scale_max = 1.05
+color = Color(1, 0.79, 0.56, 0.26)
+color_ramp = SubResource("SunMoteLifeRamp")
+turbulence_enabled = true
+turbulence_noise_strength = 1.2
+turbulence_noise_scale = 1.0
+
+[sub_resource type="ShaderMaterial" id="DawnSunMat"]
+resource_local_to_scene = true
+shader = ExtResource("23_sun_grade")
+shader_parameter/shadow_color = Color(0.43, 0.24, 0.17, 1)
+shader_parameter/mid_color = Color(0.89, 0.63, 0.47, 1)
+shader_parameter/highlight_color = Color(1, 0.82, 0.56, 1)
+shader_parameter/mid_point = 0.5
+shader_parameter/contrast = 1.05
+shader_parameter/brightness = 1.08
+shader_parameter/cloud_shadow_color = Color(0.48, 0.43, 0.39, 1)
+shader_parameter/cloud_shadow_strength = 0.08
+shader_parameter/alpha_scale = 0.92
+shader_parameter/palette_steps = 48.0
+shader_parameter/outline_soften_color = Color(0.94, 0.66, 0.49, 1)
+shader_parameter/outline_soften_strength = 0.82
+shader_parameter/outline_alpha_reduction = 0.58
+shader_parameter/outline_sample_px = 5.0
+shader_parameter/fade_start = 0.4
+shader_parameter/fade_end = 0.56
+shader_parameter/pulse_cycle_sec = 7.8
+shader_parameter/pulse_amount = 0.065
+shader_parameter/surface_shimmer_amount = 0.035
+
+[sub_resource type="ShaderMaterial" id="ChainFarMat"]
+resource_local_to_scene = true
+shader = ExtResource("33_chain_depth")
+shader_parameter/depth_tint = Color(0.4, 0.45, 0.45, 1)
+shader_parameter/atmosphere_color = Color(0.62, 0.66, 0.64, 1)
+shader_parameter/saturation = 0.08
+shader_parameter/contrast = 0.6
+shader_parameter/brightness = 1.04
+shader_parameter/tint_strength = 0.46
+shader_parameter/atmosphere_strength = 0.58
+shader_parameter/outline_lift = 0.72
+shader_parameter/alpha_scale = 0.52
+shader_parameter/edge_fade = 0.05
+shader_parameter/palette_steps = 24.0
+shader_parameter/repeat_x = 1.0
+
+[sub_resource type="ShaderMaterial" id="ChainMidMat"]
+resource_local_to_scene = true
+shader = ExtResource("33_chain_depth")
+shader_parameter/depth_tint = Color(0.37, 0.43, 0.43, 1)
+shader_parameter/atmosphere_color = Color(0.57, 0.62, 0.61, 1)
+shader_parameter/saturation = 0.12
+shader_parameter/contrast = 0.68
+shader_parameter/brightness = 0.98
+shader_parameter/tint_strength = 0.42
+shader_parameter/atmosphere_strength = 0.48
+shader_parameter/outline_lift = 0.64
+shader_parameter/alpha_scale = 0.6
+shader_parameter/edge_fade = 0.04
+shader_parameter/palette_steps = 24.0
+shader_parameter/repeat_x = 1.0
+
+[sub_resource type="ShaderMaterial" id="LeftFarMountainMat"]
+resource_local_to_scene = true
+shader = ExtResource("19_depth_grade")
+shader_parameter/saturation = 0.34
+shader_parameter/contrast = 0.86
+shader_parameter/brightness = 1.08
+shader_parameter/atmosphere_color = Color(0.49, 0.53, 0.57, 1)
+shader_parameter/atmosphere_strength = 0.38
+shader_parameter/quiet_center = Vector2(0.5, 0.5)
+shader_parameter/quiet_radius = Vector2(0.2, 0.2)
+shader_parameter/quiet_strength = 0.0
+shader_parameter/quiet_color = Color(0.72, 0.76, 0.72, 1)
+shader_parameter/quiet_saturation = 0.35
+shader_parameter/quiet_contrast = 0.5
+shader_parameter/quiet_lift = 0.0
+shader_parameter/edge_cleanup_strength = 0.35
+shader_parameter/edge_cleanup_luma_min = 0.88
+shader_parameter/light_dir = Vector2(1, -0.8)
+shader_parameter/light_color = Color(1, 0.88, 0.62, 1)
+shader_parameter/shadow_color = Color(0.16, 0.29, 0.3, 1)
+shader_parameter/receiver_light_strength = 0.16
+shader_parameter/receiver_shadow_strength = 0.04
+shader_parameter/receiver_rim_strength = 0.12
+shader_parameter/receiver_rim_width = 1.0
+shader_parameter/horizon_warm_color = Color(0.86, 0.55, 0.44, 1)
+shader_parameter/horizon_warm_strength = 0.12
+shader_parameter/horizon_warm_start = 0.48
+shader_parameter/horizon_warm_end = 0.9
+shader_parameter/horizon_warm_center_x = 0.5
+shader_parameter/horizon_warm_half_width = 0.76
+shader_parameter/scene_light_source_uv = Vector2(0.9, -0.08)
+shader_parameter/scene_light_target_uv = Vector2(0.47, 0.78)
+shader_parameter/scene_light_top_width = 0.1
+shader_parameter/scene_light_bottom_width = 0.4
+shader_parameter/scene_light_pool_center = Vector2(0.63, 0.28)
+shader_parameter/scene_light_pool_radius = Vector2(0.56, 0.4)
+
+[sub_resource type="ShaderMaterial" id="RightFarMountainMat"]
+resource_local_to_scene = true
+shader = ExtResource("25_far_mountain_grade")
+shader_parameter/shadow_palette = Color(0.18, 0.21, 0.2, 1)
+shader_parameter/midtone_palette = Color(0.39, 0.44, 0.41, 1)
+shader_parameter/highlight_palette = Color(0.64, 0.69, 0.64, 1)
+shader_parameter/palette_midpoint = 0.46
+shader_parameter/contrast = 0.92
+shader_parameter/brightness = 1.12
+shader_parameter/saturation = 0.0
+shader_parameter/atmosphere_color = Color(0.57, 0.6, 0.57, 1)
+shader_parameter/atmosphere_strength = 0.24
+shader_parameter/horizon_warm_color = Color(0.89, 0.63, 0.47, 1)
+shader_parameter/horizon_warm_strength = 0.26
+shader_parameter/horizon_warm_start = 0.48
+shader_parameter/horizon_warm_end = 0.92
+shader_parameter/horizon_warm_center_x = 0.51
+shader_parameter/horizon_warm_half_width = 0.76
+shader_parameter/edge_cleanup_strength = 0.35
+shader_parameter/edge_cleanup_luma_min = 0.88
+shader_parameter/palette_steps = 32.0
+
+[sub_resource type="ShaderMaterial" id="SwordGraveMat"]
+resource_local_to_scene = true
+shader = ExtResource("35_sword_grave_grade")
+shader_parameter/stone_tint = Color(0.32, 0.38, 0.37, 1)
+shader_parameter/mist_tint = Color(0.58, 0.62, 0.59, 1)
+shader_parameter/sun_rim_color = Color(0.96, 0.66, 0.42, 1)
+shader_parameter/saturation = 0.24
+shader_parameter/contrast = 0.82
+shader_parameter/brightness = 0.94
+shader_parameter/tint_strength = 0.38
+shader_parameter/atmosphere_strength = 0.28
+shader_parameter/sun_rim_strength = 0.16
+shader_parameter/sun_rim_width_px = 1.0
+shader_parameter/sun_screen_pos = Vector2(0.505, 0.68)
+shader_parameter/base_mist_strength = 0.24
+shader_parameter/alpha_scale = 0.68
+shader_parameter/palette_steps = 24.0
+
+[sub_resource type="AtlasTexture" id="SwordGraveLeftTex"]
+atlas = ExtResource("34_sword_grave")
+region = Rect2(96, 320, 500, 500)
+filter_clip = true
+
+[sub_resource type="ShaderMaterial" id="SwordGlintLeftMat"]
+resource_local_to_scene = true
+shader = ExtResource("36_sword_glint")
+shader_parameter/glint_color = Color(1, 0.72, 0.38, 1)
+shader_parameter/core_color = Color(1, 0.93, 0.72, 1)
+shader_parameter/cycle_sec = 9.5
+shader_parameter/phase_offset = 0.71
+shader_parameter/pulse_hold = 0.09
+shader_parameter/pulse_fade = 0.03
+shader_parameter/intensity = 0.52
+shader_parameter/pixel_grid = Vector2(16, 16)
+shader_parameter/core_radius_px = 1.0
+shader_parameter/arm_length_px = 4.5
+
+[sub_resource type="AtlasTexture" id="SwordGraveRightTex"]
+atlas = ExtResource("34_sword_grave")
+region = Rect2(980, 300, 600, 520)
+filter_clip = true
+
+[sub_resource type="ShaderMaterial" id="SwordGlintRightMat"]
+resource_local_to_scene = true
+shader = ExtResource("36_sword_glint")
+shader_parameter/glint_color = Color(1, 0.7, 0.36, 1)
+shader_parameter/core_color = Color(1, 0.92, 0.7, 1)
+shader_parameter/cycle_sec = 11.5
+shader_parameter/phase_offset = 0.56
+shader_parameter/pulse_hold = 0.085
+shader_parameter/pulse_fade = 0.03
+shader_parameter/intensity = 0.46
+shader_parameter/pixel_grid = Vector2(16, 16)
+shader_parameter/core_radius_px = 1.0
+shader_parameter/arm_length_px = 4.0
+
+[sub_resource type="ParticleProcessMaterial" id="SunMotesNearMat"]
+emission_shape = 3
+emission_box_extents = Vector3(390, 145, 1)
+direction = Vector3(0.16, -1, 0)
+spread = 22.0
+initial_velocity_min = 5.5
+initial_velocity_max = 10.0
+gravity = Vector3(-0.45, -1.2, 0)
+scale_min = 1.35
+scale_max = 2.25
+color = Color(1, 0.72, 0.44, 0.32)
+color_ramp = SubResource("SunMoteLifeRamp")
+turbulence_enabled = true
+turbulence_noise_strength = 1.8
+turbulence_noise_scale = 1.25
+
+[sub_resource type="ShaderMaterial" id="SunVeilMat"]
+resource_local_to_scene = true
+shader = ExtResource("31_sun_veil")
+shader_parameter/veil_center = Vector2(0.51, 0.765)
+shader_parameter/veil_radius = Vector2(0.36, 0.145)
+shader_parameter/veil_color = Color(0.89, 0.68, 0.58, 1)
+shader_parameter/veil_strength = 0.22
+shader_parameter/flow_speed = 0.015
+shader_parameter/pixel_grid = Vector2(480, 270)
+
+[sub_resource type="ShaderMaterial" id="CloudSeaBackMat"]
+shader = ExtResource("10_pixel_cloud")
+shader_parameter/fill_color = Color(0.45, 0.56, 0.57, 1)
+shader_parameter/lit_color = Color(0.72, 0.8, 0.78, 1)
+shader_parameter/lit_strength = 0.28
+shader_parameter/alpha_max = 0.72
+shader_parameter/flow_speed = -0.0048
+shader_parameter/sway_speed = 0.052
+shader_parameter/mode_isolated = 0.0
+shader_parameter/cells = 9.0
+shader_parameter/keep = 1.0
+shader_parameter/cloud_size = 1.6
+shader_parameter/base_frac = 0.66
+shader_parameter/row_h = 0.17
+shader_parameter/edge_h = 0.038
+shader_parameter/inner_contrast = 0.0
+shader_parameter/breath_amount = 0.06
+shader_parameter/breath_speed = 0.12
+shader_parameter/seed = 53.0
+shader_parameter/aspect = 9.090909
+shader_parameter/pixel_grid = Vector2(667, 73)
+shader_parameter/row_count = 4.0
+shader_parameter/isolated_len_cap = 1.6
+shader_parameter/isolated_forced_stride = 3.0
+shader_parameter/isolated_break_stride = 0.0
+shader_parameter/lobe_profile = 1.0
+shader_parameter/lobe_height_scale = 0.62
+shader_parameter/lobe_shape_variation = 0.55
+shader_parameter/lobe_min_step_px = 2.0
+shader_parameter/continuous_bob_scale = 0.38
+shader_parameter/pattern_offset = 1.1
+shader_parameter/scene3_roll_amount = 0.065
+shader_parameter/scene3_roll_speed = 0.3
+shader_parameter/scene3_roll_scale = 1.15
+shader_parameter/scene3_roll_phase = 0.3
+shader_parameter/scene3_billow_amount = 0.28
+shader_parameter/scene3_billow_speed = 0.56
+shader_parameter/scene3_billow_phase = 0.9
+shader_parameter/bank_valley_center = 0.2825
+shader_parameter/bank_valley_width = 0.31
+shader_parameter/bank_valley_depth = 0.07
+shader_parameter/bank_valley_steps = 5.0
+shader_parameter/bank_valley_peak_scale = 0.45
+shader_parameter/bank_side_rise = 0.1
+shader_parameter/bank_join_height = 0.18
+shader_parameter/bank_join_variation = 0.015
+shader_parameter/water_reflect_color = Color(0.58, 0.73, 0.72, 1)
+shader_parameter/water_reflect_strength = 0.0
+shader_parameter/water_reflect_center_x = 0.5
+shader_parameter/water_reflect_half_width = 0.12
+shader_parameter/water_reflect_edge_h = 0.03
+shader_parameter/directional_light_dir = Vector2(1, -0.8)
+shader_parameter/directional_light_color = Color(1, 0.88, 0.68, 1)
+shader_parameter/directional_shadow_color = Color(0.24, 0.37, 0.38, 1)
+shader_parameter/directional_light_strength = 0.08
+shader_parameter/directional_shadow_strength = 0.06
+shader_parameter/scene_light_source_uv = Vector2(0.9, -0.08)
+shader_parameter/scene_light_target_uv = Vector2(0.47, 0.78)
+shader_parameter/scene_light_top_width = 0.1
+shader_parameter/scene_light_bottom_width = 0.4
+shader_parameter/scene_light_pool_center = Vector2(0.63, 0.28)
+shader_parameter/scene_light_pool_radius = Vector2(0.56, 0.4)
+shader_parameter/local_sun_screen_pos = Vector2(0.51, 0.796)
+shader_parameter/local_sun_rim_radius = Vector2(0.26, 0.2)
+shader_parameter/local_sun_rim_color = Color(1, 0.68, 0.42, 1)
+shader_parameter/local_sun_rim_strength = 0.72
+
+[sub_resource type="ShaderMaterial" id="CloudSeaMidMat"]
+shader = ExtResource("10_pixel_cloud")
+shader_parameter/fill_color = Color(0.5, 0.62, 0.63, 1)
+shader_parameter/lit_color = Color(0.72, 0.8, 0.78, 1)
+shader_parameter/lit_strength = 0.32
+shader_parameter/alpha_max = 0.8890000422275
+shader_parameter/flow_speed = 0.0074
+shader_parameter/sway_speed = 0.055
+shader_parameter/mode_isolated = 0.0
+shader_parameter/cells = 9.0
+shader_parameter/keep = 1.0
+shader_parameter/cloud_size = 1.6
+shader_parameter/base_frac = 0.66
+shader_parameter/row_h = 0.17
+shader_parameter/edge_h = 0.038
+shader_parameter/inner_contrast = 0.0
+shader_parameter/breath_amount = 0.07
+shader_parameter/breath_speed = 0.13
+shader_parameter/seed = 83.0
+shader_parameter/aspect = 9.090909
+shader_parameter/pixel_grid = Vector2(667, 73)
+shader_parameter/row_count = 4.0
+shader_parameter/isolated_len_cap = 1.6
+shader_parameter/isolated_forced_stride = 3.0
+shader_parameter/isolated_break_stride = 0.0
+shader_parameter/lobe_profile = 1.0
+shader_parameter/lobe_height_scale = 0.62
+shader_parameter/lobe_shape_variation = 0.55
+shader_parameter/lobe_min_step_px = 2.0
+shader_parameter/continuous_bob_scale = 0.48
+shader_parameter/pattern_offset = 2.4
+shader_parameter/scene3_roll_amount = 0.095
+shader_parameter/scene3_roll_speed = 0.42
+shader_parameter/scene3_roll_scale = 1.65
+shader_parameter/scene3_roll_phase = 2.1
+shader_parameter/scene3_billow_amount = 0.38
+shader_parameter/scene3_billow_speed = 0.82
+shader_parameter/scene3_billow_phase = 1.7
+shader_parameter/bank_valley_center = 0.2825
+shader_parameter/bank_valley_width = 0.31
+shader_parameter/bank_valley_depth = 0.07
+shader_parameter/bank_valley_steps = 5.0
+shader_parameter/bank_valley_peak_scale = 0.45
+shader_parameter/bank_side_rise = 0.1
+shader_parameter/bank_join_height = 0.18
+shader_parameter/bank_join_variation = 0.015
+shader_parameter/water_reflect_color = Color(0.58, 0.73, 0.72, 1)
+shader_parameter/water_reflect_strength = 0.0
+shader_parameter/water_reflect_center_x = 0.5
+shader_parameter/water_reflect_half_width = 0.12
+shader_parameter/water_reflect_edge_h = 0.03
+shader_parameter/directional_light_dir = Vector2(1, -0.8)
+shader_parameter/directional_light_color = Color(1, 0.88, 0.68, 1)
+shader_parameter/directional_shadow_color = Color(0.24, 0.37, 0.38, 1)
+shader_parameter/directional_light_strength = 0.08
+shader_parameter/directional_shadow_strength = 0.06
+shader_parameter/scene_light_source_uv = Vector2(0.9, -0.08)
+shader_parameter/scene_light_target_uv = Vector2(0.47, 0.78)
+shader_parameter/scene_light_top_width = 0.1
+shader_parameter/scene_light_bottom_width = 0.4
+shader_parameter/scene_light_pool_center = Vector2(0.63, 0.28)
+shader_parameter/scene_light_pool_radius = Vector2(0.56, 0.4)
+shader_parameter/local_sun_screen_pos = Vector2(0.51, 0.796)
+shader_parameter/local_sun_rim_radius = Vector2(0.21, 0.17)
+shader_parameter/local_sun_rim_color = Color(1, 0.67, 0.41, 1)
+shader_parameter/local_sun_rim_strength = 0.56
+
+[sub_resource type="ShaderMaterial" id="CloudSeaFoundationMat"]
+resource_local_to_scene = true
+shader = ExtResource("38_cloud_floor")
+shader_parameter/shadow_color = Color(0.31, 0.42, 0.44, 1)
+shader_parameter/mid_color = Color(0.43, 0.55, 0.56, 1)
+shader_parameter/highlight_color = Color(0.62, 0.7, 0.68, 1)
+shader_parameter/top_alpha = 0.18
+shader_parameter/bottom_alpha = 1.0
+shader_parameter/opaque_start = 0.58
+shader_parameter/flow_speed = -0.004
+shader_parameter/band_strength = 0.1
+shader_parameter/pixel_grid = Vector2(480, 270)
+
+[sub_resource type="ShaderMaterial" id="ChainMainMat"]
+shader = ExtResource("6_asset")
+shader_parameter/tint_color = Color(0.38, 0.47, 0.46, 1)
+shader_parameter/shadow_color = Color(0.015, 0.055, 0.06, 1)
+shader_parameter/dawn_rim_color = Color(0.9, 0.64, 0.35, 1)
+shader_parameter/tint_strength = 0.22
+shader_parameter/shadow_strength = 0.32
+shader_parameter/rim_strength = 0.08
+shader_parameter/alpha_scale = 1.0
+shader_parameter/palette_steps = 32.0
+
+[sub_resource type="ShaderMaterial" id="ChainFootOccluderMat"]
+resource_local_to_scene = true
+shader = ExtResource("32_chain_foot")
+shader_parameter/p1_foot_center = 0.175
+shader_parameter/p2_foot_center = 0.83
+shader_parameter/foot_half_width = 0.042
+shader_parameter/foot_feather = 0.012
+shader_parameter/edge_sample_px = 2.0
+shader_parameter/tint_color = Color(0.38, 0.47, 0.46, 1)
+shader_parameter/shadow_color = Color(0.015, 0.055, 0.06, 1)
+shader_parameter/dawn_rim_color = Color(0.9, 0.64, 0.35, 1)
+shader_parameter/tint_strength = 0.22
+shader_parameter/shadow_strength = 0.32
+shader_parameter/rim_strength = 0.08
+shader_parameter/alpha_scale = 0.88
+shader_parameter/palette_steps = 32.0
+
+[sub_resource type="ShaderMaterial" id="LeftCliffGradeMat"]
+resource_local_to_scene = true
+shader = ExtResource("26_cliff_grass_sway")
+shader_parameter/grass_mask = ExtResource("27_left_grass_mask")
+shader_parameter/underpaint_texture = ExtResource("28_left_grass_underpaint")
+shader_parameter/red_pivot = Vector2(0.710938, 0.391304)
+shader_parameter/green_pivot = Vector2(0.773438, 0.395257)
+shader_parameter/motion_fps = 6.0
+shader_parameter/cycle_sec = 8.5
+shader_parameter/red_angle_deg = 0.8
+shader_parameter/green_angle_deg = 0.9
+shader_parameter/phase_offset = 0.3
+shader_parameter/tint_color = Color(0.58, 0.56, 0.53, 1)
+shader_parameter/shadow_color = Color(0.2, 0.2, 0.19, 1)
+shader_parameter/dawn_rim_color = Color(0.98, 0.68, 0.43, 1)
+shader_parameter/fog_color = Color(0.64, 0.63, 0.61, 1)
+shader_parameter/saturation = 0.55
+shader_parameter/tint_strength = 0.32
+shader_parameter/shadow_strength = 0.2
+shader_parameter/rim_strength = 0.22
+shader_parameter/fog_strength = 0.22
+shader_parameter/exposure = 1.18
+shader_parameter/midtone_lift = 0.075
+shader_parameter/alpha_scale = 1.0
+shader_parameter/palette_steps = 32.0
+shader_parameter/artifact_cleanup_pixel = Vector2(-1, -1)
+shader_parameter/artifact_cleanup_strength = 0.0
+shader_parameter/cloud_band_light_color = Color(1, 0.79, 0.56, 1)
+shader_parameter/cloud_band_shadow_color = Color(0.24, 0.32, 0.32, 1)
+shader_parameter/cloud_band_light_strength = 0.28
+shader_parameter/cloud_band_shadow_strength = 0.16
+shader_parameter/cloud_roll_speed = 0.42
+shader_parameter/cloud_billow_speed = 0.82
+shader_parameter/cloud_roll_phase = 2.1
+shader_parameter/cloud_billow_phase = 1.7
+shader_parameter/cloud_band_phase = 0.15
+shader_parameter/cloud_band_slope = 0.34
+shader_parameter/cloud_band_width = 0.13
+shader_parameter/cloud_band_softness = 0.07
+shader_parameter/cloud_sun_screen_pos = Vector2(0.51, 0.78)
+
+[sub_resource type="ShaderMaterial" id="RightCliffGradeMat"]
+resource_local_to_scene = true
+shader = ExtResource("26_cliff_grass_sway")
+shader_parameter/grass_mask = ExtResource("29_right_grass_mask")
+shader_parameter/underpaint_texture = ExtResource("30_right_grass_underpaint")
+shader_parameter/red_pivot = Vector2(0.158301, 0.295455)
+shader_parameter/green_pivot = Vector2(0.57529, 0.806818)
+shader_parameter/motion_fps = 6.0
+shader_parameter/cycle_sec = 9.25
+shader_parameter/red_angle_deg = 0.75
+shader_parameter/green_angle_deg = 0.7
+shader_parameter/phase_offset = 1.55
+shader_parameter/tint_color = Color(0.58, 0.56, 0.53, 1)
+shader_parameter/shadow_color = Color(0.2, 0.2, 0.19, 1)
+shader_parameter/dawn_rim_color = Color(0.98, 0.68, 0.43, 1)
+shader_parameter/fog_color = Color(0.64, 0.63, 0.61, 1)
+shader_parameter/saturation = 0.55
+shader_parameter/tint_strength = 0.32
+shader_parameter/shadow_strength = 0.2
+shader_parameter/rim_strength = 0.25
+shader_parameter/fog_strength = 0.24
+shader_parameter/exposure = 1.2
+shader_parameter/midtone_lift = 0.08
+shader_parameter/alpha_scale = 1.0
+shader_parameter/palette_steps = 32.0
+shader_parameter/artifact_cleanup_pixel = Vector2(23, 41)
+shader_parameter/artifact_cleanup_strength = 1.0
+shader_parameter/cloud_band_light_color = Color(1, 0.77, 0.54, 1)
+shader_parameter/cloud_band_shadow_color = Color(0.22, 0.31, 0.32, 1)
+shader_parameter/cloud_band_light_strength = 0.3
+shader_parameter/cloud_band_shadow_strength = 0.17
+shader_parameter/cloud_roll_speed = 0.42
+shader_parameter/cloud_billow_speed = 0.82
+shader_parameter/cloud_roll_phase = 2.1
+shader_parameter/cloud_billow_phase = 1.7
+shader_parameter/cloud_band_phase = 2.0
+shader_parameter/cloud_band_slope = 0.34
+shader_parameter/cloud_band_width = 0.14
+shader_parameter/cloud_band_softness = 0.075
+shader_parameter/cloud_sun_screen_pos = Vector2(0.51, 0.78)
+
+[sub_resource type="ShaderMaterial" id="ChainLowerMat"]
+resource_local_to_scene = true
+shader = ExtResource("33_chain_depth")
+shader_parameter/depth_tint = Color(0.34, 0.4, 0.4, 1)
+shader_parameter/atmosphere_color = Color(0.52, 0.58, 0.57, 1)
+shader_parameter/saturation = 0.16
+shader_parameter/contrast = 0.76
+shader_parameter/brightness = 0.93
+shader_parameter/tint_strength = 0.38
+shader_parameter/atmosphere_strength = 0.38
+shader_parameter/outline_lift = 0.56
+shader_parameter/alpha_scale = 0.999999977648
+shader_parameter/edge_fade = 0.035
+shader_parameter/palette_steps = 24.0
+shader_parameter/repeat_x = 1.0
+
+[sub_resource type="ShaderMaterial" id="CloudSeaFrontMat"]
+shader = ExtResource("10_pixel_cloud")
+shader_parameter/fill_color = Color(0.52, 0.64, 0.64, 1)
+shader_parameter/lit_color = Color(0.78, 0.84, 0.8, 1)
+shader_parameter/lit_strength = 0.34
+shader_parameter/alpha_max = 0.78
+shader_parameter/flow_speed = -0.009
+shader_parameter/sway_speed = 0.06
+shader_parameter/mode_isolated = 0.0
+shader_parameter/cells = 9.0
+shader_parameter/keep = 1.0
+shader_parameter/cloud_size = 1.6
+shader_parameter/base_frac = 0.66
+shader_parameter/row_h = 0.17
+shader_parameter/edge_h = 0.038
+shader_parameter/inner_contrast = 0.0
+shader_parameter/breath_amount = 0.075
+shader_parameter/breath_speed = 0.14
+shader_parameter/seed = 131.0
+shader_parameter/aspect = 9.090909
+shader_parameter/pixel_grid = Vector2(667, 73)
+shader_parameter/row_count = 4.0
+shader_parameter/isolated_len_cap = 1.6
+shader_parameter/isolated_forced_stride = 3.0
+shader_parameter/isolated_break_stride = 0.0
+shader_parameter/lobe_profile = 1.0
+shader_parameter/lobe_height_scale = 0.62
+shader_parameter/lobe_shape_variation = 0.55
+shader_parameter/lobe_min_step_px = 2.0
+shader_parameter/continuous_bob_scale = 0.6
+shader_parameter/pattern_offset = 3.7
+shader_parameter/scene3_roll_amount = 0.12
+shader_parameter/scene3_roll_speed = 0.52
+shader_parameter/scene3_roll_scale = 2.2
+shader_parameter/scene3_roll_phase = 4.0
+shader_parameter/scene3_billow_amount = 0.46
+shader_parameter/scene3_billow_speed = 1.02
+shader_parameter/scene3_billow_phase = 3.1
+shader_parameter/bank_valley_center = 0.34
+shader_parameter/bank_valley_width = 0.31
+shader_parameter/bank_valley_depth = 0.07
+shader_parameter/bank_valley_steps = 5.0
+shader_parameter/bank_valley_peak_scale = 0.45
+shader_parameter/bank_side_rise = 0.1
+shader_parameter/bank_join_height = 0.18
+shader_parameter/bank_join_variation = 0.015
+shader_parameter/water_reflect_color = Color(0.58, 0.73, 0.72, 1)
+shader_parameter/water_reflect_strength = 0.0
+shader_parameter/water_reflect_center_x = 0.5
+shader_parameter/water_reflect_half_width = 0.12
+shader_parameter/water_reflect_edge_h = 0.03
+shader_parameter/directional_light_dir = Vector2(1, -0.8)
+shader_parameter/directional_light_color = Color(1, 0.88, 0.68, 1)
+shader_parameter/directional_shadow_color = Color(0.24, 0.37, 0.38, 1)
+shader_parameter/directional_light_strength = 0.08
+shader_parameter/directional_shadow_strength = 0.06
+shader_parameter/scene_light_source_uv = Vector2(0.9, -0.08)
+shader_parameter/scene_light_target_uv = Vector2(0.47, 0.78)
+shader_parameter/scene_light_top_width = 0.1
+shader_parameter/scene_light_bottom_width = 0.4
+shader_parameter/scene_light_pool_center = Vector2(0.63, 0.28)
+shader_parameter/scene_light_pool_radius = Vector2(0.56, 0.4)
+shader_parameter/local_sun_screen_pos = Vector2(0.51, 0.796)
+shader_parameter/local_sun_rim_radius = Vector2(0.28, 0.2)
+shader_parameter/local_sun_rim_color = Color(1, 0.67, 0.41, 1)
+shader_parameter/local_sun_rim_strength = 0.0
+
+[sub_resource type="ShaderMaterial" id="FrontFogMat"]
+shader = ExtResource("4_fog")
+shader_parameter/fog_color = Color(0.5, 0.62, 0.63, 0.28)
+shader_parameter/strength = 0.36
+shader_parameter/flow_speed = 0.04
+shader_parameter/pixel_size = 4.0
+
+[node name="Scene3" type="Control" unique_id=915354811]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_stage")
+idle_amplitude = 3.0
+idle_speed = 0.18
+pointer_strength = 4.5
+pointer_zoom = 0.006
+focus_point = Vector2(960, 690)
+focus_zoom = 0.018
+punch_zoom = 0.03
+focus_bias_x = 260.0
+
+[node name="DawnSky" type="TextureRect" parent="." unique_id=1509117963]
+texture_filter = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_sky1")
+expand_mode = 1
+metadata/parallax_factor = 0.0
+metadata/_edit_lock_ = true
+
+[node name="DawnSkyOverlay" type="TextureRect" parent="." unique_id=980702771]
+self_modulate = Color(0.84, 0.92, 0.86, 0.62)
+texture_filter = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("3_sky2")
+expand_mode = 1
+metadata/parallax_factor = 0.0
+metadata/_edit_lock_ = true
+
+[node name="DistantMountainRangeMid" type="TextureRect" parent="." unique_id=1383645119]
+self_modulate = Color(0.92, 0.92, 0.89, 0.86)
+texture_filter = 1
+material = SubResource("DistantMountainMidMat")
+layout_mode = 0
+offset_left = -6.0
+offset_top = 181.0
+offset_right = 2104.0
+offset_bottom = 847.0
+mouse_filter = 2
+texture = ExtResource("18_scene2_far")
+expand_mode = 1
+flip_h = true
+metadata/parallax_factor = 0.1
+metadata/_edit_lock_ = true
+
+[node name="DistantMountainRangeNear" type="TextureRect" parent="." unique_id=1085222187]
+self_modulate = Color(0.87, 0.89, 0.86, 0.94)
+texture_filter = 1
+material = SubResource("DistantMountainNearMat")
+layout_mode = 0
+offset_left = -177.0
+offset_top = 272.0
+offset_right = 1903.0
+offset_bottom = 928.0
+mouse_filter = 2
+texture = ExtResource("18_scene2_far")
+expand_mode = 1
+metadata/parallax_factor = 0.14
+metadata/_edit_lock_ = true
+
+[node name="BackFog" type="ColorRect" parent="." unique_id=1342523076]
+material = SubResource("BackFogMat")
+layout_mode = 0
+offset_left = -80.0
+offset_top = 360.0
+offset_right = 2000.0
+offset_bottom = 830.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+metadata/parallax_factor = 0.18
+metadata/_edit_lock_ = true
+
+[node name="SunHalo" type="ColorRect" parent="." unique_id=1405490471]
+material = SubResource("SunHaloMat")
+layout_mode = 0
+offset_right = 1920.0
+offset_bottom = 1080.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+metadata/parallax_factor = 0.26
+metadata/_edit_lock_ = true
+
+[node name="SunRayField" type="ColorRect" parent="." unique_id=70878269]
+material = SubResource("SunRayMat")
+layout_mode = 0
+offset_left = -80.0
+offset_top = 260.0
+offset_right = 2000.0
+offset_bottom = 830.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+metadata/parallax_factor = 0.25
+metadata/_edit_lock_ = true
+
+[node name="SunMotesFar" type="GPUParticles2D" parent="." unique_id=1526286527]
+texture_filter = 1
+material = SubResource("SunMoteBlend")
+position = Vector2(960, 520)
+amount = 9
+texture = SubResource("SunMoteDotTexture")
+lifetime = 11.0
+preprocess = 8.0
+explosiveness = 0.12
+randomness = 0.82
+visibility_rect = Rect2(-520, -260, 1040, 520)
+local_coords = true
+process_material = SubResource("SunMotesFarMat")
+metadata/parallax_factor = 0.28
+metadata/_edit_lock_ = true
+
+[node name="DawnSun" type="TextureRect" parent="." unique_id=37818440]
+texture_filter = 1
+material = SubResource("DawnSunMat")
+layout_mode = 0
+offset_left = 746.0
+offset_top = 620.0
+offset_right = 1190.0
+offset_bottom = 1064.0
+mouse_filter = 2
+texture = ExtResource("22_sun")
+expand_mode = 1
+metadata/parallax_factor = 0.26
+metadata/_edit_lock_ = true
+
+[node name="BackgroundChain" type="TextureRect" parent="." unique_id=580360482]
+self_modulate = Color(0.82, 0.86, 0.84, 0.72)
+texture_filter = 1
+material = SubResource("ChainFarMat")
+layout_mode = 0
+offset_left = 354.00003
+offset_top = 538.00006
+offset_right = 1567.669
+offset_bottom = 826.26416
+rotation = -0.08726646
+mouse_filter = 2
+texture = ExtResource("9_chain")
+expand_mode = 1
+metadata/parallax_factor = 0.14
+
+[node name="BackgroundChain2" type="TextureRect" parent="." unique_id=577642065]
+self_modulate = Color(0.78, 0.83, 0.82, 0.68)
+texture_filter = 1
+material = SubResource("ChainMidMat")
+layout_mode = 0
+offset_left = 310.6274
+offset_top = 679.67
+offset_right = 1637.0112
+offset_bottom = 963.94275
+rotation = 0.034906585
+mouse_filter = 2
+texture = ExtResource("9_chain")
+expand_mode = 1
+flip_h = true
+metadata/parallax_factor = 0.26
+
+[node name="LeftFarMountain" type="TextureRect" parent="." unique_id=1832827092]
+self_modulate = Color(0.98, 0.94, 0.91, 0.9)
+texture_filter = 1
+material = SubResource("LeftFarMountainMat")
+layout_mode = 0
+offset_left = -209.0
+offset_top = 293.0
+offset_right = 533.0
+offset_bottom = 1045.0
+mouse_filter = 2
+texture = ExtResource("16_left_far")
+expand_mode = 1
+metadata/parallax_factor = 0.2
+metadata/_edit_lock_ = true
+
+[node name="RightFarMountain" type="TextureRect" parent="." unique_id=1205281922]
+self_modulate = Color(0.98, 0.94, 0.92, 0.9)
+texture_filter = 1
+material = SubResource("RightFarMountainMat")
+layout_mode = 0
+offset_left = 1553.0
+offset_top = 259.0
+offset_right = 1985.0
+offset_bottom = 1213.0
+mouse_filter = 2
+texture = ExtResource("17_right_far")
+expand_mode = 1
+metadata/parallax_factor = 0.24
+metadata/_edit_lock_ = true
+
+[node name="MidSwordGrave" type="Control" parent="." unique_id=1751861470]
+anchors_preset = 0
+offset_right = 1920.0
+offset_bottom = 1080.0
+mouse_filter = 2
+metadata/parallax_factor = 0.3
+metadata/_edit_lock_ = true
+
+[node name="LeftCluster" type="TextureRect" parent="MidSwordGrave" unique_id=989469066]
+self_modulate = Color(0.82, 0.86, 0.84, 0.82)
+texture_filter = 1
+material = SubResource("SwordGraveMat")
+layout_mode = 0
+offset_left = 485.0
+offset_top = 683.0
+offset_right = 745.0
+offset_bottom = 943.0
+mouse_filter = 2
+texture = SubResource("SwordGraveLeftTex")
+expand_mode = 1
+
+[node name="LowFrequencyGlint" type="ColorRect" parent="MidSwordGrave/LeftCluster" unique_id=1777644578]
+material = SubResource("SwordGlintLeftMat")
+layout_mode = 0
+offset_left = 66.0
+offset_top = 14.0
+offset_right = 98.0
+offset_bottom = 46.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+
+[node name="RightCluster" type="TextureRect" parent="MidSwordGrave" unique_id=258352519]
+self_modulate = Color(0.8, 0.84, 0.82, 0.78)
+texture_filter = 1
+material = SubResource("SwordGraveMat")
+layout_mode = 0
+offset_left = 1275.0
+offset_top = 657.0
+offset_right = 1575.0
+offset_bottom = 917.0
+mouse_filter = 2
+texture = SubResource("SwordGraveRightTex")
+expand_mode = 1
+
+[node name="LowFrequencyGlint" type="ColorRect" parent="MidSwordGrave/RightCluster" unique_id=1565372089]
+material = SubResource("SwordGlintRightMat")
+layout_mode = 0
+offset_left = 204.0
+offset_top = 4.0
+offset_right = 236.0
+offset_bottom = 36.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+
+[node name="SunMotesNear" type="GPUParticles2D" parent="." unique_id=1811769194]
+texture_filter = 1
+material = SubResource("SunMoteBlend")
+position = Vector2(960, 620)
+amount = 6
+texture = SubResource("SunMoteDotTexture")
+lifetime = 8.0
+preprocess = 5.0
+explosiveness = 0.18
+randomness = 0.86
+visibility_rect = Rect2(-500, -250, 1000, 500)
+local_coords = true
+process_material = SubResource("SunMotesNearMat")
+metadata/parallax_factor = 0.32
+metadata/_edit_lock_ = true
+
+[node name="SunAtmosphereVeil" type="ColorRect" parent="." unique_id=1859869687]
+material = SubResource("SunVeilMat")
+layout_mode = 0
+offset_right = 1920.0
+offset_bottom = 1080.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+metadata/parallax_factor = 0.26
+metadata/_edit_lock_ = true
+
+[node name="CloudSeaBack" type="ColorRect" parent="." unique_id=2134394874]
+material = SubResource("CloudSeaBackMat")
+layout_mode = 0
+offset_left = -137.0
+offset_top = 674.0
+offset_right = 2023.0
+offset_bottom = 941.0
+mouse_filter = 2
+color = Color(0.68, 0.76, 0.74, 0.8)
+metadata/parallax_factor = 0.34
+metadata/_edit_lock_ = true
+
+[node name="FlyingFishFar" type="Node2D" parent="." unique_id=1515370050]
+script = ExtResource("40_flying_fish")
+initial_delay_sec = 5.8
+interval_min_sec = 20.0
+interval_max_sec = 32.0
+fish_count_max = 5
+spawn_x_min = 420.0
+spawn_x_max = 1500.0
+avoid_center_half_width = 210.0
+arc_height_min = 95.0
+arc_height_max = 155.0
+travel_x_max = 285.0
+leap_duration_min = 1.9
+leap_duration_max = 2.65
+fish_scale_min = 1.5
+fish_scale_max = 1.9
+fish_tint = Color(0.68, 0.79, 0.78, 0.78)
+cloud_puff_color = Color(0.7, 0.8, 0.79, 0.24)
+seed_offset = 33
+metadata/parallax_factor = 0.43
+metadata/_edit_lock_ = true
+
+[node name="CloudSeaMid" type="ColorRect" parent="." unique_id=1119165781]
+material = SubResource("CloudSeaMidMat")
+layout_mode = 0
+offset_left = 209.0
+offset_top = 764.0
+offset_right = 2012.0
+offset_bottom = 997.0
+mouse_filter = 2
+color = Color(0.72, 0.8, 0.78, 0.9)
+metadata/parallax_factor = 0.58
+metadata/_edit_lock_ = true
+
+[node name="CloudSeaFoundation" type="ColorRect" parent="." unique_id=1998293395]
+material = SubResource("CloudSeaFoundationMat")
+layout_mode = 0
+offset_left = -120.0
+offset_top = 874.0
+offset_right = 2040.0
+offset_bottom = 1092.0
+mouse_filter = 2
+metadata/parallax_factor = 0.72
+metadata/_edit_lock_ = true
+
+[node name="FlyingFishNear" type="Node2D" parent="." unique_id=1047621821]
+script = ExtResource("40_flying_fish")
+initial_delay_sec = 12.0
+interval_min_sec = 28.0
+interval_max_sec = 42.0
+fish_count_min = 3
+fish_count_max = 4
+spawn_x_min = 380.0
+spawn_x_max = 1540.0
+avoid_center_half_width = 230.0
+surface_y_min = 855.0
+surface_y_max = 905.0
+arc_height_min = 125.0
+arc_height_max = 195.0
+travel_x_min = 210.0
+travel_x_max = 340.0
+leap_duration_min = 1.85
+leap_duration_max = 2.55
+fish_scale_min = 1.8
+fish_scale_max = 2.2
+fish_tint = Color(0.74, 0.83, 0.8, 0.88)
+cloud_puff_color = Color(0.78, 0.85, 0.81, 0.3)
+seed_offset = 91
+metadata/parallax_factor = 0.8
+metadata/_edit_lock_ = true
+
+[node name="MainChain" type="TextureRect" parent="." unique_id=102152380]
+self_modulate = Color(0.72, 0.76, 0.7, 1)
+texture_filter = 1
+material = SubResource("ChainMainMat")
+layout_mode = 0
+offset_left = 224.0
+offset_top = 592.0
+offset_right = 1689.0
+offset_bottom = 956.0
+mouse_filter = 2
+texture = ExtResource("9_chain")
+expand_mode = 1
+metadata/parallax_factor = 1.0
+metadata/_edit_lock_ = true
+
+[node name="ChainFootOccluder" type="TextureRect" parent="." unique_id=37526939]
+self_modulate = Color(0.72, 0.76, 0.7, 1)
+z_index = 2
+texture_filter = 1
+material = SubResource("ChainFootOccluderMat")
+layout_mode = 0
+offset_left = 224.0
+offset_top = 592.0
+offset_right = 1689.0
+offset_bottom = 956.0
+mouse_filter = 2
+texture = ExtResource("9_chain")
+expand_mode = 1
+metadata/parallax_factor = 1.0
+metadata/_edit_lock_ = true
+
+[node name="LeftCliff" type="TextureRect" parent="." unique_id=779433589]
+self_modulate = Color(1, 0.96, 0.92, 1)
+texture_filter = 1
+material = SubResource("LeftCliffGradeMat")
+layout_mode = 0
+offset_left = -374.0
+offset_top = 220.0
+offset_right = 281.0
+offset_bottom = 1307.0
+mouse_filter = 2
+texture = ExtResource("7_left")
+expand_mode = 1
+metadata/parallax_factor = 1.1
+metadata/_edit_lock_ = true
+
+[node name="RightCliff" type="TextureRect" parent="." unique_id=456705876]
+self_modulate = Color(1, 0.96, 0.92, 1)
+texture_filter = 1
+material = SubResource("RightCliffGradeMat")
+layout_mode = 0
+offset_left = 1561.0
+offset_top = 389.0
+offset_right = 2536.0
+offset_bottom = 1194.0
+mouse_filter = 2
+texture = ExtResource("8_right")
+expand_mode = 1
+metadata/parallax_factor = 1.1
+metadata/_edit_lock_ = true
+
+[node name="BackgroundChain3" type="TextureRect" parent="." unique_id=38527923]
+self_modulate = Color(0.75, 0.81, 0.8, 0.58)
+texture_filter = 1
+material = SubResource("ChainLowerMat")
+layout_mode = 0
+offset_left = 212.5
+offset_top = 857.7
+offset_right = 1638.2
+offset_bottom = 1258.9
+rotation = -0.08726646
+mouse_filter = 2
+texture = ExtResource("9_chain")
+expand_mode = 1
+metadata/parallax_factor = 0.46
+metadata/_edit_lock_ = true
+
+[node name="CloudSeaFront" type="ColorRect" parent="." unique_id=1618819998]
+material = SubResource("CloudSeaFrontMat")
+layout_mode = 0
+offset_left = -100.0
+offset_top = 826.0
+offset_right = 2040.0
+offset_bottom = 1084.0
+mouse_filter = 2
+color = Color(0.76, 0.84, 0.8, 0.82)
+metadata/parallax_factor = 1.2
+metadata/_edit_lock_ = true
+
+[node name="FrontFog" type="ColorRect" parent="." unique_id=1758706211]
+material = SubResource("FrontFogMat")
+layout_mode = 0
+offset_left = -80.0
+offset_top = 760.0
+offset_right = 2000.0
+offset_bottom = 1084.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+metadata/parallax_factor = 1.35
+metadata/_edit_lock_ = true

@@ -13,6 +13,46 @@ const VALID_ROLES := ["经济", "进攻", "防守"]
 const DIM_LOCKED := {"进攻": "进攻", "防御": "防守", "能量": "经济"}
 
 
+func test_h01_published_data_matches_approved_redesign() -> void:
+	var h := load("res://assets/data/heroes/h01.tres") as HeroData
+	assert_not_null(h, "h01 数据资源必须可加载")
+	assert_eq(h.max_hp, 5, "虚日生命应为 5")
+	assert_eq(h.skill_description, "步虚无有乡", "虚日应使用已定稿技能名")
+	assert_eq(h.skill_detail, "虚日【鼠】在场时，获得的能量增加 0.5 点（回合被动能量除外）。",
+		"虚日描述应明确回合被动能量不受加成")
+
+
+func test_h02_published_data_matches_approved_redesign() -> void:
+	var h := load("res://assets/data/heroes/h02.tres") as HeroData
+	assert_not_null(h, "h02 数据资源必须可加载")
+	assert_eq(h.max_hp, 7, "牛金生命保持 7")
+	assert_eq(h.skill_description, "山河借骨回天法", "牛金应使用已定稿技能名")
+	assert_eq(h.skill_detail,
+		"牛金【牛】挡下「波」或「大波」后，我方下次「波」升级为「大波」。",
+		"牛金描述应准确表达挡招后团队波升级")
+
+
+func test_h03_published_data_matches_approved_redesign() -> void:
+	var h := load("res://assets/data/heroes/h03.tres") as HeroData
+	assert_not_null(h, "h03 数据资源必须可加载")
+	assert_eq(h.max_hp, 5, "尾火生命应为 5")
+	assert_eq(h.skill_description, "白额雷音", "尾火应使用已定稿技能名")
+	assert_eq(h.skill_detail,
+		"双方均使用「波」或「大波」时，尾火【虎】优先攻击；若击杀敌方出战英雄，取消其此次攻击。",
+		"尾火描述应准确表达基础攻击对攻先制与致死断招")
+
+
+func test_h04_published_data_matches_approved_redesign() -> void:
+	var h := load("res://assets/data/heroes/h04.tres") as HeroData
+	assert_not_null(h, "h04 数据资源必须可加载")
+	assert_eq(h.max_hp, 5, "房日生命保持 5")
+	assert_eq(h.team_role, "进攻", "房日的新主定位应为进攻")
+	assert_eq(h.skill_description, "十方无次第", "房日应使用已定稿技能名")
+	assert_eq(h.skill_detail,
+		"房日【兔】的「波」和「大波」可以指定任一敌方英雄。",
+		"房日描述应准确表达基础攻击自由选敌")
+
+
 func test_hero_data_launch_pool_all_have_valid_team_role() -> void:
 	# Arrange
 	var pool := HeroData.create_launch_pool()
