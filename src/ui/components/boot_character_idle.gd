@@ -1,21 +1,40 @@
 extends Control
 
+const NATIVE_SIZE := Vector2(1677.9402, 1014.42)
+const NATIVE_RIG_POSITION := Vector2(0.0, 57.48)
+const NATIVE_RIG_SCALE := Vector2(5.26, 5.26)
+
 @export_range(1.0, 8.0, 0.1) var loop_duration: float = 4.8
 
+@onready var _rig: Node2D = $Rig
 @onready var _animation_player: AnimationPlayer = $AnimationPlayer
 @onready var _waist_animation_player: AnimationPlayer = $WaistAnimationPlayer
 @onready var _rear_hand_glow: ColorRect = (
 		$Rig/RearHandEnergyAnchor/RearHandGlow)
 @onready var _rear_hand_star: ColorRect = (
 		$Rig/RearHandEnergyAnchor/RearHandStar)
+@onready var _base_material: ShaderMaterial = (
+		$Rig/Base.material as ShaderMaterial)
 
 
 func _ready() -> void:
+	resized.connect(_sync_rig_to_size)
+	_sync_rig_to_size()
 	_install_idle_animation()
 	_install_waist_animation()
 	_animation_player.play(&"idle")
 	_waist_animation_player.play(&"waist_idle")
 	_sync_energy_pulse()
+
+
+func _sync_rig_to_size() -> void:
+	if _rig == null:
+		return
+	var size_ratio := Vector2(
+		size.x / NATIVE_SIZE.x,
+		size.y / NATIVE_SIZE.y)
+	_rig.position = NATIVE_RIG_POSITION * size_ratio
+	_rig.scale = NATIVE_RIG_SCALE * size_ratio
 
 
 func _process(_delta: float) -> void:
@@ -30,6 +49,8 @@ func _sync_energy_pulse() -> void:
 		var shader_material := energy_node.material as ShaderMaterial
 		if shader_material != null:
 			shader_material.set_shader_parameter(&"pulse_phase", pulse_phase)
+	if _base_material != null:
+		_base_material.set_shader_parameter(&"energy_phase", pulse_phase)
 
 
 func _install_idle_animation() -> void:

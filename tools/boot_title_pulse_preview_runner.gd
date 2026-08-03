@@ -1,7 +1,7 @@
 extends Node
 
 const OUTPUT_DIR := "D:/Game/BoBoZan/boot_title_flow_frames"
-const CAPTURE_COUNT := 44
+const CAPTURE_COUNT := 42
 const FRAME_INTERVAL_SECONDS := 0.10
 const TITLE_CROP := Rect2i(160, 130, 300, 820)
 

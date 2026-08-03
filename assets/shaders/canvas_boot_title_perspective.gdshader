@@ -3,6 +3,8 @@ render_mode unshaded, blend_mix;
 
 uniform float perspective_strength : hint_range(0.0, 0.35, 0.01) = 0.26;
 uniform float edge_padding : hint_range(0.0, 0.45, 0.01) = 0.04;
+uniform float group_x_min : hint_range(0.0, 1.0, 0.001) = 0.0;
+uniform float group_x_max : hint_range(0.0, 1.0, 0.001) = 1.0;
 
 uniform vec4 source_structure_color : source_color = vec4(
 		0.058824, 0.105882, 0.149020, 1.0);
@@ -22,8 +24,8 @@ uniform vec4 energy_peak_color : source_color = vec4(
 
 uniform float flow_phase : hint_range(0.0, 1.0, 0.001) = 0.0;
 uniform float flow_delay : hint_range(0.0, 0.25, 0.001) = 0.0;
-uniform float flow_duration : hint_range(0.001, 0.5, 0.001) = 0.107143;
-uniform float release_duration : hint_range(0.001, 0.25, 0.001) = 0.052381;
+uniform float flow_duration : hint_range(0.001, 0.5, 0.001) = 0.321429;
+uniform float release_duration : hint_range(0.001, 0.25, 0.001) = 0.166667;
 uniform float flow_start_uv_x : hint_range(0.0, 1.0, 0.001) = 0.18;
 uniform float flow_end_uv_x : hint_range(0.0, 1.0, 0.001) = 0.89;
 uniform float fragment_origin_uv_y : hint_range(0.0, 1.0, 0.001) = 0.31;
@@ -31,6 +33,10 @@ uniform float head_width_texels : hint_range(1.0, 12.0, 1.0) = 6.0;
 uniform float tail_length_texels : hint_range(4.0, 48.0, 1.0) = 28.0;
 uniform float structure_tint_strength : hint_range(0.0, 1.0, 0.01) = 0.42;
 uniform float fragment_strength : hint_range(0.0, 1.0, 0.01) = 0.85;
+uniform vec4 outline_color : source_color = vec4(
+		0.058824, 0.105882, 0.149020, 0.88);
+uniform float outline_width_texels : hint_range(0.0, 2.0, 0.25) = 1.0;
+uniform float outline_strength : hint_range(0.0, 1.0, 0.01) = 1.0;
 
 varying vec4 vertex_color;
 
@@ -156,7 +162,10 @@ void fragment() {
 	vec2 trapezoid_uv = (UV - vec2(padding)) / usable_span;
 
 	float strength = clamp(perspective_strength, 0.0, 0.35);
-	float projected_x = clamp(trapezoid_uv.x, 0.0, 1.0);
+	float projected_x = clamp(
+			mix(group_x_min, group_x_max, trapezoid_uv.x),
+			0.0,
+			1.0);
 	float vertical_scale = 1.0 - strength * projected_x;
 	float source_y = 0.5 + (trapezoid_uv.y - 0.5) / vertical_scale;
 
@@ -314,6 +323,60 @@ void fragment() {
 						energy_peak_color.rgb,
 						fragment_intensity);
 			}
+		}
+
+		if (
+				mapped_color.a <= 0.001
+				&& outline_strength > 0.001
+		) {
+			float neighbor_alpha = 0.0;
+			for (int ring = 1; ring <= 2; ring++) {
+				float enabled = step(
+						float(ring),
+						outline_width_texels);
+				vec2 texel = (
+						TEXTURE_PIXEL_SIZE
+						* float(ring));
+				float ring_alpha = 0.0;
+				ring_alpha = max(
+						ring_alpha,
+						texture(TEXTURE, source_uv + vec2(
+								texel.x, 0.0)).a);
+				ring_alpha = max(
+						ring_alpha,
+						texture(TEXTURE, source_uv - vec2(
+								texel.x, 0.0)).a);
+				ring_alpha = max(
+						ring_alpha,
+						texture(TEXTURE, source_uv + vec2(
+								0.0, texel.y)).a);
+				ring_alpha = max(
+						ring_alpha,
+						texture(TEXTURE, source_uv - vec2(
+								0.0, texel.y)).a);
+				ring_alpha = max(
+						ring_alpha,
+						texture(TEXTURE, source_uv + texel).a);
+				ring_alpha = max(
+						ring_alpha,
+						texture(TEXTURE, source_uv - texel).a);
+				ring_alpha = max(
+						ring_alpha,
+						texture(TEXTURE, source_uv + vec2(
+								texel.x, -texel.y)).a);
+				ring_alpha = max(
+						ring_alpha,
+						texture(TEXTURE, source_uv + vec2(
+								-texel.x, texel.y)).a);
+				neighbor_alpha = max(
+						neighbor_alpha,
+						ring_alpha * enabled);
+			}
+			mapped_color = vec4(
+					outline_color.rgb,
+					neighbor_alpha
+					* outline_color.a
+					* outline_strength);
 		}
 
 		COLOR = mapped_color * vertex_color;

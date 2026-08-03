@@ -1,9 +1,12 @@
 extends Control
 
 const TITLE_TEXTURE_SIZE := 252.0
+const TITLE_GROUP_WIDTH := 801.4
 const FLOW_START_PIXELS: Array[float] = [63.5, 45.5, 45.5]
 const FLOW_END_PIXELS: Array[float] = [224.5, 224.5, 215.5]
 const FRAGMENT_ORIGIN_Y_PIXELS: Array[float] = [78.5, 78.5, 90.5]
+const GROUP_START_PIXELS: Array[float] = [499.0, 250.0, 0.0]
+const GROUP_END_PIXELS: Array[float] = [801.4, 552.4, 302.4]
 
 @export_group("Palette")
 @export var face_color: Color = Color(
@@ -11,15 +14,15 @@ const FRAGMENT_ORIGIN_Y_PIXELS: Array[float] = [78.5, 78.5, 90.5]
 @export var structure_color: Color = Color(
 		0.058824, 0.105882, 0.149020, 1.0)
 @export var energy_color: Color = Color(
-		0.866667, 0.337255, 0.223529, 1.0)
+		0.886275, 0.364706, 0.286275, 1.0)
 @export var energy_peak_color: Color = Color(
 		0.960784, 0.909804, 0.819608, 1.0)
 
 @export_group("Engraving Flow")
 @export_range(1.0, 8.0, 0.1) var flow_period_seconds: float = 4.2
-@export_range(0.0, 0.4, 0.01) var flow_stagger_seconds: float = 0.14
-@export_range(0.1, 1.0, 0.01) var flow_duration_seconds: float = 0.45
-@export_range(0.05, 0.5, 0.01) var release_duration_seconds: float = 0.22
+@export_range(0.0, 0.8, 0.01) var flow_stagger_seconds: float = 0.28
+@export_range(0.1, 2.5, 0.01) var flow_duration_seconds: float = 1.35
+@export_range(0.05, 1.5, 0.01) var release_duration_seconds: float = 0.70
 @export_range(1.0, 12.0, 1.0) var head_width_texels: float = 6.0
 @export_range(4.0, 48.0, 1.0) var tail_length_texels: float = 28.0
 @export_range(0.0, 1.0, 0.01) var structure_tint_strength: float = 0.42
@@ -120,6 +123,12 @@ func _apply_shared_parameters() -> void:
 		shader_material.set_shader_parameter(
 			&"fragment_origin_uv_y",
 			FRAGMENT_ORIGIN_Y_PIXELS[index] / TITLE_TEXTURE_SIZE)
+		shader_material.set_shader_parameter(
+			&"group_x_min",
+			GROUP_START_PIXELS[index] / TITLE_GROUP_WIDTH)
+		shader_material.set_shader_parameter(
+			&"group_x_max",
+			GROUP_END_PIXELS[index] / TITLE_GROUP_WIDTH)
 	_apply_palette()
 
 

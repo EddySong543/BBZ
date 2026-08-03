@@ -6,22 +6,272 @@
 [ext_resource type="Texture2D" uid="uid://srppixk6tsqq" path="res://assets/ui/boot/title_bo_middle.png" id="4_bo_middle"]
 [ext_resource type="Texture2D" uid="uid://u64yxf1lqakw" path="res://assets/ui/boot/title_zan_bottom.png" id="5_zan_bottom"]
 [ext_resource type="Shader" uid="uid://bgdyem7t1ncxj" path="res://assets/shaders/canvas_boot_title_perspective.gdshader" id="6_title_shader"]
-[ext_resource type="Script" path="res://src/ui/components/boot_title_controller.gd" id="7_title_controller"]
+[ext_resource type="Script" uid="uid://ckaw3t7ahebyu" path="res://src/ui/components/boot_title_controller.gd" id="7_title_controller"]
+[ext_resource type="Script" uid="uid://di0qh6ki88n6e" path="res://src/ui/components/battle_stage.gd" id="8_battle_stage"]
+[ext_resource type="Texture2D" uid="uid://l7yqhkbwpw8t" path="res://assets/ui/boot/boot_pressure_blue_base.png" id="9_blue_base"]
+[ext_resource type="Texture2D" uid="uid://b1ielbf7bgidj" path="res://assets/ui/boot/boot_pressure_blue_mid.png" id="10_blue_mid"]
+[ext_resource type="Texture2D" uid="uid://bmvjksw7pyjet" path="res://assets/ui/boot/boot_pressure_blue_light.png" id="11_blue_light"]
+[ext_resource type="Texture2D" uid="uid://b7n0cjhwpk8pi" path="res://assets/ui/boot/boot_pressure_gold_combined.png" id="12_gold_combined"]
+[ext_resource type="Texture2D" uid="uid://c3enruve11t5c" path="res://assets/ui/boot/boot_pressure_gold_flow.png" id="13_gold_flow"]
+[ext_resource type="Shader" uid="uid://cakykok0vnjl7" path="res://assets/shaders/canvas_boot_paper.gdshader" id="15_paper_shader"]
+[ext_resource type="Shader" uid="uid://b8yragtgx4ebp" path="res://assets/shaders/canvas_boot_blue_layer.gdshader" id="16_blue_shader"]
+[ext_resource type="Script" uid="uid://b4ihh610vdrnm" path="res://src/ui/components/boot_pressure_motion.gd" id="17_motion_script"]
+[ext_resource type="Shader" uid="uid://cnxchyste4tw6" path="res://assets/shaders/canvas_boot_gold_energy.gdshader" id="18_gold_shader"]
+[ext_resource type="Script" uid="uid://bv4s0isdxh2dc" path="res://src/ui/components/boot_blue_flow_motion.gd" id="19_blue_motion_script"]
+[ext_resource type="Script" uid="uid://b1tr4f3xwq31v" path="res://src/ui/components/boot_enter_prompt.gd" id="20_enter_prompt_script"]
+[ext_resource type="Shader" uid="uid://bdm3wx2k3ah2h" path="res://assets/shaders/canvas_boot_pressure_contours.gdshader" id="21_pressure_contour_shader"]
+[ext_resource type="Shader" uid="uid://cor5j57f5augg" path="res://assets/shaders/canvas_boot_foreground_brush.gdshader" id="22_foreground_brush_shader"]
+[ext_resource type="Shader" uid="uid://vx4rcnxxcphj" path="res://assets/shaders/canvas_boot_prompt_perspective.gdshader" id="23_prompt_perspective_shader"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_paper"]
+shader = ExtResource("15_paper_shader")
+shader_parameter/paper_color = Color(0.105882, 0.164706, 0.254902, 1)
+shader_parameter/fine_grain_strength = 0.01
+shader_parameter/broad_grain_strength = 0.014
+shader_parameter/grain_cells = Vector2(480, 270)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_pressure_contours"]
+shader = ExtResource("21_pressure_contour_shader")
+shader_parameter/virtual_resolution = Vector2(480, 270)
+shader_parameter/energy_origin = Vector2(0.552, 0.346)
+shader_parameter/view_aspect = 1.7778
+shader_parameter/navy_color = Color(0.196078, 0.290196, 0.372549, 0.08)
+shader_parameter/gold_color = Color(0.784314, 0.572549, 0.039216, 0.026)
+shader_parameter/drift_pixels = 1.5
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_blue_base"]
+shader = ExtResource("16_blue_shader")
+shader_parameter/motion_time = 0.0
+shader_parameter/motion_pixels = 0.0
+shader_parameter/motion_period = 7.4
+shader_parameter/bend_pixels = 0.0
+shader_parameter/flow_contrast = 0.0
+shader_parameter/motion_direction = Vector2(-1, 0.55)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_blue_mid"]
+shader = ExtResource("16_blue_shader")
+shader_parameter/motion_time = 0.0
+shader_parameter/motion_pixels = 28.0
+shader_parameter/motion_period = 5.0
+shader_parameter/bend_pixels = 2.0
+shader_parameter/flow_contrast = 0.1
+shader_parameter/motion_direction = Vector2(-1, 0.55)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_blue_light"]
+shader = ExtResource("16_blue_shader")
+shader_parameter/motion_time = 0.0
+shader_parameter/motion_pixels = 56.0
+shader_parameter/motion_period = 3.6
+shader_parameter/bend_pixels = 3.2
+shader_parameter/flow_contrast = 0.18
+shader_parameter/motion_direction = Vector2(-1, 0.55)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_gold_energy"]
+shader = ExtResource("18_gold_shader")
+shader_parameter/flow_texture = ExtResource("13_gold_flow")
+shader_parameter/motion_time = 0.0
+shader_parameter/flow_period = 5.2
+shader_parameter/hand_flow_pixels = 2.5
+shader_parameter/escape_flow_pixels = 4.0
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_foreground_brush"]
+shader = ExtResource("22_foreground_brush_shader")
+shader_parameter/tint_color = Color(0.141176, 0.211765, 0.309804, 1)
+shader_parameter/opacity = 0.18
+shader_parameter/tint_strength = 0.84
+shader_parameter/fringe_cleanup = 0.14
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_bo_top_shadow"]
+shader = ExtResource("6_title_shader")
+shader_parameter/perspective_strength = 0.1
+shader_parameter/edge_padding = 0.04
+shader_parameter/group_x_min = 0.0
+shader_parameter/group_x_max = 0.37734
+shader_parameter/source_structure_color = Color(0.058824, 0.105882, 0.14902, 1)
+shader_parameter/source_face_color = Color(0.960784, 0.909804, 0.819608, 1)
+shader_parameter/source_energy_color = Color(0.866667, 0.337255, 0.223529, 1)
+shader_parameter/structure_color = Color(0.031373, 0.070588, 0.164706, 0.28)
+shader_parameter/face_color = Color(0.031373, 0.070588, 0.164706, 0.28)
+shader_parameter/energy_color = Color(0.031373, 0.070588, 0.164706, 0.28)
+shader_parameter/energy_peak_color = Color(0.031373, 0.070588, 0.164706, 0.28)
+shader_parameter/flow_phase = 0.0
+shader_parameter/flow_delay = 0.0
+shader_parameter/flow_duration = 0.321429
+shader_parameter/release_duration = 0.166667
+shader_parameter/flow_start_uv_x = 0.18
+shader_parameter/flow_end_uv_x = 0.89
+shader_parameter/fragment_origin_uv_y = 0.31
+shader_parameter/head_width_texels = 6.0
+shader_parameter/tail_length_texels = 28.0
+shader_parameter/structure_tint_strength = 0.0
+shader_parameter/fragment_strength = 0.0
+shader_parameter/outline_color = Color(0.058824, 0.105882, 0.14902, 0.88)
+shader_parameter/outline_width_texels = 1.0
+shader_parameter/outline_strength = 0.0
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_bo_middle_shadow"]
+shader = ExtResource("6_title_shader")
+shader_parameter/perspective_strength = 0.1
+shader_parameter/edge_padding = 0.04
+shader_parameter/group_x_min = 0.311954
+shader_parameter/group_x_max = 0.689294
+shader_parameter/source_structure_color = Color(0.058824, 0.105882, 0.14902, 1)
+shader_parameter/source_face_color = Color(0.960784, 0.909804, 0.819608, 1)
+shader_parameter/source_energy_color = Color(0.866667, 0.337255, 0.223529, 1)
+shader_parameter/structure_color = Color(0.031373, 0.070588, 0.164706, 0.28)
+shader_parameter/face_color = Color(0.031373, 0.070588, 0.164706, 0.28)
+shader_parameter/energy_color = Color(0.031373, 0.070588, 0.164706, 0.28)
+shader_parameter/energy_peak_color = Color(0.031373, 0.070588, 0.164706, 0.28)
+shader_parameter/flow_phase = 0.0
+shader_parameter/flow_delay = 0.0
+shader_parameter/flow_duration = 0.321429
+shader_parameter/release_duration = 0.166667
+shader_parameter/flow_start_uv_x = 0.18
+shader_parameter/flow_end_uv_x = 0.89
+shader_parameter/fragment_origin_uv_y = 0.31
+shader_parameter/head_width_texels = 6.0
+shader_parameter/tail_length_texels = 28.0
+shader_parameter/structure_tint_strength = 0.0
+shader_parameter/fragment_strength = 0.0
+shader_parameter/outline_color = Color(0.058824, 0.105882, 0.14902, 0.88)
+shader_parameter/outline_width_texels = 1.0
+shader_parameter/outline_strength = 0.0
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_zan_bottom_shadow"]
+shader = ExtResource("6_title_shader")
+shader_parameter/perspective_strength = 0.1
+shader_parameter/edge_padding = 0.04
+shader_parameter/group_x_min = 0.62266
+shader_parameter/group_x_max = 1.0
+shader_parameter/source_structure_color = Color(0.058824, 0.105882, 0.14902, 1)
+shader_parameter/source_face_color = Color(0.960784, 0.909804, 0.819608, 1)
+shader_parameter/source_energy_color = Color(0.866667, 0.337255, 0.223529, 1)
+shader_parameter/structure_color = Color(0.031373, 0.070588, 0.164706, 0.28)
+shader_parameter/face_color = Color(0.031373, 0.070588, 0.164706, 0.28)
+shader_parameter/energy_color = Color(0.031373, 0.070588, 0.164706, 0.28)
+shader_parameter/energy_peak_color = Color(0.031373, 0.070588, 0.164706, 0.28)
+shader_parameter/flow_phase = 0.0
+shader_parameter/flow_delay = 0.0
+shader_parameter/flow_duration = 0.321429
+shader_parameter/release_duration = 0.166667
+shader_parameter/flow_start_uv_x = 0.18
+shader_parameter/flow_end_uv_x = 0.89
+shader_parameter/fragment_origin_uv_y = 0.31
+shader_parameter/head_width_texels = 6.0
+shader_parameter/tail_length_texels = 28.0
+shader_parameter/structure_tint_strength = 0.0
+shader_parameter/fragment_strength = 0.0
+shader_parameter/outline_color = Color(0.058824, 0.105882, 0.14902, 0.88)
+shader_parameter/outline_width_texels = 1.0
+shader_parameter/outline_strength = 0.0
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_bo_top"]
 shader = ExtResource("6_title_shader")
-shader_parameter/perspective_strength = 0.26
+shader_parameter/perspective_strength = 0.1
 shader_parameter/edge_padding = 0.04
+shader_parameter/group_x_min = 0.0
+shader_parameter/group_x_max = 0.37734
+shader_parameter/source_structure_color = Color(0.058824, 0.105882, 0.14902, 1)
+shader_parameter/source_face_color = Color(0.960784, 0.909804, 0.819608, 1)
+shader_parameter/source_energy_color = Color(0.866667, 0.337255, 0.223529, 1)
+shader_parameter/structure_color = Color(0.058824, 0.105882, 0.14902, 1)
+shader_parameter/face_color = Color(0.960784, 0.909804, 0.819608, 1)
+shader_parameter/energy_color = Color(0.886275, 0.364706, 0.286275, 1)
+shader_parameter/energy_peak_color = Color(0.960784, 0.909804, 0.819608, 1)
+shader_parameter/flow_phase = 0.0
+shader_parameter/flow_delay = 0.0
+shader_parameter/flow_duration = 0.321429
+shader_parameter/release_duration = 0.166667
+shader_parameter/flow_start_uv_x = 0.18
+shader_parameter/flow_end_uv_x = 0.89
+shader_parameter/fragment_origin_uv_y = 0.31
+shader_parameter/head_width_texels = 6.0
+shader_parameter/tail_length_texels = 28.0
+shader_parameter/structure_tint_strength = 0.42
+shader_parameter/fragment_strength = 0.85
+shader_parameter/outline_color = Color(0.058824, 0.105882, 0.14902, 1)
+shader_parameter/outline_width_texels = 1.0
+shader_parameter/outline_strength = 1.0
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_bo_middle"]
 shader = ExtResource("6_title_shader")
-shader_parameter/perspective_strength = 0.26
+shader_parameter/perspective_strength = 0.1
 shader_parameter/edge_padding = 0.04
+shader_parameter/group_x_min = 0.311954
+shader_parameter/group_x_max = 0.689294
+shader_parameter/source_structure_color = Color(0.058824, 0.105882, 0.14902, 1)
+shader_parameter/source_face_color = Color(0.960784, 0.909804, 0.819608, 1)
+shader_parameter/source_energy_color = Color(0.866667, 0.337255, 0.223529, 1)
+shader_parameter/structure_color = Color(0.058824, 0.105882, 0.14902, 1)
+shader_parameter/face_color = Color(0.960784, 0.909804, 0.819608, 1)
+shader_parameter/energy_color = Color(0.886275, 0.364706, 0.286275, 1)
+shader_parameter/energy_peak_color = Color(0.960784, 0.909804, 0.819608, 1)
+shader_parameter/flow_phase = 0.0
+shader_parameter/flow_delay = 0.0
+shader_parameter/flow_duration = 0.321429
+shader_parameter/release_duration = 0.166667
+shader_parameter/flow_start_uv_x = 0.18
+shader_parameter/flow_end_uv_x = 0.89
+shader_parameter/fragment_origin_uv_y = 0.31
+shader_parameter/head_width_texels = 6.0
+shader_parameter/tail_length_texels = 28.0
+shader_parameter/structure_tint_strength = 0.42
+shader_parameter/fragment_strength = 0.85
+shader_parameter/outline_color = Color(0.058824, 0.105882, 0.14902, 1)
+shader_parameter/outline_width_texels = 1.0
+shader_parameter/outline_strength = 1.0
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_zan_bottom"]
 shader = ExtResource("6_title_shader")
-shader_parameter/perspective_strength = 0.26
+shader_parameter/perspective_strength = 0.1
 shader_parameter/edge_padding = 0.04
+shader_parameter/group_x_min = 0.62266
+shader_parameter/group_x_max = 1.0
+shader_parameter/source_structure_color = Color(0.058824, 0.105882, 0.14902, 1)
+shader_parameter/source_face_color = Color(0.960784, 0.909804, 0.819608, 1)
+shader_parameter/source_energy_color = Color(0.866667, 0.337255, 0.223529, 1)
+shader_parameter/structure_color = Color(0.058824, 0.105882, 0.14902, 1)
+shader_parameter/face_color = Color(0.960784, 0.909804, 0.819608, 1)
+shader_parameter/energy_color = Color(0.886275, 0.364706, 0.286275, 1)
+shader_parameter/energy_peak_color = Color(0.960784, 0.909804, 0.819608, 1)
+shader_parameter/flow_phase = 0.0
+shader_parameter/flow_delay = 0.0
+shader_parameter/flow_duration = 0.321429
+shader_parameter/release_duration = 0.166667
+shader_parameter/flow_start_uv_x = 0.18
+shader_parameter/flow_end_uv_x = 0.89
+shader_parameter/fragment_origin_uv_y = 0.31
+shader_parameter/head_width_texels = 6.0
+shader_parameter/tail_length_texels = 28.0
+shader_parameter/structure_tint_strength = 0.42
+shader_parameter/fragment_strength = 0.85
+shader_parameter/outline_color = Color(0.058824, 0.105882, 0.14902, 1)
+shader_parameter/outline_width_texels = 1.0
+shader_parameter/outline_strength = 1.0
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_prompt_left"]
+shader = ExtResource("23_prompt_perspective_shader")
+shader_parameter/node_offset = Vector2(0, 19)
+shader_parameter/group_size = Vector2(288, 40)
+shader_parameter/group_center_y = 20.0
+shader_parameter/perspective_strength = 0.1
+shader_parameter/slope_pixels = 2.5
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_prompt_label"]
+shader = ExtResource("23_prompt_perspective_shader")
+shader_parameter/node_offset = Vector2(48, 0)
+shader_parameter/group_size = Vector2(288, 40)
+shader_parameter/group_center_y = 20.0
+shader_parameter/perspective_strength = 0.1
+shader_parameter/slope_pixels = 2.5
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_prompt_right"]
+shader = ExtResource("23_prompt_perspective_shader")
+shader_parameter/node_offset = Vector2(252, 19)
+shader_parameter/group_size = Vector2(288, 40)
+shader_parameter/group_center_y = 20.0
+shader_parameter/perspective_strength = 0.1
+shader_parameter/slope_pixels = 2.5
 
 [node name="BootScreen" type="Control" unique_id=30656907]
 layout_mode = 3
@@ -32,7 +282,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_script")
 
-[node name="Background" type="ColorRect" parent="." unique_id=1035413834]
+[node name="BackgroundStage" type="Control" parent="." unique_id=1754067425]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -40,23 +290,187 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.004, 0.003, 0.009, 1)
+script = ExtResource("8_battle_stage")
+idle_amplitude = 4.0
+idle_speed = 0.2
+ground_parallax = 0.55
+pointer_parallax = true
+pointer_strength = 5.0
+pointer_smooth = 5.5
+pointer_zoom = 0.002
+pointer_pivot_reach = 320.0
+demo_click_shake = false
+focus_point = Vector2(960, 540)
+focus_zoom = 0.0
+punch_zoom = 0.0
+
+[node name="PaperBase" type="ColorRect" parent="BackgroundStage" unique_id=2077542343]
+material = SubResource("ShaderMaterial_paper")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -96.0
+offset_top = -96.0
+offset_right = 96.0
+offset_bottom = 96.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+metadata/parallax_factor = 0.1
+
+[node name="PressureContours" type="ColorRect" parent="BackgroundStage" unique_id=784757625]
+material = SubResource("ShaderMaterial_pressure_contours")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+metadata/parallax_factor = 0.18
+
+[node name="BlueBase" type="TextureRect" parent="BackgroundStage" unique_id=573596857]
+texture_filter = 1
+material = SubResource("ShaderMaterial_blue_base")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -25.0
+offset_top = -67.0
+offset_right = 103.0
+offset_bottom = 61.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("9_blue_base")
+expand_mode = 1
+metadata/parallax_factor = 0.25
+
+[node name="BlueMid" type="TextureRect" parent="BackgroundStage" unique_id=2106159460]
+texture_filter = 1
+material = SubResource("ShaderMaterial_blue_mid")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -25.0
+offset_top = -67.0
+offset_right = 103.0
+offset_bottom = 61.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("10_blue_mid")
+expand_mode = 1
+metadata/parallax_factor = 0.45
+
+[node name="BlueLight" type="TextureRect" parent="BackgroundStage" unique_id=1116370642]
+texture_filter = 1
+material = SubResource("ShaderMaterial_blue_light")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -25.0
+offset_top = -67.0
+offset_right = 103.0
+offset_bottom = 61.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("11_blue_light")
+expand_mode = 1
+metadata/parallax_factor = 0.65
+
+[node name="GoldEnergy" type="TextureRect" parent="BackgroundStage" unique_id=2142621441]
+texture_filter = 1
+material = SubResource("ShaderMaterial_gold_energy")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 39.0
+offset_top = -3.0
+offset_right = 39.0
+offset_bottom = -3.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("12_gold_combined")
+expand_mode = 1
+metadata/parallax_factor = 0.82
+
+[node name="ForegroundBrush" type="TextureRect" parent="BackgroundStage" unique_id=1927896076]
+texture_filter = 1
+material = SubResource("ShaderMaterial_foreground_brush")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("10_blue_mid")
+expand_mode = 1
+metadata/parallax_factor = 1.08
+
+[node name="BlueFlowMotion" type="Node" parent="BackgroundStage" unique_id=1366374092]
+script = ExtResource("19_blue_motion_script")
+
+[node name="PressureMotion" type="Node" parent="BackgroundStage" unique_id=738526631]
+script = ExtResource("17_motion_script")
+flow_period = 5.2
 
 [node name="TitleColumn" type="Control" parent="." unique_id=1774752000]
 anchors_preset = 0
-offset_left = 176.0
-offset_top = 146.0
-offset_right = 428.0
-offset_bottom = 934.0
+offset_left = 37.0
+offset_top = 263.0
+offset_right = 843.4
+offset_bottom = 581.4
 mouse_filter = 2
 script = ExtResource("7_title_controller")
+
+[node name="BoTopShadow" type="TextureRect" parent="TitleColumn" unique_id=1241185897]
+texture_filter = 1
+material = SubResource("ShaderMaterial_bo_top_shadow")
+layout_mode = 0
+offset_left = 5.0
+offset_top = 9.0
+offset_right = 307.4
+offset_bottom = 311.4
+mouse_filter = 2
+texture = ExtResource("3_bo_top")
+
+[node name="BoMiddleShadow" type="TextureRect" parent="TitleColumn" unique_id=1571073025]
+texture_filter = 1
+material = SubResource("ShaderMaterial_bo_middle_shadow")
+layout_mode = 0
+offset_left = 261.0
+offset_top = 24.0
+offset_right = 563.4
+offset_bottom = 326.4
+mouse_filter = 2
+texture = ExtResource("4_bo_middle")
+
+[node name="ZanBottomShadow" type="TextureRect" parent="TitleColumn" unique_id=949663103]
+texture_filter = 1
+material = SubResource("ShaderMaterial_zan_bottom_shadow")
+layout_mode = 0
+offset_left = 512.0
+offset_top = 32.0
+offset_right = 814.4
+offset_bottom = 334.4
+mouse_filter = 2
+texture = ExtResource("5_zan_bottom")
 
 [node name="BoTop" type="TextureRect" parent="TitleColumn" unique_id=866388521]
 texture_filter = 1
 material = SubResource("ShaderMaterial_bo_top")
 layout_mode = 0
-offset_right = 252.0
-offset_bottom = 252.0
+offset_right = 302.4
+offset_bottom = 302.4
 mouse_filter = 2
 texture = ExtResource("3_bo_top")
 
@@ -64,9 +478,10 @@ texture = ExtResource("3_bo_top")
 texture_filter = 1
 material = SubResource("ShaderMaterial_bo_middle")
 layout_mode = 0
-offset_top = 268.0
-offset_right = 252.0
-offset_bottom = 520.0
+offset_left = 256.0
+offset_top = 15.0
+offset_right = 558.4
+offset_bottom = 317.4
 mouse_filter = 2
 texture = ExtResource("4_bo_middle")
 
@@ -74,15 +489,61 @@ texture = ExtResource("4_bo_middle")
 texture_filter = 1
 material = SubResource("ShaderMaterial_zan_bottom")
 layout_mode = 0
-offset_top = 536.0
-offset_right = 252.0
-offset_bottom = 788.0
+offset_left = 507.0
+offset_top = 23.0
+offset_right = 809.4
+offset_bottom = 325.4
 mouse_filter = 2
 texture = ExtResource("5_zan_bottom")
 
+[node name="EnterPrompt" type="Control" parent="." unique_id=1040569598]
+anchors_preset = 0
+offset_left = 294.0
+offset_top = 607.0
+offset_right = 582.0
+offset_bottom = 647.0
+pivot_offset = Vector2(144, 20)
+mouse_filter = 2
+script = ExtResource("20_enter_prompt_script")
+
+[node name="LineLeft" type="ColorRect" parent="EnterPrompt" unique_id=1583791424]
+material = SubResource("ShaderMaterial_prompt_left")
+layout_mode = 0
+offset_left = 6.0
+offset_top = -7.0
+offset_right = 42.0
+offset_bottom = -5.0
+mouse_filter = 2
+color = Color(0.960784, 0.909804, 0.819608, 1)
+
+[node name="Label" type="Label" parent="EnterPrompt" unique_id=160821434]
+material = SubResource("ShaderMaterial_prompt_label")
+layout_mode = 0
+offset_left = 54.0
+offset_top = -26.0
+offset_right = 246.0
+offset_bottom = 14.0
+theme_override_colors/font_color = Color(0.960784, 0.909804, 0.819608, 1)
+theme_override_colors/font_outline_color = Color(0.031373, 0.039216, 0.05098, 0.92)
+theme_override_constants/outline_size = 1
+text = "点击进入游戏"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="LineRight" type="ColorRect" parent="EnterPrompt" unique_id=847842358]
+material = SubResource("ShaderMaterial_prompt_right")
+layout_mode = 0
+offset_left = 258.0
+offset_top = -7.0
+offset_right = 294.0
+offset_bottom = -5.0
+mouse_filter = 2
+color = Color(0.960784, 0.909804, 0.819608, 1)
+
 [node name="Character" parent="." unique_id=1898497878 instance=ExtResource("2_character")]
 layout_mode = 0
-offset_left = 374.99994
-offset_top = 32.0
-offset_right = 2052.9402
-offset_bottom = 1046.42
+offset_left = 528.0
+offset_top = 96.00001
+offset_right = 2038.1462
+offset_bottom = 1008.978
+metadata/_edit_lock_ = true
