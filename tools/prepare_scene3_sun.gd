@@ -1,6 +1,6 @@
 extends SceneTree
 
-const SOURCE := "res://assets/import/sun.png"
+const SOURCE := "res://assets/scenes/scene3/scene3_source_sun.png"
 const OUTPUT := "res://assets/scenes/scene3/scene3_sun.png"
 const CLEAR_LUMINANCE := 0.92
 const CLEAR_CHROMA := 0.08

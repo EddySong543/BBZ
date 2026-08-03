@@ -9,7 +9,7 @@ cloud sea and clearly shares the direction of the replacement dawn sun.
 
 - Keep `SunRayField` above the distant mountains and below `CloudSeaBack`.
 - Place one hidden direction source below the cloud sea near the valley center.
-- Prepare `assets/import/sun.png` into a cropped true-alpha formal asset.
+- Prepare `assets/scenes/scene3/scene3_source_sun.png` into a cropped true-alpha formal asset.
 - Place the replacement `DawnSun` after `SunRayField` and before
   `CloudSeaBack`, with its lower half fading into the cloud sea.
 - Reuse the pale Scene2 distant range as three vertically offset layers. Keep

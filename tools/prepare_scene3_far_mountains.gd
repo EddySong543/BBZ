@@ -2,11 +2,11 @@ extends SceneTree
 
 const JOBS := [
 	{
-		"source": "res://assets/import/leftfarmountain.png",
+		"source": "res://assets/scenes/scene3/scene3_source_left_far_mountain.png",
 		"output": "res://assets/scenes/scene3/scene3_left_far_mountain.png",
 	},
 	{
-		"source": "res://assets/import/rightfarmountain.png",
+		"source": "res://assets/scenes/scene3/scene3_source_right_far_mountain.png",
 		"output": "res://assets/scenes/scene3/scene3_right_far_mountain.png",
 	},
 ]
