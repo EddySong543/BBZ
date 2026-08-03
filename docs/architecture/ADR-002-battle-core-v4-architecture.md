@@ -62,7 +62,7 @@ ADR-001 §D4（2026-05-18）决定**暂停** HeroSkill 组件化迁移，明确*
 
 ### D2：英雄 = 组件文件 + 双接口（被动 hook + 主动技），组件**无状态**
 
-**Current**：仅 h05 是组件（`skills/chenlong.gd`），其余 12 个 hardcoded；基类只有 1 个 hook。
+**决策时现状**：仅 h05 是组件（当时为 `skills/chenlong.gd`；现行重设计实现为 `skills/h05_pozhan.gd`），其余 12 个 hardcoded；基类当时只有 1 个 hook。
 
 **Decision**：
 - 每个英雄 = `src/battle/skills/hXX_<name>.gd`，继承 `HeroSkill`，自带：
@@ -179,7 +179,7 @@ ADR-001 §D4（2026-05-18）决定**暂停** HeroSkill 组件化迁移，明确*
 
 **Decision**：主动技英雄的组件声明 `ActiveAbilitySpec{action_id, cost, per_game_cap, occupies_slot, target_type}` + `can_use()` + `execute(battle, player, slot)`。引擎统一处理：
 - **每局 cap N**（h01/07/12/13/14/15/16/24/26/32/33 共用；h17/20/34 无 cap）
-- **动作槽例外**：当先 h07（0 能不占槽，方案 C 英雄级唯一例外）
+- **动作槽例外**：千里自在风 h07（0 能不占槽，方案 C 英雄级唯一例外）
 - **动作复制**：梅开二度 h14（下一动作 ×2）
 - **动作禁用**：君命难违 h17（对手下回合屏蔽某动作系列）
 - **结算时机选择**：天平归衡 h24（玩家选 扶倾/清算 注入点）——元机制，特殊处理

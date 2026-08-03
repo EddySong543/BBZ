@@ -60,19 +60,20 @@ func _battle_team(p0_ids: Array, hp: int = 5, e: int = 8) -> BattleCore:
 # ---- h13 玄冥 鼠潮（在场时己方每触发 combo 效果 → 团队 +0.5 能·每回合封顶 1.5）----
 
 func test_h13_shuchao_combo_proc_grants_team_energy() -> void:
-	# 龙(破甲·on_deal_hit)出战 + 暗鼠在替补 → 龙波命中 = 1 次 combo proc → 团队 +0.5 能(1 半能)
+	# 龙(破绽·攻击被挡)出战 + 暗鼠在替补 → 对手成功防御 = 1 次 combo proc → 团队 +0.5 能(1 半能)
 	var with_rat := _battle_team(["h05", "h13", "test_p0_2"], 5, 8)
 	with_rat.select_action(0, ActionDef.Action.ATTACK)
-	with_rat.select_action(1, ActionDef.Action.CHARGE)
+	with_rat.select_action(1, ActionDef.Action.DEFEND)
 	with_rat.resolve()
-	# 对照：同样龙波破甲，但替补无暗鼠 → 无鼠潮返还
+	# 对照：同样由龙逼防留下破绽，但替补无暗鼠 → 无鼠潮返还
 	var no_rat := _battle_team(["h05", "test_p0_1", "test_p0_2"], 5, 8)
 	no_rat.select_action(0, ActionDef.Action.ATTACK)
-	no_rat.select_action(1, ActionDef.Action.CHARGE)
+	no_rat.select_action(1, ActionDef.Action.DEFEND)
 	no_rat.resolve()
 	assert_eq(with_rat.energy[0] - no_rat.energy[0], 1, "暗鼠在场 + 1 次 combo proc → 团队多 +0.5 能(1 半能)")
 	assert_eq(with_rat._shuchao_procs[0], 1, "本回合计入 1 次 combo proc")
 	assert_eq(no_rat._shuchao_procs[0], 0, "无暗鼠 → 不计 proc、不产能")
+	assert_eq(int(with_rat.get_status(1, 0, "opening", 0)), 1, "龙的攻击被挡后应给目标留下破绽")
 
 
 func test_h13_shuchao_whiteboard_attack_grants_nothing() -> void:
@@ -90,14 +91,14 @@ func test_h13_shuchao_whiteboard_attack_grants_nothing() -> void:
 
 
 func test_h13_shuchao_no_cap_per_turn() -> void:
-	# 一回合 4 个 proc 事件（毒爆 + 易伤 + 龙破甲 + 鸡剑意）→ 无封顶 → 4 次全计入(2.0 能)
-	var b := _battle_team(["h05", "h13", "h10"], 5, 8)   # 龙出战 + 暗鼠替补 + 鸡替补
+	# 一回合 4 个 proc 事件（毒爆 + 易伤 + 猴碎能 + 鸡剑意）→ 无封顶 → 4 次全计入(2.0 能)
+	var b := _battle_team(["h09", "h13", "h10"], 5, 8)   # 猴出战 + 暗鼠替补 + 鸡替补
 	b.set_status(1, 0, "poison", 1)   # 敌出战预置毒(待引爆)
 	b.set_status(1, 0, "marked", 1)   # 敌出战预置易伤
-	b.select_action(0, ActionDef.Action.ATTACK)   # 龙波
+	b.select_action(0, ActionDef.Action.ATTACK)   # 猴波
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(b._shuchao_procs[0], 4, "4 个 proc 事件(毒爆/易伤/龙破甲/鸡剑意) → 无封顶·全计 4 次(旧封顶 3)")
+	assert_eq(b._shuchao_procs[0], 4, "4 个 proc 事件(毒爆/易伤/猴碎能/鸡剑意) → 无封顶·全计 4 次(旧封顶 3)")
 
 
 # ---- h14 蚩尤 卸力反震（防/大防挡下 → 反弹所挡 50% 真伤·批③起走管线打击喂原语）----

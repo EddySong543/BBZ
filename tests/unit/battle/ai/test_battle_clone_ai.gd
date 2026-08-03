@@ -82,6 +82,22 @@ func test_clone_preserves_h02_team_wave_upgrade_and_keeps_array_independent() ->
 	assert_true(b.upgrade_next_wave[1], "克隆体消费敌方升级不得污染原局")
 
 
+func test_clone_preserves_h08_retained_big_defend_and_keeps_array_independent() -> void:
+	var b := _battle2([["h08", 6], ["t01", 10], ["t02", 10]],
+		[["t10", 10], ["t11", 10], ["t12", 10]])
+	b.retained_big_defend[0] = true
+	b.retained_big_defend[1] = false
+
+	var c := b.clone()
+	assert_true(c.retained_big_defend[0], "克隆体应保留己方不坠神言")
+	assert_false(c.retained_big_defend[1], "克隆体应保留敌方默认状态")
+
+	c.retained_big_defend[0] = false
+	c.retained_big_defend[1] = true
+	assert_true(b.retained_big_defend[0], "克隆体消费保留大防不得污染原局")
+	assert_false(b.retained_big_defend[1], "克隆体建立状态不得污染原局")
+
+
 # ---- clone：推演不污染原局 ----
 
 func test_clone_resolve_does_not_mutate_original() -> void:

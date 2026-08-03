@@ -82,7 +82,7 @@ const _DEF := {
 		desc = "本回合防御成功时，我方获得 0.5 点能量。", params = {energy = 1},
 		script = preload("res://src/battle/items/t1_moli_yuanquan.gd")},
 	# --- 1G 扩展（含变体 / 净化 / 节奏 / 随机）---
-	# 注：「毒刺」（命中下毒）已删 —— 与翼火【蛇】 h06 淬毒功能完全相同，禁撞英雄（Eddy 2026-06-18）。
+	# 注：「毒刺」（命中下毒）已删 —— 与翼火【蛇】 h06【神打】功能完全相同，禁撞英雄（Eddy 2026-06-18）。
 	"t1_siyecao": {
 		name = "最后一箭", dim = "进攻", role = "随机变体", seq = _S_PRE, target = _T_ENEMY,
 		desc = "对敌方出战英雄造成 0.5 点伤害；若我方出战英雄生命低于敌方，改为 1 点伤害。", params = {dmg = 1, boon = 2},

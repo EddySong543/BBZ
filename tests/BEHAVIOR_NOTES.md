@@ -59,7 +59,7 @@
   > "双方同时出『波』 → 互相抵消，双方均不受伤害，各自消耗 1 能量"
 - **Current Behavior**：`_apply_defense(dmg, atk=ATTACK, def=ATTACK)` 没有命中 BIG_DEFEND 分支、也不满足 `def == DEFEND and atk == ATTACK`，直接 `return dmg` → 双方都被 `_route_damage` 加到对方 hp_dmg。结果是双方都受 1 伤（hp -1），能量都 -1。
 - **测试**：`tests/unit/battle/test_base_actions.gd::test_attack_vs_attack_both_take_1_damage`
-- **可能原因**：早期实现遗漏，或在英雄技能（如 h05 龙威）调试中临时改的；与 `events` 输出文本（"P1/P2 命中"）一致，说明是有意走双向解算，但未对齐设计文档。
+- **可能原因**：早期实现遗漏，或在当时的英雄技能（旧 h05 龙威）调试中临时改的；与 `events` 输出文本（"P1/P2 命中"）一致，说明是有意走双向解算，但未对齐设计文档。
 
 ---
 

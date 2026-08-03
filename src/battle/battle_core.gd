@@ -74,7 +74,10 @@ var overtime_mode: bool = false           # 加时赛局（create_overtime / app
 var action_lock_turn: Array[int] = [-1, -1]     # 烛阴 h17【阖眸成夜】v5（锁招）：该回合号时此玩家只能使用 action_locked（-1=无锁）
 var action_locked: Array[int] = [-1, -1]        # 被锁定动作（ActionDef.Action 或 ActionDef.ACTIVE·=施放拍对手用过的动作·不可执行时兜底只能攒）
 var pierce_next_attack: Array[bool] = [false, false]   # 毕方 h22【焚天火兆】v3：该方下一次动作攻击穿大防（全队资源·不过期·兑现/落空即消·2026-07-06 批④）
-var upgrade_next_wave: Array[bool] = [false, false]     # 牛金 h02【山河借骨回天法】：挡下波/大波后，该方下一次波按大波结算
+var upgrade_next_wave: Array[bool] = [false, false]     # 牛金 h02【玄金不动相】：挡下波/大波后，该方下一次波按大波结算
+var retained_big_defend: Array[bool] = [false, false]   # 鬼金 h08【不坠神言】：未兑现的大防由队伍保留，实际挡下一次基础攻击后消耗
+var _retain_big_defend_candidate: Array[bool] = [false, false]  # resolve 原子相位临时态：本回合哪方由鬼金打出了待判定的大防
+var _retained_big_defend_in_use: Array[bool] = [false, false]   # resolve 临时态：已消费的后备大防继续挡完同一次多段基础攻击
 
 var rng := RandomNumberGenerator.new()    # 可 seed (§D7)：联机/录像/测试可复现
 var _skills: Array = [[], []]             # _skills[player][slot]: HeroSkill 或 null
@@ -83,13 +86,13 @@ var _skills: Array = [[], []]             # _skills[player][slot]: HeroSkill 或
 ## 随实装逐个加入。swap 后此表与 v3 _HERO_SKILL_SCRIPTS 合并/替换。
 const _HERO_SKILL_SCRIPTS := {
 	"h01": preload("res://src/battle/skills/h01_dunshu.gd"),
-	"h02": preload("res://src/battle/skills/h02_jiegu.gd"),
+	"h02": preload("res://src/battle/skills/h02_xuanjinbudongxiang.gd"),
 	"h03": preload("res://src/battle/skills/h03_leiyin.gd"),
 	"h04": preload("res://src/battle/skills/h04_wucidi.gd"),
-	"h05": preload("res://src/battle/skills/h05_liejia.gd"),
-	"h06": preload("res://src/battle/skills/h06_cuidu.gd"),
-	"h07": preload("res://src/battle/skills/h07_dangxian.gd"),
-	"h08": preload("res://src/battle/skills/h08_muyang.gd"),
+	"h05": preload("res://src/battle/skills/h05_pozhan.gd"),
+	"h06": preload("res://src/battle/skills/h06_shenda.gd"),
+	"h07": preload("res://src/battle/skills/h07_qianlizizaifeng.gd"),
+	"h08": preload("res://src/battle/skills/h08_buzhuishenyan.gd"),
 	"h09": preload("res://src/battle/skills/h09_liezhao.gd"),
 	"h10": preload("res://src/battle/skills/h10_jianyi.gd"),
 	"h11": preload("res://src/battle/skills/h11_zhuibu.gd"),
@@ -158,6 +161,9 @@ func setup(p1_heroes: Array, p2_heroes: Array, seed_value: int = 0) -> void:
 	winner = WINNER_UNDECIDED
 	pierce_next_attack = [false, false]
 	upgrade_next_wave = [false, false]
+	retained_big_defend = [false, false]
+	_retain_big_defend_candidate = [false, false]
+	_retained_big_defend_in_use = [false, false]
 
 	_build_skills()
 	_validate_skills()
@@ -1012,6 +1018,7 @@ func clone() -> BattleCore:
 	c.action_locked = action_locked.duplicate()
 	c.pierce_next_attack = pierce_next_attack.duplicate()
 	c.upgrade_next_wave = upgrade_next_wave.duplicate()
+	c.retained_big_defend = retained_big_defend.duplicate()
 	c.pve_no_econ = pve_no_econ
 	c.rng = RandomNumberGenerator.new()
 	c.rng.seed = rng.seed
@@ -1044,7 +1051,7 @@ func clone() -> BattleCore:
 #       b.select_action(0, ...)                           # 恢复后战局含随机流逐位一致，直接续打
 # 行为锁定：tests/unit/battle/v4/test_battle_snapshot.gd
 
-const SNAPSHOT_VERSION := 4
+const SNAPSHOT_VERSION := 5
 const HERO_RES_DIR := "res://assets/data/heroes/"
 ## 快照必需键（2026-07-17 终审修复·schema 门）：⚠新增引擎状态字段的"三处同步"升级为四处——
 ## clone() / to_snapshot()+from_snapshot() / 本表 / 快照测试。
@@ -1053,7 +1060,7 @@ const SNAP_REQUIRED_KEYS: Array[String] = ["v", "heroes", "active_index", "energ
 	"active_target", "attack_target", "pending_death_switch", "death_processed", "shuchao_procs", "double", "killer",
 	"last_action", "items", "item_uses", "info_distortion", "item_buffs", "imod", "relics", "slots",
 	"turn_number", "game_over", "winner", "overtime_mode", "action_lock_turn", "action_locked",
-	"pierce_next_attack", "upgrade_next_wave",
+	"pierce_next_attack", "upgrade_next_wave", "retained_big_defend",
 	"pve_no_econ", "rng_seed", "rng_state"]
 
 
@@ -1095,6 +1102,7 @@ func to_snapshot() -> Dictionary:
 		action_locked = action_locked.duplicate(),
 		pierce_next_attack = pierce_next_attack.duplicate(),
 		upgrade_next_wave = upgrade_next_wave.duplicate(),
+		retained_big_defend = retained_big_defend.duplicate(),
 		pve_no_econ = pve_no_econ,
 		rng_seed = str(rng.seed),
 		rng_state = str(rng.state),
@@ -1153,6 +1161,7 @@ func from_snapshot(d: Dictionary) -> bool:
 	action_locked.assign(s["action_locked"])
 	pierce_next_attack.assign(s["pierce_next_attack"])
 	upgrade_next_wave.assign(s["upgrade_next_wave"])
+	retained_big_defend.assign(s["retained_big_defend"])
 	pve_no_econ = bool(s["pve_no_econ"])
 	rng = RandomNumberGenerator.new()
 	rng.seed = String(s["rng_seed"]).to_int()    # ⚠ 先 seed 后 state（设 seed 会重置 state）
@@ -1346,6 +1355,13 @@ func resolve() -> Dictionary:
 			selected_action[p] = ActionDef.Action.CHARGE
 
 	var a: Array[int] = [selected_action[0], selected_action[1]]
+	_retain_big_defend_candidate = [false, false]
+	_retained_big_defend_in_use = [false, false]
+	for p in [0, 1]:
+		if a[p] == ActionDef.Action.BIG_DEFEND:
+			var action_skill: HeroSkill = _skills[p][active_index[p]]
+			_retain_big_defend_candidate[p] = \
+				action_skill != null and action_skill.retains_unused_big_defend()
 	_shuchao_procs = [0, 0]
 	for p in [0, 1]:
 		for s in range(_killer[p].size()):
@@ -1477,7 +1493,7 @@ func resolve() -> Dictionary:
 		if nullified and wave_upgraded:
 			upgrade_next_wave[p] = false
 		if not nullified and ActionDef.is_attack(a[p]):
-			# 山河借骨回天法：原选招始终保留为「波」（费用/历史/道具检查均读 a[p]）；
+			# 玄金不动相：原选招始终保留为「波」（费用/历史/道具检查均读 a[p]）；
 			# 只把本次 hit 的伤害、有效类型与基础穿透提升到「大波」。
 			var damage_action: int = ActionDef.Action.BIG_ATTACK if wave_upgraded else a[p]
 			var dmg: int = maxi(_calc_outgoing(p, damage_action) + int(item_mod(p, "atk_bonus", 0)) - int(item_mod(p, "atk_penalty", 0)), 0)
@@ -1590,6 +1606,12 @@ func resolve() -> Dictionary:
 			for hit in hitlists[p]:
 				_apply_resolve_hit(p, hit, a, events)
 
+	# Phase 4.8: 不坠神言——鬼金本回合的大防没有实际挡到基础攻击，转为不可叠加的团队后备大防。
+	for p in [0, 1]:
+		if _retain_big_defend_candidate[p]:
+			retained_big_defend[p] = true
+			events.append({id = "buzhui_shenyan_retained", player = p})
+
 	# Phase 5: 死亡结算 + 强制切换 + 胜负
 	_resolve_deaths(a, events)
 
@@ -1600,22 +1622,6 @@ func resolve() -> Dictionary:
 			var sk: HeroSkill = _skills[p][s]
 			if sk != null:
 				sk.on_resolve_end(self, p, s)
-
-	# Phase 5.6: 牧养（光版鬼金 h08）——鬼金【出战】(存活) → 你方存活【替补席】英雄每回合回 reserve_heal 半点。
-	#   鬼金站前线牧养、出战英雄(含鬼金自己)不回；走 _heal（尊重妖火禁回血、封顶 max_hp）。
-	#   （2026-07-02 Eddy：由在场收缩为出战限定——鬼金须亲自出战才牧养，不再躲替补席续航。）
-	for p in [0, 1]:
-		var act: int = active_index[p]
-		var msk: HeroSkill = _skills[p][act]
-		var rheal := 0
-		if hp[p][act] > 0 and msk != null:
-			rheal = msk.reserve_heal_per_turn()
-		if rheal > 0:
-			for s in range(hp[p].size()):
-				if s != act and hp[p][s] > 0:
-					var got: int = _heal(p, s, rheal)
-					if got > 0:
-						events.append({id = "muyang_heal", player = p, slot = s, amount = got})
 
 	# Phase 6: cleanup
 	# 遗物·Phase 6：每回合末 tick（产出/计数/充能；读 selected_action 判断本回合是否攻击）。
@@ -1720,7 +1726,7 @@ func _perform_switch(player: int, from_slot: int, to_slot: int, events: Array) -
 		relic["data"].effect.relic_on_switch_in(self, player, to_slot, relic["data"], relic["state"], events)
 
 
-## h07 当先：免费切换（不占动作槽；星日 free_switch_cap 默认 -1 = 不限次）。在【选择阶段】调用：
+## h07 千里自在风：免费切换（不占动作槽；星日 free_switch_cap 默认 -1 = 不限次）。在【选择阶段】调用：
 ## 立即换人 + 计 cap，不设 selected_action，之后玩家照常为新出战英雄选一个动作。
 ## 二元设计："涉及马的切换"都免动作槽 = 起点（马在场→重定位下场）或终点（顶马上场）任一为星日即免费。
 
@@ -1730,6 +1736,7 @@ func _grants_free_switch(player: int, slot: int) -> bool:
 	if sk == null or not sk.has_free_switch():
 		return false
 	var cap: int = sk.free_switch_cap()
+	# 保留旧内部状态键，避免战斗快照和调试工具因纯显示名重命名而失配。
 	if cap >= 0 and int(get_status(player, slot, "dangxian_uses", 0)) >= cap:
 		return false
 	return true
@@ -1805,6 +1812,7 @@ func _find_lethal_guardian(player: int) -> int:
 func _apply_resolve_hit(attacker_player: int, hit: Dictionary, actions: Array[int], events: Array) -> int:
 	var riders: Array = hit.get("riders", [])
 	var source: String = "action" if bool(hit.get("action", false)) else "item"
+	var is_base_attack: bool = bool(hit.get("action", false)) and not bool(hit.get("active", false))
 	var source_slot: int = int(hit.get("src_slot", -1))
 	var target_slot: int = int(hit.get("target_slot", -1))
 	var dealt: int = _apply_damage(
@@ -1818,7 +1826,8 @@ func _apply_resolve_hit(attacker_player: int, hit: Dictionary, actions: Array[in
 		riders,
 		source,
 		source_slot,
-		target_slot)
+		target_slot,
+		is_base_attack)
 	if bool(hit.get("active", false)):
 		var skill_slot: int = source_slot if source_slot >= 0 else active_index[attacker_player]
 		var skill: HeroSkill = _skills[attacker_player][skill_slot]
@@ -1868,7 +1877,7 @@ func damage_immune(player: int) -> bool:
 
 func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_action: int, pen: int,
 		def_action: int, events: Array, item_riders: Array = [], src: String = "action",
-		attacker_slot: int = -1, target_slot: int = -1) -> int:
+		attacker_slot: int = -1, target_slot: int = -1, is_base_attack: bool = false) -> int:
 	var slot: int = active_index[target_player]
 	if target_slot >= 0:
 		if target_slot >= hp[target_player].size() or hp[target_player][target_slot] <= 0:
@@ -1882,6 +1891,12 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		return 0
 
 	# Stage B4: 防御动作门（大防挡全部；防挡波，不挡大波/穿防攻击）
+	# 破绽（亢金 h05）：逐英雄、持续、不叠加；目标下一次受到的【基础攻击】至少穿防并立即消费。
+	# 必须显式读 is_base_attack，不能只读 atk_action/src：道具、攻击型主动技、反击和冲撞共用本管线。
+	if is_base_attack and int(get_status(target_player, slot, "opening", 0)) > 0:
+		statuses[target_player][slot].erase("opening")
+		pen = maxi(pen, ActionDef.Pen.PIERCE_DEF)
+		events.append({id = "opening_used", player = target_player, slot = slot})
 	var eff_def: int = def_action
 	var broken: int = int(get_status(target_player, slot, "broken_armor", 0))
 	if broken > 0 and def_action in ActionDef.DEFEND_ACTIONS:
@@ -1902,9 +1917,23 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		blocked = eff_def == ActionDef.Action.BIG_DEFEND
 	else:
 		blocked = eff_def == ActionDef.Action.BIG_DEFEND or eff_def == ActionDef.Action.DEFEND
+	# 当前行动的防御优先：鬼金本回合的大防已实际挡到基础攻击，就不转为团队状态。
+	if blocked and is_base_attack and def_action == ActionDef.Action.BIG_DEFEND:
+		_retain_big_defend_candidate[target_player] = false
+	var retained_block: bool = false
+	if not blocked and is_base_attack \
+			and (retained_big_defend[target_player] or _retained_big_defend_in_use[target_player]) \
+			and pen != ActionDef.Pen.TRUE_DMG and pen != ActionDef.Pen.PIERCE_BIGDEF:
+		blocked = true
+		eff_def = ActionDef.Action.BIG_DEFEND
+		retained_block = true
+		if retained_big_defend[target_player]:
+			retained_big_defend[target_player] = false
+			_retained_big_defend_in_use[target_player] = true
+			events.append({id = "buzhui_shenyan_consumed", player = target_player, slot = slot})
 	if blocked:
 		events.append({id = ("big_defend_block" if eff_def == ActionDef.Action.BIG_DEFEND else "defend_block"),
-			player = target_player, slot = slot, kind = atk_action, src = src})
+			player = target_player, slot = slot, kind = atk_action, src = src, retained = retained_block})
 		# 魔力源泉：防御成功 → +能量（每回合一次）
 		var be: int = int(item_mod(target_player, "block_energy", 0))
 		if be > 0:
@@ -1918,6 +1947,13 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		var dsk: HeroSkill = _skills[target_player][slot]
 		if dsk != null:
 			dsk.on_block(self, target_player, slot, attacker_player, atk_action, def_action, raw, src)
+		if is_base_attack:
+			var aslot: int = attacker_slot if attacker_slot >= 0 else active_index[attacker_player]
+			var ask: HeroSkill = _skills[attacker_player][aslot]
+			if ask != null:
+				ask.on_base_attack_blocked(
+					self, attacker_player, aslot, target_player, slot,
+					atk_action, def_action, raw, events)
 		return 0
 
 	var dmg := raw

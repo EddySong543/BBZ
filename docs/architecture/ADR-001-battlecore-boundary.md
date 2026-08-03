@@ -92,10 +92,10 @@ P0-1 / P0-2 / P0-3 是密集做出的架构级决策，但之前散落在 commit
 
 ### D4: HeroSkill 组件化暂停
 
-**Current**:
-- 已迁移：**1 个**（h05 辰龙 → `src/battle/skills/chenlong.gd`）
+**当时现状**:
+- 已迁移：**1 个**（当时的 h05 辰龙；现行重设计实现位于 `src/battle/skills/h05_pozhan.gd`）
 - 未迁移：**12 个**（h01~h04, h06~h13），继续走 battle_core hardcoded 分支
-- HeroSkill 基类只有 1 个 hook：`on_attack_calc`
+- 当时 HeroSkill 基类只有 1 个 hook：`on_attack_calc`
 
 **Decision**:
 - **暂停** HeroSkill 迁移；h05 保留为孤例
@@ -198,3 +198,4 @@ P0-1 / P0-2 / P0-3 是密集做出的架构级决策，但之前散落在 commit
 | 日期 | 修订 | 作者 |
 |------|------|------|
 | 2026-05-18 | 初版（P0-1 / P0-2 / P0-3 决议沉淀） | Eddy + Claude |
+| 2026-07-31 | 标明 h05 条目为决策时历史现状，并补充现行脚本索引 | Codex |

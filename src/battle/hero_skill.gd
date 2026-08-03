@@ -125,7 +125,7 @@ func hit_count(_action: int, _battle: BattleCore, _player: int, _slot: int) -> i
 
 
 ## 本英雄攻击【命中（穿过防御门、连接到目标）】后触发：施加自身 on-hit 效果。
-## 翼火 h06(叠毒) / 亢金 h05(破甲) / 紫火 h09(碎能)。引擎按 hit_count 次调用。
+## 翼火 h06(叠毒) / 紫火 h09(碎能)。引擎按 hit_count 次调用。
 func on_deal_hit(_battle: BattleCore, _player: int, _slot: int, _target_player: int, _target_slot: int, _dealt: int, _action: int) -> void:
 	pass
 
@@ -133,6 +133,15 @@ func on_deal_hit(_battle: BattleCore, _player: int, _slot: int, _target_player: 
 ## 己方任一英雄攻击命中敌方时，对本队所有英雄（含替补席）触发：团队级 on-hit 监听。
 ## 昴日（全队命中 → +1 剑气）。引擎按 hit_count 次调用。
 func on_team_deal_hit(_battle: BattleCore, _player: int, _slot: int, _attacker_slot: int, _target_player: int, _target_slot: int, _dealt: int) -> void:
+	pass
+
+
+## 本英雄发出的基础攻击被目标用「防」或「大防」完整挡下后触发。
+## 只认「波 / 大波」；独立道具伤害、攻击型主动技、反击和持续伤害不进入本钩子。
+## 亢金（给实际防御目标留下破绽）。events 可追加玩家可见的瞬时结算事件。
+func on_base_attack_blocked(_battle: BattleCore, _player: int, _slot: int,
+		_target_player: int, _target_slot: int, _attack_action: int,
+		_defense_action: int, _raw: int, _events: Array) -> void:
 	pass
 
 
@@ -164,11 +173,11 @@ func is_lethal_guardian() -> bool:
 	return false
 
 
-## 「牧养 / 休养生息」型（光版鬼金 h08）：本英雄在场（含替补·存活）时，你方退到【替补席】的存活英雄
-## 每回合回本值（半点）HP（退下火线休养；出战英雄不回）。引擎在 resolve Phase 5.6 走 _heal 入账。
-## 默认 0（不产出）；鬼金 override 返回 1（= +0.5 HP/回合）。共享原语 = 轮换续航（配星日免费切换）。
-func reserve_heal_per_turn() -> int:
-	return 0
+## 「不坠神言」型（鬼金 h08）：本英雄选择的「大防」若没有挡到基础「波 / 大波」，
+## 是否转为队伍持有的一次后备大防。状态、消费和快照由 BattleCore 统一处理。
+## 默认 false；鬼金返回 true。
+func retains_unused_big_defend() -> bool:
+	return false
 
 
 ## 「饕餮」型（并封 h24）：本英雄在场（含替补·存活）时，战场上【任一】英雄阵亡（敌我皆可）
@@ -186,7 +195,7 @@ func death_heal_self() -> int:
 	return 0
 
 
-## 免费切换次数上限（仅 has_free_switch()=true 时有意义）；-1 = 无限。星日当先 = -1（不限次）。
+## 免费切换次数上限（仅 has_free_switch()=true 时有意义）；-1 = 无限。星日【千里自在风】= -1（不限次）。
 func free_switch_cap() -> int:
 	return -1
 
@@ -283,7 +292,7 @@ func on_active_attack_resolved(_battle: BattleCore, _player: int, _slot: int, _d
 	pass
 
 
-## 本英雄是否拥有"免费切换（不占动作槽）"能力。默认 false。h07 当先返回 true。
-## 引擎通过 free_switch() 处理；cap 由引擎计数（statuses["dangxian_uses"]）。
+## 本英雄是否拥有"免费切换（不占动作槽）"能力。默认 false。h07【千里自在风】返回 true。
+## 引擎通过 free_switch() 处理；cap 由引擎计数（statuses["dangxian_uses"]，保留的旧内部键）。
 func has_free_switch() -> bool:
 	return false

@@ -18,7 +18,7 @@ const W_ACTIVE_HP := 4.0     # 出战位 HP 差额外加权（前线存活更重
 ## 之后每点仅 W_ENERGY_EXTRA → 抑制 1-ply 短视下的"无意义屯能不出手"。
 const W_ENERGY := 12.0       # 前 2 能每点价值
 
-## 状态资产项总开关/缩放（任务#7·2026-07-03）：铺垫型主动技/技能挂出的状态（沉默/毒/易伤/破甲/剑气…）
+## 状态资产项总开关/缩放（任务#7·2026-07-03）：铺垫型主动技/技能挂出的状态（沉默/毒/易伤/破绽/破甲/剑气…）
 ## 此前评估恒 0 分 → AI 视铺垫为纯亏能量、几乎不用铺垫型主动技（主动技率 0.7%·仅攻击型在用）。
 ## 本项给这些"未来会兑现的资产"记账。0.0 = 关闭（旧行为·A/B 对照 --ab status_off）。
 const W_STATUS_SCALE := 1.0
@@ -61,8 +61,8 @@ static func score(b: BattleCore, player: int, w: Dictionary = {}) -> float:
 	return s
 
 
-## player 的"状态资产"（半点量纲·≈10 分/半点）：己方增益层 + 挂在敌方身上的债/破绽。
-## 权重按"预期兑现的半点当量"手拍：毒层命中即爆(8)>易伤持续(6)>破甲/印记一次性(5/4)；
+## player 的"状态资产"（半点量纲·≈10 分/半点）：己方增益层 + 挂在敌方身上的待兑现状态。
+## 权重按"预期兑现的半点当量"手拍：毒层命中即爆(8)>易伤持续(6)>破绽/破甲/印记一次性(5/5/4)；
 ## 剑气=己方攒的穿透资源(6/层)；沉默=对手 unique 停摆(10/回合·封顶 2)。
 static func _status_assets(b: BattleCore, p: int) -> float:
 	var t := 0.0
@@ -76,6 +76,7 @@ static func _status_assets(b: BattleCore, p: int) -> float:
 		t += 8.0 * float(b.get_status(e, s2, "poison", 0))             # 毒层（命中引爆）
 		t += 6.0 * float(b.get_status(e, s2, "vuln", 0))               # 罪已昭易伤（持续·换下场才清）
 		t += 4.0 * float(b.get_status(e, s2, "marked", 0))             # 猎物印记（一次性易伤）
+		t += 5.0 * float(b.get_status(e, s2, "opening", 0))            # 破绽（下一次基础攻击穿防）
 		t += 5.0 * float(b.get_status(e, s2, "broken_armor", 0))       # 破甲（下次防御失效）
 		t += 10.0 * minf(float(b.get_status(e, s2, "silenced", 0)), 2.0)  # 沉默（unique 停摆/回合）
 	# 护主可用（天狗 h23·2026-07-04 Eddy 批③②）：替补席存活 + 御凶未用 = 一次"免死保险"资产（40 分）。

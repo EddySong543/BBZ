@@ -33,6 +33,7 @@ func _midgame() -> BattleCore:
 	var b := _battle()
 	b.set_status(0, 0, "poison", 2)
 	b.set_status(1, 1, "marked", 1)
+	b.set_status(1, 2, "opening", 1)
 	b.item_buffs[0]["next_atk_bonus"] = 2
 	b.pending_damage[1][0] = 2
 	b.give_item(0, ItemCatalog.make("t1_feibiao"))
@@ -45,6 +46,8 @@ func _midgame() -> BattleCore:
 	b.resolve()
 	b.upgrade_next_wave[0] = true
 	b.upgrade_next_wave[1] = true
+	b.retained_big_defend[0] = true
+	b.retained_big_defend[1] = false
 	return b
 
 
@@ -172,6 +175,9 @@ func test_snapshot_malformed_rejected_without_mutation() -> void:
 	var missing_h02_state: Dictionary = before.duplicate(true)
 	missing_h02_state.erase("upgrade_next_wave")
 	assert_false(b.from_snapshot(missing_h02_state), "缺牛金团队波升级状态应拒")
+	var missing_h08_state: Dictionary = before.duplicate(true)
+	missing_h08_state.erase("retained_big_defend")
+	assert_false(b.from_snapshot(missing_h08_state), "缺鬼金团队保留大防状态应拒")
 	var missing_h04_state: Dictionary = before.duplicate(true)
 	missing_h04_state.erase("attack_target")
 	assert_false(b.from_snapshot(missing_h04_state), "缺房日基础攻击目标状态应拒")

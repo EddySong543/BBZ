@@ -12,7 +12,7 @@ extends HeroSkill
 ##   → _perform_switch 让天狗登场(carry 退替补) + 计 huzhu_uses + 这一击改落天狗(走正常落 HP·天狗可能阵亡)。
 ##
 ## 设计依据（design/heroes-dark-h21-h24.md）：维度=防御·共享原语=安全网（使能暗虎血勇/暗鸡蓄势/脆皮
-##   over-extend）。⚠ 接手原鬼金 h08"守护"定位（鬼金 h08 已转【牧养】h08_muyang）。对手 yomi=先点死替补席的天狗破保险。
+##   over-extend）。⚠ 接手原鬼金 h08 的致死救援定位；鬼金现为【不坠神言】团队后备大防。对手 yomi=先点死替补席的天狗破保险。
 
 func is_lethal_guardian() -> bool:
 	return true

@@ -1369,6 +1369,12 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 			"armor_broken":
 				if on_display:
 					tags[p].append({text = tr("破甲"), col = COL_TAG_BREAK})
+			"opening_applied":
+				if on_display:
+					tags[p].append({text = tr("破绽"), col = COL_TAG_BREAK})
+			"opening_used":
+				if on_display:
+					tags[p].append({text = tr("破绽穿防"), col = COL_TAG_BREAK})
 			"lethal_rescue":
 				tags[p].append({text = tr("护主"), col = COL_TAG_SAVE, pr = 0})
 			"huzhu_counter":
@@ -1575,7 +1581,7 @@ func _show_death_switch_selection(player: int) -> void:
 ## 第一次点 → 该框立绘变「切换」二字（armed·仅提示）；
 ## 再次点同框 → 做「选择」动画(弹跳+高亮·与底部按钮一致)，把换人选为本回合动作；
 ## 第三次点同框 → 取消选择(回 armed)。选定后点「结束」=提交换人并结算回合(可提前结束)。
-## h07 当先 = 免费即时换(不占动作·本回合继续)，第二次点即换。
+## h07 千里自在风 = 免费即时换(不占动作·本回合继续)，第二次点即换。
 func _on_reserve_frame_input(event: InputEvent, frame_idx: int) -> void:
 	if state != State.PLAYER_SELECT:
 		return
@@ -1604,7 +1610,7 @@ func _on_reserve_frame_input(event: InputEvent, frame_idx: int) -> void:
 		return
 	# 同一框再次左键：
 	if battle.is_free_switch_target(PLAYER, p1_frame_slots[frame_idx]):
-		_free_switch_now(frame_idx)           # 午马当先：涉及马的切换即时免费（马在场重定位 / 顶马上场）
+		_free_switch_now(frame_idx)           # 千里自在风：涉及马的切换即时免费（马在场重定位 / 顶马上场）
 	elif _switch_selected:
 		_deselect_switch()                    # 已选 → 取消（回 armed）
 	else:
@@ -1660,7 +1666,7 @@ func _disarm_switch() -> void:
 	_switch_selected = false
 
 
-## h07 当先：免费即时换（不占动作·本回合继续行动）。
+## h07 千里自在风：免费即时换（不占动作·本回合继续行动）。
 func _free_switch_now(frame_idx: int) -> void:
 	var slot: int = p1_frame_slots[frame_idx]
 	if slot < 0:

@@ -51,7 +51,9 @@
 
 | hook | 触发位置 | 已迁移英雄 |
 |------|---------|-----------|
-| `on_attack_calc(raw_dmg, action, battle, player, energy_before) -> int` | `_calc_attack_raw` 内 | h05 龙威（首批） |
+| `on_attack_calc(raw_dmg, action, battle, player, energy_before) -> int` | `_calc_attack_raw` 内 | 当时的 h05 龙威（首批） |
+
+> **历史说明（2026-07-31）**：上表记录 v3 评估窗口，不是现行 hook 清单。h05 现已重设计为「龙御极」，实现位于 `src/battle/skills/h05_pozhan.gd`，使用 `on_base_attack_blocked`。
 
 ### 何时该加新 hook
 

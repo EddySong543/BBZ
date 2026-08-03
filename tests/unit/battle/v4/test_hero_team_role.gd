@@ -26,9 +26,9 @@ func test_h02_published_data_matches_approved_redesign() -> void:
 	var h := load("res://assets/data/heroes/h02.tres") as HeroData
 	assert_not_null(h, "h02 数据资源必须可加载")
 	assert_eq(h.max_hp, 7, "牛金生命保持 7")
-	assert_eq(h.skill_description, "山河借骨回天法", "牛金应使用已定稿技能名")
+	assert_eq(h.skill_description, "玄金不动相", "牛金应使用已定稿技能名")
 	assert_eq(h.skill_detail,
-		"牛金【牛】成功防御时，我方下一次「波」升级为「大波」。",
+		"牛金【牛】成功防御时，我方下一次的「波」升级为「大波」。",
 		"牛金短文案应使用统一的成功防御术语")
 
 
@@ -51,6 +51,28 @@ func test_h04_published_data_matches_approved_redesign() -> void:
 	assert_eq(h.skill_detail,
 		"房日【兔】的攻击可以指定任意一名敌方英雄。",
 		"房日短文案应使用统一的攻击术语")
+
+
+func test_h05_published_data_matches_approved_redesign() -> void:
+	var h := load("res://assets/data/heroes/h05.tres") as HeroData
+	assert_not_null(h, "h05 数据资源必须可加载")
+	assert_eq(h.max_hp, 5, "亢金生命保持 5")
+	assert_eq(h.team_role, "进攻", "亢金的主定位应为进攻")
+	assert_eq(h.skill_description, "龙御极", "亢金应使用已定稿技能名")
+	assert_eq(h.skill_detail,
+		"亢金【龙】的攻击被成功防御时，使目标获得破绽。",
+		"亢金短文案应使用统一的成功防御与破绽术语")
+
+
+func test_h06_published_data_matches_approved_redesign() -> void:
+	var h := load("res://assets/data/heroes/h06.tres") as HeroData
+	assert_not_null(h, "h06 数据资源必须可加载")
+	assert_eq(h.max_hp, 4, "翼火生命保持 4")
+	assert_eq(h.team_role, "进攻", "翼火的主定位应为进攻")
+	assert_eq(h.skill_description, "神打", "翼火应使用已定稿技能名")
+	assert_eq(h.skill_detail,
+		"翼火【蛇】命中敌方英雄时，使其获得1层毒素。\n毒素：可叠加。中毒英雄再次被命中时，引爆并清除全部毒素，每层造成0.5点伤害。",
+		"翼火文案应使用已定稿的毒素与引爆术语")
 
 
 func test_hero_data_launch_pool_all_have_valid_team_role() -> void:

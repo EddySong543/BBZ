@@ -68,11 +68,12 @@ func test_v1_shield_diff_weighted_by_w_shield() -> void:
 # ---- 状态资产项（任务#7·2026-07-03：铺垫型技能挂出的状态计分）----
 
 func test_v1_status_assets_enemy_debuffs_score_positive() -> void:
-	# 挂在敌方身上的毒/易伤/沉默 = 我方资产（此前恒 0 分 → 铺垫型主动技被 AI 视为纯亏）。
+	# 挂在敌方身上的毒/破绽/沉默 = 我方资产（此前恒 0 分 → 铺垫型主动技被 AI 视为纯亏）。
 	var b := _neutral()
 	b.set_status(1, 0, "poison", 2)     # 敌出战 2 层毒 → +8×2
+	b.set_status(1, 0, "opening", 1)    # 敌出战有破绽 → +5
 	b.set_status(1, 0, "silenced", 2)   # 敌被沉默 2 回合 → +10×2
-	assert_almost_eq(BattleEval.score(b, 0), 8.0 * 2.0 + 10.0 * 2.0, 0.001,
+	assert_almost_eq(BattleEval.score(b, 0), 8.0 * 2.0 + 5.0 + 10.0 * 2.0, 0.001,
 		"敌方债/破绽按半点当量计入我方资产")
 
 
