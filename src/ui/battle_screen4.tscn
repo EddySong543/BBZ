@@ -1,0 +1,211 @@
+[gd_scene load_steps=16 format=3]
+
+[ext_resource type="PackedScene" uid="uid://bn0rjf1qjld17" path="res://src/ui/battle_screen_base.tscn" id="1_base"]
+[ext_resource type="PackedScene" path="res://src/ui/scenes/scene4.tscn" id="2_scene4"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_env_scene4_character_light.gdshader" id="3_character_light"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_env_scene4_root_contact_shadow.gdshader" id="4_contact_shadow"]
+[ext_resource type="Shader" uid="uid://dnycv6j3wn0ot" path="res://assets/shaders/post_fx_color_grade.gdshader" id="5_postfx"]
+
+[sub_resource type="ShaderMaterial" id="Scene4ContactShadowMat"]
+resource_local_to_scene = true
+shader = ExtResource("4_contact_shadow")
+shader_parameter/shadow_color = Color(0.018, 0.07, 0.043, 1)
+shader_parameter/shadow_strength = 0.62
+shader_parameter/grid_cells = Vector2(44, 12)
+shader_parameter/alpha_levels = 4.0
+
+[sub_resource type="ShaderMaterial" id="Scene4P1CharacterMat"]
+resource_local_to_scene = true
+shader = ExtResource("3_character_light")
+shader_parameter/flash_amount = 0.0
+shader_parameter/flash_color = Color(1, 1, 1, 1)
+shader_parameter/source_saturation = 1.02
+shader_parameter/source_contrast = 1.01
+shader_parameter/light_dir = Vector2(0.48, -1)
+shader_parameter/backlight = 0.2
+shader_parameter/shadow_tint = Color(0.52, 0.64, 0.53, 1)
+shader_parameter/skin_warmth = Color(1.03, 1.01, 0.96, 1)
+shader_parameter/warmth_amount = 0.015
+shader_parameter/rim_color = Color(0.7, 0.86, 0.55, 1)
+shader_parameter/rim_strength = 0.07
+shader_parameter/rim_width = 1.0
+shader_parameter/fill_color = Color(0.48, 0.69, 0.48, 1)
+shader_parameter/fill_amount = 0.025
+shader_parameter/canopy_key_color = Color(0.88, 0.94, 0.66, 1)
+shader_parameter/canopy_key_amount = 0.015
+shader_parameter/forest_ambient_color = Color(0.62, 0.78, 0.66, 1)
+shader_parameter/forest_ambient_amount = 0.28
+
+[sub_resource type="ShaderMaterial" id="Scene4P2CharacterMat"]
+resource_local_to_scene = true
+shader = ExtResource("3_character_light")
+shader_parameter/flash_amount = 0.0
+shader_parameter/flash_color = Color(1, 1, 1, 1)
+shader_parameter/source_saturation = 1.02
+shader_parameter/source_contrast = 1.01
+shader_parameter/light_dir = Vector2(-0.48, -1)
+shader_parameter/backlight = 0.2
+shader_parameter/shadow_tint = Color(0.52, 0.64, 0.53, 1)
+shader_parameter/skin_warmth = Color(1.03, 1.01, 0.96, 1)
+shader_parameter/warmth_amount = 0.015
+shader_parameter/rim_color = Color(0.7, 0.86, 0.55, 1)
+shader_parameter/rim_strength = 0.07
+shader_parameter/rim_width = 1.0
+shader_parameter/fill_color = Color(0.48, 0.69, 0.48, 1)
+shader_parameter/fill_amount = 0.025
+shader_parameter/canopy_key_color = Color(0.88, 0.94, 0.66, 1)
+shader_parameter/canopy_key_amount = 0.015
+shader_parameter/forest_ambient_color = Color(0.62, 0.78, 0.66, 1)
+shader_parameter/forest_ambient_amount = 0.28
+
+[sub_resource type="ShaderMaterial" id="Scene4PostFXMat"]
+shader = ExtResource("5_postfx")
+shader_parameter/barrel_amount = 0.055
+shader_parameter/barrel_edge_margin = 0.15
+shader_parameter/edge_blur_amount = 0.0
+shader_parameter/edge_blur_start = 0.4
+shader_parameter/brightness = 1.02
+shader_parameter/contrast = 1.025
+shader_parameter/saturation = 1.015
+shader_parameter/tint_color = Color(0.98, 1, 0.99, 1)
+shader_parameter/tint_strength = 0.02
+shader_parameter/shadow_tint = Color(0.94, 0.98, 0.96, 1)
+shader_parameter/highlight_tint = Color(1.02, 1.01, 0.98, 1)
+shader_parameter/split_strength = 0.035
+shader_parameter/vignette_color = Color(0.025, 0.035, 0.04, 1)
+shader_parameter/vignette_strength = 0.08
+shader_parameter/vignette_radius = 0.92
+shader_parameter/vignette_softness = 0.58
+shader_parameter/grain_amount = 0.01
+shader_parameter/grain_scale = 1.6
+shader_parameter/impact_strength = 0.0
+shader_parameter/impact_invert = 0.0
+shader_parameter/impact_center = Vector2(0.5, 0.55)
+shader_parameter/impact_burst_radius = 0.26
+shader_parameter/impact_jag = 0.11
+shader_parameter/impact_jag_freq = 7.0
+shader_parameter/impact_th_out = 0.52
+shader_parameter/impact_th_in = 0.13
+shader_parameter/impact_white = 0.86
+shader_parameter/impact_px = 3.0
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_p1a"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_p1b"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_p1c"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_p2a"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_p2b"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_p2c"]
+
+[node name="BattleScreen4" instance=ExtResource("1_base")]
+countdown_normal_color = Color(0.94902, 0.909804, 0.8, 1)
+countdown_outline_color = Color(0, 0, 0, 0.8)
+countdown_outline_size = 4
+countdown_ornament_color = Color(0.94902, 0.909804, 0.8, 1)
+countdown_ornament_underlay_color = Color(0.07, 0.04, 0.02, 0.88)
+countdown_ornament_underlay_width = 3.0
+
+[node name="Stage" parent="StageSlot" parent_id_path=PackedInt32Array(924300025) index="0" instance=ExtResource("2_scene4")]
+layout_mode = 1
+mouse_filter = 2
+pointer_parallax = true
+demo_click_shake = false
+
+[node name="P1Shadow" parent="." index="3" unique_id=329774492]
+texture_filter = 1
+material = SubResource("Scene4ContactShadowMat")
+offset_left = 414.0
+offset_top = 734.0
+offset_right = 546.0
+offset_bottom = 770.0
+rotation = 0.0
+pivot_offset = Vector2(66, 18)
+
+[node name="P2Shadow" parent="." index="4" unique_id=1318395873]
+texture_filter = 1
+material = SubResource("Scene4ContactShadowMat")
+offset_left = 1374.0
+offset_top = 734.0
+offset_right = 1506.0
+offset_bottom = 770.0
+rotation = 0.0
+pivot_offset = Vector2(66, 18)
+
+[node name="P1CharDisplay" parent="." index="5" unique_id=1642938575]
+rim_color = Color(0.7, 0.86, 0.55, 1)
+rim_strength = 0.07
+rim_width = 1.0
+backlight = 0.2
+shadow_tint = Color(0.52, 0.64, 0.53, 1)
+light_dir = Vector2(0.48, -1)
+skin_warmth = Color(1.03, 1.01, 0.96, 1)
+warmth_amount = 0.015
+fill_color = Color(0.48, 0.69, 0.48, 1)
+fill_amount = 0.025
+
+[node name="AnimatedSprite2D" parent="P1CharDisplay/SubViewport" parent_id_path=PackedInt32Array(1642938575, 1325957388) index="1" unique_id=1622338484]
+material = SubResource("Scene4P1CharacterMat")
+
+[node name="P2CharDisplay" parent="." index="6" unique_id=915119977]
+rim_color = Color(0.7, 0.86, 0.55, 1)
+rim_strength = 0.07
+rim_width = 1.0
+flip_h = true
+backlight = 0.2
+shadow_tint = Color(0.52, 0.64, 0.53, 1)
+light_dir = Vector2(0.48, -1)
+skin_warmth = Color(1.03, 1.01, 0.96, 1)
+warmth_amount = 0.015
+fill_color = Color(0.48, 0.69, 0.48, 1)
+fill_amount = 0.025
+
+[node name="AnimatedSprite2D" parent="P2CharDisplay/SubViewport" parent_id_path=PackedInt32Array(915119977, 1325957388) index="1" unique_id=1622338484]
+material = SubResource("Scene4P2CharacterMat")
+
+[node name="ForeDust" parent="." index="7" unique_id=844619574]
+visible = false
+emitting = false
+
+[node name="LowerDust" parent="." index="8" unique_id=802756316]
+visible = false
+emitting = false
+
+[node name="PostFX" parent="." index="10" unique_id=516553634]
+material = SubResource("Scene4PostFXMat")
+
+[node name="P1Frame0" parent="P1Hud" parent_id_path=PackedInt32Array(1074064709) index="2"]
+offset_right = 98.0
+offset_bottom = 76.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_p1a")
+
+[node name="P1Frame1" parent="P1Hud" parent_id_path=PackedInt32Array(1074064709) index="3"]
+offset_right = 744.0
+offset_bottom = 74.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_p1b")
+
+[node name="P1Frame2" parent="P1Hud" parent_id_path=PackedInt32Array(1074064709) index="5"]
+offset_right = 664.0
+offset_bottom = 74.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_p1c")
+
+[node name="P2Frame0" parent="P2Hud" parent_id_path=PackedInt32Array(1758094651) index="2"]
+offset_right = 1886.0
+offset_bottom = 76.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_p2a")
+
+[node name="P2Frame1" parent="P2Hud" parent_id_path=PackedInt32Array(1758094651) index="3"]
+offset_right = 1258.0
+offset_bottom = 74.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_p2b")
+
+[node name="P2Frame2" parent="P2Hud" parent_id_path=PackedInt32Array(1758094651) index="5"]
+offset_right = 1338.0
+offset_bottom = 74.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_p2c")
+
+[editable path="P1CharDisplay"]
+[editable path="P2CharDisplay"]
