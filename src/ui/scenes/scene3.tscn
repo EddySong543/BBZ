@@ -794,31 +794,29 @@ self_modulate = Color(0.92, 0.92, 0.89, 0.86)
 texture_filter = 1
 material = SubResource("DistantMountainMidMat")
 layout_mode = 0
-offset_left = -6.0
-offset_top = 181.0
-offset_right = 2104.0
-offset_bottom = 847.0
+offset_left = -40.0
+offset_top = 178.0
+offset_right = 2070.0
+offset_bottom = 844.0
 mouse_filter = 2
 texture = ExtResource("18_scene2_far")
 expand_mode = 1
 flip_h = true
 metadata/parallax_factor = 0.1
-metadata/_edit_lock_ = true
 
 [node name="DistantMountainRangeNear" type="TextureRect" parent="." unique_id=1085222187]
 self_modulate = Color(0.87, 0.89, 0.86, 0.94)
 texture_filter = 1
 material = SubResource("DistantMountainNearMat")
 layout_mode = 0
-offset_left = -177.0
-offset_top = 272.0
-offset_right = 1903.0
-offset_bottom = 928.0
+offset_left = -211.0
+offset_top = 269.0
+offset_right = 1869.0
+offset_bottom = 925.0
 mouse_filter = 2
 texture = ExtResource("18_scene2_far")
 expand_mode = 1
 metadata/parallax_factor = 0.14
-metadata/_edit_lock_ = true
 
 [node name="BackFog" type="ColorRect" parent="." unique_id=1342523076]
 material = SubResource("BackFogMat")
@@ -835,8 +833,10 @@ metadata/_edit_lock_ = true
 [node name="SunHalo" type="ColorRect" parent="." unique_id=1405490471]
 material = SubResource("SunHaloMat")
 layout_mode = 0
-offset_right = 1920.0
-offset_bottom = 1080.0
+offset_left = -35.0
+offset_top = 2.0
+offset_right = 1885.0
+offset_bottom = 1082.0
 mouse_filter = 2
 color = Color(0, 0, 0, 0)
 metadata/parallax_factor = 0.26
@@ -845,10 +845,10 @@ metadata/_edit_lock_ = true
 [node name="SunRayField" type="ColorRect" parent="." unique_id=70878269]
 material = SubResource("SunRayMat")
 layout_mode = 0
-offset_left = -80.0
-offset_top = 260.0
-offset_right = 2000.0
-offset_bottom = 830.0
+offset_left = -115.0
+offset_top = 262.0
+offset_right = 1965.0
+offset_bottom = 832.0
 mouse_filter = 2
 color = Color(0, 0, 0, 0)
 metadata/parallax_factor = 0.25
@@ -857,7 +857,7 @@ metadata/_edit_lock_ = true
 [node name="SunMotesFar" type="GPUParticles2D" parent="." unique_id=1526286527]
 texture_filter = 1
 material = SubResource("SunMoteBlend")
-position = Vector2(960, 520)
+position = Vector2(925, 522)
 amount = 9
 texture = SubResource("SunMoteDotTexture")
 lifetime = 11.0
@@ -874,10 +874,10 @@ metadata/_edit_lock_ = true
 texture_filter = 1
 material = SubResource("DawnSunMat")
 layout_mode = 0
-offset_left = 746.0
-offset_top = 620.0
-offset_right = 1190.0
-offset_bottom = 1064.0
+offset_left = 711.0
+offset_top = 622.0
+offset_right = 1155.0
+offset_bottom = 1066.0
 mouse_filter = 2
 texture = ExtResource("22_sun")
 expand_mode = 1
@@ -898,6 +898,7 @@ mouse_filter = 2
 texture = ExtResource("9_chain")
 expand_mode = 1
 metadata/parallax_factor = 0.14
+metadata/_edit_lock_ = true
 
 [node name="BackgroundChain2" type="TextureRect" parent="." unique_id=577642065]
 self_modulate = Color(0.78, 0.83, 0.82, 0.68)
@@ -914,6 +915,7 @@ texture = ExtResource("9_chain")
 expand_mode = 1
 flip_h = true
 metadata/parallax_factor = 0.26
+metadata/_edit_lock_ = true
 
 [node name="LeftFarMountain" type="TextureRect" parent="." unique_id=1832827092]
 self_modulate = Color(0.98, 0.94, 0.91, 0.9)
