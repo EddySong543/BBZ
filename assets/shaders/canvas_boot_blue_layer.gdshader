@@ -7,6 +7,14 @@ uniform float motion_period : hint_range(2.0, 12.0, 0.1) = 5.2;
 uniform float bend_pixels : hint_range(0.0, 4.0, 0.1) = 1.5;
 uniform float flow_contrast : hint_range(0.0, 0.3, 0.005) = 0.10;
 uniform vec2 motion_direction = vec2(-1.0, 0.55);
+uniform vec3 palette_shadow = vec3(0.203922, 0.227451, 0.250980);
+uniform vec3 palette_mid = vec3(0.349020, 0.388235, 0.431373);
+uniform vec3 palette_light = vec3(0.666667, 0.705882, 0.745098);
+uniform float palette_strength : hint_range(0.0, 1.0, 0.01) = 1.0;
+uniform sampler2D intro_path_texture : repeat_disable, filter_nearest;
+uniform float intro_stroke_progress : hint_range(0.0, 1.0, 0.001) = 1.0;
+uniform float intro_stroke_feather : hint_range(0.02, 0.24, 0.001) = 0.13;
+uniform float intro_layer_offset : hint_range(-0.12, 0.12, 0.005) = 0.0;
 
 varying vec4 vertex_color;
 
@@ -64,5 +72,41 @@ void fragment() {
 	mixed_rgb *= (
 			1.0
 			+ (traveling_value - 0.35) * flow_contrast);
-	COLOR = vec4(mixed_rgb, mixed_alpha) * vertex_color;
+	float luminance = dot(
+			mixed_rgb,
+			vec3(0.299, 0.587, 0.114));
+	vec3 graphite = mix(
+			palette_shadow,
+			palette_mid,
+			smoothstep(0.08, 0.38, luminance));
+	graphite = mix(
+			graphite,
+			palette_light,
+			smoothstep(0.40, 0.76, luminance));
+	mixed_rgb = mix(
+			mixed_rgb,
+			graphite,
+			clamp(palette_strength, 0.0, 1.0));
+
+	// The generated path follows clustered source brush marks. The broad
+	// transition avoids the straight windshield-wiper edge of a UV sweep.
+	float path_progress = texture(intro_path_texture, UV).r;
+	float effective_progress = clamp(
+			intro_stroke_progress + intro_layer_offset,
+			0.0,
+			1.0);
+	float intro_reveal = (
+			smoothstep(
+					path_progress - intro_stroke_feather,
+					path_progress,
+					effective_progress));
+	if (intro_stroke_progress <= 0.001) {
+		intro_reveal = 0.0;
+	} else if (intro_stroke_progress >= 0.999) {
+		intro_reveal = 1.0;
+	}
+	COLOR = vec4(
+			mixed_rgb,
+			mixed_alpha * intro_reveal
+		) * vertex_color;
 }

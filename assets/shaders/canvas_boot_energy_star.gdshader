@@ -18,14 +18,23 @@ uniform float ring_fade_start : hint_range(0.3, 0.8, 0.01) = 0.52;
 uniform float grid_size : hint_range(8.0, 96.0, 1.0) = 48.0;
 uniform float pulse_amount : hint_range(0.0, 0.3, 0.01) = 0.055;
 uniform float pulse_phase : hint_range(0.0, 1.0, 0.001) = 0.0;
+uniform float intro_pulse_enabled : hint_range(0.0, 1.0, 1.0) = 0.0;
+uniform float intro_pulse_progress : hint_range(0.0, 1.0, 0.001) = 0.0;
 
 void fragment() {
 	vec2 pixel_uv = floor(UV * grid_size + vec2(0.5)) / grid_size;
 	vec2 point = (pixel_uv - vec2(0.5)) * 2.0;
 	float abs_x = abs(point.x);
 	float abs_y = abs(point.y);
-	float outward_phase = fract(pulse_phase * 2.0);
+	float outward_phase = mix(
+			fract(pulse_phase * 2.0),
+			clamp(intro_pulse_progress, 0.0, 1.0),
+			clamp(intro_pulse_enabled, 0.0, 1.0));
 	float pulse_envelope = sin(outward_phase * 3.14159265);
+	float intro_ray_extent = mix(
+			1.0,
+			smoothstep(0.06, 0.56, outward_phase),
+			clamp(intro_pulse_enabled, 0.0, 1.0));
 
 	float horizontal_progress = clamp(
 			abs_x / horizontal_length,
@@ -66,13 +75,17 @@ void fragment() {
 				horizontal_width,
 				horizontal_width + 0.025,
 				abs(point.y - horizontal_center)))
-			* step(abs_x, horizontal_length));
+			* step(
+					abs_x,
+					horizontal_length * intro_ray_extent));
 	float vertical_ray = (
 			(1.0 - smoothstep(
 				vertical_width,
 				vertical_width + 0.025,
 				abs(point.x - vertical_center)))
-			* step(abs_y, vertical_length));
+			* step(
+					abs_y,
+					vertical_length * intro_ray_extent));
 	float horizontal_pulse = (
 			1.0
 			- smoothstep(

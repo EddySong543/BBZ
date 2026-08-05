@@ -28,15 +28,19 @@ uniform float flow_duration : hint_range(0.001, 0.5, 0.001) = 0.321429;
 uniform float release_duration : hint_range(0.001, 0.25, 0.001) = 0.166667;
 uniform float flow_start_uv_x : hint_range(0.0, 1.0, 0.001) = 0.18;
 uniform float flow_end_uv_x : hint_range(0.0, 1.0, 0.001) = 0.89;
-uniform float fragment_origin_uv_y : hint_range(0.0, 1.0, 0.001) = 0.31;
 uniform float head_width_texels : hint_range(1.0, 12.0, 1.0) = 6.0;
 uniform float tail_length_texels : hint_range(4.0, 48.0, 1.0) = 28.0;
+uniform float flow_pixel_step_texels : hint_range(1.0, 8.0, 1.0) = 4.0;
+uniform float flow_value_steps : hint_range(2.0, 8.0, 1.0) = 3.0;
 uniform float structure_tint_strength : hint_range(0.0, 1.0, 0.01) = 0.42;
-uniform float fragment_strength : hint_range(0.0, 1.0, 0.01) = 0.85;
 uniform vec4 outline_color : source_color = vec4(
 		0.058824, 0.105882, 0.149020, 0.88);
 uniform float outline_width_texels : hint_range(0.0, 2.0, 0.25) = 1.0;
 uniform float outline_strength : hint_range(0.0, 1.0, 0.01) = 1.0;
+uniform float intro_reveal_progress : hint_range(0.0, 1.0, 0.001) = 1.0;
+uniform float intro_reveal_feather : hint_range(0.001, 0.10, 0.001) = 0.025;
+uniform float intro_blade_width : hint_range(0.01, 0.16, 0.001) = 0.065;
+uniform float intro_blade_strength : hint_range(0.0, 1.0, 0.01) = 0.62;
 
 varying vec4 vertex_color;
 
@@ -119,40 +123,80 @@ vec4 remap_title_color(vec4 sampled_color) {
 }
 
 
-float moving_flow_intensity(
-		float source_pixel_x,
-		float head_pixel_x,
-		float entry_ramp
+float flow_cell_intensity(
+		float source_cell,
+		float head_cell,
+		float flow_direction
 ) {
-	float distance_to_head = abs(source_pixel_x - head_pixel_x);
-	float head = 1.0 - smoothstep(
-			0.0,
-			max(head_width_texels, 1.0),
+	float cell_delta = head_cell - source_cell;
+	float pixel_step = max(flow_pixel_step_texels, 1.0);
+	float head_radius_cells = max(
+			floor(
+				head_width_texels
+				/ pixel_step
+				* 0.5),
+			0.0);
+	float tail_cells = max(
+			floor(tail_length_texels / pixel_step + 0.5),
+			1.0);
+	float distance_to_head = abs(cell_delta);
+	float head = 1.0 - step(
+			head_radius_cells + 0.01,
 			distance_to_head);
-	float trail_distance = head_pixel_x - source_pixel_x;
-	float trail = (
+	float trail_distance = cell_delta * flow_direction;
+	float trail_active = (
 			step(0.0, trail_distance)
-			* (
-				1.0
-				- smoothstep(
-						0.0,
-						max(tail_length_texels, 1.0),
-						trail_distance)
-			)
-			* 0.68);
-	return max(head, trail) * entry_ramp;
+			* (1.0 - step(tail_cells + 0.01, trail_distance)));
+	float trail_progress = clamp(
+			trail_distance / tail_cells,
+			0.0,
+			1.0);
+	float value_steps = max(flow_value_steps, 2.0);
+	float stepped_trail = (
+			floor((1.0 - trail_progress) * value_steps)
+			/ value_steps);
+	float pattern_slot = mod(floor(trail_distance), 3.0);
+	float block_pattern = mix(
+			1.0,
+			0.50,
+			step(1.0, pattern_slot));
+	block_pattern = mix(
+			block_pattern,
+			0.10,
+			step(2.0, pattern_slot));
+	return max(
+			head,
+			stepped_trail
+				* block_pattern
+				* 0.72
+				* trail_active);
 }
 
 
-float square_fragment(
-		vec2 source_pixel,
-		vec2 center,
-		float half_size
+float moving_flow_intensity(
+		float source_pixel_x,
+		float head_pixel_x,
+		float flow_direction,
+		float entry_ramp
 ) {
-	vec2 delta = abs(source_pixel - center);
-	return 1.0 - step(
-			half_size,
-			max(delta.x, delta.y));
+	float pixel_step = max(flow_pixel_step_texels, 1.0);
+	float source_cell = floor(source_pixel_x / pixel_step);
+	float continuous_head_cell = head_pixel_x / pixel_step;
+	float lower_head_cell = floor(continuous_head_cell);
+	float upper_head_cell = lower_head_cell + 1.0;
+	float cell_blend = fract(continuous_head_cell);
+	float lower_intensity = flow_cell_intensity(
+			source_cell,
+			lower_head_cell,
+			flow_direction);
+	float upper_intensity = flow_cell_intensity(
+			source_cell,
+			upper_head_cell,
+			flow_direction);
+	return mix(
+			lower_intensity,
+			upper_intensity,
+			cell_blend) * clamp(entry_ramp, 0.0, 1.0);
 }
 
 
@@ -205,10 +249,13 @@ void fragment() {
 					flow_end_uv_x,
 					eased_progress);
 			float head_pixel_x = head_uv_x / TEXTURE_PIXEL_SIZE.x;
-			float entry_ramp = smoothstep(0.0, 0.12, flow_progress);
+			float flow_direction = sign(
+					flow_end_uv_x - flow_start_uv_x);
+			float entry_ramp = clamp(flow_progress / 0.12, 0.0, 1.0);
 			flow_intensity = moving_flow_intensity(
 					source_pixel.x,
 					head_pixel_x,
+					flow_direction,
 					entry_ramp);
 		} else if (release_active) {
 			release_progress = clamp(
@@ -221,14 +268,26 @@ void fragment() {
 			float endpoint_hold = (
 					1.0
 					- smoothstep(0.0, 0.62, release_progress));
-			flow_intensity = (
+			float safe_pixel_step = max(
+					flow_pixel_step_texels,
+					1.0);
+			float source_cell = floor(
+					source_pixel.x / safe_pixel_step);
+			float endpoint_cell = floor(
+					endpoint_pixel_x / safe_pixel_step + 0.5);
+			float endpoint_cells = max(
+					floor(
+						head_width_texels / safe_pixel_step
+						+ 0.5),
+					1.0);
+			float endpoint_block = (
 					1.0
-					- smoothstep(
-							0.0,
-							max(head_width_texels, 1.0),
-							abs(source_pixel.x - endpoint_pixel_x))
-				) * endpoint_hold;
+					- step(
+							endpoint_cells + 0.01,
+							abs(source_cell - endpoint_cell)));
+			flow_intensity = endpoint_block * endpoint_hold;
 		}
+		flow_intensity = clamp(flow_intensity, 0.0, 1.0);
 
 		float current_energy = energy_mask(sampled_color);
 		if (current_energy > 0.5 && flow_intensity > 0.001) {
@@ -270,59 +329,6 @@ void fragment() {
 					adjacent_energy
 					* flow_intensity
 					* clamp(structure_tint_strength, 0.0, 1.0));
-		}
-
-		float fragment_intensity = 0.0;
-		if (release_active) {
-			vec2 fragment_origin = vec2(
-					flow_end_uv_x / TEXTURE_PIXEL_SIZE.x + 2.0,
-					fragment_origin_uv_y / TEXTURE_PIXEL_SIZE.y);
-			float release_ramp = (
-					smoothstep(0.0, 0.10, release_progress)
-					* (
-						1.0
-						- smoothstep(0.62, 1.0, release_progress)
-					));
-			vec2 fragment_one = fragment_origin + vec2(
-					3.0 + 15.0 * release_progress,
-					-1.0 - 4.0 * release_progress);
-			vec2 fragment_two = fragment_origin + vec2(
-					2.0 + 11.0 * release_progress,
-					3.0 + 2.0 * release_progress);
-			vec2 fragment_three = fragment_origin + vec2(
-					5.0 + 8.0 * release_progress,
-					-5.0 + release_progress);
-			float fragment_mask = max(
-					square_fragment(
-							source_pixel,
-							fragment_one,
-							1.15),
-					max(
-						square_fragment(
-								source_pixel,
-								fragment_two,
-								0.85),
-						square_fragment(
-								source_pixel,
-								fragment_three,
-								0.75)));
-			fragment_intensity = (
-					fragment_mask
-					* release_ramp
-					* clamp(fragment_strength, 0.0, 1.0));
-		}
-
-		if (fragment_intensity > 0.001) {
-			if (mapped_color.a <= 0.001) {
-				mapped_color = vec4(
-						energy_peak_color.rgb,
-						fragment_intensity);
-			} else {
-				mapped_color.rgb = mix(
-						mapped_color.rgb,
-						energy_peak_color.rgb,
-						fragment_intensity);
-			}
 		}
 
 		if (
@@ -379,6 +385,45 @@ void fragment() {
 					* outline_strength);
 		}
 
+		float global_title_x = mix(
+				group_x_min,
+				group_x_max,
+				source_uv.x);
+		float blade_coordinate = clamp(
+				global_title_x
+				+ (source_uv.y - 0.5) * 0.07,
+				0.0,
+				1.0);
+		float base_reveal = (
+				1.0
+				- smoothstep(
+						intro_reveal_progress,
+						intro_reveal_progress
+						+ intro_reveal_feather,
+						blade_coordinate));
+		if (intro_reveal_progress <= 0.001) {
+			base_reveal = 0.0;
+		} else if (intro_reveal_progress >= 0.999) {
+			base_reveal = 1.0;
+		}
+		float intro_blade = (
+				1.0
+				- smoothstep(
+						intro_blade_width * 0.32,
+						intro_blade_width,
+						abs(
+							blade_coordinate
+							- intro_reveal_progress)));
+		intro_blade *= (
+				1.0
+				- step(0.999, intro_reveal_progress));
+		mapped_color.rgb = mix(
+				mapped_color.rgb,
+				energy_peak_color.rgb,
+				intro_blade
+					* base_reveal
+					* clamp(intro_blade_strength, 0.0, 1.0));
+		mapped_color.a *= base_reveal;
 		COLOR = mapped_color * vertex_color;
 	}
 }

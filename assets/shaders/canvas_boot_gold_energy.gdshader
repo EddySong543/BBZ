@@ -2,10 +2,19 @@ shader_type canvas_item;
 render_mode unshaded, blend_mix;
 
 uniform sampler2D flow_texture : repeat_disable, filter_nearest;
+uniform sampler2D intro_path_texture : repeat_disable, filter_nearest;
 uniform float motion_time = 0.0;
 uniform float flow_period : hint_range(2.0, 12.0, 0.1) = 5.2;
 uniform float hand_flow_pixels : hint_range(0.0, 8.0, 0.1) = 2.5;
 uniform float escape_flow_pixels : hint_range(0.0, 16.0, 0.5) = 4.0;
+uniform float minimum_source_alpha : hint_range(0.5, 1.0, 0.01) = 0.72;
+uniform float hand_motion_strength : hint_range(0.0, 0.5, 0.01) = 0.16;
+uniform float escape_motion_strength : hint_range(0.0, 0.8, 0.01) = 0.38;
+uniform float escape_highlight_strength : hint_range(0.0, 0.65, 0.01) = 0.52;
+uniform vec3 escape_highlight_color = vec3(1.0, 0.86, 0.54);
+uniform float intro_path_progress : hint_range(0.0, 1.0, 0.001) = 1.0;
+uniform float intro_path_feather : hint_range(0.02, 0.24, 0.001) = 0.14;
+uniform float intro_head_width : hint_range(0.02, 0.20, 0.001) = 0.075;
 
 varying vec4 vertex_color;
 
@@ -25,8 +34,8 @@ float escape_region(float flow_region) {
 }
 
 
-float phase_weight(float phase) {
-	return 1.0 - abs(phase * 2.0 - 1.0);
+float circular_phase_distance(float first, float second) {
+	return abs(fract(first - second + 0.5) - 0.5);
 }
 
 
@@ -40,55 +49,88 @@ void fragment() {
 
 	float hand_mask = hand_region(flow.b);
 	float escape_mask = escape_region(flow.b);
-	float flow_mask = max(hand_mask, escape_mask);
 	float travel_pixels = (
 			hand_mask * hand_flow_pixels
 			+ escape_mask * escape_flow_pixels);
 
-	// Each phase only advances in the encoded upper-right direction.
-	// Its reset happens at zero weight while the other phase carries the
-	// texture, so the energy never visibly reverses or globally breathes.
 	float clock = (
 			motion_time / max(flow_period, 0.001)
 			+ flow.a * 0.08);
-	float phase_a = fract(clock);
-	float phase_b = fract(clock + 0.5);
-	float weight_a = phase_weight(phase_a);
-	float weight_b = phase_weight(phase_b);
-	float weight_sum = max(weight_a + weight_b, 0.001);
-
-	vec2 offset_a = (
+	float travel_phase = fract(clock);
+	vec2 flow_offset = (
 			direction
-			* phase_a
+			* travel_phase
 			* travel_pixels
 			* TEXTURE_PIXEL_SIZE);
-	vec2 offset_b = (
-			direction
-			* phase_b
-			* travel_pixels
-			* TEXTURE_PIXEL_SIZE);
-	vec4 sample_a = texture(
+	vec4 transported = texture(
 			TEXTURE,
-			clamp(UV - offset_a, vec2(0.0), vec2(1.0)));
-	vec4 sample_b = texture(
-			TEXTURE,
-			clamp(UV - offset_b, vec2(0.0), vec2(1.0)));
-
-	vec3 transported_rgb = (
-			sample_a.rgb * sample_a.a * weight_a
-			+ sample_b.rgb * sample_b.a * weight_b
-			) / max(
-					sample_a.a * weight_a
-					+ sample_b.a * weight_b,
-					0.001);
-	float transported_alpha = (
-			sample_a.a * weight_a
-			+ sample_b.a * weight_b
-			) / weight_sum;
-	vec4 transported = vec4(
-			transported_rgb,
-			transported_alpha);
+			clamp(UV - flow_offset, vec2(0.0), vec2(1.0)));
 	vec4 source = texture(TEXTURE, UV);
 
-	COLOR = mix(source, transported, flow_mask) * vertex_color;
+	// Keep the authored ring stable. Only a restrained portion of the hand
+	// area and upper outer arc follows the flow map, and the source alpha
+	// never drops below the configured floor.
+	float motion_strength = (
+			hand_mask * hand_motion_strength
+			+ escape_mask * escape_motion_strength);
+	float transported_coverage = smoothstep(
+			0.06,
+			0.58,
+			transported.a);
+	float effective_motion = (
+			clamp(motion_strength, 0.0, 0.8)
+			* transported_coverage);
+	vec4 energy = vec4(
+			mix(source.rgb, transported.rgb, effective_motion),
+			mix(source.a, transported.a, effective_motion));
+	energy.a = max(
+			energy.a,
+			source.a * clamp(minimum_source_alpha, 0.5, 1.0));
+
+	// A brightness ridge travels continuously along the encoded outer arc.
+	// This animates the original pixels rather than spawning a duplicate.
+	float wave_phase = fract(motion_time / max(flow_period, 0.001));
+	float wave_distance = circular_phase_distance(flow.a, wave_phase);
+	float outer_wave = (
+			escape_mask
+			* (1.0 - smoothstep(0.035, 0.16, wave_distance)));
+	energy.rgb = mix(
+			energy.rgb,
+			escape_highlight_color,
+			outer_wave
+			* clamp(escape_highlight_strength, 0.0, 0.65));
+
+	// The path texture encodes a clockwise, source-aware paint order that
+	// starts near the character's head. A wide irregular front prevents
+	// the hard radial edge of an angular "windshield wiper" reveal.
+	float source_path_progress = texture(
+			intro_path_texture,
+			UV).r;
+	float intro_path_mask = smoothstep(
+			source_path_progress - intro_path_feather,
+			source_path_progress,
+			intro_path_progress);
+	float intro_head = (
+			1.0
+			- smoothstep(
+					intro_head_width * 0.35,
+					intro_head_width,
+					abs(
+						source_path_progress
+						- intro_path_progress)));
+	if (intro_path_progress <= 0.001) {
+		intro_path_mask = 0.0;
+		intro_head = 0.0;
+	} else if (intro_path_progress >= 0.999) {
+		intro_path_mask = 1.0;
+		intro_head = 0.0;
+	}
+	energy.rgb = mix(
+			energy.rgb,
+			escape_highlight_color,
+			intro_head * intro_path_mask * 0.22);
+	energy = vec4(
+			energy.rgb * intro_path_mask,
+			energy.a * intro_path_mask);
+	COLOR = energy * vertex_color;
 }

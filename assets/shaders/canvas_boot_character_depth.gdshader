@@ -12,6 +12,8 @@ uniform vec4 rear_light_color : source_color = vec4(
 		0.909804, 0.784314, 0.439216, 1.0);
 uniform float rear_light_strength : hint_range(0.0, 0.3, 0.01) = 0.14;
 uniform float energy_phase : hint_range(0.0, 1.0, 0.001) = 0.0;
+uniform float intro_light_progress : hint_range(0.0, 1.0, 0.001) = 1.0;
+uniform float intro_silhouette_floor : hint_range(0.0, 0.2, 0.005) = 0.0;
 
 varying vec4 vertex_color;
 
@@ -73,5 +75,32 @@ void fragment() {
 	result.rgb = min(
 			vec3(1.0),
 			result.rgb + rear_light_color.rgb * warm_light);
+
+	// Lift the whole character's exposure while a broad, soft hand light
+	// leads the change. There is no moving UV boundary, so detached hair
+	// pieces and the upper-right silhouette cannot expose a mask seam.
+	float safe_intro_progress = clamp(
+			intro_light_progress,
+			0.0,
+			1.0);
+	float global_lift = smoothstep(
+			0.08,
+			0.96,
+			safe_intro_progress);
+	float hand_lead = smoothstep(
+			0.0,
+			0.30,
+			safe_intro_progress);
+	float broad_hand_light = (
+			1.0
+			- smoothstep(0.05, 1.08, rear_distance));
+	float intro_light = max(
+			global_lift,
+			broad_hand_light * hand_lead);
+	float intro_brightness = mix(
+			clamp(intro_silhouette_floor, 0.0, 0.2),
+			1.0,
+			intro_light);
+	result.rgb *= intro_brightness;
 	COLOR = result * vertex_color;
 }

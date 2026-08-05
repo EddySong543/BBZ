@@ -8,15 +8,23 @@ const NEXT_SCENE := "res://src/ui/main_menu.tscn"
 const AudioEventsBoot := preload("res://src/core/audio_events.gd")
 
 var _entering: bool = false
+var _intro_finished: bool = false
+
+@onready var _title: BootTitleController = $TitleColumn
+@onready var _enter_prompt: BootEnterPrompt = $EnterPrompt
+@onready var _intro_controller: BootIntroController = $IntroController
 
 
 func _ready() -> void:
 	AudioEventsBoot.ensure_buses()
 	GameSettings.load_and_apply()
+	_enter_prompt.synchronize_with_title(_title)
+	_intro_controller.intro_finished.connect(_on_intro_finished)
+	_intro_controller.play_intro()
 
 
 func can_enter() -> bool:
-	return not _entering
+	return _intro_finished and not _entering
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -36,7 +44,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 
 func _request_enter() -> void:
-	if _entering or TransitionManager.is_busy():
+	if not can_enter() or TransitionManager.is_busy():
 		return
 	_entering = true
+	_enter_prompt.play_enter_feedback()
 	TransitionManager.transition_to(NEXT_SCENE)
+
+
+func _on_intro_finished() -> void:
+	_intro_finished = true
