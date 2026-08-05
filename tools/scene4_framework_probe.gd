@@ -24,10 +24,20 @@ func _ready() -> void:
 	stage.set("_pnx", 0.0)
 	stage.call("_process", 0.0)
 	screen.call("_process", 0.0)
+	await _shot(ProbeOutput.path("scene4_framework_center.png"))
+	await get_tree().create_timer(2.4).timeout
+	await _shot(ProbeOutput.path("scene4_ambient_fx_later.png"))
+	await get_tree().create_timer(2.4).timeout
+	await _shot(ProbeOutput.path("scene4_ambient_fx_alternate.png"))
+	await _capture_layer_motion(screen, stage)
+
+	# Re-baseline immediately before the parallax assertion. The layered motion
+	# capture intentionally hides most CanvasItems for several seconds.
+	stage.set("_pnx", 0.0)
+	stage.call("_process", 0.0)
+	screen.call("_process", 0.0)
 	var platform_center_x := platform.position.x
 	var world_center_x := world.position.x
-	await _shot(ProbeOutput.path("scene4_framework_center.png"))
-
 	stage.set("_pnx", 1.0)
 	stage.call("_process", 0.0)
 	screen.call("_process", 0.0)
@@ -44,6 +54,92 @@ func _ready() -> void:
 			sync_error)
 	BattleSetup.reset()
 	get_tree().quit(0 if is_zero_approx(sync_error) else 1)
+
+
+func _capture_layer_motion(screen: Control, stage: BattleStage) -> void:
+	# Stop countdown/tween callbacks from re-showing HUD nodes during the long
+	# isolated captures. Shader TIME continues independently.
+	screen.process_mode = Node.PROCESS_MODE_DISABLED
+	for child: Node in screen.get_children():
+		if child is CanvasItem and child != screen.get_node("StageSlot"):
+			(child as CanvasItem).visible = false
+
+	var atmosphere_layers: Array[String] = [
+		"PreviewBackdrop",
+		"Sky",
+		"FarForest",
+		"RuinStone1",
+		"RuinStone2",
+		"RuinStone3",
+		"RuinStone4",
+		"BackgroundTree2",
+		"BackgroundTree",
+		"BackgroundTopLeaves",
+		"CanopyLightShafts",
+		"MidgroundMist",
+		"CanopyMotes",
+		"RuinMotes1",
+		"RuinMotes2",
+		"RuinMotes3",
+		"RuinMotes4",
+		"BattlePlatform",
+		"ForegroundFog",
+	]
+	for child: Node in stage.get_children():
+		if child is CanvasItem:
+			(child as CanvasItem).visible = child.name in atmosphere_layers
+	await _shot(ProbeOutput.path("scene4_midground_atmosphere_a.png"))
+	await get_tree().create_timer(3.6).timeout
+	await _shot(ProbeOutput.path("scene4_midground_atmosphere_b.png"))
+
+	var foreground_fog_layers: Array[String] = [
+		"PreviewBackdrop",
+		"BattlePlatform",
+		"LeftTree",
+		"RightTree",
+		"TopLeaves",
+		"ForegroundFog",
+	]
+	for child: Node in stage.get_children():
+		if child is CanvasItem:
+			(child as CanvasItem).visible = child.name in foreground_fog_layers
+	await _shot(ProbeOutput.path("scene4_foreground_fog_a.png"))
+	await get_tree().create_timer(3.2).timeout
+	await _shot(ProbeOutput.path("scene4_foreground_fog_b.png"))
+
+	var stone_layers: Array[String] = [
+		"PreviewBackdrop",
+		"Sky",
+		"FarForest",
+		"RuinStone1",
+		"RuinStone2",
+		"RuinStone3",
+		"RuinStone4",
+	]
+	for child: Node in stage.get_children():
+		if child is CanvasItem:
+			(child as CanvasItem).visible = child.name in stone_layers
+	await _shot(ProbeOutput.path("scene4_stone_flow_a.png"))
+	await get_tree().create_timer(0.75).timeout
+	await _shot(ProbeOutput.path("scene4_stone_flow_smooth_b.png"))
+	await get_tree().create_timer(0.75).timeout
+	await _shot(ProbeOutput.path("scene4_stone_flow_smooth_c.png"))
+	await get_tree().create_timer(5.5).timeout
+	await _shot(ProbeOutput.path("scene4_stone_flow_b.png"))
+
+	var sway_layers: Array[String] = [
+		"PreviewBackdrop",
+		"BackgroundTopLeaves",
+		"LeftTree",
+		"RightTree",
+		"TopLeaves",
+	]
+	for child: Node in stage.get_children():
+		if child is CanvasItem:
+			(child as CanvasItem).visible = child.name in sway_layers
+	await _shot(ProbeOutput.path("scene4_hanging_sway_a.png"))
+	await get_tree().create_timer(2.2).timeout
+	await _shot(ProbeOutput.path("scene4_hanging_sway_b.png"))
 
 
 func _shot(path: String) -> void:
