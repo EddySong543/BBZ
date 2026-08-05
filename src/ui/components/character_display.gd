@@ -57,17 +57,16 @@ extends SubViewportContainer
 		if is_node_ready() and _sprite and _sprite.sprite_frames:
 			for anim_name in _sprite.sprite_frames.get_animation_names():
 				_sprite.sprite_frames.set_animation_speed(anim_name, v)
-			_apply_idle_speed()   # idle 不跟 anim_fps，按帧数动态覆盖（少帧放慢）
+			_apply_idle_speed()   # idle 不跟 anim_fps，按帧数统一循环时长
 
 @export_group("Idle 动态调速")
-## idle 满帧时的播放帧率（基准）。帧数 ≥ idle_ref_frames 的 idle 用此值。
+## idle 基准帧率。与 idle_ref_frames 共同决定所有角色一致的循环时长。
 ## 8.0=循环约 0.75s（2026-06-28 Eddy：原 12.0≈0.5s 普遍偏快→放慢）；想更慢往 6 调(≈1.0s)。
 @export var idle_base_fps: float = 8.0:
 	set(v):
 		idle_base_fps = v
 		_apply_idle_speed()
-## idle 基准帧数（满帧）。帧数 < 此值的 idle 按比例放慢、循环时长与满帧一致；
-## 帧数 ≥ 此值不加速（封顶 base_fps）。多数英雄 idle = 5~6 帧，个别 12 帧。
+## idle 基准帧数。少帧和多帧角色都会按帧数换算 fps，使循环时长一致。
 @export var idle_ref_frames: int = 6:
 	set(v):
 		idle_ref_frames = maxi(1, v)
@@ -354,9 +353,11 @@ func pulse_rim(boost: float = 0.8, duration: float = 0.25) -> void:
 
 
 ## 按 idle 帧数动态设循环速度（解决"少帧 idle 播太快显急促"）：
-##   fps = idle_base_fps × min(帧数, idle_ref_frames) / idle_ref_frames
-##   → 满帧(≥ref)用 base_fps；少帧按比例降速、循环时长与满帧一致；多帧封顶 base_fps 不被加速。
-##   例(base 12 / ref 6)：6帧→12fps(0.5s)、5帧→10fps(0.5s)、12帧→12fps(1.0s)。
+##   fps = idle_base_fps × 帧数 / idle_ref_frames
+##   → 不论英雄是少帧还是多帧，idle 都使用同一循环时长。角色贴图中的
+##   光影变化因此不会在 P1/P2 两侧表现成不同闪烁速度。
+##   例(base 8 / ref 6)：6帧→8fps(0.75s)、5帧→6.67fps(0.75s)、
+##   12帧→16fps(0.75s)。
 ## ⚠ 改的是共享 SpriteFrames 资源的 speed（同一英雄 .tres 多处实例一致·不同英雄各自独立）。
 func _apply_idle_speed() -> void:
 	if not _sprite or not _sprite.sprite_frames:
@@ -366,7 +367,7 @@ func _apply_idle_speed() -> void:
 	var n: int = _sprite.sprite_frames.get_frame_count("idle")
 	if n <= 0 or idle_ref_frames <= 0:
 		return
-	var fps: float = idle_base_fps * minf(float(n), float(idle_ref_frames)) / float(idle_ref_frames)
+	var fps: float = idle_base_fps * float(n) / float(idle_ref_frames)
 	_sprite.sprite_frames.set_animation_speed("idle", fps)
 
 

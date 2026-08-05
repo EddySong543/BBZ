@@ -1703,6 +1703,26 @@ func test_default_battle_screen_keeps_scene1_character_rendering_contract() -> v
 	screen.free()
 
 
+func test_character_idle_cycle_duration_is_shared_across_frame_counts() -> void:
+	var display := CharacterDisplay.new()
+	add_child_autofree(display)
+	await get_tree().process_frame
+
+	for frame_count: int in [3, 6, 12]:
+		var frames := SpriteFrames.new()
+		frames.add_animation("idle")
+		for _frame_index: int in range(frame_count):
+			frames.add_frame("idle", null)
+		display.sprite_frames = frames
+		var fps := frames.get_animation_speed("idle")
+		var cycle_duration := float(frame_count) / fps
+		assert_almost_eq(
+				cycle_duration,
+				float(display.idle_ref_frames) / display.idle_base_fps,
+				0.001,
+				"P1/P2 idle light changes must share one cycle duration")
+
+
 func test_scene2_binds_live_character_textures_to_the_river() -> void:
 	BattleSetup.reset()
 	var screen := (load(BATTLE2_PATH) as PackedScene).instantiate()
