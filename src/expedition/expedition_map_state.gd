@@ -12,23 +12,19 @@
 extends RefCounted
 
 const Loot := preload("res://src/expedition/expedition_loot.gd")
+const QingfengLayout := preload("res://src/expedition/maps/qingfeng_ricefield_layout.gd")
 
 const MONSTER_DATA_PATH := "res://assets/data/expedition/monsters.json"
 
 # ── 调优旋钮（子文档 B §9）──
-const SIZE: int = 12
-const WALL_RATE: float = 0.2
+const WIDTH: int = QingfengLayout.WIDTH
+const HEIGHT: int = QingfengLayout.HEIGHT
 const S0: int = 40                  # 初始补给
 const HUNGER_DMG: float = 0.5       # 补给 0 后每步全队各扣
 const D_DIVISOR: float = 30.0       # 危险度分母：D = floor(刻/30)
 const D_CAP: int = 5
 const HP_SCALE_PER_D: float = 0.15  # 新遭遇怪物 HP +15%/级
-const EXT1_CLOSE: float = 60.0      # 撤1 关闭刻
-const EXT2_OPEN: float = 30.0       # 撤2 开放刻
-const EXT2_CLOSE: float = 90.0      # 撤2 关闭刻
-const MONSTER_COUNT: int = 12
-const EVENT_COUNT: int = 7
-const CHEST_COUNT: int = 6
+const PLAYER_VISION_RADIUS: int = 3
 const SOLVE_EFF_MIN: float = 0.7    # 先知拆解效率带（原型研究发现）
 const SOLVE_EFF_MAX: float = 0.9
 
@@ -63,6 +59,19 @@ const HERO_NAMES: Array = ["先锋·占位", "游侠·占位", "术士·占位",
 func setup(p_seed: int) -> void:
 	seed_value = p_seed
 	rng.seed = p_seed
+	revealed.clear()
+	ext_pos.clear()
+	monsters.clear()
+	events.clear()
+	chests.clear()
+	wanderer = Vector2i(-1, -1)
+	wanderer_monster.clear()
+	supplies = S0
+	steps = 0
+	battle_beats = 0.0
+	battles_won = 0
+	over = false
+	result = {}
 	team = [{"name": HERO_NAMES[0], "hp": 5.0, "hp_max": 5.0}]
 	_load_monster_defs()
 	_generate()
@@ -79,13 +88,9 @@ func danger() -> int:
 	return mini(D_CAP, int(floor(ticks() / D_DIVISOR)))
 
 
-## 撤离点当前是否开放（撤1: 0-60 / 撤2: 30-90 / 撤3: 永开）。
+## 本局启用的撤离点始终开放；是否已经被玩家发现只由 revealed 决定。
 func ext_open(tile: int) -> bool:
-	match tile:
-		Tile.EXT1: return ticks() < EXT1_CLOSE
-		Tile.EXT2: return ticks() >= EXT2_OPEN and ticks() < EXT2_CLOSE
-		Tile.EXT3: return true
-	return false
+	return ext_pos.has(tile)
 
 
 ## 尝试移动一步。返回 {moved:bool, kind:String, msgs:Array}。
@@ -94,7 +99,7 @@ func try_move(dir: Vector2i) -> Dictionary:
 	if over:
 		return {"moved": false, "kind": "over", "msgs": []}
 	var target: Vector2i = player + dir
-	if target.x < 0 or target.y < 0 or target.x >= SIZE or target.y >= SIZE:
+	if target.x < 0 or target.y < 0 or target.x >= WIDTH or target.y >= HEIGHT:
 		return {"moved": false, "kind": "wall", "msgs": []}
 	if grid[target.y][target.x] == Tile.WALL:
 		return {"moved": false, "kind": "wall", "msgs": []}
@@ -351,79 +356,46 @@ func _pick_monster(tier: int) -> Dictionary:
 
 
 func _generate() -> void:
-	grid = []
-	for y: int in SIZE:
-		var row: Array = []
-		for x: int in SIZE:
-			row.append(Tile.WALL if rng.randf() < WALL_RATE else Tile.FLOOR)
-		grid.append(row)
-	start_pos = Vector2i(0, SIZE / 2)
-	grid[start_pos.y][start_pos.x] = Tile.START
+	grid = QingfengLayout.build_grid(Tile.WALL, Tile.FLOOR, Tile.START)
+	start_pos = QingfengLayout.START
 	player = start_pos
-	# 软锁保底（2026-07-17 审计修复·≈0.8%/局）：起点在左边界、三邻各 20% 独立成墙——
-	# 三墙同出=BFS 只剩起点·三个撤离点还会连环盖到起点，而撤离只在「移动进入」触发
-	# =既动不了也撤不了。确定性凿开右邻（固定方向·只影响中招的种子·其余图纹丝不动）。
-	if grid[start_pos.y][start_pos.x + 1] == Tile.WALL \
-			and grid[start_pos.y - 1][start_pos.x] == Tile.WALL \
-			and grid[start_pos.y + 1][start_pos.x] == Tile.WALL:
-		grid[start_pos.y][start_pos.x + 1] = Tile.FLOOR
-	var dist := _bfs_dist(start_pos)
-	for y: int in SIZE:
-		for x: int in SIZE:
-			var c := Vector2i(x, y)
-			if grid[y][x] != Tile.WALL and not dist.has(c):
-				grid[y][x] = Tile.WALL
-	var cells_by_dist: Array = dist.keys()
-	cells_by_dist.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return int(dist[a]) < int(dist[b]))
-	_place_ext(Tile.EXT1, dist, 2, 5, cells_by_dist)
-	_place_ext(Tile.EXT2, dist, 7, 12, cells_by_dist)
-	var deepest: Vector2i = cells_by_dist[cells_by_dist.size() - 1]
-	grid[deepest.y][deepest.x] = Tile.EXT3
-	ext_pos[Tile.EXT3] = deepest
-	var free: Array = dist.keys().filter(func(c: Vector2i) -> bool: return grid[c.y][c.x] == Tile.FLOOR and int(dist[c]) >= 2)
-	for i: int in range(free.size() - 1, 0, -1):
-		var j: int = rng.randi_range(0, i)
-		var tmp: Vector2i = free[i]
-		free[i] = free[j]
-		free[j] = tmp
-	var max_d: int = int(dist[deepest])
-	for i: int in MONSTER_COUNT:
-		if free.is_empty():
-			break
-		var c: Vector2i = free.pop_back()
-		var band: float = float(dist[c]) / float(maxi(1, max_d))
-		var tier: int = 1
-		if band > 0.66:
-			tier = 3 if rng.randf() < 0.35 else 2
-		elif band > 0.33:
-			tier = 2 if rng.randf() < 0.5 else 1
-		var def: Dictionary = _pick_monster(tier)
-		grid[c.y][c.x] = Tile.MONSTER
-		monsters[c] = {"key": def["key"], "name": def["name"], "tier": tier, "hp": float(def["hp"]), "hp_max": float(def["hp"]), "resolved": false, "def": def.get("def", {})}
-	for i: int in EVENT_COUNT:
-		if free.is_empty():
-			break
-		var c: Vector2i = free.pop_back()
-		grid[c.y][c.x] = Tile.EVENT
-		events[c] = EVENT_POOL[rng.randi_range(0, EVENT_POOL.size() - 1)]
-	for i: int in CHEST_COUNT:
-		if free.is_empty():
-			break
-		var c: Vector2i = free.pop_back()
-		grid[c.y][c.x] = Tile.CHEST
-		chests[c] = {"revealed_by_map": false, "egg": false}
+
+	var exit_candidates: Array[Vector2i] = QingfengLayout.EXIT_CANDIDATES.duplicate()
+	_shuffle_with_rng(exit_candidates)
+	var exit_count: int = 1 + rng.randi_range(0, 1)
+	for index: int in exit_count:
+		var exit_tile: int = Tile.EXT1 + index
+		var exit_cell: Vector2i = exit_candidates[index]
+		grid[exit_cell.y][exit_cell.x] = exit_tile
+		ext_pos[exit_tile] = exit_cell
+
+	var enemy_anchors: Array[Vector2i] = QingfengLayout.MONSTER_ANCHORS.duplicate()
+	enemy_anchors.erase(QingfengLayout.REPAIR_GUARD_ANCHOR)
+	enemy_anchors.erase(QingfengLayout.BOSS_ANCHOR)
+	_shuffle_with_rng(enemy_anchors)
+	_spawn_monster(QingfengLayout.REPAIR_GUARD_ANCHOR, 2)
+	_spawn_monster(QingfengLayout.BOSS_ANCHOR, 3)
+	var enemy_count: int = mini(enemy_anchors.size(), 4 + rng.randi_range(0, 2))
+	for index: int in enemy_count:
+		var cell: Vector2i = enemy_anchors[index]
+		var tier: int = 1 if cell.y >= 8 else 2
+		_spawn_monster(cell, tier)
+
+	var search_anchors: Array[Vector2i] = QingfengLayout.SEARCH_ANCHORS.duplicate()
+	_shuffle_with_rng(search_anchors)
+	var search_count: int = mini(search_anchors.size(), 4 + rng.randi_range(0, 2))
+	for index: int in search_count:
+		var cell: Vector2i = search_anchors[index]
+		grid[cell.y][cell.x] = Tile.CHEST
+		chests[cell] = {"revealed_by_map": false, "egg": false}
 
 
-func _place_ext(tile: int, dist: Dictionary, d_min: int, d_max: int, sorted_cells: Array) -> void:
-	var band: Array = sorted_cells.filter(func(c: Vector2i) -> bool:
-		return int(dist[c]) >= d_min and int(dist[c]) <= d_max and grid[c.y][c.x] == Tile.FLOOR)
-	var c: Vector2i
-	if band.is_empty():
-		c = sorted_cells[mini(sorted_cells.size() - 1, d_min * 2)]
-	else:
-		c = band[rng.randi_range(0, band.size() - 1)]
-	grid[c.y][c.x] = tile
-	ext_pos[tile] = c
+func _spawn_monster(cell: Vector2i, tier: int) -> void:
+	var definition: Dictionary = _pick_monster(tier)
+	grid[cell.y][cell.x] = Tile.MONSTER
+	monsters[cell] = {"key": definition["key"], "name": definition["name"], "tier": tier,
+		"hp": float(definition["hp"]), "hp_max": float(definition["hp"]), "resolved": false,
+		"def": definition.get("def", {})}
 
 
 func _bfs_dist(from: Vector2i) -> Dictionary:
@@ -433,7 +405,7 @@ func _bfs_dist(from: Vector2i) -> Dictionary:
 		var c: Vector2i = queue.pop_front()
 		for d: Vector2i in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
 			var n: Vector2i = c + d
-			if n.x < 0 or n.y < 0 or n.x >= SIZE or n.y >= SIZE:
+			if n.x < 0 or n.y < 0 or n.x >= WIDTH or n.y >= HEIGHT:
 				continue
 			if grid[n.y][n.x] == Tile.WALL or dist.has(n):
 				continue
@@ -442,32 +414,27 @@ func _bfs_dist(from: Vector2i) -> Dictionary:
 	return dist
 
 
+func _shuffle_with_rng(values: Array[Vector2i]) -> void:
+	for index: int in range(values.size() - 1, 0, -1):
+		var swap_index: int = rng.randi_range(0, index)
+		var held: Vector2i = values[index]
+		values[index] = values[swap_index]
+		values[swap_index] = held
+
+
 func _reveal_around(c: Vector2i) -> void:
-	for dy: int in range(-1, 2):
-		for dx: int in range(-1, 2):
+	for dy: int in range(-PLAYER_VISION_RADIUS, PLAYER_VISION_RADIUS + 1):
+		for dx: int in range(-PLAYER_VISION_RADIUS, PLAYER_VISION_RADIUS + 1):
+			if dx * dx + dy * dy > PLAYER_VISION_RADIUS * PLAYER_VISION_RADIUS:
+				continue
 			var n := c + Vector2i(dx, dy)
-			if n.x >= 0 and n.y >= 0 and n.x < SIZE and n.y < SIZE:
+			if n.x >= 0 and n.y >= 0 and n.x < WIDTH and n.y < HEIGHT:
 				revealed[n] = true
 
 
 func _wanderer_tick() -> void:
-	if danger() >= D_CAP and wanderer == Vector2i(-1, -1):
-		wanderer = Vector2i(ext_pos[Tile.EXT3])
-	if wanderer == Vector2i(-1, -1) or wanderer == player:
-		return
-	var diff: Vector2i = player - wanderer
-	var options: Array = []
-	if absi(diff.x) >= absi(diff.y):
-		options = [Vector2i(signi(diff.x), 0), Vector2i(0, signi(diff.y))]
-	else:
-		options = [Vector2i(0, signi(diff.y)), Vector2i(signi(diff.x), 0)]
-	for d: Vector2i in options:
-		if d == Vector2i.ZERO:
-			continue
-		var n: Vector2i = wanderer + d
-		if n.x >= 0 and n.y >= 0 and n.x < SIZE and n.y < SIZE and grid[n.y][n.x] != Tile.WALL:
-			wanderer = n
-			return
+	# 旧危险度游荡怪已作废。普通敌人的巡逻/追击将由晴风稻田敌人层单独实现。
+	return
 
 
 func _apply_team_damage(dmg: float) -> void:

@@ -150,7 +150,7 @@ func _bfs(m: MapState, from: Vector2i) -> Dictionary:
 		var c: Vector2i = queue.pop_front()
 		for d: Vector2i in DIRS:
 			var n: Vector2i = c + d
-			if n.x < 0 or n.y < 0 or n.x >= MapState.SIZE or n.y >= MapState.SIZE:
+			if n.x < 0 or n.y < 0 or n.x >= MapState.WIDTH or n.y >= MapState.HEIGHT:
 				continue
 			if m.grid[n.y][n.x] == MapState.Tile.WALL or dist.has(n):
 				continue

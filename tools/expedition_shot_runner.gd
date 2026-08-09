@@ -7,10 +7,15 @@ extends Node
 ## 战斗路径回归另走 tools/pve_battle_shot_runner。
 
 const HeroDataScript := preload("res://src/battle/hero_data.gd")
+const MapState := preload("res://src/expedition/expedition_map_state.gd")
 
 const OUT_SELECT := "D:/Game/BoBoZan/_probe_output/exped_select.png"
 const OUT_IDLE := "D:/Game/BoBoZan/_probe_output/exped_idle.png"
+const OUT_SEARCH_REVEALED := "D:/Game/BoBoZan/_probe_output/exped_search_revealed.png"
+const OUT_SEARCH_OPENED := "D:/Game/BoBoZan/_probe_output/exped_search_opened.png"
 const OUT_WALK := "D:/Game/BoBoZan/_probe_output/exped_walk.png"
+const OUT_EXIT := "D:/Game/BoBoZan/_probe_output/exped_exit.png"
+const OUT_EXIT_DIALOG := "D:/Game/BoBoZan/_probe_output/exped_exit_dialog.png"
 const OUT_BACKPACK := "D:/Game/BoBoZan/_probe_output/exped_backpack.png"
 const OUT_DIALOG := "D:/Game/BoBoZan/_probe_output/exped_dialog.png"
 const OUT_DEATH := "D:/Game/BoBoZan/_probe_output/exped_death.png"
@@ -30,18 +35,57 @@ func _ready() -> void:
 	await get_tree().create_timer(0.5).timeout
 	await _shot(OUT_SELECT)
 	# 代码选定初始英雄（取池中第 3 个=有立绘的常规英雄）→ 进图
+	screen.seed_value = 777
 	screen._on_hero_selected(HeroDataScript.create_launch_pool()[2])
 	await get_tree().create_timer(0.6).timeout
 	await _shot(OUT_IDLE)
+	# 三层格子验收：把镜头暂移到一个搜索目标，确认地表、透明物体和运行时标识能独立叠加。
+	var saved_player: Vector2i = screen.map.player
+	var saved_revealed: Dictionary = screen.map.revealed.duplicate()
+	var search_cell: Vector2i = Vector2i(screen.map.chests.keys()[0])
+	screen.map.player = search_cell + Vector2i.DOWN
+	screen.map.revealed[search_cell] = true
+	screen._refresh()
+	await get_tree().create_timer(0.5).timeout
+	await _shot(OUT_SEARCH_REVEALED)
+	var saved_search_tile: int = screen.map.grid[search_cell.y][search_cell.x]
+	var saved_search_data: Dictionary = screen.map.chests[search_cell].duplicate()
+	screen.map.grid[search_cell.y][search_cell.x] = MapState.Tile.FLOOR
+	screen.map.chests.erase(search_cell)
+	screen._refresh()
+	await get_tree().create_timer(0.2).timeout
+	await _shot(OUT_SEARCH_OPENED)
+	screen.map.grid[search_cell.y][search_cell.x] = saved_search_tile
+	screen.map.chests[search_cell] = saved_search_data
+	screen.map.player = saved_player
+	screen.map.revealed = saved_revealed
+	screen._refresh()
 	for k: int in WALK_KEYS:
+		if screen.dialog.visible:
+			screen.dialog.hide()   # 截图巡检只看地图移动/视窗跟随，跳过随机遭遇选择
 		var ev := InputEventKey.new()
 		ev.keycode = k
 		ev.physical_keycode = k
 		ev.pressed = true
 		Input.parse_input_event(ev)
 		await get_tree().create_timer(0.12).timeout
+	if screen.dialog.visible:
+		screen.dialog.hide()
 	await get_tree().create_timer(0.4).timeout
 	await _shot(OUT_WALK)
+	# —— 晴风稻田撤离验证：开局不标明；探明后显示；主动交互才弹确认。——
+	var exit_cell: Vector2i = screen.map.ext_pos.values()[0]
+	screen.map.player = exit_cell + Vector2i.DOWN
+	screen.map._reveal_around(exit_cell)
+	screen._refresh()
+	await get_tree().create_timer(0.3).timeout
+	await _shot(OUT_EXIT)
+	screen.map.player = exit_cell
+	screen._refresh()
+	screen._try_interact_current_cell()
+	await get_tree().create_timer(0.3).timeout
+	await _shot(OUT_EXIT_DIALOG)
+	screen.dialog.hide()
 	# —— 背包浮层验证：注入掉落 → B 浮层（拾取区图标 + 背包放置 + 保险槽）——
 	var loot_script := preload("res://src/expedition/expedition_loot.gd")
 	screen.pending.append_array(loot_script.roll_drop(screen.map.rng, "t3"))

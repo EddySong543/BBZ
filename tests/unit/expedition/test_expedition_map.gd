@@ -1,197 +1,130 @@
 extends GutTest
 
-## 远征地图状态 行为锁定测试（规则源：design/expedition-map.md）。
-## 覆盖：生成完整性与同种子复现 / 迷雾 / 时钟计量 / 危险度公式 / 撤离窗口时刻表（无死锁）/
-## 遭遇结算不回溯 / 饥饿行军 / 死亡与撤离结算。战斗数值 = 占位模型，只锁结构不锁数值。
+## 晴风稻田地图状态行为测试。
+## 只锁定当前已确认的固定地图、随机局势、迷雾发现和常开撤离；旧随机墙/三撤离窗/饥饿/危险度不再是契约。
 
 const MapState := preload("res://src/expedition/expedition_map_state.gd")
+const Layout := preload("res://src/expedition/maps/qingfeng_ricefield_layout.gd")
 
-const DIRS: Array = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
+const DIRS: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
 
 
 func _make(p_seed: int) -> MapState:
-	var m: MapState = MapState.new()
-	m.setup(p_seed)
-	return m
+	var map: MapState = MapState.new()
+	map.setup(p_seed)
+	return map
 
 
-func test_map_setup_generates_complete_map() -> void:
-	# Arrange + Act
-	for seed_v: int in [1, 777, 31337]:
-		var m: MapState = _make(seed_v)
-		# Assert
-		assert_eq(m.ext_pos.size(), 3, "种子 %d 撤离点应 3 个" % seed_v)
-		assert_gt(m.monsters.size(), 0, "种子 %d 应有怪" % seed_v)
-		assert_eq(m.team.size(), 1, "开局 1 英雄")
+func test_map_setup_uses_fixed_qingfeng_dimensions_and_one_or_two_exits() -> void:
+	for seed_value: int in [1, 777, 31337]:
+		var map: MapState = _make(seed_value)
+		assert_eq(map.grid.size(), Layout.HEIGHT)
+		assert_eq((map.grid[0] as Array).size(), Layout.WIDTH)
+		assert_between(map.ext_pos.size(), 1, 2)
+		assert_eq(map.team.size(), 1, "开局仍为1名英雄")
 
 
-func test_map_setup_same_seed_same_map() -> void:
-	# Arrange + Act
-	var a: MapState = _make(777)
-	var b: MapState = _make(777)
-	# Assert
-	assert_eq(a.monsters.keys(), b.monsters.keys())
-	assert_eq(a.ext_pos[MapState.Tile.EXT3], b.ext_pos[MapState.Tile.EXT3])
+func test_map_terrain_is_fixed_across_seeds() -> void:
+	var first: MapState = _make(1)
+	var second: MapState = _make(31337)
+	assert_eq(_wall_signature(first), _wall_signature(second))
 
 
-func test_map_fog_starts_revealed_around_start_and_grows() -> void:
-	# Arrange
-	var m: MapState = _make(777)
-	assert_true(m.revealed.has(m.start_pos))
-	var before: int = m.revealed.size()
-	# Act：随机走（战斗/事件就地清掉保证可走）
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 42
-	for i: int in 60:
-		if m.over:
-			break
-		var res: Dictionary = m.try_move(DIRS[rng.randi_range(0, 3)])
-		match String(res["kind"]):
-			"monster": m.fight(m.player)
-			"wanderer": m.fight_wanderer()
-			"chest": m.open_chest(m.player)
-			"event":
-				m.events.erase(m.player)
-				m.grid[m.player.y][m.player.x] = MapState.Tile.FLOOR
-	# Assert
-	assert_gt(m.revealed.size(), before, "迷雾应随移动扩张")
+func test_map_same_seed_reproduces_dynamic_content() -> void:
+	var first: MapState = _make(777)
+	var second: MapState = _make(777)
+	assert_eq(first.monsters.keys(), second.monsters.keys())
+	assert_eq(first.chests.keys(), second.chests.keys())
+	assert_eq(first.ext_pos, second.ext_pos)
 
 
-func test_map_ticks_equals_steps_plus_half_beats() -> void:
-	# Arrange
-	var m: MapState = _make(777)
-	# Act
-	m.try_move(Vector2i.RIGHT)
-	m.battle_beats = 10.0
-	# Assert
-	assert_almost_eq(m.ticks(), float(m.steps) + 5.0, 0.001)
+func test_map_exits_use_only_fixed_candidates_and_are_always_open() -> void:
+	var saw_one: bool = false
+	var saw_two: bool = false
+	for seed_value: int in range(40):
+		var map: MapState = _make(seed_value)
+		saw_one = saw_one or map.ext_pos.size() == 1
+		saw_two = saw_two or map.ext_pos.size() == 2
+		for tile: int in map.ext_pos:
+			var exit_cell: Vector2i = map.ext_pos[tile]
+			assert_has(Layout.EXIT_CANDIDATES, exit_cell)
+			assert_true(map.ext_open(tile), "启用的撤离点从开局起始终开放")
+	assert_true(saw_one, "种子池中应能生成单撤离点局")
+	assert_true(saw_two, "种子池中应能生成双撤离点局")
 
 
-func test_map_danger_formula_capped_at_five() -> void:
-	# Arrange
-	var m: MapState = _make(777)
-	# Act + Assert
-	assert_eq(m.danger(), 0)
-	m.battle_beats = 70.0   # 刻 35 → D1
-	assert_eq(m.danger(), 1)
-	m.battle_beats = 400.0  # 刻 200 → 封顶 5
-	assert_eq(m.danger(), 5)
+func test_map_exits_start_hidden_and_are_reachable() -> void:
+	for seed_value: int in [3, 9, 27]:
+		var map: MapState = _make(seed_value)
+		var reachable: Dictionary = _reachable_from(map.start_pos, map.grid)
+		for tile: int in map.ext_pos:
+			var exit_cell: Vector2i = map.ext_pos[tile]
+			assert_false(map.revealed.has(exit_cell), "进图时不主动标明撤离点")
+			assert_true(reachable.has(exit_cell), "启用的撤离点必须可达")
 
 
-func test_map_extraction_windows_follow_schedule_no_deadlock() -> void:
-	# Arrange
-	var m: MapState = _make(31337)
-	# Act + Assert：t=0 / t=35 / t=65 / t=100 四个时刻
-	assert_true(m.ext_open(MapState.Tile.EXT1))
-	assert_false(m.ext_open(MapState.Tile.EXT2))
-	assert_true(m.ext_open(MapState.Tile.EXT3))
-	m.battle_beats = 70.0
-	assert_true(m.ext_open(MapState.Tile.EXT1))
-	assert_true(m.ext_open(MapState.Tile.EXT2))
-	m.battle_beats = 130.0
-	assert_false(m.ext_open(MapState.Tile.EXT1))
-	assert_true(m.ext_open(MapState.Tile.EXT2))
-	m.battle_beats = 200.0
-	assert_false(m.ext_open(MapState.Tile.EXT2))
-	assert_true(m.ext_open(MapState.Tile.EXT3), "撤3 永开 = 无死锁保证")
+func test_map_content_uses_only_authored_anchor_pools() -> void:
+	for seed_value: int in [5, 17, 29]:
+		var map: MapState = _make(seed_value)
+		assert_true(map.events.is_empty(), "第一版灰盒暂不生成事件")
+		assert_true(map.monsters.has(Layout.REPAIR_GUARD_ANCHOR), "检修院守卫位置固定")
+		assert_true(map.monsters.has(Layout.BOSS_ANCHOR), "收割场Boss位置固定")
+		for cell: Vector2i in map.monsters:
+			assert_has(Layout.MONSTER_ANCHORS, cell)
+		for cell: Vector2i in map.chests:
+			assert_has(Layout.SEARCH_ANCHORS, cell)
 
 
-func test_map_encounter_scaling_not_retroactive() -> void:
-	# Arrange
-	var m: MapState = _make(777)
-	var mc: Vector2i = m.monsters.keys()[0]
-	# Act：D0 结算 → 拉高时钟 → 重看
-	var hp_at_d0: float = float(m.resolve_encounter(mc)["hp"])
-	m.battle_beats = 400.0
-	var hp_at_d5: float = float(m.resolve_encounter(mc)["hp"])
-	# Assert
-	assert_almost_eq(hp_at_d5, hp_at_d0, 0.001, "已结算怪不回溯强化")
-
-
-func test_map_new_encounter_at_d5_gets_scaled() -> void:
-	# Arrange
-	var m: MapState = _make(777)
-	m.battle_beats = 400.0  # D5
-	var mc: Vector2i = Vector2i(-1, -1)
-	for c: Vector2i in m.monsters:
-		if not bool(m.monsters[c]["resolved"]):
-			mc = c
-			break
-	var base_hp: float = float(m.monsters[mc]["hp_max"])
-	# Act
-	var resolved: Dictionary = m.resolve_encounter(mc)
-	# Assert：吃 ×1.75 强化，或被 T1→T2 替换（同样是强化路径）
-	var scaled_ok: bool = float(resolved["hp"]) >= ceilf(base_hp * 1.75) - 0.001
-	assert_true(scaled_ok or int(resolved["tier"]) == 2)
-
-
-func test_map_hunger_march_damages_team() -> void:
-	# Arrange
-	var m: MapState = _make(1)
-	m.supplies = 0
-	var hp_before: float = float(m.team[0]["hp"])
-	# Act：走一步（找一个能走的方向）
-	for d: Vector2i in DIRS:
-		if bool(m.try_move(d)["moved"]):
-			break
-	# Assert
-	assert_almost_eq(float(m.team[0]["hp"]), hp_before - 0.5, 0.001)
-
-
-func test_map_starve_to_death_settles_as_death() -> void:
-	# Arrange
-	var m: MapState = _make(2)
-	m.supplies = 0
-	m.team[0]["hp"] = 0.5
-	# Act：走到死
-	while not m.over:
+func test_map_fog_grows_after_movement() -> void:
+	var map: MapState = _make(777)
+	var before: int = map.revealed.size()
+	for i: int in 8:
 		var moved: bool = false
-		for d: Vector2i in DIRS:
-			if bool(m.try_move(d)["moved"]):
+		for dir: Vector2i in DIRS:
+			var result: Dictionary = map.try_move(dir)
+			if bool(result["moved"]):
 				moved = true
 				break
 		if not moved:
 			break
-	# Assert
-	assert_true(m.over)
-	assert_eq(String(m.result["outcome"]), "death")
+	assert_gt(map.revealed.size(), before)
 
 
-func test_map_extract_settles_with_clock_report() -> void:
-	# Arrange
-	var m: MapState = _make(3)
-	m.battle_beats = 140.0  # 刻 70 → 落带
-	# Act
-	m.extract()
-	# Assert
-	assert_eq(String(m.result["outcome"]), "extract")
-	assert_true(bool(m.result["in_band"]))
+func test_map_extract_settles_run() -> void:
+	var map: MapState = _make(3)
+	map.extract()
+	assert_eq(String(map.result["outcome"]), "extract")
 
 
 func test_map_recruit_caps_at_three() -> void:
-	# Arrange
-	var m: MapState = _make(4)
-	# Act + Assert
-	assert_ne(m.recruit(), "")
-	assert_ne(m.recruit(), "")
-	assert_eq(m.recruit(), "", "满 3 人后招募返回空")
-	assert_eq(m.team.size(), 3)
+	var map: MapState = _make(4)
+	assert_ne(map.recruit(), "")
+	assert_ne(map.recruit(), "")
+	assert_eq(map.recruit(), "")
+	assert_eq(map.team.size(), 3)
 
 
-func test_map_start_never_boxed_in_softlock_guard() -> void:
-	# 审计修复（2026-07-17 三轮⑤·≈0.8%/局）：起点三邻各 20% 独立成墙——三墙同出时
-	# 撤离点会连环盖到起点·撤离又只在「移动进入」触发=既动不了也撤不了。
-	# 保底=确定性凿开右邻。500 种子扫描（期望原软锁种子约 4 个·修复后全可动）。
-	var locked: Array = []
-	for seed_v: int in range(500):
-		var m: MapState = _make(seed_v)
-		var s: Vector2i = m.start_pos
-		var open := false
-		for d: Vector2i in [Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
-			var n: Vector2i = s + d
-			if n.y >= 0 and n.y < MapState.SIZE and m.grid[n.y][n.x] != MapState.Tile.WALL:
-				open = true
-				break
-		if not open:
-			locked.append(seed_v)
-	assert_eq(locked, [], "被三墙围死的软锁种子: %s" % str(locked))
+func _wall_signature(map: MapState) -> String:
+	var rows: Array[String] = []
+	for y: int in MapState.HEIGHT:
+		var row: String = ""
+		for x: int in MapState.WIDTH:
+			row += "#" if map.grid[y][x] == MapState.Tile.WALL else "."
+		rows.append(row)
+	return "\n".join(rows)
+
+
+func _reachable_from(start: Vector2i, grid: Array) -> Dictionary:
+	var seen: Dictionary = {start: true}
+	var queue: Array[Vector2i] = [start]
+	while not queue.is_empty():
+		var cell: Vector2i = queue.pop_front()
+		for dir: Vector2i in DIRS:
+			var next: Vector2i = cell + dir
+			if next.x < 0 or next.y < 0 or next.x >= MapState.WIDTH or next.y >= MapState.HEIGHT:
+				continue
+			if grid[next.y][next.x] == MapState.Tile.WALL or seen.has(next):
+				continue
+			seen[next] = true
+			queue.append(next)
+	return seen
