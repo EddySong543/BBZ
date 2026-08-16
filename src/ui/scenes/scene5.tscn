@@ -1,0 +1,696 @@
+[gd_scene format=3 uid="uid://i3k585dqqimg"]
+
+[ext_resource type="Script" uid="uid://di0qh6ki88n6e" path="res://src/ui/components/battle_stage.gd" id="1_stage"]
+[ext_resource type="Texture2D" uid="uid://igjp2i066m3v" path="res://assets/scenes/scene5/scene5_ground.png" id="3_ground"]
+[ext_resource type="Texture2D" uid="uid://cevjp0d6citm5" path="res://assets/scenes/scene5/scene5_sky.png" id="4_sky"]
+[ext_resource type="Texture2D" uid="uid://7n38aiqsry0a" path="res://assets/scenes/scene5/scene5_sky_overlay.png" id="5_sky_overlay"]
+[ext_resource type="Texture2D" uid="uid://dvkcj3jltrils" path="res://assets/scenes/scene5/scene5_far_wheat.png" id="7_far_wheat"]
+[ext_resource type="Texture2D" uid="uid://bed4m8ebybgag" path="res://assets/scenes/scene5/scene5_near_wheat.png" id="8_near_wheat"]
+[ext_resource type="Texture2D" uid="uid://if1rdjt5o0jv" path="res://assets/scenes/scene5/scene5_distant_field.png" id="9_distant_field"]
+[ext_resource type="Shader" uid="uid://bjyo7nvgsu6p8" path="res://assets/shaders/scene5_wheat_wind.gdshader" id="10_wind_shader"]
+[ext_resource type="Script" uid="uid://damknlqk7lt7m" path="res://src/ui/components/scene5_wind_field.gd" id="11_wind_field"]
+[ext_resource type="Texture2D" uid="uid://84ywb0gn8dhn" path="res://assets/scenes/scene5/scene5_wind_chaff_atlas.png" id="12_chaff"]
+[ext_resource type="Shader" uid="uid://damoawvp7j3xw" path="res://assets/shaders/scene5_sun_rays.gdshader" id="14_sun_rays"]
+[ext_resource type="Script" uid="uid://cum6ef8jkdxxg" path="res://src/ui/components/scene5_wheat_mesh.gd" id="15_wheat_mesh"]
+[ext_resource type="Shader" uid="uid://bqm6bapmhmg0k" path="res://assets/shaders/canvas_env_dark_smoke.gdshader" id="16_pixel_cloud"]
+[ext_resource type="Shader" uid="uid://0tjgiqy11mjf" path="res://assets/shaders/scene5_distant_wheat_light.gdshader" id="17_distant_light"]
+
+[sub_resource type="ShaderMaterial" id="Scene5SunRayMat"]
+shader = ExtResource("14_sun_rays")
+shader_parameter/sun_center = Vector2(0.84, 0.19)
+shader_parameter/aspect_ratio = 1.777778
+shader_parameter/ray_color = Color(1, 0.76, 0.48, 1)
+shader_parameter/ray_intensity = 0.17
+shader_parameter/ray_width_scale = 2.6
+shader_parameter/drift_amount = 0.072
+shader_parameter/gate_speed = 0.62
+shader_parameter/breath_cycle_sec = 8.4
+shader_parameter/pixel_grid = Vector2(480, 270)
+
+[sub_resource type="ShaderMaterial" id="Scene5CloudMainMat"]
+resource_local_to_scene = true
+shader = ExtResource("16_pixel_cloud")
+shader_parameter/fill_color = Color(0.56, 0.43, 0.58, 1)
+shader_parameter/lit_color = Color(1, 0.76, 0.49, 1)
+shader_parameter/lit_strength = 0.38
+shader_parameter/alpha_max = 0.32
+shader_parameter/flow_speed = -0.0034
+shader_parameter/sway_speed = 0.105
+shader_parameter/smooth_flow = 0.0
+shader_parameter/motion_blend = 1.0
+shader_parameter/mode_isolated = 1.0
+shader_parameter/cells = 8.0
+shader_parameter/keep = 0.58
+shader_parameter/cloud_size = 1.18
+shader_parameter/base_frac = 0.78
+shader_parameter/row_h = 0.12
+shader_parameter/edge_h = 0.032
+shader_parameter/inner_contrast = 0.0
+shader_parameter/breath_amount = 0.03
+shader_parameter/breath_speed = 0.14
+shader_parameter/seed = 35.0
+shader_parameter/aspect = 6.933333
+shader_parameter/pixel_grid = Vector2(520, 75)
+shader_parameter/row_count = 4.0
+shader_parameter/isolated_len_cap = 1.18
+shader_parameter/isolated_forced_stride = 3.0
+shader_parameter/isolated_break_stride = 5.0
+shader_parameter/lobe_profile = 1.0
+shader_parameter/lobe_height_scale = 0.68
+shader_parameter/lobe_shape_variation = 0.72
+shader_parameter/lobe_min_step_px = 2.0
+shader_parameter/continuous_bob_scale = 0.36
+shader_parameter/pattern_offset = 1.8
+shader_parameter/bank_valley_center = 0.5
+shader_parameter/bank_valley_width = 0.25
+shader_parameter/bank_valley_depth = 0.0
+shader_parameter/bank_valley_steps = 4.0
+shader_parameter/bank_valley_peak_scale = 1.0
+shader_parameter/bank_side_rise = 0.0
+shader_parameter/bank_join_height = 0.0
+shader_parameter/bank_join_variation = 0.0
+shader_parameter/water_reflect_color = Color(0.58, 0.73, 0.72, 1)
+shader_parameter/water_reflect_strength = 0.0
+shader_parameter/water_reflect_center_x = 0.5
+shader_parameter/water_reflect_half_width = 0.12
+shader_parameter/water_reflect_edge_h = 0.03
+shader_parameter/directional_light_dir = Vector2(1, -0.8)
+shader_parameter/directional_light_color = Color(1, 0.88, 0.68, 1)
+shader_parameter/directional_shadow_color = Color(0.24, 0.37, 0.38, 1)
+shader_parameter/directional_light_strength = 0.0
+shader_parameter/directional_shadow_strength = 0.0
+shader_parameter/scene_light_source_uv = Vector2(0.9, -0.08)
+shader_parameter/scene_light_target_uv = Vector2(0.47, 0.78)
+shader_parameter/scene_light_top_width = 0.1
+shader_parameter/scene_light_bottom_width = 0.4
+shader_parameter/scene_light_pool_center = Vector2(0.63, 0.28)
+shader_parameter/scene_light_pool_radius = Vector2(0.56, 0.4)
+
+[sub_resource type="Gradient" id="Gradient_horizon"]
+offsets = PackedFloat32Array(0, 0.34, 0.43, 0.52, 0.62, 1)
+colors = PackedColorArray(1, 0.9, 0.62, 0, 1, 0.9, 0.62, 0, 1, 0.91, 0.58, 0.04, 1, 0.94, 0.68, 0.12, 1, 0.87, 0.46, 0.06, 1, 0.87, 0.46, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture_horizon"]
+gradient = SubResource("Gradient_horizon")
+width = 1920
+height = 1080
+fill = 1
+fill_from = Vector2(0.5, 0)
+fill_to = Vector2(0.5, 1)
+
+[sub_resource type="ShaderMaterial" id="Scene5DistantLightMat"]
+resource_local_to_scene = true
+shader = ExtResource("17_distant_light")
+shader_parameter/wave_speed = 0.022
+shader_parameter/wave_phase = 0.055
+shader_parameter/wave_width = 0.21
+shader_parameter/secondary_offset = 0.43
+shader_parameter/secondary_strength = 0.52
+shader_parameter/light_strength = 0.64
+shader_parameter/light_color = Color(1, 0.86, 0.42, 1)
+shader_parameter/gold_left = 0.2
+shader_parameter/gold_right = 0.89
+shader_parameter/gold_ratio_threshold = 0.47
+shader_parameter/gold_luminance_threshold = 0.28
+shader_parameter/gold_rest_dim = 0.09
+shader_parameter/bottom_edge_trim = 1.0
+
+[sub_resource type="ShaderMaterial" id="Scene5MidFarWindMat"]
+resource_local_to_scene = true
+shader = ExtResource("10_wind_shader")
+shader_parameter/clip_top = 0.0
+shader_parameter/mirror_texture = 0.0
+shader_parameter/tip_y = 0.28
+shader_parameter/root_y = 0.94
+shader_parameter/geometry_y_start = 0.39
+shader_parameter/geometry_y_feather = 0.05
+shader_parameter/cluster_count = 10.0
+shader_parameter/cycle_sec = 13.8
+shader_parameter/phase_seed = 19.7
+shader_parameter/sway_px = 1.2
+shader_parameter/detail_px = 0.26
+shader_parameter/detail_frequency = 2.3
+shader_parameter/vertical_phase = 2.7
+shader_parameter/inertia_mix = 0.4
+shader_parameter/bend_power = 1.62
+shader_parameter/field_wave_strength = 0.42
+shader_parameter/field_wave_speed = 0.0175
+shader_parameter/field_wave_phase = 0.36
+shader_parameter/field_wave_scale = 1.0
+shader_parameter/field_wave_y_start = 0.36
+shader_parameter/field_wave_y_end = 0.54
+shader_parameter/field_wave_feather = 0.03
+shader_parameter/field_wave_color = Color(1, 0.83, 0.42, 1)
+shader_parameter/field_highlight_threshold = 0.72
+shader_parameter/field_highlight_softness = 0.06
+shader_parameter/field_highlight_rest = 1.0
+shader_parameter/field_highlight_demote = 0.0
+shader_parameter/field_wave_width = 0.22
+shader_parameter/field_wave_secondary_offset = 0.47
+shader_parameter/field_wave_secondary_strength = 0.36
+shader_parameter/depth_haze_color = Color(0.94, 0.73, 0.58, 1)
+shader_parameter/depth_haze_strength = 0.28
+shader_parameter/shape_wave_vertical_px = 2.6
+shader_parameter/shape_wave_horizontal_px = 1.6
+shader_parameter/shape_wave_cycles = 1.25
+shader_parameter/shape_wave_y_start = 0.34
+shader_parameter/shape_wave_y_end = 0.82
+shader_parameter/shape_wave_feather = 0.07
+shader_parameter/gust_strength = 0.0
+shader_parameter/gust_direction = 1.0
+shader_parameter/gust_px = 3.4
+
+[sub_resource type="ShaderMaterial" id="Scene5FarWindMat"]
+resource_local_to_scene = true
+shader = ExtResource("10_wind_shader")
+shader_parameter/clip_top = 0.0
+shader_parameter/mirror_texture = 0.0
+shader_parameter/tip_y = 0.28
+shader_parameter/root_y = 0.94
+shader_parameter/geometry_y_start = 0.4
+shader_parameter/geometry_y_feather = 0.045
+shader_parameter/cluster_count = 12.0
+shader_parameter/cycle_sec = 11.6
+shader_parameter/phase_seed = 4.2
+shader_parameter/sway_px = 2.1
+shader_parameter/detail_px = 0.42
+shader_parameter/detail_frequency = 2.8
+shader_parameter/vertical_phase = 3.2
+shader_parameter/inertia_mix = 0.34
+shader_parameter/bend_power = 1.55
+shader_parameter/field_wave_strength = 0.82
+shader_parameter/field_wave_speed = 0.022
+shader_parameter/field_wave_phase = 0.055
+shader_parameter/field_wave_scale = 1.15
+shader_parameter/field_wave_y_start = 0.37
+shader_parameter/field_wave_y_end = 0.54
+shader_parameter/field_wave_feather = 0.025
+shader_parameter/field_wave_color = Color(1, 0.86, 0.42, 1)
+shader_parameter/field_highlight_threshold = 0.72
+shader_parameter/field_highlight_softness = 0.06
+shader_parameter/field_highlight_rest = 1.0
+shader_parameter/field_highlight_demote = 0.0
+shader_parameter/field_wave_width = 0.17
+shader_parameter/field_wave_secondary_offset = 0.43
+shader_parameter/field_wave_secondary_strength = 0.48
+shader_parameter/depth_haze_color = Color(0.9, 0.72, 0.58, 1)
+shader_parameter/depth_haze_strength = 0.16
+shader_parameter/shape_wave_vertical_px = 4.8
+shader_parameter/shape_wave_horizontal_px = 3.2
+shader_parameter/shape_wave_cycles = 1.65
+shader_parameter/shape_wave_y_start = 0.34
+shader_parameter/shape_wave_y_end = 0.86
+shader_parameter/shape_wave_feather = 0.06
+shader_parameter/gust_strength = 0.0
+shader_parameter/gust_direction = 1.0
+shader_parameter/gust_px = 5.0
+
+[sub_resource type="ShaderMaterial" id="Scene5FarCoverBackMat"]
+resource_local_to_scene = true
+shader = ExtResource("10_wind_shader")
+shader_parameter/clip_top = 0.36
+shader_parameter/mirror_texture = 1.0
+shader_parameter/tip_y = 0.28
+shader_parameter/root_y = 0.95
+shader_parameter/geometry_y_start = 0.4
+shader_parameter/geometry_y_feather = 0.05
+shader_parameter/cluster_count = 14.0
+shader_parameter/cycle_sec = 10.4
+shader_parameter/phase_seed = 31.2
+shader_parameter/sway_px = 2.8
+shader_parameter/detail_px = 0.62
+shader_parameter/detail_frequency = 3.4
+shader_parameter/vertical_phase = 3.6
+shader_parameter/inertia_mix = 0.4
+shader_parameter/bend_power = 1.48
+shader_parameter/field_wave_strength = 0.66
+shader_parameter/field_wave_speed = 0.025
+shader_parameter/field_wave_phase = 0.58
+shader_parameter/field_wave_scale = 1.2
+shader_parameter/field_wave_y_start = 0.39
+shader_parameter/field_wave_y_end = 0.58
+shader_parameter/field_wave_feather = 0.035
+shader_parameter/field_wave_color = Color(1, 0.84, 0.4, 1)
+shader_parameter/field_highlight_threshold = 0.72
+shader_parameter/field_highlight_softness = 0.06
+shader_parameter/field_highlight_rest = 1.0
+shader_parameter/field_highlight_demote = 0.0
+shader_parameter/field_wave_width = 0.18
+shader_parameter/field_wave_secondary_offset = 0.4
+shader_parameter/field_wave_secondary_strength = 0.44
+shader_parameter/depth_haze_color = Color(0.92, 0.7, 0.5, 1)
+shader_parameter/depth_haze_strength = 0.12
+shader_parameter/shape_wave_vertical_px = 4.2
+shader_parameter/shape_wave_horizontal_px = 3.5
+shader_parameter/shape_wave_cycles = 1.85
+shader_parameter/shape_wave_y_start = 0.36
+shader_parameter/shape_wave_y_end = 0.88
+shader_parameter/shape_wave_feather = 0.06
+shader_parameter/gust_strength = 0.0
+shader_parameter/gust_direction = 1.0
+shader_parameter/gust_px = 5.8
+
+[sub_resource type="Gradient" id="Gradient_mid_field"]
+offsets = PackedFloat32Array(0, 0.43, 0.5, 0.58, 0.7, 1)
+colors = PackedColorArray(0.52, 0.4, 0.26, 0, 0.52, 0.4, 0.26, 0, 1, 0.76, 0.3, 0.04, 0.68, 0.44, 0.18, 0.1, 0.3, 0.21, 0.12, 0.07, 0.3, 0.21, 0.12, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture_mid_field"]
+gradient = SubResource("Gradient_mid_field")
+width = 1920
+height = 1080
+fill = 1
+fill_from = Vector2(0.5, 0)
+fill_to = Vector2(0.5, 1)
+
+[sub_resource type="Gradient" id="Gradient_mid"]
+offsets = PackedFloat32Array(0, 0.48, 0.64, 0.82, 1)
+colors = PackedColorArray(0.38, 0.31, 0.25, 0, 0.7, 0.52, 0.28, 0.015, 0.42, 0.3, 0.18, 0.08, 0.23, 0.18, 0.12, 0.24, 0.09, 0.075, 0.055, 0.46)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture_mid"]
+gradient = SubResource("Gradient_mid")
+width = 1920
+height = 1080
+fill = 1
+fill_from = Vector2(0.5, 0)
+fill_to = Vector2(0.5, 1)
+
+[sub_resource type="CanvasItemMaterial" id="Scene5ChaffAtlasMat"]
+light_mode = 1
+particles_animation = true
+particles_anim_h_frames = 4
+particles_anim_v_frames = 2
+particles_anim_loop = false
+
+[sub_resource type="Gradient" id="Gradient_chaff_life"]
+offsets = PackedFloat32Array(0, 0.12, 0.72, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 0.92, 1, 1, 1, 0.74, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture_chaff_life"]
+gradient = SubResource("Gradient_chaff_life")
+
+[sub_resource type="ParticleProcessMaterial" id="Scene5AmbientChaffMat"]
+emission_shape = 3
+emission_box_extents = Vector3(980, 150, 1)
+direction = Vector3(1, -0.08, 0)
+spread = 16.0
+initial_velocity_min = 18.0
+initial_velocity_max = 36.0
+angular_velocity_min = -6.0
+angular_velocity_max = 6.0
+gravity = Vector3(2, 0.8, 0)
+damping_min = 0.04
+damping_max = 0.1
+scale_min = 0.9
+scale_max = 1.35
+color = Color(1, 0.84, 0.4, 0.78)
+color_ramp = SubResource("GradientTexture_chaff_life")
+anim_offset_max = 1.0
+
+[sub_resource type="ParticleProcessMaterial" id="Scene5GustChaffMat"]
+resource_local_to_scene = true
+emission_shape = 3
+emission_box_extents = Vector3(850, 125, 1)
+direction = Vector3(1, -0.08, 0)
+spread = 7.0
+initial_velocity_min = 80.0
+initial_velocity_max = 145.0
+angular_velocity_min = -13.0
+angular_velocity_max = 13.0
+gravity = Vector3(5, 1.5, 0)
+damping_min = 36.0
+damping_max = 52.0
+scale_max = 1.55
+color = Color(1, 0.82, 0.3, 0.9)
+color_ramp = SubResource("GradientTexture_chaff_life")
+anim_offset_max = 1.0
+
+[sub_resource type="ShaderMaterial" id="Scene5NearWindMat"]
+resource_local_to_scene = true
+shader = ExtResource("10_wind_shader")
+shader_parameter/clip_top = 0.0
+shader_parameter/mirror_texture = 0.0
+shader_parameter/tip_y = 0.28
+shader_parameter/root_y = 1.0
+shader_parameter/geometry_y_start = 0.27
+shader_parameter/geometry_y_feather = 0.05
+shader_parameter/cluster_count = 18.0
+shader_parameter/cycle_sec = 9.4
+shader_parameter/phase_seed = 27.4
+shader_parameter/sway_px = 5.4
+shader_parameter/detail_px = 1.35
+shader_parameter/detail_frequency = 4.6
+shader_parameter/vertical_phase = 2.6
+shader_parameter/inertia_mix = 0.48
+shader_parameter/bend_power = 1.18
+shader_parameter/field_wave_strength = 0.0
+shader_parameter/field_wave_speed = 0.075
+shader_parameter/field_wave_phase = 0.055
+shader_parameter/field_wave_scale = 1.25
+shader_parameter/field_wave_y_start = 0.2
+shader_parameter/field_wave_y_end = 0.46
+shader_parameter/field_wave_feather = 0.05
+shader_parameter/field_wave_color = Color(1, 0.82, 0.36, 1)
+shader_parameter/field_highlight_threshold = 0.72
+shader_parameter/field_highlight_softness = 0.06
+shader_parameter/field_highlight_rest = 0.28
+shader_parameter/field_highlight_demote = 0.32
+shader_parameter/field_wave_width = 0.17
+shader_parameter/field_wave_secondary_offset = 0.43
+shader_parameter/field_wave_secondary_strength = 0.48
+shader_parameter/depth_haze_color = Color(0.92, 0.73, 0.55, 1)
+shader_parameter/depth_haze_strength = 0.0
+shader_parameter/shape_wave_vertical_px = 0.0
+shader_parameter/shape_wave_horizontal_px = 0.0
+shader_parameter/shape_wave_cycles = 1.6
+shader_parameter/shape_wave_y_start = 0.34
+shader_parameter/shape_wave_y_end = 0.86
+shader_parameter/shape_wave_feather = 0.06
+shader_parameter/gust_strength = 0.0
+shader_parameter/gust_direction = 1.0
+shader_parameter/gust_px = 9.6
+
+[node name="Scene5" type="Control" unique_id=1837926955]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_stage")
+idle_amplitude = 5.0
+pointer_parallax = true
+demo_click_shake = false
+
+[node name="Sky" type="TextureRect" parent="." unique_id=247314067]
+self_modulate = Color(0.86, 0.98, 1.08, 1)
+texture_filter = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -7.0
+offset_top = -202.0
+offset_right = 1.0
+offset_bottom = -194.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("4_sky")
+expand_mode = 1
+metadata/parallax_factor = 0.1
+metadata/asset_slot = "scene5_sky.png"
+metadata/placeholder = false
+metadata/_edit_lock_ = true
+
+[node name="SunRayField" type="ColorRect" parent="." unique_id=134388698]
+texture_filter = 1
+material = SubResource("Scene5SunRayMat")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 374.0
+offset_top = -453.0
+offset_right = 374.0
+offset_bottom = -453.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+metadata/parallax_factor = 0.11
+metadata/asset_slot = "procedural_scene3_style_sun_rays"
+metadata/placeholder = false
+metadata/_edit_lock_ = true
+
+[node name="SkyOverlay" type="TextureRect" parent="." unique_id=1246775655]
+self_modulate = Color(0.92, 1.08, 0.96, 0.58)
+texture_filter = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -3.0
+offset_top = -355.0
+offset_right = -3.0
+offset_bottom = -355.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("5_sky_overlay")
+expand_mode = 1
+metadata/parallax_factor = 0.12
+metadata/asset_slot = "scene5_sky_overlay.png"
+metadata/placeholder = false
+metadata/_edit_lock_ = true
+
+[node name="UpperCloud" type="Control" parent="." unique_id=1669658580]
+texture_filter = 1
+anchors_preset = 0
+offset_left = -80.0
+offset_top = 82.0
+offset_right = 2000.0
+offset_bottom = 482.0
+mouse_filter = 2
+metadata/parallax_factor = 0.16
+metadata/asset_slot = "procedural_scene5_primary_pixel_cloud"
+metadata/placeholder = false
+metadata/_edit_lock_ = true
+
+[node name="CloudMain" type="ColorRect" parent="UpperCloud" unique_id=1850812674]
+texture_filter = 1
+material = SubResource("Scene5CloudMainMat")
+layout_mode = 0
+offset_top = 90.0
+offset_right = 2080.0
+offset_bottom = 390.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+
+[node name="HorizonHaze" type="TextureRect" parent="." unique_id=81009054]
+self_modulate = Color(1, 1, 1, 0.58)
+texture_filter = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -8.0
+offset_top = -4.0
+offset_right = 8.0
+offset_bottom = 4.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = SubResource("GradientTexture_horizon")
+expand_mode = 1
+metadata/parallax_factor = 0.22
+metadata/asset_slot = "procedural_horizon_haze"
+metadata/placeholder = false
+metadata/_edit_lock_ = true
+
+[node name="DistantWheat" type="TextureRect" parent="." unique_id=1718362783]
+self_modulate = Color(1, 1.08, 0.86, 0.88)
+texture_filter = 1
+material = SubResource("Scene5DistantLightMat")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -27.0
+offset_top = -65.0
+offset_right = 6.0
+offset_bottom = -8.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("9_distant_field")
+expand_mode = 1
+metadata/parallax_factor = 0.25
+metadata/asset_slot = "scene5_distant_field.png"
+metadata/placeholder = false
+
+[node name="MidFarWheat" type="Control" parent="." unique_id=453729312]
+self_modulate = Color(0.82, 0.9, 0.76, 0.72)
+texture_filter = 1
+material = SubResource("Scene5MidFarWindMat")
+anchors_preset = 0
+offset_left = -59.0
+offset_top = 157.99998
+offset_right = 905.5
+offset_bottom = 1032.4
+scale = Vector2(2.08, 1.03)
+mouse_filter = 2
+script = ExtResource("15_wheat_mesh")
+texture = ExtResource("7_far_wheat")
+mesh_columns = 96
+mesh_rows = 20
+metadata/parallax_factor = 0.32
+metadata/asset_slot = "scene5_far_wheat.png:derived_mid_depth"
+metadata/placeholder = false
+metadata/_edit_lock_ = true
+
+[node name="FarWheat" type="Control" parent="." unique_id=1824529800]
+self_modulate = Color(0.9, 0.98, 0.78, 0.94)
+texture_filter = 1
+material = SubResource("Scene5FarWindMat")
+anchors_preset = 0
+offset_left = 4.0
+offset_top = 136.0
+offset_right = 968.5
+offset_bottom = 1010.4
+scale = Vector2(2, 1.25)
+mouse_filter = 2
+script = ExtResource("15_wheat_mesh")
+texture = ExtResource("7_far_wheat")
+mesh_columns = 128
+mesh_rows = 28
+metadata/parallax_factor = 0.4
+metadata/asset_slot = "scene5_far_wheat.png:complete_mesh"
+metadata/placeholder = false
+metadata/_edit_lock_ = true
+
+[node name="FarWheatCoverBack" type="Control" parent="." unique_id=1693909111]
+self_modulate = Color(0.88, 0.94, 0.72, 0.9)
+texture_filter = 1
+material = SubResource("Scene5FarCoverBackMat")
+anchors_preset = 0
+offset_left = -55.0
+offset_top = 52.0
+offset_right = 891.6982
+offset_bottom = 1322.2124
+scale = Vector2(2.12, 1.13)
+mouse_filter = 2
+script = ExtResource("15_wheat_mesh")
+texture = ExtResource("7_far_wheat")
+mesh_columns = 104
+mesh_rows = 22
+metadata/parallax_factor = 0.46
+metadata/asset_slot = "scene5_far_wheat.png:derived_cover_back"
+metadata/placeholder = false
+metadata/_edit_lock_ = true
+
+[node name="MidFieldHaze" type="TextureRect" parent="." unique_id=1939579266]
+texture_filter = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -8.0
+offset_top = -4.0
+offset_right = 8.0
+offset_bottom = 4.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = SubResource("GradientTexture_mid_field")
+expand_mode = 1
+metadata/parallax_factor = 0.56
+metadata/asset_slot = "procedural_mid_field_haze"
+metadata/placeholder = false
+metadata/_edit_lock_ = true
+
+[node name="Atmosphere" type="TextureRect" parent="." unique_id=1746638630]
+texture_filter = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = SubResource("GradientTexture_mid")
+expand_mode = 1
+metadata/parallax_factor = 0.65
+metadata/asset_slot = "procedural_atmosphere"
+metadata/placeholder = false
+metadata/_edit_lock_ = true
+
+[node name="AmbientChaff" type="GPUParticles2D" parent="." unique_id=1437154587]
+texture_filter = 1
+material = SubResource("Scene5ChaffAtlasMat")
+position = Vector2(960, 600)
+amount = 12
+texture = ExtResource("12_chaff")
+lifetime = 12.0
+preprocess = 12.0
+randomness = 0.92
+visibility_rect = Rect2(-1080, -260, 2160, 520)
+local_coords = true
+process_material = SubResource("Scene5AmbientChaffMat")
+metadata/parallax_factor = 0.82
+metadata/asset_slot = "scene5_wind_chaff_atlas.png:random_4x2"
+metadata/placeholder = false
+
+[node name="BattlePlatform" type="NinePatchRect" parent="." unique_id=947461939]
+self_modulate = Color(0.72, 0.76, 0.58, 1)
+texture_filter = 1
+layout_mode = 0
+offset_left = -16.0
+offset_top = 600.0
+offset_right = 976.0
+offset_bottom = 761.0
+scale = Vector2(2, 2)
+texture = ExtResource("3_ground")
+patch_margin_left = 8
+patch_margin_right = 8
+axis_stretch_horizontal = 2
+metadata/parallax_factor = 1.0
+metadata/asset_slot = "scene5_ground.png"
+metadata/placeholder = false
+metadata/_edit_lock_ = true
+
+[node name="GustChaff" type="GPUParticles2D" parent="." unique_id=1204599927]
+texture_filter = 1
+material = SubResource("Scene5ChaffAtlasMat")
+position = Vector2(960, 640)
+emitting = false
+amount = 14
+texture = ExtResource("12_chaff")
+lifetime = 2.4
+one_shot = true
+explosiveness = 0.82
+randomness = 0.45
+visibility_rect = Rect2(-1100, -260, 2200, 520)
+local_coords = true
+process_material = SubResource("Scene5GustChaffMat")
+metadata/parallax_factor = 1.08
+metadata/asset_slot = "scene5_wind_chaff_atlas.png:random_4x2"
+metadata/placeholder = false
+
+[node name="NearWheatLeft" type="Control" parent="." unique_id=1047779489]
+self_modulate = Color(0.58, 0.52, 0.34, 0.92)
+texture_filter = 1
+material = SubResource("Scene5NearWindMat")
+anchors_preset = 0
+offset_left = -191.0
+offset_top = 213.99998
+offset_right = 540.6667
+offset_bottom = 561.2001
+scale = Vector2(3, 2.5)
+mouse_filter = 2
+script = ExtResource("15_wheat_mesh")
+texture = ExtResource("8_near_wheat")
+mesh_columns = 56
+mesh_rows = 12
+metadata/parallax_factor = 1.22
+metadata/asset_slot = "scene5_near_wheat.png"
+metadata/placeholder = false
+metadata/_edit_lock_ = true
+
+[node name="WindField" type="Node" parent="." unique_id=1942437471]
+script = ExtResource("11_wind_field")
+wind_layer_paths = Array[NodePath]([NodePath("../MidFarWheat"), NodePath("../FarWheat"), NodePath("../FarWheatCoverBack"), NodePath("../NearWheatLeft")])
+ambient_particles_path = NodePath("../AmbientChaff")
+gust_particles_path = NodePath("../GustChaff")
+
+[node name="CompositionGuides" type="Node2D" parent="." unique_id=166591733]
+visible = false
+
+[node name="P1Baseline" type="Marker2D" parent="CompositionGuides" unique_id=539834723]
+position = Vector2(480, 748)
+
+[node name="P2Baseline" type="Marker2D" parent="CompositionGuides" unique_id=1565375272]
+position = Vector2(1440, 748)
+
+[node name="PlatformBaseline" type="Marker2D" parent="CompositionGuides" unique_id=1240898858]
+position = Vector2(960, 748)

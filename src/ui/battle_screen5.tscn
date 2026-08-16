@@ -1,0 +1,183 @@
+[gd_scene load_steps=14 format=3]
+
+[ext_resource type="PackedScene" path="res://src/ui/battle_screen_base.tscn" id="1_base"]
+[ext_resource type="PackedScene" path="res://src/ui/scenes/scene5.tscn" id="2_scene5"]
+[ext_resource type="Shader" path="res://assets/shaders/post_fx_color_grade.gdshader" id="3_postfx"]
+[ext_resource type="Texture2D" path="res://assets/scenes/scene5/scene5_near_wheat.png" id="4_near_wheat"]
+[ext_resource type="Shader" path="res://assets/shaders/scene5_wheat_wind.gdshader" id="5_occluder"]
+[ext_resource type="Script" path="res://src/ui/components/scene5_wheat_mesh.gd" id="6_wheat_mesh"]
+
+[sub_resource type="ShaderMaterial" id="Scene5OccluderMat"]
+resource_local_to_scene = true
+shader = ExtResource("5_occluder")
+shader_parameter/clip_top = 0.58
+shader_parameter/tip_y = 0.28
+shader_parameter/root_y = 1.0
+shader_parameter/geometry_y_start = 0.27
+shader_parameter/geometry_y_feather = 0.05
+shader_parameter/cluster_count = 18.0
+shader_parameter/cycle_sec = 9.4
+shader_parameter/phase_seed = 27.4
+shader_parameter/sway_px = 5.4
+shader_parameter/detail_px = 1.35
+shader_parameter/detail_frequency = 4.6
+shader_parameter/vertical_phase = 2.6
+shader_parameter/inertia_mix = 0.48
+shader_parameter/bend_power = 1.18
+shader_parameter/field_wave_strength = 0.0
+shader_parameter/field_wave_speed = 0.075
+shader_parameter/field_wave_scale = 1.25
+shader_parameter/field_wave_y_start = 0.2
+shader_parameter/field_wave_y_end = 0.46
+shader_parameter/field_wave_feather = 0.05
+shader_parameter/field_wave_color = Color(1, 0.82, 0.36, 1)
+shader_parameter/depth_haze_color = Color(0.92, 0.73, 0.55, 1)
+shader_parameter/depth_haze_strength = 0.0
+shader_parameter/gust_strength = 0.0
+shader_parameter/gust_direction = 1.0
+shader_parameter/gust_px = 9.6
+
+[sub_resource type="ShaderMaterial" id="Scene5PostFXMat"]
+resource_local_to_scene = true
+shader = ExtResource("3_postfx")
+shader_parameter/barrel_amount = 0.04
+shader_parameter/barrel_edge_margin = 0.15
+shader_parameter/edge_blur_amount = 0.0
+shader_parameter/edge_blur_start = 0.4
+shader_parameter/brightness = 1.08
+shader_parameter/contrast = 0.94
+shader_parameter/saturation = 0.9
+shader_parameter/tint_color = Color(0.96, 0.97, 1, 1)
+shader_parameter/tint_strength = 0.035
+shader_parameter/shadow_tint = Color(0.68, 0.67, 0.78, 1)
+shader_parameter/highlight_tint = Color(1, 0.93, 0.68, 1)
+shader_parameter/split_strength = 0.14
+shader_parameter/vignette_color = Color(0.025, 0.03, 0.045, 1)
+shader_parameter/vignette_strength = 0.025
+shader_parameter/vignette_radius = 0.96
+shader_parameter/vignette_softness = 0.6
+shader_parameter/grain_amount = 0.006
+shader_parameter/grain_scale = 1.6
+shader_parameter/impact_strength = 0.0
+shader_parameter/impact_invert = 0.0
+shader_parameter/impact_center = Vector2(0.5, 0.55)
+shader_parameter/impact_burst_radius = 0.26
+shader_parameter/impact_jag = 0.11
+shader_parameter/impact_jag_freq = 7.0
+shader_parameter/impact_th_out = 0.52
+shader_parameter/impact_th_in = 0.13
+shader_parameter/impact_white = 0.86
+shader_parameter/impact_px = 3.0
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_p1_0"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_p1_1"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_p1_2"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_p2_0"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_p2_1"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_p2_2"]
+
+[node name="BattleScreen5" instance=ExtResource("1_base")]
+countdown_normal_color = Color(0.94902, 0.909804, 0.8, 1)
+countdown_ornament_color = Color(0.94902, 0.909804, 0.8, 1)
+
+[node name="Stage" parent="StageSlot" parent_id_path=PackedInt32Array(924300025) index="0" instance=ExtResource("2_scene5")]
+layout_mode = 1
+mouse_filter = 2
+pointer_parallax = true
+demo_click_shake = false
+
+[node name="P1Shadow" parent="." index="3" unique_id=329774492]
+self_modulate = Color(0.24, 0.2, 0.17, 0.46)
+
+[node name="P2Shadow" parent="." index="4" unique_id=1318395873]
+self_modulate = Color(0.24, 0.2, 0.17, 0.46)
+
+[node name="P1CharDisplay" parent="." index="5" unique_id=1642938575]
+rim_color = Color(1, 0.89, 0.62, 1)
+rim_strength = 0.1
+rim_width = 1.5
+backlight = 0.12
+shadow_tint = Color(0.56, 0.55, 0.6, 1)
+light_dir = Vector2(0.55, -1)
+skin_warmth = Color(1.04, 1.02, 0.96, 1)
+warmth_amount = 0.12
+fill_color = Color(1, 0.78, 0.5, 1)
+fill_amount = 0.09
+
+[node name="P2CharDisplay" parent="." index="6" unique_id=915119977]
+rim_color = Color(1, 0.89, 0.62, 1)
+rim_strength = 0.1
+rim_width = 1.5
+backlight = 0.12
+shadow_tint = Color(0.56, 0.55, 0.6, 1)
+light_dir = Vector2(0.55, -1)
+skin_warmth = Color(1.04, 1.02, 0.96, 1)
+warmth_amount = 0.12
+fill_color = Color(1, 0.78, 0.5, 1)
+fill_amount = 0.09
+
+[node name="WorldForegroundOccluder" type="Control" parent="."]
+self_modulate = Color(0.58, 0.52, 0.34, 0.92)
+texture_filter = 1
+material = SubResource("Scene5OccluderMat")
+layout_mode = 0
+offset_left = -191.0
+offset_top = 213.99998
+offset_right = 540.6667
+offset_bottom = 561.2001
+scale = Vector2(3, 2.5)
+mouse_filter = 2
+script = ExtResource("6_wheat_mesh")
+texture = ExtResource("4_near_wheat")
+mesh_columns = 56
+mesh_rows = 12
+metadata/source_stage_layer = "NearWheatLeft"
+
+[node name="ForeDust" parent="." index="7" unique_id=844619574]
+visible = false
+emitting = false
+
+[node name="LowerDust" parent="." index="8" unique_id=802756316]
+visible = false
+emitting = false
+
+[node name="PostFX" parent="." index="10" unique_id=516553634]
+material = SubResource("Scene5PostFXMat")
+
+[node name="P1Frame0" parent="P1Hud" parent_id_path=PackedInt32Array(1074064709) index="2" unique_id=2129820687]
+offset_right = 98.0
+offset_bottom = 76.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_p1_0")
+
+[node name="P1Frame1" parent="P1Hud" parent_id_path=PackedInt32Array(1074064709) index="3" unique_id=1566007647]
+offset_right = 744.0
+offset_bottom = 74.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_p1_1")
+
+[node name="P1Frame2" parent="P1Hud" parent_id_path=PackedInt32Array(1074064709) index="5" unique_id=1208252427]
+offset_right = 664.0
+offset_bottom = 74.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_p1_2")
+
+[node name="P2Frame0" parent="P2Hud" parent_id_path=PackedInt32Array(1758094651) index="2" unique_id=1770616061]
+offset_right = 1886.0
+offset_bottom = 76.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_p2_0")
+
+[node name="P2Frame1" parent="P2Hud" parent_id_path=PackedInt32Array(1758094651) index="3" unique_id=1621653890]
+offset_right = 1258.0
+offset_bottom = 74.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_p2_1")
+
+[node name="P2Frame2" parent="P2Hud" parent_id_path=PackedInt32Array(1758094651) index="5" unique_id=1695379356]
+offset_right = 1338.0
+offset_bottom = 74.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_p2_2")
+
+[editable path="P1CharDisplay"]
+[editable path="P2CharDisplay"]

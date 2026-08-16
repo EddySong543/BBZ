@@ -20,6 +20,12 @@ uniform float lit_strength : hint_range(0.0, 1.0) = 0.6;   // 月光缘强度
 uniform float alpha_max : hint_range(0.0, 1.0) = 0.88;
 uniform float flow_speed = 0.006;     // 整体流速（格/秒·整像素步进）
 uniform float sway_speed = 0.18;      // 单旗缓漂相位速度
+// Scene5 can opt into continuous travel while established Scene1/2
+// materials retain their original stepped timing through the default value.
+uniform float smooth_flow : hint_range(0.0, 1.0, 1.0) = 0.0;
+// Scene5 uses adjacent-pixel temporal blending: the cloud stays slow and
+// pixel-shaped, while only the entering/leaving edge pixels crossfade.
+uniform float motion_blend : hint_range(0.0, 1.0, 1.0) = 0.0;
 uniform float mode_isolated : hint_range(0.0, 1.0) = 1.0;  // 1=孤立雾旗 0=连绵雾墙（前景框）
 uniform float cells = 10.0;           // x 向格数
 uniform float keep : hint_range(0.0, 1.0) = 0.5;    // 簇保留率（雾墙配 1.0）
@@ -367,15 +373,31 @@ void fragment() {
 	float qx = cells / pixel_grid.x;
 	float qy_f = (cells / aspect) / pixel_grid.y;
 	// 整像素流动步进 + 半像素中心采样（根治闪烁的两把锁）
-	float flow_t = floor(t * flow_speed * cells / qx) * qx;
-	float cu_c = uvq.x * cells + qx * 0.5 + flow_t + pattern_offset;     // 流动列中心
+	float stepped_flow = floor(t * flow_speed * cells / qx) * qx;
+	float continuous_flow = t * flow_speed * cells;
+	float legacy_flow = mix(stepped_flow, continuous_flow, smooth_flow);
+	float travel_pixels = t * abs(flow_speed) * cells / max(qx, 0.0001);
+	float travel_direction = mix(-1.0, 1.0, step(0.0, flow_speed));
+	float current_flow = floor(travel_pixels) * qx * travel_direction;
+	float next_flow = current_flow + qx * travel_direction;
+	current_flow = mix(legacy_flow, current_flow, motion_blend);
+	next_flow = mix(legacy_flow, next_flow, motion_blend);
+	float motion_phase = smoothstep(0.0, 1.0, fract(travel_pixels))
+			* motion_blend;
+	float cu_c = uvq.x * cells + qx * 0.5 + current_flow + pattern_offset;
+	float cu_next = uvq.x * cells + qx * 0.5 + next_flow + pattern_offset;
 	float cv_c = uvq.y * cells / aspect + qy_f * 0.5;   // 行中心
 	float h_units = cells / aspect;
 
-	float cover = smoke_cover(cu_c, cv_c, t, h_units, uvq.x);
+	float cover_current = smoke_cover(cu_c, cv_c, t, h_units, uvq.x);
+	float cover_next = smoke_cover(cu_next, cv_c, t, h_units, uvq.x);
+	float cover = mix(cover_current, cover_next, motion_phase);
 	// 月光缘：本像素在雾内、其上 edge_h 处在雾外 = 顶面暴露 → 一线脆亮
-	float cover_up = smoke_cover(
+	float cover_up_current = smoke_cover(
 			cu_c, cv_c - edge_h, t, h_units, uvq.x);
+	float cover_up_next = smoke_cover(
+			cu_next, cv_c - edge_h, t, h_units, uvq.x);
+	float cover_up = mix(cover_up_current, cover_up_next, motion_phase);
 	float lit = cover * (1.0 - min(cover_up, 1.0));
 
 	// F 体内两档明度横向流纹：不同行相位错开滚动（只染体色·月光缘不受染）
@@ -390,8 +412,11 @@ void fragment() {
 	// water_reflect_underside: a single hard cyan value on the lower edge of
 	// isolated cloud masses near the fall. Continuous cloud banks do not gain
 	// a false glowing outline.
-	float cover_down = smoke_cover(
+	float cover_down_current = smoke_cover(
 			cu_c, cv_c + water_reflect_edge_h, t, h_units, uvq.x);
+	float cover_down_next = smoke_cover(
+			cu_next, cv_c + water_reflect_edge_h, t, h_units, uvq.x);
+	float cover_down = mix(cover_down_current, cover_down_next, motion_phase);
 	float lower_edge = cover * (1.0 - min(cover_down, 1.0));
 	float reflect_distance = abs(uvq.x - water_reflect_center_x);
 	float reflect_axis = 1.0 - smoothstep(

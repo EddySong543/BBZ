@@ -1,0 +1,12 @@
+Use case: stylized-concept
+Asset type: pixel-art VFX sprite source sheet for a Godot 2D golden wheat-field battle scene
+Input image: use wind_chaff_01.png only as the pixel scale, palette, and crisp style reference
+Primary request: create eight clearly different individual airborne wheat chaff, husk, or awn fragments, exactly one fragment per cell in a clean 4 columns by 2 rows grid. Every fragment must have a distinct silhouette: varied length, curvature, tilt, fullness, and one or two split awns; none may be a duplicated rotation or mirror. They will later be cropped into separate particle textures.
+Scene/backdrop: perfectly flat solid #00ff00 chroma-key background
+Style/medium: crisp hand-authored pixel art, tiny game VFX sprite, hard pixel clusters, no antialias blur
+Composition/framing: equal-size grid cells with generous empty space; one centered fragment per cell; no fragment crosses or touches a cell boundary; no groups of multiple pieces inside any cell
+Color palette: pale straw yellow, honey gold, small amber shadow clusters; do not use green in the subject
+Constraints: uniform chroma background with no gradient, texture, shadow, floor, glow, haze, text, grid lines, watermark, or reflection. Keep each fragment opaque and cleanly separated. Do not create whole wheat stalks, leaves, feathers, or four-piece clusters.
+Avoid: identical shapes, repeated rotations, soft painterly edges, oversized objects, black background, transparency simulation, cast shadows
+
+Output preparation: built-in ImageGen, chroma-key removal, nearest-neighbor resize to a transparent 256x128 atlas with eight 64x64 cells.

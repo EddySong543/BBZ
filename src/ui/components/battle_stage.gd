@@ -1,10 +1,14 @@
 class_name BattleStage
 extends Control
 
+signal battle_response_requested(strength: float, direction: float)
+
 ## 多层视差对战舞台（屋顶夜战）。
 ##
 ## 各子节点通过 metadata `parallax_factor` 声明视差强度：
 ## 0 = 静止背景（天空），1 = 与舞台地面同步，>1 = 前景（飘叶等）。
+## 单层可用 `pointer_parallax_factor` 只覆写鼠标响应，同时保留原系数对
+## idle、震屏和镜头推近的作用；未声明时自动沿用 `parallax_factor`。
 ## 脚本在 _ready 缓存各层基准位置，随后按 idle 漂移 / 命中抖动 / 可选鼠标视差
 ## 偏移各层位置。素材到位后，在编辑器里直接替换对应 TextureRect 的 texture
 ## 即可，无需改动脚本。
@@ -68,6 +72,9 @@ const IDLE_FAR_CAP := -0.2
 var _layers: Array[CanvasItem] = []   # Control 或 Node2D（粒子等）·两者都有 position/scale·经 set/get 驱动
 var _bases: PackedVector2Array = PackedVector2Array()
 var _factors: PackedFloat32Array = PackedFloat32Array()
+## Optional per-layer mouse response. It falls back to `parallax_factor`, so
+## existing scenes retain their exact behavior unless a layer opts out.
+var _pointer_factors: PackedFloat32Array = PackedFloat32Array()
 var _base_scales: PackedVector2Array = PackedVector2Array()   # 各层基准 scale（保留 .tscn 预设）
 var _time: float = 0.0
 var _shake_amp: float = 0.0
@@ -89,7 +96,10 @@ func _ready() -> void:
 		if (child is Control or child is Node2D) and child.has_meta("parallax_factor"):
 			_layers.append(child)
 			_bases.append(child.get(&"position"))
-			_factors.append(float(child.get_meta("parallax_factor")))
+			var factor := float(child.get_meta("parallax_factor"))
+			_factors.append(factor)
+			_pointer_factors.append(float(child.get_meta(
+					"pointer_parallax_factor", factor)))
 			_base_scales.append(child.get(&"scale"))
 	# 镜头推近用动态对焦点（显式 position 数学绕 _focal 缩放·见 _process）→ 焦点可随动作左右偏置。
 	_focal = focus_point
@@ -115,6 +125,7 @@ func shake(amp: float, kick_dir_x: float = 0.0) -> void:
 	_shake_amp = maxf(_shake_amp, amp)
 	if kick_dir_x != 0.0:
 		_shake_kick = clampf(kick_dir_x, -1.0, 1.0) * amp * shake_kick_scale
+	battle_response_requested.emit(amp, kick_dir_x)
 
 
 ## 设置镜头对焦（on=推近；dir 水平偏置：+1 攻击=焦点右移聚焦敌人 / -1 防御=左移聚焦自身 / 0 技能居中）。
@@ -144,6 +155,17 @@ func focal() -> Vector2:
 ## 位置上 → 角色与脚下屋脊同步平移、零滑动。鼠标居中/关闭时为零向量。
 func pointer_ground_offset() -> Vector2:
 	return Vector2(-_pnx * pointer_strength * ground_parallax, 0.0)
+
+
+## Updates the authored base of a registered parallax layer without removing
+## it from shake, focus, or pointer-parallax processing.
+func set_layer_base_position(layer: CanvasItem, base_position: Vector2) -> void:
+	var layer_index := _layers.find(layer)
+	if layer_index < 0:
+		layer.position = base_position
+		return
+	_bases[layer_index] = base_position
+	layer.position = base_position
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -191,9 +213,11 @@ func _process(delta: float) -> void:
 
 	for i in _layers.size():
 		var f: float = _factors[i]
+		var pointer_f: float = _pointer_factors[i]
 		var idle_w: float = maxf(f - ground_parallax, IDLE_FAR_CAP)
 		var off := Vector2(
-			drift_x * idle_w + (shake_x + _shake_kick - _pnx * pointer_strength) * f,
+			drift_x * idle_w + (shake_x + _shake_kick) * f
+					- _pnx * pointer_strength * pointer_f,
 			shake_y * f)
 		# 镜头推近：绕动态对焦点 _focal 缩放（显式 position 数学·焦点随动作左右偏置=聚焦敌/我）。
 		# k=1（静止）时退化为 position=base+off、scale=base → 与原始画面一像素不差。
@@ -202,7 +226,7 @@ func _process(delta: float) -> void:
 		# ⚠只做横向：均匀缩放的纵向分量会让底部檐角随鼠标上下起伏 1-2px（"建筑呼吸"·
 		# Eddy 2026-07-09 否）——横向 0.3~0.8% 拉伸像素上不可见，纵向不缩不挪。
 		# _pnx=0（鼠标居中/关闭）时 km=1 → 与原始画面一像素不差。
-		var km: float = 1.0 + zoom_m * maxf(f - ground_parallax, 0.0)
+		var km: float = 1.0 + zoom_m * maxf(pointer_f - ground_parallax, 0.0)
 		var p: Vector2 = _focal + (_bases[i] - _focal) * k + off
 		_layers[i].set(&"position", Vector2(pivot_m.x + (p.x - pivot_m.x) * km, p.y))
 		_layers[i].set(&"scale", Vector2(_base_scales[i].x * k * km, _base_scales[i].y * k))
