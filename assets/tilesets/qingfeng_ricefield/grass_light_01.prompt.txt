@@ -1,0 +1,5 @@
+Use case: production terrain tile
+Reference composition: exec-9f1368b1-c3e6-4d6d-a236-f97b5c4e3124.png
+Generated source: exec-525ebc03-88a6-4aff-88b7-2cd5f42bb949.png
+Prompt: Strict top-down orthographic pixel-art grass ground, warm yellow-green palette, quiet sparse pixel mottling, dark local-color outer seam and a subtle lighter inner edge. Full-bleed square surface only; no object, tuft, flower, prop, transparent corner, rounded card, thickness, shadow, antialiasing, gradient, blur, UI, text, or watermark.
+Processing: center crop; NEAREST resize to 60x60; adaptive 8-color quantization; dithering disabled. Runtime displays at 120x120 with Nearest filtering.

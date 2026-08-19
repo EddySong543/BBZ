@@ -1,0 +1,125 @@
+[gd_resource type="TileSet" format=3 uid="uid://4fnp7pyn3dfd"]
+
+[ext_resource type="Texture2D" uid="uid://2ig8ytrat3s8" path="res://assets/tilesets/qingfeng_ricefield/grass_ref37_ref39_plain_v1.png" id="1_su8c1"]
+[ext_resource type="Texture2D" uid="uid://ptc7a116o6pu" path="res://assets/tilesets/qingfeng_ricefield/dirt_ref37_ref39_plain_v1.png" id="2_gskie"]
+[ext_resource type="Texture2D" uid="uid://cisrougw61pec" path="res://assets/tilesets/qingfeng_ricefield/overlays/overlay_straw_fragments_v1.png" id="3_bmrqu"]
+[ext_resource type="Texture2D" uid="uid://boc638bp3sx6e" path="res://assets/tilesets/qingfeng_ricefield/overlays/overlay_green_leaves_v1.png" id="4_op7c8"]
+[ext_resource type="Texture2D" uid="uid://dg34pm0wujno6" path="res://assets/tilesets/qingfeng_ricefield/overlays/overlay_dirt_crack_v1.png" id="5_pcc2e"]
+[ext_resource type="Texture2D" uid="uid://dtsuup0oke7af" path="res://assets/tilesets/qingfeng_ricefield/golden_wave_ground_v1.png" id="6_dank5"]
+[ext_resource type="Texture2D" uid="uid://h5l51j4atu2q" path="res://assets/tilesets/qingfeng_ricefield/qingfeng_teleport_v1.png" id="7_xxb3k"]
+[ext_resource type="Texture2D" uid="uid://dkclp8lg1annc" path="res://assets/tilesets/qingfeng_ricefield/overlays/overlay_flower_white_v1.png" id="8_gx1pv"]
+[ext_resource type="Texture2D" uid="uid://obmgaov0bwpa" path="res://assets/tilesets/qingfeng_ricefield/overlays/overlay_flower_yellow_v1.png" id="9_kt3ad"]
+[ext_resource type="Texture2D" uid="uid://cxsp6whdv7vcu" path="res://assets/tilesets/qingfeng_ricefield/overlays/overlay_flower_pink_v1.png" id="10_cx2ce"]
+[ext_resource type="Texture2D" uid="uid://c66plogollutm" path="res://assets/tilesets/qingfeng_ricefield/overlays/overlay_short_grass_v1.png" id="11_1we4n"]
+[ext_resource type="Texture2D" uid="uid://bijo88ueoalb" path="res://assets/tilesets/qingfeng_ricefield/overlays/overlay_clover_v1.png" id="12_5dfm6"]
+[ext_resource type="Texture2D" uid="uid://cbb2c4tt2hhy8" path="res://assets/tilesets/qingfeng_ricefield/overlays/overlay_stone_chips_pale_v1.png" id="13_jisal"]
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_v0aks"]
+texture = ExtResource("1_su8c1")
+texture_region_size = Vector2i(60, 60)
+0:0/0 = 0
+0:0/0/custom_data_1 = "grass_plain"
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_aqaeg"]
+texture = ExtResource("2_gskie")
+texture_region_size = Vector2i(60, 60)
+0:0/0 = 0
+0:0/0/custom_data_0 = 2
+0:0/0/custom_data_1 = "dirt_plain"
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_3xrsd"]
+texture = ExtResource("3_bmrqu")
+texture_region_size = Vector2i(60, 60)
+0:0/0 = 0
+0:0/0/custom_data_0 = -1
+0:0/0/custom_data_1 = "overlay_straw_fragments"
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_fdkxd"]
+texture = ExtResource("4_op7c8")
+texture_region_size = Vector2i(60, 60)
+0:0/0 = 0
+0:0/0/custom_data_0 = -1
+0:0/0/custom_data_1 = "overlay_green_leaves"
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_7wa28"]
+texture = ExtResource("5_pcc2e")
+texture_region_size = Vector2i(60, 60)
+0:0/0 = 0
+0:0/0/custom_data_0 = -1
+0:0/0/custom_data_1 = "overlay_dirt_crack"
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_vmptq"]
+texture = ExtResource("6_dank5")
+texture_region_size = Vector2i(60, 60)
+0:0/0 = 0
+0:0/0/custom_data_0 = 1
+0:0/0/custom_data_1 = "rice_golden_wave"
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_fr04t"]
+texture = ExtResource("7_xxb3k")
+texture_region_size = Vector2i(60, 60)
+0:0/0 = 0
+0:0/0/custom_data_0 = 2
+0:0/0/custom_data_1 = "teleport_qingfeng"
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_mbs8i"]
+texture = ExtResource("8_gx1pv")
+texture_region_size = Vector2i(60, 60)
+0:0/0 = 0
+0:0/0/custom_data_0 = -1
+0:0/0/custom_data_1 = "overlay_flower_white"
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_vc81e"]
+texture = ExtResource("9_kt3ad")
+texture_region_size = Vector2i(60, 60)
+0:0/0 = 0
+0:0/0/custom_data_0 = -1
+0:0/0/custom_data_1 = "overlay_flower_yellow"
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_pwxv5"]
+texture = ExtResource("10_cx2ce")
+texture_region_size = Vector2i(60, 60)
+0:0/0 = 0
+0:0/0/custom_data_0 = -1
+0:0/0/custom_data_1 = "overlay_flower_pink"
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_0usfa"]
+texture = ExtResource("11_1we4n")
+texture_region_size = Vector2i(60, 60)
+0:0/0 = 0
+0:0/0/custom_data_0 = -1
+0:0/0/custom_data_1 = "overlay_short_grass"
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_uibnt"]
+texture = ExtResource("12_5dfm6")
+texture_region_size = Vector2i(60, 60)
+0:0/0 = 0
+0:0/0/custom_data_0 = -1
+0:0/0/custom_data_1 = "overlay_clover"
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_qleuo"]
+texture = ExtResource("13_jisal")
+texture_region_size = Vector2i(60, 60)
+0:0/0 = 0
+0:0/0/custom_data_0 = -1
+0:0/0/custom_data_1 = "overlay_stone_chips_pale"
+
+[resource]
+tile_size = Vector2i(60, 60)
+custom_data_layer_0/name = "ground_type"
+custom_data_layer_0/type = 2
+custom_data_layer_1/name = "asset_id"
+custom_data_layer_1/type = 4
+sources/0 = SubResource("TileSetAtlasSource_v0aks")
+sources/1 = SubResource("TileSetAtlasSource_aqaeg")
+sources/2 = SubResource("TileSetAtlasSource_vmptq")
+sources/3 = SubResource("TileSetAtlasSource_fr04t")
+sources/4 = SubResource("TileSetAtlasSource_mbs8i")
+sources/5 = SubResource("TileSetAtlasSource_vc81e")
+sources/6 = SubResource("TileSetAtlasSource_pwxv5")
+sources/7 = SubResource("TileSetAtlasSource_0usfa")
+sources/8 = SubResource("TileSetAtlasSource_uibnt")
+sources/9 = SubResource("TileSetAtlasSource_qleuo")
+sources/10 = SubResource("TileSetAtlasSource_3xrsd")
+sources/11 = SubResource("TileSetAtlasSource_fdkxd")
+sources/12 = SubResource("TileSetAtlasSource_7wa28")

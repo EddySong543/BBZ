@@ -1,0 +1,37 @@
+{
+  "ok": true,
+  "manifest": "D:\\Game\\BoBoZan\\Claude-Code-Game-Studios-cn-localization\\assets\\tilesets\\qingfeng_ricefield\\wheat_wave\\wheat_wave_manifest.json",
+  "atlas": {
+    "path": "D:\\Game\\BoBoZan\\Claude-Code-Game-Studios-cn-localization\\assets\\tilesets\\qingfeng_ricefield\\wheat_wave\\wheat_wave_spritesheet_v1.png",
+    "width": 360,
+    "height": 60,
+    "columns": 6,
+    "rows": 1,
+    "cell_width": 60,
+    "cell_height": 60
+  },
+  "states": [
+    {
+      "name": "wheat_wave",
+      "row": 0,
+      "frame_count": 6,
+      "durations_ms": [
+        90,
+        110,
+        130,
+        130,
+        110,
+        90
+      ],
+      "nontransparent_pixels": [
+        3552,
+        3552,
+        3552,
+        3552,
+        3552,
+        3552
+      ]
+    }
+  ],
+  "gif": true
+}

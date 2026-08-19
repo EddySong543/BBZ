@@ -1,0 +1,5 @@
+Use case: precise-object-edit
+Asset type: BBZ Qingfeng Ricefield formal wheat tile, selected Scheme C
+Reference: wheat_scheme_c_complete_waves.png for the selected two-band composition; grass_ref37_ref39_v2.png for the formal tile silhouette.
+Request: keep two broad diagonal wind bands and 10 to 12 short complete wheat heads leaning in one direction; every head stays inside a 12 percent safe margin; simplify to a 30x30 logical-pixel vocabulary and a restrained straw, gold, amber, ochre and olive-brown palette.
+Avoid: clipped heads, edge-touching spikelets, flat gold fill, smooth gradients, blur, fine noise, fake pixel texture, text and watermark.

@@ -1,0 +1,4 @@
+Deterministic palette derivative of grass_scheme1_v1.png; no image generation.
+Preserve every source pixel coordinate and alpha value.
+RGB transform for visible pixels: red * 0.72, green * 0.78, blue * 0.78, rounded to the nearest integer.
+Purpose: a true-pixel dark grass variant with identical silhouette, vegetation placement, clipped corners, and coarse-pixel density.

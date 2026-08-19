@@ -1,58 +1,51 @@
 ## 远征模式 — 地图探索状态（纯逻辑·无 UI·可单元测试）。规则源：design/expedition-map.md。
 ##
-## 覆盖：网格生成（BFS 保连通·同种子同图）/ 迷雾 / 三压力源（补给·危险度时钟·撤离关窗）/
-## 遭遇结算尺（强化不回溯）/ 游荡怪 / 事件格 / 双结算。
-## ⚠ 本文件的占位自动结算（先知效率带 0.7-0.9 伤/拍·校准 v6）现仅剩巢穴怪回退在用——
-##   常规踩怪已接真战斗（2026-07-06 D 批·expedition_screen→battle_screen pve_* 交接）。
+## 晴风稻田只生成已确认的固定地形、撤离点与搜索目标；正式敌人设计完成前不生成敌人。
+## Tile.MONSTER 与 inject/resolve/apply 接口保留为通用遭遇边界，不绑定具体敌人、策略或掉落表。
 ##
 ## 用法示例：
 ##   const MapState := preload("res://src/expedition/expedition_map_state.gd")
 ##   var m: MapState = MapState.new(); m.setup(777)
-##   var res: Dictionary = m.try_move(Vector2i.RIGHT)   # res.kind: move|wall|monster|event|chest|ext|wanderer|death
+##   var res: Dictionary = m.try_move(Vector2i.RIGHT)   # res.kind: move|wall|monster|event|chest|ext
 extends RefCounted
 
 const Loot := preload("res://src/expedition/expedition_loot.gd")
 const QingfengLayout := preload("res://src/expedition/maps/qingfeng_ricefield_layout.gd")
 
-const MONSTER_DATA_PATH := "res://assets/data/expedition/monsters.json"
-
 # ── 调优旋钮（子文档 B §9）──
 const WIDTH: int = QingfengLayout.WIDTH
 const HEIGHT: int = QingfengLayout.HEIGHT
-const S0: int = 40                  # 初始补给
-const HUNGER_DMG: float = 0.5       # 补给 0 后每步全队各扣
-const D_DIVISOR: float = 30.0       # 危险度分母：D = floor(刻/30)
-const D_CAP: int = 5
-const HP_SCALE_PER_D: float = 0.15  # 新遭遇怪物 HP +15%/级
-const PLAYER_VISION_RADIUS: int = 3
-const SOLVE_EFF_MIN: float = 0.7    # 先知拆解效率带（原型研究发现）
-const SOLVE_EFF_MAX: float = 0.9
+const PLAYER_VISION_RADIUS: int = 7 # 兼容旧调用；正式边界由下方横纵半径共同定义。
+const PLAYER_VISION_HALF_WIDTH: int = 6
+const PLAYER_VISION_HALF_HEIGHT: int = 4
 
 enum Tile { FLOOR, WALL, START, EXT1, EXT2, EXT3, MONSTER, EVENT, CHEST }
 
 var rng := RandomNumberGenerator.new()
 var seed_value: int = 0
 var grid: Array = []                # grid[y][x] = Tile
-var revealed: Dictionary = {}       # Vector2i -> true（到过/看过永久探明）
+var revealed: Dictionary = {}       # Vector2i -> true（永久探索记录，供未来地图/任务使用）
+var visible: Dictionary = {}        # Vector2i -> true（当前角色圆形视野，移动后实时重算）
 var player: Vector2i
 var start_pos: Vector2i
 var ext_pos: Dictionary = {}        # Tile.EXT1.. -> Vector2i
-var monsters: Dictionary = {}       # Vector2i -> {key,name,tier,hp,hp_max,resolved}
+var monsters: Dictionary = {}       # Vector2i -> 通用遭遇 Dictionary（允许 opponents:Array）
 var events: Dictionary = {}         # Vector2i -> 事件名（一次性·行商回访例外）
 var chests: Dictionary = {}         # Vector2i -> {revealed_by_map,egg}
-var wanderer: Vector2i = Vector2i(-1, -1)   # D=5 游荡怪·(-1,-1)=未出
-var supplies: int = S0
 var steps: int = 0
-var battle_beats: float = 0.0
-## 队伍（1 开局 → 篝火招募至 3）：[{name, hp, hp_max}]
+## 队伍（1 开局 → 篝火招募至 3）：[{hero_id, name, hp, hp_max}]
 var team: Array = []
 var battles_won: int = 0
 var over: bool = false
-var result: Dictionary = {}         # {outcome:extract|death, cause, ticks, steps, battles}
-var monster_defs: Array = []
+var result: Dictionary = {}         # {outcome:extract|death, cause, steps, battles}
 
-const EVENT_POOL: Array = ["篝火", "岔路赌局", "清泉", "行商", "陷阱", "神龛", "藏宝图", "巢穴", "修补匠", "兽踪"]
-const HERO_NAMES: Array = ["先锋·占位", "游侠·占位", "术士·占位", "斥候·占位"]
+const EVENT_POOL: Array = ["篝火", "岔路赌局", "清泉", "行商", "陷阱", "神龛", "藏宝图", "修补匠", "兽踪"]
+const INITIAL_TEAM_PLACEHOLDER := {
+	"hero_id": "",
+	"name": "待选英雄",
+	"hp": 1.0,
+	"hp_max": 1.0,
+}
 
 
 ## 初始化一局（同种子同图·可复现）。
@@ -60,32 +53,18 @@ func setup(p_seed: int) -> void:
 	seed_value = p_seed
 	rng.seed = p_seed
 	revealed.clear()
+	visible.clear()
 	ext_pos.clear()
 	monsters.clear()
 	events.clear()
 	chests.clear()
-	wanderer = Vector2i(-1, -1)
-	wanderer_monster.clear()
-	supplies = S0
 	steps = 0
-	battle_beats = 0.0
 	battles_won = 0
 	over = false
 	result = {}
-	team = [{"name": HERO_NAMES[0], "hp": 5.0, "hp_max": 5.0}]
-	_load_monster_defs()
+	team = [INITIAL_TEAM_PLACEHOLDER.duplicate(true)]
 	_generate()
 	_reveal_around(player)
-
-
-## 当前时钟：刻 = 步数×1 + 战斗拍×0.5。
-func ticks() -> float:
-	return float(steps) + battle_beats * 0.5
-
-
-## 危险度等级 D = floor(刻/30)，封顶 5。
-func danger() -> int:
-	return mini(D_CAP, int(floor(ticks() / D_DIVISOR)))
 
 
 ## 本局启用的撤离点始终开放；是否已经被玩家发现只由 revealed 决定。
@@ -94,7 +73,7 @@ func ext_open(tile: int) -> bool:
 
 
 ## 尝试移动一步。返回 {moved:bool, kind:String, msgs:Array}。
-## kind: wall|move|monster|event|chest|ext|wanderer|death|over。
+## kind: wall|move|monster|event|chest|ext|over。
 func try_move(dir: Vector2i) -> Dictionary:
 	if over:
 		return {"moved": false, "kind": "over", "msgs": []}
@@ -104,24 +83,9 @@ func try_move(dir: Vector2i) -> Dictionary:
 	if grid[target.y][target.x] == Tile.WALL:
 		return {"moved": false, "kind": "wall", "msgs": []}
 	steps += 1
-	supplies -= 1
-	var msgs: Array = []
-	if supplies < 0:
-		supplies = 0
-		for h: Dictionary in team:
-			if float(h["hp"]) > 0.0:
-				h["hp"] = float(h["hp"]) - HUNGER_DMG
-		msgs.append("饥饿行军：全队 -%.1f HP" % HUNGER_DMG)
-		if _team_dead():
-			_die("饿死在途中")
-			return {"moved": true, "kind": "death", "msgs": msgs}
 	player = target
 	_reveal_around(player)
-	var out := {"moved": true, "kind": "move", "msgs": msgs}
-	_wanderer_tick()
-	if wanderer == player:
-		out["kind"] = "wanderer"
-		return out
+	var out := {"moved": true, "kind": "move", "msgs": []}
 	match grid[target.y][target.x]:
 		Tile.MONSTER: out["kind"] = "monster"
 		Tile.EVENT: out["kind"] = "event"
@@ -130,107 +94,78 @@ func try_move(dir: Vector2i) -> Dictionary:
 	return out
 
 
-## 遭遇结算尺（🔒不回溯）：首次遭遇按当时 D 强化 HP，并处理 D≥3 的 T1→T2 替换（40%）。
+## 手工注入一个正式遭遇。正常晴风生成不会调用此接口。
+## encounter 由敌人设计层拥有，可携带 opponents:Array、loot:Array 与任意区域规则数据。
+func inject_encounter(c: Vector2i, encounter: Dictionary) -> bool:
+	if c.x < 0 or c.y < 0 or c.x >= WIDTH or c.y >= HEIGHT:
+		return false
+	if grid[c.y][c.x] == Tile.WALL or encounter.is_empty():
+		return false
+	monsters[c] = encounter.duplicate(true)
+	grid[c.y][c.x] = Tile.MONSTER
+	return true
+
+
+## 返回已注入的遭遇；没有遭遇时返回空字典，不进行旧版危险度强化或随机替换。
 func resolve_encounter(c: Vector2i) -> Dictionary:
-	var m: Dictionary = monsters[c]
-	if not bool(m["resolved"]):
-		var d: int = danger()
-		if d >= 3 and int(m["tier"]) == 1 and rng.randf() < 0.4:
-			var up: Dictionary = _pick_monster(2)
-			m["key"] = up["key"]
-			m["name"] = String(up["name"]) + "(替)"
-			m["tier"] = 2
-			m["hp"] = float(up["hp"])
-			m["hp_max"] = float(up["hp"])
-			m["def"] = up.get("def", {})
-		var scaled: float = ceilf(float(m["hp_max"]) * (1.0 + HP_SCALE_PER_D * float(d)))
-		m["hp"] = scaled
-		m["hp_max"] = scaled
-		m["resolved"] = true
-	return m
-
-
-## 占位自动战斗。eff_bonus = 装备加成（每件 +0.05 效率·占位钩子）。
-## 返回 {name,tier,beats,dmg,loot:Array[,death]}。胜利后怪物格转空地、掉落由调用方入包。
-func fight(c: Vector2i, eff_bonus: float = 0.0) -> Dictionary:
-	var m: Dictionary = resolve_encounter(c)
-	var eff: float = rng.randf_range(SOLVE_EFF_MIN, SOLVE_EFF_MAX) + eff_bonus
-	var beats: int = int(ceilf(float(m["hp"]) / eff))
-	battle_beats += float(beats)
-	var dmg_bands: Dictionary = {1: [0.0, 1.0], 2: [1.0, 2.5], 3: [2.5, 4.5]}
-	var band: Array = dmg_bands[int(m["tier"])]
-	var dmg: float = snappedf(rng.randf_range(float(band[0]), float(band[1])), 0.5)
-	_apply_team_damage(dmg)
-	var report := {"name": m["name"], "tier": int(m["tier"]), "beats": beats, "dmg": dmg, "loot": []}
-	if _team_dead():
-		_die("战死于 %s" % String(m["name"]))
-		report["death"] = true
-		return report
-	battles_won += 1
-	monsters.erase(c)
-	grid[c.y][c.x] = Tile.FLOOR
-	if wanderer == c:
-		wanderer = Vector2i(-1, -1)
-	report["loot"] = Loot.roll_drop(rng, "t%d" % int(m["tier"]))
-	return report
-
-
-## 逃跑：敌方免费命中一拍（占位=0.5×tier）·退回 back_to·怪驻留血量。
-func flee(c: Vector2i, back_to: Vector2i) -> Dictionary:
-	var m: Dictionary = resolve_encounter(c)
-	var dmg: float = 0.5 * float(m["tier"])
-	_apply_team_damage(dmg)
-	battle_beats += 1.0
-	player = back_to
-	var report := {"name": m["name"], "dmg": dmg}
-	if _team_dead():
-		_die("逃跑时被 %s 击倒" % String(m["name"]))
-		report["death"] = true
-	return report
-
-
-## D=5 游荡怪强制遭遇（不可拒绝）。
-func fight_wanderer(eff_bonus: float = 0.0) -> Dictionary:
-	var def: Dictionary = _pick_monster(2)
-	var hp: float = ceilf(float(def["hp"]) * (1.0 + HP_SCALE_PER_D * float(danger())))
-	var eff: float = rng.randf_range(SOLVE_EFF_MIN, SOLVE_EFF_MAX) + eff_bonus
-	var beats: int = int(ceilf(hp / eff))
-	battle_beats += float(beats)
-	var dmg: float = snappedf(rng.randf_range(1.5, 3.0), 0.5)
-	_apply_team_damage(dmg)
-	var report := {"name": "游荡·" + String(def["name"]), "tier": 2, "beats": beats, "dmg": dmg, "loot": []}
-	if _team_dead():
-		_die("被游荡怪追上")
-		report["death"] = true
-		return report
-	battles_won += 1
-	wanderer = Vector2i(-1, -1)
-	report["loot"] = Loot.roll_drop(rng, "t2")
-	return report
+	return monsters.get(c, {})
 
 
 ## 开宝箱：格子转空地，返回掉落（兽踪蛋附加）。
 func open_chest(c: Vector2i) -> Array:
-	var egg: bool = bool(chests[c].get("egg", false))
-	var loot: Array = Loot.roll_drop(rng, "chest")
-	if egg:
-		loot.append({"id": "egg", "name": "宠物蛋", "cat": "rare", "tier": 0, "shape": Loot.SHAPE_2X2, "gold": 0, "note": "兽踪", "icon": "egg"})
-	chests.erase(c)
-	grid[c.y][c.x] = Tile.FLOOR
+	var loot: Array = prepare_chest_contents(c)
+	deplete_chest(c)
 	return loot
 
 
-## 补给 +amount（干粮/行商）。
-func add_supplies(amount: int) -> void:
-	supplies += amount
+## 首次打开时一次性生成并固定内容；中断、重开或跨战斗恢复均不得重掷。
+## 返回深拷快照，容器系统不能反向污染地图真相源。
+func prepare_chest_contents(c: Vector2i) -> Array:
+	if not chests.has(c):
+		return []
+	var chest: Dictionary = chests[c]
+	if not chest.has("contents"):
+		var generated: Array = Loot.roll_drop(rng, "chest")
+		if bool(chest.get("egg", false)):
+			generated.append({"id": "egg", "name": "宠物蛋", "cat": "rare", "tier": 0,
+					"shape": Loot.SHAPE_2X2, "gold": 0, "note": "兽踪", "icon": "egg"})
+		chest["contents"] = generated.duplicate(true)
+		chests[c] = chest
+	return (chest["contents"] as Array).duplicate(true)
 
 
-## 篝火招募：队伍 <3 时加入新英雄并返回其名，满员返回 ""。
-func recruit() -> String:
-	if team.size() >= 3:
+## 容器中所有已揭示物品均被拿走后才移除地图对象；地表保持不变。
+func deplete_chest(c: Vector2i) -> bool:
+	if not chests.has(c):
+		return false
+	chests.erase(c)
+	grid[c.y][c.x] = Tile.FLOOR
+	return true
+
+
+## 搜索/拾取等非移动地图行动的统一回合钩子。
+## 后续敌人地图 AI 接入时从本入口推进敌人行动；基础行动本身不额外扣资源。
+func advance_world_action(action: String) -> Dictionary:
+	if over:
+		return {"ok": false, "kind": "over", "action": action, "msgs": []}
+	steps += 1
+	return {"ok": true, "kind": action, "action": action, "msgs": []}
+
+
+## 篝火招募：只接受带稳定 hero_id 的真实英雄快照，避免 PvE 再次生成白板角色。
+func recruit(hero_entry: Dictionary = {}) -> String:
+	if team.size() >= 3 or String(hero_entry.get("hero_id", "")).strip_edges().is_empty():
 		return ""
-	var hero_name: String = HERO_NAMES[team.size()]
-	team.append({"name": hero_name, "hp": 5.0, "hp_max": 5.0})
+	var hero_name: String = String(hero_entry.get("name", "")).strip_edges()
+	var hp_max: float = maxf(1.0, float(hero_entry.get("hp_max", 1.0)))
+	if hero_name.is_empty():
+		return ""
+	team.append({
+		"hero_id": String(hero_entry["hero_id"]),
+		"name": hero_name,
+		"hp": clampf(float(hero_entry.get("hp", hp_max)), 0.0, hp_max),
+		"hp_max": hp_max,
+	})
 	return hero_name
 
 
@@ -247,6 +182,16 @@ func heal_front(amount: float) -> void:
 		if float(h["hp"]) > 0.0:
 			h["hp"] = minf(float(h["hp_max"]), float(h["hp"]) + amount)
 			return
+
+
+## 前排承受明确的地图伤害；仅具体事件调用，不形成通用随时间衰减。
+func damage_front(amount: float, cause: String) -> void:
+	for h: Dictionary in team:
+		if float(h["hp"]) > 0.0:
+			h["hp"] = maxf(0.0, float(h["hp"]) - amount)
+			break
+	if _team_dead():
+		_die(cause)
 
 
 ## 藏宝图：探明一处未知宝箱，返回坐标（无则 (-1,-1)）。
@@ -275,26 +220,11 @@ func mark_egg_chest() -> Vector2i:
 	return best
 
 
-# ── 真战斗交接（任务 D·2026-07-06·战斗结算在 battle_screen·此处只管状态回写）──
+# ── 通用真战斗交接（战斗结算在 battle_screen，此处只管地图状态回写）──
 
-var wanderer_monster: Dictionary = {}   # 游荡怪遭遇实体（首遇生成·被打跑保留血量·击杀清空）
-
-
-## 游荡怪遭遇实体（真战斗用）：首遇按当时 D 强化生成 T2·驻留至被击杀。
-func wanderer_encounter() -> Dictionary:
-	if wanderer_monster.is_empty():
-		var def: Dictionary = _pick_monster(2)
-		var hp_scaled: float = ceilf(float(def["hp"]) * (1.0 + HP_SCALE_PER_D * float(danger())))
-		wanderer_monster = {"key": def["key"], "name": "游荡·" + String(def["name"]), "tier": 2,
-			"hp": hp_scaled, "hp_max": hp_scaled, "resolved": true, "def": def.get("def", {})}
-	return wanderer_monster
-
-
-## 真战斗结果回写（battle_screen 打完回来调）。
-## outcome: win|lose|flee；beats=战斗拍数（刻=×0.5 由 ticks() 统一算）；team_hp=半点数组（按出战顺序）；
-## monster_hp=怪物剩余半点。返回 {loot:Array}（win 时按 tier 掉落·其余空）。
-func apply_battle_result(c: Vector2i, is_wanderer: bool, outcome: String, beats: int, team_hp: Array, monster_hp: int, back_to: Vector2i) -> Dictionary:
-	battle_beats += float(beats)
+## outcome: win|lose|flee；team_hp/opponent_hp 均为 BattleCore 半点数组。
+## 胜利奖励来自遭遇自身的 loot，不再读取旧版 T 级掉落表。
+func apply_battle_result(c: Vector2i, outcome: String, _beats: int, team_hp: Array, opponent_hp: Array, back_to: Vector2i) -> Dictionary:
 	# 回写对位：进战快照只含【存活者】（前排先死=死者是队列前缀）→ 按存活顺序回写。
 	var idx: int = 0
 	for h: Dictionary in team:
@@ -303,62 +233,63 @@ func apply_battle_result(c: Vector2i, is_wanderer: bool, outcome: String, beats:
 				h["hp"] = float(int(team_hp[idx])) / 2.0
 			idx += 1
 	var out := {"loot": []}
-	var m: Dictionary = wanderer_monster if is_wanderer else monsters.get(c, {})
-	if m.is_empty():
+	var encounter: Dictionary = monsters.get(c, {})
+	if encounter.is_empty():
 		return out
 	match outcome:
 		"win":
 			battles_won += 1
-			out["loot"] = Loot.roll_drop(rng, "t%d" % int(m["tier"]))
-			if is_wanderer:
-				wanderer_monster = {}
-				wanderer = Vector2i(-1, -1)
-			else:
-				monsters.erase(c)
-				grid[c.y][c.x] = Tile.FLOOR
-				if wanderer == c:
-					wanderer = Vector2i(-1, -1)
+			var encounter_loot: Variant = encounter.get("loot", [])
+			if encounter_loot is Array:
+				out["loot"] = (encounter_loot as Array).duplicate(true)
+			monsters.erase(c)
+			grid[c.y][c.x] = Tile.FLOOR
 		"flee":
-			m["hp"] = maxf(0.5, float(monster_hp) / 2.0)   # 怪物驻留血量（至少半点·防 0 血活怪）
-			player = back_to                               # 退回进入前的格子
+			_write_opponent_hp(encounter, opponent_hp)
+			player = back_to
+			_reveal_around(player)
 		"lose":
-			pass   # 死亡结算由调用方走 _team_dead 判定
+			_write_opponent_hp(encounter, opponent_hp)
+		_:
+			push_warning("未知远征战斗结果：%s" % outcome)
 	if _team_dead():
-		_die("战死于 %s" % String(m["name"]))
+		_die("战死于 %s" % String(encounter.get("name", "敌人")))
 	return out
 
 
-## 撤离结算：终局并写 result（金币/货品由背包层负责·此处只记时钟战报）。
+func _write_opponent_hp(encounter: Dictionary, opponent_hp: Array) -> void:
+	var opponents_value: Variant = encounter.get("opponents", [])
+	if not opponents_value is Array:
+		return
+	var opponents: Array = opponents_value as Array
+	var result_index: int = 0
+	for opponent_value: Variant in opponents:
+		if not opponent_value is Dictionary:
+			continue
+		var opponent: Dictionary = opponent_value as Dictionary
+		if float(opponent.get("hp", 0.0)) <= 0.0:
+			continue
+		if result_index >= opponent_hp.size():
+			break
+		opponent["hp"] = float(int(opponent_hp[result_index])) / 2.0
+		result_index += 1
+
+
+## 撤离结算：终局并写 result（金币/货品由背包层负责）。
 func extract() -> void:
 	over = true
-	result = {"outcome": "extract", "cause": "", "ticks": ticks(), "steps": steps,
-		"battles": battles_won, "in_band": ticks() >= 60.0 and ticks() <= 100.0}
+	result = {"outcome": "extract", "cause": "", "steps": steps, "battles": battles_won}
 
 
 # ── 内部 ──
-
-func _load_monster_defs() -> void:
-	monster_defs = []
-	var txt: String = FileAccess.get_file_as_string(MONSTER_DATA_PATH)
-	var data: Variant = JSON.parse_string(txt)
-	if data is Dictionary:
-		for key: String in data:
-			var m: Dictionary = data[key]
-			# def = 完整 JSON 定义（真战斗的怪物驾驶员要读策略表·任务 D）
-			monster_defs.append({"key": key, "name": String(m["name"]), "tier": int(m["tier"]), "hp": int(m["hp"]), "def": m})
-
-
-func _pick_monster(tier: int) -> Dictionary:
-	var pool: Array = monster_defs.filter(func(m: Dictionary) -> bool: return int(m["tier"]) == tier)
-	if pool.is_empty():
-		return {"key": "?", "name": "怪", "tier": tier, "hp": tier * 6}
-	return pool[rng.randi_range(0, pool.size() - 1)]
 
 
 func _generate() -> void:
 	grid = QingfengLayout.build_grid(Tile.WALL, Tile.FLOOR, Tile.START)
 	start_pos = QingfengLayout.START
 	player = start_pos
+	if not QingfengLayout.CURRENT_DYNAMIC_CONTENT_ENABLED:
+		return
 
 	var exit_candidates: Array[Vector2i] = QingfengLayout.EXIT_CANDIDATES.duplicate()
 	_shuffle_with_rng(exit_candidates)
@@ -369,18 +300,6 @@ func _generate() -> void:
 		grid[exit_cell.y][exit_cell.x] = exit_tile
 		ext_pos[exit_tile] = exit_cell
 
-	var enemy_anchors: Array[Vector2i] = QingfengLayout.MONSTER_ANCHORS.duplicate()
-	enemy_anchors.erase(QingfengLayout.REPAIR_GUARD_ANCHOR)
-	enemy_anchors.erase(QingfengLayout.BOSS_ANCHOR)
-	_shuffle_with_rng(enemy_anchors)
-	_spawn_monster(QingfengLayout.REPAIR_GUARD_ANCHOR, 2)
-	_spawn_monster(QingfengLayout.BOSS_ANCHOR, 3)
-	var enemy_count: int = mini(enemy_anchors.size(), 4 + rng.randi_range(0, 2))
-	for index: int in enemy_count:
-		var cell: Vector2i = enemy_anchors[index]
-		var tier: int = 1 if cell.y >= 8 else 2
-		_spawn_monster(cell, tier)
-
 	var search_anchors: Array[Vector2i] = QingfengLayout.SEARCH_ANCHORS.duplicate()
 	_shuffle_with_rng(search_anchors)
 	var search_count: int = mini(search_anchors.size(), 4 + rng.randi_range(0, 2))
@@ -388,15 +307,6 @@ func _generate() -> void:
 		var cell: Vector2i = search_anchors[index]
 		grid[cell.y][cell.x] = Tile.CHEST
 		chests[cell] = {"revealed_by_map": false, "egg": false}
-
-
-func _spawn_monster(cell: Vector2i, tier: int) -> void:
-	var definition: Dictionary = _pick_monster(tier)
-	grid[cell.y][cell.x] = Tile.MONSTER
-	monsters[cell] = {"key": definition["key"], "name": definition["name"], "tier": tier,
-		"hp": float(definition["hp"]), "hp_max": float(definition["hp"]), "resolved": false,
-		"def": definition.get("def", {})}
-
 
 func _bfs_dist(from: Vector2i) -> Dictionary:
 	var dist: Dictionary = {from: 0}
@@ -423,30 +333,33 @@ func _shuffle_with_rng(values: Array[Vector2i]) -> void:
 
 
 func _reveal_around(c: Vector2i) -> void:
-	for dy: int in range(-PLAYER_VISION_RADIUS, PLAYER_VISION_RADIUS + 1):
-		for dx: int in range(-PLAYER_VISION_RADIUS, PLAYER_VISION_RADIUS + 1):
-			if dx * dx + dy * dy > PLAYER_VISION_RADIUS * PLAYER_VISION_RADIUS:
+	visible.clear()
+	for dy: int in range(-PLAYER_VISION_HALF_HEIGHT - 1, PLAYER_VISION_HALF_HEIGHT + 2):
+		for dx: int in range(-PLAYER_VISION_HALF_WIDTH - 1, PLAYER_VISION_HALF_WIDTH + 2):
+			if not vision_contains_delta(Vector2i(dx, dy)):
 				continue
 			var n := c + Vector2i(dx, dy)
 			if n.x >= 0 and n.y >= 0 and n.x < WIDTH and n.y < HEIGHT:
+				visible[n] = true
 				revealed[n] = true
 
 
-func _wanderer_tick() -> void:
-	# 旧危险度游荡怪已作废。普通敌人的巡逻/追击将由晴风稻田敌人层单独实现。
-	return
+## 接近13×9的贴格视野。横边按列、竖边按行各自稳定凹凸一格；
+## 两组约束同时成立，因此四角自然缺格，而不是圆形、菱形或完整矩形。
+static func vision_contains_delta(delta: Vector2i) -> bool:
+	var horizontal_radius: int = PLAYER_VISION_HALF_WIDTH + _vision_edge_jitter(delta.y, 2)
+	var vertical_radius: int = PLAYER_VISION_HALF_HEIGHT + _vision_edge_jitter(delta.x, 5)
+	return absi(delta.x) <= horizontal_radius and absi(delta.y) <= vertical_radius
 
 
-func _apply_team_damage(dmg: float) -> void:
-	var remain: float = dmg
-	for h: Dictionary in team:
-		if remain <= 0.0:
-			break
-		if float(h["hp"]) <= 0.0:
-			continue
-		var take: float = minf(float(h["hp"]), remain)
-		h["hp"] = float(h["hp"]) - take
-		remain -= take
+static func _vision_edge_jitter(axis_index: int, salt: int) -> int:
+	var shifted: int = axis_index + 32
+	var bucket: int = posmod(shifted * shifted * 3 + shifted * 5 + salt, 7)
+	if bucket == 0:
+		return -1
+	if bucket == 6:
+		return 1
+	return 0
 
 
 func _team_dead() -> bool:
@@ -458,4 +371,4 @@ func _team_dead() -> bool:
 
 func _die(cause: String) -> void:
 	over = true
-	result = {"outcome": "death", "cause": cause, "ticks": ticks(), "steps": steps, "battles": battles_won}
+	result = {"outcome": "death", "cause": cause, "steps": steps, "battles": battles_won}

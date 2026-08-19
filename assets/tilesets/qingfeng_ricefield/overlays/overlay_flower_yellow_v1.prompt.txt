@@ -1,0 +1,1 @@
+Deterministic production spec. Exactly five 4x4 source-pixel blocks on a transparent 60x60 canvas: four warm-yellow petals in a cross plus one orange centre block. No stem, leaves, ground, shadow, gradient, blur, noise, border, text, or watermark.

@@ -1,0 +1,5 @@
+Use case: precise-object-edit
+Asset type: BBZ Qingfeng Ricefield formal grass ground variant
+Reference: grass_ref37_ref39_v2.png.
+Request: preserve every authored pixel shape and alpha value; make a restrained palette-only sibling by shifting the olive hue slightly cooler and lowering value by about 7.5 percent.
+Avoid: new motifs, removed motifs, random per-pixel colors, gradients, blur, fine noise, neon green and excessive darkness.

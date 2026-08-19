@@ -11,8 +11,8 @@ const Loot := preload("res://src/expedition/expedition_loot.gd")
 
 # ── 调优旋钮（子文档 C §9）──
 const MAX_DIM: int = 6                       # 扩容上限 6×6
-const DEATH_GOLD_RATE: float = 0.3           # 死亡金币保底率
 const INSURANCE_MAX: Vector2i = Vector2i(2, 2)  # 保险槽尺寸上限
+const INVALID_CELL: Vector2i = Vector2i(-1, -1)
 
 var rows: int = 4
 var cols: int = 4
@@ -49,18 +49,96 @@ func can_place(shape: Array, anchor: Vector2i) -> bool:
 func place(item: Dictionary, shape: Array, anchor: Vector2i) -> bool:
 	if not can_place(shape, anchor):
 		return false
-	placements.append({"item": item, "anchor": anchor, "shape": shape.duplicate()})
+	placements.append({"item": item.duplicate(true), "anchor": anchor, "shape": shape.duplicate()})
 	return true
+
+
+## UI 无关的快捷放置事务。按当前朝向开始尝试四种旋转，行优先找到首个合法位置。
+## 返回结构化结果供后续容器 UI 使用；失败绝不丢弃或修改传入物品。
+func auto_place(item: Dictionary, allow_rotation: bool = true) -> Dictionary:
+	var base_shape_value: Variant = item.get("shape", [])
+	if not base_shape_value is Array or (base_shape_value as Array).is_empty():
+		return {"ok": false, "reason": "INVALID_SHAPE"}
+	var candidate: Array = (base_shape_value as Array).duplicate()
+	var seen_shapes: Dictionary = {}
+	var rotation_count: int = 4 if allow_rotation else 1
+	for rotation: int in rotation_count:
+		var shape_key: String = _shape_key(candidate)
+		if not seen_shapes.has(shape_key):
+			seen_shapes[shape_key] = true
+			var anchor: Vector2i = first_fit(candidate)
+			if anchor != INVALID_CELL:
+				place(item, candidate, anchor)
+				return {
+					"ok": true,
+					"anchor": anchor,
+					"shape": candidate.duplicate(),
+					"rotations": rotation,
+				}
+		candidate = Loot.rotate_shape(candidate)
+	return {"ok": false, "reason": "NO_SPACE"}
+
+
+## 给定朝向的第一个合法锚点；无位置返回 INVALID_CELL。
+func first_fit(shape: Array) -> Vector2i:
+	for y: int in rows:
+		for x: int in cols:
+			var anchor := Vector2i(x, y)
+			if can_place(shape, anchor):
+				return anchor
+	return INVALID_CELL
+
+
+## 原子移动：目标非法时完整恢复原 placement，不让 UI 拖拽造成物品丢失。
+func move_at(from_cell: Vector2i, target_anchor: Vector2i) -> bool:
+	var placement: Dictionary = _placement_at(from_cell)
+	if placement.is_empty():
+		return false
+	var old_index: int = placements.find(placement)
+	placements.remove_at(old_index)
+	if can_place(placement["shape"], target_anchor):
+		placement["anchor"] = target_anchor
+		placements.insert(old_index, placement)
+		return true
+	placements.insert(old_index, placement)
+	return false
+
+
+## 原地旋转同样是事务；越界或碰撞时保持原朝向和位置。
+func rotate_at(cell: Vector2i) -> bool:
+	var placement: Dictionary = _placement_at(cell)
+	if placement.is_empty():
+		return false
+	var old_index: int = placements.find(placement)
+	var rotated: Array = Loot.rotate_shape(placement["shape"])
+	placements.remove_at(old_index)
+	if can_place(rotated, Vector2i(placement["anchor"])):
+		placement["shape"] = rotated
+		placements.insert(old_index, placement)
+		return true
+	placements.insert(old_index, placement)
+	return false
 
 
 ## 取走覆盖 cell 的整件物品；返回 placement，无则 {}。
 func remove_at(cell: Vector2i) -> Dictionary:
-	var occ := occupied_cells()
-	if not occ.has(cell):
+	var p: Dictionary = _placement_at(cell)
+	if p.is_empty():
 		return {}
-	var p: Dictionary = occ[cell]
 	placements.erase(p)
 	return p
+
+
+func _placement_at(cell: Vector2i) -> Dictionary:
+	return occupied_cells().get(cell, {})
+
+
+func _shape_key(shape: Array) -> String:
+	var cells: Array[String] = []
+	for off: Vector2i in shape:
+		cells.append("%d,%d" % [off.x, off.y])
+	cells.sort()
+	return ";".join(cells)
 
 
 ## 修补匠扩容 +1 行；到 6×6 上限返回 false。
@@ -136,11 +214,10 @@ func settle_extract() -> Dictionary:
 	return {"gold": gold, "goods": goods, "equipment_lost": equipment.size()}
 
 
-## 死亡结算：仅保险槽保留；背包金币类按 30% 折算；其余（含装备栏）全部消失。
+## 死亡结算：仅保险槽保留；背包与装备栏（包括金币类）全部消失。
 ## 返回 {gold:int, kept:Array, lost_count:int}。
 func settle_death() -> Dictionary:
-	var gold: int = int(floor(float(gold_total()) * DEATH_GOLD_RATE))
 	var kept: Array = []
 	if not insurance.is_empty():
 		kept.append(insurance)
-	return {"gold": gold, "kept": kept, "lost_count": placements.size() + equipment.size()}
+	return {"gold": 0, "kept": kept, "lost_count": placements.size() + equipment.size()}

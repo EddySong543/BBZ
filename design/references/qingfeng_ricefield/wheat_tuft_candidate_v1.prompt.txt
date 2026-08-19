@@ -1,0 +1,9 @@
+Use case: stylized-concept
+Asset type: reusable one-by-one game environment prop sprite, displayed at 128x128
+Reference: the large golden wheat tufts in the integrated Qingfeng Ricefield preview
+Primary request: exactly one isolated low, broad golden wheat tuft, with no tile and no ground
+Shape: two stout main stems and one smaller branch, only two to three grain-bearing tips, large plump golden grain heads, a small open gap through the middle
+Style: polished modern pixel-art-inspired sprite, chunky deliberate pixel clusters, warm brown stems, limited golden palette, crisp silhouette, restrained detail
+Composition: centered with generous padding and a bottom-center ground-contact anchor
+Background: perfectly flat solid #FF00FF chroma key for local alpha removal
+Avoid: dense wheat row, many thin stalks, realistic botany, tall emblem shape, soil, grass, tile border, shadow, text, watermark

@@ -1,0 +1,5 @@
+Use case: stylized-concept
+Asset type: second dark-family reusable top-down terrain surface texture for a Godot square grid cell
+References: grass_dark_01, grass_light_02, and the approved Qingfeng Ref37 composition preview
+Create a distinct dark sibling with a slightly cooler muted leaf-green base, around ten percent lighter than grass_dark_01 but clearly darker than the light family. Keep the same strict top-down pixel scale, sparse detail density, full-bleed ground, uniform neutral lighting, and a new irregular cluster layout.
+No tile outline, rim, rounded square, chamfer, gutter, transparent corner, thickness, object, wheat, stone, chest, character, UI, text, path, fog, vignette, or watermark. Runtime code supplies the border and global lighting.

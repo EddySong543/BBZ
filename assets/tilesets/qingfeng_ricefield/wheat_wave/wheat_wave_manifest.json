@@ -1,0 +1,20 @@
+{
+  "cell_width": 60,
+  "cell_height": 60,
+  "columns": 6,
+  "states": [
+    {
+      "name": "wheat_wave",
+      "row": 0,
+      "frames": [
+        "wheat_wave_000.png",
+        "wheat_wave_001.png",
+        "wheat_wave_002.png",
+        "wheat_wave_003.png",
+        "wheat_wave_004.png",
+        "wheat_wave_005.png"
+      ],
+      "durations_ms": [90, 110, 130, 130, 110, 90]
+    }
+  ]
+}

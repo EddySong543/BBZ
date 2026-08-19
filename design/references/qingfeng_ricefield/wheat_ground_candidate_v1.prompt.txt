@@ -1,0 +1,8 @@
+Use case: stylized-concept
+Asset type: square ground-only terrain tile for a top-down grid game
+Reference: the friendly bright pixel-inspired farmland rendering in the integrated Qingfeng Ricefield preview
+Primary request: foundation surface for a golden wheat-field floor cell
+Surface: honey-ochre and amber-gold cultivated soil, quiet broad horizontal furrows, sparse pale straw flecks and darker soil pixels, calm center for a separate prop and player sprite
+Style: polished modern pixel-art-inspired terrain, restrained pixel clusters, limited palette, orthographic top-down, full bleed to every edge
+Constraints: ground only, no wheat plant, grass, rocks, character, border, frame, grid line, bevel, transparent corners, shadow, text, or watermark
+Avoid: orange road appearance, beach sand, flat bright-yellow fill, dense texture noise, central emblem, rounded corners, black seams

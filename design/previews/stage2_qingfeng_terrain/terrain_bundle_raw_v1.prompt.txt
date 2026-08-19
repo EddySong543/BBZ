@@ -1,0 +1,7 @@
+Use case: stylized-concept
+Asset type: preview-only true-pixel terrain tile sheet for the BBZ Qingfeng Ricefield Godot grid map
+References: the current 1920x1080 Scheme A runtime screenshot plus the approved grass, dirt and golden-wave ground tiles.
+Request: one clean 4x4 sheet with wide solid #FF00FF gutters. Row 1 contains three materially distinct grass tiles and a grass-to-dirt straight boundary. Row 2 contains two materially distinct dry dirt tiles and grass-to-dirt corner transitions. Row 3 contains golden-wave interior and wheat-field edge/corner transitions. Row 4 contains horizontal/vertical low field ridges and horizontal/vertical shallow irrigation ditches.
+Style: authentic coarse top-down pixel art, hard nearest-neighbour pixels, limited palette, readable 2x2 or 3x3 logical clusters.
+Constraints: preserve the approved palette relationships; distinct texture topology per material; every tile fully contained; no baked rounded frame because the runtime Scheme A shader supplies it.
+Avoid: gradients, blur, antialiasing, semi-transparent pixels, fine noise, fake pixel filters, text, UI, characters, props, 3D/isometric blocks and clipped motifs.

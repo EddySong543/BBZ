@@ -7,7 +7,7 @@
 ## 用法：
 ##   const PixelArt := preload("res://src/expedition/expedition_pixel_art.gd")
 ##   PixelArt.draw_icon(canvas, "gem", rect, Color("b08a3a"))       # 画进 CanvasItem
-##   btn.icon = PixelArt.get_texture("ration", Color("4f9d52"))     # 生成缓存纹理（按钮用）
+##   btn.icon = PixelArt.get_texture("potion", Color("4f9d52"))     # 生成缓存纹理（按钮用）
 extends RefCounted
 
 const DARKEN: float = 0.45
@@ -61,15 +61,6 @@ const ICONS: Dictionary = {
 		"xXxXXxXx",
 		"xXxXXxXx",
 		"x.x..x.x"],
-	"ration": [
-		"........",
-		"..xxxx..",
-		".xXXXXx.",
-		"xXoXoXXx",
-		"xXXXXXXx",
-		".xXXXXx.",
-		"..xxxx..",
-		"........"],
 	"potion": [
 		"...xx...",
 		"...XX...",

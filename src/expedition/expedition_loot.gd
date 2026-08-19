@@ -34,9 +34,8 @@ const GOLD_DEFS: Array = [
 	{"id": "screen", "name": "鎏金屏风", "shape": SHAPE_2X3, "gold": 210, "w": 5, "icon": "screen"},
 ]
 const CONSUMABLE_DEFS: Array = [
-	{"id": "ration", "name": "干粮", "shape": SHAPE_1X1, "w": 50, "note": "+10 补给", "icon": "ration"},
-	{"id": "potion", "name": "药瓶", "shape": SHAPE_1X1, "w": 30, "note": "单英雄 +1 HP", "icon": "potion"},
-	{"id": "soup", "name": "大补汤", "shape": SHAPE_2X1, "w": 20, "note": "全队 +0.5 HP", "icon": "soup"},
+	{"id": "potion", "name": "药瓶", "shape": SHAPE_1X1, "w": 60, "note": "单英雄 +1 HP", "icon": "potion"},
+	{"id": "soup", "name": "大补汤", "shape": SHAPE_2X1, "w": 40, "note": "全队 +0.5 HP", "icon": "soup"},
 ]
 const RARE_DEFS: Array = [
 	{"id": "shard", "name": "英雄碎片", "shape": SHAPE_1X1, "w": 50, "icon": "shard"},

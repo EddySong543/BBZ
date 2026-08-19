@@ -11,6 +11,12 @@ const MapState := preload("res://src/expedition/expedition_map_state.gd")
 
 const OUT_SELECT := "D:/Game/BoBoZan/_probe_output/exped_select.png"
 const OUT_IDLE := "D:/Game/BoBoZan/_probe_output/exped_idle.png"
+const OUT_ATMOSPHERE_A := "D:/Game/BoBoZan/_probe_output/exped_atmosphere_a.png"
+const OUT_ATMOSPHERE_B := "D:/Game/BoBoZan/_probe_output/exped_atmosphere_b.png"
+const OUT_ATMOSPHERE_OFF := "D:/Game/BoBoZan/_probe_output/exped_atmosphere_off.png"
+const OUT_CAMERA_TOP_LEFT := "D:/Game/BoBoZan/_probe_output/exped_camera_top_left.png"
+const OUT_CAMERA_TRACKING := "D:/Game/BoBoZan/_probe_output/exped_camera_tracking.png"
+const OUT_CAMERA_BOTTOM_RIGHT := "D:/Game/BoBoZan/_probe_output/exped_camera_bottom_right.png"
 const OUT_SEARCH_REVEALED := "D:/Game/BoBoZan/_probe_output/exped_search_revealed.png"
 const OUT_SEARCH_OPENED := "D:/Game/BoBoZan/_probe_output/exped_search_opened.png"
 const OUT_WALK := "D:/Game/BoBoZan/_probe_output/exped_walk.png"
@@ -39,12 +45,49 @@ func _ready() -> void:
 	screen._on_hero_selected(HeroDataScript.create_launch_pool()[2])
 	await get_tree().create_timer(0.6).timeout
 	await _shot(OUT_IDLE)
-	# 三层格子验收：把镜头暂移到一个搜索目标，确认地表、透明物体和运行时标识能独立叠加。
+	await _shot(OUT_ATMOSPHERE_A)
+	await get_tree().create_timer(1.4).timeout
+	await _shot(OUT_ATMOSPHERE_B)
+	screen.atmosphere_layer.visible = false
+	await _shot(OUT_ATMOSPHERE_OFF)
+	screen.atmosphere_layer.visible = true
+	# 默认使用平滑跟随；四角探针同时证明镜头会在真实地图边缘停止。
 	var saved_player: Vector2i = screen.map.player
 	var saved_revealed: Dictionary = screen.map.revealed.duplicate()
+	var saved_visible: Dictionary = screen.map.visible.duplicate()
+	for y: int in MapState.HEIGHT:
+		for x: int in MapState.WIDTH:
+			screen.map.revealed[Vector2i(x, y)] = true
+			screen.map.visible[Vector2i(x, y)] = true
+	screen.map.player = Vector2i.ZERO
+	screen._camera_initialized = false
+	screen._refresh()
+	await get_tree().create_timer(0.12).timeout
+	await _shot(OUT_CAMERA_TOP_LEFT)
+	for target_cell: Vector2i in [Vector2i(4, 3), Vector2i(8, 6), Vector2i(12, 9), Vector2i(17, 13)]:
+		screen.map.player = target_cell
+		screen._refresh()
+		await get_tree().create_timer(0.055).timeout
+	await _shot(OUT_CAMERA_TRACKING)
+	await get_tree().create_timer(0.8).timeout
+	await _shot(OUT_CAMERA_BOTTOM_RIGHT)
+	var token_screen_center: Vector2 = (
+			screen.map_view.position
+			+ screen.map_world.position
+			+ screen.player_token.position
+			+ screen.player_token.size * 0.5)
+	print("CAMERA_BOTTOM_RIGHT_OFFSET=", screen.map_world.position,
+			" TOKEN_SCREEN_CENTER=", token_screen_center,
+			" TARGET=", screen._camera_target_token_origin,
+			" VISUAL=", screen._camera_visual_token_origin)
+	screen.map.player = saved_player
+	screen.map.revealed = saved_revealed
+	screen.map.visible = saved_visible
+	screen._camera_initialized = false
+	# 三层格子验收：把镜头暂移到一个搜索目标，确认地表、透明物体和运行时标识能独立叠加。
 	var search_cell: Vector2i = Vector2i(screen.map.chests.keys()[0])
 	screen.map.player = search_cell + Vector2i.DOWN
-	screen.map.revealed[search_cell] = true
+	screen.map._reveal_around(screen.map.player)
 	screen._refresh()
 	await get_tree().create_timer(0.5).timeout
 	await _shot(OUT_SEARCH_REVEALED)
@@ -59,6 +102,7 @@ func _ready() -> void:
 	screen.map.chests[search_cell] = saved_search_data
 	screen.map.player = saved_player
 	screen.map.revealed = saved_revealed
+	screen.map.visible = saved_visible
 	screen._refresh()
 	for k: int in WALK_KEYS:
 		if screen.dialog.visible:
@@ -76,7 +120,7 @@ func _ready() -> void:
 	# —— 晴风稻田撤离验证：开局不标明；探明后显示；主动交互才弹确认。——
 	var exit_cell: Vector2i = screen.map.ext_pos.values()[0]
 	screen.map.player = exit_cell + Vector2i.DOWN
-	screen.map._reveal_around(exit_cell)
+	screen.map._reveal_around(screen.map.player)
 	screen._refresh()
 	await get_tree().create_timer(0.3).timeout
 	await _shot(OUT_EXIT)

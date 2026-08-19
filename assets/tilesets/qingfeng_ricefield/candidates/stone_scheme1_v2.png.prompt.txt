@@ -1,0 +1,8 @@
+Use case: stylized-concept
+Asset type: production pixel-art stone terrain tile variation for BBZ Qingfeng Ricefield
+Input images: Image 1 is the approved whole-stone tile whose material, footprint, lighting, and outline must be preserved; Images 2 and 3 establish the family edge language.
+Primary request: Create one alternate whole-cell stone terrain tile, never stones placed on grass. Preserve the compact pixel-cut square silhouette, deep blue-charcoal outer outline, cool gray limited palette, upper-left flat pixel highlight, lower-right stepped shadow, and large readable rock masses. Change the internal stone layout to three dominant slabs: a broad horizontal slab across the upper-left, a tall irregular slab on the right, and a wide low slab across the bottom, separated by thick dark joints. Make it clearly different from Image 1 while equally solid and impassable.
+Scene/backdrop: perfectly uniform solid #FF00FF chroma-key background, no texture, no shadow.
+Style/medium: authentic coarse pixel art, hard block pixels, limited 7-to-9 colors, no antialiasing and no smooth gradient.
+Composition: one centered isolated tile only, about 86 percent canvas coverage, generous magenta padding, no sprite sheet.
+Avoid: grass underlay, individual loose rocks, pebble scatter, stone wall viewed from the side, standard perfect square, excessive roundness, thin cracks, noisy details, smooth bevel, soft lighting, perspective thickness, cast shadow, UI, text, watermark. Do not use #FF00FF inside the tile.

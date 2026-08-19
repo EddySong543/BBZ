@@ -1,0 +1,7 @@
+Preview composition contract:
+- Base layer: wheat_ground_candidate_v1.png
+- Object layer: wheat_tuft_candidate_v1.png, preserving its alpha and bottom-center anchor
+- Marker/grid layer: intentionally omitted; the runtime draws it independently
+- Runtime composite: 128x128
+- Review preview: nearest-neighbor 4x enlargement to 512x512
+- No part of the wheat is baked into the ground asset

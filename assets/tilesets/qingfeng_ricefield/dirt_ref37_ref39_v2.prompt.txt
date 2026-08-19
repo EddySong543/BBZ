@@ -1,0 +1,6 @@
+Use case: stylized-concept
+Asset type: BBZ Qingfeng Ricefield 60x60 ground tile
+Primary request: Precisely preserve the approved dirt tile from exec-b0d767a9-a47b-415b-a9f5-1cccfba94d08.png.
+Style/medium: true coarse pixel art, 30x30 logical pixels enlarged exactly 2x with nearest-neighbor sampling
+Color palette: warm ochre clay with broad connected regions, one upper-left crack, one compressed soil patch, pebbles and short ruts
+Constraints: preserve motif positions; tiny two-step transparent pixel corner cuts; no smoothing, gradients, antialiasing, dirty micro-noise, or redesign

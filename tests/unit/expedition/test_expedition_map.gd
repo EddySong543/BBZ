@@ -15,13 +15,17 @@ func _make(p_seed: int) -> MapState:
 	return map
 
 
-func test_map_setup_uses_fixed_qingfeng_dimensions_and_one_or_two_exits() -> void:
+func test_map_setup_uses_fixed_qingfeng_dimensions_without_placeholder_objects() -> void:
 	for seed_value: int in [1, 777, 31337]:
 		var map: MapState = _make(seed_value)
 		assert_eq(map.grid.size(), Layout.HEIGHT)
 		assert_eq((map.grid[0] as Array).size(), Layout.WIDTH)
-		assert_between(map.ext_pos.size(), 1, 2)
+		assert_eq(map.ext_pos.size(), 0)
+		assert_true(map.chests.is_empty())
+		assert_true(map.monsters.is_empty())
+		assert_true(map.events.is_empty())
 		assert_eq(map.team.size(), 1, "开局仍为1名英雄")
+		assert_true((map.team[0] as Dictionary).has("hero_id"), "队伍条目保留稳定英雄身份字段")
 
 
 func test_map_terrain_is_fixed_across_seeds() -> void:
@@ -33,75 +37,80 @@ func test_map_terrain_is_fixed_across_seeds() -> void:
 func test_map_same_seed_reproduces_dynamic_content() -> void:
 	var first: MapState = _make(777)
 	var second: MapState = _make(777)
-	assert_eq(first.monsters.keys(), second.monsters.keys())
+	assert_true(first.monsters.is_empty(), "晴风稻田暂不生成旧版敌人")
+	assert_true(second.monsters.is_empty(), "重复生成也不得带回旧版敌人")
 	assert_eq(first.chests.keys(), second.chests.keys())
 	assert_eq(first.ext_pos, second.ext_pos)
 
 
-func test_map_exits_use_only_fixed_candidates_and_are_always_open() -> void:
-	var saw_one: bool = false
-	var saw_two: bool = false
-	for seed_value: int in range(40):
-		var map: MapState = _make(seed_value)
-		saw_one = saw_one or map.ext_pos.size() == 1
-		saw_two = saw_two or map.ext_pos.size() == 2
-		for tile: int in map.ext_pos:
-			var exit_cell: Vector2i = map.ext_pos[tile]
-			assert_has(Layout.EXIT_CANDIDATES, exit_cell)
-			assert_true(map.ext_open(tile), "启用的撤离点从开局起始终开放")
-	assert_true(saw_one, "种子池中应能生成单撤离点局")
-	assert_true(saw_two, "种子池中应能生成双撤离点局")
-
-
-func test_map_exits_start_hidden_and_are_reachable() -> void:
-	for seed_value: int in [3, 9, 27]:
-		var map: MapState = _make(seed_value)
-		var reachable: Dictionary = _reachable_from(map.start_pos, map.grid)
-		for tile: int in map.ext_pos:
-			var exit_cell: Vector2i = map.ext_pos[tile]
-			assert_false(map.revealed.has(exit_cell), "进图时不主动标明撤离点")
-			assert_true(reachable.has(exit_cell), "启用的撤离点必须可达")
-
-
-func test_map_content_uses_only_authored_anchor_pools() -> void:
+func test_map_currently_spawns_ground_only_but_keeps_future_anchor_pools() -> void:
 	for seed_value: int in [5, 17, 29]:
 		var map: MapState = _make(seed_value)
 		assert_true(map.events.is_empty(), "第一版灰盒暂不生成事件")
-		assert_true(map.monsters.has(Layout.REPAIR_GUARD_ANCHOR), "检修院守卫位置固定")
-		assert_true(map.monsters.has(Layout.BOSS_ANCHOR), "收割场Boss位置固定")
-		for cell: Vector2i in map.monsters:
-			assert_has(Layout.MONSTER_ANCHORS, cell)
-		for cell: Vector2i in map.chests:
-			assert_has(Layout.SEARCH_ANCHORS, cell)
+		assert_true(map.monsters.is_empty(), "正式敌人完成前，普通敌人、守卫与Boss均不生成")
+		assert_false(_grid_contains(map.grid, MapState.Tile.MONSTER), "地图中不得残留旧版敌人格")
+		assert_true(map.chests.is_empty(), "当前纯地表版本不得生成不可见搜索点")
+		assert_true(map.ext_pos.is_empty(), "撤离点视觉重做前不得生成不可见撤离格")
+	assert_has(Layout.MONSTER_ANCHORS, Layout.REPAIR_GUARD_ANCHOR, "检修院敌人锚点继续保留")
+	assert_has(Layout.MONSTER_ANCHORS, Layout.BOSS_ANCHOR, "收割场敌人锚点继续保留")
 
 
-func test_map_fog_grows_after_movement() -> void:
+func test_map_visibility_follows_player_while_discovery_history_remains() -> void:
 	var map: MapState = _make(777)
-	var before: int = map.revealed.size()
-	for i: int in 8:
-		var moved: bool = false
-		for dir: Vector2i in DIRS:
-			var result: Dictionary = map.try_move(dir)
-			if bool(result["moved"]):
-				moved = true
-				break
-		if not moved:
-			break
-	assert_gt(map.revealed.size(), before)
+	var start: Vector2i = map.player
+	assert_true(map.visible.has(start))
+	map.player = Vector2i(16, 9)
+	map._reveal_around(map.player)
+	assert_false(map.visible.has(start), "离开角色视野的旧格必须重新进入迷雾")
+	assert_true(map.revealed.has(start), "永久探索记录仍保留，供未来地图与任务系统使用")
+	assert_true(map.visible.has(map.player), "玩家所在格始终可见")
+	var min_delta := Vector2i(99, 99)
+	var max_delta := Vector2i(-99, -99)
+	for cell: Vector2i in map.visible:
+		var delta: Vector2i = cell - map.player
+		assert_true(MapState.vision_contains_delta(delta),
+				"当前可见格必须服从稳定的贴格不规则近方形边界")
+		min_delta.x = mini(min_delta.x, delta.x)
+		min_delta.y = mini(min_delta.y, delta.y)
+		max_delta.x = maxi(max_delta.x, delta.x)
+		max_delta.y = maxi(max_delta.y, delta.y)
+	assert_gte(max_delta.x - min_delta.x + 1, 12, "视野主体宽度应接近13格")
+	assert_gte(max_delta.y - min_delta.y + 1, 8, "视野主体高度应接近9格")
+	assert_false(MapState.vision_contains_delta(Vector2i(7, 5)),
+			"近方形四角必须保留少量整格缺口，不能变成完整矩形")
+
+
+func test_remote_map_reveal_is_safe_when_current_map_has_no_containers() -> void:
+	var map: MapState = _make(777)
+	var found: Vector2i = map.reveal_random_chest()
+	assert_eq(found, Vector2i(-1, -1))
 
 
 func test_map_extract_settles_run() -> void:
 	var map: MapState = _make(3)
 	map.extract()
 	assert_eq(String(map.result["outcome"]), "extract")
+	assert_false(map.result.has("ticks"), "旧危险度时钟不得进入结算")
+	assert_false(map.result.has("in_band"), "旧撤离时间带不得进入结算")
+
+
+func test_map_actions_never_apply_generic_hunger_damage() -> void:
+	var map: MapState = _make(9)
+	map.team[0] = {"hero_id": "h01", "name": "子鼠", "hp": 5.0, "hp_max": 5.0}
+	for index: int in 100:
+		map.advance_world_action("wait")
+	assert_almost_eq(float(map.team[0]["hp"]), 5.0, 0.01)
+	assert_false(map.over)
+	assert_eq(map.steps, 100)
 
 
 func test_map_recruit_caps_at_three() -> void:
 	var map: MapState = _make(4)
-	assert_ne(map.recruit(), "")
-	assert_ne(map.recruit(), "")
-	assert_eq(map.recruit(), "")
+	assert_ne(map.recruit({"hero_id": "h02", "name": "丑牛", "hp": 10.0, "hp_max": 10.0}), "")
+	assert_ne(map.recruit({"hero_id": "h03", "name": "寅虎", "hp": 10.0, "hp_max": 10.0}), "")
+	assert_eq(map.recruit({"hero_id": "h04", "name": "卯兔", "hp": 10.0, "hp_max": 10.0}), "")
 	assert_eq(map.team.size(), 3)
+	assert_eq(String(map.team[1]["hero_id"]), "h02")
 
 
 func _wall_signature(map: MapState) -> String:
@@ -112,6 +121,13 @@ func _wall_signature(map: MapState) -> String:
 			row += "#" if map.grid[y][x] == MapState.Tile.WALL else "."
 		rows.append(row)
 	return "\n".join(rows)
+
+
+func _grid_contains(grid: Array, tile: int) -> bool:
+	for row: Array in grid:
+		if row.has(tile):
+			return true
+	return false
 
 
 func _reachable_from(start: Vector2i, grid: Array) -> Dictionary:

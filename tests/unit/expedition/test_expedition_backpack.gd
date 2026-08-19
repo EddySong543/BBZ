@@ -60,6 +60,39 @@ func test_backpack_remove_at_returns_whole_item() -> void:
 	assert_eq(bp.placements.size(), 0)
 
 
+func test_backpack_auto_place_returns_transaction_result() -> void:
+	var bp: Backpack = Backpack.new()
+	var item: Dictionary = _item("金锭", "gold", Loot.SHAPE_1X2, 50)
+	var result: Dictionary = bp.auto_place(item)
+
+	assert_true(bool(result["ok"]))
+	assert_eq(Vector2i(result["anchor"]), Vector2i.ZERO)
+	assert_eq(int(result["rotations"]), 0)
+	assert_eq(bp.placements.size(), 1)
+	item["name"] = "外部篡改"
+	assert_eq(String(bp.placements[0]["item"]["name"]), "金锭",
+			"背包必须持有深拷贝，容器/UI 不能从外部污染已放入物品")
+
+
+func test_backpack_failed_move_restores_original_placement() -> void:
+	var bp: Backpack = Backpack.new()
+	bp.place(_item("古瓮", "gold", Loot.SHAPE_2X2, 120), Loot.SHAPE_2X2, Vector2i(0, 0))
+	bp.place(_item("碎宝石", "gold", Loot.SHAPE_1X1, 20), Loot.SHAPE_1X1, Vector2i(2, 0))
+
+	assert_false(bp.move_at(Vector2i(0, 0), Vector2i(1, 0)))
+	assert_eq(bp.placements.size(), 2)
+	assert_eq(Vector2i(bp.placements[0]["anchor"]), Vector2i.ZERO)
+	assert_eq(String(bp.remove_at(Vector2i(1, 1))["item"]["name"]), "古瓮")
+
+
+func test_backpack_rotation_is_atomic_when_new_shape_would_overflow() -> void:
+	var bp: Backpack = Backpack.new()
+	bp.place(_item("金锭", "gold", Loot.SHAPE_1X2, 50), Loot.SHAPE_1X2, Vector2i(2, 3))
+
+	assert_false(bp.rotate_at(Vector2i(2, 3)))
+	assert_eq(bp.placements[0]["shape"], Loot.SHAPE_1X2)
+
+
 func test_backpack_expand_caps_at_six() -> void:
 	# Arrange
 	var bp: Backpack = Backpack.new()
@@ -107,7 +140,7 @@ func test_settle_extract_counts_backpack_and_insurance_not_equipment() -> void:
 	assert_eq(int(r["equipment_lost"]), 1)
 
 
-func test_settle_death_keeps_insurance_and_30pct_gold() -> void:
+func test_settle_death_keeps_only_insurance_and_loses_all_gold() -> void:
 	# Arrange
 	var bp: Backpack = Backpack.new()
 	bp.place(_item("金锭", "gold", Loot.SHAPE_1X2, 50), Loot.SHAPE_1X2, Vector2i(0, 0))
@@ -117,8 +150,8 @@ func test_settle_death_keeps_insurance_and_30pct_gold() -> void:
 	bp.insure(_item("英雄碎片", "rare", Loot.SHAPE_1X1))
 	# Act
 	var r: Dictionary = bp.settle_death()
-	# Assert：金币 21 = floor(70×0.3)·保住保险槽 1 件·背包 3+装备 1 = 4 件消失
-	assert_eq(int(r["gold"]), 21)
+	# Assert：金币不保底·保住保险槽 1 件·背包 3+装备 1 = 4 件消失
+	assert_eq(int(r["gold"]), 0)
 	assert_eq((r["kept"] as Array).size(), 1)
 	assert_eq(int(r["lost_count"]), 4)
 

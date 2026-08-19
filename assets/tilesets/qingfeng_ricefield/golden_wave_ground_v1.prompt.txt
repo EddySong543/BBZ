@@ -1,0 +1,5 @@
+Use case: precise-object-edit
+Asset type: BBZ Qingfeng Ricefield golden wind-wave ground tile
+Reference: selected wheat Scheme C for its diagonal wave palette and grass_ref37_ref39_v2.png for the formal tile silhouette.
+Request: remove all wheat, stems and plant shadows; retain only two or three broad connected diagonal golden wind bands with irregular chunky pixel edges and restrained negative space.
+Avoid: wheat or grass motifs, sand dunes, water, road markings, flat pure color, gradients, blur, fine noise, text and watermark.

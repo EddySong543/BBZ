@@ -1,0 +1,6 @@
+Deterministic existing-asset derivation for the approved Qingfeng grid style.
+Reuse grass_ref37_ref39_plain_v1.png one-to-one for its coarse 2x2 pixel grain,
+exact four-corner alpha silhouette, border structure, and internal material rhythm.
+Translate only its palette into the warm orange-brown range sampled from the
+approved dirt_ref37_ref39_v2.png. The result is a clean foundation-only dirt
+tile: no crack, rut, footprint, grass tuft, stone, object, symbol, or gradient.

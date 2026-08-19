@@ -1,0 +1,4 @@
+Use case: large windborne field particle atlas
+Generated source: exec-4e0ea6a8-3160-4703-b9e4-1982517a21bd.png
+Prompt: Exactly four isolated windblown golden rice-husk or short broken straw-leaf sprites in one horizontal row. Crisp chunky hard pixels, warm golden ochre palette, dark amber edge, pale highlight, transparent background. No wheat stalk, bundle, ground, shadow, glow, dust cloud, text, UI, frame, watermark, blur, or antialiasing.
+Processing: split source into four equal regions; isolate saturated gold pixels from the generated checker background; fit each sprite inside a 16x20 frame with NEAREST sampling; map to a shared six-color palette; save as a 64x20 RGBA atlas.

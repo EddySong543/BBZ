@@ -1,0 +1,9 @@
+Use case: production candidate for a reusable Qingfeng Ricefield foreground object
+Reference: assets/tilesets/qingfeng_ricefield/style_reference.png for palette, lighting, and chunky pixel treatment only
+
+Create exactly one isolated wheat tuft. The anatomy is the priority: three separate wheat stalks rise independently from one compact shared base; there is no trunk and no branching. Each stalk carries exactly one tapered wheat ear, made from orderly alternating grains along a central axis. Use two taller stalks and one slightly shorter stalk, gently fanning outward. Add only a few narrow leaves near the lower third.
+
+The sprite must work as a transparent object placed over a grass ground tile. Keep a compact bottom-center anchor and a clean upper silhouette that can later sway from side to side. Use warm ripe gold, ochre stems, muted olive only at the base, upper-left light, a limited palette, and crisp chunky pixel clusters.
+
+Background: removable magenta chroma key.
+Avoid: a branching tree or antler shape, corn, rice panicles, feathers, dense crop rows, ground tiles, soil, borders, platforms, baskets, text, UI, characters, photorealism, or painterly rendering.

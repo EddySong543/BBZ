@@ -1,0 +1,6 @@
+Use case: precise-object-edit
+Asset type: BBZ Qingfeng Ricefield formal teleport ground tile
+Reference: exec-f94947b3-0c53-4dff-8ac4-66d393f2a572.png as the approved teleport design; grass_ref37_ref39_v2.png as the approved ground style.
+Request: preserve the dark teal diamond support, central gold beacon, paired gold wing ornaments, lower crescent and point; only clean the pixel construction, replace the surrounding grass language, and reduce glow to hard color steps.
+Production normalization: crop the bright generated tile, sample to a 30x30 logical grid, quantize to a limited palette, replace the discordant olive center samples with one continuous bright-gold core, restore the project two-step transparent corner cuts, and enlarge exactly 2x to 60x60.
+Avoid: redesign, circular rune, mechanical concentric squares, 3D platform, gradients, blur, fine noise, cropped ornaments, text and watermark.

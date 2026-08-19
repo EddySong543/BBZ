@@ -1,0 +1,8 @@
+Use case: stylized-concept
+Asset type: production pixel-art grass terrain tile variation for BBZ Qingfeng Ricefield
+Input images: Image 1 is the approved grass tile whose exact material family, footprint, edge, and palette hierarchy must be preserved; Images 2 and 3 establish the same tile family.
+Primary request: Create one new grass whole-cell terrain asset rather than a recolor. Preserve the bright olive-green flat surface, dark green coarse outline, compact pixel-cut corners, calm open center, limited palette, and upper-left daylight. Change the internal vegetation silhouettes: place one broad two-leaf tuft near the upper-left, one low bent tuft at the middle-right, one small three-pixel clover cluster near the lower-left, and an irregular short dark-green edge patch along the lower-right. It must be visibly different from Image 1 while still sparse and reusable in large regions.
+Scene/backdrop: perfectly uniform solid #FF00FF chroma-key background, no gradient, no texture, no shadow.
+Style/medium: authentic coarse pixel art, hard block pixels, limited 6-to-8 greens, no antialiasing, no faux-pixel smooth curves.
+Composition: one centered isolated tile only, about 86 percent canvas coverage, generous magenta padding, no sprite sheet.
+Avoid: mere color shift, flowers, wheat, stones, dirt patches, dense grass carpet, centered decorative icon, mechanical concentric shape, standard perfect square, excessive rounding, tiny noise, smooth gradients, soft shading, cast shadow, UI, text, watermark. Do not use #FF00FF inside the tile.

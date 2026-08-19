@@ -1,0 +1,5 @@
+Use case: precise-object-edit
+Asset type: BBZ Qingfeng Ricefield formal dirt ground variant
+Reference: dirt_ref37_ref39_v2.png for material, brightness and palette; grass_ref37_ref39_v2.png for the formal tile silhouette.
+Request: preserve the warm ochre clay brightness while changing the surface layout to a short upper-right rut, a lower-left three-pebble cluster, a broad pale compacted patch at center-left and two small lower-right nicks.
+Avoid: simple darkening, the original long branching crack, the original large compressed patch, dense noise, puddles, grass, wheat, gradients, text and watermark.

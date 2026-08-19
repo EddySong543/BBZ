@@ -1,0 +1,1 @@
+Deterministic production spec. Rebuild the approved preview's compact three-leaf clover on a transparent 60x60 canvas. Use a strict 2px logical grid: three thick rounded leaves overlap around one short central stem, with one dark outline tone and three flat green face tones. No thin veins, isolated specks, ground, cast shadow, gradient, blur, noise, text, or watermark.

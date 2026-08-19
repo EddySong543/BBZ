@@ -1,0 +1,9 @@
+Use case: stylized-concept
+Asset type: sparse alternate production pixel-art wheat-field terrain tile for BBZ Qingfeng Ricefield
+Input images: Image 1 is the approved wheat tile and defines the only acceptable wheat/field style. Image 2 defines the calm flat ground treatment and clean sparse surface.
+Primary request: Create one new whole-cell wheat-field tile variation with a calm, open composition. Keep the same olive field base, dark coarse outline, compact pixel-cut corners, golden wheat palette, and hard coarse pixels. Use exactly TWO main wheat ears: one tall ear leaning slightly right in the right half, and one shorter ear leaning slightly left in the left half. Add exactly ONE tiny low cut-stubble cluster at the bottom center. Leave the rest of the field base plain and open.
+Critical cleanliness rule: no decorative ground dots, no scattered grass, no pebbles, no seed speckles, no texture noise, no extra wheat heads, no background leaf carpet. At least half of the tile interior must remain visually empty flat olive field.
+Scene/backdrop: perfectly uniform solid #FF00FF chroma-key background with no texture, no lighting variation, no shadow.
+Style/medium: authentic coarse pixel art with a limited palette and hard block pixels; no antialiasing, no smooth gradients, no faux-pixel softness.
+Composition: one centered isolated tile only, about 86 percent canvas coverage, generous magenta padding, no sprite sheet.
+Avoid: dense bouquet, three tall stalks, repeating centered arrangement, noisy field surface, dirt-colored background, loose object on grass, standard perfect square, excessive rounding, thin line art, soft shading, perspective thickness, cast shadow, UI, text, watermark. Do not use #FF00FF inside the tile.

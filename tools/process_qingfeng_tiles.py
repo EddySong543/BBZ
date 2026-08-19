@@ -10,10 +10,24 @@ from PIL import Image
 
 TILES = {
     "grass_alpha.png": ("grass_01.png", "ground"),
-    "rice_alpha.png": ("rice_01.png", "ground"),
+    "rice_alpha.png": ("rice_01.png", "object"),
     "dirt_alpha.png": ("dirt_path_01.png", "ground"),
     "boundary_alpha.png": ("field_boundary_01.png", "object"),
     "search_alpha.png": ("search_supply_01.png", "object"),
+}
+
+GRASS_VARIANTS = {
+    "grass_light_01_source.png": "grass_light_01.png",
+    "grass_light_02_source.png": "grass_light_02.png",
+    "grass_dark_01_source.png": "grass_dark_01.png",
+    "grass_dark_02_source.png": "grass_dark_02.png",
+}
+
+# Image generation supplies texture detail; this small deterministic calibration
+# keeps the four sources inside the approved Ref37 olive-green value range.
+GRASS_CHANNEL_SCALE = {
+    "light": (0.72, 0.84, 0.90),
+    "dark": (1.50, 1.68, 1.05),
 }
 
 OUTPUT_SIZE = 128
@@ -69,13 +83,33 @@ def normalize_tile(source: Path, destination: Path, layer_kind: str) -> None:
     print(f"Wrote {destination} ({result.mode} {result.size[0]}x{result.size[1]})")
 
 
+def normalize_grass_variant(source: Path, destination: Path) -> None:
+    """Center-crop an image-gen grass surface without inventing tile borders."""
+    image = Image.open(source).convert("RGBA")
+    side = min(image.width, image.height)
+    left = (image.width - side) // 2
+    top = (image.height - side) // 2
+    square = image.crop((left, top, left + side, top + side))
+    result = square.resize((OUTPUT_SIZE, OUTPUT_SIZE), Image.Resampling.LANCZOS)
+    family = "light" if "light" in destination.stem else "dark"
+    red, green, blue, alpha = result.split()
+    scales = GRASS_CHANNEL_SCALE[family]
+    red = red.point(lambda value: min(255, round(value * scales[0])))
+    green = green.point(lambda value: min(255, round(value * scales[1])))
+    blue = blue.point(lambda value: min(255, round(value * scales[2])))
+    result = Image.merge("RGBA", (red, green, blue, alpha))
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    result.save(destination, format="PNG", optimize=False)
+    print(f"Wrote {destination} ({result.mode} {result.size[0]}x{result.size[1]})")
+
+
 def compose_preview(output_dir: Path, preview_path: Path) -> None:
     cells = [
-        ("grass_01.png", None), ("rice_01.png", None), ("dirt_path_01.png", None),
+        ("grass_01.png", None), ("grass_01.png", "rice_01.png"), ("dirt_path_01.png", None),
         ("grass_01.png", "field_boundary_01.png"),
         ("grass_01.png", "search_supply_01.png"),
         ("dirt_path_01.png", "search_supply_01.png"),
-        ("rice_01.png", None),
+        ("grass_01.png", "rice_01.png"),
         ("grass_01.png", "field_boundary_01.png"),
         ("dirt_path_01.png", None),
     ]
@@ -100,13 +134,23 @@ def compose_preview(output_dir: Path, preview_path: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input-dir", type=Path, required=True)
+    parser.add_argument("--input-dir", type=Path)
+    parser.add_argument("--grass-variants-dir", type=Path)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--preview", type=Path)
     args = parser.parse_args()
 
-    for source_name, (destination_name, layer_kind) in TILES.items():
-        normalize_tile(args.input_dir / source_name, args.output_dir / destination_name, layer_kind)
+    if args.input_dir is None and args.grass_variants_dir is None:
+        parser.error("provide --input-dir and/or --grass-variants-dir")
+    if args.input_dir is not None:
+        for source_name, (destination_name, layer_kind) in TILES.items():
+            normalize_tile(args.input_dir / source_name, args.output_dir / destination_name, layer_kind)
+    if args.grass_variants_dir is not None:
+        for source_name, destination_name in GRASS_VARIANTS.items():
+            normalize_grass_variant(
+                args.grass_variants_dir / source_name,
+                args.output_dir / destination_name,
+            )
     if args.preview is not None:
         compose_preview(args.output_dir, args.preview)
 
