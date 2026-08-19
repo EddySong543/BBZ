@@ -48,7 +48,10 @@ func _request_enter() -> void:
 		return
 	_entering = true
 	_enter_prompt.play_enter_feedback()
-	TransitionManager.transition_to(NEXT_SCENE)
+	_intro_controller.play_exit_impulse()
+	TransitionManager.transition_from_boot(
+		NEXT_SCENE,
+		Vector2(0.553, 0.346))
 
 
 func _on_intro_finished() -> void:

@@ -26,6 +26,8 @@ uniform float crack_phase : hint_range(0.0, 6.3, 0.01) = 1.2;
 uniform float yellow_ratio_threshold : hint_range(0.1, 0.5, 0.01) = 0.18;
 uniform float crack_luma_threshold : hint_range(0.05, 0.7, 0.01) = 0.17;
 uniform float crack_coverage_limit : hint_range(0.01, 0.12, 0.01) = 0.08;
+uniform float outer_hotspot_suppression : hint_range(0.0, 0.2, 0.01) = 0.0;
+uniform float outer_hotspot_width : hint_range(0.02, 0.3, 0.01) = 0.12;
 
 varying vec4 node_modulate;
 
@@ -97,6 +99,15 @@ void fragment() {
 			palette_light.rgb,
 			smoothstep(0.56, 1.0, palette_value));
 	color = mix(color, mapped_palette, palette_strength);
+
+	// Broad edge glow competes with the central battle space. Suppress only the
+	// upper outer field before crack heat is restored below, so the authored
+	// bright fissure cores stay crisp instead of being globally dimmed.
+	float outer_distance = min(UV.x, 1.0 - UV.x);
+	float outer_field = 1.0 - smoothstep(
+			0.0, outer_hotspot_width, outer_distance);
+	float upper_field = 1.0 - smoothstep(0.18, 0.72, UV.y);
+	color *= 1.0 - outer_field * upper_field * outer_hotspot_suppression;
 
 	float crack_mask = far_crack_mask(source);
 	vec2 flow_state = far_lava_flow(source_pixel, source_size);

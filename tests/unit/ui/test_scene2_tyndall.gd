@@ -2,27 +2,7 @@ extends GutTest
 
 const SCENE1_PATH := "res://src/ui/scenes/scene1.tscn"
 const SCENE2_PATH := "res://src/ui/scenes/scene2.tscn"
-const TYNDALL_SHADER_PATH := "res://assets/shaders/canvas_env_scene2_tyndall.gdshader"
-const BRIDGE_LIGHT_SHADER_PATH := "res://assets/shaders/canvas_env_scene2_bridge_light.gdshader"
-
-
-func test_scene2_tyndall_layers_follow_depth_occlusion_order() -> void:
-	var stage := (load(SCENE2_PATH) as PackedScene).instantiate()
-	var far := stage.get_node("TyndallFar") as ColorRect
-	var mist := stage.get_node("TyndallMist") as ColorRect
-
-	assert_lt(stage.get_node("FarMountain2").get_index(), far.get_index())
-	assert_lt(far.get_index(), stage.get_node("MidMountain").get_index())
-	assert_lt(stage.get_node("Waterfall").get_index(), mist.get_index())
-	assert_lt(mist.get_index(), stage.get_node("WaterfallRidgeContact").get_index())
-	assert_false(stage.has_node("TyndallLanding"),
-			"Ground light must land through receiving materials, not a fullscreen overlay")
-
-	assert_eq((far.material as ShaderMaterial).shader.resource_path, TYNDALL_SHADER_PATH)
-	assert_eq((mist.material as ShaderMaterial).shader.resource_path, TYNDALL_SHADER_PATH)
-	var bridge_material := stage.get_node("StoneBridge").material as ShaderMaterial
-	assert_eq(bridge_material.shader.resource_path, BRIDGE_LIGHT_SHADER_PATH)
-	stage.free()
+const SKY_GRADE_SHADER_PATH := "res://assets/shaders/canvas_env_scene2_sky_grade.gdshader"
 
 
 func test_scene2_tyndall_stays_pixel_stepped_and_restrained() -> void:
@@ -43,7 +23,6 @@ func test_scene2_tyndall_stays_pixel_stepped_and_restrained() -> void:
 func test_scene2_receivers_share_one_visible_screen_space_light_field() -> void:
 	var stage := (load(SCENE2_PATH) as PackedScene).instantiate()
 	var receiver_names := [
-		"Sky",
 		"MidMountain",
 		"WaterfallRidgeLeft",
 		"Waterfall",
@@ -64,8 +43,11 @@ func test_scene2_receivers_share_one_visible_screen_space_light_field() -> void:
 				"%s must use scene coordinates instead of restarting light in local UV" % node_name)
 
 	var sky_material := stage.get_node("Sky").material as ShaderMaterial
-	assert_gte(float(sky_material.get_shader_parameter("scene_light_strength")), 0.15)
-	assert_gte(float(sky_material.get_shader_parameter("scene_shadow_strength")), 0.15)
+	assert_eq(sky_material.shader.resource_path, SKY_GRADE_SHADER_PATH)
+	assert_false(sky_material.shader.code.contains("scene2_light_field"),
+			"Sky keeps its authored grade without the removed manual light field")
+	assert_null(sky_material.get_shader_parameter("scene_light_strength"))
+	assert_null(sky_material.get_shader_parameter("scene_shadow_strength"))
 	var ridge_material := stage.get_node("WaterfallRidgeLeft").material as ShaderMaterial
 	assert_gte(float(ridge_material.get_shader_parameter("receiver_light_strength")), 0.2)
 	assert_gte(float(ridge_material.get_shader_parameter("receiver_shadow_strength")), 0.15)

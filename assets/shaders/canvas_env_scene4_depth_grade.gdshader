@@ -23,6 +23,10 @@ uniform float palette_source_light : hint_range(0.1, 1.0, 0.01) = 0.58;
 uniform float sway_strength_px : hint_range(0.0, 6.0, 0.1) = 0.0;
 uniform float sway_speed : hint_range(0.0, 2.0, 0.01) = 0.72;
 uniform float sway_phase : hint_range(0.0, 6.3, 0.01) = 0.0;
+// Optional phase drift across the source width. Zero preserves the exact
+// legacy motion; hanging canopies can opt in so separate leaf clusters do not
+// slide as one rigid strip.
+uniform float sway_spatial_phase : hint_range(0.0, 6.3, 0.01) = 0.0;
 uniform float sway_y_start : hint_range(0.0, 1.0, 0.01) = 0.0;
 uniform float sway_y_end : hint_range(0.0, 1.0, 0.01) = 1.0;
 uniform float sway_x_min : hint_range(0.0, 1.0, 0.01) = 0.0;
@@ -33,7 +37,13 @@ uniform float sway_depth_influence : hint_range(0.0, 1.0, 0.01) = 1.0;
 uniform float sway_blend_strength : hint_range(0.0, 1.0, 0.01) = 1.0;
 uniform float alpha_cleanup_threshold : hint_range(0.0, 0.8, 0.01) = 0.0;
 uniform float alpha_cleanup_softness : hint_range(0.01, 0.4, 0.01) = 0.18;
-// Optional rectangular reveal used by the FarForest branch occluder.
+// Optional lower-edge dissolve for full-frame distant art. Zero floor reveals
+// the authored Sky instead of preserving a second ground line.
+uniform bool lower_alpha_fade_enabled = false;
+uniform float lower_alpha_fade_start : hint_range(0.0, 1.0, 0.01) = 0.7;
+uniform float lower_alpha_fade_end : hint_range(0.0, 1.0, 0.01) = 0.9;
+uniform float lower_alpha_floor : hint_range(0.0, 1.0, 0.01) = 0.0;
+// Optional rectangular reveal retained for direct editable layer masks.
 uniform bool alpha_window_enabled = false;
 uniform vec2 alpha_window_min = vec2(0.0);
 uniform vec2 alpha_window_max = vec2(1.0);
@@ -62,10 +72,14 @@ void fragment() {
 			(UV.y - sway_y_start) / max(sway_y_end - sway_y_start, 0.001),
 			0.0,
 			1.0);
-	float sway_wave = sin(TIME * sway_speed + sway_phase);
+	float sway_wave = sin(
+			TIME * sway_speed
+			+ sway_phase
+			+ UV.x * sway_spatial_phase);
 	sway_wave += sin(
 			TIME * sway_speed * sway_secondary_ratio
-			+ sway_phase * 1.31) * sway_secondary_strength;
+			+ sway_phase * 1.31
+			+ UV.x * sway_spatial_phase * 1.7) * sway_secondary_strength;
 	float sway_weight = mix(
 			1.0,
 			hanging_depth,
@@ -142,8 +156,16 @@ void fragment() {
 				alpha_cleanup_threshold + alpha_cleanup_softness,
 				source.a);
 	}
+	float lower_alpha_fade = 1.0;
+	if (lower_alpha_fade_enabled) {
+		float fade_progress = smoothstep(
+				lower_alpha_fade_start,
+				max(lower_alpha_fade_end, lower_alpha_fade_start + 0.001),
+				UV.y);
+		lower_alpha_fade = mix(1.0, lower_alpha_floor, fade_progress);
+	}
 	COLOR = vec4(
 			clamp(color, vec3(0.0), vec3(1.0)),
-			clean_alpha * alpha_window)
+			clean_alpha * alpha_window * lower_alpha_fade)
 			* node_modulate;
 }

@@ -42,7 +42,12 @@ uniform float heat_haze_strength : hint_range(0.0, 3.0, 0.05) = 0.0;
 uniform float heat_haze_speed : hint_range(0.0, 1.5, 0.01) = 0.34;
 uniform float heat_haze_scale : hint_range(2.0, 18.0, 0.1) = 8.4;
 uniform float heat_haze_top_weight : hint_range(0.0, 1.0, 0.01) = 0.20;
+uniform float heat_haze_lower_focus : hint_range(0.0, 0.8, 0.01) = 0.10;
 uniform float heat_haze_vertical : hint_range(0.0, 0.5, 0.01) = 0.16;
+uniform float heat_haze_character_protection : hint_range(0.0, 1.0, 0.01) = 0.0;
+uniform vec2 heat_haze_p1_center = vec2(0.25, 0.58);
+uniform vec2 heat_haze_p2_center = vec2(0.75, 0.58);
+uniform vec2 heat_haze_character_radius = vec2(0.15, 0.34);
 group_uniforms;
 
 group_uniforms impact_frame;
@@ -71,7 +76,7 @@ vec2 rising_refraction(vec2 screen_uv, vec2 screen_pixel_size) {
 	float vertical_weight = mix(
 			heat_haze_top_weight,
 			1.0,
-			smoothstep(0.10, 0.88, screen_uv.y));
+			smoothstep(heat_haze_lower_focus, 0.90, screen_uv.y));
 	float broad = sin(
 			screen_uv.y * heat_haze_scale * 6.2831853
 			- rise * 6.2831853
@@ -84,7 +89,18 @@ vec2 rising_refraction(vec2 screen_uv, vec2 screen_pixel_size) {
 	vec2 heat_haze_offset = vec2(
 			field * screen_pixel_size.x,
 			fine * screen_pixel_size.y * heat_haze_vertical);
-	return heat_haze_offset * heat_haze_strength * vertical_weight;
+	vec2 p1_delta = (screen_uv - heat_haze_p1_center)
+			/ max(heat_haze_character_radius, vec2(0.001));
+	vec2 p2_delta = (screen_uv - heat_haze_p2_center)
+			/ max(heat_haze_character_radius, vec2(0.001));
+	float p1_protection = 1.0 - smoothstep(0.72, 1.12, length(p1_delta));
+	float p2_protection = 1.0 - smoothstep(0.72, 1.12, length(p2_delta));
+	float character_protection = max(p1_protection, p2_protection)
+			* heat_haze_character_protection;
+	return heat_haze_offset
+			* heat_haze_strength
+			* vertical_weight
+			* (1.0 - character_protection);
 }
 
 

@@ -9,6 +9,7 @@ extends Node
 @onready var gold_energy: TextureRect = $"../GoldEnergy"
 
 var _animation_time: float = 0.0
+var _speed_multiplier: float = 1.0
 var _contour_material: ShaderMaterial
 var _gold_material: ShaderMaterial
 
@@ -21,12 +22,18 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if not animation_enabled:
 		return
-	_animation_time = fposmod(_animation_time + delta, 120.0)
+	_animation_time = fposmod(
+		_animation_time + delta * _speed_multiplier,
+		120.0)
 	_apply_motion()
 
 
 func animation_time() -> float:
 	return _animation_time
+
+
+func set_speed_multiplier(multiplier: float) -> void:
+	_speed_multiplier = maxf(multiplier, 0.0)
 
 
 func prepare_intro() -> void:
@@ -52,6 +59,7 @@ func set_intro_progress(
 
 func finish_intro() -> void:
 	set_intro_progress(1.0, 1.0)
+	_speed_multiplier = 1.0
 	animation_enabled = true
 
 

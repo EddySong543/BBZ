@@ -33,8 +33,15 @@ const GROUP_END_PIXELS: Array[float] = [726.0, 498.0, 270.0]
 @export_range(0.0, 1.0, 0.01) var structure_tint_strength: float = 0.42
 
 @export_group("Opening Entry")
-@export_range(0.01, 0.16, 0.001) var intro_blade_width: float = 0.065
-@export_range(0.0, 1.0, 0.01) var intro_blade_strength: float = 0.62
+@export_range(0.001, 0.05, 0.001) var intro_reveal_feather: float = 0.012
+@export_range(0.01, 0.30, 0.001) var intro_crack_peak_width: float = 0.11
+@export_range(0.0, 0.20, 0.001) var intro_shadow_lag: float = 0.055
+@export_range(0.0, 0.25, 0.001) var intro_english_delay: float = 0.052632
+
+@export_group("Pointer Perspective")
+@export_range(0.0, 10.0, 0.1) var pointer_yaw_degrees: float = 6.0
+@export_range(0.0, 6.0, 0.1) var pointer_pitch_degrees: float = 2.5
+@export_range(1.0, 12.0, 0.1) var pointer_smooth: float = 5.0
 
 @onready var _bo_top: TextureRect = $BoTop
 @onready var _bo_middle: TextureRect = $BoMiddle
@@ -51,6 +58,7 @@ var _english_material: ShaderMaterial
 var _english_shadow_material: ShaderMaterial
 var _phase_tween: Tween
 var _current_flow_phase: float = 0.0
+var _pointer_tilt: Vector2 = Vector2.ZERO
 
 
 func _ready() -> void:
@@ -59,6 +67,29 @@ func _ready() -> void:
 		return
 	_apply_shared_parameters()
 	_start_phase_tween()
+	_apply_pointer_tilt()
+
+
+func _process(delta: float) -> void:
+	var viewport_size := get_viewport_rect().size
+	var target := Vector2.ZERO
+	if viewport_size.x > 0.0 and viewport_size.y > 0.0:
+		var mouse_position := get_viewport().get_mouse_position()
+		target = Vector2(
+			(mouse_position.x / viewport_size.x - 0.5) * 2.0,
+			(mouse_position.y / viewport_size.y - 0.5) * 2.0)
+		target.x = clampf(target.x, -1.0, 1.0)
+		target.y = clampf(target.y, -1.0, 1.0)
+	var response := 1.0 - exp(-maxf(pointer_smooth, 0.001) * delta)
+	_pointer_tilt = _pointer_tilt.lerp(target, response)
+	_apply_pointer_tilt()
+
+
+func preview_pointer_tilt(normalized_pointer: Vector2) -> void:
+	_pointer_tilt = Vector2(
+		clampf(normalized_pointer.x, -1.0, 1.0),
+		clampf(normalized_pointer.y, -1.0, 1.0))
+	_apply_pointer_tilt()
 
 
 func apply_palette(
@@ -172,6 +203,15 @@ func _apply_shared_parameters() -> void:
 
 	for index: int in _materials.size():
 		var shader_material := _materials[index]
+		shader_material.set_shader_parameter(&"flow_enabled", false)
+		shader_material.set_shader_parameter(&"intro_shadow", false)
+		shader_material.set_shader_parameter(&"intro_progress_delay", 0.0)
+		shader_material.set_shader_parameter(
+			&"intro_reveal_feather",
+			intro_reveal_feather)
+		shader_material.set_shader_parameter(
+			&"intro_crack_peak_width",
+			intro_crack_peak_width)
 		shader_material.set_shader_parameter(
 			&"flow_delay",
 			float(index) * flow_stagger_seconds / safe_period)
@@ -197,12 +237,6 @@ func _apply_shared_parameters() -> void:
 			&"structure_tint_strength",
 			structure_tint_strength)
 		shader_material.set_shader_parameter(
-			&"intro_blade_width",
-			intro_blade_width)
-		shader_material.set_shader_parameter(
-			&"intro_blade_strength",
-			intro_blade_strength)
-		shader_material.set_shader_parameter(
 			&"flow_start_uv_x",
 			FLOW_START_PIXELS[index] / TITLE_TEXTURE_SIZE)
 		shader_material.set_shader_parameter(
@@ -215,17 +249,58 @@ func _apply_shared_parameters() -> void:
 			&"group_x_max",
 			GROUP_END_PIXELS[index] / TITLE_GROUP_WIDTH)
 	for shadow_material: ShaderMaterial in _shadow_materials:
+		shadow_material.set_shader_parameter(&"flow_enabled", false)
+		shadow_material.set_shader_parameter(&"intro_shadow", true)
+		shadow_material.set_shader_parameter(&"intro_progress_delay", 0.0)
 		shadow_material.set_shader_parameter(
-			&"intro_blade_width",
-			intro_blade_width)
+			&"intro_reveal_feather",
+			intro_reveal_feather)
 		shadow_material.set_shader_parameter(
-			&"intro_blade_strength",
-			0.0)
+			&"intro_shadow_lag",
+			intro_shadow_lag)
 	_apply_english_parameters(
 		safe_period,
 		normalized_flow_duration,
 		normalized_release_duration)
 	_apply_palette()
+	_apply_pointer_tilt()
+
+
+func _apply_pointer_tilt() -> void:
+	var yaw_strength := tan(deg_to_rad(pointer_yaw_degrees))
+	var pitch_strength := tan(deg_to_rad(pointer_pitch_degrees))
+	for shader_material: ShaderMaterial in (
+			_materials + _shadow_materials):
+		shader_material.set_shader_parameter(
+			&"pointer_yaw",
+			_pointer_tilt.x)
+		shader_material.set_shader_parameter(
+			&"pointer_pitch",
+			_pointer_tilt.y)
+		shader_material.set_shader_parameter(
+			&"pointer_yaw_strength",
+			yaw_strength)
+		shader_material.set_shader_parameter(
+			&"pointer_pitch_strength",
+			pitch_strength)
+	for shader_material: ShaderMaterial in [
+		_english_material,
+		_english_shadow_material,
+	]:
+		if shader_material == null:
+			continue
+		shader_material.set_shader_parameter(
+			&"pointer_yaw",
+			_pointer_tilt.x)
+		shader_material.set_shader_parameter(
+			&"pointer_pitch",
+			_pointer_tilt.y)
+		shader_material.set_shader_parameter(
+			&"pointer_yaw_strength",
+			yaw_strength)
+		shader_material.set_shader_parameter(
+			&"pointer_pitch_strength",
+			pitch_strength)
 
 
 func _apply_english_parameters(
@@ -235,6 +310,9 @@ func _apply_english_parameters(
 ) -> void:
 	if _english_material == null or _english_shadow_material == null:
 		return
+	_english_material.set_shader_parameter(
+		&"flow_enabled",
+		true)
 	_english_material.set_shader_parameter(
 		&"flow_delay",
 		0.12 / safe_period)
@@ -260,21 +338,34 @@ func _apply_english_parameters(
 		&"structure_tint_strength",
 		structure_tint_strength)
 	_english_material.set_shader_parameter(
-		&"intro_blade_width",
-		intro_blade_width)
+		&"intro_reveal_feather",
+		intro_reveal_feather)
 	_english_material.set_shader_parameter(
-		&"intro_blade_strength",
-		intro_blade_strength * 0.82)
+		&"intro_crack_peak_width",
+		intro_crack_peak_width)
+	_english_material.set_shader_parameter(&"intro_shadow", false)
+	_english_material.set_shader_parameter(
+		&"intro_progress_delay",
+		intro_english_delay)
 	_english_material.set_shader_parameter(&"flow_start_uv_x", 0.98)
 	_english_material.set_shader_parameter(&"flow_end_uv_x", 0.02)
 	_english_material.set_shader_parameter(&"group_x_min", 0.0)
 	_english_material.set_shader_parameter(&"group_x_max", 1.0)
 	_english_shadow_material.set_shader_parameter(
-		&"intro_blade_width",
-		intro_blade_width)
+		&"flow_enabled",
+		false)
 	_english_shadow_material.set_shader_parameter(
-		&"intro_blade_strength",
-		0.0)
+		&"intro_shadow",
+		true)
+	_english_shadow_material.set_shader_parameter(
+		&"intro_progress_delay",
+		intro_english_delay)
+	_english_shadow_material.set_shader_parameter(
+		&"intro_reveal_feather",
+		intro_reveal_feather)
+	_english_shadow_material.set_shader_parameter(
+		&"intro_shadow_lag",
+		intro_shadow_lag)
 
 
 func _apply_palette() -> void:

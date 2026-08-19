@@ -9,9 +9,8 @@ const BACKGROUND_TOP_LEAVES_PATH := "res://assets/scenes/scene4/scene4_backgroun
 const BACKGROUND_TREE_PATH := "res://assets/scenes/scene4/scene4_background_tree.png"
 const BACKGROUND_TREE_2_PATH := "res://assets/scenes/scene4/scene4_background_tree_2.png"
 const BATTLE_PLATFORM_PATH := "res://assets/scenes/scene4/scene4_battle_platform.png"
-const LEFT_TREE_PATH := "res://assets/scenes/scene4/scene4_foreground_left_tree.png"
-const RIGHT_TREE_PATH := "res://assets/scenes/scene4/scene4_foreground_right_tree.png"
-const TOP_LEAVES_PATH := "res://assets/scenes/scene4/scene4_top_leaves.png"
+const LEFT_TREE_2_PATH := "res://assets/scenes/scene4/scene4_foreground_left_tree_2.png"
+const RIGHT_TREE_2_PATH := "res://assets/scenes/scene4/scene4_foreground_right_tree_2.png"
 const RUIN_STONE_1_PATH := "res://assets/scenes/scene4/scene4_midground_ruin_stone_1.png"
 const RUIN_STONE_2_PATH := "res://assets/scenes/scene4/scene4_midground_ruin_stone_2.png"
 const SKY_SHADER_PATH := "res://assets/shaders/canvas_env_scene4_sky_grade.gdshader"
@@ -24,6 +23,7 @@ const FOREGROUND_FOG_SHADER_PATH := "res://assets/shaders/canvas_env_scene4_fore
 const CHARACTER_SHADER_PATH := "res://assets/shaders/canvas_env_scene4_character_light.gdshader"
 const SHADOW_SHADER_PATH := "res://assets/shaders/canvas_env_scene4_root_contact_shadow.gdshader"
 const POSTFX_SHADER_PATH := "res://assets/shaders/post_fx_color_grade.gdshader"
+const LEAF_SPIRIT_SCRIPT_PATH := "res://src/ui/components/scene4_leaf_spirit_swarm.gd"
 
 
 func test_scene4_has_an_independent_shared_battle_entry() -> void:
@@ -49,90 +49,43 @@ func test_scene4_has_an_independent_shared_battle_entry() -> void:
 	assert_true(screen.has_node("P2Hud"))
 	assert_true(screen.has_node("Buttons"))
 	assert_true(screen.has_node("DeathSwitchOverlay"))
+	assert_false(screen.character_reflections_enabled)
+	assert_true(screen.character_reflection_receiver_path.is_empty())
 	BattleSetup.reset()
 
 
-func test_scene4_exposes_nearest_filtered_flat_parallax_layers() -> void:
-	var scene_source := FileAccess.get_file_as_string(SCENE4_PATH)
+func test_scene4_leaf_spirits_are_low_frequency_procedural_pixel_creatures() -> void:
 	var stage := (load(SCENE4_PATH) as PackedScene).instantiate()
 	add_child_autofree(stage)
-	var layer_contract: Dictionary[String, float] = {
-		"Sky": 0.0,
-		"FarForest": 0.05,
-		"BackgroundTopLeaves": 0.08,
-		"BackgroundTree2": 0.1,
-		"BackgroundTree": 0.22,
-		"CanopyLightShafts": 0.32,
-		"RuinStone1": 0.46,
-		"RuinStone3": 0.46,
-		"RuinStone4": 0.46,
-		"RuinStone2": 0.52,
-		"CanopyMotes": 0.58,
-		"MidgroundMist": 0.7,
-		"RuinMotes1": 0.46,
-		"RuinMotes2": 0.52,
-		"RuinMotes3": 0.46,
-		"RuinMotes4": 0.46,
-		"BattlePlatform": 1.0,
-		"LeftTree": 1.2,
-		"RightTree": 1.2,
-		"TopLeaves": 1.25,
-		"ForegroundMotes": 1.5,
-		"ForegroundFog": 1.58,
-	}
-	for node_name: String in layer_contract:
-		var layer := stage.get_node(node_name) as CanvasItem
-		assert_not_null(layer)
-		assert_eq(layer.get_parent(), stage)
-		assert_eq(layer.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST)
-		assert_eq(float(layer.get_meta("parallax_factor")), layer_contract[node_name])
-		if layer is Control:
-			assert_eq((layer as Control).mouse_filter, Control.MOUSE_FILTER_IGNORE)
+	await get_tree().process_frame
 
-	assert_lt(stage.get_node("Sky").get_index(),
-			stage.get_node("FarForest").get_index())
-	assert_lt(stage.get_node("FarForest").get_index(),
-			stage.get_node("BackgroundTree2").get_index())
-	assert_lt(stage.get_node("BackgroundTree2").get_index(),
-			stage.get_node("BackgroundTree").get_index())
-	assert_lt(stage.get_node("BackgroundTree").get_index(),
-			stage.get_node("BackgroundTopLeaves").get_index())
-	assert_lt(stage.get_node("BackgroundTopLeaves").get_index(),
-			stage.get_node("CanopyLightShafts").get_index())
-	assert_lt(stage.get_node("CanopyLightShafts").get_index(),
-			stage.get_node("MidgroundMist").get_index())
-	assert_lt(stage.get_node("MidgroundMist").get_index(),
-			stage.get_node("CanopyMotes").get_index())
-	assert_lt(stage.get_node("FarForest").get_index(),
-			stage.get_node("RuinStone1").get_index())
-	assert_lt(stage.get_node("RuinStone1").get_index(),
-			stage.get_node("RuinStone2").get_index())
-	assert_lt(stage.get_node("RuinStone2").get_index(),
-			stage.get_node("RuinStone3").get_index())
-	assert_lt(stage.get_node("CanopyLightShafts").get_index(),
-			stage.get_node("CanopyMotes").get_index())
-	assert_lt(stage.get_node("TopLeaves").get_index(),
-			stage.get_node("ForegroundMotes").get_index())
-	assert_lt(stage.get_node("ForegroundMotes").get_index(),
-			stage.get_node("ForegroundFog").get_index())
+	var spirits := stage.get_node("LeafSpirits")
+	assert_not_null(spirits)
+	assert_eq(spirits.get_script().resource_path, LEAF_SPIRIT_SCRIPT_PATH)
+	assert_between(float(spirits.interval_min_sec), 22.0, 24.0)
+	assert_between(float(spirits.interval_max_sec), 36.0, 38.0)
+	assert_eq(int(spirits.spirit_count_min), 2)
+	assert_eq(int(spirits.spirit_count_max), 3)
+	assert_gte(float(spirits.spirit_scale_min), 2.2)
+	assert_lte(float(spirits.spirit_scale_max), 3.1)
+	assert_eq(int(spirits.call("get_pool_size")), 5)
 
-	for child: Node in stage.get_children():
-		assert_false(child.name.ends_with("Slot"))
-	for removed_foreground: String in ["NearCenter", "NearLeft", "NearRight"]:
-		assert_false(stage.has_node(removed_foreground))
+	var source := FileAccess.get_file_as_string(LEAF_SPIRIT_SCRIPT_PATH)
+	assert_true(source.contains("Image.create"))
+	assert_true(source.contains("_cubic_bezier"))
+	assert_true(source.contains("_flight_progress"))
+	assert_false(source.contains("res://assets/"))
 
-	assert_true(scene_source.contains(SKY_SHADER_PATH))
-	assert_true(scene_source.contains(DEPTH_GRADE_SHADER_PATH))
-	assert_true(scene_source.contains(RELIC_GLOW_SHADER_PATH))
-	assert_true(scene_source.contains(CANOPY_SHAFTS_SHADER_PATH))
-	assert_true(scene_source.contains(MIDGROUND_MIST_SHADER_PATH))
-	assert_true(scene_source.contains(MOTE_SYNC_SHADER_PATH))
-	assert_true(scene_source.contains(FOREGROUND_FOG_SHADER_PATH))
-	assert_false(scene_source.contains("canvas_env_scene4_canopy_sky"))
-	assert_false(scene_source.contains("canvas_env_stars"))
-	assert_false(scene_source.contains("canvas_env_moon"))
-	assert_false(scene_source.contains("res://assets/import/"))
-	assert_false(scene_source.contains("generated_images"))
+	assert_true(bool(spirits.call("trigger_swarm", 1)))
+	await get_tree().process_frame
+	assert_between(int(spirits.call("get_active_spirit_count")), 2, 3)
+	var first_sprite := spirits.get_child(1) as Sprite2D
+	assert_not_null(first_sprite)
+	assert_not_null(first_sprite.texture)
+	assert_eq(first_sprite.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST)
+	assert_eq(first_sprite.hframes, 4)
+	assert_eq(first_sprite.texture.get_width() / first_sprite.hframes, 16)
+	assert_eq(first_sprite.texture.get_height(), 14)
 
 
 func test_scene4_connects_formal_tree_assets_to_expected_layers() -> void:
@@ -141,17 +94,23 @@ func test_scene4_connects_formal_tree_assets_to_expected_layers() -> void:
 	var expected_assets: Dictionary[String, String] = {
 		"Sky": SKY_TEXTURE_PATH,
 		"FarForest": FAR_FOREST_PATH,
-		"BackgroundTopLeaves": BACKGROUND_TOP_LEAVES_PATH,
+		"BackgroundBottomLeaves": BACKGROUND_TOP_LEAVES_PATH,
+		"BackgroundTopLeaves2": BACKGROUND_TOP_LEAVES_PATH,
 		"BackgroundTree": BACKGROUND_TREE_PATH,
 		"BackgroundTree2": BACKGROUND_TREE_2_PATH,
 		"BattlePlatform": BATTLE_PLATFORM_PATH,
-		"LeftTree": LEFT_TREE_PATH,
-		"RightTree": RIGHT_TREE_PATH,
-		"TopLeaves": TOP_LEAVES_PATH,
+		"LeftTree2": LEFT_TREE_2_PATH,
+		"RightTree2": RIGHT_TREE_2_PATH,
 		"RuinStone1": RUIN_STONE_1_PATH,
 		"RuinStone2": RUIN_STONE_2_PATH,
 		"RuinStone3": RUIN_STONE_1_PATH,
 		"RuinStone4": RUIN_STONE_1_PATH,
+	}
+	var replacement_dimensions: Dictionary[String, Vector2] = {
+		"FarForest": Vector2(248.0, 140.0),
+		"BattlePlatform": Vector2(308.0, 96.0),
+		"LeftTree2": Vector2(217.0, 217.0),
+		"RightTree2": Vector2(157.0, 244.0),
 	}
 	for node_path: String in expected_assets:
 		var art := stage.get_node(node_path) as TextureRect
@@ -160,25 +119,69 @@ func test_scene4_connects_formal_tree_assets_to_expected_layers() -> void:
 		assert_eq(art.texture.resource_path, expected_assets[node_path])
 		assert_eq(art.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST)
 		assert_eq(art.mouse_filter, Control.MOUSE_FILTER_IGNORE)
+		if node_path in replacement_dimensions:
+			assert_eq(
+					art.texture.get_size(),
+					replacement_dimensions[node_path],
+					"%s 使用 2026-08-09 导入的替换素材" % node_path)
 
-	assert_eq((stage.get_node("BackgroundTree") as Control).scale,
-			Vector2(3.4, 3.4))
-	assert_eq((stage.get_node("BackgroundTree2") as Control).scale,
-			Vector2(4.2, 4.2))
-	assert_eq((stage.get_node("FarForest") as Control).scale,
-			Vector2(8.0, 8.0))
-	assert_eq((stage.get_node("BackgroundTopLeaves") as Control).scale,
-			Vector2(4.2, 4.2))
+	assert_eq(
+			(stage.get_node("FarForest") as TextureRect).stretch_mode,
+			TextureRect.STRETCH_KEEP_ASPECT_COVERED)
+	var far_forest := stage.get_node("FarForest") as TextureRect
+	assert_eq(far_forest.anchor_right, 1.0)
+	assert_eq(far_forest.anchor_bottom, 1.0)
+	var far_forest_factor := float(far_forest.get_meta("parallax_factor"))
+	var bottom_leaves := stage.get_node("BackgroundBottomLeaves") as TextureRect
+	assert_true(bottom_leaves.flip_v)
+	assert_eq(bottom_leaves.anchor_right, 1.0)
+	assert_eq(bottom_leaves.anchor_bottom, 1.0)
+	assert_almost_eq(bottom_leaves.rotation, PI, 0.0001,
+			"保留 Eddy 取消底部垂直反转后的手动构图")
+	var bottom_leaves_factor := float(bottom_leaves.get_meta("parallax_factor"))
+	assert_lt(far_forest_factor, bottom_leaves_factor)
+	assert_lt(bottom_leaves_factor, 1.0)
 	assert_eq((stage.get_node("BattlePlatform") as Control).scale,
 			Vector2(6.0, 6.0))
-	assert_eq((stage.get_node("LeftTree") as Control).scale,
-			Vector2(4.0, 4.0))
-	assert_eq((stage.get_node("RightTree") as Control).scale,
-			Vector2(4.0, 4.0))
-	assert_eq((stage.get_node("RuinStone1") as Control).scale,
-			Vector2(2.5, 2.5))
-	assert_eq((stage.get_node("RuinStone2") as Control).scale,
-			Vector2(2.5, 2.5))
+
+
+func test_scene4_separates_platform_from_bottom_canopy_without_moving_authored_art() -> void:
+	var stage := (load(SCENE4_PATH) as PackedScene).instantiate()
+	add_child_autofree(stage)
+	var bottom_leaves := stage.get_node("BackgroundBottomLeaves") as TextureRect
+	var bottom_material := bottom_leaves.material as ShaderMaterial
+	var platform := stage.get_node("BattlePlatform") as TextureRect
+	var platform_material := platform.material as ShaderMaterial
+	var depth_shadow := stage.get_node_or_null("BattlePlatformDepthShadow") as TextureRect
+
+	assert_not_null(depth_shadow)
+	if depth_shadow == null:
+		return
+	assert_eq(depth_shadow.texture.resource_path, BATTLE_PLATFORM_PATH)
+	assert_eq(depth_shadow.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST)
+	assert_eq(depth_shadow.mouse_filter, Control.MOUSE_FILTER_IGNORE)
+	assert_eq(depth_shadow.position.x, platform.position.x)
+	assert_almost_eq(depth_shadow.position.y - platform.position.y, 1.0, 0.001)
+	assert_eq(depth_shadow.size, platform.size)
+	assert_eq(depth_shadow.scale, platform.scale)
+	assert_eq(depth_shadow.get_index() + 1, platform.get_index())
+	assert_eq(float(depth_shadow.get_meta("parallax_factor")), 1.0)
+	assert_between(depth_shadow.modulate.a, 0.38, 0.48)
+	var shadow_material := depth_shadow.material as ShaderMaterial
+	assert_not_null(shadow_material)
+	assert_eq(shadow_material.shader.resource_path, DEPTH_GRADE_SHADER_PATH)
+	assert_lte(float(shadow_material.get_shader_parameter("brightness")), 0.4)
+	assert_gte(float(shadow_material.get_shader_parameter("palette_strength")), 0.9)
+
+	assert_gte(bottom_leaves.modulate.a, 0.99)
+	assert_between(float(bottom_material.get_shader_parameter("brightness")), 0.58, 0.62)
+	assert_between(float(bottom_material.get_shader_parameter("saturation")), 0.46, 0.5)
+	assert_between(float(bottom_material.get_shader_parameter("contrast")), 0.72, 0.76)
+	assert_between(float(bottom_material.get_shader_parameter("haze_strength")), 0.16, 0.2)
+	var bottom_mid := bottom_material.get_shader_parameter("palette_mid") as Color
+	var platform_mid := platform_material.get_shader_parameter("palette_mid") as Color
+	assert_lt(bottom_mid.g - bottom_mid.b, platform_mid.g - platform_mid.b)
+	assert_between(float(platform_material.get_shader_parameter("contrast")), 0.94, 0.97)
 
 
 func test_scene4_grades_every_environment_asset_by_depth_role() -> void:
@@ -186,13 +189,13 @@ func test_scene4_grades_every_environment_asset_by_depth_role() -> void:
 	add_child_autofree(stage)
 	var depth_layers: Array[String] = [
 		"FarForest",
-		"BackgroundTopLeaves",
+		"BackgroundBottomLeaves",
+		"BackgroundTopLeaves2",
 		"BackgroundTree",
 		"BackgroundTree2",
 		"BattlePlatform",
-		"LeftTree",
-		"RightTree",
-		"TopLeaves",
+		"LeftTree2",
+		"RightTree2",
 	]
 	for node_name: String in depth_layers:
 		var layer := stage.get_node(node_name) as TextureRect
@@ -210,15 +213,83 @@ func test_scene4_grades_every_environment_asset_by_depth_role() -> void:
 	var far_forest_material := (
 			stage.get_node("FarForest") as TextureRect
 	).material as ShaderMaterial
-	assert_lte(float(far_forest_material.get_shader_parameter("contrast")), 0.7)
-	assert_gte(float(far_forest_material.get_shader_parameter("haze_strength")), 0.3)
+	assert_between(
+			float(far_forest_material.get_shader_parameter("brightness")),
+			0.74,
+			0.78)
+	assert_between(
+			float(far_forest_material.get_shader_parameter("saturation")),
+			0.48,
+			0.52)
+	assert_between(
+			float(far_forest_material.get_shader_parameter("contrast")),
+			0.6,
+			0.64)
+	assert_between(
+			float(far_forest_material.get_shader_parameter("haze_strength")),
+			0.36,
+			0.4)
+	var far_mid := far_forest_material.get_shader_parameter("palette_mid") as Color
+	assert_lte(absf(far_mid.g - far_mid.b), 0.03)
+	assert_true(bool(far_forest_material.get_shader_parameter(
+			"lower_alpha_fade_enabled")))
+	assert_between(
+			float(far_forest_material.get_shader_parameter(
+					"lower_alpha_fade_start")),
+			0.64,
+			0.68)
+	assert_between(
+			float(far_forest_material.get_shader_parameter(
+					"lower_alpha_fade_end")),
+			0.86,
+			0.9)
+	assert_eq(float(far_forest_material.get_shader_parameter(
+			"lower_alpha_floor")), 0.0)
+	assert_true(far_forest_material.shader.code.contains("lower_alpha_fade"))
 
 	var tree2_material := (
 			stage.get_node("BackgroundTree2") as TextureRect
 	).material as ShaderMaterial
-	assert_lte(float(tree2_material.get_shader_parameter("brightness")), 0.78)
-	assert_lte(float(tree2_material.get_shader_parameter("contrast")), 0.8)
-	assert_gte(float(tree2_material.get_shader_parameter("haze_strength")), 0.2)
+	var tree1_material := (
+			stage.get_node("BackgroundTree") as TextureRect
+	).material as ShaderMaterial
+	assert_between(
+			float(tree2_material.get_shader_parameter("brightness")),
+			0.65,
+			0.69)
+	assert_between(
+			float(tree2_material.get_shader_parameter("saturation")),
+			0.63,
+			0.69)
+	assert_between(
+			float(tree2_material.get_shader_parameter("contrast")),
+			0.82,
+			0.86)
+	assert_between(
+			float(tree2_material.get_shader_parameter("tint_strength")),
+			0.22,
+			0.3)
+	assert_between(
+			float(tree2_material.get_shader_parameter("haze_strength")),
+			0.15,
+			0.19)
+	assert_lt(
+			float(tree2_material.get_shader_parameter("brightness")),
+			float(tree1_material.get_shader_parameter("brightness")))
+	assert_lte(
+			float(tree2_material.get_shader_parameter("contrast")),
+			float(tree1_material.get_shader_parameter("contrast")))
+	assert_gt(
+			float(tree2_material.get_shader_parameter("haze_strength")),
+			float(tree1_material.get_shader_parameter("haze_strength")))
+	for palette_parameter: String in [
+		"palette_shadow",
+		"palette_mid",
+		"palette_light",
+	]:
+		assert_eq(
+				tree2_material.get_shader_parameter(palette_parameter),
+				tree1_material.get_shader_parameter(palette_parameter))
 
 	var sky_material := (
 			stage.get_node("Sky") as TextureRect
@@ -307,67 +378,183 @@ func test_scene4_grades_every_environment_asset_by_depth_role() -> void:
 
 	assert_false(stage.has_node("RuinStone2BranchOccluder"))
 
-	var top_leaves := stage.get_node("TopLeaves") as TextureRect
-	var top_leaves_material := top_leaves.material as ShaderMaterial
-	assert_gte(
-			float(top_leaves_material.get_shader_parameter("contrast")),
-			1.06)
-	assert_gte(
-			float(top_leaves_material.get_shader_parameter(
-					"alpha_cleanup_threshold")),
-			0.18)
-	assert_lte(
-			float(top_leaves_material.get_shader_parameter(
+	var background_top_leaves := (
+			stage.get_node("BackgroundTopLeaves2") as TextureRect
+	)
+	var background_bottom_leaves := (
+			stage.get_node("BackgroundBottomLeaves") as TextureRect
+	)
+	var background_top_material := (
+			background_top_leaves.material as ShaderMaterial
+	)
+	var background_bottom_material := (
+			background_bottom_leaves.material as ShaderMaterial
+	)
+	assert_ne(background_top_material, background_bottom_material)
+	assert_between(
+			float(background_top_material.get_shader_parameter(
+					"sway_strength_px")),
+			1.5,
+			1.7)
+	assert_between(
+			float(background_top_material.get_shader_parameter("sway_speed")),
+			0.3,
+			0.34)
+	assert_between(
+			float(background_top_material.get_shader_parameter(
+					"sway_spatial_phase")),
+			1.3,
+			1.5)
+	assert_between(
+			float(background_top_material.get_shader_parameter(
+					"sway_secondary_ratio")),
+			0.39,
+			0.43)
+	assert_between(
+			float(background_top_material.get_shader_parameter(
+					"sway_secondary_strength")),
+			0.1,
+			0.14)
+	assert_between(
+			float(background_top_material.get_shader_parameter(
 					"sway_blend_strength")),
-			0.24)
-	assert_lte(
-			float(top_leaves_material.get_shader_parameter(
-					"sway_depth_influence")),
-			0.4)
-	assert_gte(top_leaves.modulate.a, 0.86)
+			0.6,
+			0.7)
+	assert_true(background_top_material.shader.code.contains(
+			"sway_spatial_phase"))
+	assert_eq(float(background_bottom_material.get_shader_parameter(
+			"sway_strength_px")), 0.0)
+	assert_eq(float(background_bottom_material.get_shader_parameter(
+			"sway_speed")), 0.0)
+	assert_eq(float(background_bottom_material.get_shader_parameter(
+			"sway_secondary_strength")), 0.0)
+	assert_gte(background_bottom_leaves.modulate.a, 0.99)
 	assert_between(
-			float(top_leaves_material.get_shader_parameter("brightness")),
-			0.7,
-			0.74)
-	assert_lte(
-			float(top_leaves_material.get_shader_parameter("palette_strength")),
+			float(background_bottom_material.get_shader_parameter("brightness")),
+			0.58,
+			0.62)
+	assert_between(
+			float(background_bottom_material.get_shader_parameter("saturation")),
+			0.46,
+			0.5)
+	assert_between(
+			float(background_bottom_material.get_shader_parameter("contrast")),
+			0.72,
 			0.76)
+	assert_between(
+			float(background_bottom_material.get_shader_parameter("haze_strength")),
+			0.16,
+			0.2)
+	assert_between(
+			float(background_bottom_material.get_shader_parameter(
+					"alpha_cleanup_threshold")),
+			0.07,
+			0.09)
+	assert_between(
+			float(background_bottom_material.get_shader_parameter(
+					"alpha_cleanup_softness")),
+			0.05,
+			0.07)
 
-	var sway_speeds: Array[float] = []
-	for moving_layer: String in [
-		"BackgroundTopLeaves",
-		"TopLeaves",
-	]:
-		var moving_material := (
-				stage.get_node(moving_layer) as TextureRect
-		).material as ShaderMaterial
-		assert_gte(
-				float(moving_material.get_shader_parameter("sway_strength_px")),
-				2.0)
-		sway_speeds.append(
-				float(moving_material.get_shader_parameter("sway_speed")))
-	assert_ne(sway_speeds[0], sway_speeds[1])
-	assert_false((
-			stage.get_node("LeftTree") as TextureRect
-	).material.shader.code.contains("stepped_time"))
-	assert_eq(float((
-			stage.get_node("LeftTree") as TextureRect
-	).material.get_shader_parameter("sway_strength_px")), 0.0)
-	var right_material := (
-			stage.get_node("RightTree") as TextureRect
-	).material as ShaderMaterial
-	assert_eq(float(right_material.get_shader_parameter("sway_strength_px")), 0.0)
-	var left_material := (
-			stage.get_node("LeftTree") as TextureRect
-	).material as ShaderMaterial
-	assert_between(
-			float(left_material.get_shader_parameter("brightness")),
-			0.8,
-			0.84)
-	assert_between(
-			float(right_material.get_shader_parameter("brightness")),
-			0.79,
-			0.83)
+	var foreground_tree_contracts: Dictionary[String, Dictionary] = {
+		"LeftTree2": {
+			"brightness": 0.68,
+			"strength": 2.4,
+			"speed": 0.87,
+			"period": 7.22,
+			"phase": 0.35,
+			"x_min": 0.36,
+			"x_max": 0.63,
+			"y_min": 0.08,
+			"y_max": 0.72,
+		},
+		"RightTree2": {
+			"brightness": 0.72,
+			"strength": 2.1,
+			"speed": 0.58,
+			"period": 10.83,
+			"phase": 3.4,
+			"x_min": 0.25,
+			"x_max": 0.51,
+			"y_min": 0.10,
+			"y_max": 0.70,
+		},
+	}
+	for tree_name: String in foreground_tree_contracts:
+		var contract: Dictionary = foreground_tree_contracts[tree_name]
+		var tree := stage.get_node(tree_name) as TextureRect
+		var tree_material := tree.material as ShaderMaterial
+		assert_true(tree.visible)
+		assert_false(tree_material.shader.code.contains("stepped_time"))
+		assert_almost_eq(
+				float(tree_material.get_shader_parameter("sway_strength_px")),
+				float(contract["strength"]),
+				0.001,
+				"%s 仅摆动挑选出的垂藤" % tree_name)
+		assert_almost_eq(
+				float(tree_material.get_shader_parameter("sway_speed")),
+				float(contract["speed"]),
+				0.001)
+		assert_almost_eq(
+				float(tree_material.get_shader_parameter("sway_phase")),
+				float(contract["phase"]),
+				0.001)
+		assert_almost_eq(
+				TAU / float(tree_material.get_shader_parameter("sway_speed")),
+				float(contract["period"]),
+				0.05,
+				"%s 使用明确且可读的独立主周期" % tree_name)
+		assert_almost_eq(
+				float(tree_material.get_shader_parameter("sway_x_min")),
+				float(contract["x_min"]),
+				0.001)
+		assert_almost_eq(
+				float(tree_material.get_shader_parameter("sway_x_max")),
+				float(contract["x_max"]),
+				0.001)
+		assert_almost_eq(
+				float(tree_material.get_shader_parameter("sway_y_start")),
+				float(contract["y_min"]),
+				0.001)
+		assert_almost_eq(
+				float(tree_material.get_shader_parameter("sway_y_end")),
+				float(contract["y_max"]),
+				0.001)
+		assert_between(
+				float(contract["x_max"]) - float(contract["x_min"]),
+				0.24,
+				0.28,
+				"扩展藤蔓数量时仍不得覆盖树干主体")
+		assert_almost_eq(
+				float(tree_material.get_shader_parameter("brightness")),
+				float(contract["brightness"]),
+				0.001,
+				"%s 使用独立的近景压暗值" % tree_name)
+	var left_tree_material := (
+			(stage.get_node("LeftTree2") as TextureRect).material as ShaderMaterial
+	)
+	var right_tree_material := (
+			(stage.get_node("RightTree2") as TextureRect).material as ShaderMaterial
+	)
+	assert_ne(
+			float(left_tree_material.get_shader_parameter("sway_speed")),
+			float(right_tree_material.get_shader_parameter("sway_speed")),
+			"左右藤蔓不能使用相同节奏")
+	assert_gt(
+			absf(
+					TAU / float(left_tree_material.get_shader_parameter("sway_speed"))
+					- TAU / float(right_tree_material.get_shader_parameter("sway_speed"))),
+			3.0,
+			"左右主周期至少拉开 3 秒，避免短时间内看成同步摆动")
+
+	var platform_material := (
+			(stage.get_node("BattlePlatform") as TextureRect).material
+			as ShaderMaterial
+	)
+	assert_between(float(platform_material.get_shader_parameter("brightness")), 0.8, 0.84)
+	assert_between(float(platform_material.get_shader_parameter("saturation")), 0.66, 0.72)
+	assert_between(float(platform_material.get_shader_parameter("contrast")), 0.94, 0.97)
+	assert_between(float(platform_material.get_shader_parameter("haze_strength")), 0.03, 0.06)
 
 
 func test_scene4_guides_keep_the_mature_character_baseline() -> void:
@@ -418,11 +605,18 @@ func test_scene4_owns_authored_sky_grade_and_forest_motes() -> void:
 	assert_eq(mist_material.shader.resource_path, MIDGROUND_MIST_SHADER_PATH)
 	assert_between(
 			float(mist_material.get_shader_parameter("mist_strength")),
-			0.06,
-			0.08)
-	assert_lte(
+			0.1,
+			0.12)
+	assert_between(
+			float(mist_material.get_shader_parameter("band_center")),
+			0.79,
+			0.81)
+	assert_between(
 			float(mist_material.get_shader_parameter("band_half_width")),
-			0.09)
+			0.09,
+			0.11)
+	var mist_color := mist_material.get_shader_parameter("mist_color") as Color
+	assert_lte(absf(mist_color.g - mist_color.b), 0.03)
 	assert_true(mist_material.shader.code.contains("value_noise"))
 	assert_true(mist_material.shader.code.contains("pixel_grid"))
 
@@ -455,13 +649,15 @@ func test_scene4_owns_authored_sky_grade_and_forest_motes() -> void:
 	var foreground_fog := stage.get_node("ForegroundFog") as ColorRect
 	var foreground_fog_material := foreground_fog.material as ShaderMaterial
 	assert_not_null(foreground_fog_material)
+	assert_true(foreground_fog.visible,
+			"极薄前景雾只负责融合平台下缘与底部叶幕")
 	assert_eq(
 			foreground_fog_material.shader.resource_path,
 			FOREGROUND_FOG_SHADER_PATH)
 	assert_between(
 			float(foreground_fog_material.get_shader_parameter("alpha_max")),
-			0.3,
-			0.38)
+			0.04,
+			0.08)
 	assert_between(
 			float(foreground_fog_material.get_shader_parameter("drift_speed")),
 			0.02,
@@ -474,9 +670,10 @@ func test_scene4_owns_authored_sky_grade_and_forest_motes() -> void:
 	)
 	assert_gt(foreground_fog_color.g, foreground_fog_color.r)
 	assert_gt(foreground_fog_color.g, foreground_fog_color.b)
-	assert_gte(foreground_fog.offset_top, 760.0)
-	assert_lte(foreground_fog.offset_top, 800.0)
-	assert_gte(foreground_fog.offset_bottom, 1080.0)
+	assert_gte(foreground_fog.offset_top, 810.0)
+	assert_lte(foreground_fog.offset_top, 830.0)
+	assert_gte(foreground_fog.offset_bottom, 1020.0)
+	assert_lte(foreground_fog.offset_bottom, 1060.0)
 	assert_true(foreground_fog_material.shader.code.contains("pixel_grid"))
 	assert_true(foreground_fog_material.shader.code.contains("crest_band"))
 

@@ -7,6 +7,12 @@ uniform vec2 size_px = vec2(1680.0, 420.0);
 uniform float pixel_size : hint_range(2.0, 8.0, 1.0) = 4.0;
 uniform vec4 mist_color : source_color = vec4(0.55, 0.08, 0.06, 1.0);
 uniform float mist_strength : hint_range(0.0, 0.2, 0.005) = 0.055;
+uniform vec4 smoke_color : source_color = vec4(0.28, 0.035, 0.045, 1.0);
+uniform float smoke_strength : hint_range(0.0, 0.12, 0.005) = 0.0;
+uniform float smoke_rise_speed : hint_range(0.0, 0.08, 0.001) = 0.018;
+uniform float smoke_scale : hint_range(2.0, 12.0, 0.1) = 5.2;
+uniform float smoke_center_width : hint_range(0.08, 0.5, 0.01) = 0.34;
+uniform float smoke_layout : hint_range(-1.0, 1.0, 1.0) = 1.0;
 uniform vec4 ember_color : source_color = vec4(1.0, 0.37, 0.08, 1.0);
 uniform vec4 ember_edge_color : source_color = vec4(0.72, 0.12, 0.025, 1.0);
 uniform float ember_strength : hint_range(0.0, 1.0, 0.01) = 0.72;
@@ -15,6 +21,7 @@ uniform float ember_rise_speed : hint_range(0.0, 48.0, 1.0) = 22.0;
 uniform float ember_horizontal_drift : hint_range(-0.2, 0.2, 0.01) = 0.06;
 uniform float phase_seed = 17.0;
 uniform float motion_feather : hint_range(0.0, 0.45, 0.01) = 0.18;
+uniform float source_bias_strength : hint_range(0.0, 1.0, 0.01) = 0.0;
 
 varying vec4 node_modulate;
 
@@ -94,6 +101,33 @@ void fragment() {
 			* (1.0 - smoothstep(0.92, 1.0, uv_px.x));
 	float mist = mist_density * mist_band * side_fade * mist_strength;
 
+	// One very slow, broken heat-smoke contour rises from the central forge
+	// valley. It is pixel-stable in space and never fills the negative space
+	// with a soft translucent blanket.
+	float smoke_rise = TIME * smoke_rise_speed;
+	float smoke_broad = value_noise(vec2(
+			uv_px.x * smoke_scale + smoke_rise * 0.27,
+			uv_px.y * smoke_scale * 1.34 + smoke_rise));
+	float smoke_detail = value_noise(vec2(
+			uv_px.x * smoke_scale * 2.1 - smoke_rise * 0.19,
+			uv_px.y * smoke_scale * 2.7 + smoke_rise * 1.41));
+	float smoke_field = smoke_broad * 0.76 + smoke_detail * 0.24;
+	float smoke_contour = smoothstep(0.54, 0.67, smoke_field)
+			* (1.0 - smoothstep(0.71, 0.82, smoke_field));
+	float smoke_vertical = smoothstep(0.40, 0.64, uv_px.y)
+			* (1.0 - smoothstep(0.88, 1.0, uv_px.y));
+	float smoke_center = 1.0 - smoothstep(
+			smoke_center_width,
+			min(smoke_center_width + 0.14, 0.50),
+			abs(uv_px.x - 0.5));
+	float smoke_sides = 1.0 - smoke_center;
+	float smoke_layout_mask = mix(
+			smoke_sides,
+			smoke_center,
+			step(0.0, smoke_layout));
+	float smoke = smoke_contour * smoke_vertical * smoke_layout_mask
+			* smoke_strength;
+
 	float travel = TIME * ember_rise_speed;
 	float phase = travel / pixel_size;
 	float current_travel = floor(phase) * pixel_size;
@@ -108,11 +142,26 @@ void fragment() {
 			blend_phase);
 	float vertical_spawn_fade = smoothstep(0.12, 0.45, uv_px.y)
 			* (1.0 - smoothstep(0.84, 0.98, uv_px.y));
+	float source_field = value_noise(vec2(
+			uv_px.x * 7.0 + phase_seed * 0.11,
+			uv_px.y * 4.0 + phase_seed * 0.03));
+	float lower_source = smoothstep(0.38, 0.88, uv_px.y);
+	float fissure_source = smoothstep(0.46, 0.72, source_field);
+	float source_coherence = mix(
+			1.0,
+			mix(0.48, 1.28, lower_source * fissure_source),
+			source_bias_strength);
 	float ember_alpha = ember_shape * vertical_spawn_fade
-			* side_fade * ember_strength;
+			* side_fade * ember_strength * source_coherence;
 
 	vec3 ember_tint = mix(
 			ember_edge_color.rgb, ember_color.rgb, step(0.70, ember_shape));
-	vec3 color = mix(mist_color.rgb, ember_tint, step(mist, ember_alpha));
-	COLOR = vec4(color, max(mist, ember_alpha)) * node_modulate;
+	float atmosphere_alpha = max(mist, smoke);
+	vec3 atmosphere_tint = mix(
+			mist_color.rgb, smoke_color.rgb, step(mist, smoke));
+	vec3 color = mix(
+			atmosphere_tint,
+			ember_tint,
+			step(atmosphere_alpha, ember_alpha));
+	COLOR = vec4(color, max(atmosphere_alpha, ember_alpha)) * node_modulate;
 }

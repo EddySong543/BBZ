@@ -12,6 +12,7 @@
 [ext_resource type="Texture2D" uid="uid://tw1gt0dl6d5q" path="res://assets/ui/boot/character/boot_char_waist_screen_left.png" id="10_waist_screen_left"]
 [ext_resource type="Shader" uid="uid://bsmdudbadtp1n" path="res://assets/shaders/canvas_boot_character_shadow.gdshader" id="11_shadow_shader"]
 [ext_resource type="Shader" uid="uid://bb4j5xpdtor7w" path="res://assets/shaders/canvas_boot_character_depth.gdshader" id="12_depth_shader"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_boot_character_overlay.gdshader" id="13_overlay_shader"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_energy_glow"]
 shader = ExtResource("8_glow_shader")
@@ -20,6 +21,9 @@ shader_parameter/intensity = 0.78
 shader_parameter/radius = 0.92
 shader_parameter/pulse_amount = 0.06
 shader_parameter/pulse_phase = 0.0
+shader_parameter/pointer_tilt = Vector2(0, 0)
+shader_parameter/pointer_shift = 0.05
+shader_parameter/pointer_depth = 0.16
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_energy_star"]
 shader = ExtResource("9_star_shader")
@@ -37,12 +41,25 @@ shader_parameter/ray_pulse_width = 0.14
 shader_parameter/ring_strength = 0.42
 shader_parameter/ring_birth_duration = 0.16
 shader_parameter/ring_fade_start = 0.52
-shader_parameter/grid_size = 48.0
+shader_parameter/grid_size = 60.0
 shader_parameter/pulse_amount = 0.055
 shader_parameter/pulse_phase = 0.0
+shader_parameter/pointer_tilt = Vector2(0, 0)
+shader_parameter/pointer_rotation_degrees = 6.0
+shader_parameter/pointer_near_extension = 0.25
+shader_parameter/pointer_far_reduction = 0.15
+shader_parameter/pointer_ring_depth = 0.22
+shader_parameter/pointer_highlight_shift = 0.045
+shader_parameter/coordinate_scale = 1.25
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_character_depth"]
 shader = ExtResource("12_depth_shader")
+shader_parameter/pointer_tilt = Vector2(0, 0)
+shader_parameter/perspective_pivot = Vector2(0.56, 0.5)
+shader_parameter/pointer_yaw_strength = 0.052
+shader_parameter/pointer_pitch_strength = 0.021
+shader_parameter/front_hand_start = 0.62
+shader_parameter/front_hand_depth_boost = 1.25
 shader_parameter/hand_center = Vector2(0.82, 0.32)
 shader_parameter/hand_radius = Vector2(0.27, 0.34)
 shader_parameter/blur_texels = 1.0
@@ -53,10 +70,28 @@ shader_parameter/rear_light_radius = Vector2(0.22, 0.3)
 shader_parameter/rear_light_color = Color(0.909804, 0.784314, 0.439216, 1)
 shader_parameter/rear_light_strength = 0.14
 shader_parameter/energy_phase = 0.0
+shader_parameter/energy_transfer_center = Vector2(0.505, 0.405)
+shader_parameter/energy_transfer_radius = Vector2(0.2, 0.23)
+shader_parameter/energy_transfer_strength = 0.045
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_character_shadow"]
 shader = ExtResource("11_shadow_shader")
+shader_parameter/pointer_tilt = Vector2(0, 0)
+shader_parameter/perspective_pivot = Vector2(0.56, 0.5)
+shader_parameter/pointer_yaw_strength = 0.052
+shader_parameter/pointer_pitch_strength = 0.021
+shader_parameter/front_hand_start = 0.62
+shader_parameter/front_hand_depth_boost = 1.25
 shader_parameter/shadow_color = Color(0.0313725, 0.0392157, 0.0509804, 0.82)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_character_overlay"]
+shader = ExtResource("13_overlay_shader")
+shader_parameter/pointer_tilt = Vector2(0, 0)
+shader_parameter/perspective_pivot = Vector2(0.56, 0.5)
+shader_parameter/pointer_yaw_strength = 0.052
+shader_parameter/pointer_pitch_strength = 0.021
+shader_parameter/front_hand_start = 0.62
+shader_parameter/front_hand_depth_boost = 1.25
 
 [node name="BootCharacterIdle" type="Control" unique_id=1424163463]
 layout_mode = 3
@@ -85,10 +120,10 @@ mouse_filter = 2
 [node name="RearHandStar" type="ColorRect" parent="Rig/RearHandEnergyAnchor" unique_id=1494498467]
 z_index = 20
 material = SubResource("ShaderMaterial_energy_star")
-offset_left = -30.14
-offset_top = -30.14
-offset_right = 30.14
-offset_bottom = 30.14
+offset_left = -37.675
+offset_top = -37.675
+offset_right = 37.675
+offset_bottom = 37.675
 mouse_filter = 2
 
 [node name="Base" type="Sprite2D" parent="Rig" unique_id=1404843144]
@@ -110,6 +145,7 @@ position = Vector2(183, 91)
 
 [node name="WaistScreenRight" type="Sprite2D" parent="Rig/WaistScreenRightPivot" unique_id=1849971669]
 texture_filter = 1
+material = SubResource("ShaderMaterial_character_overlay")
 position = Vector2(-183, -91)
 texture = ExtResource("7_waist_screen_right")
 centered = false
@@ -119,27 +155,32 @@ position = Vector2(139, 91)
 
 [node name="WaistScreenLeft" type="Sprite2D" parent="Rig/WaistScreenLeftPivot" unique_id=1624321806]
 texture_filter = 1
+material = SubResource("ShaderMaterial_character_overlay")
 position = Vector2(-139, -91)
 texture = ExtResource("10_waist_screen_left")
 centered = false
 
 [node name="FurRightTips" type="Sprite2D" parent="Rig" unique_id=715662368]
 texture_filter = 1
+material = SubResource("ShaderMaterial_character_overlay")
 texture = ExtResource("6_fur_right")
 centered = false
 
 [node name="HairLeftTips" type="Sprite2D" parent="Rig" unique_id=563050165]
 texture_filter = 1
+material = SubResource("ShaderMaterial_character_overlay")
 texture = ExtResource("3_hair_left")
 centered = false
 
 [node name="HairRightTips" type="Sprite2D" parent="Rig" unique_id=625756076]
 texture_filter = 1
+material = SubResource("ShaderMaterial_character_overlay")
 texture = ExtResource("4_hair_right")
 centered = false
 
 [node name="HairFrontTips" type="Sprite2D" parent="Rig" unique_id=1227373915]
 texture_filter = 1
+material = SubResource("ShaderMaterial_character_overlay")
 texture = ExtResource("5_hair_front")
 centered = false
 

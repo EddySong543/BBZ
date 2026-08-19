@@ -3,11 +3,10 @@
 [ext_resource type="Script" uid="uid://di0qh6ki88n6e" path="res://src/ui/components/battle_stage.gd" id="1_stage"]
 [ext_resource type="Texture2D" uid="uid://cybdwidqwuufk" path="res://assets/scenes/scene4/scene4_background_tree.png" id="2_background_tree"]
 [ext_resource type="Texture2D" uid="uid://d1tff3kxxh224" path="res://assets/scenes/scene4/scene4_battle_platform.png" id="3_battle_platform"]
-[ext_resource type="Texture2D" uid="uid://cqmnqwaa5q243" path="res://assets/scenes/scene4/scene4_foreground_left_tree.png" id="4_left_tree"]
-[ext_resource type="Texture2D" uid="uid://ckp7qjuhyodla" path="res://assets/scenes/scene4/scene4_foreground_right_tree.png" id="5_right_tree"]
+[ext_resource type="Texture2D" uid="uid://d1c4yx685s1s3" path="res://assets/scenes/scene4/scene4_foreground_left_tree_2.png" id="5_left_tree_2"]
+[ext_resource type="Texture2D" uid="uid://cg4ocqf1hrwg2" path="res://assets/scenes/scene4/scene4_foreground_right_tree_2.png" id="5_right_tree_2"]
 [ext_resource type="Texture2D" uid="uid://buwm4ombxh8vn" path="res://assets/scenes/scene4/scene4_sky.png" id="6_sky"]
 [ext_resource type="Texture2D" uid="uid://bxa8j3q5folyb" path="res://assets/scenes/scene4/scene4_background_tree_2.png" id="7_background_tree_2"]
-[ext_resource type="Texture2D" uid="uid://lpmc5dc5ljts" path="res://assets/scenes/scene4/scene4_top_leaves.png" id="8_top_leaves"]
 [ext_resource type="Shader" uid="uid://1buwv06dmdhd" path="res://assets/shaders/canvas_env_scene4_sky_grade.gdshader" id="9_sky_grade"]
 [ext_resource type="Texture2D" uid="uid://7u4f1tlsevjw" path="res://assets/scenes/scene4/scene4_background_top_leaves.png" id="10_background_top_leaves"]
 [ext_resource type="Shader" uid="uid://cng2i80udwusb" path="res://assets/shaders/canvas_env_scene4_depth_grade.gdshader" id="11_depth_grade"]
@@ -19,6 +18,7 @@
 [ext_resource type="Shader" uid="uid://o43te7w5njvv" path="res://assets/shaders/canvas_env_scene4_midground_mist.gdshader" id="20_midground_mist"]
 [ext_resource type="Shader" uid="uid://bwutwwtjnl2wo" path="res://assets/shaders/canvas_env_scene4_mote_sync.gdshader" id="21_mote_sync"]
 [ext_resource type="Shader" uid="uid://cimmhf6wiuv4y" path="res://assets/shaders/canvas_env_scene4_foreground_fog.gdshader" id="22_foreground_fog"]
+[ext_resource type="Script" uid="uid://bslpks1d1ebru" path="res://src/ui/components/scene4_leaf_spirit_swarm.gd" id="23_leaf_spirits"]
 
 [sub_resource type="ShaderMaterial" id="Scene4SkyGradeMat"]
 resource_local_to_scene = true
@@ -33,23 +33,24 @@ shader_parameter/source_light = 0.26
 [sub_resource type="ShaderMaterial" id="Scene4FarForestMat"]
 resource_local_to_scene = true
 shader = ExtResource("11_depth_grade")
-shader_parameter/brightness = 0.84
-shader_parameter/saturation = 0.56
-shader_parameter/contrast = 0.68
-shader_parameter/tint_color = Color(0.45, 0.72, 0.55, 1)
-shader_parameter/tint_strength = 0.32
-shader_parameter/highlight_rolloff = 0.28
-shader_parameter/haze_color = Color(0.46, 0.68, 0.55, 1)
-shader_parameter/haze_strength = 0.34
-shader_parameter/palette_shadow = Color(0.07, 0.23, 0.18, 1)
-shader_parameter/palette_mid = Color(0.23, 0.47, 0.35, 1)
-shader_parameter/palette_light = Color(0.58, 0.75, 0.52, 1)
-shader_parameter/palette_strength = 0.74
+shader_parameter/brightness = 0.76
+shader_parameter/saturation = 0.5
+shader_parameter/contrast = 0.62
+shader_parameter/tint_color = Color(0.28, 0.5, 0.49, 1)
+shader_parameter/tint_strength = 0.36
+shader_parameter/highlight_rolloff = 0.3
+shader_parameter/haze_color = Color(0.3, 0.49, 0.47, 1)
+shader_parameter/haze_strength = 0.38
+shader_parameter/palette_shadow = Color(0.04, 0.17, 0.155, 1)
+shader_parameter/palette_mid = Color(0.13, 0.34, 0.32, 1)
+shader_parameter/palette_light = Color(0.37, 0.55, 0.5, 1)
+shader_parameter/palette_strength = 0.78
 shader_parameter/palette_source_dark = 0.05
-shader_parameter/palette_source_light = 0.6
+shader_parameter/palette_source_light = 0.58
 shader_parameter/sway_strength_px = 0.0
 shader_parameter/sway_speed = 0.72
 shader_parameter/sway_phase = 0.0
+shader_parameter/sway_spatial_phase = 0.0
 shader_parameter/sway_y_start = 0.0
 shader_parameter/sway_y_end = 1.0
 shader_parameter/sway_x_min = 0.0
@@ -60,6 +61,10 @@ shader_parameter/sway_depth_influence = 1.0
 shader_parameter/sway_blend_strength = 1.0
 shader_parameter/alpha_cleanup_threshold = 0.0
 shader_parameter/alpha_cleanup_softness = 0.18
+shader_parameter/lower_alpha_fade_enabled = true
+shader_parameter/lower_alpha_fade_start = 0.66
+shader_parameter/lower_alpha_fade_end = 0.88
+shader_parameter/lower_alpha_floor = 0.0
 shader_parameter/alpha_window_enabled = false
 shader_parameter/alpha_window_min = Vector2(0, 0)
 shader_parameter/alpha_window_max = Vector2(1, 1)
@@ -144,36 +149,41 @@ shader_parameter/base_charge = 0.18
 shader_parameter/energy_pixel_size_px = 1.0
 shader_parameter/motion_feather = 0.06
 
-[sub_resource type="ShaderMaterial" id="Scene4BackgroundTree2Mat"]
+[sub_resource type="ShaderMaterial" id="Scene4BackgroundBottomLeavesMat"]
 resource_local_to_scene = true
 shader = ExtResource("11_depth_grade")
-shader_parameter/brightness = 0.74
-shader_parameter/saturation = 0.58
-shader_parameter/contrast = 0.78
-shader_parameter/tint_color = Color(0.38, 0.65, 0.48, 1)
+shader_parameter/brightness = 0.6
+shader_parameter/saturation = 0.48
+shader_parameter/contrast = 0.74
+shader_parameter/tint_color = Color(0.22, 0.42, 0.4, 1)
 shader_parameter/tint_strength = 0.36
-shader_parameter/highlight_rolloff = 0.3
-shader_parameter/haze_color = Color(0.34, 0.58, 0.46, 1)
-shader_parameter/haze_strength = 0.24
-shader_parameter/palette_shadow = Color(0.045, 0.17, 0.13, 1)
-shader_parameter/palette_mid = Color(0.16, 0.38, 0.29, 1)
-shader_parameter/palette_light = Color(0.43, 0.61, 0.41, 1)
-shader_parameter/palette_strength = 0.72
+shader_parameter/highlight_rolloff = 0.24
+shader_parameter/haze_color = Color(0.24, 0.42, 0.4, 1)
+shader_parameter/haze_strength = 0.18
+shader_parameter/palette_shadow = Color(0.04, 0.14, 0.135, 1)
+shader_parameter/palette_mid = Color(0.11, 0.28, 0.275, 1)
+shader_parameter/palette_light = Color(0.3, 0.44, 0.4, 1)
+shader_parameter/palette_strength = 0.76
 shader_parameter/palette_source_dark = 0.04
-shader_parameter/palette_source_light = 0.58
+shader_parameter/palette_source_light = 0.56
 shader_parameter/sway_strength_px = 0.0
-shader_parameter/sway_speed = 0.72
+shader_parameter/sway_speed = 0.0
 shader_parameter/sway_phase = 0.0
-shader_parameter/sway_y_start = 0.0
-shader_parameter/sway_y_end = 1.0
+shader_parameter/sway_spatial_phase = 0.0
+shader_parameter/sway_y_start = 0.16
+shader_parameter/sway_y_end = 0.68
 shader_parameter/sway_x_min = 0.0
 shader_parameter/sway_x_max = 1.0
-shader_parameter/sway_secondary_ratio = 0.57
-shader_parameter/sway_secondary_strength = 0.36
+shader_parameter/sway_secondary_ratio = 0.63
+shader_parameter/sway_secondary_strength = 0.0
 shader_parameter/sway_depth_influence = 1.0
 shader_parameter/sway_blend_strength = 1.0
-shader_parameter/alpha_cleanup_threshold = 0.0
-shader_parameter/alpha_cleanup_softness = 0.18
+shader_parameter/alpha_cleanup_threshold = 0.08
+shader_parameter/alpha_cleanup_softness = 0.06
+shader_parameter/lower_alpha_fade_enabled = false
+shader_parameter/lower_alpha_fade_start = 0.7
+shader_parameter/lower_alpha_fade_end = 0.9
+shader_parameter/lower_alpha_floor = 0.0
 shader_parameter/alpha_window_enabled = false
 shader_parameter/alpha_window_min = Vector2(0, 0)
 shader_parameter/alpha_window_max = Vector2(1, 1)
@@ -198,6 +208,7 @@ shader_parameter/palette_source_light = 0.57
 shader_parameter/sway_strength_px = 0.0
 shader_parameter/sway_speed = 0.72
 shader_parameter/sway_phase = 0.0
+shader_parameter/sway_spatial_phase = 0.0
 shader_parameter/sway_y_start = 0.0
 shader_parameter/sway_y_end = 1.0
 shader_parameter/sway_x_min = 0.0
@@ -208,6 +219,49 @@ shader_parameter/sway_depth_influence = 1.0
 shader_parameter/sway_blend_strength = 1.0
 shader_parameter/alpha_cleanup_threshold = 0.0
 shader_parameter/alpha_cleanup_softness = 0.18
+shader_parameter/lower_alpha_fade_enabled = false
+shader_parameter/lower_alpha_fade_start = 0.7
+shader_parameter/lower_alpha_fade_end = 0.9
+shader_parameter/lower_alpha_floor = 0.0
+shader_parameter/alpha_window_enabled = false
+shader_parameter/alpha_window_min = Vector2(0, 0)
+shader_parameter/alpha_window_max = Vector2(1, 1)
+
+[sub_resource type="ShaderMaterial" id="Scene4BackgroundTree2Mat"]
+resource_local_to_scene = true
+shader = ExtResource("11_depth_grade")
+shader_parameter/brightness = 0.67
+shader_parameter/saturation = 0.66
+shader_parameter/contrast = 0.84
+shader_parameter/tint_color = Color(0.31, 0.59, 0.42, 1)
+shader_parameter/tint_strength = 0.28
+shader_parameter/highlight_rolloff = 0.24
+shader_parameter/haze_color = Color(0.27, 0.5, 0.39, 1)
+shader_parameter/haze_strength = 0.17
+shader_parameter/palette_shadow = Color(0.035, 0.14, 0.11, 1)
+shader_parameter/palette_mid = Color(0.12, 0.31, 0.23, 1)
+shader_parameter/palette_light = Color(0.36, 0.55, 0.34, 1)
+shader_parameter/palette_strength = 0.72
+shader_parameter/palette_source_dark = 0.035
+shader_parameter/palette_source_light = 0.57
+shader_parameter/sway_strength_px = 0.0
+shader_parameter/sway_speed = 0.72
+shader_parameter/sway_phase = 0.0
+shader_parameter/sway_spatial_phase = 0.0
+shader_parameter/sway_y_start = 0.0
+shader_parameter/sway_y_end = 1.0
+shader_parameter/sway_x_min = 0.0
+shader_parameter/sway_x_max = 1.0
+shader_parameter/sway_secondary_ratio = 0.57
+shader_parameter/sway_secondary_strength = 0.36
+shader_parameter/sway_depth_influence = 1.0
+shader_parameter/sway_blend_strength = 1.0
+shader_parameter/alpha_cleanup_threshold = 0.0
+shader_parameter/alpha_cleanup_softness = 0.18
+shader_parameter/lower_alpha_fade_enabled = false
+shader_parameter/lower_alpha_fade_start = 0.7
+shader_parameter/lower_alpha_fade_end = 0.9
+shader_parameter/lower_alpha_floor = 0.0
 shader_parameter/alpha_window_enabled = false
 shader_parameter/alpha_window_min = Vector2(0, 0)
 shader_parameter/alpha_window_max = Vector2(1, 1)
@@ -229,19 +283,24 @@ shader_parameter/palette_light = Color(0.4, 0.58, 0.36, 1)
 shader_parameter/palette_strength = 0.7
 shader_parameter/palette_source_dark = 0.04
 shader_parameter/palette_source_light = 0.58
-shader_parameter/sway_strength_px = 3.4
-shader_parameter/sway_speed = 0.48
+shader_parameter/sway_strength_px = 1.6
+shader_parameter/sway_speed = 0.32
 shader_parameter/sway_phase = 0.4
+shader_parameter/sway_spatial_phase = 1.4
 shader_parameter/sway_y_start = 0.16
 shader_parameter/sway_y_end = 0.68
 shader_parameter/sway_x_min = 0.0
 shader_parameter/sway_x_max = 1.0
-shader_parameter/sway_secondary_ratio = 0.63
-shader_parameter/sway_secondary_strength = 0.22
+shader_parameter/sway_secondary_ratio = 0.41
+shader_parameter/sway_secondary_strength = 0.12
 shader_parameter/sway_depth_influence = 1.0
-shader_parameter/sway_blend_strength = 1.0
+shader_parameter/sway_blend_strength = 0.65
 shader_parameter/alpha_cleanup_threshold = 0.0
 shader_parameter/alpha_cleanup_softness = 0.18
+shader_parameter/lower_alpha_fade_enabled = false
+shader_parameter/lower_alpha_fade_start = 0.7
+shader_parameter/lower_alpha_fade_end = 0.9
+shader_parameter/lower_alpha_floor = 0.0
 shader_parameter/alpha_window_enabled = false
 shader_parameter/alpha_window_min = Vector2(0, 0)
 shader_parameter/alpha_window_max = Vector2(1, 1)
@@ -258,11 +317,11 @@ shader_parameter/pixel_grid = Vector2(240, 135)
 [sub_resource type="ShaderMaterial" id="Scene4MidgroundMistMat"]
 resource_local_to_scene = true
 shader = ExtResource("20_midground_mist")
-shader_parameter/mist_color = Color(0.27, 0.46, 0.38, 1)
-shader_parameter/mist_strength = 0.07
-shader_parameter/drift_speed = 0.006
-shader_parameter/band_center = 0.64
-shader_parameter/band_half_width = 0.085
+shader_parameter/mist_color = Color(0.29, 0.42, 0.43, 1)
+shader_parameter/mist_strength = 0.11
+shader_parameter/drift_speed = 0.005
+shader_parameter/band_center = 0.8
+shader_parameter/band_half_width = 0.1
 shader_parameter/pixel_grid = Vector2(240, 135)
 
 [sub_resource type="ShaderMaterial" id="Scene4CanopyMoteSyncMat"]
@@ -370,26 +429,66 @@ shader_parameter/relic_pulse_speed = 0.085
 shader_parameter/relic_pulse_phase = 4.55
 shader_parameter/mote_tint = Color(0.604, 0.682, 0.725, 0.9)
 
+[sub_resource type="ShaderMaterial" id="Scene4BattlePlatformDepthShadowMat"]
+resource_local_to_scene = true
+shader = ExtResource("11_depth_grade")
+shader_parameter/brightness = 0.36
+shader_parameter/saturation = 0.45
+shader_parameter/contrast = 0.86
+shader_parameter/tint_color = Color(0.18, 0.36, 0.34, 1)
+shader_parameter/tint_strength = 0.55
+shader_parameter/highlight_rolloff = 0.12
+shader_parameter/haze_color = Color(0.12, 0.27, 0.26, 1)
+shader_parameter/haze_strength = 0.06
+shader_parameter/palette_shadow = Color(0.012, 0.055, 0.05, 1)
+shader_parameter/palette_mid = Color(0.03, 0.11, 0.105, 1)
+shader_parameter/palette_light = Color(0.08, 0.19, 0.17, 1)
+shader_parameter/palette_strength = 0.95
+shader_parameter/palette_source_dark = 0.03
+shader_parameter/palette_source_light = 0.5
+shader_parameter/sway_strength_px = 0.0
+shader_parameter/sway_speed = 0.72
+shader_parameter/sway_phase = 0.0
+shader_parameter/sway_spatial_phase = 0.0
+shader_parameter/sway_y_start = 0.0
+shader_parameter/sway_y_end = 1.0
+shader_parameter/sway_x_min = 0.0
+shader_parameter/sway_x_max = 1.0
+shader_parameter/sway_secondary_ratio = 0.57
+shader_parameter/sway_secondary_strength = 0.36
+shader_parameter/sway_depth_influence = 1.0
+shader_parameter/sway_blend_strength = 1.0
+shader_parameter/alpha_cleanup_threshold = 0.08
+shader_parameter/alpha_cleanup_softness = 0.06
+shader_parameter/lower_alpha_fade_enabled = false
+shader_parameter/lower_alpha_fade_start = 0.7
+shader_parameter/lower_alpha_fade_end = 0.9
+shader_parameter/lower_alpha_floor = 0.0
+shader_parameter/alpha_window_enabled = false
+shader_parameter/alpha_window_min = Vector2(0, 0)
+shader_parameter/alpha_window_max = Vector2(1, 1)
+
 [sub_resource type="ShaderMaterial" id="Scene4BattlePlatformMat"]
 resource_local_to_scene = true
 shader = ExtResource("11_depth_grade")
-shader_parameter/brightness = 0.84
-shader_parameter/saturation = 0.78
-shader_parameter/contrast = 0.94
-shader_parameter/tint_color = Color(0.38, 0.62, 0.42, 1)
-shader_parameter/tint_strength = 0.28
-shader_parameter/highlight_rolloff = 0.14
-shader_parameter/haze_color = Color(0.26, 0.46, 0.34, 1)
-shader_parameter/haze_strength = 0.02
+shader_parameter/brightness = 0.82
+shader_parameter/saturation = 0.7
+shader_parameter/contrast = 0.95
+shader_parameter/tint_color = Color(0.38, 0.56, 0.34, 1)
+shader_parameter/tint_strength = 0.3
+shader_parameter/highlight_rolloff = 0.18
+shader_parameter/haze_color = Color(0.24, 0.42, 0.34, 1)
+shader_parameter/haze_strength = 0.04
 shader_parameter/palette_shadow = Color(0.035, 0.13, 0.095, 1)
-shader_parameter/palette_mid = Color(0.15, 0.33, 0.23, 1)
-shader_parameter/palette_light = Color(0.44, 0.59, 0.34, 1)
+shader_parameter/palette_mid = Color(0.145, 0.31, 0.22, 1)
+shader_parameter/palette_light = Color(0.4, 0.54, 0.31, 1)
 shader_parameter/palette_strength = 0.72
 shader_parameter/palette_source_dark = 0.04
 shader_parameter/palette_source_light = 0.62
 shader_parameter/sway_strength_px = 0.0
 shader_parameter/sway_speed = 0.72
 shader_parameter/sway_phase = 0.0
+shader_parameter/sway_spatial_phase = 0.0
 shader_parameter/sway_y_start = 0.0
 shader_parameter/sway_y_end = 1.0
 shader_parameter/sway_x_min = 0.0
@@ -400,14 +499,18 @@ shader_parameter/sway_depth_influence = 1.0
 shader_parameter/sway_blend_strength = 1.0
 shader_parameter/alpha_cleanup_threshold = 0.0
 shader_parameter/alpha_cleanup_softness = 0.18
+shader_parameter/lower_alpha_fade_enabled = false
+shader_parameter/lower_alpha_fade_start = 0.7
+shader_parameter/lower_alpha_fade_end = 0.9
+shader_parameter/lower_alpha_floor = 0.0
 shader_parameter/alpha_window_enabled = false
 shader_parameter/alpha_window_min = Vector2(0, 0)
 shader_parameter/alpha_window_max = Vector2(1, 1)
 
-[sub_resource type="ShaderMaterial" id="Scene4LeftTreeMat"]
+[sub_resource type="ShaderMaterial" id="Scene4LeftTree2Mat"]
 resource_local_to_scene = true
 shader = ExtResource("11_depth_grade")
-shader_parameter/brightness = 0.82
+shader_parameter/brightness = 0.68
 shader_parameter/saturation = 0.7
 shader_parameter/contrast = 0.92
 shader_parameter/tint_color = Color(0.3, 0.56, 0.4, 1)
@@ -421,27 +524,32 @@ shader_parameter/palette_light = Color(0.36, 0.52, 0.35, 1)
 shader_parameter/palette_strength = 0.66
 shader_parameter/palette_source_dark = 0.03
 shader_parameter/palette_source_light = 0.54
-shader_parameter/sway_strength_px = 0.0
-shader_parameter/sway_speed = 0.9
-shader_parameter/sway_phase = 1.2
-shader_parameter/sway_y_start = 0.12
-shader_parameter/sway_y_end = 0.76
-shader_parameter/sway_x_min = 0.34
-shader_parameter/sway_x_max = 0.7
-shader_parameter/sway_secondary_ratio = 0.57
-shader_parameter/sway_secondary_strength = 0.36
+shader_parameter/sway_strength_px = 2.4
+shader_parameter/sway_speed = 0.87
+shader_parameter/sway_phase = 0.35
+shader_parameter/sway_spatial_phase = 1.1
+shader_parameter/sway_y_start = 0.08
+shader_parameter/sway_y_end = 0.72
+shader_parameter/sway_x_min = 0.36
+shader_parameter/sway_x_max = 0.63
+shader_parameter/sway_secondary_ratio = 0.53
+shader_parameter/sway_secondary_strength = 0.2
 shader_parameter/sway_depth_influence = 1.0
-shader_parameter/sway_blend_strength = 1.0
+shader_parameter/sway_blend_strength = 0.75
 shader_parameter/alpha_cleanup_threshold = 0.0
 shader_parameter/alpha_cleanup_softness = 0.18
+shader_parameter/lower_alpha_fade_enabled = false
+shader_parameter/lower_alpha_fade_start = 0.7
+shader_parameter/lower_alpha_fade_end = 0.9
+shader_parameter/lower_alpha_floor = 0.0
 shader_parameter/alpha_window_enabled = false
 shader_parameter/alpha_window_min = Vector2(0, 0)
 shader_parameter/alpha_window_max = Vector2(1, 1)
 
-[sub_resource type="ShaderMaterial" id="Scene4RightTreeMat"]
+[sub_resource type="ShaderMaterial" id="Scene4RightTree2Mat"]
 resource_local_to_scene = true
 shader = ExtResource("11_depth_grade")
-shader_parameter/brightness = 0.81
+shader_parameter/brightness = 0.72
 shader_parameter/saturation = 0.68
 shader_parameter/contrast = 0.92
 shader_parameter/tint_color = Color(0.29, 0.55, 0.39, 1)
@@ -455,53 +563,24 @@ shader_parameter/palette_light = Color(0.35, 0.51, 0.345, 1)
 shader_parameter/palette_strength = 0.66
 shader_parameter/palette_source_dark = 0.03
 shader_parameter/palette_source_light = 0.54
-shader_parameter/sway_strength_px = 0.0
-shader_parameter/sway_speed = 0.57
-shader_parameter/sway_phase = 2.5
-shader_parameter/sway_y_start = 0.24
-shader_parameter/sway_y_end = 0.68
-shader_parameter/sway_x_min = 0.5
-shader_parameter/sway_x_max = 0.8
-shader_parameter/sway_secondary_ratio = 0.73
-shader_parameter/sway_secondary_strength = 0.3
+shader_parameter/sway_strength_px = 2.1
+shader_parameter/sway_speed = 0.58
+shader_parameter/sway_phase = 3.4
+shader_parameter/sway_spatial_phase = 0.8
+shader_parameter/sway_y_start = 0.1
+shader_parameter/sway_y_end = 0.7
+shader_parameter/sway_x_min = 0.25
+shader_parameter/sway_x_max = 0.51
+shader_parameter/sway_secondary_ratio = 0.71
+shader_parameter/sway_secondary_strength = 0.16
 shader_parameter/sway_depth_influence = 1.0
-shader_parameter/sway_blend_strength = 1.0
+shader_parameter/sway_blend_strength = 0.72
 shader_parameter/alpha_cleanup_threshold = 0.0
 shader_parameter/alpha_cleanup_softness = 0.18
-shader_parameter/alpha_window_enabled = false
-shader_parameter/alpha_window_min = Vector2(0, 0)
-shader_parameter/alpha_window_max = Vector2(1, 1)
-
-[sub_resource type="ShaderMaterial" id="Scene4TopLeavesMat"]
-resource_local_to_scene = true
-shader = ExtResource("11_depth_grade")
-shader_parameter/brightness = 0.72
-shader_parameter/saturation = 0.58
-shader_parameter/contrast = 1.06
-shader_parameter/tint_color = Color(0.26, 0.47, 0.34, 1)
-shader_parameter/tint_strength = 0.28
-shader_parameter/highlight_rolloff = 0.18
-shader_parameter/haze_color = Color(0.19, 0.37, 0.28, 1)
-shader_parameter/haze_strength = 0.0
-shader_parameter/palette_shadow = Color(0.02, 0.08, 0.064, 1)
-shader_parameter/palette_mid = Color(0.085, 0.21, 0.16, 1)
-shader_parameter/palette_light = Color(0.3, 0.45, 0.31, 1)
-shader_parameter/palette_strength = 0.74
-shader_parameter/palette_source_dark = 0.03
-shader_parameter/palette_source_light = 0.52
-shader_parameter/sway_strength_px = 2.8
-shader_parameter/sway_speed = 0.62
-shader_parameter/sway_phase = 3.35
-shader_parameter/sway_y_start = 0.12
-shader_parameter/sway_y_end = 0.62
-shader_parameter/sway_x_min = 0.0
-shader_parameter/sway_x_max = 1.0
-shader_parameter/sway_secondary_ratio = 0.41
-shader_parameter/sway_secondary_strength = 0.28
-shader_parameter/sway_depth_influence = 0.35
-shader_parameter/sway_blend_strength = 0.22
-shader_parameter/alpha_cleanup_threshold = 0.2
-shader_parameter/alpha_cleanup_softness = 0.16
+shader_parameter/lower_alpha_fade_enabled = false
+shader_parameter/lower_alpha_fade_start = 0.7
+shader_parameter/lower_alpha_fade_end = 0.9
+shader_parameter/lower_alpha_floor = 0.0
 shader_parameter/alpha_window_enabled = false
 shader_parameter/alpha_window_min = Vector2(0, 0)
 shader_parameter/alpha_window_max = Vector2(1, 1)
@@ -530,12 +609,12 @@ turbulence_noise_scale = 1.6
 [sub_resource type="ShaderMaterial" id="Scene4ForegroundFogMat"]
 resource_local_to_scene = true
 shader = ExtResource("22_foreground_fog")
-shader_parameter/fog_color = Color(0.43, 0.56, 0.54, 1)
-shader_parameter/fog_light_color = Color(0.62, 0.7, 0.68, 1)
-shader_parameter/alpha_max = 0.3
+shader_parameter/fog_color = Color(0.23, 0.38, 0.36, 1)
+shader_parameter/fog_light_color = Color(0.35, 0.48, 0.44, 1)
+shader_parameter/alpha_max = 0.06
 shader_parameter/drift_speed = 0.024
 shader_parameter/scale_x = 2.4
-shader_parameter/crest_y = 0.16
+shader_parameter/crest_y = 0.22
 shader_parameter/pixel_grid = Vector2(240, 50)
 
 [node name="Scene4" type="Control" unique_id=1486413313]
@@ -579,42 +658,47 @@ metadata/_edit_lock_ = true
 modulate = Color(1, 1, 1, 0.92)
 texture_filter = 1
 material = SubResource("Scene4FarForestMat")
-layout_mode = 0
-offset_left = -217.0
-offset_top = -302.0
-offset_right = 68.25
-offset_bottom = -89.625
-scale = Vector2(8, 8)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -37.0
+offset_top = 1.0
+offset_right = 151.0
+offset_bottom = 221.0
+grow_horizontal = 2
+grow_vertical = 2
 mouse_filter = 2
 texture = ExtResource("12_far_forest")
 expand_mode = 1
-metadata/parallax_factor = 0.05
-metadata/_edit_lock_ = true
+stretch_mode = 6
+metadata/parallax_factor = 0.04
 
 [node name="RuinStone1" type="TextureRect" parent="." unique_id=902910827]
 modulate = Color(0.92, 1, 0.92, 0.76)
 texture_filter = 1
 material = SubResource("Scene4RuinStone1Mat")
 layout_mode = 0
-offset_left = 528.00006
-offset_top = 176.00002
-offset_right = 712.80005
-offset_bottom = 560.8
+offset_left = 461.0
+offset_top = 172.0
+offset_right = 645.8
+offset_bottom = 556.8
 scale = Vector2(2.5, 2.5)
 mouse_filter = 2
 texture = ExtResource("16_ruin_stone_1")
 expand_mode = 1
 metadata/parallax_factor = 0.46
+metadata/_edit_lock_ = true
 
 [node name="RuinStone2" type="TextureRect" parent="." unique_id=145619908]
 modulate = Color(0.92, 1, 0.92, 0.76)
 texture_filter = 1
 material = SubResource("Scene4RuinStone2Mat")
 layout_mode = 0
-offset_left = 1109.0
-offset_top = 293.0
-offset_right = 1237.8
-offset_bottom = 631.8
+offset_left = 1077.0
+offset_top = 369.0
+offset_right = 1205.8
+offset_bottom = 707.7998
 scale = Vector2(2.5, 2.5)
 mouse_filter = 2
 texture = ExtResource("17_ruin_stone_2")
@@ -643,10 +727,10 @@ modulate = Color(0.92, 1, 0.92, 0.76)
 texture_filter = 1
 material = SubResource("Scene4RuinStone4Mat")
 layout_mode = 0
-offset_left = 83.0
-offset_top = 71.00001
-offset_right = 220.1997
-offset_bottom = 455.80005
+offset_left = 93.0
+offset_top = 439.0
+offset_right = 230.1997
+offset_bottom = 823.80005
 scale = Vector2(2.5, 2.5)
 mouse_filter = 2
 texture = ExtResource("16_ruin_stone_1")
@@ -654,29 +738,36 @@ expand_mode = 1
 metadata/parallax_factor = 0.46
 metadata/_edit_lock_ = true
 
-[node name="BackgroundTree2" type="TextureRect" parent="." unique_id=319299711]
+[node name="BackgroundBottomLeaves" type="TextureRect" parent="." unique_id=1791066636]
+visible = false
 texture_filter = 1
-material = SubResource("Scene4BackgroundTree2Mat")
-layout_mode = 0
-offset_left = 1006.99994
-offset_top = -226.0
-offset_right = 1470.9998
-offset_bottom = 173.5238
-scale = Vector2(4.2, 4.2)
+material = SubResource("Scene4BackgroundBottomLeavesMat")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 2045.0
+offset_top = 1854.0
+offset_right = 2045.0
+offset_bottom = 1854.0
+grow_horizontal = 2
+grow_vertical = 2
+rotation = 3.1415927
 mouse_filter = 2
-texture = ExtResource("7_background_tree_2")
+texture = ExtResource("10_background_top_leaves")
 expand_mode = 1
-metadata/parallax_factor = 0.1
-metadata/_edit_lock_ = true
+stretch_mode = 6
+flip_v = true
+metadata/parallax_factor = 0.45
 
 [node name="BackgroundTree" type="TextureRect" parent="." unique_id=1455757301]
 texture_filter = 1
 material = SubResource("Scene4BackgroundTreeMat")
 layout_mode = 0
-offset_left = -583.0
-offset_top = -472.0
-offset_right = 29.647095
-offset_bottom = -44.70587
+offset_left = -612.0
+offset_top = -392.0
+offset_right = -89.05878
+offset_bottom = -11.705872
 scale = Vector2(3.4, 3.4)
 mouse_filter = 2
 texture = ExtResource("2_background_tree")
@@ -684,15 +775,30 @@ expand_mode = 1
 metadata/parallax_factor = 0.22
 metadata/_edit_lock_ = true
 
-[node name="BackgroundTopLeaves" type="TextureRect" parent="." unique_id=1791066636]
+[node name="BackgroundTree2" type="TextureRect" parent="." unique_id=319299711]
+texture_filter = 1
+material = SubResource("Scene4BackgroundTree2Mat")
+layout_mode = 0
+offset_left = 1166.0
+offset_top = -240.99998
+offset_right = 1629.9998
+offset_bottom = 158.52382
+scale = Vector2(4.2, 4.2)
+mouse_filter = 2
+texture = ExtResource("7_background_tree_2")
+expand_mode = 1
+metadata/parallax_factor = 0.1
+metadata/_edit_lock_ = true
+
+[node name="BackgroundTopLeaves2" type="TextureRect" parent="." unique_id=751513697]
 modulate = Color(1, 1, 1, 0.62)
 texture_filter = 1
 material = SubResource("Scene4BackgroundTopLeavesMat")
 layout_mode = 0
-offset_left = -79.00003
-offset_top = -171.0
-offset_right = 427.19052
-offset_bottom = 118.523834
+offset_left = -153.0
+offset_top = -208.99998
+offset_right = 353.19055
+offset_bottom = 80.52394
 scale = Vector2(4.2, 4.2)
 mouse_filter = 2
 texture = ExtResource("10_background_top_leaves")
@@ -744,7 +850,7 @@ metadata/_edit_lock_ = true
 [node name="RuinMotes1" type="GPUParticles2D" parent="." unique_id=664672651]
 texture_filter = 1
 material = SubResource("Scene4RuinMote1SyncMat")
-position = Vector2(700, 650)
+position = Vector2(632.99994, 646)
 amount = 6
 texture = SubResource("CanopyMoteDotTexture")
 lifetime = 5.2
@@ -754,12 +860,11 @@ visibility_rect = Rect2(-90, -210, 180, 420)
 local_coords = true
 process_material = SubResource("RuinReactiveMotesMat")
 metadata/parallax_factor = 0.46
-metadata/_edit_lock_ = true
 
 [node name="RuinMotes2" type="GPUParticles2D" parent="." unique_id=785887169]
 texture_filter = 1
 material = SubResource("Scene4RuinMote2SyncMat")
-position = Vector2(1270, 650)
+position = Vector2(1238, 797)
 amount = 6
 texture = SubResource("CanopyMoteDotTexture")
 lifetime = 5.2
@@ -769,7 +874,6 @@ visibility_rect = Rect2(-90, -210, 180, 420)
 local_coords = true
 process_material = SubResource("RuinReactiveMotesMat")
 metadata/parallax_factor = 0.52
-metadata/_edit_lock_ = true
 
 [node name="RuinMotes3" type="GPUParticles2D" parent="." unique_id=184816463]
 texture_filter = 1
@@ -784,12 +888,11 @@ visibility_rect = Rect2(-90, -210, 180, 420)
 local_coords = true
 process_material = SubResource("RuinReactiveMotesMat")
 metadata/parallax_factor = 0.46
-metadata/_edit_lock_ = true
 
 [node name="RuinMotes4" type="GPUParticles2D" parent="." unique_id=236762802]
 texture_filter = 1
 material = SubResource("Scene4RuinMote4SyncMat")
-position = Vector2(250, 650)
+position = Vector2(254, 897)
 amount = 6
 texture = SubResource("CanopyMoteDotTexture")
 lifetime = 5.2
@@ -799,16 +902,21 @@ visibility_rect = Rect2(-90, -210, 180, 420)
 local_coords = true
 process_material = SubResource("RuinReactiveMotesMat")
 metadata/parallax_factor = 0.46
-metadata/_edit_lock_ = true
 
-[node name="BattlePlatform" type="TextureRect" parent="." unique_id=185780273]
+[node name="LeafSpirits" type="Node2D" parent="." unique_id=1293141109]
 texture_filter = 1
-material = SubResource("Scene4BattlePlatformMat")
+script = ExtResource("23_leaf_spirits")
+metadata/parallax_factor = 0.42
+
+[node name="BattlePlatformDepthShadow" type="TextureRect" parent="." unique_id=1386594146]
+modulate = Color(1, 1, 1, 0.44)
+texture_filter = 1
+material = SubResource("Scene4BattlePlatformDepthShadowMat")
 layout_mode = 0
-offset_left = -306.0
-offset_top = 273.985
-offset_right = 88.16669
-offset_bottom = 469.65167
+offset_left = -81.0
+offset_top = 579.0
+offset_right = 265.66666
+offset_bottom = 660.6667
 scale = Vector2(6, 6)
 mouse_filter = 2
 texture = ExtResource("3_battle_platform")
@@ -816,50 +924,49 @@ expand_mode = 1
 metadata/parallax_factor = 1.0
 metadata/_edit_lock_ = true
 
-[node name="LeftTree" type="TextureRect" parent="." unique_id=190877483]
+[node name="BattlePlatform" type="TextureRect" parent="." unique_id=185780273]
 texture_filter = 1
-material = SubResource("Scene4LeftTreeMat")
+material = SubResource("Scene4BattlePlatformMat")
 layout_mode = 0
-offset_left = -324.0
+offset_left = -81.0
+offset_top = 578.0
+offset_right = 265.66666
+offset_bottom = 659.6667
+scale = Vector2(6, 6)
+mouse_filter = 2
+texture = ExtResource("3_battle_platform")
+expand_mode = 1
+metadata/parallax_factor = 1.0
+metadata/_edit_lock_ = true
+
+[node name="LeftTree2" type="TextureRect" parent="." unique_id=1229249967]
+texture_filter = 1
+material = SubResource("Scene4LeftTree2Mat")
+layout_mode = 0
+offset_left = -71.0
 offset_top = -63.0
-offset_right = -128.0
-offset_bottom = 254.25
+offset_right = 177.0
+offset_bottom = 242.5
 scale = Vector2(4, 4)
 mouse_filter = 2
-texture = ExtResource("4_left_tree")
+texture = ExtResource("5_left_tree_2")
 expand_mode = 1
 metadata/parallax_factor = 1.2
 metadata/_edit_lock_ = true
 
-[node name="RightTree" type="TextureRect" parent="." unique_id=581880441]
+[node name="RightTree2" type="TextureRect" parent="." unique_id=1091853912]
 texture_filter = 1
-material = SubResource("Scene4RightTreeMat")
+material = SubResource("Scene4RightTree2Mat")
 layout_mode = 0
-offset_left = 493.0
-offset_top = -164.0
-offset_right = 880.5
-offset_bottom = 166.0
+offset_left = 934.0
+offset_top = -20.0
+offset_right = 1217.25
+offset_bottom = 309.5
 scale = Vector2(4, 4)
 mouse_filter = 2
-texture = ExtResource("5_right_tree")
+texture = ExtResource("5_right_tree_2")
 expand_mode = 1
 metadata/parallax_factor = 1.2
-metadata/_edit_lock_ = true
-
-[node name="TopLeaves" type="TextureRect" parent="." unique_id=1018077298]
-modulate = Color(1, 1, 1, 0.88)
-texture_filter = 1
-material = SubResource("Scene4TopLeavesMat")
-layout_mode = 0
-offset_left = -66.0
-offset_top = -144.0
-offset_right = 447.0
-offset_bottom = 172.0
-scale = Vector2(4, 4)
-mouse_filter = 2
-texture = ExtResource("8_top_leaves")
-expand_mode = 1
-metadata/parallax_factor = 1.25
 metadata/_edit_lock_ = true
 
 [node name="ForegroundMotes" type="GPUParticles2D" parent="." unique_id=1746331435]
@@ -882,9 +989,9 @@ texture_filter = 1
 material = SubResource("Scene4ForegroundFogMat")
 layout_mode = 0
 offset_left = -120.0
-offset_top = 780.0
+offset_top = 820.0
 offset_right = 2040.0
-offset_bottom = 1120.0
+offset_bottom = 1040.0
 mouse_filter = 2
 color = Color(0, 0, 0, 0)
 metadata/parallax_factor = 1.58

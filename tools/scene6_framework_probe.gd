@@ -21,6 +21,7 @@ func _ready() -> void:
 	var world := screen.get_node("WorldGroup") as Control
 	var p1 := screen.get_node("WorldGroup/P1CharDisplay") as CharacterDisplay
 	var p2 := screen.get_node("WorldGroup/P2CharDisplay") as CharacterDisplay
+	var mid_ash := stage.get_node("MidAshBack") as ColorRect
 	stage.set_process(false)
 	screen.set_process(false)
 	stage.set("_pnx", 0.0)
@@ -29,6 +30,13 @@ func _ready() -> void:
 	var platform_center_x: float = platform.position.x
 	var world_center_x: float = world.position.x
 	await _shot(ProbeOutput.path("scene6_chilu_valley_center.png"))
+	var character_stability := await _measure_character_stability(p1, p2, 18, 0.08)
+	mid_ash.visible = false
+	await get_tree().process_frame
+	await _shot(ProbeOutput.path("scene6_depth_layers_off.png"))
+	mid_ash.visible = true
+	await get_tree().process_frame
+	await _shot(ProbeOutput.path("scene6_depth_layers_on.png"))
 
 	var magma_material := magma.material.duplicate(true) as ShaderMaterial
 	magma.material = magma_material
@@ -110,11 +118,14 @@ func _ready() -> void:
 		and p2.visible
 		and (p1_material.get_shader_parameter("light_dir") as Vector2).x < 0.0
 		and (p2_material.get_shader_parameter("light_dir") as Vector2).x > 0.0
-		and (p1_material.get_shader_parameter("rim_strength_cap") as float) <= 0.30
-		and (p2_material.get_shader_parameter("rim_strength_cap") as float) <= 0.30
+		and (p1_material.get_shader_parameter("rim_strength_cap") as float) <= 0.04
+		and (p2_material.get_shader_parameter("rim_strength_cap") as float) <= 0.04
+		and is_zero_approx(p1_material.get_shader_parameter("flash_peak_strength") as float)
+		and is_zero_approx(p2_material.get_shader_parameter("flash_peak_strength") as float)
 		and (screen.get_node("WorldGroup/P1Shadow") as TextureRect).self_modulate.r < 0.4
 		and (screen.get_node("WorldGroup/P2Shadow") as TextureRect).self_modulate.r < 0.4)
 	var platform_node := stage.get_node("BattlePlatform") as NinePatchRect
+	var depth_heat_veil := stage.get_node_or_null("DepthHeatVeil") as ColorRect
 	var magma_occluded := (
 		magma != null
 		and magma.get_index() < platform_node.get_index()
@@ -133,6 +144,12 @@ func _ready() -> void:
 		and stage.get_node_or_null("ForgeCore") == null
 		and stage.get_node_or_null("PlatformForgeContact") == null
 		and stage.get_node_or_null("UnderbridgeForge") == null
+		and stage.get_node_or_null("FarSmokeBanks") == null
+		and stage.get_node_or_null("MidAshBack") is ColorRect
+		and depth_heat_veil != null
+		and depth_heat_veil.material is ShaderMaterial
+		and depth_heat_veil.get_index() > stage.get_node("FarBackground").get_index()
+		and depth_heat_veil.get_index() < stage.get_node("MidgroundLeft").get_index()
 		and magma_occluded
 		and magma.visible
 		and magma.material is ShaderMaterial
@@ -141,7 +158,9 @@ func _ready() -> void:
 		and (stage.get_node("MidgroundLeft") as TextureRect).material is ShaderMaterial
 		and (stage.get_node("MidgroundRight") as TextureRect).material is ShaderMaterial
 		and ((screen.get_node("PostFX") as ColorRect).material as ShaderMaterial).get_shader_parameter(
-				"heat_haze_strength") as float >= 1.0)
+				"heat_haze_strength") as float >= 1.0
+		and ((screen.get_node("PostFX") as ColorRect).material as ShaderMaterial).get_shader_parameter(
+				"heat_haze_character_protection") as float >= 0.99)
 	var passed: bool = (
 		not stage.get_meta("framework_only", true)
 		and environment_ready
@@ -153,6 +172,8 @@ func _ready() -> void:
 		and magma_hot_pixels > 256
 		and switch_armed
 		and characters_ready
+		and character_stability.x <= 0.025
+		and character_stability.y <= 0.025
 		and missing_nodes.is_empty())
 	print(
 			"SCENE6_CHILU_VALLEY_PROBE: ",
@@ -177,6 +198,8 @@ func _ready() -> void:
 			magma_hot_pixels,
 			" magma_luma_amplitude=",
 			magma_luma_amplitude,
+			" character_luma_delta=",
+			character_stability,
 			" missing=",
 			missing_nodes)
 	BattleSetup.reset()
@@ -192,6 +215,49 @@ func _shot(path: String) -> void:
 		push_error(
 				"Scene6 framework probe could not save %s (error=%d)"
 				% [path, error])
+
+
+func _measure_character_stability(
+		p1: CharacterDisplay,
+		p2: CharacterDisplay,
+		sample_count: int,
+		interval: float) -> Vector2:
+	var p1_min := Vector4(INF, INF, INF, INF)
+	var p1_max := Vector4(-INF, -INF, -INF, -INF)
+	var p2_min := Vector4(INF, INF, INF, INF)
+	var p2_max := Vector4(-INF, -INF, -INF, -INF)
+	for _sample_index: int in sample_count:
+		await get_tree().create_timer(interval).timeout
+		var p1_profile := _character_color_profile(p1)
+		var p2_profile := _character_color_profile(p2)
+		p1_min = p1_min.min(p1_profile)
+		p1_max = p1_max.max(p1_profile)
+		p2_min = p2_min.min(p2_profile)
+		p2_max = p2_max.max(p2_profile)
+	print(
+			"SCENE6_CHARACTER_STABILITY: p1_delta=", p1_max - p1_min,
+			" p2_delta=", p2_max - p2_min,
+			" channels=rgb_luma")
+	return Vector2(p1_max.w - p1_min.w, p2_max.w - p2_min.w)
+
+
+func _character_color_profile(display: CharacterDisplay) -> Vector4:
+	var image := display.get_render_texture().get_image()
+	image.resize(96, 96, Image.INTERPOLATE_NEAREST)
+	var sum := Vector3.ZERO
+	var visible_count := 0
+	for y: int in image.get_height():
+		for x: int in image.get_width():
+			var sample := image.get_pixel(x, y)
+			if sample.a <= 0.05:
+				continue
+			sum += Vector3(sample.r, sample.g, sample.b)
+			visible_count += 1
+	if visible_count == 0:
+		return Vector4.ZERO
+	var average := sum / float(visible_count)
+	var luma := average.dot(Vector3(0.299, 0.587, 0.114))
+	return Vector4(average.x, average.y, average.z, luma)
 
 
 func _render_magma_sample(source_material: ShaderMaterial, phase: float) -> Image:

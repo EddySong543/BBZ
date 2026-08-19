@@ -26,7 +26,10 @@
 [ext_resource type="Texture2D" uid="uid://bkr4k2kn7f3nu" path="res://assets/ui/boot/boot_pressure_blue_intro_path.png" id="24_blue_intro_path"]
 [ext_resource type="Texture2D" uid="uid://cfbf55vc2ugkj" path="res://assets/ui/boot/boot_pressure_gold_intro_path.png" id="25_gold_intro_path"]
 [ext_resource type="Texture2D" uid="uid://cdwgtbs67ytic" path="res://assets/ui/boot/title_bobozan.png" id="26_english_title"]
-
+[ext_resource type="Texture2D" path="res://assets/ui/boot/title_intro_bo_top.png" id="27_title_intro_bo_top"]
+[ext_resource type="Texture2D" path="res://assets/ui/boot/title_intro_bo_middle.png" id="28_title_intro_bo_middle"]
+[ext_resource type="Texture2D" path="res://assets/ui/boot/title_intro_zan_bottom.png" id="29_title_intro_zan_bottom"]
+[ext_resource type="Texture2D" path="res://assets/ui/boot/title_intro_bobozan.png" id="30_title_intro_bobozan"]
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_paper"]
 shader = ExtResource("15_paper_shader")
 shader_parameter/paper_color = Color(0.031373, 0.039216, 0.058824, 1)
@@ -66,7 +69,7 @@ shader_parameter/palette_strength = 1.0
 shader_parameter/intro_path_texture = ExtResource("24_blue_intro_path")
 shader_parameter/intro_stroke_progress = 1.0
 shader_parameter/intro_stroke_feather = 0.13
-shader_parameter/intro_layer_offset = -0.04
+shader_parameter/intro_layer_offset = 0.065
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_blue_mid"]
 shader = ExtResource("16_blue_shader")
@@ -100,7 +103,7 @@ shader_parameter/palette_strength = 1.0
 shader_parameter/intro_path_texture = ExtResource("24_blue_intro_path")
 shader_parameter/intro_stroke_progress = 1.0
 shader_parameter/intro_stroke_feather = 0.13
-shader_parameter/intro_layer_offset = 0.035
+shader_parameter/intro_layer_offset = -0.06
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_gold_energy"]
 shader = ExtResource("18_gold_shader")
@@ -118,6 +121,10 @@ shader_parameter/escape_highlight_color = Vector3(1, 0.86, 0.54)
 shader_parameter/intro_path_progress = 1.0
 shader_parameter/intro_path_feather = 0.14
 shader_parameter/intro_head_width = 0.075
+shader_parameter/intro_contact_min = Vector2(0.48, 0.18)
+shader_parameter/intro_contact_max = Vector2(0.76, 0.52)
+shader_parameter/intro_late_path_threshold = 0.84
+shader_parameter/intro_contact_path_ceiling = 0.32
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_foreground_brush"]
 shader = ExtResource("22_foreground_brush_shader")
@@ -131,6 +138,7 @@ shader_parameter/intro_stroke_feather = 0.15
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_bo_top_shadow"]
 shader = ExtResource("6_title_shader")
+shader_parameter/flow_enabled = false
 shader_parameter/perspective_strength = 0.1
 shader_parameter/edge_padding = 0.04
 shader_parameter/group_x_min = 0.0
@@ -154,13 +162,15 @@ shader_parameter/structure_tint_strength = 0.0
 shader_parameter/outline_color = Color(0.058824, 0.105882, 0.14902, 0.88)
 shader_parameter/outline_width_texels = 1.0
 shader_parameter/outline_strength = 0.0
+shader_parameter/intro_activation_map = ExtResource("27_title_intro_bo_top")
 shader_parameter/intro_reveal_progress = 1.0
-shader_parameter/intro_reveal_feather = 0.025
-shader_parameter/intro_blade_width = 0.065
-shader_parameter/intro_blade_strength = 0.62
+shader_parameter/intro_reveal_feather = 0.012
+shader_parameter/intro_shadow = true
+shader_parameter/intro_shadow_lag = 0.055
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_bo_middle_shadow"]
 shader = ExtResource("6_title_shader")
+shader_parameter/flow_enabled = false
 shader_parameter/perspective_strength = 0.1
 shader_parameter/edge_padding = 0.04
 shader_parameter/group_x_min = 0.31405
@@ -184,13 +194,15 @@ shader_parameter/structure_tint_strength = 0.0
 shader_parameter/outline_color = Color(0.058824, 0.105882, 0.14902, 0.88)
 shader_parameter/outline_width_texels = 1.0
 shader_parameter/outline_strength = 0.0
+shader_parameter/intro_activation_map = ExtResource("28_title_intro_bo_middle")
 shader_parameter/intro_reveal_progress = 1.0
-shader_parameter/intro_reveal_feather = 0.025
-shader_parameter/intro_blade_width = 0.065
-shader_parameter/intro_blade_strength = 0.62
+shader_parameter/intro_reveal_feather = 0.012
+shader_parameter/intro_shadow = true
+shader_parameter/intro_shadow_lag = 0.055
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_zan_bottom_shadow"]
 shader = ExtResource("6_title_shader")
+shader_parameter/flow_enabled = false
 shader_parameter/perspective_strength = 0.1
 shader_parameter/edge_padding = 0.04
 shader_parameter/group_x_min = 0.628099
@@ -214,13 +226,15 @@ shader_parameter/structure_tint_strength = 0.0
 shader_parameter/outline_color = Color(0.058824, 0.105882, 0.14902, 0.88)
 shader_parameter/outline_width_texels = 1.0
 shader_parameter/outline_strength = 0.0
+shader_parameter/intro_activation_map = ExtResource("29_title_intro_zan_bottom")
 shader_parameter/intro_reveal_progress = 1.0
-shader_parameter/intro_reveal_feather = 0.025
-shader_parameter/intro_blade_width = 0.065
-shader_parameter/intro_blade_strength = 0.62
+shader_parameter/intro_reveal_feather = 0.012
+shader_parameter/intro_shadow = true
+shader_parameter/intro_shadow_lag = 0.055
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_english_shadow"]
 shader = ExtResource("6_title_shader")
+shader_parameter/flow_enabled = false
 shader_parameter/perspective_strength = 0.04
 shader_parameter/edge_padding = 0.025
 shader_parameter/group_x_min = 0.0
@@ -244,13 +258,16 @@ shader_parameter/structure_tint_strength = 0.42
 shader_parameter/outline_color = Color(0.058824, 0.105882, 0.14902, 0.88)
 shader_parameter/outline_width_texels = 1.0
 shader_parameter/outline_strength = 0.0
+shader_parameter/intro_activation_map = ExtResource("30_title_intro_bobozan")
 shader_parameter/intro_reveal_progress = 1.0
-shader_parameter/intro_reveal_feather = 0.025
-shader_parameter/intro_blade_width = 0.065
-shader_parameter/intro_blade_strength = 0.62
+shader_parameter/intro_reveal_feather = 0.012
+shader_parameter/intro_progress_delay = 0.052632
+shader_parameter/intro_shadow = true
+shader_parameter/intro_shadow_lag = 0.055
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_bo_top"]
 shader = ExtResource("6_title_shader")
+shader_parameter/flow_enabled = false
 shader_parameter/perspective_strength = 0.1
 shader_parameter/edge_padding = 0.04
 shader_parameter/group_x_min = 0.0
@@ -276,13 +293,14 @@ shader_parameter/structure_tint_strength = 0.42
 shader_parameter/outline_color = Color(0.058824, 0.105882, 0.14902, 1)
 shader_parameter/outline_width_texels = 1.0
 shader_parameter/outline_strength = 1.0
+shader_parameter/intro_activation_map = ExtResource("27_title_intro_bo_top")
 shader_parameter/intro_reveal_progress = 1.0
-shader_parameter/intro_reveal_feather = 0.025
-shader_parameter/intro_blade_width = 0.065
-shader_parameter/intro_blade_strength = 0.62
+shader_parameter/intro_reveal_feather = 0.012
+shader_parameter/intro_crack_peak_width = 0.11
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_bo_middle"]
 shader = ExtResource("6_title_shader")
+shader_parameter/flow_enabled = false
 shader_parameter/perspective_strength = 0.1
 shader_parameter/edge_padding = 0.04
 shader_parameter/group_x_min = 0.31405
@@ -308,13 +326,14 @@ shader_parameter/structure_tint_strength = 0.42
 shader_parameter/outline_color = Color(0.058824, 0.105882, 0.14902, 1)
 shader_parameter/outline_width_texels = 1.0
 shader_parameter/outline_strength = 1.0
+shader_parameter/intro_activation_map = ExtResource("28_title_intro_bo_middle")
 shader_parameter/intro_reveal_progress = 1.0
-shader_parameter/intro_reveal_feather = 0.025
-shader_parameter/intro_blade_width = 0.065
-shader_parameter/intro_blade_strength = 0.62
+shader_parameter/intro_reveal_feather = 0.012
+shader_parameter/intro_crack_peak_width = 0.11
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_zan_bottom"]
 shader = ExtResource("6_title_shader")
+shader_parameter/flow_enabled = false
 shader_parameter/perspective_strength = 0.1
 shader_parameter/edge_padding = 0.04
 shader_parameter/group_x_min = 0.628099
@@ -340,13 +359,14 @@ shader_parameter/structure_tint_strength = 0.42
 shader_parameter/outline_color = Color(0.058824, 0.105882, 0.14902, 1)
 shader_parameter/outline_width_texels = 1.0
 shader_parameter/outline_strength = 1.0
+shader_parameter/intro_activation_map = ExtResource("29_title_intro_zan_bottom")
 shader_parameter/intro_reveal_progress = 1.0
-shader_parameter/intro_reveal_feather = 0.025
-shader_parameter/intro_blade_width = 0.065
-shader_parameter/intro_blade_strength = 0.62
+shader_parameter/intro_reveal_feather = 0.012
+shader_parameter/intro_crack_peak_width = 0.11
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_english"]
 shader = ExtResource("6_title_shader")
+shader_parameter/flow_enabled = true
 shader_parameter/perspective_strength = 0.04
 shader_parameter/edge_padding = 0.025
 shader_parameter/group_x_min = 0.0
@@ -372,10 +392,11 @@ shader_parameter/structure_tint_strength = 0.42
 shader_parameter/outline_color = Color(0.058824, 0.105882, 0.14902, 1)
 shader_parameter/outline_width_texels = 1.0
 shader_parameter/outline_strength = 1.0
+shader_parameter/intro_activation_map = ExtResource("30_title_intro_bobozan")
 shader_parameter/intro_reveal_progress = 1.0
-shader_parameter/intro_reveal_feather = 0.025
-shader_parameter/intro_blade_width = 0.065
-shader_parameter/intro_blade_strength = 0.62
+shader_parameter/intro_reveal_feather = 0.012
+shader_parameter/intro_progress_delay = 0.052632
+shader_parameter/intro_crack_peak_width = 0.11
 
 [node name="BootScreen" type="Control" unique_id=30656907]
 layout_mode = 3
@@ -524,6 +545,7 @@ mouse_filter = 2
 texture = ExtResource("12_gold_combined")
 expand_mode = 1
 metadata/parallax_factor = 0.82
+metadata/pointer_parallax_factor = 0.28
 metadata/_edit_lock_ = true
 
 [node name="ForegroundBrush" type="TextureRect" parent="BackgroundStage" unique_id=1927896076]

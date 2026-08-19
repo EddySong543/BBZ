@@ -1,0 +1,101 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" uid="uid://di0qh6ki88n6e" path="res://src/ui/components/battle_stage.gd" id="1_stage"]
+
+[node name="Scene7" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_stage")
+idle_amplitude = 5.0
+metadata/framework_only = true
+metadata/theme_name = "Scene7 中性框架"
+
+[node name="PreviewBackdrop" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.045, 0.052, 0.065, 1)
+
+[node name="Sky" type="TextureRect" parent="."]
+texture_filter = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 6
+metadata/parallax_factor = 0.0
+
+[node name="FarBackground" type="TextureRect" parent="."]
+texture_filter = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 6
+metadata/parallax_factor = 0.18
+
+[node name="Midground" type="TextureRect" parent="."]
+texture_filter = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 6
+metadata/parallax_factor = 0.55
+
+[node name="BattlePlatform" type="TextureRect" parent="."]
+texture_filter = 1
+layout_mode = 0
+offset_left = 120.0
+offset_top = 728.0
+offset_right = 1800.0
+offset_bottom = 768.0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 6
+metadata/parallax_factor = 1.0
+
+[node name="Foreground" type="TextureRect" parent="."]
+texture_filter = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 6
+metadata/parallax_factor = 1.25
+
+[node name="CompositionGuides" type="Node2D" parent="."]
+
+[node name="P1Baseline" type="Marker2D" parent="CompositionGuides"]
+position = Vector2(480, 748)
+
+[node name="P2Baseline" type="Marker2D" parent="CompositionGuides"]
+position = Vector2(1440, 748)
+
+[node name="PlatformBaseline" type="Marker2D" parent="CompositionGuides"]
+position = Vector2(960, 748)

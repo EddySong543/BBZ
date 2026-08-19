@@ -36,6 +36,8 @@ func _ready() -> void:
 		"TitleColumn/EnglishSubtitle") as TextureRect
 	var character_base := boot.get_node_or_null(
 		"Character/Rig/Base") as Sprite2D
+	var title_controller := boot.get_node_or_null(
+		"TitleColumn") as BootTitleController
 	if (
 		intro == null
 		or prompt == null
@@ -48,6 +50,7 @@ func _ready() -> void:
 		or title == null
 		or english == null
 		or character_base == null
+		or title_controller == null
 	):
 		push_error("Boot intro runtime nodes are incomplete.")
 		get_tree().quit(1)
@@ -63,32 +66,53 @@ func _ready() -> void:
 		return
 	if not (
 		is_equal_approx(
+			intro.flash_start_seconds,
+			0.04)
+		and is_equal_approx(
 			intro.brush_start_seconds,
-			intro.flash_start_seconds)
+			0.12)
 		and is_equal_approx(
 			intro.gold_start_seconds,
-			intro.flash_start_seconds)
+			intro.brush_start_seconds)
 		and is_equal_approx(
 			intro.prompt_start_seconds,
 			intro.title_start_seconds)
-		and is_equal_approx(
-			intro.prompt_duration_seconds,
-			intro.title_duration_seconds)
 		and is_equal_approx(
 			intro.total_duration_seconds,
 			1.32)
 		and is_equal_approx(
 			intro.brush_duration_seconds,
-			1.2)
+			0.72)
 		and is_equal_approx(
 			intro.gold_duration_seconds,
-			1.2)
+			0.92)
+		and is_equal_approx(
+			intro.pressure_start_seconds,
+			0.28)
+		and is_equal_approx(
+			intro.pressure_duration_seconds,
+			0.70)
 		and is_equal_approx(
 			intro.title_start_seconds,
 			intro.brush_start_seconds)
 		and is_equal_approx(
 			intro.title_duration_seconds,
-			intro.brush_duration_seconds)
+			0.76)
+		and is_equal_approx(
+			intro.prompt_duration_seconds,
+			0.94)
+		and is_equal_approx(
+			intro.impact_propagation_start_seconds,
+			0.18)
+		and is_equal_approx(
+			intro.impact_propagation_end_seconds,
+			0.88)
+		and is_equal_approx(
+			intro.impact_propagation_lead_seconds,
+			0.12)
+		and is_equal_approx(
+			intro.impact_support_lead_seconds,
+			0.06)
 	):
 		push_error("Boot intro timing contract drifted.")
 		get_tree().quit(1)
@@ -103,22 +127,18 @@ func _ready() -> void:
 
 	var capture_points: Array[Array] = [
 		["00_character_ready", 0.0],
+		["01_energy_trigger", 0.18],
+		["02_impact_propagation", 0.30],
+		["03_impact_body", 0.48],
+		["03b_gold_contact_check", 0.68],
+		["04_clean_lock", 0.88],
 		[
-			"01_flash_brush_start",
-			intro.flash_start_seconds + 0.08,
-		],
-		[
-			"02_brush_quarter",
-			intro.brush_start_seconds
-				+ intro.brush_duration_seconds * 0.25,
-		],
-		[
-			"03_brush_mid",
+			"05_brush_mid",
 			intro.brush_start_seconds
 				+ intro.brush_duration_seconds * 0.50,
 		],
 		[
-			"04_parallel_placed",
+			"06_parallel_placed",
 			maxf(
 				intro.brush_start_seconds
 					+ intro.brush_duration_seconds,
@@ -127,11 +147,11 @@ func _ready() -> void:
 				+ 0.02,
 		],
 		[
-			"05_parallel_entry",
+			"07_parallel_entry",
 			intro.title_start_seconds
 				+ intro.title_duration_seconds * 0.45,
 		],
-		["06_idle", intro.total_duration_seconds],
+		["08_idle", intro.total_duration_seconds],
 	]
 
 	var captured_frames: Dictionary = {}
@@ -155,6 +175,27 @@ func _ready() -> void:
 				% output_path)
 			get_tree().quit(1)
 			return
+
+	intro.finish_immediately()
+	title_controller.set_process(false)
+	for pointer_capture: Array in [
+		["09_title_pointer_left", Vector2(-1.0, 0.0)],
+		["10_title_pointer_right", Vector2(1.0, 0.0)],
+		["11_title_pointer_upper", Vector2(0.0, -1.0)],
+	]:
+		title_controller.preview_pointer_tilt(pointer_capture[1])
+		await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		var pointer_image := get_viewport().get_texture().get_image()
+		var pointer_path := "%s/%s.png" % [
+			OUTPUT_DIR,
+			String(pointer_capture[0]),
+		]
+		if pointer_image.save_png(pointer_path) != OK:
+			push_error("Boot pointer-title frame could not be saved.")
+			get_tree().quit(1)
+			return
+	title_controller.preview_pointer_tilt(Vector2.ZERO)
 
 	if black_base.color != Color.BLACK:
 		push_error("Boot intro black base is not pure black.")
@@ -204,22 +245,23 @@ func _ready() -> void:
 		push_error("Boot title did not start with the brush impact.")
 		get_tree().quit(1)
 		return
+	var quarter_brush_progress := _shader_float(
+		blue_mid,
+		&"intro_stroke_progress")
+	var quarter_gold_progress := _shader_float(
+		gold,
+		&"intro_path_progress")
 	if (
-		not is_equal_approx(
-			_shader_float(
-				blue_mid,
-				&"intro_stroke_progress"),
-			0.25)
-		or not is_equal_approx(
-			_shader_float(
-				gold,
-				&"intro_path_progress"),
-			0.25)
+		quarter_brush_progress <= 0.08
+		or quarter_brush_progress >= 0.30
+		or quarter_gold_progress <= 0.0
+		or quarter_gold_progress >= quarter_brush_progress
 		or _shader_float(star, &"intro_pulse_enabled") > 0.001
 		or not boot.scale.is_equal_approx(Vector2.ONE)
 		or not boot.position.is_equal_approx(Vector2.ZERO)
 	):
-		push_error("Boot reveal is accelerated or still contains a pulse.")
+		push_error(
+			"Boot layered reveal lost its visible phase separation.")
 		get_tree().quit(1)
 		return
 
@@ -257,14 +299,22 @@ func _ready() -> void:
 	var title_entry_progress := _shader_float(
 		title,
 		&"intro_reveal_progress")
+	var title_material := title.material as ShaderMaterial
+	var english_material := english.material as ShaderMaterial
 	if (
 		title_entry_progress <= 0.0
 		or title_entry_progress >= 1.0
-		or _shader_float(title, &"intro_blade_strength") <= 0.0
+		or title_material.get_shader_parameter(
+			&"intro_activation_map") == null
 		or not is_equal_approx(
 			_shader_float(english, &"intro_reveal_progress"),
 			title_entry_progress)
-		or _shader_float(english, &"intro_blade_strength") <= 0.0
+		or english_material.get_shader_parameter(
+			&"intro_activation_map") == null
+		or not is_equal_approx(
+			_shader_float(english, &"intro_progress_delay"),
+			0.052632)
+		or title_material.shader.code.contains("blade_coordinate")
 		or not prompt.visible
 		or prompt.modulate.a <= 0.0
 	):
@@ -333,7 +383,7 @@ func _ready() -> void:
 
 	print(
 		"BOOT_INTRO_V8_FRAMES_OK: character_ready=true "
-		+ "parallel_linear_1_2_second_entry=true pulse=false "
+		+ "layered_impact_entry=true pulse=false "
 		+ "flash_start=%.2f "
 		% runtime_intro.flash_start_seconds
 		+ "duration=%.2f playback=%.3f frames=%d"

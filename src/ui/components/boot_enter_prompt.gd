@@ -8,9 +8,6 @@ extends Control
 @export_group("Title Sync")
 @export_range(0.1, 1.5, 0.05) var title_peak_delay_seconds: float = 0.5
 
-@export_group("Enter Feedback")
-@export_range(0.9, 1.0, 0.005) var enter_feedback_scale: float = 0.975
-
 @onready var _label: Label = $Label
 
 var _fade_tween: Tween
@@ -74,7 +71,7 @@ func play_enter_feedback() -> void:
 		_fade_tween.kill()
 
 	modulate.a = 1.0
-	scale = Vector2.ONE * enter_feedback_scale
+	scale = Vector2.ONE
 
 
 func prepare_intro() -> void:
