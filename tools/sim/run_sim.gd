@@ -96,7 +96,11 @@ func _run_batch(pool: Array, label: String = "") -> Dictionary:
 	var csv_rows: Array = []
 	var win := {0: 0, 1: 0, 2: 0, -1: 0}   # winner: 0 平 / 1 P1 / 2 P2 / -1 未决(capped)
 	var turns_list: Array = []
-	var item_stat := {}                      # 道具统计（used = 提交盲选的道具次数）
+	var item_stat := {
+		used = 0, by_id = {}, # 一次性道具提交（含即时资源件）
+		relic_activations = 0, relic_activations_by_id = {},
+		relic_triggers = 0, relic_triggers_by_id = {},
+	}
 	var action_count := {}                  # action int → 次数
 	var hero_present := {}                   # hero_id → 出场局数
 	var hero_win := {}                       # hero_id → 所在队获胜局数
@@ -235,6 +239,8 @@ func _run_batch(pool: Array, label: String = "") -> Dictionary:
 		turns_med = (turns_list[turns_list.size() / 2] if not turns_list.is_empty() else 0),
 		turns_avg = _avg(turns_list),
 		actions = action_count, items_used = int(item_stat.get("used", 0)),
+		relic_activations = int(item_stat.get("relic_activations", 0)),
+		relic_triggers = int(item_stat.get("relic_triggers", 0)),
 		stats = stats, ot = ot,
 		ab = ({a = ab_a, b = ab_b, draw = ab_draw} if ab_active() else {}),
 	}
@@ -512,7 +518,7 @@ func _play(b: BattleCore, ai0: BattleAI, ai1: BattleAI, action_count: Dictionary
 		var c1: Dictionary = ai1.choose_action(b, 1)
 		BattleAI.commit_attack_items(b, 0, int(c0["action"]))
 		BattleAI.commit_attack_items(b, 1, int(c1["action"]))
-		item_stat["used"] = item_stat.get("used", 0) + b.item_uses[0].size() + b.item_uses[1].size()
+		_record_item_uses(b, item_stat)
 		_tally(action_count, int(c0["action"]))
 		_tally(action_count, int(c1["action"]))
 		# 各英雄主动技使用（选择时点记·出战英雄即释放者）
@@ -528,6 +534,7 @@ func _play(b: BattleCore, ai0: BattleAI, ai1: BattleAI, action_count: Dictionary
 		if not b.apply_choice(1, c1):
 			b.select_action(1, ActionDef.Action.CHARGE)
 		var rr: Dictionary = b.resolve()
+		_record_relic_events(rr.get("events", []), item_stat)
 		if not stats.is_empty():
 			_scan_events(rr.get("events", []), stats)
 		# 出战阵亡 → AI 选替补上场
@@ -548,8 +555,47 @@ func _play(b: BattleCore, ai0: BattleAI, ai1: BattleAI, action_count: Dictionary
 	}
 
 
+## 在 resolve 清空队列前记录本回合全部提交；点金石的换件、魔晶/熔炉的即时资源仍走统一 item_uses 记录。
+func _record_item_uses(b: BattleCore, item_stat: Dictionary) -> void:
+	var by_id: Dictionary = item_stat.get("by_id", {})
+	for p: int in [0, 1]:
+		for use_variant in b.item_uses[p]:
+			var use: Dictionary = use_variant
+			var data: ItemData = use.get("data", null)
+			if data == null:
+				continue
+			# 持续遗物由 resolve 后的权威 relic_activated / relic_trigger 单独统计，
+			# 不再混入“一次性道具提交”，否则每次成功激活会被双计。
+			if bool(data.params.get("relic", false)):
+				continue
+			item_stat["used"] = int(item_stat.get("used", 0)) + 1
+			by_id[data.item_id] = int(by_id.get(data.item_id, 0)) + 1
+	item_stat["by_id"] = by_id
+
+
+## 激活与实际兑现都消费权威事件；被天罗/封印回滚的遗物不会留下激活事件。
+func _record_relic_events(events: Array, item_stat: Dictionary) -> void:
+	var activation_by_id: Dictionary = item_stat.get("relic_activations_by_id", {})
+	var trigger_by_id: Dictionary = item_stat.get("relic_triggers_by_id", {})
+	for event_variant in events:
+		var event: Dictionary = event_variant
+		var item_id: String = String(event.get("item_id", ""))
+		if item_id.is_empty():
+			continue
+		match String(event.get("id", "")):
+			"relic_activated":
+				item_stat["relic_activations"] = int(
+					item_stat.get("relic_activations", 0)) + 1
+				activation_by_id[item_id] = int(activation_by_id.get(item_id, 0)) + 1
+			"relic_trigger":
+				item_stat["relic_triggers"] = int(item_stat.get("relic_triggers", 0)) + 1
+				trigger_by_id[item_id] = int(trigger_by_id.get(item_id, 0)) + 1
+	item_stat["relic_activations_by_id"] = activation_by_id
+	item_stat["relic_triggers_by_id"] = trigger_by_id
+
+
 ## 扫一回合事件流入深层统计：伤害来源占比（动作/技能 vs 道具）+ 大波被大防拦截数。
-## 道具系伤害 = damage_taken(src=item) + 延迟伤害(妖火/藤蔓) + 尾后针反击。
+## 道具系伤害 = damage_taken(src=item，已含尾后针实际伤害) + 延迟/妖火生命损失。
 func _scan_events(events: Array, stats: Dictionary) -> void:
 	for ev in events:
 		match String(ev.get("id", "")):
@@ -560,8 +606,8 @@ func _scan_events(events: Array, stats: Dictionary) -> void:
 					stats["dmg_action"] = int(stats["dmg_action"]) + int(ev.get("amount", 0))
 			"deferred_damage":
 				stats["dmg_item"] = int(stats["dmg_item"]) + int(ev.get("amount", 0))
-			"weihouzhen_sting":
-				stats["dmg_item"] = int(stats["dmg_item"]) + BattleCore.WEIHOUZHEN_STING_DMG
+			"yaohuo_loss":
+				stats["dmg_item"] = int(stats["dmg_item"]) + int(ev.get("amount", 0))
 			"big_defend_block":
 				if String(ev.get("src", "action")) == "action" and int(ev.get("kind", -1)) == ActionDef.Action.BIG_ATTACK:
 					stats["bigwave_blocked"] = int(stats["bigwave_blocked"]) + 1
@@ -677,11 +723,47 @@ func _write_outputs(csv_rows: Array, win: Dictionary, turns_list: Array,
 			md.store_line("| %s | %d | %s |" % [_action_label(k), action_count[k], _pct(action_count[k], act_total)])
 	md.store_line("")
 
-	# 道具使用（验证经济已接入·总提交盲选道具次数 / 局均）
+	# 道具使用：一次性提交、遗物激活与遗物实际触发分开，避免持久件被统计成“未使用”。
 	var items_used: int = int(item_stat.get("used", 0))
+	var relic_activations: int = int(item_stat.get("relic_activations", 0))
+	var relic_triggers: int = int(item_stat.get("relic_triggers", 0))
 	md.store_line("## 道具使用")
-	md.store_line("- 总提交道具次数：**%d** ｜ 局均：%.2f 次/局\n" % [
-		items_used, (float(items_used) / float(total) if total > 0 else 0.0)])
+	md.store_line("- 一次性道具提交：**%d** ｜ 遗物激活：**%d** ｜ 遗物触发：**%d**\n" % [
+		items_used, relic_activations, relic_triggers])
+	var item_by_id: Dictionary = item_stat.get("by_id", {})
+	if not item_by_id.is_empty():
+		md.store_line("| 道具 | Tier | 使用次数 | 占全部道具 |")
+		md.store_line("|------|------|---------:|-----------:|")
+		var item_ids: Array = item_by_id.keys()
+		item_ids.sort_custom(func(a: String, b: String) -> bool:
+			return int(item_by_id[a]) > int(item_by_id[b]))
+		for item_id_variant in item_ids:
+			var item_id := String(item_id_variant)
+			var data: ItemData = ItemCatalog.make(item_id)
+			if data != null:
+				md.store_line("| %s | T%d | %d | %s |" % [
+					data.item_name, data.tier, int(item_by_id[item_id]),
+					_pct(int(item_by_id[item_id]), items_used)])
+		md.store_line("")
+	var relic_activation_by_id: Dictionary = item_stat.get("relic_activations_by_id", {})
+	var relic_trigger_by_id: Dictionary = item_stat.get("relic_triggers_by_id", {})
+	if not relic_activation_by_id.is_empty():
+		md.store_line("| 遗物 | 激活次数 | 触发次数 | 次/激活 |")
+		md.store_line("|------|---------:|---------:|--------:|")
+		var relic_ids: Array = relic_activation_by_id.keys()
+		relic_ids.sort_custom(func(a: String, b: String) -> bool:
+			return int(relic_activation_by_id[a]) > int(relic_activation_by_id[b]))
+		for relic_id_variant in relic_ids:
+			var relic_id := String(relic_id_variant)
+			var relic_data: ItemData = ItemCatalog.make(relic_id)
+			if relic_data == null:
+				continue
+			var activations: int = int(relic_activation_by_id.get(relic_id, 0))
+			var triggers: int = int(relic_trigger_by_id.get(relic_id, 0))
+			md.store_line("| %s | %d | %d | %.2f |" % [
+				relic_data.item_name, activations, triggers,
+				(float(triggers) / float(activations) if activations > 0 else 0.0)])
+		md.store_line("")
 
 	# 深层统计（2026-07-03·#1 统计增强）：伤害来源占比 + 大波拦截率
 	if not stats.is_empty():

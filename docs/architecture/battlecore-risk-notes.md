@@ -27,7 +27,7 @@
 |---|------|---------|---------|
 | 1 | ATTACK × ATTACK 双方各受 1 伤（B-001） | 第一眼像 bug，会被"修"成抵消 | `# LOCKED-FOR-REFACTOR` + `BEHAVIOR_NOTES.md` |
 | 2 | `_calc_attack_raw` 内 hardcoded 被动列表（chenlong/xugou） | 加新被动时忘加到这里 | **HeroSkill 迁移**（本文 §3） |
-| 3 | `select_switch_target` 内 h07/h09 字面量分支 | 拆英雄技能时漏迁移 | 未来 `on_switch_in/out` hooks |
+| 3 | 切换能力绕过 `_perform_switch` / `_can_switch` 单点入口 | 强制切换、免费切换与切换惩罚漏触发 | 所有切换来源统一走入口与 `on_switch_in/out` hooks |
 | 4 | `turn_number += 1` 在 `resolve()` 末尾，司晨用 `(turn_number+1) % 3` | 递增时机改了，司晨周期偏移 1 | docstring 锁定时机 |
 | 5 | `events: Array[String]` 是 UI 唯一事件源 | 字符串改动会让 UI / 测试同时炸 | `last_result` 字段尽量稳定，新增字段不删旧字段 |
 
@@ -53,7 +53,7 @@
 |------|---------|-----------|
 | `on_attack_calc(raw_dmg, action, battle, player, energy_before) -> int` | `_calc_attack_raw` 内 | 当时的 h05 龙威（首批） |
 
-> **历史说明（2026-07-31）**：上表记录 v3 评估窗口，不是现行 hook 清单。h05 现已重设计为「龙御极」，实现位于 `src/battle/skills/h05_pozhan.gd`，使用 `on_base_attack_blocked`。
+> **历史说明（2026-08-04）**：上表记录 v3 评估窗口，不是现行 hook 清单。h05 现行「龙御极」实现位于 `src/battle/skills/h05_longyuji.gd`，组件只声明 `enables_empowered_wave()` 能力；可选强化波的合法 choice、费用、伤害、AI、联机与快照由 `BattleCore` 统一收口。
 
 ### 何时该加新 hook
 

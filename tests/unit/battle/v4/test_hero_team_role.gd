@@ -58,10 +58,12 @@ func test_h05_published_data_matches_approved_redesign() -> void:
 	assert_not_null(h, "h05 数据资源必须可加载")
 	assert_eq(h.max_hp, 5, "亢金生命保持 5")
 	assert_eq(h.team_role, "进攻", "亢金的主定位应为进攻")
+	assert_eq(h.skill_type, HeroData.SkillType.ENHANCED_ACTION,
+		"龙御极由玩家选择强化波，应标记为主动强化")
 	assert_eq(h.skill_description, "龙御极", "亢金应使用已定稿技能名")
 	assert_eq(h.skill_detail,
-		"亢金【龙】的攻击被成功防御时，使目标获得破绽。",
-		"亢金短文案应使用统一的成功防御与破绽术语")
+		"亢金【龙】在队时，我方的「波」可以额外消耗1点能量，使伤害增加1点。",
+		"亢金短文案应明确强化波是团队可选的额外消耗")
 
 
 func test_h06_published_data_matches_approved_redesign() -> void:
@@ -71,8 +73,88 @@ func test_h06_published_data_matches_approved_redesign() -> void:
 	assert_eq(h.team_role, "进攻", "翼火的主定位应为进攻")
 	assert_eq(h.skill_description, "神打", "翼火应使用已定稿技能名")
 	assert_eq(h.skill_detail,
-		"翼火【蛇】命中敌方英雄时，使其获得1层毒素。\n毒素：可叠加。中毒英雄再次被命中时，引爆并清除全部毒素，每层造成0.5点伤害。",
+		"翼火【蛇】命中敌方英雄时，使其获得1层毒素。\n毒素：可叠加。中毒英雄再次被「波」或「大波」命中时，引爆并清除全部毒素，每层造成0.5点伤害。",
 		"翼火文案应使用已定稿的毒素与引爆术语")
+
+
+func test_h15_published_data_matches_approved_redesign() -> void:
+	var h := load("res://assets/data/heroes/h15.tres") as HeroData
+	assert_not_null(h, "h15 数据资源必须可加载")
+	assert_eq(h.max_hp, 7, "穷奇生命保持 7")
+	assert_eq(h.team_role, "进攻", "穷奇的主定位应为进攻")
+	assert_eq(h.skill_description, "七杀战鬼", "穷奇应使用已定稿技能名")
+	assert_eq(h.skill_detail,
+		"穷奇【虎】的「波」穿防，但无法使用「防」和「大防」。",
+		"穷奇文案应使用已定稿的穿防与禁防表述")
+
+
+func test_h16_published_data_matches_approved_redesign() -> void:
+	var h := load("res://assets/data/heroes/h16.tres") as HeroData
+	assert_not_null(h, "h16 数据资源必须可加载")
+	assert_eq(h.max_hp, 4, "广寒生命保持 4")
+	assert_eq(h.team_role, "经济", "广寒暂沿用当前组队标签")
+	assert_eq(h.skill_description, "白虹", "广寒应使用已定稿技能名")
+	assert_eq(h.skill_detail,
+		"队友攻击命中时，立刻登场并追击同一目标1点伤害。",
+		"h16 文案应为已批准的替补追击版本")
+
+
+func test_h08_published_data_matches_approved_redesign() -> void:
+	var h := load("res://assets/data/heroes/h08.tres") as HeroData
+	assert_not_null(h, "h08 数据资源必须可加载")
+	assert_eq(h.max_hp, 6, "鬼金生命保持 6")
+	assert_eq(h.team_role, "防守", "鬼金的主定位应为防守")
+	assert_eq(h.skill_description, "不坠神言", "鬼金应使用已定稿技能名")
+	assert_eq(h.skill_detail,
+		"鬼金【羊】的「大防」未挡到攻击时，由我方保留至下一回合结束。",
+		"鬼金短文案应明确保留大防只持续到下一回合结束")
+
+
+func test_h13_published_data_matches_approved_redesign() -> void:
+	var h := load("res://assets/data/heroes/h13.tres") as HeroData
+	assert_not_null(h, "h13 数据资源必须可加载")
+	assert_eq(h.max_hp, 4, "玄冥生命保持 4")
+	assert_eq(h.team_role, "进攻", "玄冥的新主定位应为进攻")
+	assert_eq(h.skill_type, HeroData.SkillType.ENHANCED_ACTION,
+		"暗潮由玩家选择大波形态，应标记为主动强化")
+	assert_eq(h.skill_description, "暗潮", "玄冥应使用最新定稿技能名")
+	assert_eq(h.skill_detail,
+		"玄冥【鼠】的「大波」可以改为连续两次「波」。",
+		"玄冥短文案应明确大波的可选双波形态")
+
+
+func test_h14_published_data_matches_approved_redesign() -> void:
+	var h := load("res://assets/data/heroes/h14.tres") as HeroData
+	assert_not_null(h, "h14 数据资源必须可加载")
+	assert_eq(h.max_hp, 6, "蚩尤生命保持 6")
+	assert_eq(h.team_role, "经济", "生命替代能量支付的主定位应为经济")
+	assert_eq(h.dimension, "能量", "蚩尤应归入能量维度")
+	assert_eq(h.skill_type, HeroData.SkillType.ENHANCED_ACTION, "蚩尤的新技能应标记为主动强化")
+	assert_eq(h.skill_description, "天不葬", "蚩尤应使用最新定稿技能名")
+	assert_eq(h.skill_detail,
+		"本回合，我方消耗的能量改为消耗蚩尤【牛】的血量。",
+		"蚩尤短文案应与定稿措辞完全一致")
+
+
+func test_h18_published_data_matches_approved_redesign() -> void:
+	var h := load("res://assets/data/heroes/h18.tres") as HeroData
+	assert_not_null(h, "h18 数据资源必须可加载")
+	assert_eq(h.max_hp, 6, "相柳生命保持 6")
+	assert_eq(h.team_role, "经济", "旧 UI 分类按兼容规则暂不逐只迁移")
+	assert_eq(h.skill_type, HeroData.SkillType.EXTRA_ACTION, "相柳的新技能应标记为主动技")
+	assert_eq(h.skill_description, "游丝引", "相柳技能名应为定稿名称")
+	assert_eq(h.skill_detail,
+		"平均分配我方所有存活英雄的当前生命。",
+		"相柳短文案应与定稿措辞完全一致")
+
+
+func test_h23_published_data_matches_approved_redesign() -> void:
+	var h := load("res://assets/data/heroes/h23.tres") as HeroData
+	assert_not_null(h, "h23 数据资源必须可加载")
+	assert_eq(h.max_hp, 6, "天狗生命保持 6")
+	assert_eq(h.skill_detail,
+		"天狗【狗】的「波」和「大波」造成的伤害会等量降低目标的能量上限（最低3点）",
+		"天狗短文案应与本轮定稿措辞完全一致")
 
 
 func test_hero_data_launch_pool_all_have_valid_team_role() -> void:

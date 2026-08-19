@@ -4,3 +4,8 @@ extends ItemEffect
 func apply_pre(battle: BattleCore, player: int, _target: int, _data: ItemData) -> void:
 	if battle.selected_action[1 - player] == ActionDef.Action.BIG_ATTACK and battle.selected_action[player] == ActionDef.Action.DEFEND:
 		battle.set_item_mod(player, "def_upgrade", 1)
+
+
+func apply_second_pre(battle: BattleCore, player: int, _target: int, data: ItemData,
+		_events: Array) -> void:
+	apply_pre(battle, player, -1, data)

@@ -1,5 +1,5 @@
 extends ItemEffect
 
-## 心脏掌握魔法：你这次攻击无视对手护甲层（穿甲·#4；仍受"挡不挡"约束）。
+## 心脏掌握魔法：仅本回合令下一次基础攻击改为真实伤害。
 func apply_pre(battle: BattleCore, player: int, _target: int, _data: ItemData) -> void:
-	battle.set_item_mod(player, "pierce_armor", true)
+	battle.set_item_mod(player, "next_base_attack_true_damage", true)

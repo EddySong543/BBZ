@@ -68,19 +68,59 @@ func test_v1_shield_diff_weighted_by_w_shield() -> void:
 # ---- 状态资产项（任务#7·2026-07-03：铺垫型技能挂出的状态计分）----
 
 func test_v1_status_assets_enemy_debuffs_score_positive() -> void:
-	# 挂在敌方身上的毒/破绽/沉默 = 我方资产（此前恒 0 分 → 铺垫型主动技被 AI 视为纯亏）。
+	# 挂在敌方身上的毒/破甲/沉默 = 我方资产（此前恒 0 分 → 铺垫型主动技被 AI 视为纯亏）。
 	var b := _neutral()
 	b.set_status(1, 0, "poison", 2)     # 敌出战 2 层毒 → +8×2
-	b.set_status(1, 0, "opening", 1)    # 敌出战有破绽 → +5
+	b.set_status(1, 0, "broken_armor", 1) # 敌出战有破甲 → +5
 	b.set_status(1, 0, "silenced", 2)   # 敌被沉默 2 回合 → +10×2
 	assert_almost_eq(BattleEval.score(b, 0), 8.0 * 2.0 + 5.0 + 10.0 * 2.0, 0.001,
-		"敌方债/破绽按半点当量计入我方资产")
+		"敌方债/破甲按半点当量计入我方资产")
 
 
 func test_v1_status_assets_own_jianqi_scores() -> void:
 	var b := _neutral()
 	b.set_status(0, 0, "jianqi", 3)     # 我方 3 层剑气 → +6×3
 	assert_almost_eq(BattleEval.score(b, 0), 6.0 * 3.0, 0.001, "剑气层 = 己方攒的穿透资源")
+
+
+func test_v1_status_assets_h08_retained_big_defend_scores_only_while_valid() -> void:
+	var b := _neutral()
+	b.retained_big_defend[0] = true
+	b.retained_big_defend_until_turn[0] = b.turn_number
+	assert_almost_eq(BattleEval.score(b, 0), BattleEval.W_RETAINED_BIG_DEFEND, 0.001,
+		"下一回合仍有效的不坠神言应被 AI 视为团队防御资产")
+
+	b.retained_big_defend_until_turn[0] = b.turn_number - 1
+	assert_almost_eq(BattleEval.score(b, 0), 0.0, 0.001, "已过期的神言不得继续计分")
+
+
+func test_v1_fatal_damage_immunity_is_contextual_survival_value() -> void:
+	var b := _neutral()
+	b.set_status(0, 1, "fatal_damage_immunity", 1)
+	assert_almost_eq(BattleEval._status_assets(b, 0), BattleEval.W_FATAL_IMMUNITY, 0.001,
+		"满血替补的还魂保护应有基础价值，不能被视为白板")
+
+	b.hp[0][1] = BattleEval.FATAL_IMMUNITY_LOW_HP_LINE
+	assert_almost_eq(BattleEval._status_assets(b, 0),
+		BattleEval.W_FATAL_IMMUNITY + BattleEval.W_FATAL_IMMUNITY_LOW_HP, 0.001,
+		"低血英雄的保命更可能兑现，应获得有限加成")
+
+	b.active_index[0] = 1
+	assert_almost_eq(BattleEval._status_assets(b, 0), BattleEval.W_FATAL_IMMUNITY
+		+ BattleEval.W_FATAL_IMMUNITY_LOW_HP + BattleEval.W_FATAL_IMMUNITY_ACTIVE, 0.001,
+		"低血出战者的保护应比替补保护更能改变下一拍选择")
+
+	b.set_status(0, 1, "fatal_damage_immunity", 3)
+	assert_almost_eq(BattleEval._status_assets(b, 0), BattleEval.W_FATAL_IMMUNITY
+		+ BattleEval.W_FATAL_IMMUNITY_LOW_HP + BattleEval.W_FATAL_IMMUNITY_ACTIVE, 0.001,
+		"旧快照中的异常多层也只按一份保险计值")
+
+	b.hp[0][0] = 0
+	b.hp[0][2] = 0
+	assert_almost_eq(BattleEval._status_assets(b, 0), BattleEval.W_FATAL_IMMUNITY
+		+ BattleEval.W_FATAL_IMMUNITY_LOW_HP + BattleEval.W_FATAL_IMMUNITY_ACTIVE
+		+ BattleEval.W_FATAL_IMMUNITY_LAST_ALIVE, 0.001,
+		"最后存活英雄的保命应获得关键存活者加成")
 
 
 func test_v1_status_assets_antisymmetric_and_switchable() -> void:
@@ -124,6 +164,99 @@ func test_v1_energy_marginal_decay_beyond_cap() -> void:
 	b.energy = [3, 2]   # 我方第 3 能 vs 对手 2 能（前 2 能对称抵消）
 	assert_almost_eq(BattleEval.score(b, 0), BattleEval.W_ENERGY_EXTRA * 1.0, 0.001,
 		"第 3 能只值 W_ENERGY_EXTRA（抑制无意义屯能）")
+
+
+func test_v1_persistent_energy_max_difference_is_valued() -> void:
+	var b := _neutral()
+	b.energy_max[1] -= 2
+	assert_almost_eq(BattleEval.score(b, 0), BattleEval.W_ENERGY_MAX * 2.0, 0.001,
+		"敌方永久少 1 点能量上限应计为我方优势")
+
+
+func test_v1_scheduled_magic_crystal_debt_is_a_liability() -> void:
+	var b := _neutral()
+	b.item_buffs[0]["energy_debt_turns"] = [{turn = b.turn_number + 1, amount = 2}]
+	assert_almost_eq(BattleEval.score(b, 0), -BattleEval.W_SCHEDULED_ENERGY_DEBT * 2.0, 0.001,
+			"魔晶下回合偿还不能被 AI 当作没有代价的永久能量")
+	assert_almost_eq(BattleEval.score(b, 0), -BattleEval.score(b, 1), 0.001)
+
+
+func test_v1_scheduled_item_seal_is_valued_for_the_attacker() -> void:
+	var b := _neutral()
+	b.item_buffs[1]["sealed_item_turns"] = [{turn = b.turn_number + 1, charges = 1}]
+	assert_almost_eq(BattleEval.score(b, 0), BattleEval.W_SCHEDULED_ITEM_SEAL, 0.001,
+			"封印卷轴的下回合一次失效应作为公开干扰资产计分")
+	assert_almost_eq(BattleEval.score(b, 0), -BattleEval.score(b, 1), 0.001)
+
+
+func test_v1_t3_charge_and_turn_relics_use_authoritative_state_values() -> void:
+	var b := _neutral()
+	b.hp[0][0] = 4 # 缺 6 半血，续命香两回合最多恰好回复 6 半血。
+	b.set_status(1, 0, "poison", 2)
+	b.relics[0] = [
+		{data = ItemCatalog.make("t3_budongmingwang"), state = {charges = 2}},
+		{data = ItemCatalog.make("t3_hedinghong"), state = {charges = 1}},
+		{data = ItemCatalog.make("t3_judingsanhua"), state = {charges = 3}},
+		{data = ItemCatalog.make("t3_qingyuanbaolian"), state = {remaining_turns = 2}},
+		{data = ItemCatalog.make("t3_xumingxiang"), state = {remaining_turns = 2}},
+		{data = ItemCatalog.make("t3_yemingzhu"), state = {charges = 2}},
+	]
+	var expected: float = BattleEval.W_RELIC_BUDONG_CHARGE * 2.0 \
+		+ BattleEval.W_RELIC_HEDING_LAYER * 2.0 \
+		+ BattleEval.W_RELIC_JUDING_CHARGE * 3.0 \
+		+ BattleEval.W_RELIC_QING_TURN * 2.0 \
+		+ BattleEval.W_RELIC_XUMING_HALF_HEAL * 6.0 \
+		+ BattleEval.W_RELIC_YEMING_CHARGE * 2.0
+	assert_almost_eq(BattleEval._relic_assets(b, 0), expected, 0.001,
+		"次数与回合遗物必须按快照 state 估值，而不是只认目录EV")
+
+
+func test_v1_values_jubao_long_term_income_and_sheming_action_debt() -> void:
+	var b := _neutral()
+	b.relics[0].append({data = ItemCatalog.make("t3_jubao_pen"), state = {active = true}})
+	assert_almost_eq(BattleEval._relic_assets(b, 0), BattleEval.W_RELIC_JUBAO, 0.001)
+	b.item_buffs[0]["exhausted_turn"] = b.turn_number + 1
+	assert_almost_eq(BattleEval._status_assets(b, 0),
+		BattleEval.W_RELIC_JUBAO - BattleEval.W_EXHAUSTED_TURN, 0.001,
+		"赊命券的6能已进入资源值，评估器还必须扣除下一回合行动负债")
+
+
+func test_v1_shixinding_values_attack_plan_and_prices_forced_backlash() -> void:
+	var b := _neutral()
+	b.relics[0].append({data = ItemCatalog.make("t3_shixinding"), state = {}})
+	assert_almost_eq(BattleEval._relic_assets(b, 0),
+		BattleEval.W_RELIC_SHIXIN_ATTACK_READY, 0.001,
+		"仍能打波时噬心钉是持续进攻资产")
+
+	b.energy[0] = 0
+	b.item_buffs[0]["free_big_attack_until_turn"] = b.turn_number
+	assert_almost_eq(BattleEval._relic_assets(b, 0),
+		BattleEval.W_RELIC_SHIXIN_ATTACK_READY, 0.001,
+		"零能时至臻剑意的免费大波仍可维持噬心钉进攻链")
+	b.item_buffs[0].erase("free_big_attack_until_turn")
+	assert_almost_eq(BattleEval._relic_assets(b, 0),
+		-BattleEval.W_RELIC_SHIXIN_BACKLASH_HALF * 6.0, 0.001,
+		"无法继续攻击时必须提前计入3点反噬，不能把噬心钉永远当纯增伤")
+
+
+func test_v1_morihuozhong_and_free_big_attack_are_contextual_assets() -> void:
+	var b := _neutral()
+	b.relics[0].append({data = ItemCatalog.make("t3_morihuozhong"), state = {}})
+	assert_almost_eq(BattleEval._relic_assets(b, 0),
+		BattleEval.W_RELIC_MORIHUO_DORMANT, 0.001)
+	b.hp[0][1] = 0
+	b.hp[0][2] = 0
+	assert_almost_eq(BattleEval._relic_assets(b, 0),
+		BattleEval.W_RELIC_MORIHUO_LAST_ALIVE, 0.001,
+		"末日火种应在仅剩一人时从潜在资产转为残局核心")
+
+	var free_big := _neutral()
+	free_big.item_buffs[0]["free_big_attack_until_turn"] = free_big.turn_number
+	assert_almost_eq(BattleEval._status_assets(free_big, 0),
+		BattleEval.W_FREE_BIG_ATTACK, 0.001)
+	free_big.turn_number += 1
+	assert_almost_eq(BattleEval._status_assets(free_big, 0), 0.0, 0.001,
+		"过期的免费大波窗口不得继续估值")
 
 
 # ---- 终局：胜/负/平 ----

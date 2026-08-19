@@ -41,24 +41,24 @@ func _aa(b: BattleCore, a0: int, a1: int) -> void:
 	b.resolve()
 
 
-# === 续命香：每回合 +0.5 HP × 3 后到期 ===
+# === 续命香：每回合 +1.5 HP × 3 后到期 ===
 
 func test_relic_xumingxiang_heals_three_turns_then_expires() -> void:
 	var b := _battle()
 	b.hp[0][0] = 10
 	b.use_item(0, _give(b, 0, "t3_xumingxiang"))
 	_cc(b)
-	assert_eq(b.hp[0][0], 11)   # turn1
+	assert_eq(b.hp[0][0], 13)   # turn1
 	_cc(b)
-	assert_eq(b.hp[0][0], 12)   # turn2
+	assert_eq(b.hp[0][0], 16)   # turn2
 	_cc(b)
-	assert_eq(b.hp[0][0], 13)   # turn3
+	assert_eq(b.hp[0][0], 19)   # turn3
 	assert_eq(b.relics[0].size(), 0, "3 回合后遗物到期移除")
 	_cc(b)
-	assert_eq(b.hp[0][0], 13)   # 已到期 → 不再回血
+	assert_eq(b.hp[0][0], 19)   # 已到期 → 不再回血
 
 
-# === 青元宝莲：每回合 +0.5 能，3 回合后消失 ===
+# === 青元宝莲：每回合 +1.5 能，3 回合后消失 ===
 
 func test_relic_qingyuanbaolian_gains_energy() -> void:
 	var b := _battle(4)
@@ -69,7 +69,7 @@ func test_relic_qingyuanbaolian_gains_energy() -> void:
 	base.select_action(0, A.DEFEND)
 	base.select_action(1, A.DEFEND)
 	base.resolve()
-	assert_eq(got - base.energy[0], 1, "遗物每回合 +0.5 能 = 1 半能")
+	assert_eq(got - base.energy[0], 3, "遗物每回合 +1.5 能 = 3 半能")
 
 
 func test_relic_qingyuanbaolian_expires_after_three() -> void:
@@ -82,7 +82,7 @@ func test_relic_qingyuanbaolian_expires_after_three() -> void:
 	assert_eq(b.relics[0].size(), 0)
 
 
-# === 噬心钉：攻击 +1.0 伤 + 无法防御 ===
+# === 噬心钉：攻击 +1.0 伤，停攻则反噬并结束 ===
 
 func test_relic_shixinding_attack_bonus() -> void:
 	var b := _battle()
@@ -91,11 +91,12 @@ func test_relic_shixinding_attack_bonus() -> void:
 	assert_eq(b.hp[1][0], 16)   # 波 2 + 1.0 = 4
 
 
-func test_relic_shixinding_cannot_defend() -> void:
+func test_relic_shixinding_backlashes_when_not_attacking() -> void:
 	var b := _battle()
 	b.use_item(0, _give(b, 0, "t3_shixinding"))
-	_aa(b, A.DEFEND, A.ATTACK)   # 防失效 → 对手波命中
-	assert_eq(b.hp[0][0], 18)
+	_aa(b, A.DEFEND, A.ATTACK)   # 防仍生效；回合末因未攻击反噬 3 HP
+	assert_eq(b.hp[0][0], 14)
+	assert_eq(b.relics[0].size(), 0, "反噬后结束此效果")
 
 
 func test_control_skilless_defend_blocks_attack() -> void:
@@ -104,21 +105,21 @@ func test_control_skilless_defend_blocks_attack() -> void:
 	assert_eq(b.hp[0][0], 20)   # 对照：正常防挡下波
 
 
-# === 不动明王甲：防御得益 + 攻击惩罚 ===
+# === 不动明王甲：接下来 3 次成功防御转化整次攻击总伤害为护盾 ===
 
-func test_relic_budongmingwang_block_heals() -> void:
+func test_relic_budongmingwang_block_grants_shield() -> void:
 	var b := _battle()
-	b.hp[0][0] = 10
 	b.use_item(0, _give(b, 0, "t3_budongmingwang"))
-	_aa(b, A.DEFEND, A.ATTACK)   # 防挡下波 → 成功 → 回 0.5 HP
-	assert_eq(b.hp[0][0], 11)
+	_aa(b, A.DEFEND, A.ATTACK)
+	assert_eq(b.shield[0][0], 2, "成功防住波后获得等同攻击总伤害的护盾")
+	assert_eq(int(b.relics[0][0]["state"].get("charges", 0)), 2)
 
 
-func test_relic_budongmingwang_attack_penalty() -> void:
+func test_relic_budongmingwang_has_no_attack_penalty() -> void:
 	var b := _battle()
 	b.use_item(0, _give(b, 0, "t3_budongmingwang"))
 	_aa(b, A.ATTACK, A.CHARGE)
-	assert_eq(b.hp[1][0], 19)   # 波 2 − 0.5 = 1
+	assert_eq(b.hp[1][0], 18)
 
 
 # === 聚鼎三花：3 次攻击后散（extra_hits 行为需英雄 on-hit，本测仅锁充能/不自伤）===
@@ -134,11 +135,22 @@ func test_relic_judingsanhua_expires_after_three_attacks() -> void:
 	assert_eq(b.hp[1][0], 14, "无技能英雄下 extra_hits 不自带伤害（仅 波 ×3=6）")
 
 
+func test_relic_judingsanhua_does_not_repeat_item_attack_aftereffects() -> void:
+	var b := _battle(6)
+	b.hp[0] = [10, 10, 10]
+	b.use_item(0, _give(b, 0, "t3_judingsanhua"))
+	b.use_item(0, _give(b, 0, "t2_jike"))
+	b.use_item(0, _give(b, 0, "t2_huoshou"))
+	_aa(b, A.ATTACK, A.CHARGE)
+	assert_eq(b.hp[0], [12, 12, 12], "三花只额外触发英雄技能，饥渴仍只治疗一次")
+	assert_eq(b.energy[0], 9, "三花不复制护手的回能")
+
+
 # === 基建：持久 + clone 独立 + 全遗物可跑 ===
 
 func test_relic_persists_across_turns() -> void:
 	var b := _battle()
-	b.use_item(0, _give(b, 0, "t3_shixinding"))
+	b.use_item(0, _give(b, 0, "t3_morihuozhong"))
 	_cc(b)
 	assert_eq(b.relics[0].size(), 1, "永久遗物跨回合存活")
 	_cc(b)
@@ -151,8 +163,8 @@ func test_clone_copies_relics_independently() -> void:
 	_cc(b)   # tick 一次 → state.used→1
 	var c := b.clone()
 	assert_eq(c.relics[0].size(), 1)
-	c.relics[0][0]["state"]["used"] = 99
-	assert_ne(int(b.relics[0][0]["state"].get("used", 0)), 99, "改 clone 的遗物状态不影响原局")
+	c.relics[0][0]["state"]["remaining_turns"] = 99
+	assert_ne(int(b.relics[0][0]["state"].get("remaining_turns", 0)), 99, "改 clone 的遗物状态不影响原局")
 
 
 func test_all_relics_run_many_turns() -> void:
@@ -169,16 +181,17 @@ func test_all_relics_run_many_turns() -> void:
 		assert_true(true, "%s 跑 5 回合不崩" % id)
 
 
-# === 夜明珠：切换登场 → 敌方出战被冲撞（A4 搬入 relic_on_switch_in 后的回归锁定）===
+# === 夜明珠：接下来 3 次正常切换，伤敌 1 点并给新出战英雄 1 点护盾 ===
 
 func test_relic_yemingzhu_switch_in_charges_enemy() -> void:
-	# 持夜明珠 + P0 切换登场 → 敌方出战被登场冲撞 0.5（1 半点·真伤）。
+	# 持夜明珠 + P0 正常切换登场 → 敌方出战受 1 点伤害，新出战英雄得 1 点护盾。
 	var b := _battle()
 	b.use_item(0, _give(b, 0, "t3_yemingzhu"))
 	b.select_switch(0, 1)
 	b.select_action(1, A.CHARGE)
 	b.resolve()
-	assert_eq(b.hp[1][0], 19, "夜明珠登场冲撞：敌方出战 20→19（-0.5）")
+	assert_eq(b.hp[1][0], 18, "夜明珠切换：敌方出战 20→18（-1）")
+	assert_eq(b.shield[0][1], 2, "夜明珠切换：新出战英雄获得 1 点护盾")
 	# 对照：无夜明珠切换不冲撞
 	var base := _battle()
 	base.select_switch(0, 1)
@@ -187,7 +200,7 @@ func test_relic_yemingzhu_switch_in_charges_enemy() -> void:
 	assert_eq(base.hp[1][0], 20, "无夜明珠 → 切换不冲撞")
 
 
-# === 鹤顶红：毒爆额外 +1.0（A4 搬入 relic_poison_detonate_bonus 后的回归锁定）===
+# === 鹤顶红：下次毒爆每层额外 +1 ===
 
 func test_relic_hedinghong_amplifies_poison_detonate() -> void:
 	# 持鹤顶红 + 敌出战带 1 层毒 → P0 波命中引爆：波2 + 毒爆1 + 鹤顶红2 = 5 半点。
@@ -203,4 +216,4 @@ func test_relic_hedinghong_amplifies_poison_detonate() -> void:
 	base.select_action(1, A.CHARGE)
 	base.resolve()
 	assert_eq(base.hp[1][0], 17, "无鹤顶红：波2 + 毒爆1 = 3 半点（20→17）")
-	assert_eq(base.hp[1][0] - b.hp[1][0], 2, "鹤顶红使毒爆多扣 2 半点（+1.0）")
+	assert_eq(base.hp[1][0] - b.hp[1][0], 2, "鹤顶红使每层毒素多扣 2 半点（+1）")

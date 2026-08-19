@@ -9,4 +9,4 @@ extends HeroSkill
 func on_self_damaged(battle: BattleCore, player: int, _slot: int, dealt: int, _attacker_player: int) -> void:
 	if dealt <= 1:
 		return   # 0.5 伤（1 半点）不足 2 半点起转，向下取整为 0
-	battle.energy[player] = mini(battle.energy[player] + dealt / 2, ActionDef.MAX_ENERGY)
+	battle._gain_energy(player, dealt / 2, false)

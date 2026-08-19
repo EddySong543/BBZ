@@ -1,34 +1,46 @@
 extends HeroSkill
 
-## h18 相柳【困于泽国】被动 · 状态 · HP6（批③ 4→5·批⑧ 2026-07-10 5→6 数值补贴——慢钱被动命不够长·机制不动）
-## 相柳【出战·存活】时：① 对手【无法主动切换】（含星日免费切换）——被死死缠住、逃不掉；
-##   ② 对手的【防】不再免费（+1 能·2026-07-05 批③ J 案·泽国防御税——泥沼里连躲闪都沉重）。
-##   死亡换人 / 紫火调虎离山 / 道具强制切换 等"被动·触发"切换不受影响（只锁对手【主动】切换）。
-## 引擎收口：切换锁=can_afford(SWITCH)+is_free_switch_target（_can_switch）；防御税=_get_cost(DEFEND)
-##   单点（can_afford/疾风双动作/resolve 扣费全自动生效）。下场/阵亡/被沉默即全解。
+## h18 相柳主动技 · 防守 · HP6
+## 消耗 1 点能量并占用本回合行动：平均分配我方所有存活英雄的当前生命。
 ##
-## 批③诊断与理据（验收卷 33.8%·2026-07-05）：锁切换只覆盖全场 6% 频率的动作、价值押在
-##   "对手想切换"上——大多数拍 aura 白挂 + HP4 太脆常常没值回票价就死。
-##   J 案把 aura 的税基从 6%（切换）换到 33%（防御·全场最高频动作）——威慑变每拍实税，
-##   同时 = 防 33% 超带的英雄层反龟牌。「困」主题闭环：跑不掉（锁切换）+ 躲不起（防加税）。
-##   A 案 HP 4→5 轻补生存；"可被点掉解套"的脆皮自限保留。
-##   ⚠ 组合观察位：相柳+烛阴（冻结拍防要花钱付不起 + 切换被锁 → 对手只能攒/免费道具）=
-##   设计内双英雄 combo（各有 cap/脆皮自限·下轮盯数据）。
+## 规则边界：
+##   - 仅记录发动时仍存活的英雄；阵亡英雄不参与，也不会被复活。
+##   - 总生命严格守恒，不超过各英雄的生命上限。
+##   - 生命以半点为整数单位；不能整除时按槽位顺序分配余下半点，最终差值至多为 0.5。
+##   - 护盾、状态与生命上限不变。
 ##
-## 设计依据（heroes-redesign / build-design-framework）：
-##   维度 = 状态（持续束缚·跨回合；触发=aura、避开 on-hit 同质）。
-##   为何宽 combo（trap 引擎）：把对手核心【钉死逃不掉】→ 你全队的铺设（龙留破绽 / 暗虎压 /
-##     集火 / 毒）全砸在同一个跑不了的目标上；防御税再逼它"要么花钱躲、要么硬吃"。
-##   agency / yomi：你拿脆皮蛇顶前面锁住对手核心、集火收割；对手只能先点掉蛇解套，
-##     或预判被缠提前换位 / 留净化手段。
-##   与光翼火 h06【神打】(状态·叠毒引爆) 机制全异；与娄金(罚切换·真伤)/h09 碎能(删能量存量)
-##     也不同——这是【硬锁+加税】，不删对手任何存量。
-##
-## 【实现注记】aura 作用于【对手】→ 由 BattleCore 统一收口（本组件只声明两个只读 hook·无状态）。
+## 技能名暂沿用旧名，待本轮命名确认后再同步资源与文件名。
 
-func locks_enemy_switch() -> bool:
+const COST: int = 2   # 2 半能 = 1 能
+
+
+func has_active() -> bool:
 	return true
 
 
-func enemy_defend_cost_add() -> int:
-	return 2   # +1 能（2 半能·泽国防御税·2026-07-05 批③ J 案）
+func active_cost(_battle: BattleCore, _player: int, _slot: int) -> int:
+	return COST
+
+
+func execute_active(battle: BattleCore, player: int, _slot: int) -> void:
+	var living: Array[int] = battle.living_heroes(player)
+	var total_hp: int = 0
+	for hero_slot: int in living:
+		total_hp += battle.hp[player][hero_slot]
+
+	var redistributed: Array[int] = []
+	redistributed.resize(battle.hp[player].size())
+	redistributed.fill(0)
+	for _half_point: int in range(total_hp):
+		var target_slot: int = -1
+		for hero_slot: int in living:
+			if redistributed[hero_slot] >= battle.max_hp[player][hero_slot]:
+				continue
+			if target_slot < 0 or redistributed[hero_slot] < redistributed[target_slot]:
+				target_slot = hero_slot
+		if target_slot < 0:
+			break
+		redistributed[target_slot] += 1
+
+	for hero_slot: int in living:
+		battle.hp[player][hero_slot] = redistributed[hero_slot]

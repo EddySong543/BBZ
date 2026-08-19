@@ -49,9 +49,9 @@ func _dim_share(drafts: Array, dim: String) -> float:
 	return float(hit) / float(total)
 
 
-# === 数据：24 首发英雄维度标签（真相源 = heroes-schools.md §3.1）===
+# === 数据：24 首发英雄兼容维度标签（六维仅服务 T2 加权，不再承担人数配额）===
 
-func test_hero_pool_launch_dimensions_valid_and_quota_4_each() -> void:
+func test_hero_pool_launch_dimensions_are_valid_and_all_represented() -> void:
 	# Arrange
 	var counts: Dictionary = {}
 	for d in DIMS_6:
@@ -65,7 +65,7 @@ func test_hero_pool_launch_dimensions_valid_and_quota_4_each() -> void:
 		if counts.has(h.dimension):
 			counts[h.dimension] = int(counts[h.dimension]) + 1
 	for d in DIMS_6:
-		assert_eq(int(counts[d]), 4, "维度「%s」配额 = 4 只（6 维 × 4·heroes-schools §3.1）" % d)
+		assert_gt(int(counts[d]), 0, "兼容维度「%s」至少应有一名英雄，保证 T2 加权仍可覆盖" % d)
 
 
 # === 护栏 ①：3 候选互不重复 ===
@@ -94,9 +94,9 @@ func test_draft_lineup_dimension_items_appear_more_often() -> void:
 	# Act
 	var share_atk: float = _dim_share(_sample_drafts(b_atk, SAMPLES), "进攻")
 	var share_plain: float = _dim_share(_sample_drafts(b_plain, SAMPLES), "进攻")
-	# Assert：T1 池进攻 5/20 → 无权重基准 ≈25%、2× 加权首抽 ≈40%（不放回+小保底略拉低）
+	# Assert：T1 池进攻 5/19 → 无权重基准 ≈26%、2× 加权首抽 ≈42%（不放回+小保底略拉低）
 	assert_gt(share_atk, share_plain + 0.05, "命中阵容维度的道具应显著更常出现（2× 加权）")
-	assert_gt(share_atk, 0.30, "加权后进攻件占比应明显高于 25% 无权重基准")
+	assert_gt(share_atk, 0.30, "加权后进攻件占比应明显高于 26% 无权重基准")
 
 
 # === 护栏 ③：小保底 = 3 候选至少跨 2 个维度 ===

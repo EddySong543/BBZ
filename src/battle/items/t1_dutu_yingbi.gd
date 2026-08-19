@@ -1,8 +1,10 @@
 extends ItemEffect
 
-## 赌徒的硬币：抛币——正面这次攻击 +1.0 伤、反面落空（动作清零）。赌自己、不抹对手的读。
+## 赌徒的硬币：抛币——我方或敌方本回合下一次基础攻击总伤害 +2。
 func apply_pre(battle: BattleCore, player: int, _target: int, data: ItemData) -> void:
 	if battle.rng.randf() < 0.5:
-		battle.add_item_mod(player, "atk_bonus", int(data.params.get("win", 2)))
+		battle.add_item_mod(player, "base_attack_total_bonus", int(data.params.get("bonus", 4)))
 	else:
-		battle.set_item_mod(player, "atk_nullify", true)
+		var opp: int = 1 - player
+		if not battle.item_debuff_blocked(opp):
+			battle.add_item_mod(opp, "base_attack_total_bonus", int(data.params.get("bonus", 4)))

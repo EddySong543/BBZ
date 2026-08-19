@@ -62,7 +62,7 @@ ADR-001 §D4（2026-05-18）决定**暂停** HeroSkill 组件化迁移，明确*
 
 ### D2：英雄 = 组件文件 + 双接口（被动 hook + 主动技），组件**无状态**
 
-**决策时现状**：仅 h05 是组件（当时为 `skills/chenlong.gd`；现行重设计实现为 `skills/h05_pozhan.gd`），其余 12 个 hardcoded；基类当时只有 1 个 hook。
+**决策时现状**：仅 h05 是组件（当时为 `skills/chenlong.gd`；现行重设计实现为 `skills/h05_longyuji.gd`），其余 12 个 hardcoded；基类当时只有 1 个 hook。
 
 **Decision**：
 - 每个英雄 = `src/battle/skills/hXX_<name>.gd`，继承 `HeroSkill`，自带：
@@ -134,7 +134,7 @@ ADR-001 §D4（2026-05-18）决定**暂停** HeroSkill 组件化迁移，明确*
 ### D5：每槽位状态容器（随切换保留），引擎统一 tick 时长
 
 **Decision**：`statuses[player][slot]` = 一组 StatusEffect（`{id, magnitude, duration, source}`）+ 结构化字段。承载：
-- 自身状态：窟层(h04) / 连段(h09) / 待发(h14) / 蓄势(h25) / 周而复始在场 buff(h23) / 变身 form(h26)
+- 自身状态：毒素(h06) / 剑气(h10) / 脆弱(h20) / 变身 form
 - 他人施加的 debuff：燃烧(h32) / 沉默(h15) / 易伤
 - 绑定：挚爱(h19) / 契约(h28) 存 `link[player]`
 
@@ -162,7 +162,7 @@ ADR-001 §D4（2026-05-18）决定**暂停** HeroSkill 组件化迁移，明确*
 ### D7：可 seed 的 RNG 注入（修 H6）
 
 **Current**：`randi_range` 直调，无法重放。
-**Decision**：BattleCore 持有 `RandomNumberGenerator`（构造/ setup 时传入 seed）；所有随机（h13 翻倍、h23 抽祝福）走它。
+**Decision**：BattleCore 持有 `RandomNumberGenerator`（构造/ setup 时传入 seed）；所有技能与道具随机分支统一走它。
 **Rationale**：联机公平 + 测试确定性 + 录像重放。服务器权威下 seed 由服务器定。
 
 ---
@@ -181,7 +181,7 @@ ADR-001 §D4（2026-05-18）决定**暂停** HeroSkill 组件化迁移，明确*
 - **每局 cap N**（h01/07/12/13/14/15/16/24/26/32/33 共用；h17/20/34 无 cap）
 - **动作槽例外**：千里自在风 h07（0 能不占槽，方案 C 英雄级唯一例外）
 - **动作复制**：梅开二度 h14（下一动作 ×2）
-- **动作禁用**：君命难违 h17（对手下回合屏蔽某动作系列）
+- **动作锁定**：保留基建（原 h17 使用；2026-08-06 重设计后暂无英雄施加者）
 - **结算时机选择**：天平归衡 h24（玩家选 扶倾/清算 注入点）——元机制，特殊处理
 
 **Rationale**：主动技的 cap / 扣能 / 可用性是横切样板，统一比每英雄重写省且一致。

@@ -1,6 +1,13 @@
 extends ItemEffect
 
-## 风之靴：本回合若你「切换」，下回合你的攻击 +0.5 伤（借风势而上·跨回合 buff）。
+## 回马枪：本回合实际发生「切换」后，下回合第一次基础攻击总伤害 +1.5。
 func apply_pre(battle: BattleCore, player: int, _target: int, data: ItemData) -> void:
-	if battle.selected_action[player] == ActionDef.Action.SWITCH:
-		battle.item_buffs[player]["next_atk_bonus"] = int(data.params.get("bonus", 1))
+	var bonus: int = int(data.params.get("bonus", 3))
+	# h07 的免费切换在选择阶段即时发生，早于道具结算；此处补认已经发生的切换。
+	if battle.free_switch_usage_turn[player] == battle.turn_number \
+			and battle.free_switch_uses[player] > 0:
+		battle.item_buffs[player]["next_atk_total_bonus"] = int(
+			battle.item_buffs[player].get("next_atk_total_bonus", 0)) + bonus
+		return
+	# 付费切换、强制切换和追击登场稍后统一经过 BattleCore._perform_switch。
+	battle.add_item_mod(player, "switch_next_atk_total_bonus", bonus)

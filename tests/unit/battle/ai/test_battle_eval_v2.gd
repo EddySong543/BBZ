@@ -51,6 +51,26 @@ func test_v2_credits_lethal_threat() -> void:
 		"对手在斩杀线内应加致命威胁分")
 
 
+func test_v2_fatal_immunity_removes_immediate_lethal_threat() -> void:
+	var b := _neutral()
+	b.hp[1][0] = 2
+	b.set_status(1, 0, "fatal_damage_immunity", 1)
+	assert_almost_eq(BattleEvalV2.score(b, 0) - BattleEval.score(b, 0), 0.0, 0.001,
+		"致命伤害会被整次免除，v2 不应继续把受保护目标计为下一拍可斩杀")
+
+
+func test_v2_free_big_attack_window_creates_threat_without_current_energy() -> void:
+	var b := _neutral()
+	b.hp[1][0] = 2
+	b.energy[0] = 0
+	assert_almost_eq(BattleEvalV2.score(b, 0) - BattleEval.score(b, 0), 0.0, 0.001,
+		"零能且无窗口时不构成立即可兑现的攻击威胁")
+	b.item_buffs[0]["free_big_attack_until_turn"] = b.turn_number
+	assert_almost_eq(BattleEvalV2.score(b, 0) - BattleEval.score(b, 0),
+		BattleEvalV2.THREAT_W, 0.001,
+		"至臻剑意的免费大波必须被进阶评估识别为真实斩杀资源")
+
+
 # ---- 延迟伤害加分（道具妖火/藤蔓挂在对手头上的债）----
 
 func test_v2_credits_pending_damage_on_opponent() -> void:
@@ -62,6 +82,18 @@ func test_v2_credits_pending_damage_on_opponent() -> void:
 	# Assert：v2 比基础高出 PENDING_W × 2（对手将掉血 = 利好）
 	assert_almost_eq(BattleEvalV2.score(b, 0) - base, BattleEvalV2.PENDING_W * 2.0, 0.001,
 		"对手头上的延迟伤害应加分")
+
+
+func test_v2_credits_yaohuo_only_while_target_is_still_active() -> void:
+	var b := _neutral()
+	var base := BattleEval.score(b, 0)
+	b.add_timed_item_effect(1, {
+		id = "yaohuo", target_slot = 0, due_turn = 1, amount = 3, source_player = 0,
+	})
+	assert_almost_eq(BattleEvalV2.score(b, 0) - base, BattleEvalV2.PENDING_W * 3.0, 0.001)
+	b.active_index[1] = 1
+	assert_almost_eq(BattleEvalV2.score(b, 0) - BattleEval.score(b, 0), 0.0, 0.001,
+		"目标离场后妖火可规避，AI不应继续按必得伤害估值")
 
 
 # ---- 反对称（零和自洽）----

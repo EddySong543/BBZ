@@ -5,12 +5,13 @@
 [resource]
 script = ExtResource("1_h13")
 hero_id = "h13"
-team_role = "经济"
-dimension = "能量"
+team_role = "进攻"
+dimension = "进攻"
 hero_name = "玄冥【鼠】"
 max_hp = 4
-skill_description = "北冥归墟"
-skill_detail = "我方每触发一次附加效果，获得 0.5 点能量。"
+skill_type = 2
+skill_description = "暗潮"
+skill_detail = "玄冥【鼠】的「大波」可以改为连续两次「波」。"
 portrait_path = "res://assets/sprites/heroes/h13/h13_portrait.png"
 skill_icon_path = "res://assets/sprites/heroes/h13/h13_skill.png"
 sprite_frames_path = "res://assets/sprites/heroes/h13/h13_idle.tres"

@@ -1,8 +1,12 @@
 extends ItemEffect
 
-## 血魔的獠牙：你这次攻击命中（穿过防御门连接）时回 0.5 HP。
-func apply_pre(battle: BattleCore, player: int, _target: int, _data: ItemData) -> void:
-	battle.add_item_rider(player, _data)
+## 血魔的獠牙：下一次基础攻击命中后，按整次攻击实际造成的伤害回复（含护盾损失）。
+func apply_pre(battle: BattleCore, player: int, _target: int, data: ItemData) -> void:
+	battle.add_base_attack_aftereffect(player, data)
 
-func on_attack_connect(battle: BattleCore, player: int, _target_player: int, _target_slot: int, _dealt: int, data: ItemData) -> void:
-	battle._heal(player, battle.active_index[player], int(data.params.get("heal", 1)))
+
+func on_base_attack_resolved(battle: BattleCore, player: int, context: Dictionary,
+		_data: ItemData, _events: Array) -> void:
+	var slot: int = int(context.get("source_slot", battle.active_index[player]))
+	if bool(context.get("connected", false)) and battle.hp[player][slot] > 0:
+		battle._heal(player, slot, int(context.get("damage_total", 0)))

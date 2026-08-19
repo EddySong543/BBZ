@@ -8,6 +8,7 @@ extends GutTest
 const A := ActionDef.Action
 const SEED := 777
 const SS := BattleCore.SlotState
+const ITEM_GALLERY_SCREEN := preload("res://src/ui/item_gallery_screen.gd")
 
 
 func _hero(id: String, hp: int) -> HeroData:
@@ -134,7 +135,7 @@ func test_use_slot_item_resolves() -> void:
 	b.select_action(0, A.CHARGE)
 	b.select_action(1, A.CHARGE)
 	b.resolve()
-	assert_eq(b.hp[1][0], 19, "槽内飞镖照常 0.5 伤")
+	assert_eq(b.hp[1][0], 18, "槽内生锈暗器照常造成 1 点伤害")
 
 
 func test_clone_copies_slots_independently() -> void:
@@ -240,12 +241,30 @@ func test_slot_row_new_frame_palette_and_inner_mask_fit() -> void:
 		b.slots[0][0]["item"] = ItemCatalog.make(tier_items[tier - 1])
 		row.refresh(b, 0)
 		var mat: ShaderMaterial = row._tex_frame_mats[0]
+		var cell_mat: ShaderMaterial = row._cell_mats[0]
 		assert_eq(mat.get_shader_parameter("shadow_color"), ItemSlotRow.FRAME_SHADOW_T[tier],
 				"第%d阶外框暗部色" % tier)
 		assert_eq(mat.get_shader_parameter("mid_color"), ItemSlotRow.FRAME_MID_T[tier],
 				"第%d阶外框主色" % tier)
 		assert_eq(mat.get_shader_parameter("highlight_color"), ItemSlotRow.FRAME_HIGHLIGHT_T[tier],
 				"第%d阶外框高光色" % tier)
+		assert_eq(cell_mat.get_shader_parameter("material_lighting"), 0.0,
+				"道具格底关闭额外材质光照，与图鉴一致")
+		if tier < 3:
+			assert_eq(cell_mat.get_shader_parameter("fill_color"), ItemSlotRow.CELL_FILL_T[tier],
+					"普通/稀有格底顶部色与图鉴一致")
+			assert_eq(cell_mat.get_shader_parameter("inner_color"), ItemSlotRow.CELL_CENTER_T[tier],
+					"普通/稀有格底底部色与图鉴一致")
+			assert_eq(cell_mat.get_shader_parameter("vertical_gradient"), 1.0,
+					"普通/稀有格底使用图鉴的上暗下亮纵向渐变")
+			assert_eq(cell_mat.get_shader_parameter("use_tex"), 0.0,
+					"普通/稀有格底不误用传说贴图")
+		else:
+			assert_eq(cell_mat.get_shader_parameter("use_tex"), 1.0,
+					"传说格底沿用金色背景贴图")
+			assert_eq(cell_mat.get_shader_parameter("tex_top_darkening"),
+					ItemSlotRow.LEGENDARY_TOP_DARKENING,
+					"传说格底顶部压暗量与图鉴一致")
 
 
 func test_draft_popup_resolves_choice_once() -> void:
@@ -278,12 +297,34 @@ func test_draft_popup_new_frame_size_position_and_palette() -> void:
 			"升级三选一外框按新素材放大")
 	assert_eq(cell.position, slot_pos + Vector2.ONE * inset,
 			"升级三选一格底限制在内孔起点")
-	assert_eq(cell.size, slot_size - Vector2.ONE * inset * 2.0,
-			"升级三选一格底限制在内孔尺寸")
+	assert_almost_eq(cell.size.x, slot_size.x - inset * 2.0, 0.001,
+			"升级三选一格底宽度限制在内孔尺寸")
+	assert_almost_eq(cell.size.y, slot_size.y - inset * 2.0, 0.001,
+			"升级三选一格底高度限制在内孔尺寸")
+	assert_eq(ItemDraftPopup.CELL_INSET_RATIO, ItemFrameStyle.CELL_INSET_RATIO,
+			"升级三选一与图鉴/战斗栏共用填充内边距，避免格底水平偏移")
 	assert_eq((cell.material as ShaderMaterial).get_shader_parameter("corner_radius"), 0.0,
 			"升级三选一格底取消旧圆角，填充色覆盖四角")
+	assert_eq((cell.material as ShaderMaterial).get_shader_parameter("vertical_gradient"), 1.0,
+			"升级三选一普通/稀有格底使用共享的上暗下亮渐变")
+	assert_eq((cell.material as ShaderMaterial).get_shader_parameter("fill_color"),
+			ItemFrameStyle.CELL_TOP[2], "升级三选一顶部色读取共享样式")
+	assert_eq((cell.material as ShaderMaterial).get_shader_parameter("inner_color"),
+			ItemFrameStyle.CELL_BOTTOM[2], "升级三选一底部色读取共享样式")
 	assert_eq((frame.material as ShaderMaterial).get_shader_parameter("mid_color"),
 			ItemDraftPopup.FRAME_MID[2], "升级三选一稀有框恢复紫色")
+
+
+func test_item_frame_style_is_the_single_palette_source() -> void:
+	assert_eq(ITEM_GALLERY_SCREEN.CELL_FILL, ItemFrameStyle.CELL_TOP)
+	assert_eq(ITEM_GALLERY_SCREEN.CELL_CENTER, ItemFrameStyle.CELL_BOTTOM)
+	assert_eq(ItemSlotRow.CELL_FILL_T, ItemFrameStyle.CELL_TOP)
+	assert_eq(ItemSlotRow.CELL_CENTER_T, ItemFrameStyle.CELL_BOTTOM)
+	assert_eq(ItemDraftPopup.CELL_FILL, ItemFrameStyle.CELL_TOP)
+	assert_eq(ItemDraftPopup.CELL_CENTER, ItemFrameStyle.CELL_BOTTOM)
+	assert_eq(ITEM_GALLERY_SCREEN.FRAME_MID, ItemFrameStyle.FRAME_MID)
+	assert_eq(ItemSlotRow.FRAME_MID_T, ItemFrameStyle.FRAME_MID)
+	assert_eq(ItemDraftPopup.FRAME_MID, ItemFrameStyle.FRAME_MID)
 
 
 func test_battle_screen_script_compiles_with_m3_wiring() -> void:
@@ -306,6 +347,10 @@ func test_catalog_upgrade_chain_links() -> void:
 	assert_eq(ItemCatalog.make("t2_fali").upgrade_to, "t3_fali")
 	assert_eq(ItemCatalog.make("t2_feibiao").upgrade_to, "", "飞镖线 T2 封顶")
 	assert_eq(ItemCatalog.make("t3_shengming").upgrade_to, "", "生命药水 T3 封顶")
+	assert_eq(ItemCatalog.make("t3_shengming").params, {heal = 6}, "上等生命药水回复3点")
+	assert_eq(ItemCatalog.make("t3_fali").params, {energy = 8}, "上等法力药水立即获得4点能量")
+	assert_eq(ItemCatalog.make("t3_shengming").ev_half, 6, "T3 升级目标采用统一新估值")
+	assert_eq(ItemCatalog.make("t3_fali").ev_half, 6, "T3 升级目标采用统一新估值")
 
 
 func test_upgrade_draft_3_from_next_tier_then_swap_and_relock() -> void:
@@ -382,7 +427,7 @@ func test_cannot_upgrade_top_tier_but_can_upgrade_non_family() -> void:
 	assert_false(b.can_upgrade(0, 0), "顶级（T3）不可升")
 	assert_false(b.pick_upgrade(0, 0, 0))
 	# 新模型：无预设升级款的 T1 件也可升（候选来自下一级池·B2 的核心动机）。
-	b.slots[0][0]["item"] = ItemCatalog.make("t1_xianshou")    # 无 upgrade_to
+	b.slots[0][0]["item"] = ItemCatalog.make("t1_dutu_yingbi") # 删除命运骰子后无 upgrade_to
 	assert_eq(b.slot_item(0, 0).upgrade_to, "", "该件无预设升级款")
 	assert_true(b.can_upgrade(0, 0), "无预设升级款的 T1 件也能升级")
 

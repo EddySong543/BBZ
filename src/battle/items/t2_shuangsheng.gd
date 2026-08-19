@@ -1,5 +1,6 @@
 extends ItemEffect
 
-## 双生咒符：你本回合攻击的命中次数 +1（多触发一次 on-hit，伤害不变·泛连携放大）。
+## 双生咒符：下一次基础攻击增加整次总伤害，并额外触发命中效果。
 func apply_pre(battle: BattleCore, player: int, _target: int, data: ItemData) -> void:
-	battle.add_item_mod(player, "extra_hits", int(data.params.get("hits", 1)))
+	battle.add_item_mod(player, "base_attack_total_bonus", int(data.params.get("bonus", 2)))
+	battle.add_item_mod(player, "whole_attack_extra_hit_effects", int(data.params.get("triggers", 1)))

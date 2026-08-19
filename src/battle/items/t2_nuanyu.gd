@@ -1,6 +1,5 @@
 extends ItemEffect
 
-## 暖玉：你「防御」回合回 1.0 HP（绑防御 = 反 stall）。
-func apply_pre(battle: BattleCore, player: int, target: int, data: ItemData) -> void:
-	if battle.selected_action[player] in ActionDef.DEFEND_ACTIONS:
-		battle._heal(player, target, int(data.params.get("heal", 2)))
+## 暖玉：成功防御后，所有存活英雄各回复 1 点生命。
+func apply_pre(battle: BattleCore, player: int, _target: int, data: ItemData) -> void:
+	battle.add_item_mod(player, "t2_block_team_heal", int(data.params.get("heal", 2)))

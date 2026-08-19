@@ -59,7 +59,7 @@ func start(team0: Array, team1: Array, seed_v: int, send_cb: Callable) -> void:
 		_rtk[p] = crypto.generate_random_bytes(16).hex_encode()
 	for p in 2:
 		_send.call(p, {v = NetProtocol.PROTO_VERSION, kind = "match_start", you = p,
-			heroes = [_pack_team(0), _pack_team(1)], turn = battle.turn_number, view = _view(),
+			heroes = [_pack_team(0), _pack_team(1)], turn = battle.turn_number, view = _view(p),
 			rtk = _rtk[p], snap = _snap_for(p)})
 
 
@@ -85,7 +85,7 @@ func handle(player: int, msg: Variant) -> void:
 		if phase == Phase.SELECT:
 			# 补发 turn_begin：重连者立刻回到选招（否则要干等到下一拍）
 			_send.call(player, {v = NetProtocol.PROTO_VERSION, kind = "turn_begin",
-				turn = battle.turn_number, view = _view(), snap = _snap_for(player)})
+				turn = battle.turn_number, view = _view(player), snap = _snap_for(player)})
 		return
 	if phase == Phase.OVER:
 		_send.call(player, NetProtocol.msg_error("match_over"))
@@ -104,6 +104,8 @@ func handle(player: int, msg: Variant) -> void:
 			_on_econ_refill(player, int(d["slot"]))
 		"econ_pick":
 			_on_econ_pick(player, d)
+		"item_draft":
+			_on_pointstone_draft(player, int(d["slot"]), int(d["target"]))
 		"death_switch":
 			_on_death_switch(player, int(d["slot"]))
 
@@ -126,26 +128,79 @@ func _on_submit(player: int, d: Dictionary) -> void:
 
 
 func _apply_payload(core: BattleCore, player: int, d: Dictionary) -> bool:
-	for s in d["item_slots"]:
-		if not core.use_slot(player, int(s)):
+	if bool(d.get("double", false)):
+		return false   # 旧 h16 双动作字段只为线协议兼容保留；现行规则不接受 true
+	var want_blood_payment := bool(d.get("blood_payment", false))
+	var free_switches: Array = d.get("free_switches", [])
+	var blood_payment_step := int(d.get("blood_payment_step", -1))
+	# 客户端会逻辑预览 h07 免费切换；权威端在提交时按原顺序重建同一 pending 序列。
+	# 真实出入场 hook 统一等到天罗裁定后兑现。step=N 表示在第 N 次预览前由当时
+	# 出战的蚩尤发动，切换最终获准时仍保留原付款槽。
+	for step in range(free_switches.size() + 1):
+		if want_blood_payment and blood_payment_step == step \
+				and not core.set_blood_payment_active(player, true):
+			return false
+		if step < free_switches.size() and not core.free_switch(player, int(free_switches[step])):
+			return false
+	# 兼容旧客户端：无 step 的血量支付仍按“提交动作前由当前蚩尤发动”处理。
+	if want_blood_payment and blood_payment_step < 0 \
+			and not core.set_blood_payment_active(player, true):
+		return false
+	var item_slots: Array = d["item_slots"]
+	var item_slot_targets: Array = d.get("item_slot_targets", [])
+	var item_slot_choices: Array = d.get("item_slot_choices", [])
+	for index in item_slots.size():
+		var source_slot: int = int(item_slots[index])
+		var item_target: int = -1 if item_slot_targets.is_empty() else int(item_slot_targets[index])
+		var item_choice: int = -1 if item_slot_choices.is_empty() else int(item_slot_choices[index])
+		var source_item: ItemData = core.slot_item(player, source_slot)
+		if source_item != null and source_item.item_id == "t2_dianjinshi":
+			# 候选必须先由权威 item_draft 入口生成并缓存；客户端不能凭空猜下标触发新随机。
+			if item_choice < 0 or (core.slots[player][source_slot]["upg_draft"] as Array).is_empty():
+				return false
+		elif item_choice != -1:
+			return false
+		var hero_target: int = item_target \
+			if BattleCore.item_requires_friendly_hero_target(source_item) else -1
+		# 同一逐位字段复用为槽目标：熔炉/点金石指己方槽，时滞枷锁指敌方槽；
+		# 具体归属由 BattleCore 的道具分类与权威合法性校验裁定。
+		var slot_target: int = -1 if hero_target >= 0 else item_target
+		if not core.use_slot(player, source_slot, hero_target, slot_target, item_choice):
 			return false
 	# 动作合法性=legal_actions 白名单精确匹配（apply_choice 对未知动作号可能宽容·权威校验不赌下游）
 	var want_action := int(d["action"])
 	var want_target := int(d["target"])
+	var want_empowered_wave := bool(d.get("empowered_wave", false))
+	var want_split_big_wave := bool(d.get("split_big_wave", false))
+	var want_energy_cap_discount := bool(d.get("energy_cap_discount", false))
 	var legal := false
 	for la in core.legal_actions(player):
-		if int(la["action"]) == want_action and int(la["target"]) == want_target:
+		if int(la["action"]) == want_action and int(la["target"]) == want_target \
+				and bool(la.get("empowered_wave", false)) == want_empowered_wave \
+				and bool(la.get("split_big_wave", false)) == want_split_big_wave \
+				and bool(la.get("blood_payment", false)) == want_blood_payment \
+				and bool(la.get("energy_cap_discount", false)) == want_energy_cap_discount:
 			legal = true
 			break
 	if not legal:
 		return false
-	if not core.apply_choice(player, {action = want_action, target = want_target}):
+	if not core.apply_choice(player, {
+		action = want_action,
+		target = want_target,
+		empowered_wave = want_empowered_wave,
+		split_big_wave = want_split_big_wave,
+		blood_payment = want_blood_payment,
+		energy_cap_discount = want_energy_cap_discount,
+	}):
 		return false
-	# 疾风附加动作（h16）：付第二份能·can_double 把门
-	if bool(d.get("double", false)):
-		if not core.can_double(player):
-			return false
-		core.select_double(player, true)
+	var second_action := int(d.get("second_action", -1))
+	if second_action >= 0 and not core.apply_second_choice(player, {
+		action = second_action,
+		target = int(d.get("second_target", -1)),
+	}):
+		return false
+	if second_action < 0 and core.has_lianhuan_gu_queued(player):
+		return false
 	return true
 
 
@@ -165,7 +220,7 @@ func _commit_and_resolve() -> void:
 	for p in 2:
 		_send.call(p, {v = NetProtocol.PROTO_VERSION, kind = "resolve",
 			actions = [r.get("p1_action", -1), r.get("p2_action", -1)],
-			events = r.get("events", []), pending = pending, view = _view(),
+			events = r.get("events", []), pending = pending, view = _view(p),
 			snap = _snap_for(p)})
 	if phase == Phase.OVER:
 		for p in 2:
@@ -180,7 +235,7 @@ func _begin_turn() -> void:
 	_arm_turn_deadline()
 	for p in 2:
 		_send.call(p, {v = NetProtocol.PROTO_VERSION, kind = "turn_begin",
-			turn = battle.turn_number, view = _view(), snap = _snap_for(p)})
+			turn = battle.turn_number, view = _view(p), snap = _snap_for(p)})
 
 
 ## 断线冻结（2026-07-17 审计修复）：deadline 是绝对时间戳——旧行为"断线期不检查"只是不判，
@@ -289,6 +344,22 @@ func _on_econ_draft(player: int, slot: int, upgrade: bool) -> void:
 		slot = slot, upgrade = upgrade, options = ids})
 
 
+## 点金石候选属于本次道具使用的私有信息：权威核心生成并缓存，只有本人收到。
+## 目标变化时核心沿用来源槽的同一组候选，避免通过反复点选重掷。
+func _on_pointstone_draft(player: int, slot: int, target: int) -> void:
+	if not _econ_gate(player):
+		return
+	var options: Array = battle.begin_pointstone_draft(player, slot, target)
+	if options.is_empty():
+		_send.call(player, NetProtocol.msg_error("draft_unavailable"))
+		return
+	var ids: Array[String] = []
+	for item_variant in options:
+		ids.append((item_variant as ItemData).item_id)
+	_send.call(player, {v = NetProtocol.PROTO_VERSION, kind = "pointstone_offer",
+		slot = slot, target = target, options = ids})
+
+
 func _on_econ_pick(player: int, d: Dictionary) -> void:
 	if not _econ_gate(player):
 		return
@@ -316,7 +387,7 @@ func _on_death_switch(player: int, slot: int) -> void:
 
 
 func _msg_view(viewer: int) -> Dictionary:
-	return {v = NetProtocol.PROTO_VERSION, kind = "view", view = _view(), snap = _snap_for(viewer)}
+	return {v = NetProtocol.PROTO_VERSION, kind = "view", view = _view(viewer), snap = _snap_for(viewer)}
 
 
 ## 按接收者过滤的权威快照（2026-07-17 审计修复·ADR-004「视图过滤」首段落地）：
@@ -329,23 +400,32 @@ func _snap_for(viewer: int) -> Dictionary:
 	for sl in (s["slots"] as Array)[opp]:
 		(sl as Dictionary)["draft"] = []
 		(sl as Dictionary)["upg_draft"] = []
+		if bool(battle.info_distortion[opp].get("hide_item_bar", false)):
+			(sl as Dictionary)["item"] = ""
 	(s["info_distortion"] as Array)[opp] = {}
 	return s
 
 
-## 公开视图（MVP=全量公开·本作明牌博弈）。信息扭曲道具（幻影/迷雾）的按视角过滤=ADR-004 M3。
-func _view() -> Dictionary:
+## 公开视图默认明牌；迷雾斗篷按接收者把对方道具 id 过滤为空，槽态仍公开。
+func _view(viewer: int = -1) -> Dictionary:
+	var packed_slots: Array = [_pack_slots(0), _pack_slots(1)]
+	if viewer in [0, 1]:
+		var opp: int = 1 - viewer
+		if bool(battle.info_distortion[opp].get("hide_item_bar", false)):
+			for sl in packed_slots[opp]:
+				(sl as Dictionary)["item"] = ""
 	return {
 		turn = battle.turn_number,
 		hp = battle.hp.duplicate(true),
 		max_hp = battle.max_hp.duplicate(true),
 		shield = battle.shield.duplicate(true),
 		energy = battle.energy.duplicate(),
+		energy_max = battle.energy_max.duplicate(),
 		active_index = battle.active_index.duplicate(),
 		pending_death_switch = battle.pending_death_switch.duplicate(),
 		game_over = battle.game_over,
 		winner = battle.winner,
-		slots = [_pack_slots(0), _pack_slots(1)],
+		slots = packed_slots,
 	}
 
 

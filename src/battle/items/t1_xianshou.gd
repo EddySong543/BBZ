@@ -1,5 +1,5 @@
 extends ItemEffect
 
-## 先手：你这次攻击 +0.5 伤（动作修正器）。
+## 先手：本回合下一次基础攻击的总伤害 +1。
 func apply_pre(battle: BattleCore, player: int, _target: int, data: ItemData) -> void:
-	battle.add_item_mod(player, "atk_bonus", int(data.params.get("bonus", 1)))
+	battle.add_item_mod(player, "base_attack_total_bonus", int(data.params.get("bonus", 2)))

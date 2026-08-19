@@ -17,7 +17,7 @@ var turn: int = -1
 var phase := "waiting"               # waiting / select / death_switch / over
 var view: Dictionary = {}            # 服务器最新公开视图（UI 只读）
 var heroes: Array = []               # 双方阵容 [{id,name,max_hp}...]×2（match_start 快照）
-var draft_offer: Dictionary = {}     # 本端最近 3 选 1 {slot, upgrade, options:[item_id]}
+var draft_offer: Dictionary = {}     # 本端最近 3 选 1；含普通经济或点金石私有候选
 var events_log: Array = []           # 每拍事件批（UI 演出按序消费·消费掉可 pop）
 var resolves: Array = []             # 结算消息队列（M1·battle_screen 逐条弹出播动画·含 snap）
 var snap: Dictionary = {}            # 服务器最新权威快照（镜像同步源·match_start/turn_begin/resolve/view 均更新）
@@ -60,6 +60,8 @@ func _on_msg(d: Dictionary) -> void:
 			phase = "select"
 			draft_offer = {}
 		"draft_offer":
+			draft_offer = d
+		"pointstone_offer":
 			draft_offer = d
 		"resolve":
 			view = d["view"]
@@ -109,8 +111,16 @@ func _take_snap(d: Dictionary) -> void:
 
 # —— 玩家操作面（全部按当前 turn 打包·服务器二道门校验）——
 
-func submit(action: int, target: int = -1, item_slots: Array = [], double: bool = false) -> void:
-	transport.send(NetProtocol.msg_submit_turn(turn, action, target, item_slots, double))
+func submit(action: int, target: int = -1, item_slots: Array = [], double: bool = false,
+		empowered_wave: bool = false, split_big_wave: bool = false,
+		blood_payment: bool = false, free_switches: Array = [],
+		blood_payment_step: int = -1, energy_cap_discount: bool = false,
+		item_slot_targets: Array = [], item_slot_choices: Array = [],
+		second_action: int = -1, second_target: int = -1) -> void:
+	transport.send(NetProtocol.msg_submit_turn(
+		turn, action, target, item_slots, double, empowered_wave, split_big_wave, blood_payment,
+		free_switches, blood_payment_step, energy_cap_discount, item_slot_targets,
+		item_slot_choices, second_action, second_target))
 
 
 func request_draft(slot: int, upgrade: bool = false) -> void:
@@ -119,6 +129,10 @@ func request_draft(slot: int, upgrade: bool = false) -> void:
 
 func request_refill(slot: int) -> void:
 	transport.send(NetProtocol.msg_econ_refill(turn, slot))
+
+
+func request_pointstone_draft(slot: int, target: int) -> void:
+	transport.send(NetProtocol.msg_item_draft(turn, slot, target))
 
 
 func pick(slot: int, choice: int, upgrade: bool = false) -> void:

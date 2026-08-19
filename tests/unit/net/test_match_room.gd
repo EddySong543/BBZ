@@ -25,6 +25,17 @@ func _team(prefix: String, hp: int) -> Array:
 	return [_hero(prefix + "1", hp), _hero(prefix + "2", hp), _hero(prefix + "3", hp)]
 
 
+func _ready_item_slot(item_id: String) -> Dictionary:
+	return {
+		state = BattleCore.SlotState.CHARGING,
+		item = ItemCatalog.make(item_id),
+		since = -1,
+		used = false,
+		draft = [],
+		upg_draft = [],
+	}
+
+
 ## 组一桌：房间 + 双方环回传输 + 双客户端。返回 {room, clients, server_ends}。
 func _table(hp: int = 2) -> Dictionary:
 	var pair0: Array = NetTransport.LoopbackTransport.make_pair()
@@ -102,6 +113,446 @@ func test_match_room_rejects_illegal_submissions() -> void:
 	assert_eq(room.battle.turn_number, 0, "非法/等待期间真局不得推进")
 
 
+func test_match_client_and_room_forward_item_slot_target_to_furnace() -> void:
+	var t := _table(5)
+	var room: MatchRoom = t.room
+	var c0: MatchClient = t.clients[0]
+	var c1: MatchClient = t.clients[1]
+	room.battle.energy = [0, 0]
+	room.battle.slots[0] = [
+		_ready_item_slot("t1_ronglu"),
+		_ready_item_slot("t1_feibiao"),
+		_ready_item_slot("t1_jiudun"),
+	]
+	_pump(t)
+
+	c0.submit(A.DEFEND, -1, [0], false, false, false, false, [], -1, false, [1])
+	c1.submit(A.DEFEND)
+	_pump(t)
+
+	assert_null(room.battle.slots[0][0]["item"], "熔炉自身应在使用后消耗")
+	assert_null(room.battle.slots[0][1]["item"], "协议指定的槽1应被熔炉烧掉")
+	assert_eq((room.battle.slots[0][2]["item"] as ItemData).item_id, "t1_jiudun",
+		"未被指定的槽2不得受影响")
+
+
+func test_match_room_routes_secondary_target_to_friendly_hero_items() -> void:
+	var t := _table(5)
+	var room: MatchRoom = t.room
+	var c0: MatchClient = t.clients[0]
+	var c1: MatchClient = t.clients[1]
+	room.battle.slots[0][0] = _ready_item_slot("t2_huzhen_ding")
+	_pump(t)
+
+	c0.submit(A.CHARGE, -1, [0], false, false, false, false, [], -1, false, [2])
+	c1.submit(A.CHARGE)
+	_pump(t)
+
+	assert_eq(room.battle.shield[0][2], 4, "协议副目标应解释为己方英雄槽")
+	assert_eq(room.battle.shield[0][0], 0)
+
+
+func test_match_room_routes_houzhen_target_to_end_turn_entry() -> void:
+	var t := _table(5)
+	var room: MatchRoom = t.room
+	var c0: MatchClient = t.clients[0]
+	var c1: MatchClient = t.clients[1]
+	room.battle.slots[0][0] = _ready_item_slot("t1_houzhen_qian")
+	_pump(t)
+
+	c0.submit(A.CHARGE, -1, [0], false, false, false, false, [], -1, false, [2])
+	c1.submit(A.CHARGE)
+	_pump(t)
+
+	assert_eq(room.battle.active_index[0], 2, "协议副目标应成为候阵签的回合末登场位")
+
+
+func test_match_room_requires_and_executes_lianhuan_second_action() -> void:
+	var t := _table(5)
+	var room: MatchRoom = t.room
+	var c0: MatchClient = t.clients[0]
+	var c1: MatchClient = t.clients[1]
+	room.battle.energy = [4, 0]
+	room.battle.slots[0][0] = _ready_item_slot("t3_lianhuan_gu")
+	_pump(t)
+
+	# 缺第二行动的提交在克隆预检中拒绝，权威战局不得被消耗或污染。
+	c0.submit(A.CHARGE, -1, [0])
+	_pump(t)
+	assert_true(c0.errors.has("illegal_submission"))
+	assert_eq((room.battle.slots[0][0]["item"] as ItemData).item_id, "t3_lianhuan_gu")
+
+	# 合法的「攒→波」经完整客户端/房间链执行；P1 的攒用于完成同时提交。
+	c0.submit(A.CHARGE, -1, [0], false, false, false, false, [], -1, false,
+		[-1], [-1], A.ATTACK, -1)
+	c1.submit(A.CHARGE)
+	_pump(t)
+	assert_null(room.battle.slots[0][0]["item"])
+	assert_eq(room.battle.hp[1][0], 8, "第二行动的波应造成1点伤害")
+
+
+func test_match_room_rejects_missing_or_illegal_friendly_hero_target() -> void:
+	for item_id in ["t2_yijia_huan", "t2_huzhen_ding", "t2_jieyin_pei",
+			"t2_daishang_san", "t2_xingjun_yaonang", "t1_houzhen_qian"]:
+		var sent: Array = [[], []]
+		var room := MatchRoom.new()
+		room.start(_team("a", 5), _team("b", 5), SEED,
+			func(p: int, msg: Dictionary) -> void: (sent[p] as Array).append(msg))
+		room.battle.slots[0][0] = _ready_item_slot(item_id)
+		var before: Dictionary = room.battle.to_snapshot()
+		room.handle(0, NetProtocol.msg_submit_turn(0, A.CHARGE, -1, [0]))
+		assert_eq(_last_error(sent[0]), "illegal_submission")
+		assert_eq_deep(room.battle.to_snapshot(), before)
+
+	var bad_sent: Array = [[], []]
+	var bad_room := MatchRoom.new()
+	bad_room.start(_team("a", 5), _team("b", 5), SEED,
+		func(p: int, msg: Dictionary) -> void: (bad_sent[p] as Array).append(msg))
+	bad_room.battle.slots[0][0] = _ready_item_slot("t2_huzhen_ding")
+	bad_room.handle(0, NetProtocol.msg_submit_turn(
+		0, A.CHARGE, -1, [0], false, false, false, false, [], -1, false, [0]))
+	assert_eq(_last_error(bad_sent[0]), "illegal_submission", "护阵钉不能指定出战位")
+
+
+func test_match_room_routes_shizhi_target_to_an_enemy_item_slot() -> void:
+	var t := _table(5)
+	var room: MatchRoom = t.room
+	var c0: MatchClient = t.clients[0]
+	var c1: MatchClient = t.clients[1]
+	room.battle.slots[0][0] = _ready_item_slot("t2_shizhi_jiasuo")
+	room.battle.slots[1][2] = _ready_item_slot("t2_feibiao")
+	room.battle.slots[1][2]["since"] = room.battle.turn_number
+	_pump(t)
+
+	c0.submit(A.CHARGE, -1, [0], false, false, false, false, [], -1, false, [2])
+	c1.submit(A.CHARGE)
+	_pump(t)
+	assert_eq(int(room.battle.slots[1][2]["since"]), 1)
+	assert_false(room.battle.slot_ready(1, 2))
+
+
+func test_miwu_snapshots_hide_only_the_opponent_item_ids() -> void:
+	var room := MatchRoom.new()
+	room.start(_team("a", 5), _team("b", 5), SEED, func(_p: int, _msg: Dictionary) -> void: pass)
+	room.battle.slots[0][0] = _ready_item_slot("t2_feibiao")
+	room.battle.info_distortion[0]["hide_item_bar"] = true
+
+	var owner_snap: Dictionary = room._snap_for(0)
+	var enemy_snap: Dictionary = room._snap_for(1)
+	assert_eq(String(((owner_snap["slots"] as Array)[0][0] as Dictionary)["item"]), "t2_feibiao")
+	assert_eq(String(((enemy_snap["slots"] as Array)[0][0] as Dictionary)["item"]), "")
+	assert_eq(String(((room._view(1)["slots"] as Array)[0][0] as Dictionary)["item"]), "",
+		"公开view也不能成为改包读取道具id的后门")
+
+
+func test_match_room_authoritatively_accepts_xunxing_wave_target_and_rejects_forgery() -> void:
+	var sent: Array = [[], []]
+	var room: MatchRoom = MatchRoom.new()
+	room.start(_team("a", 5), _team("b", 5), SEED,
+		func(p: int, msg: Dictionary) -> void: (sent[p] as Array).append(msg))
+	room.battle.energy = [20, 20]
+	room.battle.slots[0][0] = _ready_item_slot("t1_xunxing_zhui")
+	room.handle(0, NetProtocol.msg_submit_turn(0, A.ATTACK, 2, [0]))
+	room.handle(1, NetProtocol.msg_submit_turn(0, A.CHARGE, -1, []))
+
+	assert_eq(room.battle.hp[1][2], 9, "权威端应将 0.5 点寻星波结算到后排目标")
+	assert_eq(room.battle.hp[1][0], 10, "敌方出战位不得被误伤")
+	assert_eq((sent[0] as Array).filter(
+		func(msg: Dictionary) -> bool: return String(msg.get("kind", "")) == "error").size(), 0)
+
+	var forged_sent: Array = [[], []]
+	var forged: MatchRoom = MatchRoom.new()
+	forged.start(_team("a", 5), _team("b", 5), SEED,
+		func(p: int, msg: Dictionary) -> void: (forged_sent[p] as Array).append(msg))
+	forged.battle.energy = [20, 20]
+	forged.handle(0, NetProtocol.msg_submit_turn(0, A.ATTACK, 2, []))
+	assert_eq(_last_error(forged_sent[0]), "illegal_submission",
+		"未提交寻星坠时伪造后排波目标必须被拒绝")
+	assert_eq(forged.battle.turn_number, 0, "非法目标提交不得污染真局")
+
+
+func test_match_room_privately_offers_pointstone_t3_and_commits_selected_choice() -> void:
+	var t := _table(5)
+	var room: MatchRoom = t.room
+	var c0: MatchClient = t.clients[0]
+	var c1: MatchClient = t.clients[1]
+	room.battle.slots[0] = [
+		_ready_item_slot("t2_dianjinshi"),
+		_ready_item_slot("t1_feibiao"),
+		_ready_item_slot("t1_jiudun"),
+	]
+	_pump(t)
+
+	c0.request_pointstone_draft(0, 1)
+	_pump(t)
+	var offer: Dictionary = c0.draft_offer
+	assert_eq(String(offer.get("kind", "")), "pointstone_offer")
+	assert_eq((offer.get("options", []) as Array).size(), 3)
+	assert_true(c1.draft_offer.is_empty(), "点金石传说候选只能私发使用者")
+	var chosen_id: String = String((offer["options"] as Array)[1])
+
+	c0.submit(A.DEFEND, -1, [0], false, false, false, false, [], -1, false,
+		[1], [1])
+	c1.submit(A.CHARGE)
+	_pump(t)
+
+	assert_null(room.battle.slots[0][0]["item"], "点金石自身应被消耗")
+	assert_eq((room.battle.slots[0][1]["item"] as ItemData).item_id, chosen_id,
+		"权威端必须采用私发候选中提交的下标")
+	assert_eq((room.battle.slots[0][1]["item"] as ItemData).tier, 3)
+	assert_false(bool(room.battle.slots[0][1]["used"]), "传说道具不能在升级回合顺带使用")
+	assert_eq((room.battle.slots[0][2]["item"] as ItemData).item_id, "t1_jiudun",
+		"未指定的普通道具不得被升级")
+
+
+func test_match_room_rejects_illegal_furnace_target_without_probe_pollution() -> void:
+	var sent: Array = [[], []]
+	var room := MatchRoom.new()
+	room.start(_team("a", 5), _team("b", 5), SEED,
+		func(p: int, msg: Dictionary) -> void: (sent[p] as Array).append(msg))
+	room.battle.energy = [0, 0]
+	room.battle.slots[0] = [
+		_ready_item_slot("t1_ronglu"),
+		_ready_item_slot("t1_feibiao"),
+		_ready_item_slot("t1_jiudun"),
+	]
+	var before: Dictionary = room.battle.to_snapshot()
+
+	room.handle(0, NetProtocol.msg_submit_turn(
+		0, A.DEFEND, -1, [0], false, false, false, false, [], -1, false, [0]))
+
+	assert_eq(_last_error(sent[0]), "illegal_submission", "熔炉不得把自身作为燃料")
+	assert_eq_deep(room.battle.to_snapshot(), before)
+
+
+func test_match_room_rejects_pointstone_target_that_is_not_ready_tier1() -> void:
+	var sent: Array = [[], []]
+	var room := MatchRoom.new()
+	room.start(_team("a", 5), _team("b", 5), SEED,
+		func(p: int, msg: Dictionary) -> void: (sent[p] as Array).append(msg))
+	room.battle.slots[0] = [
+		_ready_item_slot("t2_dianjinshi"),
+		_ready_item_slot("t2_feibiao"),
+		_ready_item_slot("t1_jiudun"),
+	]
+	var before: Dictionary = room.battle.to_snapshot()
+
+	room.handle(0, NetProtocol.msg_item_draft(0, 0, 1))
+
+	assert_eq(_last_error(sent[0]), "draft_unavailable", "点金石只能选择另一件可使用的普通道具")
+	assert_eq_deep(room.battle.to_snapshot(), before)
+
+
+func test_match_room_rejects_pointstone_submit_without_authoritative_offer() -> void:
+	var sent: Array = [[], []]
+	var room := MatchRoom.new()
+	room.start(_team("a", 5), _team("b", 5), SEED,
+		func(p: int, msg: Dictionary) -> void: (sent[p] as Array).append(msg))
+	room.battle.slots[0] = [
+		_ready_item_slot("t2_dianjinshi"),
+		_ready_item_slot("t1_feibiao"),
+		_ready_item_slot("t1_jiudun"),
+	]
+	var before: Dictionary = room.battle.to_snapshot()
+
+	room.handle(0, NetProtocol.msg_submit_turn(
+		0, A.DEFEND, -1, [0], false, false, false, false, [], -1, false, [1], [0]))
+
+	assert_eq(_last_error(sent[0]), "illegal_submission",
+		"未请求权威候选时不得伪造点金石选择")
+	assert_eq_deep(room.battle.to_snapshot(), before)
+
+
+func test_match_room_accepts_h05_empowered_wave_and_rejects_forged_one() -> void:
+	var sent: Array = [[], []]
+	var room: MatchRoom = MatchRoom.new()
+	room.start([_hero("a0", 5), _hero("h05", 5), _hero("a2", 5)], _team("b", 5), SEED,
+		func(p: int, msg: Dictionary) -> void: (sent[p] as Array).append(msg))
+	room.battle.energy = [8, 8]
+	room.handle(0, NetProtocol.msg_submit_turn(0, A.ATTACK, -1, [], false, true))
+	room.handle(1, NetProtocol.msg_submit_turn(0, A.CHARGE, -1, []))
+	assert_eq(room.battle.hp[1][0], 6, "权威房间应按强化波造成 2 点伤害")
+
+	var forged: MatchRoom = MatchRoom.new()
+	var forged_sent: Array = [[], []]
+	forged.start(_team("a", 5), _team("b", 5), SEED,
+		func(p: int, msg: Dictionary) -> void: (forged_sent[p] as Array).append(msg))
+	forged.battle.energy = [8, 8]
+	forged.handle(0, NetProtocol.msg_submit_turn(0, A.ATTACK, -1, [], false, true))
+	assert_eq(_last_error(forged_sent[0]), "illegal_submission", "队内无亢金时伪造强化标记必须被业务层拒绝")
+	assert_eq(forged.battle.turn_number, 0, "非法强化提交不得污染真局")
+
+
+func test_match_room_accepts_h13_split_big_wave_and_rejects_forged_one() -> void:
+	var sent: Array = [[], []]
+	var room: MatchRoom = MatchRoom.new()
+	room.start([_hero("h13", 4), _hero("a1", 5), _hero("a2", 5)], _team("b", 5), SEED,
+		func(p: int, msg: Dictionary) -> void: (sent[p] as Array).append(msg))
+	room.battle.energy = [8, 8]
+	room.handle(0, NetProtocol.msg_submit_turn(0, A.BIG_ATTACK, -1, [], false, false, true))
+	room.handle(1, NetProtocol.msg_submit_turn(0, A.CHARGE, -1, []))
+	assert_eq(room.battle.hp[1][0], 6, "权威房间应按玄冥双波造成两次共 2 点伤害")
+
+	var forged: MatchRoom = MatchRoom.new()
+	var forged_sent: Array = [[], []]
+	forged.start(_team("a", 5), _team("b", 5), SEED,
+		func(p: int, msg: Dictionary) -> void: (forged_sent[p] as Array).append(msg))
+	forged.battle.energy = [8, 8]
+	forged.handle(0, NetProtocol.msg_submit_turn(0, A.BIG_ATTACK, -1, [], false, false, true))
+	assert_eq(_last_error(forged_sent[0]), "illegal_submission", "无玄冥时伪造双波标记必须被业务层拒绝")
+	assert_eq(forged.battle.turn_number, 0, "非法双波提交不得污染真局")
+
+
+func test_match_room_accepts_h14_blood_payment_and_rejects_forged_one() -> void:
+	var sent: Array = [[], []]
+	var room: MatchRoom = MatchRoom.new()
+	room.start([_hero("h14", 6), _hero("a1", 5), _hero("a2", 5)], _team("b", 5), SEED,
+		func(p: int, msg: Dictionary) -> void: (sent[p] as Array).append(msg))
+	room.battle.energy = [0, 0]
+	room.handle(0, NetProtocol.msg_submit_turn(0, A.BIG_ATTACK, -1, [], false, false, false, true))
+	room.handle(1, NetProtocol.msg_submit_turn(0, A.CHARGE, -1, []))
+	assert_eq(room.battle.hp[0][0], 6, "权威房间应由蚩尤支付大波的 3 点生命")
+	assert_eq(room.battle.hp[1][0], 6, "权威房间仍应结算大波伤害")
+
+	var forged: MatchRoom = MatchRoom.new()
+	var forged_sent: Array = [[], []]
+	forged.start(_team("a", 5), _team("b", 5), SEED,
+		func(p: int, msg: Dictionary) -> void: (forged_sent[p] as Array).append(msg))
+	forged.battle.energy = [0, 0]
+	forged.handle(0, NetProtocol.msg_submit_turn(0, A.ATTACK, -1, [], false, false, false, true))
+	assert_eq(_last_error(forged_sent[0]), "illegal_submission", "无蚩尤时伪造生命支付标记必须被业务层拒绝")
+	assert_eq(forged.battle.turn_number, 0, "非法生命支付提交不得污染真局")
+
+
+func test_match_room_accepts_h24_discount_and_rejects_forged_one() -> void:
+	var sent: Array = [[], []]
+	var room: MatchRoom = MatchRoom.new()
+	room.start([_hero("a0", 5), _hero("h24", 6), _hero("a2", 5)], _team("b", 5), SEED,
+		func(p: int, msg: Dictionary) -> void: (sent[p] as Array).append(msg))
+	room.battle.energy = [4, 4]
+	room.handle(0, NetProtocol.msg_submit_turn(
+		0, A.BIG_ATTACK, -1, [], false, false, false, false, [], -1, true))
+	room.handle(1, NetProtocol.msg_submit_turn(0, A.CHARGE, -1, []))
+	assert_eq(room.battle.energy_max[0], 18, "权威房间应结算并封的 1 点上限代价")
+	assert_eq(room.battle.hp[1][0], 6, "减费后仍应正常打出大波")
+
+	var forged: MatchRoom = MatchRoom.new()
+	var forged_sent: Array = [[], []]
+	forged.start(_team("a", 5), _team("b", 5), SEED,
+		func(p: int, msg: Dictionary) -> void: (forged_sent[p] as Array).append(msg))
+	forged.battle.energy = [4, 4]
+	forged.handle(0, NetProtocol.msg_submit_turn(
+		0, A.BIG_ATTACK, -1, [], false, false, false, false, [], -1, true))
+	assert_eq(_last_error(forged_sent[0]), "illegal_submission", "无并封时伪造减费标记必须被拒绝")
+	assert_eq(forged.battle.energy_max[0], 20, "非法减费提交不得污染真局上限")
+
+
+func test_match_room_replays_single_h07_free_switch_before_paid_h07_action() -> void:
+	var sent: Array = [[], []]
+	var room: MatchRoom = MatchRoom.new()
+	room.start(
+		[_hero("h14", 6), _hero("h07", 6), _hero("h17", 7)],
+		_team("b", 5),
+		SEED,
+		func(p: int, msg: Dictionary) -> void: (sent[p] as Array).append(msg))
+	room.battle.energy = [0, 0]
+	room.handle(0, NetProtocol.msg_submit_turn(
+		0, A.BIG_ATTACK, -1, [], false, false, false, true, [1], 0))
+	room.handle(1, NetProtocol.msg_submit_turn(0, A.CHARGE, -1, []))
+
+	assert_eq(room.battle.active_index[0], 1, "权威端应重放本回合唯一一次蚩尤→星日免费切换")
+	assert_eq(room.battle.hp[0][0], 6, "星日大波的 3 点费用应由原槽蚩尤支付")
+	assert_eq(room.battle.energy[0], 2, "血量支付不得误扣团队能量，只获得正常回合被动能量")
+	assert_eq(room.battle.hp[1][0], 5, "星日登场0.5点并继续打出大波2点")
+
+
+func test_match_room_tianluo_cancels_h07_preview_for_both_players_and_arrival_orders() -> void:
+	# MatchRoom 只在双方都提交后落真局；以下同时交换玩家编号与消息到达顺序，
+	# 锁定天罗裁定不能依赖“谁是 P0”或“谁先发包”。
+	for h07_player: int in [0, 1]:
+		for h07_first: bool in [false, true]:
+			var sent: Array = [[], []]
+			var room: MatchRoom = MatchRoom.new()
+			var h07_team: Array = [
+				_hero("h07_origin", 10), _hero("h07", 10), _hero("h07_third", 10),
+			]
+			var plain_team: Array = _team("plain", 10)
+			room.start(h07_team if h07_player == 0 else plain_team,
+				plain_team if h07_player == 0 else h07_team, SEED,
+				func(p: int, msg: Dictionary) -> void: (sent[p] as Array).append(msg))
+			room.battle.energy = [0, 0]
+			var tianluo_player: int = 1 - h07_player
+			room.battle.slots[tianluo_player][0] = _ready_item_slot("t3_tianluodiwang")
+			room.battle.relics[h07_player].append({
+				data = ItemCatalog.make("t3_yemingzhu"), state = {charges = 3},
+			})
+			room.battle.set_status(h07_player, 0, "vuln", 3)
+			var enemy_hp_before: int = room.battle.hp[tianluo_player][0]
+
+			var h07_msg: Dictionary = NetProtocol.msg_submit_turn(
+				0, A.DEFEND, -1, [], false, false, false, false, [1])
+			var tianluo_msg: Dictionary = NetProtocol.msg_submit_turn(
+				0, A.DEFEND, -1, [0])
+			var first_player: int = h07_player if h07_first else tianluo_player
+			var second_player: int = tianluo_player if h07_first else h07_player
+			room.handle(first_player, h07_msg if h07_first else tianluo_msg)
+			room.handle(second_player, tianluo_msg if h07_first else h07_msg)
+
+			assert_eq(room.battle.active_index[h07_player], 0,
+				"天罗必须取消选择期免费切换预览")
+			assert_eq(room.battle.hp[tianluo_player][0], enemy_hp_before,
+				"被取消的星日登场不能先造成冲撞")
+			assert_eq(room.battle.shield[h07_player][1], 0,
+				"被取消的夜明珠不能给预览目标护盾")
+			assert_eq(int(room.battle.relics[h07_player][0]["state"].get("charges", 0)), 3,
+				"被取消的夜明珠不能消耗次数")
+			assert_eq(int(room.battle.get_status(h07_player, 0, "vuln", 0)), 3,
+				"原出战英雄不能发生离场清状态副作用")
+			assert_eq(room.battle.free_switch_uses[h07_player], 0,
+				"天罗取消后免费切换次数应恢复")
+			var saw_cancel := false
+			for msg_variant in sent[h07_player]:
+				var msg: Dictionary = msg_variant
+				if String(msg.get("kind", "")) != "resolve":
+					continue
+				for event_variant in msg.get("events", []):
+					var event: Dictionary = event_variant
+					if String(event.get("id", "")) == "free_switch_cancelled" \
+							and int(event.get("player", -1)) == h07_player:
+						saw_cancel = true
+			assert_true(saw_cancel, "联机结算事件必须显式告知 UI 免费切换被天罗取消")
+
+
+func test_match_room_sage_book_preserves_h07_switch_against_tianluo() -> void:
+	var sent: Array = [[], []]
+	var room: MatchRoom = MatchRoom.new()
+	room.start(
+		[_hero("origin", 10), _hero("h07", 10), _hero("third", 10)],
+		_team("enemy", 10), SEED,
+		func(p: int, msg: Dictionary) -> void: (sent[p] as Array).append(msg))
+	room.battle.energy = [0, 0]
+	room.battle.slots[0][0] = _ready_item_slot("t1_hushenfu")
+	room.battle.slots[1][0] = _ready_item_slot("t3_tianluodiwang")
+	room.battle.relics[0].append({
+		data = ItemCatalog.make("t3_yemingzhu"), state = {charges = 3},
+	})
+	room.battle.set_status(0, 0, "vuln", 3)
+	var enemy_hp_before: int = room.battle.hp[1][0]
+
+	room.handle(1, NetProtocol.msg_submit_turn(0, A.DEFEND, -1, [0]))
+	room.handle(0, NetProtocol.msg_submit_turn(
+		0, A.DEFEND, -1, [0], false, false, false, false, [1]))
+
+	assert_eq(room.battle.active_index[0], 1,
+		"圣贤书抵消天罗后，免费切换应在权威端恰好兑现一次")
+	assert_eq(enemy_hp_before - room.battle.hp[1][0], 3,
+		"星日冲撞与夜明珠伤害应各兑现一次")
+	assert_eq(room.battle.shield[0][1], 2)
+	assert_eq(int(room.battle.relics[0][0]["state"].get("charges", 0)), 2)
+	assert_eq(int(room.battle.get_status(0, 0, "vuln", 0)), 0)
+	assert_eq(room.battle.free_switch_uses[0], 1)
+
+
 func test_match_room_draft_offer_is_private() -> void:
 	# Arrange：推进到 slot1 解锁后请求 3 选 1
 	var t := _table(5)
@@ -174,6 +625,11 @@ func test_match_client_snapshot_flip_roundtrip() -> void:
 	room.start(_team("a", 5), _team("b", 3), SEED,
 		func(p: int, msg: Dictionary) -> void: (sent[p] as Array).append(msg))
 	room.battle.energy = [9, 3]
+	room.battle.energy_max = [18, 12]
+	room.battle.relics[0].append({
+		data = ItemCatalog.make("t3_yemingzhu"), state = {charges = 2},
+	})
+	room.battle.item_buffs[0]["free_big_attack_until_turn"] = room.battle.turn_number
 	var snap: Dictionary = room.battle.to_snapshot()
 	# Act
 	var flipped: Dictionary = MatchClient.flip_snapshot(snap)
@@ -183,16 +639,28 @@ func test_match_client_snapshot_flip_roundtrip() -> void:
 	assert_true(b.from_snapshot(flipped))
 	assert_eq(b.energy[0], 3, "翻转后玩家0=原玩家1")
 	assert_eq(b.energy[1], 9)
+	assert_eq(b.energy_max, [12, 18], "动态能量上限应随玩家视角一起翻转")
+	assert_eq((b.relics[1][0]["data"] as ItemData).item_id, "t3_yemingzhu")
+	assert_eq(int(b.relics[1][0]["state"].get("charges", 0)), 2,
+		"遗物权威次数应随所属玩家一起翻转")
+	assert_eq(int(b.item_buffs[1].get("free_big_attack_until_turn", -1)), room.battle.turn_number,
+		"免费大波窗口应随所属玩家一起翻转")
 	assert_eq((b.heroes[0][0] as HeroData).hero_id, "b1", "翻转后己方阵容=原对方阵容")
 	# winner 常量互换
 	var w := snap.duplicate(true)
 	w["winner"] = BattleCore.WINNER_P1
 	assert_eq(int(MatchClient.flip_snapshot(w)["winner"]), BattleCore.WINNER_P2)
 	# 事件翻转：player 0↔1·victory winner 互换
-	var evs: Array = [{id = "damage_taken", player = 0, amount = 2}, {id = "victory", winner = BattleCore.WINNER_P1}]
+	var evs: Array = [
+		{id = "damage_taken", player = 0, amount = 2},
+		{id = "victory", winner = BattleCore.WINNER_P1},
+		{id = "relic_trigger", player = 0, item_id = "t3_yemingzhu"},
+	]
 	var fev: Array = MatchClient.flip_events(evs)
 	assert_eq(int(fev[0]["player"]), 1)
 	assert_eq(int(fev[1]["winner"]), BattleCore.WINNER_P2)
+	assert_eq(int(fev[2]["player"]), 1)
+	assert_eq(String(fev[2]["item_id"]), "t3_yemingzhu", "遗物ID不是阵营字段，不得被视角翻转改写")
 
 
 func test_match_room_deadline_force_submits_charge() -> void:
@@ -319,6 +787,11 @@ func test_match_room_snapshot_hides_opponent_draft_options() -> void:
 	var room: MatchRoom = t.room
 	var some_id: String = String(ItemCatalog.ids()[0])
 	(room.battle.slots[0][0] as Dictionary)["draft"] = [ItemCatalog.make(some_id)]
+	(room.battle.slots[0][0] as Dictionary)["upg_draft"] = [ItemCatalog.make("t3_jianyi")]
+	room.battle.relics[0].append({
+		data = ItemCatalog.make("t3_budongmingwang"), state = {charges = 2},
+	})
+	room.battle.item_buffs[0]["free_big_attack_until_turn"] = room.battle.turn_number
 
 	# Act：双方各自 resync 拿全量快照
 	(t.clients[0] as MatchClient).request_resync()
@@ -332,6 +805,16 @@ func test_match_room_snapshot_hides_opponent_draft_options() -> void:
 	var theirs: Array = snap1["slots"][0][0]["draft"]
 	assert_eq(mine.size(), 1, "本人应看到自己的候选")
 	assert_eq(theirs.size(), 0, "对手侧快照的候选必须剥空")
+	assert_eq((snap0["slots"][0][0]["upg_draft"] as Array).size(), 1,
+		"本人应看到自己的点金石传说候选")
+	assert_eq((snap1["slots"][0][0]["upg_draft"] as Array).size(), 0,
+		"对手侧快照不得通过点金石缓存泄漏传说候选")
+	for public_snap in [snap0, snap1]:
+		assert_eq(String(public_snap["relics"][0][0].get("id", "")), "t3_budongmingwang",
+			"已激活遗物属于公开战局信息")
+		assert_eq(int(public_snap["relics"][0][0]["state"].get("charges", 0)), 2)
+		assert_eq(int(public_snap["item_buffs"][0].get("free_big_attack_until_turn", -1)),
+			room.battle.turn_number, "免费大波窗口必须通过权威重连快照恢复")
 
 
 func test_match_room_reconnect_during_death_switch_restores_phase() -> void:

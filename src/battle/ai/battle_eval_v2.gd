@@ -5,7 +5,7 @@ extends RefCounted
 ##
 ## 在 BattleEval(v1 基础: HP/能量/存活/护盾) 之上叠加「牌感」项：
 ##   - 致命威胁压力（对手出战在斩杀线内 → 我占主动）。
-##   - 延迟伤害（道具妖火/藤蔓挂在对手头上的债·PENDING_W）。
+##   - 延迟伤害（旧延迟队列 + 妖火截止账目·PENDING_W）。
 ##
 ## 定位：强在「牌感」而非算力——非大师(不靠深搜穷举)，更接近读盘老练的优秀玩家。
 ## 零和：所有项均 own−opp，保持与 BattleEval 一致的反对称（双方各解同一矩阵自洽）。
@@ -35,7 +35,12 @@ static func score(b: BattleCore, player: int, w: Dictionary = {}) -> float:
 ## attacker 对 defender 出战英雄的斩杀威胁压力。
 static func _threat(b: BattleCore, attacker: int, defender: int) -> float:
 	var ds: int = b.active_index[defender]
-	if b.hp[defender][ds] > 0 and b.hp[defender][ds] <= THREAT_HP_LINE and b.energy[attacker] >= THREAT_MIN_ENERGY:
+	# 一次致命伤害会被整次免除，受保护目标不属于“下一拍可斩杀”状态。
+	if int(b.get_status(defender, ds, "fatal_damage_immunity", 0)) > 0:
+		return 0.0
+	var has_attack_resource: bool = b.energy[attacker] >= THREAT_MIN_ENERGY \
+		or int(b.item_buffs[attacker].get("free_big_attack_until_turn", -1)) == b.turn_number
+	if b.hp[defender][ds] > 0 and b.hp[defender][ds] <= THREAT_HP_LINE and has_attack_resource:
 		return THREAT_W
 	return 0.0
 
@@ -44,4 +49,10 @@ static func _pending(b: BattleCore, p: int) -> int:
 	var t := 0
 	for v in b.pending_damage[p]:
 		t += int(v)
+	for effect_variant in b.timed_item_effects[p]:
+		var effect: Dictionary = effect_variant
+		var slot: int = int(effect.get("target_slot", -1))
+		if String(effect.get("id", "")) == "yaohuo" and slot == b.active_index[p] \
+				and slot >= 0 and slot < b.hp[p].size() and b.hp[p][slot] > 0:
+			t += int(effect.get("amount", 0))
 	return t

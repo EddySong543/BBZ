@@ -130,18 +130,17 @@ func on_deal_hit(_battle: BattleCore, _player: int, _slot: int, _target_player: 
 	pass
 
 
-## 己方任一英雄攻击命中敌方时，对本队所有英雄（含替补席）触发：团队级 on-hit 监听。
-## 昴日（全队命中 → +1 剑气）。引擎按 hit_count 次调用。
-func on_team_deal_hit(_battle: BattleCore, _player: int, _slot: int, _attacker_slot: int, _target_player: int, _target_slot: int, _dealt: int) -> void:
+## 本英雄的一次基础「波 / 大波」完成伤害结算后触发一次。
+## dealt = 本次实际落在目标 HP 上的半点伤害，包含合并进该次攻击伤害的道具加成；防住或未落血时为 0。
+## 与 on_deal_hit 不同，本 hook 不随 hit_count / 道具额外命中重复，也不响应道具、主动技或反击伤害。
+func on_base_attack_damage_dealt(_battle: BattleCore, _player: int, _slot: int,
+		_target_player: int, _target_slot: int, _dealt: int, _action: int, _events: Array) -> void:
 	pass
 
 
-## 本英雄发出的基础攻击被目标用「防」或「大防」完整挡下后触发。
-## 只认「波 / 大波」；独立道具伤害、攻击型主动技、反击和持续伤害不进入本钩子。
-## 亢金（给实际防御目标留下破绽）。events 可追加玩家可见的瞬时结算事件。
-func on_base_attack_blocked(_battle: BattleCore, _player: int, _slot: int,
-		_target_player: int, _target_slot: int, _attack_action: int,
-		_defense_action: int, _raw: int, _events: Array) -> void:
+## 己方任一英雄攻击命中敌方时，对本队所有英雄（含替补席）触发：团队级 on-hit 监听。
+## 昴日（全队命中 → +1 剑气）。引擎按 hit_count 次调用。
+func on_team_deal_hit(_battle: BattleCore, _player: int, _slot: int, _attacker_slot: int, _target_player: int, _target_slot: int, _dealt: int) -> void:
 	pass
 
 
@@ -149,7 +148,7 @@ func on_base_attack_blocked(_battle: BattleCore, _player: int, _slot: int,
 ## attack_action / defense_action = 防御门所见的有效攻击类型 / 防守方原始选择（有效类型可能不同于攻击方原选招）；
 ## raw = 被挡伤害半点；
 ## src = "action"（基础或主动攻击）/ "item"（道具 hit）。
-## 牛金（挡招蓄团队强化波）/ 蚩尤（反弹被挡伤害的 50%）。
+## 牛金（挡招蓄团队强化波）等防御触发技能复用此钩子。
 func on_block(_battle: BattleCore, _player: int, _slot: int, _attacker_player: int,
 		_attack_action: int, _defense_action: int, _raw: int, _src: String) -> void:
 	pass
@@ -166,73 +165,55 @@ func energy_gain_bonus(_battle: BattleCore, _player: int, _slot: int) -> int:
 	return 0
 
 
-## 「顶替承伤」型守护者（天狗 h23）：在替补席存活时，我方英雄受【致命伤害】→ 本英雄立刻登场顶替，
-## 原 carry 退居替补获救、这一击改落到本英雄身上（本英雄吃这下·可能被打死；每局一次）。
-## 默认 false；天狗 override。
-func is_lethal_guardian() -> bool:
-	return false
-
-
 ## 「不坠神言」型（鬼金 h08）：本英雄选择的「大防」若没有挡到基础「波 / 大波」，
-## 是否转为队伍持有的一次后备大防。状态、消费和快照由 BattleCore 统一处理。
+## 是否转为队伍持有至下一回合结束的一次后备大防。状态、到期、消费和快照由 BattleCore 统一处理。
 ## 默认 false；鬼金返回 true。
 func retains_unused_big_defend() -> bool:
 	return false
 
 
-## 「饕餮」型（并封 h24）：本英雄在场（含替补·存活）时，战场上【任一】英雄阵亡（敌我皆可）
-## → 本英雄所属队【团队】能量 +本值（半能）。引擎在 _resolve_deaths 每个死亡点扫双方存活英雄累计。
-## 默认 0（不产出）；并封 override 返回 4（= +2.0 能/死）。
-func death_energy_bonus() -> int:
-	return 0
-
-
-## 「饕餮食肉」型（并封 h24·2026-07-04 双头分食优化）：与 death_energy_bonus 同触发面——
-## 战场任一英雄阵亡 → 【本英雄自己】回复本值（半点）生命（一头吞魂产能·一头食肉回血）。
-## 走 _heal（尊重禁回血·封顶 max_hp）；替补席也回（在场光环同 death_energy_bonus）。
-## 默认 0（不回复）；并封 override 返回 2（= +1.0 生命/死）。
-func death_heal_self() -> int:
-	return 0
-
-
-## 免费切换次数上限（仅 has_free_switch()=true 时有意义）；-1 = 无限。星日【千里自在风】= -1（不限次）。
+## 每回合免费切换次数上限（仅 has_free_switch()=true 时有意义）；-1 = 无限。星日【千里自在风】= 1。
 func free_switch_cap() -> int:
 	return -1
 
 
 ## 本英雄（出战时）是否可以使用「防 / 大防」。默认 true。
-## 穷奇 h15【血勇】= false（嗜杀红温·有进无退·彻底放弃防御）。
+## 穷奇 h15【七杀战鬼】= false（嗜杀红温·有进无退·彻底放弃防御）。
 ## 引擎在 can_afford() 统一 gate：返 false 时防/大防变不合法（legal_actions 不列、UI 按钮禁用、AI 不选）。
 func can_defend() -> bool:
 	return true
 
 
-## 「鼠潮」型（玄冥 h13）：本英雄在场（含替补·存活）时，己方每触发一次 combo 效果
-## （毒爆 / 易伤 / 破甲 / 碎能 / 剑意 / 反震 / 冲撞 / 溢杀…），团队能量额外 +本值（半能）。
-## 引擎在每个 combo 结算点调 BattleCore._note_combo_proc() 累计（2026-07-01 去每回合封顶）。
-## 默认 0（不产出）；玄冥 override 返回 1（= +0.5 能/proc）。这是"combo→能量"共享原语的产出端。
-func combo_proc_energy() -> int:
+## 广寒 h16：本英雄存活于替补席时，队友基础攻击命中后登场追击同一目标。
+## 返回追击伤害（半点）；0 = 无此能力。引擎只登记每个动作的首次连接，
+## 并在双方主攻击完成后统一处理登场与追击，避免改变同步攻击的目标快照。
+func reserve_pursuit_damage() -> int:
 	return 0
 
 
-## 「疾风」型（广寒 h16）：本英雄在场（含替补·存活）时，己方每局可 N 次把【同一个动作】
-## 再做一次（附加动作·波/大波/攒可双·技能/切换/防御除外）。返回每局上限 N（0 = 不提供）。
-## 引擎在 can_double()/select_double()/resolve() 处理；cap 计在本英雄 slot 的 "jifeng_uses"。
-func double_action_cap() -> int:
-	return 0
-
-
-## 「缠绕」型（相柳 h18）：本英雄【出战·存活】时，对手【无法主动切换】（含星日免费切换）。
-## 死亡换人 / 紫火调虎离山 / 道具强制切换等"被动·触发"切换不受影响。引擎在 can_afford(SWITCH) +
-## is_free_switch_target 统一 gate（_can_switch）。默认 false。
-func locks_enemy_switch() -> bool:
+## 「龙御极」型（亢金 h05）：本英雄在队时，为己方开放可选强化波。
+## 玩家可让本次基础「波」额外支付 1 能并增加 1 点伤害；选择、费用和联机状态由 BattleCore 统一处理。
+## 默认 false；亢金返回 true。
+func enables_empowered_wave() -> bool:
 	return false
 
 
-## 「泽国防御税」（相柳 h18·2026-07-05 批③ J 案）：本英雄【出战·存活·未被沉默】时，
-## 敌方【防】的费用附加半能数（默认 0）。引擎在 _get_cost(DEFEND) 单点收口。
-func enemy_defend_cost_add() -> int:
-	return 0
+## 玄冥 h13：本英雄出战时，是否可把自己选择的「大波」改为连续两次「波」。
+## 只声明能力；合法 choice、结算形态、AI、联机与快照由 BattleCore 统一处理。
+func allows_split_big_wave() -> bool:
+	return false
+
+
+## 蚩尤 h14：本英雄出战时，是否可主动把本回合行动能量费用改为由自己支付等量生命。
+## 这是“不占行动的主动强化”；选择与费用结算由 BattleCore 统一处理。
+func enables_blood_payment() -> bool:
+	return false
+
+
+## 并封 h24：本英雄在队时，是否为我方开放“降低 1 点能量上限，令本回合行动少消耗 1 点能量”的可选变体。
+## 这里只声明能力；资格、费用、上限底线、AI、联机与快照由 BattleCore 统一处理。
+func enables_energy_cap_discount() -> bool:
+	return false
 
 
 # ============================================================
@@ -293,6 +274,6 @@ func on_active_attack_resolved(_battle: BattleCore, _player: int, _slot: int, _d
 
 
 ## 本英雄是否拥有"免费切换（不占动作槽）"能力。默认 false。h07【千里自在风】返回 true。
-## 引擎通过 free_switch() 处理；cap 由引擎计数（statuses["dangxian_uses"]，保留的旧内部键）。
+## 引擎通过 free_switch() 处理；cap 由团队级回合状态统一计数。
 func has_free_switch() -> bool:
 	return false

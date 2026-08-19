@@ -1,15 +1,28 @@
 extends ItemEffect
 
-## 夜明珠〔遗物〕：你切换登场的英雄，本回合攻击 +0.5 且登场冲撞 0.5（非免费切换，故不撞马）。
-## 永久遗物；登场加成 + 冲撞逻辑走 relic_on_switch_in（BattleCore._perform_switch 遍历本方遗物调·2026-07-02 A4 由 core 硬编码搬来）。
-const ATK_BONUS := 1     # 登场当回合攻击 +0.5 HP（_imod·本回合修正）
-const CHARGE_DMG := 1    # 登场冲撞给敌方出战 0.5 HP 真伤
+
+func relic_on_activate(_battle: BattleCore, _player: int, data: ItemData,
+		state: Dictionary, _events: Array) -> void:
+	state["charges"] = int(state.get("charges", 0)) + int(data.params.get("charges", 3))
 
 
-func relic_on_switch_in(battle: BattleCore, player: int, _slot: int, _data: ItemData, _state: Dictionary, events: Array) -> void:
-	battle.add_item_mod(player, "atk_bonus", ATK_BONUS)
-	var opp: int = 1 - player
-	var oa: int = battle.active_index[opp]
-	if battle.hp[opp][oa] > 0 and not battle.damage_immune(opp):   # 周天罡气：冲撞也免
-		battle.hp[opp][oa] -= CHARGE_DMG
-		events.append({id = "yemingzhu_charge", player = player})
+func relic_on_switch_in(battle: BattleCore, player: int, slot: int, data: ItemData,
+		state: Dictionary, events: Array) -> void:
+	var charges: int = int(state.get("charges", 0))
+	if charges <= 0:
+		return
+	var damage: int = int(data.params.get("dmg", 2))
+	var armor: int = int(data.params.get("armor", 2))
+	var opponent: int = 1 - player
+	battle._apply_damage(opponent, damage, player, ActionDef.Action.ATTACK,
+		ActionDef.Pen.NORMAL, ActionDef.Action.CHARGE, events, [], "item", slot)
+	if battle.hp[player][slot] > 0:
+		battle.shield[player][slot] += armor
+	state["charges"] = charges - 1
+	events.append({id = "relic_trigger", player = player, item_id = data.item_id,
+		damage = damage, armor = armor, charges = charges - 1})
+
+
+func relic_end(_battle: BattleCore, _player: int, _data: ItemData, state: Dictionary,
+		_events: Array) -> bool:
+	return int(state.get("charges", 0)) > 0

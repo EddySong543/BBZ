@@ -1,10 +1,6 @@
 extends ItemEffect
 
-## 力量的代价：对手本回合费能动作（大波/大防）多耗 1 能（课税·配碎能卡死）。
+## 力量的代价：本回合基础攻击总伤害增加2点，回合末处决当时的出战英雄。
 func apply_pre(battle: BattleCore, player: int, _target: int, data: ItemData) -> void:
-	var opp: int = 1 - player
-	if battle.item_debuff_blocked(opp):
-		return
-	var oa: int = battle.selected_action[opp]
-	if oa == ActionDef.Action.BIG_ATTACK or oa == ActionDef.Action.BIG_DEFEND:
-		battle.add_item_mod(opp, "cost_add", int(data.params.get("tax", 2)))
+	battle.add_item_mod(player, "turn_base_attack_total_bonus", int(data.params.get("bonus", 4)))
+	battle.set_item_mod(player, "strength_price_execution", true)

@@ -1,5 +1,12 @@
 extends ItemEffect
 
-## 上等法力药水：立即 +2.0 能（法力线顶·超充燃料）。
-func apply_pre(battle: BattleCore, player: int, _target: int, data: ItemData) -> void:
-	battle._gain_energy(player, int(data.params.get("energy", 4)))
+
+func resolves_on_submit() -> bool:
+	return true
+
+
+func apply_on_submit(battle: BattleCore, player: int, _target: int, data: ItemData,
+		events: Array) -> void:
+	var gained: int = battle._gain_energy(player, int(data.params.get("energy", 8)))
+	events.append({id = "item_energy_gain", player = player, item_id = data.item_id,
+		amount = gained})

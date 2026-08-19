@@ -5,11 +5,17 @@ extends RefCounted
 ## 服务器绝不信任客户端——本文件的 validate_c2s 是服务端第一道门（业务合法性在 match_room 二道门）。
 ##
 ## C2S（客户端→服务器）kind：
-##   submit_turn  {v, kind, turn, action:int, target:int, item_slots:Array[int], double:bool}
+##   submit_turn  {v, kind, turn, action:int, target:int, item_slots:Array[int], item_slot_targets:Array[int],
+##                 item_slot_choices:Array[int],
+##                 double:bool(保留字段·须为false),
+##                 empowered_wave:bool, split_big_wave:bool, blood_payment:bool,
+##                 free_switches:Array[int], blood_payment_step:int, energy_cap_discount:bool,
+##                 second_action:int, second_target:int}
 ##   econ_draft   {v, kind, turn, slot}            → 服务器回 draft_offer（仅发本人）
 ##   econ_upgrade {v, kind, turn, slot}            → 服务器回 draft_offer(upgrade)（仅发本人）
 ##   econ_refill  {v, kind, turn, slot}            → 付能补充（start_refill）→ draft_offer（仅发本人）
 ##   econ_pick    {v, kind, turn, slot, choice, upgrade:bool}
+##   item_draft   {v, kind, turn, slot, target}     → 点金石传说道具 3 选 1（仅私发本人）
 ##   death_switch {v, kind, turn, slot}
 ##   resync       {v, kind}                        → 服务器回 snapshot（断线重连）
 ##   hello        {v, kind, team:[hero_id×3]|[], pass?, gv?} → 开局前=报到+交换阵容；开局后=重连（房间回 snapshot+turn_begin）
@@ -23,7 +29,7 @@ extends RefCounted
 ##   bp_start {you, pool} / bp_progress {n=对方张数} / bp_reveal {picks:[双方×3]·绝对视角}（BP 阶段·2026-07-17）
 
 const PROTO_VERSION := 1
-const C2S_KINDS: Array[String] = ["submit_turn", "econ_draft", "econ_upgrade", "econ_refill", "econ_pick", "death_switch", "resync", "hello", "bp_progress", "bp_confirm"]
+const C2S_KINDS: Array[String] = ["submit_turn", "econ_draft", "econ_upgrade", "econ_refill", "econ_pick", "item_draft", "death_switch", "resync", "hello", "bp_progress", "bp_confirm"]
 const TEAM_SIZE := 3
 const MAX_HERO_ID_LEN := 8
 const MAX_PASS_LEN := 16       # 房间口令上限（好友房准入·2026-07-14）
@@ -33,6 +39,7 @@ const MAX_RTK_LEN := 64        # 重连令牌上限（中局重连身份凭据·
 const MAX_ITEM_SLOTS := 3      # 与 BattleCore.SLOT_COUNT 一致（入包范围校验用·防超长数组）
 const MAX_ACTION := 16         # 动作枚举安全上限（真合法性由 match_room 按 legal_actions 判）
 const MAX_TEAM_SLOT := 2       # 槽位 0..2
+const MAX_FREE_SWITCHES := 1   # h07 每回合最多一次免费切换；协议入口同步收紧
 
 
 ## 校验客户端入包。返回 ""=通过，否则错误码（服务器直接回 error 不进业务层）。
@@ -90,21 +97,89 @@ static func validate_c2s(msg: Variant) -> String:
 		return "bad_turn"
 	match kind:
 		"submit_turn":
-			if not _is_int(d.get("action")) or int(d["action"]) < 0 or int(d["action"]) > MAX_ACTION:
+			if not _is_int(d.get("action")) or int(d["action"]) < 0 \
+					or (int(d["action"]) > MAX_ACTION and int(d["action"]) != ActionDef.ACTIVE):
 				return "bad_action"
 			if not _is_int(d.get("target")) or int(d["target"]) < -1 or int(d["target"]) > MAX_TEAM_SLOT:
 				return "bad_target"
+			var second_action: Variant = d.get("second_action", -1)
+			if not _is_int(second_action) or int(second_action) < -1 \
+					or int(second_action) > ActionDef.Action.BIG_DEFEND:
+				return "bad_second_action"
+			var second_target: Variant = d.get("second_target", -1)
+			if not _is_int(second_target) or int(second_target) < -1 \
+					or int(second_target) > MAX_TEAM_SLOT:
+				return "bad_second_target"
+			if int(second_action) < 0 and int(second_target) >= 0:
+				return "bad_second_target"
 			var slots: Variant = d.get("item_slots")
 			if not (slots is Array) or (slots as Array).size() > MAX_ITEM_SLOTS:
 				return "bad_item_slots"
 			for s in slots:
 				if not _is_int(s) or int(s) < 0 or int(s) > MAX_ITEM_SLOTS - 1:
 					return "bad_item_slots"
+			# 与 item_slots 逐位对应：-1=道具默认目标，0..2=道具槽目标（当前供随身熔炉选燃料）。
+			# 旧客户端没有该字段时等价于全 -1；显式携带时必须严格等长，防索引错配。
+			var item_slot_targets: Array = []
+			if d.has("item_slot_targets"):
+				var targets_v: Variant = d["item_slot_targets"]
+				if not (targets_v is Array):
+					return "bad_item_slot_targets"
+				item_slot_targets = targets_v
+				if item_slot_targets.size() != (slots as Array).size():
+					return "bad_item_slot_targets"
+			else:
+				item_slot_targets.resize((slots as Array).size())
+				item_slot_targets.fill(-1)
+			for item_target in item_slot_targets:
+				if not _is_int(item_target) or int(item_target) < -1 or int(item_target) > MAX_TEAM_SLOT:
+					return "bad_item_slot_targets"
+			# 与 item_slots 逐位对应；-1=该道具无需选择，0..2=点金石私有候选下标。
+			var item_slot_choices: Array = []
+			if d.has("item_slot_choices"):
+				var choices_v: Variant = d["item_slot_choices"]
+				if not (choices_v is Array):
+					return "bad_item_slot_choices"
+				item_slot_choices = choices_v
+				if item_slot_choices.size() != (slots as Array).size():
+					return "bad_item_slot_choices"
+			else:
+				item_slot_choices.resize((slots as Array).size())
+				item_slot_choices.fill(-1)
+			for item_choice in item_slot_choices:
+				if not _is_int(item_choice) or int(item_choice) < -1 or int(item_choice) > 2:
+					return "bad_item_slot_choices"
 			if not (d.get("double", false) is bool):
 				return "bad_double_flag"
+			if not (d.get("empowered_wave", false) is bool):
+				return "bad_empowered_wave_flag"
+			if not (d.get("split_big_wave", false) is bool):
+				return "bad_split_big_wave_flag"
+			if not (d.get("blood_payment", false) is bool):
+				return "bad_blood_payment_flag"
+			if not (d.get("energy_cap_discount", false) is bool):
+				return "bad_energy_cap_discount_flag"
+			var free_switches: Variant = d.get("free_switches", [])
+			if not (free_switches is Array) or (free_switches as Array).size() > MAX_FREE_SWITCHES:
+				return "bad_free_switches"
+			for target in free_switches:
+				if not _is_int(target) or int(target) < 0 or int(target) > MAX_TEAM_SLOT:
+					return "bad_free_switches"
+			var blood_step: Variant = d.get("blood_payment_step", -1)
+			if not _is_int(blood_step) or int(blood_step) < -1 \
+					or int(blood_step) > (free_switches as Array).size():
+				return "bad_blood_payment_step"
+			if not bool(d.get("blood_payment", false)) and int(blood_step) != -1:
+				return "bad_blood_payment_step"
 		"econ_draft", "econ_upgrade", "econ_refill":
 			if not _slot_ok(d):
 				return "bad_slot"
+		"item_draft":
+			if not _slot_ok(d):
+				return "bad_slot"
+			if not _is_int(d.get("target")) or int(d["target"]) < 0 \
+					or int(d["target"]) > MAX_TEAM_SLOT or int(d["target"]) == int(d["slot"]):
+				return "bad_item_target"
 		"econ_pick":
 			if not _slot_ok(d):
 				return "bad_slot"
@@ -138,9 +213,32 @@ static func _is_int(v: Variant) -> bool:
 
 # —— C2S 构造（客户端用·保证自家包永远过校验）——
 
-static func msg_submit_turn(turn: int, action: int, target: int, item_slots: Array, double: bool = false) -> Dictionary:
+static func msg_submit_turn(turn: int, action: int, target: int, item_slots: Array,
+		double: bool = false, empowered_wave: bool = false, split_big_wave: bool = false,
+		blood_payment: bool = false, free_switches: Array = [],
+		blood_payment_step: int = -1, energy_cap_discount: bool = false,
+		item_slot_targets: Array = [], item_slot_choices: Array = [],
+		second_action: int = -1, second_target: int = -1) -> Dictionary:
+	var normalized_item_targets: Array = item_slot_targets.duplicate()
+	if normalized_item_targets.is_empty() and not item_slots.is_empty():
+		normalized_item_targets.resize(item_slots.size())
+		normalized_item_targets.fill(-1)
+	var normalized_item_choices: Array = item_slot_choices.duplicate()
+	if normalized_item_choices.is_empty() and not item_slots.is_empty():
+		normalized_item_choices.resize(item_slots.size())
+		normalized_item_choices.fill(-1)
 	return {v = PROTO_VERSION, kind = "submit_turn", turn = turn, action = action, target = target,
-		item_slots = item_slots.duplicate(), double = double}
+		item_slots = item_slots.duplicate(), item_slot_targets = normalized_item_targets,
+		item_slot_choices = normalized_item_choices,
+		double = double, empowered_wave = empowered_wave,
+		split_big_wave = split_big_wave, blood_payment = blood_payment,
+		free_switches = free_switches.duplicate(), blood_payment_step = blood_payment_step,
+		energy_cap_discount = energy_cap_discount, second_action = second_action,
+		second_target = second_target}
+
+
+static func msg_item_draft(turn: int, slot: int, target: int) -> Dictionary:
+	return {v = PROTO_VERSION, kind = "item_draft", turn = turn, slot = slot, target = target}
 
 
 static func msg_econ_draft(turn: int, slot: int, upgrade: bool) -> Dictionary:

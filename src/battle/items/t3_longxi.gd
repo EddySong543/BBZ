@@ -1,9 +1,21 @@
 extends ItemEffect
 
-## 龙息：本回合「大波」翻倍（4.0 穿防）；若对手「大防」会挡下 → 下回合力竭（强制 CHARGE）。
-func apply_pre(battle: BattleCore, player: int, _target: int, _data: ItemData) -> void:
+
+func apply_pre(battle: BattleCore, player: int, _target: int, data: ItemData) -> void:
 	if battle.selected_action[player] != ActionDef.Action.BIG_ATTACK:
 		return
 	battle.set_item_mod(player, "atk_mult", 2)
-	if battle.selected_action[1 - player] == ActionDef.Action.BIG_DEFEND:
-		battle.item_buffs[player]["exhausted_next"] = true
+	battle.add_base_attack_aftereffect(player, data)
+
+
+func apply_second_pre(battle: BattleCore, player: int, _target: int, data: ItemData,
+		_events: Array) -> void:
+	apply_pre(battle, player, -1, data)
+
+
+func on_base_attack_resolved(battle: BattleCore, player: int, context: Dictionary,
+		data: ItemData, events: Array) -> void:
+	if not bool(context.get("blocked_by_big_defend", false)):
+		return
+	battle.item_buffs[player]["exhausted_next"] = true
+	events.append({id = "longxi_exhausted", player = player, item_id = data.item_id})
