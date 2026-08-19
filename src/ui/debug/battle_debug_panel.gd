@@ -51,8 +51,8 @@ func _dbg_enter_overtime() -> void:
 
 
 func _dbg_full_energy() -> void:
-	_battle.energy[PLAYER] = ActionDef.MAX_ENERGY
-	_battle.energy[AI] = ActionDef.MAX_ENERGY
+	_battle.energy[PLAYER] = _battle.energy_max[PLAYER]
+	_battle.energy[AI] = _battle.energy_max[AI]
 	state_changed.emit()
 
 

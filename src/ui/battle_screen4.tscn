@@ -112,6 +112,8 @@ shader_parameter/impact_px = 3.0
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_5lng4"]
 
 [node name="BattleScreen4" unique_id=1557182044 instance=ExtResource("1_base")]
+character_reflections_enabled = false
+character_reflection_receiver_path = NodePath("")
 countdown_normal_color = Color(0.94902, 0.909804, 0.8, 1)
 countdown_ornament_color = Color(0.94902, 0.909804, 0.8, 1)
 

@@ -20,7 +20,7 @@ signal slot_unhovered                    # 鼠标离开槽位
 
 const SLOT_W := 68.0   # 道具框（2026-06-28 Eddy：76→缩小一些）
 const SLOT_H := 68.0
-const GAP := 9.0
+const GAP := 12.0   # 战斗 HUD 三格之间留出清晰分组；配合 0.92 行缩放，成品净距约 11px。
 
 ## 维度 → 芯片底色（与动作按钮 / draft 卡 / 飘字同源的语义色板）。
 const DIM_COLOR := {
@@ -33,28 +33,23 @@ const DIM_COLOR := {
 ##   双层 = 暗格底 canvas_ui_item_cell_bg（稀有度暗底 + 中心高亮 + 传说金底图）+ 稀有度像素框 canvas_ui_pixel_frame。
 ##   与 item_gallery_screen 完全同源（像素框 + 暗格 + 居中图标 + 全圆角）。jelly 仅保留给右上「升」角标。
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")        # 点选金晕外环用（框本体全走回纹贴图）
-const FRAME_PALETTE_SHADER := preload("res://assets/shaders/canvas_ui_item_frame_palette.gdshader")
-const ITEM_FRAME_TEX := preload("res://assets/ui/item_frame.png")   # 单一明暗母版；三阶颜色由 palette shader 生成
+const FRAME_PALETTE_SHADER := ItemFrameStyle.FRAME_SHADER
+const ITEM_FRAME_TEX := ItemFrameStyle.FRAME_TEXTURE
 # 格底内外色（2026-07-13 与图鉴同源定版：四角=深饱和阶色·中心=略浅阶色·传说走 gold_bottom）。
-const CELL_FILL_T := {1: Color("#6E9BD2"), 2: Color("#9A7FD0")}
-const CELL_CENTER_T := {1: Color("#88AEDE"), 2: Color("#B098E0")}
-const FRAME_SHADOW_T := {
-	1: Color("#102C4A"), 2: Color("#2A1246"), 3: Color("#4A2F08"),
-}
-const FRAME_MID_T := {
-	1: Color("#4A86C2"), 2: Color("#8050BC"), 3: Color("#C78F27"),
-}
-const FRAME_HIGHLIGHT_T := {
-	1: Color("#B9D9F2"), 2: Color("#D6B1F2"), 3: Color("#F7DE9A"),
-}
-const CELL_BG_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")     # 暗格底：圆角 + 稀有度暗底 + 中心高亮 + 传说金底图
+const CELL_FILL_T := ItemFrameStyle.CELL_TOP
+const CELL_CENTER_T := ItemFrameStyle.CELL_BOTTOM
+const FRAME_SHADOW_T := ItemFrameStyle.FRAME_SHADOW
+const FRAME_MID_T := ItemFrameStyle.FRAME_MID
+const FRAME_HIGHLIGHT_T := ItemFrameStyle.FRAME_HIGHLIGHT
+const CELL_BG_SHADER := ItemFrameStyle.CELL_SHADER
 const JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")          # 仅「升」角标用
-const LEGENDARY_BG := preload("res://assets/ui/gold_bottom.png")                            # 传说道具金云纹背景（Eddy 美术·与图鉴同源）
-const LEGENDARY_BG_TINT := Color(1.0, 1.0, 1.0, 1.0)
+const LEGENDARY_BG := ItemFrameStyle.LEGENDARY_TEXTURE
+const LEGENDARY_BG_TINT := ItemFrameStyle.LEGENDARY_TINT
+const LEGENDARY_TOP_DARKENING := ItemFrameStyle.LEGENDARY_TOP_DARKENING
 const FRAME_EDGE_OUTER := Color(0.16, 0.10, 0.06)   # 框外轮廓=深咖（与图鉴同）
-const FRAME_ART_SIZE := Vector2(87.25, 87.25)        # 新图透明边较宽：放大至实际金属外沿贴合 68px 槽位
-const FRAME_ART_OFFSET := Vector2(-9.6, -10.0)       # 由 alpha 外接框 (138,143)-(1116,1112) 对齐槽位
-const CELL_INSET := 6.0                              # 新框内孔约 56px；格底只铺在内孔下方，绝不露到框外
+const FRAME_ART_SIZE := Vector2.ONE * SLOT_W * ItemFrameStyle.FRAME_ART_SCALE
+const FRAME_ART_OFFSET := Vector2(SLOT_W, SLOT_H) * ItemFrameStyle.FRAME_OFFSET_RATIO
+const CELL_INSET := SLOT_W * ItemFrameStyle.CELL_INSET_RATIO
 const CELL_CORNER := 0.18                            # 圆角（格底与框一致·与图鉴同·全圆角无方角）
 const CELL_GRID := 23.0    # 像素格数（= 图鉴 BOX/6）。用「格数」而非 SLOT_W/6 → 边框按比例随框缩放、不会在小框上变粗（2026-06-28 Eddy：去掉过厚棕边·与图鉴完全一致）
 const EDGE_OUTER := Color(0.11, 0.09, 0.075)    # 统一暗轮廓（暖黑·与暖色UI同温·任何色相都干净）
@@ -128,10 +123,16 @@ var hoverable := false:
 		hoverable = v
 		_apply_mouse_filter()
 
+## 非交互的敌方栏只在“选择敌方道具槽”期间接受左键；不开放升级或经济操作。
+var targetable := false:
+	set(v):
+		targetable = v
+		_apply_mouse_filter()
+
 
 func _apply_mouse_filter() -> void:
 	for b in _buttons:
-		b.mouse_filter = Control.MOUSE_FILTER_STOP if (interactive or hoverable) \
+		b.mouse_filter = Control.MOUSE_FILTER_STOP if (interactive or hoverable or targetable) \
 				else Control.MOUSE_FILTER_IGNORE
 
 const ICON_INSET := 9.0                          # 图标内缩（露出框·与图鉴 17/138≈12% 同比例·落在内框里不溢出）
@@ -212,10 +213,7 @@ func _make_bottom_shadow_material() -> ShaderMaterial:
 
 
 func _set_texture_frame_palette(m: ShaderMaterial, tier: int) -> void:
-	var key := clampi(tier, 1, 3)
-	m.set_shader_parameter("shadow_color", FRAME_SHADOW_T[key])
-	m.set_shader_parameter("mid_color", FRAME_MID_T[key])
-	m.set_shader_parameter("highlight_color", FRAME_HIGHLIGHT_T[key])
+	ItemFrameStyle.apply_frame_palette(m, tier)
 
 
 func _ready() -> void:
@@ -306,7 +304,7 @@ func _ready() -> void:
 		btn.focus_mode = Control.FOCUS_NONE
 		btn.position = base
 		btn.size = Vector2(SLOT_W, SLOT_H)
-		btn.mouse_filter = Control.MOUSE_FILTER_STOP if (interactive or hoverable) \
+		btn.mouse_filter = Control.MOUSE_FILTER_STOP if (interactive or hoverable or targetable) \
 				else Control.MOUSE_FILTER_IGNORE
 		btn.pressed.connect(_on_slot_pressed.bind(i))
 		btn.gui_input.connect(_on_slot_gui_input.bind(i))   # 右键=升级（快捷入口·与角标同信号）
@@ -470,7 +468,7 @@ func _make_chevrons() -> Control:
 
 
 func _on_slot_pressed(slot: int) -> void:
-	if interactive:
+	if interactive or targetable:
 		slot_clicked.emit(slot)
 
 
@@ -499,7 +497,7 @@ func _on_slot_unhover() -> void:
 
 ## 按经济状态刷新 3 个芯片（2026-07-13 重做：无文字状态语言——回纹框+封条/卡背/金币+动效）。
 ## staged：本回合已点选「使用」的槽位（仅 P1 传入；金边+图标下沉）。
-func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
+func refresh(battle: BattleCore, player: int, staged: Array = [], concealed: bool = false) -> void:
 	if battle == null or player < 0 or player >= battle.slots.size():
 		return
 	if battle.slots[player].size() < 3 or _cells.size() < 3:
@@ -546,7 +544,7 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 					frame_mod = Color(0.74, 0.72, 0.69)
 					_pouches[i].modulate = Color(0.72, 0.72, 0.72)
 			BattleCore.SlotState.CHARGING:
-				var item: ItemData = battle.slot_item(player, i)
+				var item: ItemData = null if concealed else battle.slot_item(player, i)
 				has_item = item != null
 				legend = has_item and item.tier >= 3        # 传说 → 格底用 gold_bottom 金底图
 				if has_item:
@@ -593,13 +591,19 @@ func refresh(battle: BattleCore, player: int, staged: Array = []) -> void:
 		icon.position.y = ICON_INSET + (3.0 if staged_now else 0.0)
 		# 格底应用
 		var cmat: ShaderMaterial = _cell_mats[i]
-		cmat.set_shader_parameter("fill_color", fb)
-		cmat.set_shader_parameter("inner_color", cell_inner)
-		cmat.set_shader_parameter("center_glow", glow)
-		cmat.set_shader_parameter("use_tex", 1.0 if legend else 0.0)
-		if legend:
-			cmat.set_shader_parameter("bg_tex", LEGENDARY_BG)
-			cmat.set_shader_parameter("tex_tint", LEGENDARY_BG_TINT)
+		if has_item:
+			# 统一样式负责阶色、纵向渐变与传说贴图；战斗状态只附加锁定压暗。
+			var state_tint := Color(0.68, 0.68, 0.68, 1.0) if locked_item else Color.WHITE
+			ItemFrameStyle.apply_cell_palette(cmat, cur_tier, state_tint)
+		else:
+			# 空槽保留战斗 HUD 原有的柔和中心高光，避免改变状态语言。
+			cmat.set_shader_parameter("fill_color", fb)
+			cmat.set_shader_parameter("inner_color", cell_inner)
+			cmat.set_shader_parameter("center_glow", glow)
+			cmat.set_shader_parameter("vertical_gradient", 0.0)
+			cmat.set_shader_parameter("material_lighting", 0.0)
+			cmat.set_shader_parameter("use_tex", 0.0)
+			cmat.set_shader_parameter("tex_top_darkening", 0.0)
 		# 框应用：全状态=回纹贴图框（有道具=阶框/无道具=暖骨中性框）；点选叠金晕外环+框身提金（入场 pop 一次）。
 		_tex_frames[i].visible = true
 		_tex_frames[i].texture = frame_tex

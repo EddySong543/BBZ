@@ -1,125 +1,160 @@
 class_name DeathSwitchOverlay
 extends Control
 
-## 阵亡替补选择浮窗 —— 全屏暗化背景 + 居中提示 + 倒计时 + 横排新版 item_frame 头像。
-## 通过 show_selection(player, reserves) 弹出；用户点击某个头像框后发出 selection_made(slot)。
-##
-## 倒计时(PICK_SECONDS=10 秒)：到点未选则自动选最左侧(reserves[0]，即首个存活替补)并发出 selection_made。
-## 血量显示 = 现役 ReserveHpRow：单个平行四边形血块 + 数字。
-## 每个替补 = 居中竖排：新版头像框 + 名字 + 斜切血量（固定 FRAME_SIZE 宽对齐）。
+## 阵亡替补选择浮窗：轻压暗战场，只保留标题与横排替补头像。
+## 候选头像直接复用战斗 HUD 的 HeroFrame 菱形模式；倒计时只由 BattleScreen 顶部统一管理。
 
-const ItemAvatarFrameScene := preload("res://src/ui/components/item_avatar_frame.tscn")
+const HeroFrameScene := preload("res://src/ui/components/hero_frame.tscn")
 const ReserveHpRowScript := preload("res://src/ui/components/reserve_hp_row.gd")
-const FRAME_SIZE := 120.0
-const PICK_SECONDS := 10
+const RoundLabelOrnamentsComponent := preload("res://src/ui/components/round_label_ornaments.gd")
+const FRAME_SIZE := 112.0
+const PORTRAIT_SIZE := 115.5
+const PORTRAIT_RISE := 16.5
+const NORMAL_TEXT_COLOR := Color("#F2E8CC")
+const MUTED_TEXT_COLOR := Color("#D7E1EA")
+const ORNAMENT_UNDERLAY := Color(0.07, 0.04, 0.02, 0.88)
+const HOVER_MODULATE := Color(1.12, 1.12, 1.12, 1.0)
 
 signal selection_made(slot: int)
 
 @onready var _prompt: Label = $PromptLabel
-@onready var _countdown: Label = $CountdownLabel
 @onready var _card_container: HBoxContainer = $CardContainer
 
-var _time_left: float = 0.0
-var _counting: bool = false
-var _default_slot: int = -1   # 倒计时归零时自动选的槽位（= 最左侧 / 首个存活替补）
+var _default_slot: int = -1
+var _committing: bool = false
+var _prompt_ornaments: Control
+var _hover_tweens: Dictionary = {}
 
 
 func _ready() -> void:
-	FontManager.apply(_prompt, 32)   # 32=16×2 整数倍·清晰
-	_prompt.add_theme_color_override("font_color", Color.WHITE)
-	FontManager.apply(_countdown, 48)   # 倒计时大数字（48=16×3 整数倍·清晰）
-	_countdown.add_theme_color_override("font_color", Color.WHITE)
+	FontManager.apply(_prompt, 32)
+	_prompt.add_theme_color_override("font_color", NORMAL_TEXT_COLOR)
+	_prompt.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.05, 0.92))
+	_prompt.add_theme_constant_override("outline_size", 4)
+	_prompt_ornaments = RoundLabelOrnamentsComponent.new()
+	_prompt_ornaments.name = "TitleOrnaments"
+	_prompt.add_child(_prompt_ornaments)
+	_prompt_ornaments.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_prompt_ornaments.call("configure", NORMAL_TEXT_COLOR, ORNAMENT_UNDERLAY, 3.0)
 	visible = false
-	set_process(false)
 
 
-## 弹出浮窗。reserves 数组每项为 [slot_idx:int, hero:HeroData, hp:float]（多余元素忽略）。
-## title 可覆盖提示文案（加时赛选人复用本浮窗·2026-07-03）。
+## reserves 每项为 [slot_idx:int, hero:HeroData, hp:float]。
 func show_selection(player: int, reserves: Array, title: String = "选择出战英雄") -> void:
 	_prompt.text = tr(title)
 
 	for child in _card_container.get_children():
+		_card_container.remove_child(child)
 		child.queue_free()
 
 	_default_slot = int(reserves[0][0]) if reserves.size() > 0 else -1
+	_committing = false
+	_hover_tweens.clear()
 
-	var pcolor := Color("#3f86c8") if player == 0 else Color("#d24a44")  # 阵营宝石色(与战斗内一致)
+	var player_color := Color("#3F86C8") if player == 0 else Color("#D24A44")
 	for entry in reserves:
 		var slot_idx: int = int(entry[0])
-		var h: HeroData = entry[1]
+		var hero: HeroData = entry[1]
 		var hp: float = float(entry[2])
-		_card_container.add_child(_create_frame_entry(h, hp, slot_idx, pcolor))
+		_card_container.add_child(_create_frame_entry(hero, hp, slot_idx, player_color))
 
 	visible = true
-	_time_left = float(PICK_SECONDS)
-	_counting = true
-	_update_countdown_label()
-	set_process(true)
+	_prompt_ornaments.call("refresh")
 
 
-## 倒计时：每帧递减，归零自动选最左侧替补。
-func _process(delta: float) -> void:
-	if not _counting:
-		return
-	_time_left -= delta
-	_update_countdown_label()
-	if _time_left <= 0.0:
-		_counting = false
-		set_process(false)
-		_on_selected(_default_slot)
+## 由 BattleScreen 顶部统一倒计时归零时调用；浮层不再拥有独立 Timer/Label。
+func select_default() -> void:
+	_commit_selection(_default_slot)
 
 
-func _update_countdown_label() -> void:
-	var secs := maxi(int(ceil(_time_left)), 0)
-	_countdown.text = "%d" % secs
-	# 最后 3 秒转红催促。
-	_countdown.add_theme_color_override("font_color", Color("#ff6666") if secs <= 3 else Color.WHITE)
-
-
-## 单个替补 = 居中竖排：新版 item_frame 头像 + 名字 + 平行四边形血量。
-func _create_frame_entry(h: HeroData, hp: float, slot: int, pcolor: Color) -> Control:
+func _create_frame_entry(
+		hero: HeroData, hp: float, slot: int, player_color: Color) -> Control:
 	var wrap := Control.new()
-	wrap.custom_minimum_size = Vector2(FRAME_SIZE, FRAME_SIZE + 72.0)
+	wrap.name = "Choice_%d" % slot
+	wrap.custom_minimum_size = Vector2(FRAME_SIZE, FRAME_SIZE + 70.0)
 	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	var frame := ItemAvatarFrameScene.instantiate() as ItemAvatarFrame
+	var frame := HeroFrameScene.instantiate() as HeroFrame
 	wrap.add_child(frame)
 	frame.position = Vector2.ZERO
+	frame.hero_name = hero.hero_name
+	frame.player_color = player_color
+	frame.flip_h = player_color.r > player_color.b
 	frame.frame_size = Vector2(FRAME_SIZE, FRAME_SIZE)
-	frame.portrait_path = h.portrait_path
-	frame.set_faction_color(pcolor)
-	frame.gui_input.connect(_on_frame_input.bind(slot))
+	frame.diamond_mode = true
+	frame.diamond_portrait_px = PORTRAIT_SIZE
+	frame.diamond_portrait_rise = PORTRAIT_RISE
+	frame.diamond_stroke_px = 6.0
+	frame.diamond_rim_px = 3.0
+	frame.diamond_inner_rim_px = 2.0
+	frame.bottom_shadow_enabled = true
+	frame.portrait_path = hero.portrait_path
+	frame.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	frame.mouse_entered.connect(_on_frame_hover.bind(frame, true))
+	frame.mouse_exited.connect(_on_frame_hover.bind(frame, false))
+	frame.gui_input.connect(_on_frame_input.bind(slot, frame))
 
-	var name_lbl := Label.new()
-	name_lbl.text = h.hero_name
-	name_lbl.position = Vector2(0, FRAME_SIZE + 6.0)
-	name_lbl.size = Vector2(FRAME_SIZE, 22)
-	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	FontManager.apply(name_lbl, 16)
-	name_lbl.add_theme_color_override("font_color", Color.WHITE)
-	name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	wrap.add_child(name_lbl)
+	var name_label := Label.new()
+	name_label.name = "HeroName"
+	name_label.text = hero.hero_name
+	name_label.position = Vector2(0.0, FRAME_SIZE + 5.0)
+	name_label.size = Vector2(FRAME_SIZE, 24.0)
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	FontManager.apply(name_label, 18)
+	name_label.add_theme_color_override("font_color", MUTED_TEXT_COLOR)
+	name_label.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.05, 0.9))
+	name_label.add_theme_constant_override("outline_size", 3)
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wrap.add_child(name_label)
 
 	var hp_row := ReserveHpRowScript.new() as ReserveHpRow
 	hp_row.name = "HpRow"
-	hp_row.position = Vector2(0.0, FRAME_SIZE + 28.0)
+	hp_row.position = Vector2(0.0, FRAME_SIZE + 30.0)
 	hp_row.size = Vector2(FRAME_SIZE, 40.0)
-	hp_row.icon_slant = -4.0 if pcolor.b >= pcolor.r else 4.0
+	hp_row.icon_slant = -4.0 if player_color.b >= player_color.r else 4.0
 	hp_row.set_values(hp, 0.0)
 	wrap.add_child(hp_row)
 
 	return wrap
 
 
-func _on_frame_input(event: InputEvent, slot: int) -> void:
+func _on_frame_hover(frame: HeroFrame, hovering: bool) -> void:
+	if _committing or not is_instance_valid(frame):
+		return
+	var key := frame.get_instance_id()
+	var previous: Tween = _hover_tweens.get(key)
+	if previous != null and previous.is_valid():
+		previous.kill()
+	var tween := create_tween().set_parallel(true)
+	_hover_tweens[key] = tween
+	tween.tween_property(
+		frame, "position", Vector2(0.0, -2.0) if hovering else Vector2.ZERO, 0.12
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(
+		frame, "modulate", HOVER_MODULATE if hovering else Color.WHITE, 0.12
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+
+func _on_frame_input(event: InputEvent, slot: int, frame: HeroFrame) -> void:
 	if event is InputEventMouseButton:
-		var mb := event as InputEventMouseButton
-		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
-			_on_selected(slot)
+		var mouse_button := event as InputEventMouseButton
+		if mouse_button.pressed and mouse_button.button_index == MOUSE_BUTTON_LEFT:
+			frame.is_selected = true
+			_commit_selection(slot, true)
 
 
-func _on_selected(slot: int) -> void:
-	_counting = false
-	set_process(false)
-	visible = false
+func _commit_selection(slot: int, show_click_feedback: bool = false) -> void:
+	if _committing or slot < 0:
+		return
+	_committing = true
+	if show_click_feedback:
+		# 规则信号立即发出；浮层只多保留极短一拍，让 HeroFrame 选中反馈真实渲染。
+		get_tree().create_timer(0.07).timeout.connect(_hide_after_click_feedback)
+	else:
+		visible = false
 	selection_made.emit(slot)
+
+
+func _hide_after_click_feedback() -> void:
+	visible = false

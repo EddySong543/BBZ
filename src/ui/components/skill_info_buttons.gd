@@ -195,19 +195,13 @@ func _update_side(side: int) -> void:
 		p.color = PIP_ON if k == _idx[side] else PIP_OFF
 
 
-## 浮层文案：英雄名·技能名（主动/被动）→ 技能描述 → 教学行。
-## 换行交给 battle_screen 的 _wrap_fixed（保留手动 \n）。
+## 悬停对象已经表达英雄、技能与翻页操作，浮层只保留技能说明正文。
+## 换行交给 battle_screen 的 L 框中文智能换行。
 func _tip_text(side: int) -> String:
 	var h: HeroData = _hero(side)
 	if h == null:
 		return ""
-	var sk: HeroSkill = _battle.get_skill(side, _idx[side])
-	var is_active: bool = sk != null and (sk.has_active() or sk.has_free_switch())
-	var kind: String = tr("主动") if is_active else tr("被动")
-	var who: String = tr("己方") if side == 0 else tr("敌方")
-	return "%s %s·%s（%s）\n%s\n%s" % [
-		who, tr(h.hero_name), tr(h.skill_description), kind,
-		tr(h.skill_detail), tr("左键下一个·右键上一个")]
+	return tr(h.skill_detail)
 
 
 func _on_enter(side: int) -> void:

@@ -2,26 +2,26 @@ extends SceneTree
 
 ## 鼠标指针生成器（G 件·2026-07-15 Eddy 选 B「族语化经典箭头」·程序自产零外部资产）：
 ## 沿革：v2 暖色 → v3 尾腿顺斜方切 → v4 去尾箭镞（外形 Eddy ✅）→ v5 悬停手型⛔（读作竖中指）→
-## **v6 悬停金晕版（2026-07-15 晚·Eddy：保持箭头形·动效不变暗）**：两态箭镞完全同形同色，
-## 悬停只在描边外圈加 1 设计格**金晕外环** #DCA12E——搬全游戏现成点选语言（道具格/图鉴选中=金晕外环·
-## 深金档=亮纸暗夜双衬底已验证），箭头纹丝不动、金晕向外绽出，⛔变暗⛔换形。
-## 常态双色=暖纸身 #F0D7A2 + 近黑描边 #130C08（外深内浅·Eddy 定·§2 取色铁律）。
-## 24×24 设计网格 ×2 = 48×48 成品（描边/金晕各 1 设计格=2 成品px）。
+## **v8 柔和小号版（2026-08-17）**：两态箭镞完全同形同色；悬停不再套一整圈粗金壳，
+## 只在箭镞右下受光侧保留 1 设计格金色偏移边。金色负责提示“可点”，近黑轮廓仍负责勾形，
+## 因而不会把小光标读成双层徽章。内芯改为中性暖灰米白，避开旧版脏黄与纯白刺眼两端；
+## 箭镞实显尺寸约缩小 25%。⛔变暗⛔换形⛔柔化边缘。
+## 常态双色=柔和米白内填充 #E8E4DA + 近黑描边 #130C08；悬停态额外增加右下金边 #DCA12E。
+## 18×18 设计网格 ×2 = 36×36 成品（描边/偏移金边各 1 设计格=2 成品px）。
 ## 跑法：godot --headless --path . -s res://tools/gen_ui_cursor.gd
 ## 输出：assets/ui/cursor_arrow.png / cursor_hand.png（文件名沿用 POINTING_HAND 槽位名·实际=箭镞+金晕）
-## + stdout 打 hotspot（两态同=近黑描边尖端·金晕只向外扩不动内容=悬停切换零跳动）。
+## + stdout 打 hotspot（两态同=近黑描边尖端·偏移金边不动内容=悬停切换零跳动）。
 ## ⚠ 覆盖同路径贴图后必须跑 --import（老规矩）。悬停想退回"什么都不变"：transition_manager
 ## 把 POINTING_HAND 注册指向 CURSOR_ARROW 即可。
 
-const GRID := 24
+const GRID := 18
 const SCALE := 2
-const BODY := Color("F0D7A2")   # 暖纸身（牌匾/导航钮族纸面色·资产实测）
+const BODY := Color("E8E4DA")   # 中性暖灰米白：不脏黄、不刺眼
 const RIM := Color("130C08")    # 近黑描边（悬停框族近黑·亮纸上勾形）
-const HALO := Color("DCA12E")   # 金晕外环（图鉴选中深金档·亮纸暗夜双衬底已验证）
+const HALO := Color("DCA12E")   # 悬停右下偏移金边（沿用图鉴选中金色）
 
-# 箭镞形状表（v4 定稿不动·设计格行段表 y -> [x_start, x_end]·手调迭代口）：
-# 头三角（尖 (3,2)·45° 斜边·左缘垂直）+跟部收锋 (3,16)·⛔尾腿
-# （尾腿三代全废教训：细长附肢在 48px 档怎么做都别扭·经典箭镞本身已足够读作指针——见 git 史）。
+# 箭镞形状表（v4 轮廓语言的小号重绘·设计格行段表 y -> [x_start, x_end]）：
+# 头三角（尖 (3,2)·45° 斜边·左缘垂直）+跟部收锋 (3,12)·⛔尾腿。
 const ARROW_SPANS := {
 	2:  [[3, 3]],
 	3:  [[3, 4]],
@@ -31,13 +31,9 @@ const ARROW_SPANS := {
 	7:  [[3, 8]],
 	8:  [[3, 9]],
 	9:  [[3, 10]],
-	10: [[3, 11]],
-	11: [[3, 12]],
-	12: [[3, 13]],
-	13: [[3, 6]],
-	14: [[3, 5]],
-	15: [[3, 4]],
-	16: [[3, 3]],
+	10: [[3, 5]],
+	11: [[3, 4]],
+	12: [[3, 3]],
 }
 
 
@@ -50,7 +46,7 @@ func _init() -> void:
 	var rim_px := _shell(body_px, body_px)
 	var solid := body_px.duplicate()
 	solid.merge(rim_px)
-	var halo_px := _shell(solid, solid)
+	var halo_px := _directional_hover_edge(solid)
 
 	for variant: Array in [["cursor_arrow", false], ["cursor_hand", true]]:
 		var img := Image.create(GRID * SCALE, GRID * SCALE, false, Image.FORMAT_RGBA8)
@@ -68,7 +64,18 @@ func _init() -> void:
 	quit()
 
 
-## 外壳：base 的 8 邻域中不属于 exclude 的格（第一次调=描边·第二次调=金晕·家族两遍描边法推广）
+## 悬停金边只取实体向右下偏移的一格：长斜边和尾部转折会自然亮起，左缘与顶部保持干净。
+## 这是硬像素偏移边，不使用模糊、透明渐变或完整第二圈轮廓。
+func _directional_hover_edge(solid: Dictionary) -> Dictionary:
+	var out := {}
+	for p: Vector2i in solid:
+		var n := p + Vector2i(1, 1)
+		if not solid.has(n):
+			out[n] = true
+	return out
+
+
+## 外壳：base 的 8 邻域中不属于 exclude 的格（用于近黑描边）。
 func _shell(base: Dictionary, exclude: Dictionary) -> Dictionary:
 	var out := {}
 	for p: Vector2i in base:

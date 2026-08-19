@@ -8,17 +8,19 @@ extends Control
 
 const HERO_GALLERY_SCENE := preload("res://src/ui/hero_gallery_screen.tscn")
 const ITEM_GALLERY_SCENE := preload("res://src/ui/item_gallery_screen.tscn")
-const PLAQUE_TEX := preload("res://assets/ui/ui_plaque.png")   # 页签皮=米色回纹匾(9-slice·与两图鉴牌匾共用·2026-07-13)
 
 const DESIGN := Vector2(1920.0, 1080.0)   # 图鉴屏设计分辨率（缩放前）
 const PANEL_SCALE := 0.86                  # 「大部分屏幕但不占满」
 const DIM_COLOR := Color(0.0, 0.0, 0.0, 0.62)
-const TAB_SIZE := Vector2(200.0, 46.0)
-const TAB_GAP := 24.0
+const TAB_SIZE := Vector2(188.0, 52.0)
+const TAB_GAP := 18.0
 const TAB_Y := 16.0
 
-const INK := Color(0.24, 0.19, 0.12)             # 墨字（亮纸底·与主菜单导航钮同语言）
-const TAB_DIM := Color(0.72, 0.69, 0.63)         # 未选中页签=匾皮压暗（StyleBoxTexture modulate）
+const INK := Color("2E2922")
+const SHELL_EDGE := Color("6B4A32")
+const TAB_IDLE := Color("EAD9BA")
+const TAB_HOVER := Color("EBCB8D")
+const TAB_SELECTED := Color("C99032")
 
 var _holder: Control = null
 var _galleries: Array = [null, null]   # 0=英雄图鉴 1=道具图鉴（懒加载缓存）
@@ -56,8 +58,8 @@ func _ready() -> void:
 		var btn := Button.new()
 		btn.name = "Tab%d" % i
 		btn.text = String(labels[i])
-		btn.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST   # 匾皮像素边保真
-		btn.focus_mode = Control.FOCUS_NONE
+		btn.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		btn.focus_mode = Control.FOCUS_ALL
 		btn.position = Vector2((DESIGN.x - total_w) * 0.5 + i * (TAB_SIZE.x + TAB_GAP), TAB_Y)
 		btn.size = TAB_SIZE
 		btn.pressed.connect(_show_tab.bind(i))
@@ -109,19 +111,31 @@ func _set_gallery_input(active_idx: int) -> void:
 
 
 func _refresh_tabs() -> void:
-	# 页签皮=米色回纹匾 9-slice（2026-07-13 换皮：StyleBoxFlat 羊皮胶囊退役）；选中=原亮/未选=压暗。
+	# 共用页签采用平面阶梯按钮；不模拟牌匾、金属包角或实体书签。
 	for i in _tab_btns.size():
 		var btn: Button = _tab_btns[i]
 		var sel: bool = (i == _current_tab)
-		var sb := StyleBoxTexture.new()
-		sb.texture = PLAQUE_TEX
-		sb.texture_margin_left = 26    # 新牌匾（265×63）角钩区实量（与两图鉴牌匾同边距）
-		sb.texture_margin_right = 26
-		sb.texture_margin_top = 23
-		sb.texture_margin_bottom = 23
-		sb.modulate_color = Color.WHITE if sel else TAB_DIM
-		for st in ["normal", "hover", "pressed", "disabled", "focus"]:
-			btn.add_theme_stylebox_override(st, sb)
+		btn.add_theme_color_override("font_color", INK)
+		btn.add_theme_color_override("font_hover_color", INK)
+		btn.add_theme_color_override("font_pressed_color", INK)
+		btn.add_theme_stylebox_override(
+			"normal", _tab_style(TAB_SELECTED if sel else TAB_IDLE, 4 if sel else 2))
+		btn.add_theme_stylebox_override("hover", _tab_style(TAB_HOVER, 2))
+		btn.add_theme_stylebox_override("pressed", _tab_style(TAB_SELECTED, 4))
+		btn.add_theme_stylebox_override(
+			"focus", _tab_style(TAB_SELECTED if sel else TAB_IDLE, 3))
+		btn.add_theme_stylebox_override(
+			"disabled", _tab_style(TAB_IDLE.darkened(0.12), 2))
+
+
+func _tab_style(fill: Color, bottom_width: int) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = fill
+	style.border_color = SHELL_EDGE
+	style.set_border_width_all(2)
+	style.border_width_bottom = bottom_width
+	style.set_corner_radius_all(2)
+	return style
 
 
 func _on_dim_input(event: InputEvent) -> void:

@@ -19,6 +19,14 @@ func _ready() -> void:
 	g._select(7)                                     # 第二排（验证选中环+右页刷新）
 	await get_tree().create_timer(0.5).timeout
 	await _shot("gallery_cur_sel.png")
+
+	g._turn_page(1)                                  # 第二页（验证 12/页与翻页入口状态）
+	await get_tree().create_timer(0.5).timeout
+	await _shot("gallery_cur_page2.png")
+
+	g._select(13)                                    # h14 主动强化（验证朱砂主动印）
+	await get_tree().create_timer(0.5).timeout
+	await _shot("gallery_cur_active.png")
 	get_tree().quit()
 
 

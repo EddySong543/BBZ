@@ -193,7 +193,6 @@ var _sel_tween: Tween      # 选中弹跳动画（选择动作时的 pop）
 var _diamond: ColorRect    # 菱形外框（diamond_mode 懒建）
 var _bottom_shadow: ColorRect   # 战斗 HUD 专用定向下投影（opt-in）
 var _active_corners: ActiveCornerOrnaments   # 出战位三点护角（左/右/下；顶部让给越框立绘）
-var _death_cross: DeathCross   # 阵亡红✕（懒建·is_dead 才出现）
 static var _cache: Dictionary = {}
 
 const DIAMOND_FRAME_SHADER := preload("res://assets/shaders/canvas_ui_diamond_frame.gdshader")
@@ -290,6 +289,8 @@ func _refresh_style() -> void:
 		dm.set_shader_parameter("fill_color", fill)
 		# 备选位不加新装饰，只把下半边从 0.72 提到 0.80，避免深色背景上沉成一根细暗线。
 		dm.set_shader_parameter("edge_bottom_mul", 0.72 if is_active else 0.80)
+		# 淘汰裂痕直接刻进当前菱形边框 shader，不再创建断角/覆盖层。
+		dm.set_shader_parameter("fractured", is_dead)
 		_diamond.modulate = frame_mod
 
 	if _active_corners != null:
@@ -298,36 +299,17 @@ func _refresh_style() -> void:
 		_active_corners.queue_redraw()
 
 	if _portrait:
-		if is_dead:
-			(_portrait as TextureRect).modulate = Color(0.45, 0.45, 0.5)
-		else:
-			(_portrait as TextureRect).modulate = Color.WHITE
+		var portrait := _portrait as TextureRect
+		portrait.modulate = Color.WHITE if diamond_mode else (
+			Color(0.45, 0.45, 0.5) if is_dead else Color.WHITE)
+		# 菱形遮罩不读取 modulate.rgb，阵亡灰化必须由遮罩材质自身完成。
+		if diamond_mode and portrait.material is ShaderMaterial:
+			var portrait_material := portrait.material as ShaderMaterial
+			portrait_material.set_shader_parameter("desaturation", 0.90 if is_dead else 0.0)
+			portrait_material.set_shader_parameter("brightness", 0.48 if is_dead else 1.0)
 
 	if _name_label:
 		(_name_label as Label).text = hero_name.substr(0, 2) if hero_name != "" else ""
-
-	_refresh_death_cross()
-
-
-## 阵亡红✕（2026-07-18 Eddy：「不仅变灰，再加一个叉叉」）——压灰只是"暗了一点"，
-## 三米外扫一眼分不出死活；红✕是 BP 禁用卡早已验证过的一眼读法（hero_card.BanMark 同源），
-## 这里按菱形框的内接正方形收边，✕ 的四个端点正落在菱形四条边的中点上、不出框。
-func _refresh_death_cross() -> void:
-	if not is_dead:
-		if _death_cross != null:
-			_death_cross.visible = false
-		return
-	if _death_cross == null:
-		_death_cross = DeathCross.new()
-		_death_cross.name = "DeathCross"
-		_death_cross.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		add_child(_death_cross)
-	# 树序最后 → 画在立绘/边框之上（set_switch_prompt 的「切换」字若已建也在其下，
-	# 但阵亡英雄不会进 armed 态，二者不同时出现）。
-	move_child(_death_cross, get_child_count() - 1)
-	_death_cross.inscribed = diamond_mode   # 菱形=按内接正方形收边；方框=四角留边即可
-	_death_cross.visible = true
-	_death_cross.queue_redraw()
 
 
 # ============================================================
@@ -552,49 +534,6 @@ class ActiveCornerOrnaments extends Control:
 		# 一条连续 V：暗色只作外轮廓，暖金是唯一主体，不再切段或添加“固定块”。
 		draw_polyline(points, DARK, DARK_WIDTH, false)
 		draw_polyline(points, GOLD, GOLD_WIDTH, false)
-
-
-## 阵亡红✕：两道像素台阶粗斜杠（近黑衬底 + 阵亡红主体），与 hero_card.BanMark 同源画法
-## （量化到格坐标逐格行走 → 台阶等宽、不出半像素毛边）。
-## inscribed=true（菱形框）时收进内接正方形：菱形 |x|/a+|y|/b≤1 的最大内接正方形半边 = a/2，
-## 于是 ✕ 的端点正落在四条斜边的中点，既撑得开又一点不出框。
-class DeathCross extends Control:
-	const X_RED := Color("#d8453e")
-	const X_DARK := Color(0.04, 0.02, 0.02, 0.9)
-
-	## true = 按菱形内接正方形收边（diamond_mode）；false = 方框四角留边。
-	var inscribed: bool = false:
-		set(v):
-			inscribed = v
-			queue_redraw()
-
-	func _ready() -> void:
-		mouse_filter = Control.MOUSE_FILTER_IGNORE
-		resized.connect(queue_redraw)
-
-	func _draw() -> void:
-		var block := maxf(roundf(size.x / 24.0), 2.0)
-		# 菱形：内接正方形边长 = 框的一半 → 四周各让出 1/4；方框：沿用 BanMark 的 4 格内缩。
-		var ins: float = size.x * 0.25 if inscribed else block * 4.0
-		var cells: Array[Vector2] = []
-		_collect(Vector2(ins, ins), Vector2(size.x - ins, size.y - ins), block, cells)
-		_collect(Vector2(size.x - ins, ins), Vector2(ins, size.y - ins), block, cells)
-		# 两道斜杠先齐画衬底、再齐画红体 → 交叉处不露暗缝
-		for c in cells:
-			draw_rect(Rect2(c.x - 2.0, c.y - 2.0, block * 2.0 + 4.0, block * 2.0 + 4.0), X_DARK)
-		for c in cells:
-			draw_rect(Rect2(c.x, c.y, block * 2.0, block * 2.0), X_RED)
-
-	## 量化到格坐标逐格行走，收集每格 2×2 块簇的左上角。
-	func _collect(a: Vector2, b: Vector2, block: float, out: Array[Vector2]) -> void:
-		var ca := Vector2(roundf(a.x / block), roundf(a.y / block))
-		var cb := Vector2(roundf(b.x / block), roundf(b.y / block))
-		var steps := int(maxf(absf(cb.x - ca.x), absf(cb.y - ca.y)))
-		for i in steps + 1:
-			var t := float(i) / maxf(float(steps), 1.0)
-			out.append(Vector2(
-				roundf(lerpf(ca.x, cb.x, t)) * block - block * 0.5,
-				roundf(lerpf(ca.y, cb.y, t)) * block - block * 0.5))
 
 
 ## 选择弹跳动画：选中=带 overshoot 放大(像底部按钮 ButtonJuice)；取消=回弹归位。

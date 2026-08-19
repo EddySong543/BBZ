@@ -20,6 +20,8 @@ const TITLE_SHADER_PATH := (
 	"res://assets/shaders/canvas_boot_title_perspective.gdshader")
 const CHARACTER_DEPTH_SHADER_PATH := (
 	"res://assets/shaders/canvas_boot_character_depth.gdshader")
+const CHARACTER_OVERLAY_SHADER_PATH := (
+	"res://assets/shaders/canvas_boot_character_overlay.gdshader")
 const BLUE_LAYER_PATHS: Array[String] = [
 	"res://assets/ui/boot/boot_pressure_blue_base.png",
 	"res://assets/ui/boot/boot_pressure_blue_mid.png",
@@ -489,10 +491,10 @@ func test_boot_title_uses_white_gold_palette_on_black_stage() -> void:
 	var title_column := boot.get_node("TitleColumn")
 	assert_true(title_column.visible)
 	var contracts: Array[Array] = [
-		["BoTopShadow", "BoTop"],
-		["BoMiddleShadow", "BoMiddle"],
-		["ZanBottomShadow", "ZanBottom"],
-		["EnglishSubtitleShadow", "EnglishSubtitle"],
+		["BoTopShadow", "BoTop", false],
+		["BoMiddleShadow", "BoMiddle", false],
+		["ZanBottomShadow", "ZanBottom", false],
+		["EnglishSubtitleShadow", "EnglishSubtitle", true],
 	]
 	for contract: Array in contracts:
 		var shadow := title_column.get_node(contract[0]) as TextureRect
@@ -513,6 +515,9 @@ func test_boot_title_uses_white_gold_palette_on_black_stage() -> void:
 			0.0)
 
 		var face_material := face.material as ShaderMaterial
+		assert_eq(
+			bool(face_material.get_shader_parameter(&"flow_enabled")),
+			bool(contract[2]))
 		assert_true(
 			Color(face_material.get_shader_parameter(
 					&"structure_color")).is_equal_approx(
@@ -713,6 +718,164 @@ func test_boot_character_reuses_star_phase_for_warm_energy_light() -> void:
 	assert_gt(last_phase, first_phase)
 
 
+func test_boot_character_pointer_response_turns_character_around_chest() -> void:
+	var boot := await _instantiate_boot()
+	var character := boot.get_node("Character") as BootCharacterIdle
+	var base := character.get_node("Rig/Base") as Sprite2D
+	var base_material := base.material as ShaderMaterial
+	var star := character.get_node(
+		"Rig/RearHandEnergyAnchor/RearHandStar") as ColorRect
+	var glow := character.get_node(
+		"Rig/RearHandEnergyAnchor/RearHandGlow") as ColorRect
+	var star_material := star.material as ShaderMaterial
+	var glow_material := glow.material as ShaderMaterial
+	var animation_player := character.get_node(
+		"AnimationPlayer") as AnimationPlayer
+	var waist_animation_player := character.get_node(
+		"WaistAnimationPlayer") as AnimationPlayer
+	var idle := animation_player.get_animation(&"idle")
+	var waist_idle := waist_animation_player.get_animation(&"waist_idle")
+
+	assert_almost_eq(float(character.get("loop_duration")), 6.4, 0.001)
+	assert_almost_eq(
+		float(character.get("waist_loop_duration")),
+		9.0,
+		0.001)
+	assert_almost_eq(
+		float(character.get("pointer_dead_zone")),
+		0.08,
+		0.001)
+	assert_almost_eq(
+		float(character.get("pointer_energy_smooth")),
+		5.0,
+		0.001)
+	assert_almost_eq(
+		float(character.get("pointer_character_yaw_degrees")),
+		3.0,
+		0.001)
+	assert_almost_eq(
+		float(character.get("pointer_character_pitch_degrees")),
+		1.2,
+		0.001)
+	assert_almost_eq(
+		float(character.get("pointer_character_smooth")),
+		4.2,
+		0.001)
+	assert_not_null(base_material)
+	assert_not_null(star_material)
+	assert_not_null(glow_material)
+	character.call(&"preview_pointer_response", Vector2.ZERO)
+	assert_eq(
+		Vector2(star_material.get_shader_parameter(&"pointer_tilt")),
+		Vector2.ZERO)
+	assert_eq(
+		Vector2(glow_material.get_shader_parameter(&"pointer_tilt")),
+		Vector2.ZERO)
+	assert_eq(
+		Vector2(base_material.get_shader_parameter(&"pointer_tilt")),
+		Vector2.ZERO)
+	assert_true(Vector2(base_material.get_shader_parameter(
+		&"perspective_pivot")).is_equal_approx(Vector2(0.56, 0.50)))
+	assert_almost_eq(
+		float(base_material.get_shader_parameter(&"front_hand_depth_boost")),
+		1.25,
+		0.001)
+	assert_true(base_material.shader.code.contains("perspective_source_uv"))
+	assert_almost_eq(
+		float(base_material.get_shader_parameter(
+			&"energy_transfer_strength")),
+		0.045,
+		0.001)
+	assert_true(star_material.shader.code.contains(
+		"horizontal_pointer_length"))
+	assert_true(star_material.shader.code.contains("highlight_center"))
+	assert_true(star_material.shader.code.contains("ring_point"))
+	assert_almost_eq(
+		float(star_material.get_shader_parameter(
+			&"pointer_near_extension")),
+		0.25,
+		0.001)
+	assert_almost_eq(
+		float(star_material.get_shader_parameter(
+			&"pointer_far_reduction")),
+		0.15,
+		0.001)
+	assert_almost_eq(
+		float(star_material.get_shader_parameter(
+			&"pointer_rotation_degrees")),
+		6.0,
+		0.001)
+	assert_true(star.size.is_equal_approx(Vector2(75.35, 75.35)))
+	assert_true(_animation_has_track(
+		idle,
+		NodePath("Rig/FurRightTips:position")))
+	assert_almost_eq(idle.length, 6.4, 0.001)
+	assert_almost_eq(waist_idle.length, 9.0, 0.001)
+
+	character.call(&"preview_pointer_response", Vector2(1.0, -1.0))
+	var expected_response := Vector2(1.0, -1.0).normalized()
+	assert_true(
+		Vector2(character.call(&"current_pointer_response"))
+			.is_equal_approx(expected_response))
+	assert_true(
+		Vector2(star_material.get_shader_parameter(&"pointer_tilt"))
+			.is_equal_approx(expected_response))
+	assert_true(
+		Vector2(glow_material.get_shader_parameter(&"pointer_tilt"))
+			.is_equal_approx(expected_response))
+	assert_true(
+		Vector2(character.call(&"current_character_pointer_response"))
+			.is_equal_approx(expected_response))
+	assert_true(
+		Vector2(base_material.get_shader_parameter(&"pointer_tilt"))
+			.is_equal_approx(expected_response))
+	var hair_left := character.get_node("Rig/HairLeftTips") as Sprite2D
+	var fur_right := character.get_node("Rig/FurRightTips") as Sprite2D
+	var shadow := character.get_node("Rig/Base/Shadow") as Sprite2D
+	var hair_material := hair_left.material as ShaderMaterial
+	var shadow_material := shadow.material as ShaderMaterial
+	assert_not_null(hair_material)
+	assert_not_null(shadow_material)
+	assert_eq(
+		hair_material.shader.resource_path,
+		CHARACTER_OVERLAY_SHADER_PATH)
+	assert_true(
+		Vector2(hair_material.get_shader_parameter(&"pointer_tilt"))
+			.is_equal_approx(expected_response))
+	assert_true(
+		Vector2(shadow_material.get_shader_parameter(&"pointer_tilt"))
+			.is_equal_approx(expected_response))
+	assert_eq(hair_left.offset, Vector2.ZERO)
+	assert_eq(fur_right.offset, Vector2.ZERO)
+	assert_ne(
+		character.get_node("Rig/RearHandEnergyAnchor").position,
+		Vector2(112.68, 47.125))
+
+	character.call(&"preview_pointer_response", Vector2(0.04, 0.04))
+	assert_eq(
+		Vector2(character.call(&"current_pointer_response")),
+		Vector2.ZERO)
+	assert_eq(
+		Vector2(star_material.get_shader_parameter(&"pointer_tilt")),
+		Vector2.ZERO)
+	assert_eq(
+		Vector2(base_material.get_shader_parameter(&"pointer_tilt")),
+		Vector2.ZERO)
+	assert_eq(
+		character.get_node("Rig/RearHandEnergyAnchor").position,
+		Vector2(112.68, 47.125))
+	assert_eq(hair_left.offset, Vector2.ZERO)
+
+
+func _animation_has_track(animation: Animation, path: NodePath) -> bool:
+	if animation == null:
+		return false
+	for track_index: int in animation.get_track_count():
+		if animation.track_get_path(track_index) == path:
+			return true
+	return false
+
+
 func test_boot_enter_prompt_matches_click_anywhere_behavior() -> void:
 	var boot := await _instantiate_boot()
 	var prompt := boot.get_node("EnterPrompt") as Control
@@ -781,7 +944,7 @@ func test_boot_enter_prompt_peaks_after_title_flow_finishes() -> void:
 	assert_almost_eq(prompt.modulate.a, 1.0, 0.001)
 
 
-func test_boot_enter_prompt_click_feedback_brightens_and_tightens_once() -> void:
+func test_boot_enter_prompt_click_feedback_stays_crisp_without_scaling() -> void:
 	var boot := await _instantiate_boot()
 	var prompt := boot.get_node("EnterPrompt") as Control
 
@@ -789,9 +952,7 @@ func test_boot_enter_prompt_click_feedback_brightens_and_tightens_once() -> void
 	assert_true(bool(prompt.call(&"is_enter_feedback_active")))
 	assert_almost_eq(prompt.modulate.a, 1.0, 0.001)
 	await get_tree().create_timer(0.12).timeout
-	assert_true(
-		prompt.scale.is_equal_approx(
-			Vector2.ONE * float(prompt.get("enter_feedback_scale"))))
+	assert_eq(prompt.scale, Vector2.ONE)
 	assert_almost_eq(prompt.modulate.a, 1.0, 0.001)
 
 

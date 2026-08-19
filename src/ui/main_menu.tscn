@@ -1,8 +1,8 @@
 [gd_scene load_steps=5 format=3 uid="uid://c30gewh5owlck"]
 
 [ext_resource type="Script" uid="uid://hq4i5dkrj42d" path="res://src/ui/main_menu.gd" id="1_menu"]
-[ext_resource type="PackedScene" uid="uid://ddiu7ck5le8p3" path="res://src/ui/scenes/menu_background.tscn" id="2_bg"]
-[ext_resource type="Script" path="res://src/ui/components/mode_card.gd" id="3_modecard"]
+[ext_resource type="PackedScene" path="res://src/ui/components/main_menu_world.tscn" id="2_world"]
+[ext_resource type="Script" path="res://src/ui/components/main_menu_entry.gd" id="3_entry"]
 [ext_resource type="PackedScene" path="res://src/ui/components/item_avatar_frame.tscn" id="4_avatarframe"]
 
 [node name="MainMenu" type="Control"]
@@ -14,7 +14,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_menu")
 
-[node name="Background" parent="." instance=ExtResource("2_bg")]
+[node name="MenuWorld" parent="." instance=ExtResource("2_world")]
 layout_mode = 1
 mouse_filter = 2
 metadata/_edit_lock_ = true
@@ -91,45 +91,41 @@ mouse_filter = 2
 
 [node name="ModeStory" type="Button" parent="UI"]
 layout_mode = 0
-offset_left = 1230.0
-offset_top = 535.0
-offset_right = 1740.0
-offset_bottom = 875.0
-script = ExtResource("3_modecard")
-card_title = "故事模式"
-card_subtitle = "英雄列传"
-card_caption = "过去"
-art_kind = 2
-title_font_size = 22
-band_ratio = 0.26
+offset_left = 770.0
+offset_top = 184.0
+offset_right = 1150.0
+offset_bottom = 294.0
+script = ExtResource("3_entry")
+destination_id = "story"
+entry_title = "故事模式"
+entry_subtitle = "英雄列传"
+accent_color = Color(0.663, 0.576, 0.875, 1)
 
 [node name="ModeMatch" type="Button" parent="UI"]
 layout_mode = 0
-offset_left = 180.0
-offset_top = 165.0
-offset_right = 1160.0
-offset_bottom = 875.0
-script = ExtResource("3_modecard")
-card_title = "匹配对战"
-card_subtitle = "1v1 同时盲选对决"
-card_caption = "现在"
-use_crown = true
-art_kind = 1
-title_font_size = 52
+offset_left = 150.0
+offset_top = 350.0
+offset_right = 500.0
+offset_bottom = 470.0
+script = ExtResource("3_entry")
+destination_id = "match"
+entry_title = "匹配对战"
+entry_subtitle = "1v1 同时盲选对决"
+accent_color = Color(0.851, 0.384, 0.333, 1)
+prominent = true
 
 [node name="ModeTower" type="Button" parent="UI"]
 layout_mode = 0
-offset_left = 1230.0
-offset_top = 165.0
-offset_right = 1740.0
-offset_bottom = 505.0
-script = ExtResource("3_modecard")
-card_title = "远征"
-card_subtitle = "单人闯关挑战"
-card_caption = "未来"
-art_kind = 3
-title_font_size = 22
-band_ratio = 0.26
+offset_left = 1420.0
+offset_top = 340.0
+offset_right = 1800.0
+offset_bottom = 470.0
+script = ExtResource("3_entry")
+destination_id = "expedition"
+entry_title = "远征"
+entry_subtitle = "搜刮、战斗、撤离"
+accent_color = Color(0.89, 0.725, 0.306, 1)
+prominent = true
 
 [node name="NavHeroes" type="Button" parent="UI"]
 layout_mode = 0
@@ -158,8 +154,8 @@ text = "商店"
 [node name="ComingSoon" type="Label" parent="UI"]
 layout_mode = 0
 offset_left = 560.0
-offset_top = 110.0
+offset_top = 324.0
 offset_right = 1360.0
-offset_bottom = 170.0
+offset_bottom = 384.0
 horizontal_alignment = 1
 vertical_alignment = 1

@@ -1,21 +1,13 @@
 extends Control
 
-## 主菜单 = 三牌阵牌桌（第七轮设计·2026-06-11 Eddy 基本通过后实装）。
-## 背景 = 单色对波波流（继承 boot 胜方色·亮主调恒定，⛔降明度=脏）。
-## 中央 = 三张命运牌（ModeCard）：故事(过去) / 匹配对战(现在·稍大) / 爬塔(未来)。
-##   高亮(金框)+放大 = 悬停/焦点专属效果（ModeCard 内实现），不属于某张固定的牌。
-## 边缘件：顶左身份带(新版 item_frame 头像+名字+段位占位=资料入口) / 顶右设置(icon锚位) /
-##   底坞 英雄(图鉴·已实装)|道具(图鉴·已实装 2026-06-26)|商店(icon锚位+字·未来收集层入口；小队已删 2026-06-12)。
-## 现仅「匹配对战」接入实际流程（→ bp_screen → 战斗），其余占位（点击弹"敬请期待"）。
-## ⚠️ 历史否决（勿再走）：海面化 / 星空压暗 / 中央大物或留白 / 公告卡 / 今日一抽（第七轮裁掉）。
+## 主菜单 = 晴风驿站功能大厅。远征地表与英雄只承担世界呈现；所有入口仍可直接点击。
+## WASD 或左键点格可让角色在纯展示地图中逐格行走；入口按钮仍是主操作，不创建远征背包或结算状态。
 
 const BP_SCENE := "res://src/ui/bp_screen.tscn"
 const PROFILE_SCENE := "res://src/ui/profile_screen.tscn"
 const ProfileStore := preload("res://src/core/player_profile.gd")   # 个人资料存档（headless 安全走 preload）
 
-# ---- 匹配状态机（临战升温·2026-06-12 改版：翻面盖牌废弃——对波卡面是全场最活的
-# 东西，翻成静态王冠=出戏。匹配中改为卡面对波升温备战，取消把手独立成钮）----
-# IDLE 点牌=开始匹配；SEARCHING 再点牌/ESC/取消钮=取消；FOUND 锁输入等转场。
+# ---- 匹配状态机：IDLE 点入口=开始；SEARCHING 再点/ESC/取消钮=取消；FOUND 锁输入。----
 # 本地用 mock_match_seconds 定时模拟匹配成功；联机时把定时器换成真匹配回调，状态机原样复用。
 enum MatchState { IDLE, SEARCHING, FOUND }
 
@@ -43,7 +35,8 @@ const INK_SOFT := Color(0.42, 0.34, 0.24)   # 淡墨（次级字）
 const CREAM := Color(0.95, 0.91, 0.80)      # 暖米白（直接压在暗波上的字·非羊皮上）
 
 @onready var _coming_soon: Label = $UI/ComingSoon
-@onready var _match_card: ModeCard = $UI/ModeMatch
+@onready var _match_entry: MainMenuEntry = $UI/ModeMatch
+@onready var _menu_world: MainMenuWorld = $MenuWorld
 
 var _toast_tween: Tween
 
@@ -57,32 +50,21 @@ func _ready() -> void:
 	FontManager.apply(_coming_soon, 40)
 	_coming_soon.add_theme_color_override("font_color", CREAM)
 	_coming_soon.modulate.a = 0.0
-	# 远征卡山脊母题跟随背景对波色：蓝胜=冷夜版 / 红胜=暖日版。借背景同款广播组，
-	# 设置面板翻转「界面主色」时（call_group("wave_flow_bg", "refresh_colors")）一并刷新。
+	# 设置面板仍通过既有广播刷新主界面颜色，世界组件只重绘视觉层。
 	add_to_group("wave_flow_bg")
-	_refresh_tower_warm()
 	_play_intro()
 
 
-## 远征卡冷暖随 boot 胜方色：蓝胜→冷夜(warm 0)、红胜→暖日(warm 1)。
-func _refresh_tower_warm() -> void:
-	var tower := $UI/ModeTower as ModeCard
-	if tower != null:
-		tower.set_art_warm(0.0 if BootResult.effective_blue_wins() else 1.0)
-
-
-## 设置面板翻转界面主色时由 call_group("wave_flow_bg", "refresh_colors") 触发（与背景同步）。
+## 设置面板翻转界面主色时由既有广播触发。
 func refresh_colors() -> void:
-	_refresh_tower_warm()
+	_menu_world.refresh_colors()
 
 
 # ============================================================
 # 各区初始化
 # ============================================================
 
-## 暗角衬底（方案A·2026-06-26）：径向暗角压住四周平淡波流 + 给中央主战卡聚光衬底 → 制造纵深、
-## 让 UI/主 CTA 跳出（治"背景平"）。纯叠加层（scoped 本菜单·不碰共享波 shader、不影响 BP），
-## 一个 alpha 控浓度、随时可关。垫在 Background 之上、UI 之下。
+## 世界边缘暗角：只压边界，让入口牌与角色保持可读。
 func _build_vignette() -> void:
 	var vig := TextureRect.new()
 	vig.name = "Vignette"
@@ -106,7 +88,7 @@ func _build_vignette() -> void:
 	vig.stretch_mode = TextureRect.STRETCH_SCALE
 	vig.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(vig)
-	move_child(vig, 1)   # Background(0) < Vignette(1) < UI(2)
+	move_child(vig, 1)   # MenuWorld(0) < Vignette(1) < UI(2)
 
 
 ## 顶左身份带：新版 item_frame 头像+名字+段位占位，整体=资料入口。
@@ -210,23 +192,39 @@ func _open_settings() -> void:
 	add_child(panel)
 
 
-## 三牌阵：匹配对战接真实流程，远征接先行版，故事接选关壳（任务 B·2026-07-12）。悬停金框+放大在 ModeCard 内。
+## 三个世界入口：直接点击；悬停只联动地图目标与角色朝向。
 func _setup_modes() -> void:
-	($UI/ModeMatch as Button).pressed.connect(_on_match_pressed)
-	($UI/ModeStory as Button).pressed.connect(_on_story_pressed)
-	($UI/ModeTower as Button).pressed.connect(_on_expedition_pressed)   # 原爬塔·2026-07-06 接远征先行版
+	var entries: Array[MainMenuEntry] = [
+		$UI/ModeMatch as MainMenuEntry,
+		$UI/ModeStory as MainMenuEntry,
+		$UI/ModeTower as MainMenuEntry,
+	]
+	for entry: MainMenuEntry in entries:
+		entry.mouse_entered.connect(_menu_world.focus_destination.bind(entry.destination_id))
+		entry.mouse_exited.connect(_menu_world.focus_destination.bind(""))
+		entry.focus_entered.connect(_menu_world.focus_destination.bind(entry.destination_id))
+		entry.focus_exited.connect(_menu_world.focus_destination.bind(""))
+	($UI/ModeMatch as MainMenuEntry).pressed.connect(_on_match_pressed)
+	($UI/ModeStory as MainMenuEntry).pressed.connect(_on_story_pressed)
+	($UI/ModeTower as MainMenuEntry).pressed.connect(_on_expedition_pressed)
 	_build_cancel_button()
-	_build_net_button()   # M1：局域网对战入口（低调工具件·⚠视觉待 Eddy F6·正式位可能并入匹配牌）
+	_build_net_button()
+	_match_entry.grab_focus()
 
 
 ## 故事模式入口：选关壳（关卡/文本全占位·待小传定稿填内容）。匹配中不离队。
 func _on_story_pressed() -> void:
 	if _match_state != MatchState.IDLE:
 		return
+	_set_mode_entries_enabled(false)
+	($UI/ModeStory as MainMenuEntry).flash_confirm()
+	await _menu_world.play_confirmation("story")
+	if not is_instance_valid(self):
+		return
 	TransitionManager.transition_to("res://src/ui/story_screen.tscn")
 
 
-## M1：局域网对战入口（右下低调小钮·同战斗内设置钮一档的工具件视觉·不与三牌抢眼）。
+## M1：局域网对战入口（右下低调工具钮，不与三个世界入口抢层级）。
 func _build_net_button() -> void:
 	var b := Button.new()
 	b.name = "NetLobbyButton"
@@ -245,10 +243,15 @@ func _build_net_button() -> void:
 func _on_expedition_pressed() -> void:
 	if _match_state != MatchState.IDLE:
 		return
+	_set_mode_entries_enabled(false)
+	($UI/ModeTower as MainMenuEntry).flash_confirm()
+	await _menu_world.play_confirmation("expedition")
+	if not is_instance_valid(self):
+		return
 	TransitionManager.transition_to("res://src/expedition/expedition_screen.tscn")
 
 
-## 「✕ 取消匹配」独立小钮（匹配中才出现·中牌正下方居中）——取消把手必须可见可点，
+## 「✕ 取消匹配」独立小钮（匹配中才出现·匹配入口正下方居中）。
 ## 不再挤在副标小字里（2026-06-12 Eddy："取消匹配感觉不明显"根修）。
 func _build_cancel_button() -> void:
 	var card := $UI/ModeMatch as Control
@@ -351,43 +354,20 @@ func _on_items_pressed() -> void:
 # 入场 / 转场
 # ============================================================
 
-## 入场：boot 决堤由全局波幕接力揭幕（TransitionManager.reveal_into·胜方波亲手掀开菜单），
-## 本场只做"水面落定"：① 整屏缩放沉降 ② 波流从激荡平息 ③ 发牌——三张牌+边缘件错落浮入。
+## 入场：世界先落定，三个入口与边缘功能随后浮入。
 func _play_intro() -> void:
-	# ① 余势缩放沉降（整屏含波流背景一起落定）
+	# Boot 转场余势只作用于世界，不改变地图构图。
 	pivot_offset = size * 0.5
 	scale = Vector2(1.045, 1.045)
 	var tz := create_tween()
 	tz.tween_property(self, "scale", Vector2.ONE, 0.9).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-
-	# ② 波流平息：决堤的能量延续进菜单背景，流速/亮度缓落常态（只动运动不动颜色）
-	var wave := get_node_or_null("Background/WaveFlow")
-	if wave != null:
-		var calm_drift: float = wave.drift_speed
-		var calm_y: float = wave.y_drift_speed
-		wave.drift_speed = calm_drift * 8.0
-		wave.y_drift_speed = calm_y * 3.0
-		var ts := create_tween().set_parallel(true)
-		ts.tween_property(wave, "drift_speed", calm_drift, 1.4)\
-			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-		ts.tween_property(wave, "y_drift_speed", calm_y, 1.4)\
-			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-		var mat := wave.material as ShaderMaterial
-		if mat != null:
-			var calm_i: float = mat.get_shader_parameter("intensity")
-			var ti := create_tween()
-			ti.tween_method(
-				func(v: float) -> void: mat.set_shader_parameter("intensity", v),
-				calm_i * 1.3, calm_i, 1.2
-			).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-
 	_animate_in()
 
 
-## ③ 发牌入场：中牌先落、两翼跟进、边缘件最后浮入（只动运行时 modulate/position，不改落位）。
+## 入口入场：远征主入口先出现，其余入口与边缘件跟进。
 func _animate_in() -> void:
 	var order: Array = [
-		$UI/ModeMatch, $UI/ModeStory, $UI/ModeTower,
+		$UI/ModeTower, $UI/ModeMatch, $UI/ModeStory,
 		$UI/IdentityButton, $UI/QuitButton, $UI/SettingsButton,
 		$UI/NavHeroes, $UI/NavItems, $UI/NavShop,
 	]
@@ -412,14 +392,23 @@ func _animate_in() -> void:
 func _on_match_pressed() -> void:
 	match _match_state:
 		MatchState.IDLE:
-			_start_search()
+			_begin_match_entry()
 		MatchState.SEARCHING:
 			_cancel_search()   # 点卡仍可取消（取消钮是主把手，这是顺手路径）
 		MatchState.FOUND:
-			pass   # 成功一拍期间锁输入，等波幕转场接管
+			pass
 
 
-## ESC 取消匹配（与取消钮/再点牌等价）。
+func _begin_match_entry() -> void:
+	_set_mode_entries_enabled(false)
+	_match_entry.flash_confirm()
+	await _menu_world.play_confirmation("match")
+	if not is_instance_valid(self) or _match_state != MatchState.IDLE:
+		return
+	_start_search()
+
+
+## ESC 取消匹配（与取消钮/再点入口等价）。
 func _unhandled_input(event: InputEvent) -> void:
 	if _match_state == MatchState.SEARCHING and event.is_action_pressed("ui_cancel"):
 		_cancel_search()
@@ -434,20 +423,20 @@ func _start_search() -> void:
 	_search_elapsed = 0.0
 	_last_dots = -1
 	_last_secs = -1
+	_set_mode_entries_enabled(true)
 	_set_side_cards_enabled(false)
-	_match_card.set_battle_ready(true)
-	_match_card.card_title = "匹配中"
-	_match_card.card_subtitle = "0:00"
+	_match_entry.set_emphasized(true)
+	_match_entry.set_status("匹配中", "0:00")
 	_show_cancel_button(true)
 
 
 func _cancel_search() -> void:
 	_match_state = MatchState.IDLE
-	_match_card.set_battle_ready(false)
-	_match_card.card_title = MATCH_TITLE
-	_match_card.card_subtitle = MATCH_SUB
+	_match_entry.set_emphasized(false)
+	_match_entry.set_status(MATCH_TITLE, MATCH_SUB)
 	_show_cancel_button(false)
 	_set_side_cards_enabled(true)
+	_menu_world.reset_home()
 
 
 ## 匹配中每帧：标题省略号逐点（0.5s/点）+ 副标正计时每秒跳；到时触发成功。
@@ -458,30 +447,31 @@ func _process(delta: float) -> void:
 	var dots := int(_search_elapsed * 2.0) % 4
 	if dots != _last_dots:
 		_last_dots = dots
-		_match_card.card_title = tr("匹配中") + ".".repeat(dots)
+		_match_entry.set_status(tr("匹配中") + ".".repeat(dots),
+				_match_entry.get_node("Subtitle").text)
 	var secs := int(_search_elapsed)
 	if secs != _last_secs:
 		_last_secs = secs
-		_match_card.card_subtitle = "%d:%02d" % [floori(secs / 60.0), secs % 60]
+		_match_entry.set_status(tr("匹配中") + ".".repeat(_last_dots),
+				"%d:%02d" % [floori(secs / 60.0), secs % 60])
 	if _search_elapsed >= mock_match_seconds:
 		_on_match_found()
 
 
-## 成功一拍（~0.45s）：对波真撞一次（ModeCard.found_flash：撞闪+涟漪+波速尖峰）
-## + 屏幕轻震 → 波幕转场进 BP——卡里的战争打响，与进 BP 叙事连贯。
+## 匹配成功：地图入口闪亮、屏幕轻震后进入备战。
 func _on_match_found() -> void:
 	_match_state = MatchState.FOUND
-	_match_card.card_title = "敌方已找到！"
-	_match_card.card_subtitle = ""
+	_match_entry.set_status("敌方已找到！", "")
 	_show_cancel_button(false)
-	_match_card.found_flash()
+	_match_entry.flash_confirm()
+	_menu_world.flash_destination("match")
 	_shake_screen()
 	await get_tree().create_timer(0.45).timeout
 	# 波幕转场（BP 重做 2A）：胜方色波卷入 → 切 BP → 波退去揭幕
 	TransitionManager.transition_to(BP_SCENE)
 
 
-## 匹配中两翼牌压暗禁点（防误触离队）；坞条/设置保持可用（占位 toast 无副作用）。
+## 匹配中另外两个入口压暗禁点；底栏与设置保持可用。
 func _set_side_cards_enabled(on: bool) -> void:
 	for n in [$UI/ModeStory, $UI/ModeTower]:
 		var card := n as Button
@@ -490,6 +480,15 @@ func _set_side_cards_enabled(on: bool) -> void:
 		tw.tween_property(card, "modulate",
 			Color.WHITE if on else Color(0.55, 0.55, 0.55), 0.25)\
 			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+
+func _set_mode_entries_enabled(on: bool) -> void:
+	for entry: MainMenuEntry in [
+		$UI/ModeMatch as MainMenuEntry,
+		$UI/ModeStory as MainMenuEntry,
+		$UI/ModeTower as MainMenuEntry,
+	]:
+		entry.disabled = not on
 
 
 ## 匹配成功轻震屏：±6px 衰减抖 5 下回位（菜单唯一震屏点，幅度克制）。
@@ -572,7 +571,7 @@ func _add_icon(host: Control, r: Rect2, icon_name: String) -> void:
 
 
 ## 给按钮挂 ButtonJuice（hover 缩放 / 按下反馈）→ 手感与战斗/选人界面统一。
-## 注：三张牌(ModeCard)自带悬停金框+放大，不挂 ButtonJuice 防双重缩放。
+## 世界入口拥有自己的焦点反馈，不再额外挂 ButtonJuice。
 func _attach_juice(btn: Button) -> void:
 	var bj := ButtonJuice.new()
 	bj.name = "ButtonJuice"

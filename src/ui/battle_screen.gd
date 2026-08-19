@@ -9,6 +9,14 @@ extends Control
 
 const A := ActionDef.Action
 const ACTIVE := ActionDef.ACTIVE
+const FURNACE_ITEM_ID := "t1_ronglu"
+const POINTSTONE_ITEM_ID := "t2_dianjinshi"
+const ENERGY_COST_SHEET := preload("res://assets/ui/icons/energy_idle.png")
+const HEART_COST_SHEET := preload("res://assets/ui/icons/heart_idle.png")
+const LONGYUJI_SKILL_ICON := preload("res://assets/sprites/heroes/h05/h05_skill.png")
+const ANCHAO_SKILL_ICON := preload("res://assets/sprites/heroes/h13/h13_skill.png")
+const H24_SKILL_ICON := preload("res://assets/sprites/heroes/h24/h24_skill.png")
+const HERO_FRAME_SCENE := preload("res://src/ui/components/hero_frame.tscn")
 
 # 动作按钮"能量消耗"金币（1 能量 1 球）= battle_screen_base.tscn 内每个按钮下的 CostPips 节点，
 # 位置/大小/间距在 Godot 编辑器里可视化调整（可视化设计·任务2）；代码只在运行时填入数量。
@@ -140,6 +148,7 @@ const COUNTDOWN_ALERT_OUTLINE_COLOR := Color(0.07, 0.04, 0.02, 0.86)
 @export_range(0.0, 6.0, 0.5) var countdown_ornament_underlay_width: float = 3.0
 
 enum State { TURN_INTRO, PLAYER_SELECT, RESOLVING, HERO_SELECT, GAME_OVER }
+enum ItemSlotTargetMode { NONE, CONSUMES, TRANSFORMS }
 
 var battle: BattleCore
 var state: int = State.TURN_INTRO
@@ -179,17 +188,23 @@ var _central_turn_cue
 var p1_frame_slots: Array[int] = [-1, -1, -1]
 var p2_frame_slots: Array[int] = [-1, -1, -1]
 
-# ---- 技能展示格：顺序浏览 [己方0,1,2 → 对方0,1,2]，点击翻页（2026-07-14 Eddy 定回归左下）----
-const SkillInfoBtns := preload("res://src/ui/components/skill_info_buttons.gd")
-var _skill_info: SkillInfoBtns = null   # 技能情报双钮（2026-07-17 取代 SkillCard 大卡）
-var btn_codex: Button = null          # 「图鉴」钮（2026-07-14 移到右侧结束旁·程序化创建=同疾风）
+var btn_codex: Button = null          # 右下「图鉴」入口（程序化创建）
+var btn_switch: Button = null         # 左下切换入口；候选头像从它向右展开
+var _switch_tray: Control = null
+var _switch_candidate_frames: Array[HeroFrame] = []
+var _switch_tray_open := false
+var _switch_tray_tween: Tween = null
+const SWITCH_MAIN_POS := Vector2(30.0, 46.0)
+const SWITCH_MAIN_SIZE := Vector2(108.0, 108.0)
+const SWITCH_FRAME_SIZE := 76.0
+const SWITCH_FRAME_STEP := 94.0
 var _special_icon: TextureRect = null # 技能钮内的英雄专属技能图标（2026-07-17 Eddy 点单·懒创建）
 var _codex_overlay: Control = null    # 战斗内图鉴浮层（懒创建·关闭仅隐藏）
 
 @onready var buttons_ctrl: Control = $Buttons
 @onready var _death_switch_overlay: DeathSwitchOverlay = $DeathSwitchOverlay
 @onready var game_timer: Timer = $GameTimer
-@onready var stage: BattleStage = $StageSlot/Stage   # 入口场景静态挂载；编辑器预览与运行时一致
+@onready var stage: BattleStage = get_node_or_null("StageSlot/Stage") as BattleStage
 # 终结演出背景虚化幕（Stage 之后·WorldGroup 之前 → 只糊背景不糊双雄）。平时 veil 隐藏 +
 # grab DISABLED = 零成本；仅 _play_finisher 期间开启。
 @onready var finisher_grab: BackBufferCopy = $FinisherGrab
@@ -209,15 +224,34 @@ var _codex_overlay: Control = null    # 战斗内图鉴浮层（懒创建·关�
 @onready var p2_heart_row: HpSlantBarScript = $P2Hud/P2HeartRow
 @onready var p1_coin_row: IconPipRow = $P1Hud/P1CoinRow
 @onready var p2_coin_row: IconPipRow = $P2Hud/P2CoinRow
+@onready var p1_energy_cap_label: Label = $P1Hud/P1EnergyCapLabel
+@onready var p2_energy_cap_label: Label = $P2Hud/P2EnergyCapLabel
 
 # 道具栏（M2·占位）：程序化挂在各 HUD 下。P1=贴左(对齐左侧框组·28px 内边距)；
 # P2=镜像右贴(右内边距=P1 左内边距)，由 _build_item_rows 随槽宽自动算，修「敌方框偏左」错位。
 const ITEM_ROW_POS_P1 := Vector2(28.0, 150.0)   # 2026-06-28 Eddy：道具栏上移一些(168→150)
-const ITEM_ROW_SCALE := 0.85   # 战斗 UI 集体缩小批（2026-07-17）：道具行整体缩放（容器件档·组件内部零改动）
+const ITEM_ROW_SCALE := 0.92   # 小于 76px 替补头像一个层级，仍比旧 0.85 档清楚。
 var p1_item_row: ItemSlotRow
 var p2_item_row: ItemSlotRow
 ## M3：本回合已点选「使用」的道具槽（仅 P1）；确认时统一 use_slot 提交，进新回合清空。
 var selected_item_slots: Array[int] = []
+## 需要另选槽位的道具参数：使用槽 -> 目标道具槽。熔炉消耗目标，点金石变换目标。
+var selected_item_targets: Dictionary = {}
+## 需要明确选择己方英雄的道具参数：使用槽 -> 己方英雄槽（移甲环、护阵钉）。
+var selected_item_hero_targets: Dictionary = {}
+## 点金石 3 选 1 的候选下标：使用槽 -> 0..2。其余道具缺省为 -1。
+var selected_item_choices: Dictionary = {}
+## 联机端仅在本人内存保留点金石私有候选 id，便于显示与取消后复核，不写入公共视图。
+var selected_item_choice_options: Dictionary = {}
+## 首次点需要槽目标的道具后暂存；只有再点合法目标完成配对，来源才进入 selected_item_slots。
+var _pending_item_target_slot: int = -1
+## 正在等待玩家点击己方头像的道具来源槽。
+var _pending_item_hero_target_slot: int = -1
+## 正在等待玩家点击敌方锁定道具槽的来源槽（时滞枷锁）。
+var _pending_enemy_item_target_slot: int = -1
+var _item_target_prompt_frames: Array[int] = []
+## 联机请求点金石候选后等待权威私发的 {source,target}；期间不允许再次改动该配对。
+var _pending_pointstone_offer: Dictionary = {}
 var _drafting := false   # draft 弹窗打开中：拦截重入 + 暂停回合计时
 var _ai_rng := RandomNumberGenerator.new()   # 任务 B：AI 道具抽取选择用（与游戏 rng 分离）
 
@@ -235,11 +269,11 @@ var _think_restart: bool = false        # 任务跑着时状态又变了 → 完
 var _ai: BattleAI                             # 试玩对手 = 与 sim 统一的同一套搜索 AI（_ready 实例化）
 var _overtime := false                        # 本局是否加时赛（Q5·白板 1v1·_ready 从 BattleSetup 读）
 
-# ── 远征 PvE（任务 D·2026-07-06）：对手=怪物驾驶员（明牌概率表）·可脱离·无 PvP 道具经济 ──
-const BattlePveScript := preload("res://src/ui/components/battle_pve.gd")   # PvE 驱动器（拆分批②·仅 PvE 局创建）
+# ── 远征 PvE：公共战斗核心 + 跨战生命/回程适配 ──
+const BattlePveScript := preload("res://src/ui/components/battle_pve.gd")   # PvE 跨战状态/回程适配层（仅 PvE 局创建）
 const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")   # 导航钮贴图（米金纸面+角折·与主菜单同源）
 var _pve := false                             # 本局=远征 PvE（BattleSetup.pve_mode·须在 reset() 前读）
-var _pved: Node = null                        # PvE 驱动器组件（驾驶员/明牌/脱离/回程全在内·仅 PvE 局创建）
+var _pved: Node = null                        # PvE 只保留真 HeroData、跨战 HP 与回程结果适配
 var _story := false                           # 本局=故事关卡（BattleSetup.story_mode·须在 reset() 前读）
 var _story_level_id := ""                     # 关卡 id（回程写 story_result 定位）
 var _story_ending := false                    # 防重复回程结算
@@ -253,12 +287,25 @@ const MatchClientScript := preload("res://src/net/match_client.gd")   # 视角�
 # ---- 选择 / 样式 ----
 var action_btn_list: Array[Button] = []
 var selected_action: int = -1
+var selected_second_action: int = -1
+var _second_enemy_target_pick: int = -1
+var _second_action_btn: Button = null
 var selected_switch: int = -1
 var selected_btn: Button = null
 
-# ---- 黑暗卯兔 h16【疾风】：附加同种动作开关（程序化创建·不入 .tscn）----
-var btn_jifeng: Button = null
-var _double_armed: bool = false   # 本回合是否 armed「附加同种动作」（确认时随动作一起 select_double 提交）
+# ---- 攻击变体（程序化创建·不入 .tscn）----
+var longyuji_picker: Control = null
+var btn_longyuji_branch: Button = null
+var split_big_wave_picker: Control = null
+var btn_split_big_wave: Button = null
+var h24_discount_picker: Control = null
+var btn_h24_discount: Button = null
+var _empowered_wave_armed: bool = false   # 本回合是否为已选「波」追加龙御极的 1 能 / 1 伤
+var _split_big_wave_armed: bool = false   # 本回合是否把玄冥的「大波」改为连续两次「波」
+var _blood_payment_armed: bool = false    # 本回合是否由出战蚩尤以等量生命支付行动费用
+var _energy_cap_discount_armed: bool = false # 本回合是否降低 1 点能量上限，换取行动费用 -1
+var _free_switch_sequence: Array[int] = [] # 联机提交时重放本回合千里自在风的逻辑预览序列
+var _blood_payment_activation_step: int = -1 # 在第几次免费切换前由蚩尤发动（-1=未发动）
 
 # ---- 主动换人（任务5）：点替补框→框内显「切换」(armed)→再次点=选择(动画)→「结束」提交 ----
 var _armed_switch_frame: int = -1   # 当前 armed 的替补框索引（1 / 2），-1=无
@@ -295,6 +342,8 @@ var _time_scale_base: float = 1.0   # hitstop 恢复的目标速度（终结演�
 var _fin_impact_tweens: Array[Tween] = []   # 终结命中的 punch/下沉 tween（慢放中跑不完·归位前必须 kill 防写回放大值）
 var _act_focus_active: bool = false   # 执行动作期间镜头是否在偏焦（保留位·当前由 set_focus 直接驱动）
 var _world: Control = null    # P2b：立绘+阴影的 dolly 组（运行期归组·与背景同对焦点统一推近）
+var _world_foreground_occluder: Control = null
+var _world_foreground_source: Control = null
 var _character_reflection_receiver: Control = null
 var _character_reflection_material: ShaderMaterial = null
 
@@ -306,10 +355,10 @@ var _fx: Node = null   # BattleFx 实例（演出原语库·池在组件内）
 
 # A3b 事件注解飘字配色（伤害数字解释不了的时刻·沿用战斗已有色族不添新色相）
 const COL_TAG_POISON := Color(0.55, 0.88, 0.35)   # 毒爆=酸绿（比治疗绿偏黄·毒感）
-const COL_TAG_AMP := Color(1.0, 0.72, 0.35)       # 印记/易伤=暖橙（"这下更疼"的加伤注解）
+const COL_TAG_AMP := Color(1.0, 0.72, 0.35)       # 印记/脆弱=暖橙（"这下更疼"的加伤注解）
 const COL_TAG_ABSORB := Color(0.62, 0.78, 1.0)    # 护盾/替身=钢蓝（与格挡火花同族·"被垫掉"）
-const COL_TAG_SAVE := Color(1.0, 0.86, 0.42)      # 护主/还魂/免疫=救场金（最该被看见的时刻）
-const COL_TAG_BREAK := Color(1.0, 0.45, 0.35)     # 破甲/反击=赤红（坏消息）
+const COL_TAG_SAVE := Color(1.0, 0.86, 0.42)      # 还魂/免疫=救场金（最该被看见的时刻）
+const COL_TAG_BREAK := Color(1.0, 0.45, 0.35)     # 破甲/能量上限受损=赤红（坏消息）
 const COL_DMG_BURN := Color(1.0, 0.58, 0.22)      # 延迟伤害到期（妖火/藤蔓）=余烬橙（动作前结算的旧账）
 
 
@@ -318,6 +367,7 @@ const COL_DMG_BURN := Color(1.0, 0.58, 0.22)      # 延迟伤害到期（妖火/
 # ============================================================
 
 func _ready() -> void:
+	_ensure_stage_for_standalone_base()
 	_ai_rng.randomize()   # 任务 B：AI 道具抽取随机种子
 	_ai = BattleAI.new(0, 2, 0, {})   # 与 sim 统一：同一套搜索 AI（随机种子·深度 2·基础评估）
 	_think_ai = BattleAI.new(0, 2, 0, {})   # 任务G：异步预想副本（配置同 _ai·rng 每次快照覆盖）
@@ -327,10 +377,9 @@ func _ready() -> void:
 	_story = BattleSetup.story_mode    # 故事关卡（任务 B 壳）·同样须在 reset() 前读取
 	_story_level_id = BattleSetup.story_level_id
 	_net = BattleSetup.net_session != null   # 联机局（M1）·net_session 不被 reset() 清（生命周期独立）
-	var pve_monster: Dictionary = BattleSetup.pve_monster
-	var pve_monster_hp: int = BattleSetup.pve_monster_hp
-	var pve_team: Array = BattleSetup.pve_team.duplicate(true)
-	var pve_equipment: Array = BattleSetup.pve_equipment.duplicate()
+	var pve_player_hp: Array = BattleSetup.pve_player_hp.duplicate()
+	var pve_opponent_hp: Array = BattleSetup.pve_opponent_hp.duplicate()
+	var pve_seed: int = BattleSetup.pve_seed
 	var p0: Array
 	var p1: Array
 	if _net:
@@ -342,34 +391,28 @@ func _ready() -> void:
 		_net_sync_latest()
 		_net_last_turn = battle.turn_number
 	elif _pve:
-		# 远征队伍（1-3 人·存活者在前）与单怪都补足 3 槽白板（板凳 0 血·同加时赛零特判）
+		# 远征只适配跨战状态；双方仍使用完整 HeroData 与当前公共战斗核心。
 		_pved = BattlePveScript.new()
 		_pved.name = "BattlePve"
 		add_child(_pved)
 		_pved.setup(self)
-		p0 = _pved.build_team(pve_team)
-		p1 = _pved.build_monster(pve_monster, pve_monster_hp)
+		p0 = _pved.build_team(BattleSetup.p1_heroes)
+		p1 = _pved.build_team(BattleSetup.p2_heroes)
 	else:
 		p0 = _resolve_team(BattleSetup.p1_heroes, DEFAULT_P0)
 		p1 = _resolve_team(BattleSetup.p2_heroes, DEFAULT_P1)
 	if not _net:
 		BattleSetup.reset()   # 消费即清空：防止下一局（未经 BP）复用本局阵容
-		battle.setup(p0, p1, randi())
+		battle.setup(p0, p1, pve_seed if _pve and pve_seed != 0 else randi())
 	if _overtime:
 		# 加时赛（Q5·2026-07-03；2026-07-05 修订）：白板满血 1v1——slot0 出战、其余队友 0 血躺板凳
 		# （同归余烬·引擎/UI 全程正常 3 人局零特判）；无道具经济（不 econ_init）、被动能量照常、
 		# 上限 30 回合：打满 → 引擎骤死裁决（双方同时扣血·UI 走正常掉血/死亡演出零特判）。
 		battle.apply_overtime_bench()
 	elif _pve:
-		# 远征 PvE：HP 带入（跨战不回满·GDD）·能量每战重置（=setup 默认）·装备直入槽·
-		# 无 PvP 道具经济（不 econ_init·pve_equip_init 用 EMPTY 槽防 draft）·怪物无替补。
-		# UI 只读铁律：HP 带入走引擎入口 pve_apply_hp（不直写 battle.hp）。
-		var team_hp_in: Array = []
-		for m in pve_team:
-			team_hp_in.append(int(m["hp"]))
-		battle.pve_apply_hp(team_hp_in, pve_monster_hp)
-		battle.pve_equip_init(pve_equipment)
-		_pved.activate(pve_monster)   # 驾驶员+明牌/脱离 UI+怪物立绘（任务 I art 字段挂点在组件内）
+		# 跨战 HP 是唯一的局内初始状态差异；道具经济与本地 PvP 使用同一入口。
+		_pved.apply_initial_hp(pve_player_hp, pve_opponent_hp)
+		battle.econ_init()
 	elif not _net:
 		battle.econ_init()   # 启用道具经济（开局带 1 + 槽位状态机·M1）——联机局经济在服务器快照里
 
@@ -395,28 +438,21 @@ func _ready() -> void:
 
 	_nudge_top_ui_down()
 	_build_debug_buttons()
-	_build_settings_button()   # 战斗内设置入口（右上角小钮 + ESC·2026-07-09）
 	_fx = BattleFxScript.new()   # 演出原语库（拆分批①·池在组件内预分配）
 	_fx.name = "BattleFx"
 	add_child(_fx)
 	_fx.setup(self)
 
-	# 技能情报双钮（2026-07-17 Eddy 方案A·取代 SkillCard 大卡）：左=己方/右=敌方·
-	# 悬停出介绍（复用 _tip_panel 家族）·左键下一个/右键上一个·默认跟随出战英雄。
-	_skill_info = SkillInfoBtns.new()
-	_skill_info.position = Vector2(30.0, 916.0)   # 旧技能卡位·108 档底缘对齐 1024 一线
-	add_child(_skill_info)
-	_skill_info.tip_requested.connect(_on_skill_info_tip)
-	_skill_info.tip_dismissed.connect(_hide_tip)
-	_skill_info.refresh(battle)
-
 	# 低血红闪（任务5）：出战血条剩余爱心在 HP 占比低时红色呼吸（IconPipRow 内部实现）。
 	for row in [p1_heart_row, p2_heart_row]:
 		row.low_hp_flash = true
 		row.low_hp_ratio = LOW_HP_RATIO
+	for cap_label in [p1_energy_cap_label, p2_energy_cap_label]:
+		FontManager.apply(cap_label, 16)
 
 	_build_item_rows()
 	_build_hover_tips()        # 悬停提示（底部按钮+我方道具槽·2026-07-11）
+	_connect_hero_skill_tips()
 	if _overtime:
 		p1_item_row.visible = false   # 加时禁道具 → 道具栏整行隐藏
 		p2_item_row.visible = false
@@ -427,6 +463,23 @@ func _ready() -> void:
 	_show_turn_intro()
 	if _overtime:
 		_play_eclipse_intro()   # 「烛阴之眼」开场演出（非阻塞·与选招并行）
+
+
+## battle_screen_base.tscn 是各场景共用的 UI 母版，本身不挂具体背景舞台。
+## 直接 F6 母版时补一个透明空舞台；正式 Scene1–7 的既有 Stage 不受影响。
+func _ensure_stage_for_standalone_base() -> void:
+	if stage != null:
+		return
+	var stage_slot := get_node_or_null("StageSlot") as Control
+	if stage_slot == null:
+		push_error("BattleScreen: missing StageSlot")
+		return
+	stage = BattleStage.new()
+	stage.name = "Stage"
+	stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stage.demo_click_shake = false
+	stage_slot.add_child(stage)
+	stage.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 
 ## 离场恢复 time_scale=1：hitstop(c) 用全局 Engine.time_scale，若在定格瞬间切场景须复位，防下个场景慢动作。
@@ -505,38 +558,51 @@ func _init_buttons() -> void:
 
 	action_btn_list = [btn_charge, btn_attack, btn_big_attack, btn_defend, btn_big_defend, btn_special]
 
-	# 疾风开关：程序化创建（不动 .tscn）。节奏=紫底圆角；位置/尺寸运行期跟「结束」键上方（_refresh_jifeng）。
-	btn_jifeng = Button.new()
-	btn_jifeng.name = "BtnJifeng"
-	btn_jifeng.text = tr("疾风")
-	btn_jifeng.focus_mode = Control.FOCUS_NONE
-	btn_jifeng.clip_text = true
-	btn_jifeng.size = Vector2(120.0, 56.0)
-	var _jsb := StyleBoxFlat.new()
-	_jsb.bg_color = Color(0.45, 0.38, 0.62)        # 节奏=紫（与技能同维度色系）
-	_jsb.set_corner_radius_all(10)
-	_jsb.set_border_width_all(2)
-	_jsb.border_color = Color(0.85, 0.78, 0.5)     # 暖金边
-	for st in ["normal", "hover", "pressed", "disabled"]:
-		btn_jifeng.add_theme_stylebox_override(st, _jsb)
-	FontManager.apply_btn(btn_jifeng, 22)
-	btn_jifeng.add_theme_color_override("font_color", Color(0.98, 0.96, 0.9))
-	btn_jifeng.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.03, 0.85))
-	btn_jifeng.add_theme_constant_override("outline_size", 4)
-	_attach_button_juice(btn_jifeng)
-	btn_jifeng.pressed.connect(_on_jifeng_pressed)
-	btn_jifeng.visible = false
-	buttons_ctrl.add_child(btn_jifeng)
+	# 龙御极：底部「波」就是普通分支；选择后只在正上方追加一个技能 icon 分支。
+	# 两个按钮各自显示 1 能角标，直观表达基础 1 能 + 强化额外 1 能。
+	longyuji_picker = Control.new()
+	longyuji_picker.name = "LongyujiPicker"
+	longyuji_picker.mouse_filter = Control.MOUSE_FILTER_PASS
+	longyuji_picker.size = btn_attack.size
+	longyuji_picker.visible = false
+	buttons_ctrl.add_child(longyuji_picker)
+	btn_longyuji_branch = _make_longyuji_branch_button()
+	btn_longyuji_branch.position = Vector2.ZERO
+	btn_longyuji_branch.pressed.connect(_on_longyuji_branch_pressed)
+	longyuji_picker.add_child(btn_longyuji_branch)
 
-	# 图鉴入口（2026-07-14 Eddy：技能卡回归左下 → 图鉴钮移到「结束」左侧成组
-	# （结束=(1762,26) 128×128 → 图鉴=(1610,26) 同尺寸·间距 24·与技能钮隔 76 分组））。
-	# 导航钮贴图+墨字（主菜单导航钮同语言·避开动作按钮语义色）；程序化创建不动 .tscn（同疾风）。
+	# 并封：选择正费用行动后，在该动作正上方提供技能 icon 分支；与龙御极并存时向上叠一层。
+	h24_discount_picker = Control.new()
+	h24_discount_picker.name = "H24DiscountPicker"
+	h24_discount_picker.mouse_filter = Control.MOUSE_FILTER_PASS
+	h24_discount_picker.size = btn_attack.size
+	h24_discount_picker.visible = false
+	buttons_ctrl.add_child(h24_discount_picker)
+	btn_h24_discount = _make_h24_discount_button()
+	btn_h24_discount.position = Vector2.ZERO
+	btn_h24_discount.pressed.connect(_on_h24_discount_pressed)
+	h24_discount_picker.add_child(btn_h24_discount)
+
+	# 暗潮：底部「大波」保持原动作；选择后只在正上方追加技能 icon 分支。
+	split_big_wave_picker = Control.new()
+	split_big_wave_picker.name = "SplitBigWavePicker"
+	split_big_wave_picker.mouse_filter = Control.MOUSE_FILTER_PASS
+	split_big_wave_picker.size = btn_big_attack.size
+	split_big_wave_picker.visible = false
+	buttons_ctrl.add_child(split_big_wave_picker)
+	btn_split_big_wave = _make_split_big_wave_branch_button()
+	btn_split_big_wave.position = Vector2.ZERO
+	btn_split_big_wave.pressed.connect(_on_split_big_wave_pressed)
+	split_big_wave_picker.add_child(btn_split_big_wave)
+
+	# 图鉴是非回合操作，与结束按钮组成右下工具组；左下留给向右展开的切换模块。
 	btn_codex = Button.new()
 	btn_codex.name = "BtnCodex"
 	btn_codex.text = ""   # 「图鉴」二字 → 书本图标（2026-07-18 Eddy·图标见下方 BookIcon）
 	btn_codex.focus_mode = Control.FOCUS_NONE
 	btn_codex.clip_text = true
-	btn_codex.position = Vector2(1626.0, 46.0)   # 集体缩小批（2026-07-17）：108 与结束钮同档·底缘对齐 154·与结束间隔 38=动作排同律
+	# 108px 图鉴钮紧邻 108px 结束钮左侧，保留 12px 组内间距并共用底部基线。
+	btn_codex.position = Vector2(1652.0, 46.0)
 	btn_codex.size = Vector2(108.0, 108.0)
 	for st in ["normal", "hover", "pressed", "disabled", "focus"]:
 		btn_codex.add_theme_stylebox_override(st, StyleBoxEmpty.new())
@@ -581,10 +647,12 @@ func _init_buttons() -> void:
 	_attach_button_juice(btn_codex)
 	btn_codex.pressed.connect(_on_codex_pressed)
 	buttons_ctrl.add_child(btn_codex)
+	_build_switch_module()
 
 	# 顶部倒计时/回合开始已有右下定向阴影；底部按钮同步这套层级语言。
 	# 阴影是按钮子节点，会跟随现有 hover/selected 缩放，但不改变点击矩形。
-	for button: Button in action_btn_list + [btn_confirm, btn_codex, btn_jifeng]:
+	for button: Button in action_btn_list + [
+			btn_confirm, btn_codex, btn_switch, btn_longyuji_branch, btn_split_big_wave, btn_h24_discount]:
 		_attach_button_bottom_shadow(button)
 
 	# 镜头偏焦改由「执行动作」触发（见 _play_battle_anims）：波/大波→右聚敌、防/大防→左聚己、其余回正。
@@ -635,6 +703,134 @@ func _init_buttons() -> void:
 	# 代码只负责把角色名文本随出战英雄更新（见 _update_hero_frames）。
 
 
+func _make_longyuji_branch_button() -> Button:
+	var choice := Button.new()
+	choice.name = "BtnLongyujiBranch"
+	choice.focus_mode = Control.FOCUS_NONE
+	choice.size = btn_attack.size
+	for state_name in ["normal", "hover", "pressed", "disabled", "focus"]:
+		choice.add_theme_stylebox_override(state_name, StyleBoxEmpty.new())
+
+	var source_bg := btn_attack.get_node_or_null("Bg") as ColorRect
+	if source_bg != null and source_bg.material is ShaderMaterial:
+		var bg := ColorRect.new()
+		bg.name = "Bg"
+		bg.show_behind_parent = true
+		bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		var material := (source_bg.material as ShaderMaterial).duplicate() as ShaderMaterial
+		material.set_shader_parameter("aspect", choice.size.x / choice.size.y)
+		bg.material = material
+		choice.add_child(bg)
+		choice.move_child(bg, 0)
+
+	# 技能 icon 保持原生 64×64 像素，不做非整数缩放。
+	var icon := TextureRect.new()
+	icon.name = "SkillIcon"
+	icon.texture = LONGYUJI_SKILL_ICON
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.position = (choice.size - Vector2(64.0, 64.0)) * 0.5
+	icon.size = Vector2(64.0, 64.0)
+	choice.add_child(icon)
+
+	# 与底部动作按钮同款左上角费用徽记；此处只表示龙御极额外支付的 1 能。
+	var cost_badge := IconBadge.new()
+	cost_badge.name = "CostPips"
+	cost_badge.position = Vector2(-22.0, -24.0)
+	cost_badge.size = Vector2(70.0, 70.0)
+	cost_badge.set_icon(ENERGY_COST_SHEET, 4, 4, 0)
+	cost_badge.set_number(1)
+	cost_badge.font_size = 16
+	cost_badge.embolden = 0.7
+	choice.add_child(cost_badge)
+	_attach_button_juice(choice)
+	return choice
+
+
+func _make_split_big_wave_branch_button() -> Button:
+	var choice := Button.new()
+	choice.name = "BtnSplitBigWave"
+	choice.focus_mode = Control.FOCUS_NONE
+	choice.size = btn_big_attack.size
+	for state_name in ["normal", "hover", "pressed", "disabled", "focus"]:
+		choice.add_theme_stylebox_override(state_name, StyleBoxEmpty.new())
+
+	var source_bg := btn_big_attack.get_node_or_null("Bg") as ColorRect
+	if source_bg != null and source_bg.material is ShaderMaterial:
+		var bg := ColorRect.new()
+		bg.name = "Bg"
+		bg.show_behind_parent = true
+		bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		var material := (source_bg.material as ShaderMaterial).duplicate() as ShaderMaterial
+		material.set_shader_parameter("aspect", choice.size.x / choice.size.y)
+		bg.material = material
+		choice.add_child(bg)
+		choice.move_child(bg, 0)
+
+	var icon := TextureRect.new()
+	icon.name = "SkillIcon"
+	icon.texture = ANCHAO_SKILL_ICON
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.position = (choice.size - Vector2(64.0, 64.0)) * 0.5
+	icon.size = Vector2(64.0, 64.0)
+	choice.add_child(icon)
+	_attach_button_juice(choice)
+	return choice
+
+
+func _make_h24_discount_button() -> Button:
+	var choice := Button.new()
+	choice.name = "BtnH24Discount"
+	choice.focus_mode = Control.FOCUS_NONE
+	choice.size = btn_attack.size
+	for state_name in ["normal", "hover", "pressed", "disabled", "focus"]:
+		choice.add_theme_stylebox_override(state_name, StyleBoxEmpty.new())
+
+	var source_bg := btn_attack.get_node_or_null("Bg") as ColorRect
+	if source_bg != null and source_bg.material is ShaderMaterial:
+		var bg := ColorRect.new()
+		bg.name = "Bg"
+		bg.show_behind_parent = true
+		bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		var material := (source_bg.material as ShaderMaterial).duplicate() as ShaderMaterial
+		material.set_shader_parameter("aspect", choice.size.x / choice.size.y)
+		bg.material = material
+		choice.add_child(bg)
+		choice.move_child(bg, 0)
+
+	var icon := TextureRect.new()
+	icon.name = "SkillIcon"
+	icon.texture = H24_SKILL_ICON
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.position = (choice.size - Vector2(64.0, 64.0)) * 0.5
+	icon.size = Vector2(64.0, 64.0)
+	choice.add_child(icon)
+
+	# 沿用行动费用徽记的视觉语法；-1 表示永久支付 1 点能量上限。
+	var cap_badge := IconBadge.new()
+	cap_badge.name = "CapCost"
+	cap_badge.position = Vector2(-22.0, -24.0)
+	cap_badge.size = Vector2(70.0, 70.0)
+	cap_badge.set_icon(ENERGY_COST_SHEET, 4, 4, 0)
+	cap_badge.set_number(-1)
+	cap_badge.font_size = 16
+	cap_badge.embolden = 0.7
+	choice.add_child(cap_badge)
+	_attach_button_juice(choice)
+	return choice
+
+
 ## 结算"进攻方"判定（镜头冲突落点用·Eddy 2026-07-09 镜头规格）：
 ## 波/大波恒算进攻（被挡也算——冲突落点仍在受击侧）；主动技按"是否实际造成伤害/击杀"归类
 ## （无伤主动技=未进攻）；攒/防/大防/切换=未进攻。dmg_to_foe/foe_dead=本次结算对方承受的伤害/死亡。
@@ -644,11 +840,28 @@ func _is_offense(action: int, dmg_to_foe: int, foe_dead: bool) -> bool:
 	return action == ActionDef.ACTIVE and (dmg_to_foe > 0 or foe_dead)
 
 
+## Basic wave clashes carry their own readable direction independent of hero
+## skills and damage values. Other action pairs keep the resolved hit fallback.
+func _base_attack_response_direction(a0: int, a1: int) -> float:
+	if not ActionDef.ATTACK_ACTIONS.has(a0) \
+			or not ActionDef.ATTACK_ACTIONS.has(a1):
+		return NAN
+	var p1_rank := 1 if a0 == A.BIG_ATTACK else 0
+	var p2_rank := 1 if a1 == A.BIG_ATTACK else 0
+	return float(signi(p1_rank - p2_rank))
+
+
 ## P2b：把双方立绘 + 阴影归入一个"世界组"容器，整体随镜头推近（与背景舞台同对焦点 → 统一移动）。
 ## 运行期归组、不改 .tscn（Eddy 编辑器里仍是根节点下的 4 个子节点）；容器置于 Stage 之后、
 ## dust/后处理/UI 之前 → PostFX 仍抓得到角色，UI 仍在最上层不动。
 ## 容器缩放与角色自身 pop/前冲 juice 在场景图里相乘合成、互不打架（受击 pop 不会被 dolly 吃掉）。
 func _setup_world_group() -> void:
+	_world_foreground_occluder = get_node_or_null(
+			"WorldForegroundOccluder") as Control
+	if _world_foreground_occluder:
+		var source_path := NodePath(str(_world_foreground_occluder.get_meta(
+				"source_stage_layer", "")))
+		_world_foreground_source = stage.get_node_or_null(source_path) as Control
 	_world = Control.new()
 	_world.name = "WorldGroup"
 	_world.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -657,8 +870,42 @@ func _setup_world_group() -> void:
 	add_child(_world)
 	# 紧跟 FinisherVeil（终结演出虚化幕只糊 Stage 背景、不糊双雄）、在 dust/后处理/UI 之前。
 	move_child(_world, finisher_veil.get_index() + 1)
-	for n in [p1_shadow, p2_shadow, p1_char_display, p2_char_display]:
+	var world_items: Array[Control] = [
+		p1_shadow,
+		p2_shadow,
+		p1_char_display,
+		p2_char_display,
+	]
+	if _world_foreground_occluder:
+		world_items.append(_world_foreground_occluder)
+	for n: Control in world_items:
 		n.reparent(_world, true)   # keep_global_transform → 静止画面一像素不变
+	_sync_world_foreground_occluder()
+	var wind_field := stage.get_node_or_null("WindField")
+	if wind_field and _world_foreground_occluder \
+			and wind_field.has_method("register_external_material"):
+		wind_field.call(
+				"register_external_material",
+				_world_foreground_occluder.material)
+
+
+## Scene variants may provide an opaque lower foreground band. It remains in
+## WorldGroup after both fighters, but copies the source stage layer transform
+## so pointer parallax and camera focus never create a duplicate-texture seam.
+func _sync_world_foreground_occluder() -> void:
+	if _world_foreground_occluder == null \
+			or _world_foreground_source == null:
+		return
+	var parent_xform := (
+			_world_foreground_occluder.get_parent() as CanvasItem
+			).get_global_transform()
+	var local_xform := (
+			parent_xform.affine_inverse()
+			* _world_foreground_source.get_global_transform())
+	_world_foreground_occluder.position = local_xform.origin
+	_world_foreground_occluder.rotation = local_xform.get_rotation()
+	_world_foreground_occluder.scale = local_xform.get_scale()
+	_world_foreground_occluder.size = _world_foreground_source.size
 
 
 ## 为启用该功能的场景变体创建独享河面材质，并绑定现有角色的实时 SubViewportTexture。
@@ -734,10 +981,9 @@ func _update_character_reflections() -> void:
 
 
 func _connect_frame_signals() -> void:
-	# 主动换人：点击己方替补头像（索引 1 / 2）→ 头像下浮现「切换」小按钮（见 _on_reserve_frame_input）。
-	# 出战位（索引 0）不可点（不能换成自己）。
+	# 己方头像的普通换人入口已迁移到左下切换模块；这里仍保留道具选择己方英雄目标的成熟语义。
 	# 敌方三个头像框：平时点击无响应（回调内 gate）；h21 只接替补，h04 波/大波可接任一存活英雄。
-	for fi in [1, 2]:
+	for fi in [0, 1, 2]:
 		# 头像框换皮只能改绘制，不能拿走成熟的主动换人入口；在调用侧显式锁住输入属性，
 		# 避免组件/场景重制时把 Panel 的 mouse_filter 一并改掉后出现“看得见但点不到”。
 		p1_frames[fi].mouse_filter = Control.MOUSE_FILTER_STOP
@@ -747,6 +993,180 @@ func _connect_frame_signals() -> void:
 		p2_frames[fi].mouse_filter = Control.MOUSE_FILTER_STOP
 		p2_frames[fi].mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		p2_frames[fi].gui_input.connect(_on_enemy_frame_input.bind(fi))
+
+
+## 左下切换模块：主按钮占用原图鉴位置，两个替补头像从按钮右侧展开。
+## 候选只呈现头像与可用性，不复制生命/护盾信息；完整状态仍由顶部 HUD 承担。
+func _build_switch_module() -> void:
+	btn_switch = Button.new()
+	btn_switch.name = "BtnSwitch"
+	btn_switch.text = tr("切换")
+	btn_switch.focus_mode = Control.FOCUS_NONE
+	btn_switch.position = SWITCH_MAIN_POS
+	btn_switch.size = SWITCH_MAIN_SIZE
+	for st in ["normal", "hover", "pressed", "disabled", "focus"]:
+		btn_switch.add_theme_stylebox_override(st, StyleBoxEmpty.new())
+	FontManager.apply_btn(btn_switch, 28)
+	btn_switch.add_theme_color_override("font_color", Color(0.96, 0.97, 0.91))
+	btn_switch.add_theme_color_override("font_hover_color", Color.WHITE)
+	btn_switch.add_theme_color_override("font_disabled_color", Color(0.66, 0.70, 0.66))
+	btn_switch.add_theme_color_override("font_outline_color", Color(0.06, 0.08, 0.08, 0.9))
+	btn_switch.add_theme_constant_override("outline_size", 4)
+
+	var bg := ColorRect.new()
+	bg.name = "Bg"
+	var mat := ShaderMaterial.new()
+	mat.shader = preload("res://assets/shaders/canvas_button_jelly.gdshader")
+	mat.set_shader_parameter("fill_top", Color(0.52, 0.72, 0.70))
+	mat.set_shader_parameter("fill_bottom", Color(0.24, 0.43, 0.45))
+	mat.set_shader_parameter("edge_inner", Color(0.80, 0.90, 0.82))
+	mat.set_shader_parameter("edge_outer", Color(0.07, 0.09, 0.10))
+	mat.set_shader_parameter("fill_alpha", 1.0)
+	mat.set_shader_parameter("pixel_grid", 38.0)
+	mat.set_shader_parameter("corner", 0.22)
+	mat.set_shader_parameter("edge_px", 2.0)
+	mat.set_shader_parameter("aspect", 1.0)
+	mat.set_shader_parameter("noise_amt", 0.08)
+	mat.set_shader_parameter("wear", 0.20)
+	mat.set_shader_parameter("solid_rim", true)
+	mat.set_shader_parameter("rim_px", 1.5)
+	bg.material = mat
+	bg.show_behind_parent = true
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	btn_switch.add_child(bg)
+	_attach_button_juice(btn_switch)
+	btn_switch.pressed.connect(_on_switch_main_pressed)
+	buttons_ctrl.add_child(btn_switch)
+
+	_switch_tray = Control.new()
+	_switch_tray.name = "SwitchTray"
+	_switch_tray.position = Vector2(
+		SWITCH_MAIN_POS.x + SWITCH_MAIN_SIZE.x + 20.0,
+		SWITCH_MAIN_POS.y + (SWITCH_MAIN_SIZE.y - SWITCH_FRAME_SIZE) * 0.5)
+	_switch_tray.size = Vector2(SWITCH_FRAME_STEP + SWITCH_FRAME_SIZE, SWITCH_FRAME_SIZE)
+	_switch_tray.mouse_filter = Control.MOUSE_FILTER_PASS
+	_switch_tray.visible = false
+	buttons_ctrl.add_child(_switch_tray)
+
+	for candidate_index: int in range(2):
+		# 必须实例化正式场景：HeroFrame.new() 只有脚本空壳，没有 Portrait/Bg 等可视子节点。
+		var frame := HERO_FRAME_SCENE.instantiate() as HeroFrame
+		frame.name = "Candidate%d" % (candidate_index + 1)
+		frame.position = Vector2(SWITCH_FRAME_STEP * candidate_index, 0.0)
+		frame.frame_size = Vector2.ONE * SWITCH_FRAME_SIZE
+		frame.diamond_mode = true
+		frame.bottom_shadow_enabled = true
+		frame.mouse_filter = Control.MOUSE_FILTER_STOP
+		frame.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		frame.gui_input.connect(_on_switch_candidate_input.bind(candidate_index + 1))
+		_switch_tray.add_child(frame)
+		_switch_candidate_frames.append(frame)
+
+
+func _on_switch_main_pressed() -> void:
+	if state != State.PLAYER_SELECT or not _has_switchable_reserve():
+		return
+	_set_switch_tray_open(not _switch_tray_open)
+
+
+func _on_switch_candidate_input(event: InputEvent, frame_idx: int) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	var mb := event as InputEventMouseButton
+	if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
+		_on_switch_candidate_pressed(frame_idx)
+
+
+func _on_switch_candidate_pressed(frame_idx: int) -> void:
+	if state != State.PLAYER_SELECT or not _is_switchable_reserve(frame_idx):
+		return
+	if _switch_selected and _armed_switch_frame == frame_idx:
+		_deselect_switch()
+		_disarm_switch()
+		_refresh_switch_module()
+		return
+
+	_disarm_switch()
+	var keep_blood_payment := _blood_payment_armed \
+		and battle.is_free_switch_target(PLAYER, p1_frame_slots[frame_idx])
+	_clear_action_selection_full(keep_blood_payment)
+	_armed_switch_frame = frame_idx
+	_switch_selected = false
+	if battle.is_free_switch_target(PLAYER, p1_frame_slots[frame_idx]):
+		_free_switch_now(frame_idx)
+	else:
+		_select_switch(frame_idx)
+	# 普通切换选定后保持候选层展开：头像高亮 + 主按钮“已选” + 结束按钮呼吸共同反馈待提交态。
+	_refresh_switch_module()
+
+
+func _has_switchable_reserve() -> bool:
+	for frame_idx: int in [1, 2]:
+		if _is_switchable_reserve(frame_idx):
+			return true
+	return false
+
+
+func _set_switch_tray_open(open: bool) -> void:
+	if _switch_tray == null:
+		return
+	if _switch_tray_tween != null and _switch_tray_tween.is_valid():
+		_switch_tray_tween.kill()
+	_switch_tray_open = open
+	if not open:
+		_switch_tray.visible = false
+		return
+	_refresh_switch_module()
+	_switch_tray.visible = true
+	_switch_tray_tween = create_tween().set_parallel(true)
+	_switch_tray_tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	for index: int in range(_switch_candidate_frames.size()):
+		var frame := _switch_candidate_frames[index]
+		var final_position := Vector2(SWITCH_FRAME_STEP * index, 0.0)
+		# 点击矩形从第一帧起就按最终顺序分离，不能让第二候选在动画起点覆盖第一候选。
+		# 第二格只从第一格右缘滑出 18px，既保留“向右展开”，又全程零重叠。
+		frame.position = final_position - Vector2(minf(18.0 * index, 18.0), 0.0)
+		_switch_tray_tween.tween_property(frame, "position", final_position, 0.14)
+
+
+func _refresh_switch_module() -> void:
+	if btn_switch == null or _switch_tray == null or battle == null:
+		return
+	var can_operate := state == State.PLAYER_SELECT and _has_switchable_reserve()
+	btn_switch.disabled = not can_operate
+	_set_switch_button_feedback(_switch_selected and selected_action == A.SWITCH)
+	if not can_operate:
+		_set_switch_tray_open(false)
+	var pcolor := Color("#3f86c8")
+	for index: int in range(_switch_candidate_frames.size()):
+		var frame_idx := index + 1
+		var frame := _switch_candidate_frames[index]
+		var slot: int = p1_frame_slots[frame_idx] if frame_idx < p1_frame_slots.size() else -1
+		if slot < 0 or slot >= battle.heroes[PLAYER].size():
+			frame.visible = false
+			continue
+		_update_single_frame(frame, null, PLAYER, slot, false, pcolor)
+		var available := _is_switchable_reserve(frame_idx)
+		var candidate_selected := _switch_selected and _armed_switch_frame == frame_idx
+		if frame.is_selected != candidate_selected:
+			frame.is_selected = candidate_selected
+		if not frame.is_selected:
+			frame.modulate = Color.WHITE if available else Color(0.52, 0.52, 0.52, 0.72)
+		frame.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if available \
+			else Control.CURSOR_ARROW
+	_switch_tray.visible = _switch_tray_open
+
+
+func _set_switch_button_feedback(selected: bool) -> void:
+	if btn_switch == null:
+		return
+	btn_switch.text = tr("已选") if selected else tr("切换")
+	var previous := bool(btn_switch.get_meta("switch_selected", false))
+	if previous == selected:
+		return
+	btn_switch.set_meta("switch_selected", selected)
+	_set_btn_selected(btn_switch, selected)
 
 
 # ============================================================
@@ -766,19 +1186,6 @@ func _on_codex_pressed() -> void:
 
 
 # ============================================================
-# 技能情报双钮（2026-07-17 方案A：左=己方/右=敌方·悬停介绍·翻页浏览各自三人）
-# ============================================================
-
-## 技能情报钮悬停/悬停中翻页 → 复用统一悬停提示浮层（族语浮层·方位规则同 _show_tip_at）。
-## 定位矩形向上扩 18px：pip 行悬于钮顶外，浮层要落在 pip 之上不压点。
-func _on_skill_info_tip(target: Control, text: String) -> void:
-	var r := target.get_global_rect()
-	r.position.y -= 18.0
-	r.size.y += 18.0
-	_show_tip_at(r, text)
-
-
-# ============================================================
 # 回合流程（同时盲选）
 # ============================================================
 
@@ -787,9 +1194,6 @@ func _show_turn_intro() -> void:
 	_set_buttons_active(false, true)   # 回合介绍：动作栏整体压暗 + 禁用（灰色·防误触；进入选择阶段再亮）
 	status_label.visible = false
 	event_label.visible = false
-	if _pve:
-		_pved.pick_turn()   # 远征：怪物回合开始即定招·明牌概率表先于玩家选择亮出（GDD 明牌博弈系）
-
 	# 新回合是倒计时唯一的刷新点；此前结算/换人阶段保持的 0 在这里恢复为完整时限。
 	timer_seconds = _turn_time_limit()
 	_update_timer_label()
@@ -805,10 +1209,18 @@ func _show_turn_intro() -> void:
 func _start_player_select() -> void:
 	state = State.PLAYER_SELECT
 	selected_action = -1
+	selected_second_action = -1
+	_second_enemy_target_pick = -1
+	_second_action_btn = null
 	selected_switch = -1
 	selected_btn = null
-	_double_armed = false
-	selected_item_slots.clear()   # M3：每回合重置「本回合使用」点选
+	_empowered_wave_armed = false
+	_split_big_wave_armed = false
+	_blood_payment_armed = false
+	_energy_cap_discount_armed = false
+	_free_switch_sequence.clear()
+	_blood_payment_activation_step = -1
+	_clear_selected_items()   # M3：每回合重置使用件、槽目标与待选来源
 	status_label.visible = false   # 去除「选择你的动作」提示
 	event_label.visible = false
 	_set_buttons_active(true)
@@ -840,6 +1252,8 @@ func _on_timer_tick() -> void:
 		game_timer.stop()
 		if state == State.PLAYER_SELECT:
 			_on_confirm_pressed()
+		elif state == State.HERO_SELECT and _death_switch_overlay.visible:
+			_death_switch_overlay.select_default()
 
 
 func _countdown_color_for_seconds(seconds_left: int) -> Color:
@@ -879,32 +1293,97 @@ func _hold_timer_at_zero() -> void:
 func _on_circle_pressed(action: int, btn: Button) -> void:
 	if state != State.PLAYER_SELECT:
 		return
-	if action == ACTIVE and not battle.can_use_active(PLAYER):
-		return
+	var preview: BattleCore = _battle_after_selected_items()
+	if action == ACTIVE:
+		if battle.has_blood_payment(PLAYER):
+			var next_blood_payment := not _blood_payment_armed
+			# 已选行动若只能靠蚩尤付款，必须先取消行动，不能把界面留在
+			# “看似已选、提交后却被核心静默回退为攒”的无效状态。
+			if not next_blood_payment and selected_action >= 0 \
+					and not _selected_action_can_pay(false, _energy_cap_discount_armed):
+				return
+			if not battle.set_blood_payment_active(PLAYER, next_blood_payment):
+				return
+			_blood_payment_armed = next_blood_payment
+			_blood_payment_activation_step = _free_switch_sequence.size() \
+				if next_blood_payment else -1
+			_refresh_action_affordance()
+			return
+		if not preview.can_use_active(PLAYER, _blood_payment_armed) \
+				and not preview.can_use_active(PLAYER, _blood_payment_armed, true):
+			return
 
-	# 再点同一个 = 取消
+	# 连环鼓：第一行动已经选定后，再点另一个公共动作即选择第二行动。
+	# 第二行动不承载切换、主动技或英雄技能分支，按钮双高亮直接表达先后序列。
+	if action >= A.CHARGE and action <= A.BIG_DEFEND and selected_action >= A.CHARGE \
+			and selected_action <= A.BIG_DEFEND and preview.has_lianhuan_gu_queued(PLAYER):
+		if selected_second_action == action:
+			selected_second_action = -1
+			_second_enemy_target_pick = -1
+			_second_action_btn = null
+			_reset_button_styles()
+			if selected_btn != null:
+				_set_btn_selected(selected_btn, true)
+			return
+		if action != selected_action:
+			var first_ok: bool = preview.select_action(PLAYER, selected_action,
+				_enemy_target_pick if ActionDef.is_attack(selected_action) else -1,
+				_empowered_wave_armed, _split_big_wave_armed, _blood_payment_armed,
+				_energy_cap_discount_armed)
+			var second_target: int = preview.active_index[AI] \
+				if preview.can_target_any_enemy_with_base_attack(PLAYER, action) else -1
+			if first_ok and preview.select_second_action(PLAYER, action, second_target):
+				selected_second_action = action
+				_second_enemy_target_pick = second_target
+				_second_action_btn = btn
+				_reset_button_styles()
+				_set_btn_selected(selected_btn, true)
+				_set_btn_selected(btn, true)
+				_set_confirm_active(true)
+				return
+
 	if selected_btn == btn:
+		# 再点同一动作仍为取消；龙御极由「波」上方临时出现的技能 icon 分支切换。
+		_clear_enemy_targets()
 		selected_action = -1
+		selected_second_action = -1
+		_second_enemy_target_pick = -1
+		_second_action_btn = null
 		selected_switch = -1
 		selected_btn = null
+		_empowered_wave_armed = false
+		_split_big_wave_armed = false
+		_energy_cap_discount_armed = false
 		_reset_button_styles()
 		_update_button_states()
 		return
 
 	selected_action = action
+	selected_second_action = -1
+	_second_enemy_target_pick = -1
+	_second_action_btn = null
 	selected_switch = -1
+	_empowered_wave_armed = false
+	_split_big_wave_armed = false
+	_energy_cap_discount_armed = false
 	_reset_button_styles()
 	selected_btn = btn
+	if not _current_action_can_pay_without_h24() and preview.can_use_energy_cap_discount(
+			PLAYER, selected_action, _empowered_wave_armed, _blood_payment_armed):
+		_energy_cap_discount_armed = true
 	_set_btn_selected(btn, true)
 	_set_confirm_active(true)
+	_clear_enemy_targets()
 	if action == ACTIVE or ActionDef.is_attack(action):
 		_maybe_arm_enemy_targets(action)
-	_refresh_jifeng()   # 新选的动作是否可双 → 更新疾风开关
+	_refresh_action_modifiers()
+	_refresh_action_cost_badges()
 
 
 func _on_confirm_pressed() -> void:
-	if state != State.PLAYER_SELECT:
+	if state != State.PLAYER_SELECT or not _pending_pointstone_offer.is_empty():
 		return
+	_ensure_lianhuan_choice(_battle_after_selected_items())
 	game_timer.stop()
 	_hold_timer_at_zero()
 
@@ -913,38 +1392,87 @@ func _on_confirm_pressed() -> void:
 		_net_submit_turn()
 		return
 
+	# M3：道具先提交。槽依赖来源必须先于目标；即时产能/减费随后才能支付本回合动作。
+	for s in _ordered_selected_item_slots():
+		battle.use_slot(PLAYER, s, int(selected_item_hero_targets.get(s, -1)),
+			int(selected_item_targets.get(s, -1)),
+			int(selected_item_choices.get(s, -1)))
+
 	# 玩家提交（未选 → 默认攒）
 	if selected_action == ACTIVE:
-		battle.select_active(PLAYER, _enemy_target_pick)   # 玩家点选的敌方揪目标（-1=未选→引擎随机）
+		battle.select_active(
+			PLAYER, _enemy_target_pick, _blood_payment_armed,
+			_energy_cap_discount_armed)   # 玩家点选的敌方揪目标（-1=未选→引擎随机）
 	elif selected_action == A.SWITCH and selected_switch >= 0:
 		battle.select_switch(PLAYER, selected_switch)
 	elif selected_action >= 0:
 		battle.select_action(PLAYER, selected_action,
-			_enemy_target_pick if ActionDef.is_attack(selected_action) else -1)
-		if _double_armed and battle.can_double(PLAYER):
-			battle.select_double(PLAYER, true)   # 疾风：附加同种动作随主动作一起盲选提交
+			_enemy_target_pick if ActionDef.is_attack(selected_action) else -1,
+			_empowered_wave_armed, _split_big_wave_armed, _blood_payment_armed,
+			_energy_cap_discount_armed)
 	else:
 		battle.select_action(PLAYER, A.CHARGE)
+	if selected_second_action >= 0:
+		battle.select_second_action(PLAYER, selected_second_action, _second_enemy_target_pick)
 
-	# M3：提交本回合点选的道具（不占动作槽，与动作一起盲选结算）。
-	for s in selected_item_slots:
-		battle.use_slot(PLAYER, s)
-	selected_item_slots.clear()
-
-	# AI 选择（远征 PvE：怪物驾驶员已在回合开始定招·明牌承诺=所见即所打）
-	if _pve:
-		if _pved.choice.is_empty() or not battle.apply_choice(AI, _pved.choice):
-			battle.select_action(AI, A.CHARGE)
-	elif not _ai_pick_precomputed():
+	# PvE 与本地 PvP 共用当前 BattleAI：合法行动、道具决策和提交入口全部同源。
+	if not _ai_pick_precomputed():
 		_ai_pick(AI)   # 任务G 兜底：预想未命中（状态变过/没来得及想）→ 原同步路径
+	_clear_selected_items()
 
 	selected_action = -1
+	selected_second_action = -1
+	_second_enemy_target_pick = -1
+	_second_action_btn = null
 	selected_switch = -1
 	selected_btn = null
-	_double_armed = false
+	_empowered_wave_armed = false
+	_split_big_wave_armed = false
+	_energy_cap_discount_armed = false
+	_blood_payment_armed = false
 	_reset_button_styles()
 	_set_confirm_active(false)   # 停止呼吸：已确认提交
 	await _resolve()
+
+
+func _ensure_lianhuan_choice(preview: BattleCore) -> void:
+	if not preview.has_lianhuan_gu_queued(PLAYER):
+		selected_second_action = -1
+		_second_enemy_target_pick = -1
+		_second_action_btn = null
+		return
+	if selected_action < A.CHARGE or selected_action > A.BIG_DEFEND:
+		selected_action = A.CHARGE
+		selected_switch = -1
+		selected_btn = btn_charge
+		_empowered_wave_armed = false
+		_split_big_wave_armed = false
+		_blood_payment_armed = false
+		_energy_cap_discount_armed = false
+	if not preview.select_action(PLAYER, selected_action,
+			_enemy_target_pick if ActionDef.is_attack(selected_action) else -1,
+			_empowered_wave_armed, _split_big_wave_armed, _blood_payment_armed,
+			_energy_cap_discount_armed):
+		return
+	if selected_second_action >= 0 and preview.select_second_action(
+			PLAYER, selected_second_action, _second_enemy_target_pick):
+		return
+	for choice_variant in preview.legal_second_actions(PLAYER):
+		var choice: Dictionary = choice_variant
+		selected_second_action = int(choice["action"])
+		_second_enemy_target_pick = int(choice.get("target", -1))
+		_second_action_btn = _action_button_for(selected_second_action)
+		return
+
+
+func _action_button_for(action: int) -> Button:
+	match action:
+		A.CHARGE: return btn_charge
+		A.ATTACK: return btn_attack
+		A.BIG_ATTACK: return btn_big_attack
+		A.DEFEND: return btn_defend
+		A.BIG_DEFEND: return btn_big_defend
+	return null
 
 
 # ============================================================
@@ -1032,6 +1560,7 @@ func _net_sync_latest() -> void:
 
 ## 确认提交（联机版）：UI 选择打包成 payload 上行·锁输入等服务器结算。
 func _net_submit_turn() -> void:
+	var preview: BattleCore = _battle_after_selected_items()
 	var action := A.CHARGE
 	var target := -1
 	if selected_action == ACTIVE:
@@ -1039,7 +1568,7 @@ func _net_submit_turn() -> void:
 		target = _enemy_target_pick
 		if target < 0:
 			# 需显式目标的主动技未点选：从镜像合法集代选（联机协议要求 target 精确匹配·不留引擎随机）
-			for la in battle.legal_actions(PLAYER):
+			for la in preview.legal_actions(PLAYER):
 				if int(la["action"]) == ACTIVE:
 					target = int(la["target"])
 					break
@@ -1048,17 +1577,47 @@ func _net_submit_turn() -> void:
 		target = selected_switch
 	elif selected_action >= 0:
 		action = selected_action
-		if ActionDef.is_attack(action) and battle.can_target_any_enemy_with_base_attack(PLAYER):
+		if ActionDef.is_attack(action) \
+				and preview.can_target_any_enemy_with_base_attack(PLAYER, action):
 			target = _enemy_target_pick
 			if target < 0:
-				target = battle.active_index[AI]
-	var dbl: bool = _double_armed and battle.can_double(PLAYER)
-	BattleSetup.net_session.client.submit(action, target, selected_item_slots.duplicate(), dbl)
-	selected_item_slots.clear()
+				target = preview.active_index[AI]
+	var energy_cap_discount: bool = _energy_cap_discount_armed and \
+		preview.can_use_energy_cap_discount(
+			PLAYER, action, _empowered_wave_armed, _blood_payment_armed)
+	var blood_payment: bool = _blood_payment_armed and (
+		preview.can_use_active(PLAYER, true, energy_cap_discount) if action == ACTIVE
+		else preview.can_pay_action_with_blood(
+			PLAYER, action, _empowered_wave_armed, energy_cap_discount))
+	var empowered: bool = _empowered_wave_armed \
+		and preview.can_empower_wave_action(PLAYER, action, blood_payment, energy_cap_discount)
+	var split_big_wave: bool = _split_big_wave_armed \
+		and preview.can_split_big_wave_action(PLAYER, action, blood_payment, energy_cap_discount)
+	var ordered_item_slots: Array[int] = _ordered_selected_item_slots()
+	var item_slot_targets: Array[int] = []
+	var item_slot_choices: Array[int] = []
+	for s in ordered_item_slots:
+		item_slot_targets.append(int(selected_item_hero_targets.get(
+			s, selected_item_targets.get(s, -1))))
+		item_slot_choices.append(int(selected_item_choices.get(s, -1)))
+	BattleSetup.net_session.client.submit(
+		action, target, ordered_item_slots, false, empowered, split_big_wave, blood_payment,
+		_free_switch_sequence.duplicate(), _blood_payment_activation_step, energy_cap_discount,
+		item_slot_targets, item_slot_choices, selected_second_action,
+		_second_enemy_target_pick)
+	_clear_selected_items()
 	selected_action = -1
+	selected_second_action = -1
+	_second_enemy_target_pick = -1
+	_second_action_btn = null
 	selected_switch = -1
 	selected_btn = null
-	_double_armed = false
+	_empowered_wave_armed = false
+	_split_big_wave_armed = false
+	_energy_cap_discount_armed = false
+	_blood_payment_armed = false
+	_free_switch_sequence.clear()
+	_blood_payment_activation_step = -1
 	_reset_button_styles()
 	_set_confirm_active(false)
 	_set_buttons_active(false)
@@ -1116,13 +1675,14 @@ func _net_resume_death_switch() -> void:
 func _net_death_switch() -> void:
 	state = State.HERO_SELECT
 	_set_buttons_active(false)
-	_hold_timer_at_zero()
+	_start_death_switch_timer()
 	status_label.visible = false
 	var reserves: Array = []
 	for slot in battle.living_reserves(PLAYER):
 		reserves.append([slot, battle.heroes[PLAYER][slot], battle.hp_display(battle.hp[PLAYER][slot])])
 	_death_switch_overlay.show_selection(PLAYER, reserves)
 	var pick: int = await _death_switch_overlay.selection_made
+	game_timer.stop()
 	BattleSetup.net_session.client.death_switch(pick)
 	state = State.RESOLVING   # 等服务器广播（对方可能也在换）
 
@@ -1132,6 +1692,24 @@ func _net_open_offer(offer: Dictionary) -> void:
 	var options: Array = []
 	for id in offer.get("options", []):
 		options.append(ItemCatalog.make(String(id)))
+	if String(offer.get("kind", "")) == "pointstone_offer":
+		var source: int = int(offer.get("slot", -1))
+		var target: int = int(offer.get("target", -1))
+		if _pending_pointstone_offer.get("source", -1) != source \
+				or _pending_pointstone_offer.get("target", -1) != target:
+			_pending_pointstone_offer.clear()
+			_update_all()
+			return
+		var pointstone_choice: int = await _show_draft(
+			source, options, tr("点金石：选择传说道具（3 选 1）"))
+		_pending_pointstone_offer.clear()
+		if pointstone_choice >= 0:
+			_complete_pointstone_pair(source, target, pointstone_choice,
+				offer.get("options", []))
+		else:
+			_pending_item_target_slot = source
+		_update_all()
+		return
 	var upgrade: bool = bool(offer.get("upgrade", false))
 	var slot: int = int(offer.get("slot", 0))
 	var c: int = await _show_draft(slot, options, tr("升级道具（3 选 1）") if upgrade else tr("抽取道具（3 选 1）"))
@@ -1192,16 +1770,62 @@ func _story_finish(w: int) -> void:
 # 任务G：AI 异步预想（选招期后台想·确认时重放·详见 _think_* 变量注释）
 # ============================================================
 
-## 玩家本回合点选道具集的指纹（排序后字符串·预想结果的有效性校验键之一）。
+## 把本回合已完成配对的道具按依赖顺序提交到克隆；用于动作可支付预览与 AI 预想。
+## 熔炉/魔晶即时产能、爆裂即时减费与点金石原位升级都由 use_slot 统一反映。
+func _battle_after_selected_items() -> BattleCore:
+	var preview: BattleCore = battle.clone()
+	for s in _ordered_selected_item_slots():
+		preview.use_slot(PLAYER, s, int(selected_item_hero_targets.get(s, -1)),
+			int(selected_item_targets.get(s, -1)),
+			int(selected_item_choices.get(s, -1)))
+	return preview
+
+
+## 道具栏专用投影：只呈现点金石选定后的“锁定 T3”，不把其他暂存使用件误画成锁定。
+func _battle_for_item_row() -> BattleCore:
+	if selected_item_choices.is_empty():
+		return battle
+	var preview: BattleCore = battle.clone()
+	for owner_variant in selected_item_choices:
+		var owner: int = int(owner_variant)
+		var target: int = int(selected_item_targets.get(owner, -1))
+		var choice: int = int(selected_item_choices[owner])
+		if target < 0 or target >= preview.slots[PLAYER].size():
+			continue
+		var option_ids: Array = selected_item_choice_options.get(owner, [])
+		if option_ids.is_empty() and owner >= 0 and owner < battle.slots[PLAYER].size():
+			for item_variant in (battle.slots[PLAYER][owner]["upg_draft"] as Array):
+				option_ids.append((item_variant as ItemData).item_id)
+		if choice < 0 or choice >= option_ids.size():
+			continue
+		var legendary: ItemData = ItemCatalog.make(String(option_ids[choice]))
+		if legendary == null or legendary.tier != 3:
+			continue
+		var target_slot: Dictionary = preview.slots[PLAYER][target]
+		target_slot["item"] = legendary
+		target_slot["state"] = BattleCore.SlotState.CHARGING
+		target_slot["since"] = preview.turn_number
+		target_slot["used"] = false
+		target_slot["draft"] = []
+		target_slot["upg_draft"] = []
+	return preview
+
+
+## 玩家本回合点选道具集的指纹（槽位+目标槽排序后字符串·预想结果的有效性校验键之一）。
 func _items_key() -> String:
 	var a: Array[int] = selected_item_slots.duplicate()
 	a.sort()
-	return str(a)
+	var keyed: Array[String] = []
+	for s in a:
+		keyed.append("%d:%d:%d:%d" % [s, int(selected_item_targets.get(s, -1)),
+			int(selected_item_hero_targets.get(s, -1)),
+			int(selected_item_choices.get(s, -1))])
+	return str(keyed)
 
 
-## 拉起/重启后台预想。仅 PvP 选招阶段（PvE 怪物驾驶员回合开始已定招·不经此路径）。
+## 拉起/重启本地 AI 后台预想。PvE 与本地 PvP 共用；联机局由对端玩家决策。
 func _start_ai_think() -> void:
-	if _net or _pve or state != State.PLAYER_SELECT or battle == null or battle.game_over:
+	if _net or state != State.PLAYER_SELECT or battle == null or battle.game_over:
 		return   # 联机局无本地 AI（对手=真人·M1）
 	if _think_task >= 0:
 		_think_restart = true   # 正在想：标记重拉（旧结果会因 items_key/turn 校验不符被弃）
@@ -1211,8 +1835,11 @@ func _start_ai_think() -> void:
 	_think_out = {}
 	_think_mutex.unlock()
 	var clone: BattleCore = battle.clone()
-	for s in selected_item_slots:
-		clone.use_slot(PLAYER, s)   # 纳入玩家已点选道具（同步路径确认时同序提交·输入才逐位一致）
+	for s in _ordered_selected_item_slots():
+		clone.use_slot(PLAYER, s, int(selected_item_hero_targets.get(s, -1)),
+			int(selected_item_targets.get(s, -1)),
+			int(selected_item_choices.get(s, -1)))
+		# 纳入玩家已点选道具及槽目标（同步路径确认时同序提交·输入才逐位一致）。
 	_think_task = WorkerThreadPool.add_task(
 		_think_job.bind(clone, battle.turn_number, _items_key(), _ai.rng_snapshot(), _ai_rng.state))
 
@@ -1260,7 +1887,8 @@ func _ai_pick_precomputed() -> bool:
 	_ai.rng_restore(out["rng_end"])
 	_ai.plan_economy_apply(battle, AI, _ai_rng, int(out["econ_up"]))
 	var choice: Dictionary = out["choice"]
-	BattleAI.commit_attack_items(battle, AI, int(choice["action"]))
+	BattleAI.commit_attack_items(battle, AI, int(choice["action"]),
+		int(choice.get("second_action", -1)))
 	if not battle.apply_choice(AI, choice):
 		battle.select_action(AI, A.CHARGE)   # 兜底（与同步路径同款保险）
 	return true
@@ -1272,7 +1900,8 @@ func _ai_pick(side: int) -> void:
 	# 取代旧「随机加权出招」占位 AI；试玩与平衡模拟现共用一套决策。AI 不偷看玩家已锁动作（搜索按博弈枚举）。
 	_ai.plan_economy(battle, side, _ai_rng)
 	var choice: Dictionary = _ai.choose_action(battle, side)
-	BattleAI.commit_attack_items(battle, side, int(choice["action"]))
+	BattleAI.commit_attack_items(battle, side, int(choice["action"]),
+		int(choice.get("second_action", -1)))
 	if not battle.apply_choice(side, choice):
 		battle.select_action(side, A.CHARGE)   # 兜底（被禁/付不起→引擎 resolve guard 也兜）
 
@@ -1299,6 +1928,38 @@ func _resolve() -> void:
 	await _post_resolution(r)
 
 
+## 免费切换在选择期只改逻辑预览。若天罗于揭示后取消它，核心快照已经恢复原出战槽；
+## 在动作演出开始前只同步角色与头像布局，避免仍由预览英雄代演本回合动作。
+func _sync_cancelled_free_switch_preview(events: Array) -> void:
+	for event_variant in events:
+		var event: Dictionary = event_variant
+		if String(event.get("id", "")) != "free_switch_cancelled":
+			continue
+		_update_hero_frames()
+		_update_character_displays()
+		return
+
+
+## resolve 前 UI 正显示免费切换的预览英雄，因此本地与联机都会先抓到 preview 槽的
+## active_before / hp_before。取消事件携带原槽与裁定时原槽血量，用它修正纯演出基线；
+## 否则原槽的到期伤害注解会漏，原槽同拍治疗也会因槽位不等而不显示。
+func _correct_cancelled_free_switch_baselines(events: Array, active_before: Array[int],
+		hp_before: Array[float]) -> Dictionary:
+	var corrected_active: Array[int] = active_before.duplicate()
+	var corrected_hp: Array[float] = hp_before.duplicate()
+	for event_variant in events:
+		var event: Dictionary = event_variant
+		if String(event.get("id", "")) != "free_switch_cancelled":
+			continue
+		var player: int = int(event.get("player", -1))
+		if player < 0 or player >= corrected_active.size():
+			continue
+		corrected_active[player] = int(event.get("from", corrected_active[player]))
+		if event.has("hp_before"):
+			corrected_hp[player] = float(event["hp_before"]) / float(BattleCore.HP_UNIT)
+	return {active = corrected_active, hp = corrected_hp}
+
+
 ## 结算演出（本地/联机共用·M1 抽取）：一切动画从事件流 + 前置基线派生，零依赖"谁 resolve 的"。
 ## r 需含 events / p1_action / p2_action；active_before / hp_before = 结算前出战槽与其显示 HP
 ## （本地=resolve 前捕获·联机=镜像上快照前捕获——两者同源=屏幕上正渲染的值）。
@@ -1306,6 +1967,12 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 	# 动画所需信息全部【从事件流派生】——不再 diff 结算后的引擎完整状态，
 	# 联机（服务器权威·客户端只收 events）下同样可行。A3a（2026-07-02）：死亡判定由血量 diff 改吃 hero_died。
 	#   damage_taken 按目标槽累加；当前出战位走中央角色演出，替补位走对应头像框演出。
+	var resolution_events: Array = r.get("events", [])
+	_sync_cancelled_free_switch_preview(resolution_events)
+	var corrected_baselines: Dictionary = _correct_cancelled_free_switch_baselines(
+		resolution_events, active_before, hp_before)
+	var corrected_active_before: Array[int] = corrected_baselines["active"]
+	var corrected_hp_before: Array[float] = corrected_baselines["hp"]
 	var display_slots: Array[int] = [battle.active_index[0], battle.active_index[1]]
 	var dmg: Array[int] = [0, 0]
 	var reserve_hits: Array[Dictionary] = [{}, {}]   # slot → {amount, pen}，防替补受击误打中央角色
@@ -1314,18 +1981,25 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 	var pen_max: Array[int] = [0, 0]        # ⑧ 本拍最高穿透档（damage_taken.pen·Pen 枚举有序 → 取最高档配色）
 	var blocked: Array[bool] = [false, false]     # ② 该方本拍挡下过攻击（player=防守方）
 	var block_big_atk: Array[bool] = [false, false]  # ② 挡下的是不是大波（演出隆重度）
-	var egain: Array[int] = [0, 0]          # ③ 本拍能量获得（半能单位·charge_gain/taotie_feast 累加）
+	var egain: Array[int] = [0, 0]          # ③ 本拍能量获得（半能单位）
 	# A3b 事件注解飘字：伤害数字解释不了的时刻逐条标出（每项={text,col,可选 size/y/outline/pr}）。
 	#   tags=命中拍弹出；pre_tags=出招拍弹出（力竭/定身/到期延迟伤害——都发生在动作揭示时刻）。
 	#   替补席事件（牧羊/饕餮回血、替补位延迟伤害）不在角色身位飘字——replay 到 HUD 替补行=后续候选。
 	var tags: Array = [[], []]
 	var pre_tags: Array = [[], []]
 	var cancelled_attacks: Array[bool] = [false, false]
-	for ev in r.get("events", []):
+	# 力量的代价属于回合末自我处决，而非对方动作击杀。保留死亡演出，
+	# 但不能误触发对方终结技或“大波命中”的镜头判断。
+	var strength_price_executed: Array[bool] = [false, false]
+	for ev in resolution_events:
 		var p: int = int(ev.get("player", 0))
 		var event_slot: int = int(ev.get("slot", display_slots[p]))
 		var on_display: bool = event_slot == display_slots[p]
 		match ev.get("id", ""):
+			"item_countered":
+				var counter_player: int = int(ev.get("source_player", 1 - p))
+				if counter_player >= 0 and counter_player < pre_tags.size():
+					pre_tags[counter_player].append({text = tr("反制"), col = COL_TAG_BREAK})
 			"damage_taken":
 				if on_display:
 					dmg[p] += int(ev.get("amount", 0))
@@ -1335,6 +2009,19 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 					reserve_hit["amount"] = int(reserve_hit["amount"]) + int(ev.get("amount", 0))
 					reserve_hit["pen"] = maxi(int(reserve_hit["pen"]), int(ev.get("pen", 0)))
 					reserve_hits[p][event_slot] = reserve_hit
+			"life_lost", "yaohuo_loss":
+				# 失去生命绕过伤害管线，但仍必须进入受击演出，避免血量无提示跳变。
+				var loss_amount: int = int(ev.get("amount", 0))
+				if on_display:
+					dmg[p] += loss_amount
+					tags[p].append({
+						text = tr("妖火") if String(ev.get("id", "")) == "yaohuo_loss" else tr("反噬"),
+						col = COL_DMG_BURN if String(ev.get("id", "")) == "yaohuo_loss" else COL_TAG_BREAK,
+					})
+				else:
+					var reserve_loss: Dictionary = reserve_hits[p].get(event_slot, {amount = 0, pen = 0})
+					reserve_loss["amount"] = int(reserve_loss["amount"]) + loss_amount
+					reserve_hits[p][event_slot] = reserve_loss
 			"hero_died":
 				if event_slot == display_slots[p]:
 					dead[p] = true
@@ -1346,7 +2033,7 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 						block_big_atk[p] = true
 				else:
 					reserve_blocks[p][event_slot] = bool(reserve_blocks[p].get(event_slot, false)) or blocked_big
-			"charge_gain", "taotie_feast":
+			"charge_gain":
 				egain[p] += int(ev.get("amount", 0))
 			"poison_detonate":
 				if on_display:
@@ -1356,7 +2043,7 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 					tags[p].append({text = tr("印记"), col = COL_TAG_AMP})
 			"vuln_hit":
 				if on_display:
-					tags[p].append({text = tr("易伤"), col = COL_TAG_AMP})
+					tags[p].append({text = tr("脆弱"), col = COL_TAG_AMP})
 			"shield_absorb":
 				if on_display:
 					tags[p].append({text = tr("护盾-%s") % _fmt_hp(float(ev.get("amount", 0)) / 2.0), col = COL_TAG_ABSORB})
@@ -1369,18 +2056,36 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 			"armor_broken":
 				if on_display:
 					tags[p].append({text = tr("破甲"), col = COL_TAG_BREAK})
-			"opening_applied":
+			"longyuji_empowered":
+				tags[p].append({text = tr("龙御极"), col = COL_TAG_AMP})
+			"h13_split_big_wave":
+				tags[p].append({text = tr("双波"), col = COL_TAG_AMP})
+			"h14_blood_payment":
+				tags[p].append({
+					text = tr("生命-%s") % _fmt_hp(float(ev.get("amount", 0)) / 2.0),
+					col = COL_TAG_BREAK,
+				})
+			"h24_energy_cap_discount":
+				tags[p].append({text = tr("上限-1 / 费用-1"), col = COL_TAG_AMP})
+			"h16_reserve_pursuit":
+				tags[p].append({text = tr("追击"), col = COL_TAG_AMP})
+			"h17_transform":
+				pre_tags[p].append({text = tr("转变"), col = COL_TAG_AMP})
+			"h22_energy_burn":
+				tags[0].append({text = tr("能量归零"), col = COL_TAG_BREAK})
+				tags[1].append({text = tr("能量归零"), col = COL_TAG_BREAK})
+			"energy_max_reduced":
+				tags[p].append({
+					text = tr("能量上限-%s") % _fmt_hp(float(ev.get("amount", 0)) / float(ActionDef.ENERGY_UNIT)),
+					col = COL_TAG_BREAK,
+				})
+			"huanhun_revive", "huanhun_fatal_immunity":
 				if on_display:
-					tags[p].append({text = tr("破绽"), col = COL_TAG_BREAK})
-			"opening_used":
+					tags[p].append({text = tr("还魂"), col = COL_TAG_SAVE, pr = 0})
+			"strength_price_execution":
 				if on_display:
-					tags[p].append({text = tr("破绽穿防"), col = COL_TAG_BREAK})
-			"lethal_rescue":
-				tags[p].append({text = tr("护主"), col = COL_TAG_SAVE, pr = 0})
-			"huzhu_counter":
-				tags[1 - p].append({text = tr("反击"), col = COL_TAG_BREAK})   # 反击伤害落在攻击方身上→标注也放那侧
-			"huanhun_revive":
-				tags[p].append({text = tr("还魂"), col = COL_TAG_SAVE, pr = 0})
+					strength_price_executed[p] = true
+					tags[p].append({text = tr("代价"), col = COL_TAG_BREAK, pr = 0})
 			"base_attack_cancelled":
 				cancelled_attacks[p] = true
 				tags[p].append({text = tr("断招"), col = COL_TAG_BREAK, pr = 0})
@@ -1388,18 +2093,20 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 				pre_tags[p].append({text = tr("力竭"), col = BattleFxScript.COL_BLOCK_TEXT})
 			"switch_locked":
 				pre_tags[p].append({text = tr("定身"), col = BattleFxScript.COL_BLOCK_TEXT})
+			"free_switch_cancelled":
+				pre_tags[p].append({text = tr("天罗·切换无效"), col = BattleFxScript.COL_BLOCK_TEXT})
 			"deferred_damage":
-				# 唯一不走 damage_taken 的掉血（引擎直写 HP）——不标就是"血凭空少了"。
-				if int(ev.get("slot", -1)) == active_before[p]:
+				# 旧延迟伤害不走 damage_taken；保留其动作前余烬提示。
+				if int(ev.get("slot", -1)) == corrected_active_before[p]:
 					pre_tags[p].append({text = "-%s" % _fmt_hp(float(ev.get("amount", 0)) / 2.0),
 						col = COL_DMG_BURN, size = 44, y = 0.30, outline = Color(0.22, 0.08, 0.02, 0.95)})
 	# ③ 治疗量：同槽位显示 HP 前后差（阵亡/换槽不算）
 	var healed: Array[float] = [0.0, 0.0]
 	for p in 2:
-		if not dead[p] and battle.active_index[p] == active_before[p]:
-			var hp_now := battle.hp_display(battle.hp[p][active_before[p]])
-			if hp_now > hp_before[p]:
-				healed[p] = hp_now - hp_before[p]
+		if not dead[p] and battle.active_index[p] == corrected_active_before[p]:
+			var hp_now := battle.hp_display(battle.hp[p][corrected_active_before[p]])
+			if hp_now > corrected_hp_before[p]:
+				healed[p] = hp_now - corrected_hp_before[p]
 
 	# 头顶招式圆圈（揭示双方盲选出招）→ 消失 → 再播打斗动画
 	await _show_action_indicators(r.get("p1_action", -1), r.get("p2_action", -1))
@@ -1409,7 +2116,8 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 			anim_actions[p] = -1
 	await _play_battle_anims(anim_actions[0], anim_actions[1], dmg, dead,
 		{pen = pen_max, blocked = blocked, block_big = block_big_atk, egain = egain, healed = healed,
-			tags = tags, pre_tags = pre_tags, reserve_hits = reserve_hits, reserve_blocks = reserve_blocks})
+			tags = tags, pre_tags = pre_tags, reserve_hits = reserve_hits, reserve_blocks = reserve_blocks,
+			strength_price_executed = strength_price_executed})
 	_update_all()
 
 
@@ -1417,7 +2125,7 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 func _post_resolution(r: Dictionary) -> void:
 	if r.get("game_over", false):
 		var w: int = r.get("winner", BattleCore.WINNER_UNDECIDED)
-		# 远征 PvE：胜=怪死·其余（含同拍双死）=全灭 → 回地图结算·不走加时赛。
+		# 远征 PvE：胜=对手全灭·其余（含同拍双死）=队伍全灭 → 回地图结算·不走加时赛。
 		if _pve:
 			await _pved.finish("win" if w == BattleCore.WINNER_P1 else "lose")
 			return
@@ -1475,6 +2183,7 @@ func _post_resolution(r: Dictionary) -> void:
 func _start_overtime() -> void:
 	state = State.HERO_SELECT
 	_set_buttons_active(false)
+	_start_death_switch_timer()
 	status_label.text = tr("平局 → 加时赛！")
 	status_label.add_theme_color_override("font_color", Color("#ffd86a"))
 	status_label.visible = true
@@ -1485,6 +2194,7 @@ func _start_overtime() -> void:
 		entries.append([s, h, float(h.max_hp)])   # 满血复活展示
 	_death_switch_overlay.show_selection(PLAYER, entries, tr("加时赛：选一人出战（满血·无技能无道具）"))
 	var pick: int = await _death_switch_overlay.selection_made
+	game_timer.stop()
 	var ai_pick: int = BattleAI.choose_overtime_pick(battle, AI)
 
 	BattleSetup.p1_heroes = BattleCore.overtime_roster(battle.heroes[PLAYER], pick)
@@ -1560,7 +2270,7 @@ func _eclipse_commit(moon: CanvasItem, emat: ShaderMaterial, halo_mat: ShaderMat
 func _show_death_switch_selection(player: int) -> void:
 	state = State.HERO_SELECT
 	_set_buttons_active(false)
-	_hold_timer_at_zero()
+	_start_death_switch_timer()
 	status_label.visible = false   # 不在屏幕中间显示「英雄阵亡」，只保留换人界面
 
 	var reserves: Array = []
@@ -1569,19 +2279,24 @@ func _show_death_switch_selection(player: int) -> void:
 
 	_death_switch_overlay.show_selection(player, reserves)
 	var selected_slot: int = await _death_switch_overlay.selection_made
+	game_timer.stop()
 	battle.execute_death_switch(player, selected_slot)
 	await _death_switch_transition(player)   # 遗体消散→新人入场（秒切退役）
+
+
+func _start_death_switch_timer() -> void:
+	# 死亡补位继续使用顶部唯一回合倒计时；浮层不再拥有第二套 Label/Timer。
+	timer_seconds = _turn_time_limit()
+	timer_label.visible = true
+	_update_timer_label()
+	game_timer.start(1.0)
 
 
 # ============================================================
 # 英雄框交互（切换 / h07 免费切）
 # ============================================================
 
-## 点击己方替补头像（任务5）：
-## 第一次点 → 该框立绘变「切换」二字（armed·仅提示）；
-## 再次点同框 → 做「选择」动画(弹跳+高亮·与底部按钮一致)，把换人选为本回合动作；
-## 第三次点同框 → 取消选择(回 armed)。选定后点「结束」=提交换人并结算回合(可提前结束)。
-## h07 千里自在风 = 免费即时换(不占动作·本回合继续)，第二次点即换。
+## 顶部己方头像只处理道具选择英雄目标；普通切换统一由左下模块承接。
 func _on_reserve_frame_input(event: InputEvent, frame_idx: int) -> void:
 	if state != State.PLAYER_SELECT:
 		return
@@ -1590,39 +2305,25 @@ func _on_reserve_frame_input(event: InputEvent, frame_idx: int) -> void:
 	var mb := event as InputEventMouseButton
 	if not mb.pressed:
 		return
-
-	# 右键 = 回退一步（仅对当前 armed 的框）：选择(发光)→普通切换→角色立绘（任务2）。
-	if mb.button_index == MOUSE_BUTTON_RIGHT:
-		if _armed_switch_frame == frame_idx:
-			if _switch_selected:
-				_deselect_switch()            # 发光选中 → 普通「切换」
-			else:
-				_disarm_switch()              # 「切换」armed → 恢复角色立绘
+	if _pending_item_hero_target_slot >= 0:
+		if mb.button_index == MOUSE_BUTTON_RIGHT:
+			_pending_item_hero_target_slot = -1
+			_clear_friendly_item_target_prompts()
+			_update_all()
+			return
+		if mb.button_index == MOUSE_BUTTON_LEFT:
+			_select_friendly_item_target(frame_idx)
 		return
-
-	if mb.button_index != MOUSE_BUTTON_LEFT:
-		return
-	# 仅存活替补可换；空位 / 阵亡 / 出战位不响应。
-	if not _is_switchable_reserve(frame_idx):
-		return
-	if _armed_switch_frame != frame_idx:
-		_arm_switch_frame(frame_idx)          # 第一次左键 → armed（框内显「切换」）
-		return
-	# 同一框再次左键：
-	if battle.is_free_switch_target(PLAYER, p1_frame_slots[frame_idx]):
-		_free_switch_now(frame_idx)           # 千里自在风：涉及马的切换即时免费（马在场重定位 / 顶马上场）
-	elif _switch_selected:
-		_deselect_switch()                    # 已选 → 取消（回 armed）
-	else:
-		_select_switch(frame_idx)             # armed → 选择（动画+高亮·待「结束」提交）
+	# 非道具选人状态下，顶部头像只提供悬停说明，不再产生切换动作。
+	return
 
 
-## 该替补框是否可换人（索引 1/2、槽位有效、存活、非出战位；缠绕时全锁）。
+## 该替补框是否可换人（索引 1/2、槽位有效、存活、非出战位，并通过战斗核心动作门）。
 func _is_switchable_reserve(frame_idx: int) -> bool:
 	if frame_idx < 1 or frame_idx >= p1_frames.size():
 		return false
 	if not battle.can_switch(PLAYER):
-		return false   # 缠绕：对手出战是黑暗巳蛇 → 锁住主动切换
+		return false
 	var slot: int = p1_frame_slots[frame_idx]
 	return slot >= 0 and slot != battle.active_index[PLAYER] and battle.hp[PLAYER][slot] > 0
 
@@ -1630,7 +2331,9 @@ func _is_switchable_reserve(frame_idx: int) -> bool:
 ## 进入 armed 态：该框立绘 → 「切换」二字；先取消其它框的 armed + 清掉已选动作高亮（点切换=放弃已选动作）。
 func _arm_switch_frame(frame_idx: int) -> void:
 	_disarm_switch()
-	_clear_action_selection_full()
+	var keep_blood_payment := _blood_payment_armed \
+		and battle.is_free_switch_target(PLAYER, p1_frame_slots[frame_idx])
+	_clear_action_selection_full(keep_blood_payment)
 	_armed_switch_frame = frame_idx
 	_switch_selected = false
 	p1_frames[frame_idx].set_switch_prompt(true)
@@ -1639,10 +2342,20 @@ func _arm_switch_frame(frame_idx: int) -> void:
 ## 选择换人：框做选择弹跳动画 + 高亮(与底部按钮一致)，把 switch 设为本回合动作；「结束」呼吸提示提交。
 func _select_switch(frame_idx: int) -> void:
 	selected_action = A.SWITCH
+	selected_second_action = -1
+	_second_enemy_target_pick = -1
+	_second_action_btn = null
 	selected_switch = p1_frame_slots[frame_idx]
 	selected_btn = null
+	_empowered_wave_armed = false
+	_split_big_wave_armed = false
+	_energy_cap_discount_armed = false
+	_blood_payment_armed = false
+	battle.set_blood_payment_active(PLAYER, false)
+	_blood_payment_activation_step = -1
 	p1_frames[frame_idx].is_selected = true
 	_switch_selected = true
+	_set_switch_button_feedback(true)
 	_set_confirm_active(true)
 
 
@@ -1651,8 +2364,18 @@ func _deselect_switch() -> void:
 	if _armed_switch_frame >= 0 and _armed_switch_frame < p1_frames.size():
 		p1_frames[_armed_switch_frame].is_selected = false
 	selected_action = -1
+	selected_second_action = -1
+	_second_enemy_target_pick = -1
+	_second_action_btn = null
 	selected_switch = -1
+	_empowered_wave_armed = false
+	_split_big_wave_armed = false
+	_energy_cap_discount_armed = false
+	_blood_payment_armed = false
+	battle.set_blood_payment_active(PLAYER, false)
+	_blood_payment_activation_step = -1
 	_switch_selected = false
+	_set_switch_button_feedback(false)
 	_set_confirm_active(false)
 
 
@@ -1664,27 +2387,49 @@ func _disarm_switch() -> void:
 		f.set_switch_prompt(false)
 	_armed_switch_frame = -1
 	_switch_selected = false
+	_set_switch_button_feedback(false)
 
 
-## h07 千里自在风：免费即时换（不占动作·本回合继续行动）。
+## h07 千里自在风：每回合一次免费切换逻辑预览（不占动作·本回合继续行动）。
+## 核心只暂存 from/to 并让 active_index 指向预览英雄；出入场、冲撞与夜明珠均等到
+## 同回合天罗裁定后才原子兑现，故此处可以直接复用成熟角色/按钮刷新而不复制战局。
 func _free_switch_now(frame_idx: int) -> void:
 	var slot: int = p1_frame_slots[frame_idx]
 	if slot < 0:
 		return
 	_disarm_switch()
 	if battle.free_switch(PLAYER, slot):
+		if _net:
+			_free_switch_sequence.append(slot)
 		selected_action = -1
+		selected_second_action = -1
+		_second_enemy_target_pick = -1
+		_second_action_btn = null
 		selected_switch = -1
 		selected_btn = null
+		_empowered_wave_armed = false
+		_split_big_wave_armed = false
+		_energy_cap_discount_armed = false
 		_reset_button_styles()
 		_update_all()
 
 
-## 清掉底部动作按钮的选中高亮 + 结束呼吸 + 选择状态（点切换或换框时放弃已选动作）。
-func _clear_action_selection_full() -> void:
+## 清掉底部动作按钮的选中高亮 + 结束呼吸 + 选择状态。
+## 免费切换可保留蚩尤已发动的血量支付；普通换人会一并取消。
+func _clear_action_selection_full(preserve_blood_payment: bool = false) -> void:
 	selected_action = -1
+	selected_second_action = -1
+	_second_enemy_target_pick = -1
+	_second_action_btn = null
 	selected_switch = -1
 	selected_btn = null
+	_empowered_wave_armed = false
+	_split_big_wave_armed = false
+	_energy_cap_discount_armed = false
+	if not preserve_blood_payment:
+		_blood_payment_armed = false
+		battle.set_blood_payment_active(PLAYER, false)
+		_blood_payment_activation_step = -1
 	for btn in action_btn_list:
 		_set_btn_selected(btn, false)
 	_set_confirm_active(false)
@@ -1692,17 +2437,25 @@ func _clear_action_selection_full() -> void:
 
 
 # ============================================================
-# 敌方英雄目标选择：h21【调虎离山】与 h04【十方无次第】共用头像框入口
+# 敌方英雄目标选择：h21【调虎离山】、h04【十方无次第】与寻星坠共用头像框入口
 # ============================================================
 
-## h21：只点敌方存活替补，未选时保留技能默认；h04：波/大波可点任一存活敌方，默认锁当前出战位。
+## h21：只点敌方存活替补，未选时保留技能默认；h04：波/大波可点任一存活敌方；
+## 寻星坠：只授权原选招为「波」的本回合攻击。两者都默认锁当前敌方出战位。
+func _can_choose_enemy_attack_target(action: int) -> bool:
+	if not ActionDef.is_attack(action):
+		return false
+	var preview: BattleCore = _battle_after_selected_items()
+	return preview.can_target_any_enemy_with_base_attack(PLAYER, action)
+
+
 func _maybe_arm_enemy_targets(action: int) -> void:
 	var sk: HeroSkill = battle.get_skill(PLAYER, battle.active_index[PLAYER])
 	var include_active := false
 	var prompt := ""
 	if action == ACTIVE and sk != null and sk.active_needs_enemy_target():
 		prompt = tr("揪")
-	elif ActionDef.is_attack(action) and battle.can_target_any_enemy_with_base_attack(PLAYER):
+	elif _can_choose_enemy_attack_target(action):
 		include_active = true
 		prompt = tr("攻")
 	else:
@@ -1716,6 +2469,30 @@ func _maybe_arm_enemy_targets(action: int) -> void:
 				and (include_active or slot != battle.active_index[AI]):
 			p2_frames[fi].set_switch_prompt(true, prompt)
 			p2_frames[fi].is_selected = slot == _enemy_target_pick
+
+
+## 道具点选可以在选招前或选招后发生；每次变更都从已选道具预览重算临时选敌权。
+## 不新增界面：仍复用 h04 的敌方头像单选；若授权仍存在，保留玩家已选的存活目标。
+func _refresh_enemy_targets_after_item_change() -> void:
+	if selected_action < 0:
+		return
+	# 轻量脚本测试/非战斗预览可能尚未装配英雄框；权限仍由预览核心查询，不触碰空 UI。
+	if p2_frames.size() < 3 or p2_frame_slots.size() < 3:
+		return
+	var previous_pick: int = _enemy_target_pick
+	var should_target: bool = selected_action == ACTIVE \
+		or _can_choose_enemy_attack_target(selected_action)
+	_clear_enemy_targets()
+	if not should_target:
+		return
+	_maybe_arm_enemy_targets(selected_action)
+	if not ActionDef.is_attack(selected_action) or previous_pick < 0 \
+			or previous_pick >= battle.hp[AI].size() or battle.hp[AI][previous_pick] <= 0:
+		return
+	_enemy_target_pick = previous_pick
+	for fi in [0, 1, 2]:
+		var slot: int = p2_frame_slots[fi]
+		p2_frames[fi].is_selected = slot == previous_pick
 
 
 ## 敌方头像框点击：h21 排除出战位且允许取消；h04 包含出战位并始终保持一个明确目标。
@@ -1765,9 +2542,14 @@ func _clear_enemy_targets() -> void:
 func _set_buttons_active(active: bool, dim_inactive: bool = true) -> void:
 	if not active:
 		_disarm_switch()   # 离开选择阶段 → 退出 armed「切换」态
+		_set_switch_tray_open(false)
 		_clear_enemy_targets()   # 离开选择阶段 → 退出敌方英雄目标选择态
-		if btn_jifeng:
-			btn_jifeng.visible = false   # 结算/过场：藏疾风开关
+		if longyuji_picker:
+			longyuji_picker.visible = false
+		if split_big_wave_picker:
+			split_big_wave_picker.visible = false
+		if h24_discount_picker:
+			h24_discount_picker.visible = false
 	# 底部 UI 始终可见。
 	for btn in action_btn_list + [btn_confirm]:
 		btn.visible = true
@@ -1775,16 +2557,12 @@ func _set_buttons_active(active: bool, dim_inactive: bool = true) -> void:
 	var show_affordance := active or not dim_inactive
 	var alpha := 1.0 if show_affordance else 0.4
 	buttons_ctrl.modulate = Color(1, 1, 1, alpha)
-	if _skill_info:
-		_skill_info.visible = true
-		_skill_info.modulate = Color(1, 1, 1, alpha)
 	if show_affordance:
 		_refresh_action_affordance()   # 按能量显示亮/暗（开局与选择阶段一致）
 	else:
 		for btn in action_btn_list + [btn_confirm]:
 			btn.disabled = true        # 结算/过场：全禁用（图鉴钮不禁——随时可查阅）
-	if _skill_info:
-		_skill_info.refresh(battle)
+	_refresh_switch_module()
 
 
 ## 编辑器可摆位：按钮位置/尺寸全部读 .tscn，代码只管显隐与技能 tooltip，不再覆盖坐标。
@@ -1800,10 +2578,10 @@ func _layout_circles() -> void:
 	btn_confirm.visible = true
 
 
-## 出战英雄是否有主动技（访问 _skills，下划线约定但可读）。
+## 出战英雄是否有占行动主动技，或不占行动的主动强化。
 func _player_has_active() -> bool:
 	var sk: HeroSkill = battle.get_skill(PLAYER, battle.active_index[PLAYER])
-	return sk != null and sk.has_active()
+	return sk != null and (sk.has_active() or sk.enables_blood_payment())
 
 
 ## 技能钮图标 = 出战英雄专属技能图标（h*_skill.png·2026-07-17 Eddy 点单）；无图回退「技能」二字。
@@ -1844,7 +2622,7 @@ func _reset_button_styles() -> void:
 	_clear_enemy_targets()   # 退出 h21 敌方目标选择态
 
 
-## 为果冻按钮复制同一轮廓作为深色下投影；没有果冻 Bg 的疾风钮使用同尺寸圆角面。
+## 为果冻按钮复制同一轮廓作为深色下投影；没有果冻 Bg 的按钮使用同尺寸圆角面。
 ## 阴影位于按钮内部树序最底且 mouse_filter=IGNORE，不改变原点击、hover、disabled 行为。
 func _attach_button_bottom_shadow(btn: Button) -> void:
 	if btn == null or btn.get_node_or_null("BottomShadow") != null:
@@ -1942,50 +2720,169 @@ func _update_button_states() -> void:
 ## 按真实能量/可用性刷新每个动作按钮的 disabled（= 图标亮/暗 + 能否点）。
 ## 不依赖 state：开局回合介绍阶段也据此显示正确的亮/暗，能否实际操作交给 state 守卫拦截。
 func _refresh_action_affordance() -> void:
+	var preview: BattleCore = _battle_after_selected_items()
+	if not preview.has_lianhuan_gu_queued(PLAYER):
+		selected_second_action = -1
+		_second_enemy_target_pick = -1
+		_second_action_btn = null
 	_layout_circles()
 	for btn in action_btn_list:
 		if not btn.visible:
 			continue
 		if btn == btn_special:
-			btn.disabled = not battle.can_use_active(PLAYER)
+			btn.disabled = not preview.has_blood_payment(PLAYER) \
+				and not preview.can_use_active(PLAYER, _blood_payment_armed) \
+				and not preview.can_use_active(PLAYER, _blood_payment_armed, true)
 		else:
 			var act: int = _btn_action(btn)
-			btn.disabled = not battle.can_afford(PLAYER, act)
+			var normally_available: bool = preview.can_pay_action_with_blood(PLAYER, act) \
+				if _blood_payment_armed else preview.can_afford(PLAYER, act)
+			btn.disabled = not normally_available and not preview.can_use_energy_cap_discount(
+				PLAYER, act, false, _blood_payment_armed)
 	# 技能键能量消耗随出战英雄主动技动态变化（0 不显示）。
-	_set_cost_pips(btn_special, battle.action_cost(PLAYER, ACTIVE))
+	_refresh_action_modifiers()
+	_refresh_action_cost_badges()
 	btn_confirm.disabled = false
-	_refresh_jifeng()
 
 
-## 疾风开关（点击 = arm/disarm「附加同种动作」）。仅当前已选动作可双时有效。
-func _on_jifeng_pressed() -> void:
+## 上方技能 icon 是「波」的额外强化层；再次点击可撤销，退回普通波。
+func _on_longyuji_branch_pressed() -> void:
 	if state != State.PLAYER_SELECT:
 		return
-	if not battle.can_double_action(PLAYER, selected_action):
+	if selected_action != A.ATTACK or selected_btn != btn_attack:
 		return
-	_double_armed = not _double_armed
-	_refresh_jifeng()
-
-
-## 刷新疾风开关：在场有疾风英雄 → 显示（结束键正上方）；已选可双动作 → 可点；armed 态高亮 + 剩余次数。
-func _refresh_jifeng() -> void:
-	if btn_jifeng == null:
+	var preview: BattleCore = _battle_after_selected_items()
+	var empower: bool = not _empowered_wave_armed
+	if empower and not preview.can_empower_wave_action(
+			PLAYER, selected_action, _blood_payment_armed, _energy_cap_discount_armed):
 		return
-	if not battle.has_double(PLAYER):
-		_double_armed = false
-		btn_jifeng.visible = false
+	_empowered_wave_armed = empower
+	_split_big_wave_armed = false
+	_refresh_action_affordance()
+
+
+## 暗潮使用「大波」上方的技能 icon 分支；再次点击可撤销，退回普通大波。
+func _on_split_big_wave_pressed() -> void:
+	if state != State.PLAYER_SELECT:
 		return
-	btn_jifeng.visible = true
-	btn_jifeng.size = btn_confirm.size
-	btn_jifeng.position = btn_confirm.position + Vector2(0.0, -btn_confirm.size.y - 12.0)
-	var ok: bool = battle.can_double_action(PLAYER, selected_action)
-	if not ok:
-		_double_armed = false
-	btn_jifeng.disabled = not ok
-	btn_jifeng.text = tr("疾风×%d") % battle.double_uses_left(PLAYER)
-	_set_btn_selected(btn_jifeng, _double_armed)
+	var preview: BattleCore = _battle_after_selected_items()
+	if not preview.can_split_big_wave_action(
+			PLAYER, selected_action, _blood_payment_armed, _energy_cap_discount_armed):
+		return
+	_split_big_wave_armed = not _split_big_wave_armed
+	_empowered_wave_armed = false
+	_refresh_action_modifiers()
 
 
+func _selected_action_can_pay(blood_payment: bool, energy_cap_discount: bool) -> bool:
+	var preview: BattleCore = _battle_after_selected_items()
+	if selected_action == ACTIVE:
+		return preview.can_use_active(PLAYER, blood_payment, energy_cap_discount)
+	if selected_action < 0 or selected_action == A.SWITCH:
+		return true
+	if _empowered_wave_armed:
+		return preview.can_empower_wave_action(
+			PLAYER, selected_action, blood_payment, energy_cap_discount)
+	if _split_big_wave_armed:
+		return preview.can_split_big_wave_action(
+			PLAYER, selected_action, blood_payment, energy_cap_discount)
+	if energy_cap_discount:
+		return preview.can_use_energy_cap_discount(
+			PLAYER, selected_action, false, blood_payment)
+	return preview.can_pay_action_with_blood(PLAYER, selected_action) \
+		if blood_payment else preview.can_afford(PLAYER, selected_action)
+
+
+func _current_action_can_pay_without_h24() -> bool:
+	return _selected_action_can_pay(_blood_payment_armed, false)
+
+
+func _on_h24_discount_pressed() -> void:
+	if state != State.PLAYER_SELECT or selected_action < 0:
+		return
+	if _energy_cap_discount_armed:
+		# 若当前行动只有借助并封才付得起，则不能留下一个必定回退为「攒」的无效提交。
+		if not _current_action_can_pay_without_h24():
+			return
+		_energy_cap_discount_armed = false
+	elif _battle_after_selected_items().can_use_energy_cap_discount(
+			PLAYER, selected_action, _empowered_wave_armed, _blood_payment_armed):
+		_energy_cap_discount_armed = true
+	_refresh_action_affordance()
+
+
+func _refresh_action_modifiers() -> void:
+	_refresh_longyuji()
+	_refresh_h24_discount()
+	_set_btn_selected(btn_special, _blood_payment_armed and battle.has_blood_payment(PLAYER))
+
+
+## 刷新攻击变体：龙御极位于「波」上方，暗潮位于「大波」上方。
+func _refresh_longyuji() -> void:
+	if longyuji_picker == null or split_big_wave_picker == null or btn_split_big_wave == null:
+		return
+	var preview: BattleCore = _battle_after_selected_items()
+	var has_empowered: bool = preview.has_empowered_wave(PLAYER)
+	var has_split: bool = preview.has_split_big_wave(PLAYER)
+	if not has_empowered:
+		_empowered_wave_armed = false
+	elif _empowered_wave_armed and not preview.can_empower_wave_action(
+			PLAYER, selected_action, _blood_payment_armed, _energy_cap_discount_armed):
+		_empowered_wave_armed = false
+	_set_btn_selected(btn_attack, selected_btn == btn_attack)
+	var show_picker: bool = state == State.PLAYER_SELECT and has_empowered \
+		and selected_action == A.ATTACK and selected_btn == btn_attack
+	longyuji_picker.visible = show_picker
+	if show_picker:
+		longyuji_picker.position = Vector2(
+			btn_attack.position.x + (btn_attack.size.x - longyuji_picker.size.x) * 0.5,
+			btn_attack.position.y - longyuji_picker.size.y - 14.0)
+		btn_longyuji_branch.disabled = not preview.can_empower_wave_action(
+			PLAYER, selected_action, _blood_payment_armed, _energy_cap_discount_armed)
+		_set_btn_selected(btn_longyuji_branch, _empowered_wave_armed)
+		if btn_longyuji_branch.disabled:
+			btn_longyuji_branch.modulate = Color(0.52, 0.50, 0.47)
+
+	if not has_split:
+		_split_big_wave_armed = false
+	var show_split_picker: bool = state == State.PLAYER_SELECT and has_split \
+		and selected_action == A.BIG_ATTACK and selected_btn == btn_big_attack
+	split_big_wave_picker.visible = show_split_picker
+	if show_split_picker:
+		split_big_wave_picker.position = Vector2(
+			btn_big_attack.position.x + (btn_big_attack.size.x - split_big_wave_picker.size.x) * 0.5,
+			btn_big_attack.position.y - split_big_wave_picker.size.y - 14.0)
+		var can_split: bool = preview.can_split_big_wave_action(
+			PLAYER, selected_action, _blood_payment_armed, _energy_cap_discount_armed)
+		if not can_split:
+			_split_big_wave_armed = false
+		btn_split_big_wave.disabled = not can_split
+		_set_btn_selected(btn_split_big_wave, _split_big_wave_armed)
+
+
+func _refresh_h24_discount() -> void:
+	if h24_discount_picker == null or btn_h24_discount == null:
+		return
+	var preview: BattleCore = _battle_after_selected_items()
+	var can_discount: bool = selected_action >= 0 and preview.can_use_energy_cap_discount(
+		PLAYER, selected_action, _empowered_wave_armed, _blood_payment_armed)
+	if not can_discount:
+		_energy_cap_discount_armed = false
+	var show_picker: bool = state == State.PLAYER_SELECT and selected_btn != null and can_discount
+	h24_discount_picker.visible = show_picker
+	if not show_picker:
+		return
+	var stack_offset := 0.0
+	if selected_btn == btn_attack and longyuji_picker != null and longyuji_picker.visible:
+		stack_offset = longyuji_picker.size.y + 14.0
+	elif selected_btn == btn_big_attack and split_big_wave_picker != null \
+			and split_big_wave_picker.visible:
+		stack_offset = split_big_wave_picker.size.y + 14.0
+	h24_discount_picker.position = Vector2(
+		selected_btn.position.x + (selected_btn.size.x - h24_discount_picker.size.x) * 0.5,
+		selected_btn.position.y - h24_discount_picker.size.y - 14.0 - stack_offset)
+	btn_h24_discount.disabled = false
+	_set_btn_selected(btn_h24_discount, _energy_cap_discount_armed)
 func _btn_action(btn: Button) -> int:
 	if btn == btn_charge: return A.CHARGE
 	if btn == btn_attack: return A.ATTACK
@@ -2004,7 +2901,39 @@ func _set_cost_pips(btn: Button, cost: int, show_zero: bool = false) -> void:
 		return
 	badge.visible = cost > 0 or show_zero
 	if badge.visible:
+		var pay_with_hp: bool = _blood_payment_armed and cost > 0
+		if pay_with_hp:
+			badge.set_icon(HEART_COST_SHEET, 4, 1, 0)
+		else:
+			badge.set_icon(ENERGY_COST_SHEET, 4, 4, 0)
 		badge.set_number(int(round(cost / float(ActionDef.ENERGY_UNIT))))   # cost 为半能 → 显示整能
+
+
+func _refresh_action_cost_badges() -> void:
+	# 「波」按钮始终标基础 1 能；龙御极分支另标额外 1 能，避免同一费用被重复显示为“2 + 1”。
+	var attack_cost: int = int(ActionDef.BASE_ACTION_DEF[A.ATTACK]["cost"])
+	var big_attack_cost: int = int(ActionDef.BASE_ACTION_DEF[A.BIG_ATTACK]["cost"])
+	var big_defend_cost: int = int(ActionDef.BASE_ACTION_DEF[A.BIG_DEFEND]["cost"])
+	var active_cost: int = battle.action_cost(PLAYER, ACTIVE)
+	if _energy_cap_discount_armed:
+		match selected_action:
+			A.ATTACK:
+				attack_cost = maxi(0, attack_cost - BattleCore.ENERGY_CAP_DISCOUNT_AMOUNT)
+			A.BIG_ATTACK:
+				big_attack_cost = maxi(0, big_attack_cost - BattleCore.ENERGY_CAP_DISCOUNT_AMOUNT)
+			A.BIG_DEFEND:
+				big_defend_cost = maxi(0, big_defend_cost - BattleCore.ENERGY_CAP_DISCOUNT_AMOUNT)
+			ACTIVE:
+				active_cost = maxi(0, active_cost - BattleCore.ENERGY_CAP_DISCOUNT_AMOUNT)
+	_set_cost_pips(btn_attack, attack_cost,
+		_energy_cap_discount_armed and selected_action == A.ATTACK)
+	if btn_longyuji_branch != null:
+		_set_cost_pips(btn_longyuji_branch, BattleCore.EMPOWERED_WAVE_COST)
+	_set_cost_pips(btn_big_attack, big_attack_cost)
+	_set_cost_pips(btn_big_defend, big_defend_cost)
+	_set_cost_pips(btn_defend, ActionDef.BASE_ACTION_DEF[A.DEFEND]["cost"], true)
+	_set_cost_pips(btn_special, active_cost,
+		_energy_cap_discount_armed and selected_action == ACTIVE)
 
 
 # ============================================================
@@ -2028,6 +2957,7 @@ func _build_item_rows() -> void:
 	# 镜像宽度按缩放后的实显宽算（否则 P2 行会向内缩进一截）。
 	var row_w := (ItemSlotRow.SLOT_W * 3.0 + ItemSlotRow.GAP * 2.0) * ITEM_ROW_SCALE
 	p2_item_row.position = Vector2(SCREEN_W - ITEM_ROW_POS_P1.x - row_w, ITEM_ROW_POS_P1.y)
+	p2_item_row.slot_clicked.connect(_on_p2_item_target_clicked)
 	p2_hud.add_child(p2_item_row)
 
 
@@ -2035,44 +2965,142 @@ func _build_item_rows() -> void:
 # 悬停提示（2026-07-11 Eddy 点单·外部 UI 件到位前的程序化像素框版）
 # ============================================================
 
-const TIP_CHARS_PER_LINE := 18       # 提示每行统一字数（CJK 等宽手动换行）
+enum TipFormat { S, L }
+enum TipContentKind { PLAIN, SKILL, ITEM, AVATAR_SKILL }
+
+@export_group("悬停说明框")
+@export var tip_size_s := Vector2(320.0, 96.0)    # 基础动作、技能分支
+@export var tip_size_l := Vector2(480.0, 144.0)   # 主动技能、技能说明、道具说明
+@export var tip_size_item := Vector2(222.0, 144.0)   # 具名道具：图标+名称+正文需要独立纵向空间
+@export var tip_size_avatar_skill := Vector2(340.0, 116.0)   # 去掉标题后收短高度：技能图标 + 单段说明
+@export_range(0.5, 2.0, 0.01) var tip_texture_brightness := 1.28
+@export_subgroup("字距")
+@export_range(-4, 8, 1) var tip_glyph_spacing: int = 0
+@export_subgroup("S 框文字与留白")
+@export_range(8, 32, 1) var tip_font_size_s: int = 16
+@export_range(-4, 12, 1) var tip_line_spacing_s: int = 1
+@export_range(0.0, 32.0, 1.0) var tip_padding_horizontal_s := 12.0
+@export_range(0.0, 32.0, 1.0) var tip_padding_vertical_s := 8.0
+@export_subgroup("L 框文字与留白")
+@export_range(8, 32, 1) var tip_font_size_l: int = 16
+@export_range(-4, 12, 1) var tip_line_spacing_l: int = 1
+@export_range(0.0, 32.0, 1.0) var tip_padding_horizontal_l := 12.0
+@export_range(0.0, 32.0, 1.0) var tip_padding_vertical_l := 8.0
+@export_subgroup("道具说明排版")
+## 正值越大，道具名称与正文组成的整块越向上移动。
+@export_range(0.0, 24.0, 1.0) var item_tip_vertical_lift := 11.0
+## 以微型空行字号控制名称和正文的视觉间隔；值越大，两者越疏。
+@export_range(1, 64, 1) var item_tip_title_body_gap: int = 12
+const ITEM_TIP_ICON_SIZE := 32.0
+const ITEM_TIP_ICON_TITLE_GAP := 6.0
+const ITEM_TIP_MIN_COLUMN_WIDTH := 150.0
+const ITEM_TIP_BASE_TOP := 12.0
+@export_group("")
+
 const TIP_GAP := 12.0                # 提示框与目标控件的间距(px)
+const AVATAR_SKILL_TIP_EXTRA_DROP := 30.0   # 越过替补头像下方 28px 血量行
+const TIP_ATOMIC_TERMS: Array[String] = [
+	"0.5点", "1点", "2点", "3点", "4点", "大波", "大防", "能量", "生命", "护盾",
+	"伤害", "回合", "出战", "英雄", "敌方", "我方",
+]
 
 var _tip_panel: PanelContainer
+var _tip_content: Control
 var _tip_label: Label
+var _tip_rich: RichTextLabel
+var _tip_skill_icon: TextureRect
+var _tip_item_header: Control
+var _tip_item_icon: TextureRect
+var _tip_item_title: Label
+var _tip_stylebox: StyleBoxTexture
 
 
-## 建悬停提示（GPT 回纹折纸面贴图 9-slice·2026-07-13 换皮）+ 挂满底部动作按钮与我方道具槽。
+## 建悬停提示（中性书页像素框 9-slice）+ 挂满底部动作按钮与我方道具槽。
 ## 动作/道具数值全部从 ActionDef / BattleCore 常量推导（禁硬编码游戏数值）。
 func _build_hover_tips() -> void:
 	_tip_panel = PanelContainer.new()
-	var sb := StyleBoxTexture.new()
-	sb.texture = preload("res://assets/ui/ui_tooltip.png")   # 131×57·族语版 v11（2026-07-14 GPT 重制·近黑框+茶纸+牌匾同语回纹角内线）
-	sb.set_texture_margin_all(20.0)                          # 9-slice：四角回纹钩整块保形（实测钩横笔 y≤11/≥45·深≤18）
-	sb.axis_stretch_horizontal = StyleBoxTexture.AXIS_STRETCH_MODE_TILE   # 中段平铺防颗粒拉伸
-	sb.axis_stretch_vertical = StyleBoxTexture.AXIS_STRETCH_MODE_TILE
-	sb.content_margin_left = 16.0
-	sb.content_margin_right = 16.0
-	sb.content_margin_top = 12.0
-	sb.content_margin_bottom = 12.0
-	_tip_panel.add_theme_stylebox_override("panel", sb)
+	_tip_panel.name = "HoverTip"
+	_tip_stylebox = StyleBoxTexture.new()
+	_tip_stylebox.texture = preload("res://assets/ui/ui_tooltip_book_pixel.png")   # 192×57·黑色角套+低对比书页纹理
+	_tip_stylebox.modulate_color = Color(
+		tip_texture_brightness,
+		tip_texture_brightness,
+		tip_texture_brightness,
+		1.0
+	)
+	_tip_stylebox.set_texture_margin_all(20.0)                          # 9-slice：保留像素切角、实心角套与投影
+	# 中央纸面直接拉伸，避免纹理在宽/高方向周期性平铺成明显点阵；20px 九宫格仍锁定边框与四角。
+	_tip_stylebox.axis_stretch_horizontal = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
+	_tip_stylebox.axis_stretch_vertical = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
+	_set_tip_content_margins(TipFormat.S)
+	_tip_panel.add_theme_stylebox_override("panel", _tip_stylebox)
 	_tip_panel.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST   # 像素贴图必须点采样（默认线性会糊）
 	_tip_panel.visible = false
 	_tip_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tip_panel.clip_contents = true
 	_tip_panel.z_index = 90
+	_tip_content = Control.new()
+	_tip_content.name = "Content"
+	_tip_content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tip_content.clip_contents = true
+	_tip_panel.add_child(_tip_content)
 	_tip_label = Label.new()
-	FontManager.apply(_tip_label, 16)
+	_tip_label.name = "Text"
+	_tip_label.add_theme_font_override("font", _make_tip_font(tip_font_size_s))
+	_tip_label.add_theme_font_size_override("font_size", tip_font_size_s)
+	_tip_label.add_theme_constant_override("line_spacing", tip_line_spacing_s)
 	_tip_label.add_theme_color_override("font_color", Color(0.24, 0.19, 0.12))   # 墨字压纸面（描边退役——亮底不需要）
+	_tip_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_tip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_tip_label.clip_text = true
 	_tip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_tip_panel.add_child(_tip_label)
+	_tip_content.add_child(_tip_label)
+	_tip_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_tip_skill_icon = TextureRect.new()
+	_tip_skill_icon.name = "SkillIcon"
+	_tip_skill_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_tip_skill_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_tip_skill_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_tip_skill_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tip_skill_icon.visible = false
+	_tip_content.add_child(_tip_skill_icon)
+	_tip_skill_icon.anchor_top = 0.5
+	_tip_skill_icon.anchor_bottom = 0.5
+	_tip_skill_icon.offset_left = 0.0
+	_tip_skill_icon.offset_top = -32.0
+	_tip_skill_icon.offset_right = 64.0
+	_tip_skill_icon.offset_bottom = 32.0
+	_build_item_tip_header()
+	_tip_rich = RichTextLabel.new()
+	_tip_rich.name = "RichText"
+	_tip_rich.add_theme_font_override("normal_font", _make_tip_font(tip_font_size_l))
+	_tip_rich.add_theme_font_size_override("normal_font_size", tip_font_size_l)
+	_tip_rich.add_theme_constant_override("line_separation", tip_line_spacing_l)
+	_tip_rich.add_theme_color_override("default_color", Color(0.24, 0.19, 0.12))
+	_tip_rich.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
+	_tip_rich.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	_tip_rich.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_tip_rich.fit_content = false
+	_tip_rich.scroll_active = false
+	_tip_rich.selection_enabled = false
+	_tip_rich.context_menu_enabled = false
+	_tip_rich.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tip_rich.visible = false
+	_tip_content.add_child(_tip_rich)
+	_tip_rich.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_tip_panel)
-	_register_tip(btn_charge, _action_tip.bind(A.CHARGE))
-	_register_tip(btn_attack, _action_tip.bind(A.ATTACK))
-	_register_tip(btn_big_attack, _action_tip.bind(A.BIG_ATTACK))
-	_register_tip(btn_defend, _action_tip.bind(A.DEFEND))
-	_register_tip(btn_big_defend, _action_tip.bind(A.BIG_DEFEND))
-	_register_tip(btn_special, _special_tip)
-	_register_tip(btn_confirm, _confirm_tip)
+	_register_tip(btn_charge, _action_tip.bind(A.CHARGE), TipFormat.S, true)
+	_register_tip(btn_attack, _action_tip.bind(A.ATTACK), TipFormat.S, true)
+	_register_tip(btn_big_attack, _action_tip.bind(A.BIG_ATTACK), TipFormat.S, true)
+	_register_tip(btn_defend, _action_tip.bind(A.DEFEND), TipFormat.S, true)
+	_register_tip(btn_big_defend, _action_tip.bind(A.BIG_DEFEND), TipFormat.S, true)
+	_register_tip(btn_special, _special_tip, TipFormat.L, false, TipContentKind.SKILL)
+	_register_tip(btn_longyuji_branch, _longyuji_tip, TipFormat.L, false,
+		TipContentKind.SKILL)
+	_register_tip(btn_split_big_wave, _split_big_wave_tip, TipFormat.L, false,
+		TipContentKind.SKILL)
+	_register_tip(btn_h24_discount, _h24_discount_tip, TipFormat.L, false,
+		TipContentKind.SKILL)
 	p1_item_row.slot_hovered.connect(_on_item_slot_hovered)
 	p1_item_row.slot_unhovered.connect(_hide_tip)
 	# 敌方道具同享悬停查看（2026-07-17 Eddy）：只读提示·无点击 CTA（hoverable 不解锁点击）。
@@ -2081,46 +3109,366 @@ func _build_hover_tips() -> void:
 	p2_item_row.slot_unhovered.connect(_hide_tip)
 
 
-func _register_tip(c: Control, provider: Callable) -> void:
-	c.mouse_entered.connect(_on_tip_enter.bind(c, provider))
+## 具名道具说明的独立顶部行：原尺寸像素图标 + 名称，不再缩放正式道具框。
+## 正文仍由 RichTextLabel 承担，因此换行规则与原子词保护逻辑保持不变。
+func _build_item_tip_header() -> void:
+	_tip_item_header = Control.new()
+	_tip_item_header.name = "ItemHeader"
+	_tip_item_header.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tip_item_header.visible = false
+	_tip_content.add_child(_tip_item_header)
+	_tip_item_header.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	_tip_item_header.size = Vector2(ITEM_TIP_MIN_COLUMN_WIDTH, ITEM_TIP_ICON_SIZE)
+
+	_tip_item_icon = TextureRect.new()
+	_tip_item_icon.name = "ItemIcon"
+	_tip_item_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_tip_item_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_tip_item_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_tip_item_icon.position = Vector2.ZERO
+	_tip_item_icon.size = Vector2.ONE * ITEM_TIP_ICON_SIZE
+	_tip_item_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tip_item_header.add_child(_tip_item_icon)
+
+	_tip_item_title = Label.new()
+	_tip_item_title.name = "ItemTitle"
+	_tip_item_title.anchor_right = 1.0
+	_tip_item_title.offset_left = ITEM_TIP_ICON_SIZE + ITEM_TIP_ICON_TITLE_GAP
+	_tip_item_title.offset_right = 0.0
+	_tip_item_title.offset_bottom = ITEM_TIP_ICON_SIZE
+	_tip_item_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_tip_item_title.clip_text = true
+	_tip_item_title.add_theme_font_override("font", _make_tip_font(tip_font_size_l + 1))
+	_tip_item_title.add_theme_font_size_override("font_size", tip_font_size_l + 1)
+	_tip_item_title.add_theme_color_override("font_color", Color(0.22, 0.16, 0.10))
+	_tip_item_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tip_item_header.add_child(_tip_item_title)
+
+
+func _register_tip(c: Control, provider: Callable, format: int, centered: bool = false,
+		content_kind: int = TipContentKind.PLAIN) -> void:
+	c.mouse_entered.connect(_on_tip_enter.bind(c, provider, format, centered, content_kind))
 	c.mouse_exited.connect(_hide_tip)
 
 
-func _on_tip_enter(c: Control, provider: Callable) -> void:
-	_show_tip_at(c.get_global_rect(), str(provider.call()))
+func _on_tip_enter(c: Control, provider: Callable, format: int, centered: bool = false,
+		content_kind: int = TipContentKind.PLAIN) -> void:
+	_show_tip_at(c.get_global_rect(), str(provider.call()), format, centered, content_kind)
+
+
+## 取消左下技能翻页钮后，六个头像框直接承担各自的技能说明入口。
+## 悬停只读，不改变己方头像现有点击换人/道具选人语义。
+func _connect_hero_skill_tips() -> void:
+	for frame_idx: int in range(p1_frames.size()):
+		p1_frames[frame_idx].mouse_entered.connect(
+			_on_hero_skill_tip.bind(PLAYER, frame_idx))
+		p1_frames[frame_idx].mouse_exited.connect(_hide_tip)
+	for frame_idx: int in range(p2_frames.size()):
+		p2_frames[frame_idx].mouse_entered.connect(
+			_on_hero_skill_tip.bind(AI, frame_idx))
+		p2_frames[frame_idx].mouse_exited.connect(_hide_tip)
+
+
+func _on_hero_skill_tip(player: int, frame_idx: int) -> void:
+	if battle == null:
+		return
+	var frame_slots: Array[int] = p1_frame_slots if player == PLAYER else p2_frame_slots
+	var frames: Array[HeroFrame] = p1_frames if player == PLAYER else p2_frames
+	if frame_idx < 0 or frame_idx >= frame_slots.size() or frame_idx >= frames.size():
+		return
+	var slot: int = frame_slots[frame_idx]
+	if slot < 0 or slot >= battle.heroes[player].size():
+		return
+	var hero: HeroData = battle.heroes[player][slot]
+	if hero == null:
+		return
+	var detail: String = tr(hero.skill_detail)
+	# 头像说明只保留效果正文；旧 skill_description 是技能名，不再占据顶部一行。
+	var text: String = detail
+	if text == "":
+		text = tr("暂无技能说明")
+	var icon: Texture2D = null
+	if hero.skill_icon_path != "" and ResourceLoader.exists(hero.skill_icon_path):
+		icon = load(hero.skill_icon_path) as Texture2D
+	_show_tip_at(frames[frame_idx].get_global_rect(), text, TipFormat.L, true,
+		TipContentKind.AVATAR_SKILL, icon)
 
 
 func _on_item_slot_hovered(slot: int) -> void:
+	var sc: Vector2 = p1_item_row.scale
 	var base: Vector2 = p1_item_row.global_position \
-		+ Vector2(slot * (ItemSlotRow.SLOT_W + ItemSlotRow.GAP), 0.0)
-	_show_tip_at(Rect2(base, Vector2(ItemSlotRow.SLOT_W, ItemSlotRow.SLOT_H)), _item_slot_tip(slot))
+		+ Vector2(slot * (ItemSlotRow.SLOT_W + ItemSlotRow.GAP) * sc.x, 0.0)
+	_show_tip_at(Rect2(base, Vector2(ItemSlotRow.SLOT_W * sc.x, ItemSlotRow.SLOT_H * sc.y)),
+		_item_slot_tip(slot), TipFormat.L, false, TipContentKind.ITEM, null,
+		_item_slot_tip_data(slot, PLAYER))
 
 
-## 敌方道具悬停（2026-07-17 Eddy：敌方道具同享查看）：行带 0.85 缩放 → 槽矩形按实显宽算。
+## 敌方道具悬停：槽矩形始终按道具行的实际缩放计算。
 func _on_item_slot_hovered_p2(slot: int) -> void:
 	var sc: Vector2 = p2_item_row.scale
 	var base: Vector2 = p2_item_row.global_position \
 		+ Vector2(slot * (ItemSlotRow.SLOT_W + ItemSlotRow.GAP) * sc.x, 0.0)
 	_show_tip_at(Rect2(base, Vector2(ItemSlotRow.SLOT_W * sc.x, ItemSlotRow.SLOT_H * sc.y)),
-		_item_slot_tip(slot, AI))
+		_item_slot_tip(slot, AI), TipFormat.L, false, TipContentKind.ITEM, null,
+		_item_slot_tip_data(slot, AI))
+
+
+## 顶部英雄头像悬停：英雄槽状态跟随对应头像；团队级待命/控制/遗物状态只列在出战头像，
+## 避免让“下一次攻击真伤”“全队禁切”或遗物次数看起来像绑定某一名替补。
+func _hero_status_tip(player: int, frame_idx: int) -> String:
+	var frame_slots: Array[int] = p1_frame_slots if player == PLAYER else p2_frame_slots
+	if frame_idx < 0 or frame_idx >= frame_slots.size():
+		return ""
+	var slot: int = frame_slots[frame_idx]
+	if slot < 0 or slot >= battle.heroes[player].size():
+		return ""
+
+	var lines: Array[String] = []
+	var immunity_charges: int = int(battle.get_status(
+		player, slot, "fatal_damage_immunity", 0))
+	if immunity_charges > 0:
+		lines.append(tr("还魂丹：可免疫1次致命伤害"))
+	elif int(battle.get_status(player, slot, "huanhun_used", 0)) > 0:
+		lines.append(tr("还魂丹：本局已使用"))
+
+	if slot == battle.active_index[player]:
+		var lock_until: int = int(battle.item_buffs[player].get("switch_lock_until_turn", -1))
+		if lock_until >= battle.turn_number:
+			var remaining_turns: int = lock_until - battle.turn_number + 1
+			lines.append(tr("定身：切换无效（剩余%d回合）") % remaining_turns)
+		var energy_lock_turn: int = int(battle.item_buffs[player].get(
+			"energy_gain_lock_turn", -1))
+		if energy_lock_turn == battle.turn_number:
+			lines.append(tr("锁泉塞：本回合无法获得能量"))
+		elif energy_lock_turn == battle.turn_number + 1:
+			lines.append(tr("锁泉塞：下回合无法获得能量"))
+		var return_camp_heal: int = int(battle.item_buffs[player].get(
+			"return_camp_heal", 0))
+		if return_camp_heal > 0:
+			lines.append(tr("归营牌：下次切换时换下英雄回复%s点生命") %
+				_fmt_hp(float(return_camp_heal) / 2.0))
+		if bool(battle.info_distortion[player].get("hide_item_bar", false)):
+			lines.append(tr("迷雾斗篷：道具栏对敌方隐藏"))
+		var free_big_until: int = int(battle.item_buffs[player].get(
+			"free_big_attack_until_turn", -1))
+		if free_big_until == battle.turn_number:
+			lines.append(tr("至臻剑意：本回合第一次「大波」不消耗能量"))
+		var exhausted_turn: int = int(battle.item_buffs[player].get("exhausted_turn", -1))
+		if exhausted_turn == battle.turn_number:
+			lines.append(tr("赊命券：本回合无法行动"))
+		elif exhausted_turn == battle.turn_number + 1:
+			lines.append(tr("赊命券：下回合无法行动"))
+		_append_relic_status_lines(player, lines)
+
+	var tip := ""
+	for line in lines:
+		if tip != "":
+			tip += "\n"
+		tip += line
+	return tip
+
+
+## 团队级遗物只挂在实时出战头像，避免三张头像重复同一公开状态。
+## 次数/回合完全读取权威 relic state；UI 不自行倒计时，也不持有第二份状态。
+func _append_relic_status_lines(player: int, lines: Array[String]) -> void:
+	for relic_variant in battle.relics[player]:
+		var relic: Dictionary = relic_variant
+		var data: ItemData = relic.get("data", null)
+		if data == null or data.tier != 3:
+			continue
+		var state: Dictionary = relic.get("state", {})
+		var charges: int = maxi(int(state.get("charges", 0)), 0)
+		var remaining_turns: int = maxi(int(state.get("remaining_turns", 0)), 0)
+		match data.item_id:
+			"t3_budongmingwang":
+				lines.append(tr("不动明王甲：剩余%d次防御转甲") % charges)
+			"t3_hedinghong":
+				lines.append(tr("鹤顶红：下次毒爆每层+1伤害（剩余%d次）") % charges)
+			"t3_judingsanhua":
+				lines.append(tr("聚鼎三花：剩余%d次攻击附效") % charges)
+			"t3_jubao_pen":
+				lines.append(tr("聚宝盆：每回合结束时为空槽补入普通道具"))
+			"t3_morihuozhong":
+				if battle.alive_count(player) == 1:
+					lines.append(tr("末日火种：残局攻击与防御强化已生效"))
+				else:
+					lines.append(tr("末日火种：等待我方仅剩1名英雄"))
+			"t3_qingyuanbaolian":
+				lines.append(tr("青元宝莲：剩余%d回合获得能量") % remaining_turns)
+			"t3_shixinding":
+				lines.append(tr("噬心钉：本回合必须攻击，否则失去3点生命"))
+			"t3_xumingxiang":
+				lines.append(tr("续命香：剩余%d回合回复生命") % remaining_turns)
+			"t3_yemingzhu":
+				lines.append(tr("夜明珠：剩余%d次切换触发") % charges)
 
 
 ## 目标矩形上方居中放提示；上方放不下（道具行在屏幕上部）→ 落到下方。
-func _show_tip_at(target: Rect2, text: String) -> void:
+func _show_tip_at(target: Rect2, text: String, format: int, centered: bool = false,
+		content_kind: int = TipContentKind.PLAIN, skill_icon: Texture2D = null,
+		item_data: ItemData = null) -> void:
 	if text == "":
 		_hide_tip()
 		return
-	_tip_label.text = _wrap_fixed(text, TIP_CHARS_PER_LINE)
-	_tip_panel.reset_size()
-	var sz: Vector2 = _tip_panel.size
+	var is_avatar_skill := content_kind == TipContentKind.AVATAR_SKILL
+	var is_named_item := content_kind == TipContentKind.ITEM and item_data != null
+	var tip_size: Vector2 = tip_size_avatar_skill if is_avatar_skill else (
+		tip_size_item if is_named_item else (tip_size_s if format == TipFormat.S else tip_size_l))
+	_set_tip_content_margins(format)
+	var is_short := format == TipFormat.S
+	_tip_label.visible = is_short
+	_tip_rich.visible = not is_short
+	_tip_skill_icon.texture = skill_icon
+	_tip_skill_icon.visible = is_avatar_skill and skill_icon != null
+	_tip_item_header.visible = false
+	_tip_rich.offset_left = 76.0 if _tip_skill_icon.visible else 0.0
+	_tip_rich.offset_top = 0.0
+	_tip_rich.offset_right = 0.0
+	_tip_rich.offset_bottom = 0.0
+	if is_short:
+		_tip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if centered \
+			else HORIZONTAL_ALIGNMENT_LEFT
+		_tip_label.text = _keep_tip_terms_together(text)
+	elif is_avatar_skill:
+		_set_avatar_skill_tip_text(text)
+	else:
+		_set_l_tip_text(text, content_kind, item_data)
+	# PanelContainer 只直接管理零最小尺寸的中间层，文字自身不会再把固定框撑大。
+	_tip_panel.custom_minimum_size = Vector2.ZERO
+	_tip_panel.size = tip_size
+	var sz: Vector2 = tip_size
 	var x: float = clampf(target.position.x + target.size.x * 0.5 - sz.x * 0.5, 8.0, SCREEN_W - sz.x - 8.0)
 	# 目标在上半屏（道具行）→ 提示放下方（防压顶部头像/血行）；下半屏（底部按钮）→ 放上方。
 	var y: float = target.end.y + TIP_GAP if target.get_center().y < SCREEN_H * 0.4 \
 		else target.position.y - sz.y - TIP_GAP
+	if is_avatar_skill and target.get_center().y < SCREEN_H * 0.4:
+		y += AVATAR_SKILL_TIP_EXTRA_DROP
 	if y < 8.0 or y + sz.y > SCREEN_H - 8.0:
 		y = clampf(y, 8.0, SCREEN_H - sz.y - 8.0)
 	_tip_panel.global_position = Vector2(x, y)
 	_tip_panel.visible = true
+
+
+## 头像技能说明使用独立的「图标 + 文案」布局，不与道具文本解析共用状态。
+func _set_avatar_skill_tip_text(text: String) -> void:
+	_tip_rich.clear()
+	_tip_rich.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_tip_rich.push_paragraph(HORIZONTAL_ALIGNMENT_LEFT)
+	_tip_rich.push_font_size(tip_font_size_l)
+	_tip_rich.push_color(Color(0.27, 0.21, 0.14))
+	_tip_rich.add_text(_keep_tip_terms_together(text.strip_edges()))
+	_tip_rich.pop_all()
+
+
+func _make_tip_font(font_size: int) -> FontVariation:
+	var variation := FontVariation.new()
+	variation.base_font = FontManager._best_font(font_size)
+	variation.spacing_glyph = tip_glyph_spacing
+	return variation
+
+
+func _set_tip_content_margins(format: int) -> void:
+	var horizontal := tip_padding_horizontal_s if format == TipFormat.S \
+		else tip_padding_horizontal_l
+	var vertical := tip_padding_vertical_s if format == TipFormat.S \
+		else tip_padding_vertical_l
+	_tip_stylebox.content_margin_left = horizontal
+	_tip_stylebox.content_margin_right = horizontal
+	_tip_stylebox.content_margin_top = vertical
+	_tip_stylebox.content_margin_bottom = vertical
+
+
+## 具名道具使用「左上图标+紧随名称 / 下方正文」；空槽状态仍整体居中。
+func _set_l_tip_text(text: String, content_kind: int, item_data: ItemData = null) -> void:
+	_tip_rich.clear()
+	_tip_rich.vertical_alignment = VERTICAL_ALIGNMENT_CENTER \
+		if content_kind == TipContentKind.SKILL else VERTICAL_ALIGNMENT_TOP
+	if content_kind != TipContentKind.ITEM:
+		if content_kind == TipContentKind.SKILL:
+			_tip_rich.push_paragraph(HORIZONTAL_ALIGNMENT_CENTER)
+		_tip_rich.push_font_size(tip_font_size_l)
+		_tip_rich.push_color(Color(0.24, 0.19, 0.12))
+		_tip_rich.add_text(_keep_tip_terms_together(text))
+		_tip_rich.pop_all()
+		return
+
+	var title := ""
+	var body_lines: Array[String] = []
+	var has_named_item := text.contains("\n")
+	for line_variant in text.split("\n"):
+		var line := String(line_variant).strip_edges()
+		if line == "":
+			continue
+		if has_named_item and title == "":
+			title = line
+		else:
+			body_lines.append(line)
+	# 没有「道具名 + 换行」的 ITEM 文案都是空槽/未解锁/待抽取等槽位状态：
+	# 不再模仿说明段落顶端左排，而是在整张提示纸内水平+垂直居中。
+	if title == "":
+		_tip_item_header.visible = false
+		_tip_rich.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_tip_rich.push_paragraph(HORIZONTAL_ALIGNMENT_CENTER)
+		_tip_rich.push_font_size(tip_font_size_l)
+		_tip_rich.push_color(Color(0.27, 0.21, 0.14))
+		_tip_rich.add_text(_keep_tip_terms_together(text.strip_edges()))
+		_tip_rich.pop_all()
+		return
+	var body_text := "\n".join(body_lines)
+	var group_top := ITEM_TIP_BASE_TOP - item_tip_vertical_lift
+	var content_width := tip_size_item.x - tip_padding_horizontal_l * 2.0
+	var column_width := _item_tip_column_width(title, body_lines, content_width)
+	var column_left := floorf((content_width - column_width) * 0.5)
+	_configure_item_tip_header(title, item_data, Vector2(column_left, group_top), column_width)
+	# 标题行与正文共用同一个居中内容列；换行后仍在列内左对齐。
+	_tip_rich.offset_left = column_left
+	_tip_rich.offset_right = -(content_width - column_left - column_width)
+	_tip_rich.offset_top = group_top + ITEM_TIP_ICON_SIZE + item_tip_title_body_gap
+	_tip_rich.offset_bottom = 0.0
+	_tip_rich.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	if not body_lines.is_empty():
+		_tip_rich.push_paragraph(HORIZONTAL_ALIGNMENT_LEFT)
+		_tip_rich.push_font_size(tip_font_size_l)
+		_tip_rich.push_color(Color(0.27, 0.21, 0.14))
+		_tip_rich.add_text(_keep_tip_terms_together(body_text))
+		_tip_rich.pop_all()
+
+
+func _item_tip_column_width(title: String, body_lines: Array[String], content_width: float) -> float:
+	var title_font := _make_tip_font(tip_font_size_l + 1)
+	var body_font := _make_tip_font(tip_font_size_l)
+	var title_width := title_font.get_string_size(
+			_keep_tip_terms_together(title), HORIZONTAL_ALIGNMENT_LEFT, -1.0,
+			tip_font_size_l + 1).x
+	var natural_width := ITEM_TIP_ICON_SIZE + ITEM_TIP_ICON_TITLE_GAP + title_width
+	for line in body_lines:
+		natural_width = maxf(natural_width, body_font.get_string_size(
+				_keep_tip_terms_together(line), HORIZONTAL_ALIGNMENT_LEFT, -1.0,
+				tip_font_size_l).x)
+	return clampf(ceilf(natural_width), minf(ITEM_TIP_MIN_COLUMN_WIDTH, content_width), content_width)
+
+
+func _configure_item_tip_header(title: String, item_data: ItemData, position: Vector2,
+		column_width: float) -> void:
+	_tip_item_header.position = position
+	_tip_item_header.size = Vector2(column_width, ITEM_TIP_ICON_SIZE)
+	_tip_item_header.visible = true
+	_tip_item_title.text = _keep_tip_terms_together(title)
+	_tip_item_icon.texture = ItemCatalog.load_icon(item_data.item_id) if item_data != null else null
+	_tip_item_icon.visible = _tip_item_icon.texture != null
+
+
+## U+2060 只影响断行、不绘制；保护高频规则词，避免“能/量”“大/防”被拆到两行。
+func _keep_tip_terms_together(text: String) -> String:
+	var protected_text := text
+	for term in TIP_ATOMIC_TERMS:
+		var joined_term := ""
+		for glyph in term:
+			if joined_term != "":
+				joined_term += "\u2060"
+			joined_term += glyph
+		protected_text = protected_text.replace(term, joined_term)
+	return protected_text
 
 
 func _hide_tip() -> void:
@@ -2128,100 +3476,471 @@ func _hide_tip() -> void:
 		_tip_panel.visible = false
 
 
-## 基础动作提示（半点制换算为「点」显示·复用 _fmt_hp）。
+## 基础动作提示只解释按钮功能；费用已由按钮角标表达，不在浮层重复。
 func _action_tip(action: int) -> String:
-	var d: Dictionary = ActionDef.BASE_ACTION_DEF[action]
 	match action:
 		A.CHARGE:
-			return tr("获得%s点能量") % _fmt_hp(int(d["energy_gain"]) / 2.0)
+			return tr("获得1点能量")
 		A.ATTACK:
-			return tr("消耗%s点能量\n造成%s点伤害") % [_fmt_hp(int(d["cost"]) / 2.0), _fmt_hp(int(d["damage"]) / 2.0)]
+			return tr("造成1点伤害")
 		A.BIG_ATTACK:
-			return tr("消耗%s点能量\n造成%s点穿防伤害（大防可挡）") % [_fmt_hp(int(d["cost"]) / 2.0), _fmt_hp(int(d["damage"]) / 2.0)]
+			return tr("造成2点伤害")
 		A.DEFEND:
-			return tr("挡下敌方普通攻击\n（穿防与真伤挡不住）")
+			return tr("抵挡「波」")
 		A.BIG_DEFEND:
-			return tr("消耗%s点能量\n挡下普通与穿防攻击（真伤除外）") % _fmt_hp(int(d["cost"]) / 2.0)
+			return tr("抵挡「波」、「大波」")
 	return ""
 
 
-## 主动技提示：技能名+完整说明+费用（当前出战英雄·无主动技返回空=不显示）。
+## 主动技能按钮只显示功能正文；完整技能说明由技能情报按钮的 L 框承担。
 func _special_tip() -> String:
 	var h: HeroData = battle.active_hero(PLAYER)
 	if h == null:
 		return ""
-	var txt := tr("【%s】") % tr(h.skill_description)
-	if h.skill_detail != "":
-		txt += "\n" + tr(h.skill_detail)
-	var c: int = battle.action_cost(PLAYER, ACTIVE)
-	if c > 0:
-		txt += tr("\n消耗%s点能量") % _fmt_hp(c / 2.0)
-	return txt
+	match h.hero_id:
+		"h10":
+			return tr("消耗全部剑气发动攻击；剑气越多，伤害与穿透越强")
+		"h14":
+			return tr("将本回合行动的能量消耗改为消耗生命")
+		"h17":
+			return tr("转变为敌方当前出战英雄")
+		"h18":
+			return tr("平均分配我方所有存活英雄的当前生命")
+		"h21":
+			return tr("指定敌方一名未出战英雄登场，替换其当前出战英雄")
+		"h22":
+			return tr("下一回合结束时，双方失去全部能量")
+		_:
+			return tr(h.skill_detail)
 
 
-func _confirm_tip() -> String:
-	return tr("锁定本回合行动并结算")
+func _longyuji_tip() -> String:
+	return tr("使「波」额外造成1点伤害")
 
 
-## 我方道具槽提示（按槽状态）：解锁回合 / 抽·补·升费用 / 道具名+效果+锁定状态。
-## p=PLAYER 带操作 CTA（点击使用/右键升级/补充）；p=AI 只读版（敌方道具查看·无 CTA·2026-07-17）。
+func _split_big_wave_tip() -> String:
+	return tr("将本次「大波」改为连续两次「波」")
+
+
+func _h24_discount_tip() -> String:
+	return tr("降低1点能量上限，使本回合行动少消耗1点能量（上限最低3点）")
+
+
+## 我方道具槽提示（按槽状态）：空槽显示解锁/抽取/补充提示；
+## 已有道具只显示道具名与效果，不再在说明底部重复操作 CTA 或就绪/锁定状态。
 func _item_slot_tip(slot: int, p: int = PLAYER) -> String:
 	var mine := p == PLAYER
-	match battle.slot_state(p, slot):
+	if not mine and bool(battle.info_distortion[p].get("hide_item_bar", false)):
+		return tr("道具栏被迷雾遮蔽")
+	var shown_battle: BattleCore = _battle_for_item_row() if mine else battle
+	match shown_battle.slot_state(p, slot):
 		BattleCore.SlotState.SEALED:
 			return tr("第%d回合自动解锁") % (int(BattleCore.SLOT_UNLOCK_TURN[slot]) + 1)
 		BattleCore.SlotState.OPENED:
 			if not mine:
 				return tr("待抽取道具")
-			if battle.can_draw_slot(p, slot):
+			if shown_battle.can_draw_slot(p, slot):
 				return tr("点击抽取道具（3选1·免费）")
 			return tr("下回合可抽取道具")
 		BattleCore.SlotState.CHARGING:
-			var item: ItemData = battle.slot_item(p, slot)
+			var item: ItemData = shown_battle.slot_item(p, slot)
 			if item == null:
 				return ""
-			var txt := tr("【%s】\n%s") % [tr(item.item_name), tr(item.description)]
-			if battle.slot_ready(p, slot):
-				if mine:
-					txt += tr("\n— 点击使用")
-					if battle.can_upgrade(p, slot):
-						txt += tr("·右键升级（%s点能量）") % _fmt_hp(BattleCore.UPGRADE_COST / 2.0)
-				else:
-					txt += tr("\n— 就绪")
-			else:
-				txt += tr("\n— 锁定中·下回合可用")
-			return txt
+			return tr("%s\n%s") % [tr(item.item_name), tr(item.description)]
 		BattleCore.SlotState.EMPTY:
 			if not mine:
 				return tr("空槽")
-			if battle.can_refill(p, slot):
+			if shown_battle.can_refill(p, slot):
 				return tr("点击补充道具（3选1·消耗%s点能量）") % _fmt_hp(BattleCore.ITEM_REFILL_COST / 2.0)
 			return tr("空槽（补充需%s点能量）") % _fmt_hp(BattleCore.ITEM_REFILL_COST / 2.0)
 	return ""
 
 
-## 手动定宽换行：每行固定 chars 个字符（CJK 等宽·统一每行字数·保留已有换行）。
-func _wrap_fixed(text: String, chars: int) -> String:
-	var out := ""
-	var count := 0
-	for ch in text:
-		if ch == "\n":
-			out += ch
-			count = 0
+## 与提示文字读取同一份预览战斗，保证顶部图标/阶框不会和本回合暂存后的槽状态错位。
+func _item_slot_tip_data(slot: int, p: int = PLAYER) -> ItemData:
+	if p != PLAYER and bool(battle.info_distortion[p].get("hide_item_bar", false)):
+		return null
+	var shown_battle: BattleCore = _battle_for_item_row() if p == PLAYER else battle
+	if shown_battle.slot_state(p, slot) != BattleCore.SlotState.CHARGING:
+		return null
+	return shown_battle.slot_item(p, slot)
+
+
+func _is_furnace_slot(s: int) -> bool:
+	if battle == null or s < 0 or s >= battle.slots[PLAYER].size():
+		return false
+	var item: ItemData = battle.slot_item(PLAYER, s)
+	return item != null and item.item_id == FURNACE_ITEM_ID
+
+
+## 已配对关系中，以 s 为目标的来源槽；互斥规则依来源道具的 consumes/transforms 语义决定。
+func _target_owner_for_slot(s: int) -> int:
+	for owner_variant in selected_item_targets:
+		var owner: int = int(owner_variant)
+		if BattleCore.item_requires_enemy_item_slot_target(_effective_slot_item(owner)):
 			continue
-		out += ch
-		count += 1
-		if count >= chars:
-			out += "\n"
-			count = 0
-	return out.trim_suffix("\n")
+		if int(selected_item_targets[owner_variant]) == s:
+			return owner
+	return -1
+
+
+## 保留玩家点选顺序。带槽目标的道具只提交来源槽；熔炉燃料会被一并消耗，点金石目标会锁定一回合。
+func _ordered_selected_item_slots() -> Array[int]:
+	return selected_item_slots.duplicate()
+
+
+## 槽目标规则只看本回合开始时真正就绪的道具。点金石产出的 T3 本回合锁定，不形成链式入口。
+func _effective_slot_item(s: int) -> ItemData:
+	if battle == null or s < 0 or s >= battle.slots[PLAYER].size():
+		return null
+	return battle.slot_item(PLAYER, s)
+
+
+func _slot_target_mode(s: int) -> int:
+	var item: ItemData = _effective_slot_item(s)
+	if item == null:
+		return ItemSlotTargetMode.NONE
+	match item.item_id:
+		FURNACE_ITEM_ID:
+			return ItemSlotTargetMode.CONSUMES
+		POINTSTONE_ITEM_ID:
+			return ItemSlotTargetMode.TRANSFORMS
+		_:
+			return ItemSlotTargetMode.NONE
+
+
+func _is_valid_item_slot_target(owner: int, target: int) -> bool:
+	if battle == null or owner == target or target < 0 or target >= battle.slots[PLAYER].size():
+		return false
+	var preview: BattleCore = _battle_after_selected_items()
+	if not preview.slot_ready(PLAYER, owner) or not preview.slot_ready(PLAYER, target):
+		return false
+	var owner_item: ItemData = preview.slot_item(PLAYER, owner)
+	var target_item: ItemData = preview.slot_item(PLAYER, target)
+	if owner_item == null or target_item == null:
+		return false
+	if owner_item.item_id == FURNACE_ITEM_ID:
+		return true
+	if owner_item.item_id == POINTSTONE_ITEM_ID:
+		return target_item.tier == 1
+	return false
+
+
+## 取消一个来源及其下游依赖。点金石目标若已选择使用，也一起取消，避免悄悄改回使用旧 T1。
+func _remove_item_target_owner(owner: int) -> void:
+	selected_item_choices.erase(owner)
+	selected_item_choice_options.erase(owner)
+	if not selected_item_targets.has(owner):
+		selected_item_slots.erase(owner)
+		return
+	var target := int(selected_item_targets[owner])
+	selected_item_targets.erase(owner)
+	selected_item_slots.erase(owner)
+	if BattleCore.item_requires_enemy_item_slot_target(_effective_slot_item(owner)):
+		if _pending_enemy_item_target_slot == owner:
+			_pending_enemy_item_target_slot = -1
+		return
+	selected_item_slots.erase(target)
+	if selected_item_targets.has(target):
+		_remove_item_target_owner(target)
+	if _pending_item_target_slot == owner or _pending_item_target_slot == target:
+		_pending_item_target_slot = -1
+
+
+## 普通点击的取消语义：变换目标只取消“使用新 T2”，保留点金石配对；燃料则拆掉熔炉整组。
+func _clear_item_selection_for_slot(s: int) -> void:
+	if _pending_item_hero_target_slot == s:
+		_pending_item_hero_target_slot = -1
+		_clear_friendly_item_target_prompts()
+		return
+	if selected_item_hero_targets.has(s):
+		selected_item_hero_targets.erase(s)
+		_clear_friendly_item_target_prompts()
+	if _pending_item_target_slot == s:
+		_pending_item_target_slot = -1
+		return
+	if selected_item_targets.has(s):
+		_remove_item_target_owner(s)
+		return
+	var owner := _target_owner_for_slot(s)
+	if owner >= 0 and _slot_target_mode(owner) == ItemSlotTargetMode.CONSUMES:
+		_remove_item_target_owner(owner)
+		return
+	selected_item_slots.erase(s)
+
+
+## 新配对的目标必须先退出旧的普通使用、旧来源目标或自身下游关系，确保一槽只属一组。
+func _clear_item_selection_for_new_target(s: int) -> void:
+	selected_item_hero_targets.erase(s)
+	if selected_item_targets.has(s):
+		_remove_item_target_owner(s)
+	var owner := _target_owner_for_slot(s)
+	if owner >= 0:
+		_remove_item_target_owner(owner)
+	selected_item_slots.erase(s)
+	if _pending_item_target_slot == s:
+		_pending_item_target_slot = -1
+
+
+func _clear_selected_items() -> void:
+	selected_item_slots.clear()
+	selected_item_targets.clear()
+	selected_item_hero_targets.clear()
+	selected_item_choices.clear()
+	selected_item_choice_options.clear()
+	_pending_item_target_slot = -1
+	_pending_item_hero_target_slot = -1
+	_pending_enemy_item_target_slot = -1
+	_clear_friendly_item_target_prompts()
+	_pending_pointstone_offer.clear()
+	_refresh_enemy_targets_after_item_change()
+
+
+## 道具行现有 selected 接口只有槽数组；把使用件、目标和待选来源合并后交给它高亮。
+func _highlighted_item_slots() -> Array[int]:
+	var highlighted: Array[int] = selected_item_slots.duplicate()
+	if _pending_item_target_slot >= 0 and not highlighted.has(_pending_item_target_slot):
+		highlighted.append(_pending_item_target_slot)
+	if _pending_item_hero_target_slot >= 0 and not highlighted.has(_pending_item_hero_target_slot):
+		highlighted.append(_pending_item_hero_target_slot)
+	for target_variant in selected_item_targets.values():
+		var target := int(target_variant)
+		var target_owner: int = _target_owner_for_slot(target)
+		if target_owner >= 0 and target >= 0 and not highlighted.has(target):
+			highlighted.append(target)
+	if not _pending_pointstone_offer.is_empty():
+		for key in ["source", "target"]:
+			var pending_slot: int = int(_pending_pointstone_offer.get(key, -1))
+			if pending_slot >= 0 and not highlighted.has(pending_slot):
+				highlighted.append(pending_slot)
+	return highlighted
+
+
+## 3 选 1 完成后才把点金石加入本回合提交。目标不会加入 selected_item_slots，确保新 T3 锁定一回合。
+func _complete_pointstone_pair(owner: int, target: int, choice: int,
+		option_ids: Array = []) -> bool:
+	if choice < 0 or choice > 2 or not _is_valid_item_slot_target(owner, target):
+		return false
+	_clear_item_selection_for_new_target(target)
+	selected_item_targets[owner] = target
+	selected_item_choices[owner] = choice
+	selected_item_choice_options[owner] = option_ids.duplicate()
+	if not selected_item_slots.has(owner):
+		selected_item_slots.append(owner)
+	_pending_item_target_slot = -1
+	return true
+
+
+## 就绪槽的使用点选。槽目标道具先进入待选；合法配对后才进入提交数组。
+func _toggle_ready_item_selection(s: int) -> bool:
+	if not battle.slot_ready(PLAYER, s):
+		return false
+	if _pending_enemy_item_target_slot >= 0:
+		if s == _pending_enemy_item_target_slot:
+			_pending_enemy_item_target_slot = -1
+			return true
+		_pending_enemy_item_target_slot = -1
+	if _pending_item_hero_target_slot >= 0:
+		if s == _pending_item_hero_target_slot:
+			_pending_item_hero_target_slot = -1
+			_clear_friendly_item_target_prompts()
+			return true
+		_pending_item_hero_target_slot = -1
+		_clear_friendly_item_target_prompts()
+	if _pending_item_target_slot >= 0:
+		var owner := _pending_item_target_slot
+		if s == owner:
+			_pending_item_target_slot = -1
+			return true
+		if _slot_target_mode(owner) == ItemSlotTargetMode.TRANSFORMS:
+			return false   # 点金石还需 3 选 1，由槽点击入口异步完成。
+		# 配对验证必须基于“目标退出旧使用/旧配对”后的棋盘；否则已选择使用的新 T2 会因 used=true
+		# 被误判为不能改作熔炉燃料。非法目标则完整恢复旧选择，不制造破坏性误点。
+		var previous_slots: Array[int] = selected_item_slots.duplicate()
+		var previous_targets: Dictionary = selected_item_targets.duplicate()
+		_clear_item_selection_for_new_target(s)
+		if not _is_valid_item_slot_target(owner, s):
+			selected_item_slots = previous_slots
+			selected_item_targets = previous_targets
+			_pending_item_target_slot = owner
+			return false
+		_pending_item_target_slot = -1
+		selected_item_targets[owner] = s
+		if not selected_item_slots.has(owner):
+			selected_item_slots.append(owner)
+		return true
+
+	if selected_item_slots.has(s):
+		_clear_item_selection_for_slot(s)
+		_refresh_enemy_targets_after_item_change()
+		return true
+	var target_owner := _target_owner_for_slot(s)
+	if target_owner >= 0 and _slot_target_mode(target_owner) == ItemSlotTargetMode.CONSUMES:
+		# 燃料再次点击：拆掉熔炉配对，再按该槽自身道具处理。
+		_remove_item_target_owner(target_owner)
+	elif target_owner >= 0:
+		return false   # 点金石目标已变成锁定 T3，本回合不能再次选择使用。
+	var mode := _slot_target_mode(s)
+	if mode != ItemSlotTargetMode.NONE:
+		_pending_item_target_slot = s
+	elif BattleCore.item_requires_friendly_hero_target(_effective_slot_item(s)):
+		_disarm_switch()
+		_pending_item_hero_target_slot = s
+		_refresh_friendly_item_target_prompts()
+	elif BattleCore.item_requires_enemy_item_slot_target(_effective_slot_item(s)):
+		_pending_enemy_item_target_slot = s
+	else:
+		selected_item_slots.append(s)
+	_refresh_enemy_targets_after_item_change()
+	return true
+
+
+func _is_valid_friendly_item_target(owner: int, target: int) -> bool:
+	if battle == null or owner < 0 or target < 0 or target >= battle.hp[PLAYER].size():
+		return false
+	if not battle.slot_ready(PLAYER, owner):
+		return false
+	var item: ItemData = battle.slot_item(PLAYER, owner)
+	if not BattleCore.item_requires_friendly_hero_target(item):
+		return false
+	if BattleCore.item_requires_friendly_dead_hero_target(item):
+		return battle.is_dead_reserve(PLAYER, target)
+	if battle.hp[PLAYER][target] <= 0:
+		return false
+	if BattleCore.item_requires_friendly_reserve_target(item) \
+			and target == battle.active_index[PLAYER]:
+		return false
+	return true
+
+
+func _clear_friendly_item_target_prompts() -> void:
+	for frame_idx in _item_target_prompt_frames:
+		if frame_idx >= 0 and frame_idx < p1_frames.size() and p1_frames[frame_idx] != null:
+			p1_frames[frame_idx].set_switch_prompt(false)
+			p1_frames[frame_idx].is_selected = false
+	_item_target_prompt_frames.clear()
+
+
+func _refresh_friendly_item_target_prompts() -> void:
+	_clear_friendly_item_target_prompts()
+	if _pending_item_hero_target_slot < 0 or p1_frames.size() < 3:
+		return
+	for frame_idx in range(p1_frames.size()):
+		var hero_slot: int = p1_frame_slots[frame_idx]
+		if _is_valid_friendly_item_target(_pending_item_hero_target_slot, hero_slot):
+			p1_frames[frame_idx].set_switch_prompt(true, tr("选"))
+			_item_target_prompt_frames.append(frame_idx)
+
+
+func _select_friendly_item_target(frame_idx: int) -> bool:
+	if frame_idx < 0 or frame_idx >= p1_frame_slots.size():
+		return false
+	var owner: int = _pending_item_hero_target_slot
+	var hero_slot: int = p1_frame_slots[frame_idx]
+	if not _complete_friendly_item_target(owner, hero_slot):
+		return false
+	_clear_friendly_item_target_prompts()
+	if frame_idx < p1_frames.size() and p1_frames[frame_idx] != null:
+		p1_frames[frame_idx].is_selected = true
+		_item_target_prompt_frames.append(frame_idx)
+	_refresh_enemy_targets_after_item_change()
+	_update_all()
+	_start_ai_think()
+	return true
+
+
+func _complete_friendly_item_target(owner: int, hero_slot: int) -> bool:
+	if not _is_valid_friendly_item_target(owner, hero_slot):
+		return false
+	selected_item_hero_targets[owner] = hero_slot
+	if not selected_item_slots.has(owner):
+		selected_item_slots.append(owner)
+	_pending_item_hero_target_slot = -1
+	return true
+
+
+func _is_valid_enemy_item_slot_target(owner: int, target: int) -> bool:
+	if battle == null or owner < 0 or not battle.slot_ready(PLAYER, owner):
+		return false
+	var item: ItemData = battle.slot_item(PLAYER, owner)
+	return BattleCore.item_requires_enemy_item_slot_target(item) \
+		and battle.valid_enemy_locked_item_target(PLAYER, target)
+
+
+func _complete_enemy_item_slot_target(owner: int, target: int) -> bool:
+	if not _is_valid_enemy_item_slot_target(owner, target):
+		return false
+	selected_item_targets[owner] = target
+	if not selected_item_slots.has(owner):
+		selected_item_slots.append(owner)
+	_pending_enemy_item_target_slot = -1
+	return true
+
+
+func _on_p2_item_target_clicked(slot: int) -> void:
+	if _pending_enemy_item_target_slot < 0:
+		return
+	if _complete_enemy_item_slot_target(_pending_enemy_item_target_slot, slot):
+		_update_all()
+		_start_ai_think()
+
+
+func _pending_target_owner_is_pointstone() -> bool:
+	return _pending_item_target_slot >= 0 \
+		and _slot_target_mode(_pending_item_target_slot) == ItemSlotTargetMode.TRANSFORMS
+
+
+func _select_pointstone_target_local(target: int) -> void:
+	var owner: int = _pending_item_target_slot
+	if owner < 0:
+		return
+	if owner == target:
+		_pending_item_target_slot = -1
+		_update_all()
+		return
+	# 选作升级目标即放弃其原本的“本回合使用”选择。
+	selected_item_slots.erase(target)
+	if not _is_valid_item_slot_target(owner, target):
+		return
+	var options: Array = battle.begin_pointstone_draft(PLAYER, owner, target)
+	if options.is_empty():
+		return
+	var choice: int = await _show_draft(owner, options, tr("点金石：选择传说道具（3 选 1）"))
+	if choice >= 0:
+		var option_ids: Array[String] = []
+		for item_variant in options:
+			option_ids.append((item_variant as ItemData).item_id)
+		_complete_pointstone_pair(owner, target, choice, option_ids)
+	else:
+		_pending_item_target_slot = owner
+	_update_all()
+	_start_ai_think()
+
+
+func _request_pointstone_target_net(target: int) -> void:
+	if not _pending_pointstone_offer.is_empty():
+		return
+	var owner: int = _pending_item_target_slot
+	if owner < 0:
+		return
+	if owner == target:
+		_pending_item_target_slot = -1
+		_update_all()
+		return
+	selected_item_slots.erase(target)
+	if not _is_valid_item_slot_target(owner, target):
+		return
+	_pending_pointstone_offer = {source = owner, target = target}
+	_pending_item_target_slot = -1
+	BattleSetup.net_session.client.request_pointstone_draft(owner, target)
+	_update_all()
 
 
 ## M3：P1 道具槽点击分派（按槽态）。抽/补 = 立即生效（公开电报）；
 ## 使用 = 暂存点选（金边），确认时与动作一起盲选提交。
 ## 格解锁自动（第 3/4/5 回合·无开格步骤/费用·2026-07-03）→ SEALED（未到解锁回合）点击无操作。
 func _on_p1_slot_clicked(s: int) -> void:
-	if state != State.PLAYER_SELECT or _drafting:
+	if state != State.PLAYER_SELECT or _drafting or not _pending_pointstone_offer.is_empty():
 		return
 	# 联机（M1）：抽/补=向服务器请求（选项服务器生成·draft_offer 回来经 _net_open_offer 弹窗）；
 	# 使用点选=纯本地暂存（提交时随 payload 上行），与本地同款 toggle。
@@ -2232,11 +3951,10 @@ func _on_p1_slot_clicked(s: int) -> void:
 					BattleSetup.net_session.client.request_draft(s, false)
 			BattleCore.SlotState.CHARGING:
 				if battle.slot_ready(PLAYER, s):
-					if selected_item_slots.has(s):
-						selected_item_slots.erase(s)
-					else:
-						selected_item_slots.append(s)
-					_update_all()
+					if _pending_target_owner_is_pointstone():
+						_request_pointstone_target_net(s)
+					elif _toggle_ready_item_selection(s):
+						_update_all()
 			BattleCore.SlotState.EMPTY:
 				if battle.can_refill(PLAYER, s):
 					BattleSetup.net_session.client.request_refill(s)
@@ -2250,11 +3968,10 @@ func _on_p1_slot_clicked(s: int) -> void:
 				_update_all()
 		BattleCore.SlotState.CHARGING:
 			if battle.slot_ready(PLAYER, s):
-				if selected_item_slots.has(s):   # 可取消点选（toggle）
-					selected_item_slots.erase(s)
-				else:
-					selected_item_slots.append(s)
-				_update_all()
+				if _pending_target_owner_is_pointstone():
+					await _select_pointstone_target_local(s)
+				elif _toggle_ready_item_selection(s):
+					_update_all()
 		BattleCore.SlotState.EMPTY:
 			if battle.can_refill(PLAYER, s):
 				var opts: Array = battle.start_refill(PLAYER, s)   # 付 1 能→OPENED·本回合可抽
@@ -2272,13 +3989,18 @@ func _on_p1_slot_upgrade(s: int) -> void:
 		return
 	if _net:
 		if battle.can_upgrade(PLAYER, s):
+			_pending_item_target_slot = -1
+			_clear_item_selection_for_new_target(s)
+			_update_all()
 			BattleSetup.net_session.client.request_draft(s, true)
 		return
 	if battle.can_upgrade(PLAYER, s):
+		_pending_item_target_slot = -1
+		_clear_item_selection_for_new_target(s)
+		_update_all()
 		var c: int = await _show_draft(s, battle.begin_upgrade_draft(PLAYER, s), tr("升级道具（3 选 1）"))
 		if c >= 0:
 			battle.pick_upgrade(PLAYER, s, c)   # 付能量 → 换升级件 → 锁本回合
-			selected_item_slots.erase(s)        # 升级后该槽不再就绪 → 撤销本回合「使用」点选
 		_update_all()
 		_start_ai_think()   # 任务G：升级改变棋盘 → 重想
 
@@ -2300,10 +4022,13 @@ func _show_draft(_s: int, options: Array, title: String = "抽取道具（3 选 
 
 func _update_all() -> void:
 	_update_hero_frames()
+	_refresh_switch_module()
 	if p1_item_row != null:
-		p1_item_row.refresh(battle, 0, selected_item_slots)
+		p1_item_row.refresh(_battle_for_item_row(), 0, _highlighted_item_slots())
 	if p2_item_row != null:
-		p2_item_row.refresh(battle, 1)
+		p2_item_row.targetable = _pending_enemy_item_target_slot >= 0
+		p2_item_row.refresh(battle, 1, [], bool(
+			battle.info_distortion[1].get("hide_item_bar", false)))
 	_update_character_displays()
 	_update_energy_labels()
 	_update_hp_labels()
@@ -2428,6 +4153,17 @@ func _update_energy_labels() -> void:
 	var e1 := battle.energy[1] / float(ActionDef.ENERGY_UNIT)
 	p1_coin_row.set_value(e0, e0)
 	p2_coin_row.set_value(e1, e1)
+	var caps: Array[int] = battle.energy_max
+	for p in 2:
+		var label: Label = p1_energy_cap_label if p == 0 else p2_energy_cap_label
+		var reduced: bool = caps[p] < ActionDef.MAX_ENERGY
+		label.visible = reduced
+		if reduced:
+			label.text = tr("能量上限 %s") % _fmt_hp(float(caps[p]) / float(ActionDef.ENERGY_UNIT))
+	var cap0 := float(caps[0]) / float(ActionDef.ENERGY_UNIT)
+	var cap1 := float(caps[1]) / float(ActionDef.ENERGY_UNIT)
+	p1_coin_row.tooltip_text = tr("当前能量 %s / 上限 %s") % [_fmt_hp(e0), _fmt_hp(cap0)]
+	p2_coin_row.tooltip_text = tr("当前能量 %s / 上限 %s") % [_fmt_hp(e1), _fmt_hp(cap1)]
 
 
 func _update_hp_labels() -> void:
@@ -2451,31 +4187,6 @@ func _fmt_hp(v: float) -> String:
 	if is_equal_approx(v, roundf(v)):
 		return "%d" % int(roundf(v))
 	return "%.1f" % v
-
-
-# ============================================================
-# 战斗内设置入口（右上角小钮 + ESC）
-# ============================================================
-
-## 右上角"设置"小钮（P2 道具槽行下方空区·暗色低调工具件·不与战斗 UI 抢眼）。
-func _build_settings_button() -> void:
-	var b := Button.new()
-	b.name = "SettingsButton"
-	b.text = tr("设置")
-	FontManager.apply_btn(b, 16)
-	b.add_theme_color_override("font_color", Color(0.70, 0.64, 0.53))       # 暖骨降级字色（工具件·非主操作）
-	b.add_theme_color_override("font_hover_color", Color(0.95, 0.91, 0.8))  # hover 暖米白
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.08, 0.07, 0.06, 0.72)
-	sb.border_color = Color(0.42, 0.36, 0.26, 0.8)
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(3)
-	for st in ["normal", "hover", "pressed", "focus"]:
-		b.add_theme_stylebox_override(st, sb)
-	b.position = Vector2(1826.0, 254.0)   # P2 道具槽行正下方右缘（空天区·不压任何 HUD）
-	b.size = Vector2(64.0, 30.0)
-	b.pressed.connect(_open_settings)
-	add_child(b)
 
 
 ## 打开设置浮层（复用主菜单 SettingsPanel·加为末子节点=盖住全部战斗 UI）。
@@ -2518,10 +4229,9 @@ func _build_debug_buttons() -> void:
 	panel.overtime_requested.connect(_on_debug_overtime)
 
 
-## debug 面板改了 battle 状态 → 刷新全套显示（含换英雄需刷技能情报钮·多刷无害）。
+## debug 面板改了 battle 状态 → 刷新全套显示。
 func _on_debug_state_changed() -> void:
 	_update_all()
-	_skill_info.refresh(battle)
 	_start_ai_think()   # 任务G：调试面板直改引擎状态 → 预想作废重想
 
 
@@ -2560,11 +4270,12 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 	# 仅对方进攻=偏左聚受击的己方；仅己方进攻=偏右聚受击的敌方；双方都未进攻=不推近。
 	var p1_off := _is_offense(a0, int(dmg[1]), bool(dead[1]))
 	var p2_off := _is_offense(a1, int(dmg[0]), bool(dead[0]))
+	var strength_price_executed: Array = fx.get("strength_price_executed", [false, false])
 	# 终结演出（Q1A）：本拍"动作直接击杀出战英雄"→ 专用慢放演出取代普通结算演出。
 	# 毒引爆随攻击结算=攻击致死会触发；反弹死/纯道具死（击杀侧非进攻动作）不触发；
-	# 天狗御凶拦下致命伤=没死=自然不触发。
-	var fin_kill_p2 := bool(dead[1]) and p1_off
-	var fin_kill_p1 := bool(dead[0]) and p2_off
+	# 还魂等保命效果让目标未实际阵亡时，自然不触发终结演出。
+	var fin_kill_p2 := bool(dead[1]) and not bool(strength_price_executed[1]) and p1_off
+	var fin_kill_p1 := bool(dead[0]) and not bool(strength_price_executed[0]) and p2_off
 	if fin_kill_p1 or fin_kill_p2:
 		await _play_finisher(dmg, fin_kill_p2, fin_kill_p1, fx)
 		return
@@ -2585,8 +4296,10 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 			_fx._fly_energy_motes(p, int(egain[p]))
 	# P3：仅"大波且确实打中（伤害/击杀）"时镜头前推蓄势，峰值正好落在 0.45*phase 后的命中瞬间，
 	# 与 stage.shake() + _hitstop 合拍（被挡的大波无 impact → 不触发，避免推近落空）。
-	var big_lands := (a0 == A.BIG_ATTACK and (int(dmg[1]) > 0 or reserve_dmg[1] > 0 or bool(dead[1]))) \
-		or (a1 == A.BIG_ATTACK and (int(dmg[0]) > 0 or reserve_dmg[0] > 0 or bool(dead[0])))
+	var big_lands := (a0 == A.BIG_ATTACK and (int(dmg[1]) > 0 or reserve_dmg[1] > 0 \
+		or (bool(dead[1]) and not bool(strength_price_executed[1])))) \
+		or (a1 == A.BIG_ATTACK and (int(dmg[0]) > 0 or reserve_dmg[0] > 0 \
+		or (bool(dead[0]) and not bool(strength_price_executed[0]))))
 	if big_lands:
 		_big_attack_punch()
 	await get_tree().create_timer(action_phase_duration * 0.45).timeout
@@ -2622,7 +4335,7 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 	for p in 2:
 		if float(healed[p]) > 0.0:
 			_fx._pop_heal(p, float(healed[p]))
-	# A3b 命中拍注解：毒爆/印记/易伤/护盾/替身/免疫/破甲/护主/反击/还魂——腹位小字逐条弹出。
+	# A3b 命中拍注解：毒爆/印记/脆弱/护盾/替身/免疫/破甲/追击/还魂/能量上限——腹位小字逐条弹出。
 	var tags: Array = fx.get("tags", [[], []])
 	for p in 2:
 		_fx._pop_tags(p, tags[p])
@@ -2631,7 +4344,9 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 	var hit1 := int(dmg[1]) > 0 or reserve_hit[1] or bool(dead[1])
 	var lethal := bool(dead[0]) or bool(dead[1])
 	if any:
-		var kick := (1.0 if hit1 else 0.0) - (1.0 if hit0 else 0.0)
+		var kick := _base_attack_response_direction(a0, a1)
+		if is_nan(kick):
+			kick = (1.0 if hit1 else 0.0) - (1.0 if hit0 else 0.0)
 		# 击杀拍震屏强制加档（死亡节拍 v3 ①：这一下就该和普通命中不一样）
 		stage.shake(SHAKE_BIG if (lethal or a0 == A.BIG_ATTACK or a1 == A.BIG_ATTACK) else SHAKE_HIT, kick)
 	elif any_block:
@@ -2979,6 +4694,7 @@ func _process(_delta: float) -> void:
 		_world.scale = Vector2.ONE * gd
 		# 鼠标视差：角色组加上地面层同款平移（stage.pointer_ground_offset）→ 与脚下屋脊零滑动。
 		_world.position = stage.focal() * (1.0 - gd) + stage.pointer_ground_offset()
+	_sync_world_foreground_occluder()
 	_update_character_reflections()
 
 

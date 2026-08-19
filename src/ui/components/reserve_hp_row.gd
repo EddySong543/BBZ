@@ -7,16 +7,16 @@ extends Control
 ## 护盾存在时追加一组银灰斜切块 + 数字。两组都按实际文本宽度整体居中。
 
 @export_group("斜切血量符号")
-@export var icon_w: float = 20.0:
+@export var icon_w: float = 26.0:
 	set(v):
 		icon_w = maxf(v, 8.0)
 		queue_redraw()
-@export var icon_h: float = 10.0:
+@export var icon_h: float = 9.0:
 	set(v):
 		icon_h = maxf(v, 4.0)
 		queue_redraw()
 ## 正值向右倾，负值向左倾；左右阵营可在场景里镜像。
-@export var icon_slant: float = -4.0:
+@export var icon_slant: float = -3.0:
 	set(v):
 		icon_slant = v
 		queue_redraw()
@@ -24,15 +24,15 @@ extends Control
 	set(v):
 		icon_border = maxf(v, 0.0)
 		queue_redraw()
-@export var icon_band: float = 2.0:
+@export var icon_band: float = 1.5:
 	set(v):
 		icon_band = maxf(v, 0.0)
 		queue_redraw()
 
 @export_group("排版")
-@export var gap_icon_num: float = 5.0
+@export var gap_icon_num: float = 7.0
 @export var gap_segments: float = 9.0
-@export var font_size: int = 16
+@export var font_size: int = 18
 @export var embolden: float = 0.7
 @export var outline_size: int = 4
 
@@ -60,6 +60,15 @@ extends Control
 @export var bottom_shadow_color := Color(0.02, 0.012, 0.008, 0.30):
 	set(v):
 		bottom_shadow_color = v
+		queue_redraw()
+## 小字号数字需要比图形阴影更实，且使用整数偏移避免像素字体出现半像素虚边。
+@export var number_shadow_offset := Vector2(2.0, 3.0):
+	set(v):
+		number_shadow_offset = v.round()
+		queue_redraw()
+@export var number_shadow_color := Color(0.02, 0.012, 0.008, 0.62):
+	set(v):
+		number_shadow_color = v
 		queue_redraw()
 
 @export_group("编辑器预览")
@@ -154,6 +163,13 @@ func _draw_segment(x: float, cy: float, text: String, fill: Color, top: Color,
 
 	var nx := x + icon_w + gap_icon_num
 	var baseline := cy + (_font.get_ascent(font_size) - _font.get_descent(font_size)) * 0.5
+	if bottom_shadow_enabled:
+		var shadow_position := Vector2(nx, baseline) + number_shadow_offset
+		if outline_size > 0:
+			draw_string_outline(_font, shadow_position, text,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, outline_size, number_shadow_color)
+		draw_string(_font, shadow_position, text,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, number_shadow_color)
 	if outline_size > 0:
 		draw_string_outline(_font, Vector2(nx, baseline), text,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, outline_size, number_outline)

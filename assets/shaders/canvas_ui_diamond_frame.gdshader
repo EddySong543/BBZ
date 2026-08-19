@@ -20,11 +20,20 @@ uniform float wear : hint_range(0.0, 0.5) = 0.16;
 uniform float texture_pixel_px : hint_range(1.0, 4.0) = 2.0;
 uniform vec2 size_px = vec2(72.0, 72.0);
 uniform float px_size = 1.0;
+// 淘汰态不叠加新装饰：直接在既有菱形描边里刻出一组像素裂纹。
+uniform bool fractured = false;
 
 float hash(vec2 p) {
 	p = fract(p * vec2(123.34, 345.45));
 	p += dot(p, p + 34.345);
 	return fract(p.x * p.y);
+}
+
+float segment_distance(vec2 point, vec2 a, vec2 b) {
+	vec2 pa = point - a;
+	vec2 ba = b - a;
+	float h = clamp(dot(pa, ba) / max(dot(ba, ba), 0.0001), 0.0, 1.0);
+	return length(pa - ba * h);
 }
 
 void fragment() {
@@ -63,6 +72,24 @@ void fragment() {
 		vec3 fill = fill_color.rgb * mix(1.16, 0.70, vertical);
 		fill *= 1.0 + (grain - 0.5) * noise_amt;
 		c = vec4(fill, fill_color.a);
+	}
+	if (fractured && d <= 1.0) {
+		// 右下斜边上的 Y 形裂痕：主缝横穿原描边，两条短分叉仍限制在描边厚度内。
+		// 所有坐标均随 frame 尺寸缩放，裂痕属于同一 shader，不新增覆盖头像的节点。
+		vec2 joint = vec2(half_ext.x * 0.40, half_ext.y * 0.56);
+		float main_crack = segment_distance(p,
+			vec2(half_ext.x * 0.25, half_ext.y * 0.39),
+			vec2(half_ext.x * 0.58, half_ext.y * 0.74));
+		float upper_branch = segment_distance(p, joint,
+			vec2(half_ext.x * 0.57, half_ext.y * 0.43));
+		float inner_branch = segment_distance(p, joint,
+			vec2(half_ext.x * 0.27, half_ext.y * 0.34));
+		float fracture = min(main_crack, min(upper_branch, inner_branch));
+		float frame_inner = 1.0 - rim_d - stroke_d;
+		if (d > frame_inner && fracture < max(px_size, 1.0) * 1.15) {
+			// 用现有暗压边色切断亮边，不引入红叉、碎块或新的轮廓语言。
+			c = vec4(rim_color.rgb * 0.42, rim_color.a);
+		}
 	}
 	COLOR = c * COLOR;                         // 乘 modulate（阵亡压灰/选中提亮走它）
 }

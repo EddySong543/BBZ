@@ -18,26 +18,16 @@ const SCREEN_H := 1080.0
 
 const CARD_TEX := preload("res://assets/ui/item_draft_card.png")     # 纸卡衬纸（悬停框族语竖版）
 const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")  # 取消钮底板（全游戏导航一个语言）
-const ITEM_FRAME_TEX := preload("res://assets/ui/item_frame.png")   # 图鉴同款单一明暗母版
-# 格底（=item_gallery_screen 同源配方·2026-07-14 Eddy：抽卡格底须与图鉴一致）：
-# 四角=深饱和阶色·中心=略浅阶色·传说=gold_bottom 金云纹贴图（只换框色）。
-const CELL_BG_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")
-const FRAME_PALETTE_SHADER := preload("res://assets/shaders/canvas_ui_item_frame_palette.gdshader")
-const LEGENDARY_BG := preload("res://assets/ui/gold_bottom.png")
-const CELL_FILL := {1: Color("#6E9BD2"), 2: Color("#9A7FD0")}
-const CELL_CENTER := {1: Color("#88AEDE"), 2: Color("#B098E0")}
-const FRAME_SHADOW := {
-	1: Color("#102C4A"), 2: Color("#2A1246"), 3: Color("#4A2F08"),
-}
-const FRAME_MID := {
-	1: Color("#4A86C2"), 2: Color("#8050BC"), 3: Color("#C78F27"),
-}
-const FRAME_HIGHLIGHT := {
-	1: Color("#B9D9F2"), 2: Color("#D6B1F2"), 3: Color("#F7DE9A"),
-}
-const FRAME_ART_SCALE := 87.25 / 68.0
-const FRAME_OFFSET_RATIO := Vector2(-9.6 / 68.0, -10.0 / 68.0)
-const CELL_INSET_RATIO := 6.0 / 68.0
+const ITEM_FRAME_TEX := ItemFrameStyle.FRAME_TEXTURE
+# 兼容既有调用/测试的公开别名；真实值只在 ItemFrameStyle 中维护。
+const CELL_FILL := ItemFrameStyle.CELL_TOP
+const CELL_CENTER := ItemFrameStyle.CELL_BOTTOM
+const FRAME_SHADOW := ItemFrameStyle.FRAME_SHADOW
+const FRAME_MID := ItemFrameStyle.FRAME_MID
+const FRAME_HIGHLIGHT := ItemFrameStyle.FRAME_HIGHLIGHT
+const FRAME_ART_SCALE := ItemFrameStyle.FRAME_ART_SCALE
+const FRAME_OFFSET_RATIO := ItemFrameStyle.FRAME_OFFSET_RATIO
+const CELL_INSET_RATIO := ItemFrameStyle.CELL_INSET_RATIO
 const TIER_INK := {   # 卡名墨色三阶（=item_gallery_screen.TIER_INK 同源·稀有度不染卡面）
 	1: Color("34608F"), 2: Color("6B3D96"), 3: Color("8F6A1E"),
 }
@@ -48,13 +38,7 @@ var _done := false   # 防重复 resolve（连点 / ESC 抢答）
 
 
 func _make_tier_frame_material(tier: int) -> ShaderMaterial:
-	var key := clampi(tier, 1, 3)
-	var m := ShaderMaterial.new()
-	m.shader = FRAME_PALETTE_SHADER
-	m.set_shader_parameter("shadow_color", FRAME_SHADOW[key])
-	m.set_shader_parameter("mid_color", FRAME_MID[key])
-	m.set_shader_parameter("highlight_color", FRAME_HIGHLIGHT[key])
-	return m
+	return ItemFrameStyle.make_frame_material(tier)
 
 
 func setup(options: Array, can_cancel: bool = true, title_text: String = "抽取道具（3 选 1）") -> void:
@@ -159,19 +143,8 @@ func _build_card(item: ItemData, pos: Vector2, idx: int) -> void:
 		cell.position = slot_rect.position + Vector2.ONE * cell_inset
 		cell.size = slot_rect.size - Vector2.ONE * cell_inset * 2.0
 		cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var cm := ShaderMaterial.new()
-		cm.shader = CELL_BG_SHADER
-		cm.set_shader_parameter("fill_color", CELL_FILL.get(tier, CELL_FILL[1]))
-		cm.set_shader_parameter("inner_color", CELL_CENTER.get(tier, CELL_CENTER[1]))
-		cm.set_shader_parameter("center_glow", 1.0)
-		# 新框的阶梯角套本身就是遮罩；旧圆角会二次挖空内孔四角，亮纸上形成白缝。
-		cm.set_shader_parameter("corner_radius", 0.0)
-		cm.set_shader_parameter("pixel_grid", 128.0 / 6.0)
-		if tier == 3:
-			cm.set_shader_parameter("use_tex", 1.0)
-			cm.set_shader_parameter("bg_tex", LEGENDARY_BG)
-			cm.set_shader_parameter("tex_tint", Color(1.0, 1.0, 1.0, 1.0))
-		cm.set_shader_parameter("cloud_on", 0.0)
+		# 与图鉴/战斗栏共用纵向渐变、传说贴图与统一内孔比例。
+		var cm := ItemFrameStyle.make_cell_material(tier, 128.0 / 6.0)
 		cell.material = cm
 		card.add_child(cell)
 		# 阶框+图标：补偿新素材透明边，使金属外沿仍与 128px 图标槽对齐。

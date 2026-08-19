@@ -1,64 +1,52 @@
 extends Control
 
-## 英雄图鉴（2026-07-15 回纹卷轴换装：整屏套用道具图鉴模板——任务B）。
-## 模板=item_gallery_screen（宣纸山水衬底+墨云带+整屏手卷+牌匾贴形投影+右页单列主轴+金晕选中），
-## 英雄内容适配：左页=新版简约几何框头像网格；右页=同款 384 大展示格（内放 idle 动画）
-## + No./❤生命/主被动章行 + 技能名 + 描述墨字。
-## 旧 v4「暖深底+鎏金浮雕」外壳（酒红书页/凹陷展板/铆钉/宝石/书脊/收集徽章/行亮条）全退役。
-## 选中=金晕外环+轻暖提亮（战斗点选/道具图鉴同语言·亮纸深金档）——⛔不用 HeroFrame.is_selected
-## （那是战斗换人的冷亮蓝白语言·压在宣纸上打架；组件本体是战斗共用件不动）。
-## ⚠ 装饰节点必须 mouse_filter=IGNORE——否则吞点击（返回失效·v1 踩过坑）。
+## 英雄图鉴（2026-08-06 二维羊皮纸书改版）。
+## 视觉：正式书页素材 + 左名录/右详情双页布局 + 角色背后的透明蓝灰笔刷。
+## 行为：点击、方向键、ESC/返回、战斗内嵌关闭与英雄数据读取全部沿用成熟逻辑。
+## ⚠ 装饰节点必须 mouse_filter=IGNORE，避免遮挡头像与返回按钮。
 
 const ITEM_FRAME_TEX := preload("res://assets/ui/item_frame.png")              # 英雄图鉴统一使用新版简约几何框
-const PLAQUE_TEX := preload("res://assets/ui/ui_plaque.png")                   # 悬挂牌匾（320×62·9-slice·三挂点共用）
-const SCROLL_TEX := preload("res://assets/ui/item_codex_scroll.png")           # 整屏手卷（道具图鉴同源·1672×941 拉伸满屏）
-const BACKDROP_TEX := preload("res://assets/ui/item_codex_backdrop.png")       # 衬底=宣纸淡墨山水（道具图鉴同源）
-const INK_CLOUDS_SHADER := preload("res://assets/shaders/canvas_ui_ink_clouds.gdshader")
 const CELL_BG_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")
-const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")   # 选中金晕外环
 const FRAME_PALETTE_SHADER := preload("res://assets/shaders/canvas_ui_item_frame_palette.gdshader")
-const BANNER_TEX := preload("res://assets/ui/ui_banner_scroll.png")            # 英雄名小卷轴横幅（右页）
-const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")            # 返回钮=导航钮同皮
-const NAV_PLATE_MARGIN_X := 22   # v14（main_menu 同值）
-const NAV_PLATE_MARGIN_Y := 20
-const HEART_SHEET := preload("res://assets/ui/icons/heart_idle.png")
+const SELECTION_MARKER_SCRIPT := preload("res://src/ui/components/hero_gallery_selection_marker.gd")
 
 const HERO_DATA_DIR := "res://assets/data/heroes/"
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
 
-# ── 墨字（宣纸亮页·道具图鉴同值）──
-const INK := Color(0.24, 0.19, 0.12)
-const INK_DIM := Color(0.48, 0.41, 0.28)
-const HP_INK := Color("a83a2c")                # 生命数=朱墨（❤旁·纸上深红读得清）
-const ACTIVE_TAG := Color(0.78, 0.26, 0.19)    # 主动=朱砂印（章底色·白字深描边）
-const PASSIVE_TAG := Color(0.30, 0.45, 0.63)   # 被动=靛蓝印
+# ── 羊皮纸书色板 ──
+const BOOK_EDGE := Color("6B4A32")
+const PAPER_SOFT := Color("EAD9BA")
+const BONE_LINE := Color("B59A72")
+const INK := Color("2E2922")
+const INK_DIM := Color("706655")
+const HP_INK := Color("B63A32")
+# ── 选中态：真实框材质转金 + 单色书页棕三角箭头 ──
+const GOLD_SEL := Color("C99032")
+const SELECTED_NAME_INK := Color("9A6828")
+const POINTER_COLOR := Color("7B5E3E")
+const POINTER_SIZE := Vector2(20.0, 36.0)
 
-# ── 选中态（道具图鉴/战斗点选同语言·亮纸档金）──
-const GOLD_SEL := Color("dca12e")
-const RING_PAD := 6.0
-const SEL_TINT := Color(1.18, 1.10, 0.98)
+# ── 1920×1080 双栏几何 ──
+const PAGE_L := Rect2(50, 158, 886, 836)
+const PAGE_R := Rect2(952, 158, 918, 836)
 
-# ── 卷轴几何（道具图鉴同值）──
-const PAGE_L := Rect2(240, 128, 712, 842)
-const PAGE_R := Rect2(968, 128, 712, 842)
-const BANNER := Rect2(806, 46, 308, 78)
+# ── 左页网格：每页 4 列 × 3 行 ──
+const COLS := 4
+const CARDS_PER_PAGE := 12
+const BOX := 104.0
+const NAME_H := 36.0
+const STEP_X := 170.0
+const ROW_H := 196.0
 
-# ── 左页网格（道具图鉴同几何：6 列·92 框+34 名字带·24 英雄=6×4）──
-const COLS := 6
-const BOX := 92.0
-const NAME_H := 34.0
-const STEP_X := 108.0
-const ROW_H := 150.0
-const X0 := 282.0
-const ROW_Y0 := 236.0
-
-# ── 右页大展示格（128px 头像框资产 ×3=384 整数放大保像素）──
-const CELL := 384.0
-const CELL_FILL := Color("221c15")     # 格底四角=暖深（比框深·HeroFrame 内衬同族）
-const CELL_CENTER := Color("2e2720")   # 格底中心=略浅暖深（层次感·仍暗于框）
-const FRAME_SHADOW := Color("3A2410")
-const FRAME_MID := Color("A4773D")
-const FRAME_HIGHLIGHT := Color("F0D9A2")
+# ── 头像框：暖褐中性，不与蓝灰笔刷争色 ──
+const CELL_FILL := Color("71685D")
+const CELL_CENTER := Color("8C7C68")
+const FRAME_SHADOW := Color("49372B")
+const FRAME_MID := Color("8B765D")
+const FRAME_HIGHLIGHT := Color("D7BD91")
+const FRAME_SELECTED_SHADOW := Color("704A1E")
+const FRAME_SELECTED_MID := Color("C99032")
+const FRAME_SELECTED_HIGHLIGHT := Color("F2D28B")
 const FRAME_ART_SCALE := 87.25 / 68.0
 const FRAME_OFFSET_RATIO := Vector2(-9.6 / 68.0, -10.0 / 68.0)
 const CELL_INSET_RATIO := 5.5 / 68.0
@@ -66,31 +54,38 @@ const CELL_INSET_RATIO := 5.5 / 68.0
 var all_heroes: Array[HeroData] = []
 var card_cards: Array[Button] = []        # 格子点击壳（入场动画/ButtonJuice 挂这层）
 var card_frames: Array[Control] = []      # 图鉴专用头像根节点（不再实例化旧 HeroFrame）
+var card_name_labels: Array[Label] = []
 var _sel_idx: int = -1
-var _sel_tweens: Array[Tween] = []        # 选中动效 tween（pop+呼吸·换选先 kill 全部）
+var _current_page: int = 0
+var _sel_tweens: Array[Tween] = []        # 选中书签落位 tween（换选先 kill 全部）
 var _pop_tween: Tween                     # 右页展示落位微弹
-
-var _book_layer: Control                  # 卷轴实体（入场上浮层）
 
 # 详情板部件（_build_detail_panel 一次建好）
 var _d_anim: AnimatedSprite2D
 var _d_fallback: TextureRect      # 无 idle 资源时的静态头像兜底
 var _d_name: Label
-var _d_no_lbl: Label
 var _d_hp_heart: TextureRect
 var _d_hp_num: Label
-var _d_tag_edge: ColorRect
-var _d_tag_bg: ColorRect
+var _d_tag_group: Control
+var _d_tag_mark: Control
 var _d_tag: Label
 var _d_skill_name: Label
 var _d_skill_icon: TextureRect
 var _d_detail: Label
+var _d_detail_rule: ColorRect
+var _d_detail_pin: ColorRect
 
 @onready var pool_area: Control = $PoolArea
+@onready var portrait_grid: Control = $PoolArea/PortraitGrid
 @onready var detail_area: Control = $DetailArea
+@onready var _book_layer: Control = $BookLayer
 @onready var back_btn: Button = $TopBand/BackButton
 @onready var title_lbl: Label = $TopBand/Title
 @onready var count_lbl: Label = $TopBand/CountLabel
+@onready var page_navigation: Control = $PoolArea/PageNavigation
+@onready var previous_page_btn: Button = $PoolArea/PageNavigation/PreviousPage
+@onready var page_indicator: Label = $PoolArea/PageNavigation/PageIndicator
+@onready var next_page_btn: Button = $PoolArea/PageNavigation/NextPage
 
 
 func _ready() -> void:
@@ -98,163 +93,52 @@ func _ready() -> void:
 	_build_book()
 	_setup_top()
 	_build_pool()
+	_setup_page_navigation()
 	_build_detail_panel()
 	_select(0)
 	_play_intro()
 
 
 # ============================================================
-# 卷轴实体（道具图鉴同配方：衬底+墨云带+整屏手卷·无三阶页签）
+# 正式二维羊皮纸书素材
 # ============================================================
 
 func _build_book() -> void:
-	# 战斗内嵌模式：不带任何背景——卷轴直接悬在浮层暗幕上（与道具图鉴一致）。
-	var embedded := embedded_close.is_valid()
-	if embedded:
-		var bg := get_node_or_null("Background") as Control
-		if bg != null:
-			bg.visible = false
-	else:
-		# 衬底=宣纸淡墨山水（独立静态层·不进 _book_layer——入场上浮不带背景飞）。
-		var backdrop := TextureRect.new()
-		backdrop.name = "Backdrop"
-		backdrop.texture = BACKDROP_TEX
-		backdrop.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR   # 软笔触画面非像素资产
-		backdrop.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		backdrop.stretch_mode = TextureRect.STRETCH_SCALE
-		backdrop.position = Vector2.ZERO
-		backdrop.size = Vector2(1920.0, 1080.0)   # ⚠ 锚点满铺在程序容器下会塌 0，必须显式尺寸
-		backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		add_child(backdrop)
-		move_child(backdrop, 1)   # Background 之上（不透明满屏整层盖住）
-		# 像素墨云带（上下环绕·两条横带 quad ⛔全屏 shader·种子互异）
-		_add_ink_cloud_band(Rect2(0, 0, 1920, 150), 0.37, 0.0, 0.03, 2)
-		_add_ink_cloud_band(Rect2(0, 930, 1920, 150), 0.63, 5.0, -0.025, 3)
-
-	_book_layer = Control.new()
-	_book_layer.name = "BookLayer"
+	var bg := get_node_or_null("Background") as Control
+	if bg != null:
+		bg.visible = false
+	_book_layer.position = Vector2.ZERO
+	_book_layer.modulate = Color.WHITE
 	_book_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_book_layer)
-	move_child(_book_layer, 1 if embedded else 4)
 
-	var scroll := TextureRect.new()
-	scroll.name = "Scroll"
-	scroll.texture = SCROLL_TEX
-	scroll.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	scroll.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	scroll.stretch_mode = TextureRect.STRETCH_SCALE
-	scroll.position = Vector2.ZERO
-	scroll.size = Vector2(1920.0, 1080.0)   # ⚠ _book_layer 零尺寸 Control——必须显式尺寸
-	scroll.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_book_layer.add_child(scroll)
-
-
-## 像素墨云横带（道具图鉴同参：center_frac=垂直中心·seed 上下互异·flow=流速）。
-func _add_ink_cloud_band(r: Rect2, center_frac: float, seed_v: float, flow: float, tree_idx: int) -> void:
-	var band := ColorRect.new()
-	band.name = "InkCloudsTop" if r.position.y < 540.0 else "InkCloudsBottom"
-	band.color = Color.WHITE
-	band.position = r.position
-	band.size = r.size
-	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var m := ShaderMaterial.new()
-	m.shader = INK_CLOUDS_SHADER
-	m.set_shader_parameter("center_frac", center_frac)
-	m.set_shader_parameter("seed", seed_v)
-	m.set_shader_parameter("flow_speed", flow)
-	band.material = m
-	add_child(band)
-	move_child(band, tree_idx)
-
-
-# ============================================================
-# 顶部浮动件：悬挂牌匾（贴形投影）+ 返回钮（导航皮）+ 页眉计数
-# ============================================================
 
 func _setup_top() -> void:
-	_build_plaque()
 	_style_back_button()
-	# 计数=左页章头行右端的墨水注记（与章头同行·像书页页眉）
-	FontManager.apply(count_lbl, 18)
-	count_lbl.add_theme_color_override("font_color", Color(INK_DIM, 0.9))
-	count_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	count_lbl.position = Vector2(714, 164)
-	count_lbl.size = Vector2(200, 26)
-	count_lbl.text = tr("共 %d 位") % all_heroes.size()
 
+	title_lbl.text = ""
+	title_lbl.visible = false
 
-## 悬挂牌匾（道具图鉴同配方：贴图剪影投影+9-slice+墨字）。
-func _build_plaque() -> void:
-	var band := $TopBand as Control
-	var shadow := NinePatchRect.new()
-	shadow.name = "PlaqueShadow"
-	shadow.texture = PLAQUE_TEX
-	shadow.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	shadow.patch_margin_left = 26   # 新牌匾（265×63·回纹实钩）角钩区实量（item_gallery 同值）
-	shadow.patch_margin_right = 26
-	shadow.patch_margin_top = 23
-	shadow.patch_margin_bottom = 23
-	shadow.position = BANNER.position + Vector2(6, 8)
-	shadow.size = BANNER.size
-	shadow.modulate = Color(0.10, 0.07, 0.05, 0.38)   # 暖黑剪影（宣纸暖底同温）
-	shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	band.add_child(shadow)
-	var plaque := NinePatchRect.new()
-	plaque.name = "Plaque"
-	plaque.texture = PLAQUE_TEX
-	plaque.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	plaque.patch_margin_left = 26
-	plaque.patch_margin_right = 26
-	plaque.patch_margin_top = 23
-	plaque.patch_margin_bottom = 23
-	plaque.position = BANNER.position
-	plaque.size = BANNER.size
-	plaque.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	band.add_child(plaque)
-	title_lbl.text = tr("英雄图鉴")
-	title_lbl.position = BANNER.position + Vector2(0, -4)   # Ark 无下伸部·居中偏下补正
-	title_lbl.size = BANNER.size
-	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	title_lbl.z_index = 1
-	FontManager.apply(title_lbl, 36)
-	title_lbl.add_theme_color_override("font_color", INK)
-	title_lbl.add_theme_constant_override("outline_size", 0)
+	count_lbl.text = ""
+	count_lbl.visible = false
 
 
 func _style_back_button() -> void:
-	FontManager.apply_btn(back_btn, 24)
-	back_btn.add_theme_color_override("font_color", INK)
-	for s in ["normal", "hover", "pressed", "focus", "disabled"]:
-		back_btn.add_theme_stylebox_override(s, StyleBoxEmpty.new())
-	var plate := NinePatchRect.new()
-	plate.name = "Plate"
-	plate.texture = NAV_PLATE_TEX
-	plate.patch_margin_left = NAV_PLATE_MARGIN_X
-	plate.patch_margin_right = NAV_PLATE_MARGIN_X
-	plate.patch_margin_top = NAV_PLATE_MARGIN_Y
-	plate.patch_margin_bottom = NAV_PLATE_MARGIN_Y
-	plate.axis_stretch_horizontal = NinePatchRect.AXIS_STRETCH_MODE_TILE
-	plate.axis_stretch_vertical = NinePatchRect.AXIS_STRETCH_MODE_TILE
-	plate.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	plate.show_behind_parent = true
-	plate.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE   # ⚠ 缺这行=吞点击（返回失效）
-	back_btn.add_child(plate)
+	back_btn.text = tr("<<< 返回")
+	back_btn.focus_mode = Control.FOCUS_ALL
 	back_btn.pressed.connect(_back_to_menu)
 	var bj := ButtonJuice.new()
 	bj.name = "ButtonJuice"
 	back_btn.add_child(bj)
 
 
-func _rect(parent: Control, r: Rect2, col: Color) -> ColorRect:
-	var rect := ColorRect.new()
-	rect.color = col
-	rect.position = r.position
-	rect.size = r.size
-	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	parent.add_child(rect)
-	return rect
+func _setup_page_navigation() -> void:
+	previous_page_btn.pressed.connect(_turn_page.bind(-1))
+	next_page_btn.pressed.connect(_turn_page.bind(1))
+	for button: Button in [previous_page_btn, next_page_btn]:
+		var juice := ButtonJuice.new()
+		juice.name = "ButtonJuice"
+		button.add_child(juice)
+	_refresh_page_visibility()
 
 
 func _make_gallery_frame_material() -> ShaderMaterial:
@@ -266,68 +150,117 @@ func _make_gallery_frame_material() -> ShaderMaterial:
 	return m
 
 
+func _set_gallery_frame_selected(frame: Control, selected: bool) -> void:
+	var frame_art := frame.get_node("GalleryItemFrame") as TextureRect
+	var material := frame_art.material as ShaderMaterial
+	material.set_shader_parameter(
+		"shadow_color", FRAME_SELECTED_SHADOW if selected else FRAME_SHADOW)
+	material.set_shader_parameter(
+		"mid_color", FRAME_SELECTED_MID if selected else FRAME_MID)
+	material.set_shader_parameter(
+		"highlight_color", FRAME_SELECTED_HIGHLIGHT if selected else FRAME_HIGHLIGHT)
+
+
+func _grid_float(property_name: StringName, fallback: float) -> float:
+	var value: Variant = portrait_grid.get(property_name)
+	return float(value) if value != null else fallback
+
+
+func _grid_columns() -> int:
+	return maxi(roundi(_grid_float(&"columns", COLS)), 1)
+
+
+func _grid_page_size() -> int:
+	return maxi(roundi(_grid_float(&"cards_per_page", CARDS_PER_PAGE)), 1)
+
+
+func _page_count() -> int:
+	return maxi(ceili(all_heroes.size() / float(_grid_page_size())), 1)
+
+
+func _refresh_page_visibility() -> void:
+	var page_size := _grid_page_size()
+	var first_index := _current_page * page_size
+	var last_index := mini(first_index + page_size, card_cards.size())
+	for index in card_cards.size():
+		var card := card_cards[index]
+		card.visible = index >= first_index and index < last_index
+		if card.visible:
+			card.scale = Vector2.ONE
+			card.modulate.a = 1.0
+	page_navigation.visible = _page_count() > 1
+	page_indicator.text = "%02d / %02d" % [_current_page + 1, _page_count()]
+	previous_page_btn.disabled = _current_page <= 0
+	next_page_btn.disabled = _current_page >= _page_count() - 1
+
+
+func _turn_page(direction: int) -> void:
+	var target_page := clampi(_current_page + direction, 0, _page_count() - 1)
+	if target_page == _current_page:
+		return
+	var page_size := _grid_page_size()
+	var local_slot := _sel_idx % page_size if _sel_idx >= 0 else 0
+	var target_index := mini(target_page * page_size + local_slot, all_heroes.size() - 1)
+	_select(target_index)
+
+
+func _grid_card_position(index: int, cols: int, step_x: float, row_height: float) -> Vector2:
+	var row := floori(index / float(cols))
+	var column := index % cols
+	var center_column := (cols - 1) * 0.5
+	var normalized_edge := absf(float(column) - center_column) / maxf(center_column, 1.0)
+	return Vector2(
+		column * step_x + float(row % 2) * _grid_float(&"row_stagger_x", 0.0),
+		row * row_height
+			+ normalized_edge * normalized_edge * _grid_float(&"page_curve_y", 0.0))
+
+
+## 单色三角像素箭头：保持明确方向，用书页棕融入场景且不叠描边。
+func _make_selection_pointer(box: float) -> Control:
+	var pointer := SELECTION_MARKER_SCRIPT.new() as Control
+	pointer.name = "SelectionPointer"
+	pointer.position = Vector2(-28.0, floorf((box - POINTER_SIZE.y) * 0.5))
+	pointer.size = POINTER_SIZE
+	pointer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pointer.visible = false
+	pointer.set("color", POINTER_COLOR)
+	pointer.set_meta("home_position", pointer.position)
+	return pointer
+
+
 # ============================================================
-# 左页网格：章头 + 新版简约几何头像框 6×4（一次建好·英雄无分阶）
+# 左页网格：中性几何头像框 4×3，每页 12 位英雄
 # ============================================================
 
 func _build_pool() -> void:
-	# 章头（页首题字感）：墨字 + 细墨线（计数注记在同行右端·见 _setup_top）
-	var chapter := Label.new()
-	chapter.text = tr("英雄名录")
-	chapter.position = Vector2(X0, 150)
-	chapter.size = Vector2(300, 40)
-	FontManager.apply(chapter, 26)
-	chapter.add_theme_color_override("font_color", INK)
-	chapter.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	pool_area.add_child(chapter)
-	var rule := ColorRect.new()
-	rule.color = Color(INK, 0.30)
-	rule.position = Vector2(X0, 198)
-	rule.size = Vector2(632, 1)
-	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	pool_area.add_child(rule)
+	var cols := _grid_columns()
+	var box := _grid_float(&"box_size", BOX)
+	var step_x := _grid_float(&"step_x", STEP_X)
+	var row_height := _grid_float(&"row_height", ROW_H)
+	var page_size := _grid_page_size()
 	for i in all_heroes.size():
 		var h := all_heroes[i]
 		var card := Button.new()
 		card.flat = true
 		card.focus_mode = Control.FOCUS_NONE
-		card.size = Vector2(BOX, BOX + NAME_H)
+		card.size = Vector2(box, box + NAME_H)
 		for s in ["normal", "hover", "pressed", "focus", "disabled"]:
 			card.add_theme_stylebox_override(s, StyleBoxEmpty.new())
-		card.position = Vector2(X0 + (i % COLS) * STEP_X, ROW_Y0 + floorf(i / float(COLS)) * ROW_H)
-		# 选中金晕外环（道具图鉴同源同参）：衬在头像框后·常态隐藏·_select 切显隐+pop+呼吸。
-		var ring := ColorRect.new()
-		ring.name = "SelRing"
-		ring.color = Color.WHITE
-		ring.position = Vector2(-RING_PAD, -RING_PAD)
-		ring.size = Vector2(BOX + RING_PAD * 2.0, BOX + RING_PAD * 2.0)
-		var rm := ShaderMaterial.new()
-		rm.shader = FRAME_SHADER
-		rm.set_shader_parameter("edge_outer", GOLD_SEL.darkened(0.1))   # 外露带必须整条是金
-		rm.set_shader_parameter("edge_mid", GOLD_SEL)
-		rm.set_shader_parameter("edge_inner", GOLD_SEL.darkened(0.5))
-		rm.set_shader_parameter("pixel_grid", (BOX + RING_PAD * 2.0) / 6.0)
-		rm.set_shader_parameter("border_px", 2.0)
-		rm.set_shader_parameter("noise_amt", 0.05)
-		rm.set_shader_parameter("light_amount", 0.18)
-		rm.set_shader_parameter("aspect", 1.0)
-		rm.set_shader_parameter("corner_radius", 0.18)
-		ring.material = rm
-		ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		ring.visible = false
-		card.add_child(ring)
+		card.position = _grid_card_position(i % page_size, cols, step_x, row_height)
+		# 选中态：真实框材质转金负责确认，书脊棕侧签负责定位。
+		card.add_child(_make_selection_pointer(box))
 		# 图鉴专用头像：填充 → 头像 → 新框。完全不实例化旧 HeroFrame，避免旧框层残留。
 		var frame := Control.new()
 		frame.name = "HeroPortraitFrame"
-		frame.size = Vector2(BOX, BOX)
+		frame.size = Vector2(box, box)
 		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card.add_child(frame)
-		var cell_inset := BOX * CELL_INSET_RATIO
+		var cell_inset := box * CELL_INSET_RATIO
 		var thumb_cell := ColorRect.new()
 		thumb_cell.name = "HeroThumbCell"
 		thumb_cell.color = Color.WHITE
 		thumb_cell.position = Vector2.ONE * cell_inset
-		thumb_cell.size = Vector2(BOX, BOX) - Vector2.ONE * cell_inset * 2.0
+		thumb_cell.size = Vector2(box, box) - Vector2.ONE * cell_inset * 2.0
 		thumb_cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var thumb_cell_mat := ShaderMaterial.new()
 		thumb_cell_mat.shader = CELL_BG_SHADER
@@ -335,7 +268,7 @@ func _build_pool() -> void:
 		thumb_cell_mat.set_shader_parameter("inner_color", CELL_CENTER)
 		thumb_cell_mat.set_shader_parameter("center_glow", 1.0)
 		thumb_cell_mat.set_shader_parameter("corner_radius", 0.0)
-		thumb_cell_mat.set_shader_parameter("pixel_grid", BOX / 6.0)
+		thumb_cell_mat.set_shader_parameter("pixel_grid", box / 6.0)
 		thumb_cell_mat.set_shader_parameter("cloud_on", 0.0)
 		thumb_cell.material = thumb_cell_mat
 		frame.add_child(thumb_cell)
@@ -355,19 +288,20 @@ func _build_pool() -> void:
 		gallery_frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		gallery_frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		gallery_frame.stretch_mode = TextureRect.STRETCH_SCALE
-		gallery_frame.position = Vector2(BOX, BOX) * FRAME_OFFSET_RATIO
-		gallery_frame.size = Vector2(BOX, BOX) * FRAME_ART_SCALE
+		gallery_frame.position = Vector2(box, box) * FRAME_OFFSET_RATIO
+		gallery_frame.size = Vector2(box, box) * FRAME_ART_SCALE
 		gallery_frame.material = _make_gallery_frame_material()
 		gallery_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		frame.add_child(gallery_frame)
-		# 框下名字（亮页墨字直读·泥金+描边退役）
+		# 框下名字直读，不使用题签、描边或悬挂装饰。
 		var name_lbl := Label.new()
+		name_lbl.name = "HeroName"
 		name_lbl.text = tr(h.hero_name)
-		name_lbl.position = Vector2(-12.0, BOX + 2.0)
-		name_lbl.size = Vector2(BOX + 24.0, NAME_H)
+		name_lbl.position = Vector2(-16.0, box + 4.0)
+		name_lbl.size = Vector2(box + 32.0, NAME_H)
 		name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		name_lbl.vertical_alignment = VERTICAL_ALIGNMENT_TOP
-		FontManager.apply(name_lbl, 16)
+		FontManager.apply(name_lbl, 17)
 		name_lbl.add_theme_color_override("font_color", INK)
 		name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card.add_child(name_lbl)
@@ -375,114 +309,54 @@ func _build_pool() -> void:
 		var bj := ButtonJuice.new()
 		bj.name = "ButtonJuice"
 		card.add_child(bj)
-		pool_area.add_child(card)
+		portrait_grid.add_child(card)
 		card_cards.append(card)
 		card_frames.append(frame)
+		card_name_labels.append(name_lbl)
 	pool_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
 # ============================================================
-# 右页：单列居中主轴（道具图鉴同骨架·英雄内容）
-#   ①名字小卷轴 → ②384 大展示格（idle 动画·头像框资产 ×3） → ③No./❤生命/主被动章行
-#   → ④一条分隔墨线 → ⑤技能名（+图标） → ⑥描述墨字
+# 右页：英雄名 → 蓝灰笔刷上的角色 → 数据行 → 技能与描述
 # ============================================================
 
 func _build_detail_panel() -> void:
 	var px := PAGE_R.position.x
 	var py := PAGE_R.position.y
 
-	# ── ① 英雄名横幅=小卷轴（横向 9-slice·竖向原生高）──
-	var banner := NinePatchRect.new()
-	banner.texture = BANNER_TEX
-	banner.patch_margin_left = 96
-	banner.patch_margin_right = 96
-	banner.patch_margin_top = 0
-	banner.patch_margin_bottom = 0
-	banner.axis_stretch_horizontal = NinePatchRect.AXIS_STRETCH_MODE_TILE
-	banner.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	banner.position = Vector2(px + 54, py + 72)
-	banner.size = Vector2(PAGE_R.size.x - 108, 45)
-	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	detail_area.add_child(banner)
-	_d_name = _make_label(Vector2(px + 57, py + 72), Vector2(PAGE_R.size.x - 114, 45), 32, INK)
+	_d_name = _make_label(
+		Vector2(px + 150, py + 34), Vector2(PAGE_R.size.x - 300, 48), 32, INK)
 	_d_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_d_name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
-	# ── ② 大展示格：暖深格底 + 新版简约几何框 + idle 动画 ──
-	var cell_r := Rect2(px + (PAGE_R.size.x - CELL) * 0.5, py + 140, CELL, CELL)
-	var cell_inset := cell_r.size.x * CELL_INSET_RATIO
-	var cell := ColorRect.new()
-	cell.name = "HeroDetailCell"
-	cell.color = Color.WHITE
-	cell.position = cell_r.position + Vector2.ONE * cell_inset
-	cell.size = cell_r.size - Vector2.ONE * cell_inset * 2.0
-	cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var cm := ShaderMaterial.new()
-	cm.shader = CELL_BG_SHADER
-	cm.set_shader_parameter("fill_color", CELL_FILL)
-	cm.set_shader_parameter("inner_color", CELL_CENTER)
-	cm.set_shader_parameter("center_glow", 1.0)
-	cm.set_shader_parameter("corner_radius", 0.0)
-	cm.set_shader_parameter("pixel_grid", CELL / 6.0)   # 像素粒径 6px=与左页格同比
-	cm.set_shader_parameter("cloud_on", 0.0)
-	cell.material = cm
-	detail_area.add_child(cell)
-	# idle 动画（先加=画在框之下·踩格底暖深处）。scale=2.0 整数倍（战斗同档·像素完美）：
-	# 256 帧含大片透明留白·1.2 倍时人物仅约 120px=格大人小（首轮截图实测）；帧透明区溢出格外无害。
+	var wash := $DetailArea/HeroPortraitWash as TextureRect
+	wash.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	wash.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	wash.stretch_mode = TextureRect.STRETCH_SCALE
+	wash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
 	_d_anim = AnimatedSprite2D.new()
 	_d_anim.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_d_anim.position = cell_r.position + cell_r.size * 0.5 + Vector2(0, 24)
+	_d_anim.position = wash.position + wash.size * 0.5 + Vector2(0, 12)
 	_d_anim.scale = Vector2(2.0, 2.0)
 	detail_area.add_child(_d_anim)
 	_d_fallback = TextureRect.new()
 	_d_fallback.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_d_fallback.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_d_fallback.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_d_fallback.position = cell_r.position + Vector2(48, 48)
-	_d_fallback.size = cell_r.size - Vector2(96, 96)
+	_d_fallback.position = wash.position + Vector2(170, 20)
+	_d_fallback.size = wash.size - Vector2(340, 40)
 	_d_fallback.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_d_fallback.visible = false
 	detail_area.add_child(_d_fallback)
-	var frame := TextureRect.new()
-	frame.name = "HeroDetailItemFrame"
-	frame.texture = ITEM_FRAME_TEX
-	frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	frame.stretch_mode = TextureRect.STRETCH_SCALE
-	frame.position = cell_r.position + cell_r.size * FRAME_OFFSET_RATIO
-	frame.size = cell_r.size * FRAME_ART_SCALE
-	frame.material = _make_gallery_frame_material()
-	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	detail_area.add_child(frame)
 
-	# ── ③ 章行：No.（淡墨）+ ❤生命（朱墨）+ 主/被动章（彩底白字）——_layout_data_row 按内容居中 ──
-	_d_no_lbl = _make_label(Vector2.ZERO, Vector2(120, 38), 18, Color(INK_DIM, 0.95))
-	_d_no_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_d_hp_heart = TextureRect.new()
-	var atlas := AtlasTexture.new()
-	atlas.atlas = HEART_SHEET
-	atlas.region = Rect2(0, 0, HEART_SHEET.get_width() / 4.0, HEART_SHEET.get_height())
-	_d_hp_heart.texture = atlas
-	_d_hp_heart.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_d_hp_heart.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_d_hp_heart.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_d_hp_heart.size = Vector2(26, 26)
-	_d_hp_heart.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	detail_area.add_child(_d_hp_heart)
-	_d_hp_num = _make_label(Vector2.ZERO, Vector2(60, 38), 24, HP_INK)
-	_d_hp_num.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_d_tag_edge = _chip_rect(Color(INK, 0.75))
-	_d_tag_bg = _chip_rect(ACTIVE_TAG)
-	_d_tag = _make_label(Vector2.ZERO, Vector2(76, 34), 18, Color.WHITE)
-	_d_tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_d_tag.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_d_tag.add_theme_constant_override("outline_size", 4)
-	_d_tag.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.03, 0.9))
+	# 血量与技能类型都由场景节点承载，Godot 编辑器预览与 F6 使用同一位置。
+	_d_hp_heart = $DetailArea/HPGroup/Heart as TextureRect
+	_d_hp_num = $DetailArea/HPGroup/Number as Label
+	_d_tag_group = $DetailArea/SkillTypeGroup as Control
+	_d_tag_mark = $DetailArea/SkillTypeGroup/TypeMark as Control
+	_d_tag = $DetailArea/SkillTypeGroup/TypeLabel as Label
 
-	# ── ④ 一条分隔墨线 ──
-	_rect(detail_area, Rect2(px + (PAGE_R.size.x - 360.0) * 0.5, py + 618, 360, 1), Color(INK, 0.25))
-
-	# ── ⑤ 技能名（+可选图标·_layout_skill_row 按内容居中）+ ⑥ 描述墨字 ──
 	_d_skill_icon = TextureRect.new()
 	_d_skill_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_d_skill_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -490,31 +364,39 @@ func _build_detail_panel() -> void:
 	_d_skill_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_d_skill_icon.visible = false
 	detail_area.add_child(_d_skill_icon)
-	_d_skill_name = _make_label(Vector2.ZERO, Vector2(300, 32), 24, INK)
+	_d_skill_name = _make_label(Vector2.ZERO, Vector2(300, 36), 25, INK)
 	_d_skill_name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_d_detail_rule = ColorRect.new()
+	_d_detail_rule.name = "DetailRule"
+	_d_detail_rule.position = Vector2(px + 86, py + 680)
+	_d_detail_rule.size = Vector2(2, 60)
+	_d_detail_rule.color = Color(BONE_LINE, 0.82)
+	_d_detail_rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail_area.add_child(_d_detail_rule)
+	_d_detail_pin = ColorRect.new()
+	_d_detail_pin.name = "DetailPin"
+	_d_detail_pin.position = Vector2(px + 84, py + 674)
+	_d_detail_pin.size = Vector2(6, 6)
+	_d_detail_pin.color = Color(BONE_LINE, 0.92)
+	_d_detail_pin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail_area.add_child(_d_detail_pin)
 	_d_detail = _make_label(
-		Vector2(px + 76, py + 700),
-		Vector2(PAGE_R.size.x - 152, 168), 24, INK)
+		Vector2(px + 112, py + 670),
+		Vector2(PAGE_R.size.x - 214, 126), 22, INK)
+	_d_detail.name = "SkillDetail"
 	_d_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_d_detail.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	_d_detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
-	# 快捷键提示：卷轴下方·宣纸衬底留白带上的墨字注记
-	var hint := _make_label(Vector2(0, 986), Vector2(1920, 24), 14, Color(INK, 0.62))
-	hint.text = tr("← → 切换英雄 · ESC 返回")
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
-
-func _chip_rect(col: Color) -> ColorRect:
-	var r := ColorRect.new()
-	r.color = col
-	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	detail_area.add_child(r)
-	return r
-
-
-## 选中英雄：左格金晕外环+框身轻暖提亮（道具图鉴同语言）+ 右页填充。
+## 选中英雄：真实头像框转金 + 棕色三角指针 + 右页填充。
 func _select(idx: int) -> void:
+	if idx < 0 or idx >= all_heroes.size():
+		return
+	var target_page := floori(idx / float(_grid_page_size()))
+	if target_page != _current_page:
+		_current_page = target_page
+		_refresh_page_visibility()
 	if idx == _sel_idx:
 		return
 	for tw: Tween in _sel_tweens:
@@ -523,12 +405,16 @@ func _select(idx: int) -> void:
 	_sel_tweens.clear()
 	if _sel_idx >= 0:
 		var old := card_cards[_sel_idx]
-		var old_ring := old.get_node("SelRing") as ColorRect
-		old_ring.visible = false
-		old_ring.modulate = Color.WHITE
-		card_frames[_sel_idx].modulate = Color.WHITE
+		var old_pointer := old.get_node("SelectionPointer") as Control
+		var old_pointer_home: Vector2 = old_pointer.get_meta("home_position")
+		old_pointer.visible = false
+		old_pointer.modulate = Color.WHITE
+		old_pointer.position = old_pointer_home
+		_set_gallery_frame_selected(card_frames[_sel_idx], false)
+		card_name_labels[_sel_idx].add_theme_color_override("font_color", INK)
 	_sel_idx = idx
 	_play_select_fx(card_cards[idx], card_frames[idx])
+	card_name_labels[idx].add_theme_color_override("font_color", SELECTED_NAME_INK)
 
 	var h := all_heroes[idx]
 	if h.sprite_frames_path != "" and ResourceLoader.exists(h.sprite_frames_path):
@@ -548,11 +434,11 @@ func _select(idx: int) -> void:
 	_pop_tween.tween_property(_d_anim, "scale", Vector2(2.0, 2.0), 0.12)\
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	_d_name.text = tr(h.hero_name)
-	_d_no_lbl.text = "No.%02d" % (idx + 1)
 	_d_hp_num.text = "%d" % h.max_hp
 	var is_passive := h.skill_type == HeroData.SkillType.PASSIVE
 	_d_tag.text = tr("被动") if is_passive else tr("主动")
-	_d_tag_bg.color = PASSIVE_TAG if is_passive else ACTIVE_TAG
+	_d_tag.add_theme_color_override("font_color", Color.WHITE)
+	_d_tag_mark.call("set_passive", is_passive)
 	_d_skill_name.text = tr(h.skill_description)
 	if h.skill_icon_path != "" and ResourceLoader.exists(h.skill_icon_path):
 		_d_skill_icon.texture = load(h.skill_icon_path)
@@ -560,68 +446,26 @@ func _select(idx: int) -> void:
 	else:
 		_d_skill_icon.visible = false
 	_d_detail.text = tr(h.skill_detail) if h.skill_detail != "" else tr(h.skill_description)
-	_layout_data_row()
 	_layout_skill_row()
 
 
-## 选中动效（道具图鉴同参）：金晕环收拢 pop（0.14s）→ 安静呼吸（2.6s 循环·图鉴动效拨杆=低）。
+## 选中动效：真实框立即转金，粗像素棕色箭头轻推入；落位后完全静止。
 func _play_select_fx(card: Button, frame: Control) -> void:
-	var ring := card.get_node("SelRing") as ColorRect
-	frame.modulate = SEL_TINT   # 轻暖提亮（乘色不压蓝通道·⛔is_selected 冷蓝白=战斗换人语言）
-	var end_pos := Vector2(-RING_PAD, -RING_PAD)
-	var end_size := Vector2(BOX + RING_PAD * 2.0, BOX + RING_PAD * 2.0)
-	ring.visible = true
-	ring.position = end_pos - Vector2(3, 3)
-	ring.size = end_size + Vector2(6, 6)
-	ring.modulate = Color(1, 1, 1, 0.0)
+	var pointer := card.get_node("SelectionPointer") as Control
+	_set_gallery_frame_selected(frame, true)
+	pointer.visible = true
+	var pointer_home: Vector2 = pointer.get_meta("home_position")
+	pointer.position = pointer_home - Vector2(6, 0)
+	pointer.modulate = Color(1, 1, 1, 0.0)
 	var pop := create_tween()
 	pop.set_parallel(true)
-	pop.tween_property(ring, "position", end_pos, 0.14)\
+	pop.tween_property(pointer, "position", pointer_home, 0.16)\
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	pop.tween_property(ring, "size", end_size, 0.14)\
-		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	pop.tween_property(ring, "modulate:a", 1.0, 0.12)
+	pop.tween_property(pointer, "modulate:a", 1.0, 0.12)
 	_sel_tweens.append(pop)
-	var breath := create_tween()   # 首步 interval=让过 pop（两条 tween 不同时碰 modulate:a）
-	breath.set_loops()
-	breath.tween_interval(0.5)
-	breath.tween_property(ring, "modulate:a", 0.85, 1.0)\
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	breath.tween_property(ring, "modulate:a", 1.0, 1.1)\
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_sel_tweens.append(breath)
 
 
-## 章行（No. + ❤生命 + 主/被动章）作为一组在页内水平居中（宽度随内容 → 每次重排）。
-func _layout_data_row() -> void:
-	var y0: float = PAGE_R.position.y + 556
-	var f: Font = _d_no_lbl.get_theme_font("font")
-	var no_w: float = f.get_string_size(_d_no_lbl.text,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, _d_no_lbl.get_theme_font_size("font_size")).x
-	var num_w: float = f.get_string_size(_d_hp_num.text,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, _d_hp_num.get_theme_font_size("font_size")).x
-	var hp_w: float = 26.0 + 8.0 + num_w                    # ❤ + 间距 + 数字
-	var tag_w: float = f.get_string_size(_d_tag.text,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, _d_tag.get_theme_font_size("font_size")).x + 36.0
-	var gap := 28.0
-	var total: float = no_w + gap + hp_w + gap + tag_w
-	var x0: float = PAGE_R.position.x + (PAGE_R.size.x - total) * 0.5
-	_d_no_lbl.position = Vector2(x0, y0)
-	_d_no_lbl.size = Vector2(no_w + 4.0, 38)
-	var x1: float = x0 + no_w + gap
-	_d_hp_heart.position = Vector2(x1, y0 + 6.0)
-	_d_hp_num.position = Vector2(x1 + 26.0 + 8.0, y0)
-	_d_hp_num.size = Vector2(num_w + 4.0, 38)
-	var x2: float = x1 + hp_w + gap
-	_d_tag_edge.position = Vector2(x2 - 2, y0 + 1)
-	_d_tag_edge.size = Vector2(tag_w + 4, 38)
-	_d_tag_bg.position = Vector2(x2, y0 + 3)
-	_d_tag_bg.size = Vector2(tag_w, 34)
-	_d_tag.position = Vector2(x2, y0 + 3)
-	_d_tag.size = Vector2(tag_w, 34)
-
-
-## 技能名（+可选图标）作为一组在页内水平居中（名字长短不一 → 每次重排）。
+## 技能图标、技能名与主/被动标签作为一组在页内水平居中。
 func _layout_skill_row() -> void:
 	var f: Font = _d_skill_name.get_theme_font("font")
 	var fs: int = _d_skill_name.get_theme_font_size("font_size")
@@ -629,14 +473,18 @@ func _layout_skill_row() -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	var icon_on: bool = _d_skill_icon != null and _d_skill_icon.visible
 	var icon_block: float = 40.0 if icon_on else 0.0   # 32 图标 + 8 间距
-	var total: float = icon_block + name_w
+	var tag_gap := 18.0
+	var tag_w := 80.0
+	var total: float = icon_block + name_w + tag_gap + tag_w
 	var x0: float = PAGE_R.position.x + (PAGE_R.size.x - total) * 0.5
-	var y0: float = PAGE_R.position.y + 648
+	var y0: float = PAGE_R.position.y + 610
 	if icon_on:
 		_d_skill_icon.position = Vector2(x0, y0)
 		_d_skill_icon.size = Vector2(32, 32)
 	_d_skill_name.position = Vector2(x0 + icon_block, y0)
 	_d_skill_name.size = Vector2(name_w + 8, 32)
+	var tag_x := x0 + icon_block + name_w + tag_gap
+	_d_tag_group.position = Vector2(tag_x, y0)
 
 
 # ============================================================
@@ -650,14 +498,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	var step := 0
+	var cols := _grid_columns()
 	if event.is_action_pressed("ui_left"):
 		step = -1
 	elif event.is_action_pressed("ui_right"):
 		step = 1
 	elif event.is_action_pressed("ui_up"):
-		step = -COLS
+		step = -cols
 	elif event.is_action_pressed("ui_down"):
-		step = COLS
+		step = cols
 	if step != 0 and _sel_idx >= 0:
 		_select(wrapi(_sel_idx + step, 0, all_heroes.size()))
 		get_viewport().set_input_as_handled()
@@ -674,7 +523,7 @@ func _back_to_menu() -> void:
 	TransitionManager.transition_to(MENU_SCENE)
 
 
-## 入场：牌匾/返回滑入 + 卷轴轻微上浮 + 左页格按行翻开扫过 + 右页淡入。
+## 入场：页眉滑入 + 册页轻微上浮 + 左页格按行翻开扫过 + 右页淡入。
 func _play_intro() -> void:
 	var band := $TopBand as Control
 	var band_home := band.position
@@ -688,12 +537,20 @@ func _play_intro() -> void:
 	tb.tween_property(_book_layer, "position:y", 0.0, 0.35)\
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tb.tween_property(_book_layer, "modulate:a", 1.0, 0.25)
+	var cols := _grid_columns()
+	var page_size := _grid_page_size()
 	for i in card_cards.size():
 		var card := card_cards[i]
+		if not card.visible:
+			card.scale = Vector2.ONE
+			card.modulate.a = 1.0
+			continue
 		card.pivot_offset = card.size * 0.5
 		card.scale = Vector2(0.001, 1.0)
 		card.modulate.a = 0.0
-		var delay := 0.1 + floorf(i / float(COLS)) * 0.1 + (i % COLS) * 0.03
+		var local_index := i % page_size
+		var delay := 0.1 + floorf(local_index / float(cols)) * 0.1 \
+			+ (local_index % cols) * 0.03
 		var ta := create_tween()
 		ta.tween_interval(delay)
 		ta.tween_property(card, "modulate:a", 1.0, 0.1)

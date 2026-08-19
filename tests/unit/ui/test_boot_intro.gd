@@ -3,7 +3,7 @@ extends GutTest
 const BOOT_SCREEN_PATH := "res://src/ui/boot_screen.tscn"
 
 
-func test_boot_intro_uses_character_brush_then_title_sequence() -> void:
+func test_boot_intro_uses_layered_impact_timing() -> void:
 	var boot := await _instantiate_boot()
 	var intro := boot.get_node_or_null("IntroController")
 
@@ -17,35 +17,351 @@ func test_boot_intro_uses_character_brush_then_title_sequence() -> void:
 		0.001)
 	assert_almost_eq(
 		float(intro.get("brush_duration_seconds")),
-		1.2,
+		0.72,
 		0.001)
 	assert_almost_eq(
 		float(intro.get("gold_duration_seconds")),
-		1.2,
+		0.92,
+		0.001)
+	assert_almost_eq(
+		float(intro.get("pressure_start_seconds")),
+		0.28,
+		0.001)
+	assert_almost_eq(
+		float(intro.get("pressure_duration_seconds")),
+		0.70,
+		0.001)
+	assert_almost_eq(
+		float(intro.get("title_duration_seconds")),
+		0.76,
+		0.001)
+	assert_almost_eq(
+		float(intro.get("prompt_duration_seconds")),
+		0.94,
 		0.001)
 	assert_almost_eq(
 		float(intro.get("brush_start_seconds")),
-		float(intro.get("flash_start_seconds")),
+		float(intro.get("title_start_seconds")),
 		0.001)
 	assert_almost_eq(
 		float(intro.get("gold_start_seconds")),
-		float(intro.get("flash_start_seconds")),
+		float(intro.get("brush_start_seconds")),
 		0.001)
 	assert_almost_eq(
 		float(intro.get("prompt_start_seconds")),
 		float(intro.get("title_start_seconds")),
 		0.001)
 	assert_almost_eq(
-		float(intro.get("prompt_duration_seconds")),
-		float(intro.get("title_duration_seconds")),
-		0.001)
-	assert_almost_eq(
 		float(intro.get("title_start_seconds")),
 		float(intro.get("brush_start_seconds")),
 		0.001)
 	assert_almost_eq(
-		float(intro.get("title_duration_seconds")),
-		float(intro.get("brush_duration_seconds")),
+		float(intro.get("impact_propagation_start_seconds")),
+		0.18,
+		0.001)
+	assert_almost_eq(
+		float(intro.get("impact_propagation_end_seconds")),
+		0.88,
+		0.001)
+	assert_almost_eq(
+		float(intro.get("impact_propagation_lead_seconds")),
+		0.12,
+		0.001)
+	assert_almost_eq(
+		float(intro.get("impact_support_lead_seconds")),
+		0.06,
+		0.001)
+
+
+func test_boot_intro_continuously_propagates_then_locks_primary_layers() -> void:
+	var boot := await _instantiate_boot()
+	var intro := boot.get_node("IntroController")
+	var blue_mid := boot.get_node(
+		"BackgroundStage/BlueMid") as TextureRect
+	var gold := boot.get_node(
+		"BackgroundStage/GoldEnergy") as TextureRect
+	var title := boot.get_node("TitleColumn/BoTop") as TextureRect
+
+	intro.call(&"preview_at_time", 0.20)
+	var early_brush := _shader_float(
+		blue_mid,
+		&"intro_stroke_progress")
+	var early_gold := _shader_float(
+		gold,
+		&"intro_path_progress")
+	var early_title := _shader_float(
+		title,
+		&"intro_reveal_progress")
+
+	intro.call(&"preview_at_time", 0.24)
+	assert_gt(
+		_shader_float(blue_mid, &"intro_stroke_progress"),
+		early_brush)
+	assert_gt(
+		_shader_float(gold, &"intro_path_progress"),
+		early_gold)
+	assert_gt(
+		_shader_float(title, &"intro_reveal_progress"),
+		early_title)
+
+	assert_gt(float(intro.call(&"_impact_layer_seconds", 0.44)), 0.44)
+	assert_almost_eq(
+		float(intro.call(&"_impact_layer_seconds", 0.88)),
+		0.88,
+		0.001)
+	var previous_layer_seconds := 0.18
+	for frame_index: int in range(1, 43):
+		var sample_seconds := 0.18 + float(frame_index) / 60.0
+		var layer_seconds := float(intro.call(
+			&"_impact_layer_seconds",
+			sample_seconds))
+		assert_gt(layer_seconds, previous_layer_seconds)
+		previous_layer_seconds = layer_seconds
+
+
+func test_boot_intro_primary_layers_use_distinct_monotonic_phases() -> void:
+	var boot := await _instantiate_boot()
+	var intro := boot.get_node("IntroController")
+	var stage := boot.get_node("BackgroundStage")
+	var blue_base := stage.get_node("BlueBase") as TextureRect
+	var blue_mid := stage.get_node("BlueMid") as TextureRect
+	var blue_light := stage.get_node("BlueLight") as TextureRect
+	var gold := stage.get_node("GoldEnergy") as TextureRect
+	var contours := stage.get_node("PressureContours") as ColorRect
+	var title := boot.get_node("TitleColumn/BoTop") as TextureRect
+	var character_base := boot.get_node(
+		"Character/Rig/Base") as Sprite2D
+
+	intro.call(&"preview_at_time", 0.48)
+	var brush_progress := _shader_float(
+		blue_mid,
+		&"intro_stroke_progress")
+	var gold_progress := _shader_float(
+		gold,
+		&"intro_path_progress")
+	var title_progress := _shader_float(
+		title,
+		&"intro_reveal_progress")
+	var pressure_progress := _shader_float(
+		contours,
+		&"intro_opacity")
+	assert_gt(brush_progress, title_progress)
+	assert_gt(title_progress, gold_progress)
+	assert_gt(gold_progress, pressure_progress)
+
+	intro.call(&"preview_at_time", 0.24)
+	assert_gt(
+		_shader_float(
+			character_base,
+			&"intro_impact_progress"),
+		0.0)
+	assert_lt(
+		_shader_float(
+			character_base,
+			&"intro_impact_progress"),
+		1.0)
+
+	var base_material := blue_base.material as ShaderMaterial
+	var mid_material := blue_mid.material as ShaderMaterial
+	var light_material := blue_light.material as ShaderMaterial
+	assert_gt(
+		float(base_material.get_shader_parameter(
+			&"intro_layer_offset")),
+		float(mid_material.get_shader_parameter(
+			&"intro_layer_offset")))
+	assert_gt(
+		float(mid_material.get_shader_parameter(
+			&"intro_layer_offset")),
+		float(light_material.get_shader_parameter(
+			&"intro_layer_offset")))
+
+
+func test_boot_gold_intro_prioritizes_character_contact_energy() -> void:
+	var boot := await _instantiate_boot()
+	var gold := boot.get_node(
+		"BackgroundStage/GoldEnergy") as TextureRect
+	var material := gold.material as ShaderMaterial
+
+	assert_not_null(material)
+	if material == null:
+		return
+	assert_eq(
+		material.get_shader_parameter(&"intro_contact_min"),
+		Vector2(0.48, 0.18))
+	assert_eq(
+		material.get_shader_parameter(&"intro_contact_max"),
+		Vector2(0.76, 0.52))
+	assert_almost_eq(
+		float(material.get_shader_parameter(
+			&"intro_late_path_threshold")),
+		0.84,
+		0.001)
+	assert_almost_eq(
+		float(material.get_shader_parameter(
+			&"intro_contact_path_ceiling")),
+		0.32,
+		0.001)
+	assert_true(
+		material.shader.code.contains(
+			"source_path_progress = mix("))
+	assert_almost_eq(
+		float(gold.get_meta("pointer_parallax_factor")),
+		0.28,
+		0.001)
+
+
+func test_boot_intro_keeps_composition_anchored_without_shake() -> void:
+	var boot := await _instantiate_boot()
+	var intro := boot.get_node("IntroController")
+	var stage := boot.get_node("BackgroundStage") as Control
+	var title := boot.get_node("TitleColumn") as Control
+	var prompt := boot.get_node("EnterPrompt") as Control
+	var character := boot.get_node("Character") as Control
+	var stage_origin := stage.position
+	var title_origin := title.position
+	var prompt_origin := prompt.position
+	var character_origin := character.position
+
+	for sample_seconds: float in [0.0, 0.15, 0.34, 0.53, 1.32]:
+		intro.call(&"preview_at_time", sample_seconds)
+		assert_eq(stage.position, stage_origin)
+		assert_eq(title.position, title_origin)
+		assert_eq(prompt.position, prompt_origin)
+		assert_eq(character.position, character_origin)
+
+
+func test_boot_title_pointer_tilt_uses_one_shared_perspective_plane() -> void:
+	var boot := await _instantiate_boot()
+	var title := boot.get_node("TitleColumn") as BootTitleController
+	var material_nodes: Array[TextureRect] = [
+		boot.get_node("TitleColumn/BoTop") as TextureRect,
+		boot.get_node("TitleColumn/BoMiddle") as TextureRect,
+		boot.get_node("TitleColumn/ZanBottom") as TextureRect,
+		boot.get_node("TitleColumn/EnglishSubtitle") as TextureRect,
+		boot.get_node("TitleColumn/BoTopShadow") as TextureRect,
+		boot.get_node("TitleColumn/EnglishSubtitleShadow") as TextureRect,
+	]
+
+	assert_almost_eq(float(title.get("pointer_yaw_degrees")), 6.0, 0.001)
+	assert_almost_eq(float(title.get("pointer_pitch_degrees")), 2.5, 0.001)
+	assert_almost_eq(float(title.get("pointer_smooth")), 5.0, 0.001)
+	title.call(&"preview_pointer_tilt", Vector2(1.0, -1.0))
+	for material_node: TextureRect in material_nodes:
+		var material := material_node.material as ShaderMaterial
+		assert_almost_eq(
+			float(material.get_shader_parameter(&"pointer_yaw")),
+			1.0,
+			0.001)
+		assert_almost_eq(
+			float(material.get_shader_parameter(&"pointer_pitch")),
+			-1.0,
+			0.001)
+		assert_almost_eq(
+			float(material.get_shader_parameter(&"pointer_yaw_strength")),
+			tan(deg_to_rad(6.0)),
+			0.001)
+		assert_almost_eq(
+			float(material.get_shader_parameter(&"pointer_pitch_strength")),
+			tan(deg_to_rad(2.5)),
+			0.001)
+	assert_true(
+		(material_nodes[0].material as ShaderMaterial)
+			.shader.code.contains("group_pointer_x"))
+
+
+func test_boot_enter_prompt_keeps_decoration_lines_static() -> void:
+	var boot := await _instantiate_boot()
+	var prompt := boot.get_node("EnterPrompt") as BootEnterPrompt
+	var left_line := prompt.get_node("LineLeft") as ColorRect
+	var right_line := prompt.get_node("LineRight") as ColorRect
+
+	assert_null(left_line.material)
+	assert_null(right_line.material)
+	assert_false(prompt.has_method(&"set_line_pulse_phase"))
+
+
+func test_boot_exit_energy_builds_one_way_without_intro_pulse_falloff() -> void:
+	var boot := await _instantiate_boot()
+	var intro := boot.get_node("IntroController")
+	var star := boot.get_node(
+		"Character/Rig/RearHandEnergyAnchor/RearHandStar") as ColorRect
+	var glow := boot.get_node(
+		"Character/Rig/RearHandEnergyAnchor/RearHandGlow") as ColorRect
+
+	intro.call(&"_apply_exit_progress", 0.25)
+	var early_star_intensity := _shader_float(star, &"intensity")
+	var early_glow_intensity := _shader_float(glow, &"intensity")
+
+	intro.call(&"_apply_exit_progress", 0.75)
+	assert_gt(
+		_shader_float(star, &"intensity"),
+		early_star_intensity)
+	assert_gt(
+		_shader_float(glow, &"intensity"),
+		early_glow_intensity)
+	assert_almost_eq(
+		_shader_float(star, &"exit_release_enabled"),
+		1.0,
+		0.001)
+	assert_almost_eq(
+		_shader_float(star, &"exit_release_progress"),
+		0.75,
+		0.001)
+	assert_almost_eq(
+		_shader_float(star, &"intro_pulse_enabled"),
+		0.0,
+		0.001)
+
+
+func test_boot_exit_defaults_to_reversible_exposure_ring_variant() -> void:
+	var veil := TransitionManager.get_node(
+		"BootPixelVeil") as ColorRect
+	assert_not_null(veil)
+	var shader_material := veil.material as ShaderMaterial
+	assert_not_null(shader_material)
+	assert_eq(
+		int(shader_material.get_shader_parameter(&"transition_mode")),
+		2)
+	assert_eq(
+		TransitionManager.boot_exit_mode(),
+		TransitionManager.BootExitMode.EXPOSURE_RING)
+	var ring_fill_value: Variant = shader_material.get_shader_parameter(
+		&"ring_fill_color")
+	var ring_edge_value: Variant = shader_material.get_shader_parameter(
+		&"ring_edge_color")
+	var energy_tint_value: Variant = shader_material.get_shader_parameter(
+		&"ring_energy_tint")
+	var edge_half_width_value: Variant = shader_material.get_shader_parameter(
+		&"ring_edge_half_width")
+	assert_not_null(ring_fill_value)
+	assert_not_null(ring_edge_value)
+	assert_not_null(energy_tint_value)
+	assert_not_null(edge_half_width_value)
+	if ring_fill_value != null:
+		var ring_fill: Color = ring_fill_value
+		assert_true(ring_fill.is_equal_approx(Color.WHITE))
+	if ring_edge_value != null:
+		var ring_edge: Color = ring_edge_value
+		assert_true(
+			ring_edge.is_equal_approx(
+				Color.from_string("#D6A33E", Color.TRANSPARENT)))
+	if energy_tint_value != null:
+		var energy_tint: Color = energy_tint_value
+		assert_true(
+			energy_tint.is_equal_approx(
+				Color.from_string("#FFF7E8", Color.TRANSPARENT)))
+	if edge_half_width_value != null:
+		assert_almost_eq(
+			float(edge_half_width_value),
+			0.018,
+			0.0001)
+	assert_true(
+		shader_material.shader.code.contains("hint_screen_texture"))
+	assert_true(
+		shader_material.shader.code.contains("posterized_luma"))
+	assert_almost_eq(
+		TransitionManager.BOOT_HOLD_TIME,
+		0.03,
 		0.001)
 
 
@@ -93,6 +409,10 @@ func test_boot_intro_starts_with_character_only_and_locks_entry() -> void:
 		_shader_float(character_base, &"intro_light_progress"),
 		1.0,
 		0.001)
+	assert_almost_eq(
+		_shader_float(character_base, &"intro_impact_progress"),
+		0.0,
+		0.001)
 
 
 func test_boot_intro_star_brush_gold_and_title_progress_together() -> void:
@@ -112,14 +432,16 @@ func test_boot_intro_star_brush_gold_and_title_progress_together() -> void:
 		float(intro.get("brush_start_seconds"))
 		+ float(intro.get("brush_duration_seconds")) * 0.25)
 	intro.call(&"preview_at_time", parallel_sample)
-	assert_almost_eq(
-		_shader_float(blue_mid, &"intro_stroke_progress"),
-		0.25,
-		0.001)
-	assert_almost_eq(
-		_shader_float(gold, &"intro_path_progress"),
-		0.25,
-		0.001)
+	var brush_progress := _shader_float(
+		blue_mid,
+		&"intro_stroke_progress")
+	var gold_progress := _shader_float(
+		gold,
+		&"intro_path_progress")
+	assert_gt(brush_progress, 0.08)
+	assert_lt(brush_progress, 0.30)
+	assert_gt(gold_progress, 0.0)
+	assert_lt(gold_progress, brush_progress)
 	assert_gt(
 		_shader_float(title, &"intro_reveal_progress"),
 		0.0)
@@ -127,6 +449,12 @@ func test_boot_intro_star_brush_gold_and_title_progress_together() -> void:
 		_shader_float(character_base, &"intro_light_progress"),
 		1.0,
 		0.001)
+	assert_gt(
+		_shader_float(character_base, &"intro_impact_progress"),
+		0.0)
+	assert_lt(
+		_shader_float(character_base, &"intro_impact_progress"),
+		1.0)
 	assert_almost_eq(stage.modulate.a, 1.0, 0.001)
 	assert_true(prompt.visible)
 	assert_gt(prompt.modulate.a, 0.0)
@@ -179,16 +507,53 @@ func test_boot_intro_finishes_parallel_layers_together() -> void:
 	assert_true(boot.scale.is_equal_approx(Vector2.ONE))
 	assert_true(boot.position.is_equal_approx(Vector2.ZERO))
 
-func test_boot_intro_restores_the_original_internal_title_entry() -> void:
+func test_boot_title_intro_grows_from_authored_energy_cuts_without_ghosts() -> void:
 	var boot := await _instantiate_boot()
 	var intro := boot.get_node("IntroController")
 	var title := boot.get_node("TitleColumn/BoTop") as TextureRect
+	var title_shadow := boot.get_node(
+		"TitleColumn/BoTopShadow") as TextureRect
 	var english := boot.get_node(
 		"TitleColumn/EnglishSubtitle") as TextureRect
+	var english_shadow := boot.get_node(
+		"TitleColumn/EnglishSubtitleShadow") as TextureRect
 	var title_controller := boot.get_node("TitleColumn")
+	var title_material := title.material as ShaderMaterial
+	var title_shadow_material := title_shadow.material as ShaderMaterial
+	var english_material := english.material as ShaderMaterial
+	var english_shadow_material := english_shadow.material as ShaderMaterial
 
 	assert_null(boot.get_node_or_null("TitleColumn/TitleBladeLight"))
 	assert_false(title_controller.has_method(&"set_intro_state"))
+	assert_not_null(title_material.get_shader_parameter(
+		&"intro_activation_map"))
+	assert_not_null(english_material.get_shader_parameter(
+		&"intro_activation_map"))
+	assert_eq(
+		title_material.get_shader_parameter(&"intro_shadow"),
+		false)
+	assert_eq(
+		title_shadow_material.get_shader_parameter(&"intro_shadow"),
+		true)
+	assert_eq(
+		english_shadow_material.get_shader_parameter(&"intro_shadow"),
+		true)
+	assert_almost_eq(
+		float(title_material.get_shader_parameter(&"intro_progress_delay")),
+		0.0,
+		0.001)
+	assert_almost_eq(
+		float(english_material.get_shader_parameter(&"intro_progress_delay")),
+		0.052632,
+		0.001)
+	assert_gt(
+		float(title_shadow_material.get_shader_parameter(&"intro_shadow_lag")),
+		0.0)
+	assert_true(title_material.shader.code.contains("intro_activation_map"))
+	assert_true(title_material.shader.code.contains("crack_activation"))
+	assert_true(title_material.shader.code.contains("face_activation"))
+	assert_false(title_material.shader.code.contains("blade_coordinate"))
+	assert_false(title_material.shader.code.contains("intro_silhouette"))
 	var title_midpoint := (
 		float(intro.get("title_start_seconds"))
 		+ float(intro.get("title_duration_seconds")) * 0.5)
@@ -198,16 +563,10 @@ func test_boot_intro_restores_the_original_internal_title_entry() -> void:
 		&"intro_reveal_progress")
 	assert_gt(reveal_progress, 0.0)
 	assert_lt(reveal_progress, 1.0)
-	assert_gt(
-		_shader_float(title, &"intro_blade_strength"),
-		0.0)
 	assert_almost_eq(
 		_shader_float(english, &"intro_reveal_progress"),
 		reveal_progress,
 		0.001)
-	assert_gt(
-		_shader_float(english, &"intro_blade_strength"),
-		0.0)
 
 	var placed_sample := (
 		float(intro.get("title_start_seconds"))
@@ -262,6 +621,10 @@ func test_boot_intro_finishes_on_the_existing_idle_contract() -> void:
 		0.001)
 	assert_almost_eq(
 		_shader_float(character_base, &"intro_light_progress"),
+		1.0,
+		0.001)
+	assert_almost_eq(
+		_shader_float(character_base, &"intro_impact_progress"),
 		1.0,
 		0.001)
 	assert_almost_eq(stage.modulate.a, 1.0, 0.001)

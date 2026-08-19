@@ -245,7 +245,7 @@ func _block_fx(player: int, big_atk: bool) -> void:
 
 
 ## A3b 事件注解批量弹出：同侧多条按 TAG_STAGGER 逐条错时，上限 EVENT_TAG_MAX 条防糊屏；
-## 溢出裁剪时救场级注解（pr=0·护主/还魂/免疫）优先保留，其余按事件发生顺序。
+## 溢出裁剪时救场级注解（pr=0·还魂/免疫/断招）优先保留，其余按事件发生顺序。
 ## 延时用 tween（绑本节点·离场自动清）而非 SceneTreeTimer——防战斗屏销毁后回调打到空引用。
 func _pop_tags(player: int, tag_list: Array, base_delay: float = 0.08) -> void:
 	var list: Array = tag_list

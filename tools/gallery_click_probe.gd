@@ -1,9 +1,9 @@
 extends Node
 
-## 英雄图鉴点击回归探针（完整引擎模式·真场景）：
-##   <godot> --path . res://tools/gallery_click_probe.tscn（带窗口·非 headless）
-## 锁行为：①所有 HeroFrame 不吞点击（mouse_filter=IGNORE·2026-07-13 入树时序坑）
-##         ②合成左键点第 3 格（idx=2）中心 → _sel_idx 必须跟随。
+## 英雄图鉴交互回归探针（完整引擎模式·真场景）：
+##   tools/run_godot.ps1 -Mode Probe -Target res://tools/gallery_click_probe.tscn
+## 锁行为：①所有头像框不吞点击；②点击第 3 格选中跟随；
+##         ③方向键继续换人；④翻页保留格位；⑤内嵌模式的返回按钮继续走关闭回调。
 ## 点击=Input.parse_input_event 状态注入（⛔warp_mouse 不可靠·老教训）。
 
 func _ready() -> void:
@@ -19,15 +19,46 @@ func _ready() -> void:
 		if (f as Control).mouse_filter != Control.MOUSE_FILTER_IGNORE:
 			filter_ok = false
 	var target := 2
-	var pos := Vector2(282.0 + target * 108.0 + 46.0, 236.0 + 46.0)   # 第 3 格框中心（2026-07-15 回纹卷轴换装几何）
+	var target_card := g.card_cards[target] as Button
+	var pos := target_card.global_position + target_card.size * 0.5
 	_click(pos)
 	await get_tree().create_timer(0.3).timeout
-	var sel: int = g._sel_idx
-	if filter_ok and sel == target:
-		print("PASS: 框不吞点击·点第 %d 格选中跟随 (_sel_idx=%d)" % [target, sel])
+	var click_sel: int = g._sel_idx
+
+	var right := InputEventAction.new()
+	right.action = "ui_right"
+	right.pressed = true
+	g._unhandled_input(right)
+	await get_tree().process_frame
+	var key_sel: int = g._sel_idx
+
+	g.next_page_btn.pressed.emit()
+	await get_tree().process_frame
+	var next_page_sel: int = g._sel_idx
+	var next_page_visible: int = g.card_cards.filter(
+		func(card: Button) -> bool: return card.visible).size()
+	g.previous_page_btn.pressed.emit()
+	await get_tree().process_frame
+	var previous_page_sel: int = g._sel_idx
+
+	var close_state := {"calls": 0}
+	g.embedded_close = func() -> void:
+		close_state.calls += 1
+	g.back_btn.pressed.emit()
+	await get_tree().process_frame
+	var close_calls: int = close_state.calls
+
+	if filter_ok and click_sel == target and key_sel == target + 1 \
+			and next_page_sel == target + 1 + 12 and next_page_visible == 12 \
+			and previous_page_sel == target + 1 and close_calls == 1:
+		print("PASS: 点击、方向键、12 位分页、格位保留与内嵌返回均保持有效")
+		get_tree().quit()
 	else:
-		print("FAIL: filter_ok=%s _sel_idx=%d (期望 %d)" % [filter_ok, sel, target])
-	get_tree().quit()
+		print(
+			"FAIL: filter_ok=%s click_sel=%d key_sel=%d next=%d visible=%d previous=%d close=%d"
+			% [filter_ok, click_sel, key_sel, next_page_sel, next_page_visible,
+				previous_page_sel, close_calls])
+		get_tree().quit(1)
 
 
 func _click(pos: Vector2) -> void:

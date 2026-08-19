@@ -1,63 +1,67 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene format=3 uid="uid://cfo5tn45q3yf7"]
 
-[ext_resource type="PackedScene" path="res://src/ui/battle_screen_base.tscn" id="1_base"]
-[ext_resource type="PackedScene" path="res://src/ui/scenes/scene6.tscn" id="2_scene6"]
-[ext_resource type="Shader" path="res://assets/shaders/post_fx_color_grade.gdshader" id="3_postfx"]
-[ext_resource type="Shader" path="res://assets/shaders/canvas_env_scene6_character_light.gdshader" id="4_character_light"]
+[ext_resource type="PackedScene" uid="uid://bn0rjf1qjld17" path="res://src/ui/battle_screen_base.tscn" id="1_base"]
+[ext_resource type="PackedScene" uid="uid://b5ulrjupwyxav" path="res://src/ui/scenes/scene6.tscn" id="2_scene6"]
+[ext_resource type="Shader" uid="uid://dnycv6j3wn0ot" path="res://assets/shaders/post_fx_color_grade.gdshader" id="3_postfx"]
+[ext_resource type="Shader" uid="uid://du2t7nnyp2xfd" path="res://assets/shaders/canvas_env_scene6_character_light.gdshader" id="4_character_light"]
 
-[sub_resource type="ShaderMaterial" id="Scene6P1CharacterMat"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_qrrme"]
 resource_local_to_scene = true
 shader = ExtResource("4_character_light")
 shader_parameter/flash_amount = 0.0
-shader_parameter/flash_color = Color(1, 1, 1, 1)
-shader_parameter/source_saturation = 1.04
-shader_parameter/source_contrast = 1.04
-shader_parameter/scene_exposure = 1.07
-shader_parameter/highlight_compression = 0.14
+shader_parameter/flash_color = Color(0.72, 0.66, 0.6, 1)
+shader_parameter/flash_peak_strength = 0.0
+shader_parameter/flash_dark_response = 0.0
+shader_parameter/source_saturation = 1.0
+shader_parameter/source_contrast = 1.0
+shader_parameter/scene_exposure = 1.02
+shader_parameter/highlight_compression = 0.3
 shader_parameter/light_dir = Vector2(-0.62, 1)
-shader_parameter/backlight = 0.25
-shader_parameter/shadow_tint = Color(0.46, 0.18, 0.22, 1)
-shader_parameter/skin_warmth = Color(1.04, 1, 0.94, 1)
-shader_parameter/warmth_amount = 0.055
-shader_parameter/rim_color = Color(1, 0.56, 0.24, 1)
-shader_parameter/rim_strength = 0.1
-shader_parameter/rim_strength_cap = 0.2
+shader_parameter/backlight = 0.18
+shader_parameter/shadow_tint = Color(0.34, 0.23, 0.3, 1)
+shader_parameter/skin_warmth = Color(0.72, 0.64, 0.7, 1)
+shader_parameter/warmth_amount = 0.12
+shader_parameter/rim_color = Color(0.48, 0.28, 0.16, 1)
+shader_parameter/rim_strength = 0.02
+shader_parameter/rim_strength_cap = 0.035
 shader_parameter/rim_width = 1.0
-shader_parameter/fill_color = Color(0.46, 0.13, 0.08, 1)
-shader_parameter/fill_amount = 0.045
-shader_parameter/ambient_color = Color(0.24, 0.065, 0.085, 1)
-shader_parameter/ambient_amount = 0.028
-shader_parameter/lava_bounce_color = Color(0.96, 0.3, 0.07, 1)
-shader_parameter/lava_bounce_amount = 0.09
+shader_parameter/fill_color = Color(0.27, 0.18, 0.16, 1)
+shader_parameter/fill_amount = 0.018
+shader_parameter/ambient_color = Color(0.16, 0.1, 0.14, 1)
+shader_parameter/ambient_amount = 0.012
+shader_parameter/lava_bounce_color = Color(0.46, 0.22, 0.1, 1)
+shader_parameter/lava_bounce_amount = 0.012
 shader_parameter/lava_bounce_start = 0.47
 
-[sub_resource type="ShaderMaterial" id="Scene6P2CharacterMat"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_k7b3w"]
 resource_local_to_scene = true
 shader = ExtResource("4_character_light")
 shader_parameter/flash_amount = 0.0
-shader_parameter/flash_color = Color(1, 1, 1, 1)
-shader_parameter/source_saturation = 1.04
-shader_parameter/source_contrast = 1.04
-shader_parameter/scene_exposure = 1.0
-shader_parameter/highlight_compression = 0.22
+shader_parameter/flash_color = Color(0.72, 0.66, 0.6, 1)
+shader_parameter/flash_peak_strength = 0.0
+shader_parameter/flash_dark_response = 0.0
+shader_parameter/source_saturation = 1.0
+shader_parameter/source_contrast = 1.0
+shader_parameter/scene_exposure = 0.98
+shader_parameter/highlight_compression = 0.3
 shader_parameter/light_dir = Vector2(0.62, 1)
-shader_parameter/backlight = 0.23
-shader_parameter/shadow_tint = Color(0.46, 0.18, 0.22, 1)
-shader_parameter/skin_warmth = Color(1.04, 1, 0.94, 1)
-shader_parameter/warmth_amount = 0.05
-shader_parameter/rim_color = Color(1, 0.56, 0.24, 1)
-shader_parameter/rim_strength = 0.09
-shader_parameter/rim_strength_cap = 0.18
+shader_parameter/backlight = 0.17
+shader_parameter/shadow_tint = Color(0.34, 0.23, 0.3, 1)
+shader_parameter/skin_warmth = Color(0.74, 0.62, 0.56, 1)
+shader_parameter/warmth_amount = 0.12
+shader_parameter/rim_color = Color(0.48, 0.28, 0.16, 1)
+shader_parameter/rim_strength = 0.02
+shader_parameter/rim_strength_cap = 0.035
 shader_parameter/rim_width = 1.0
-shader_parameter/fill_color = Color(0.46, 0.13, 0.08, 1)
-shader_parameter/fill_amount = 0.038
-shader_parameter/ambient_color = Color(0.22, 0.06, 0.08, 1)
-shader_parameter/ambient_amount = 0.024
-shader_parameter/lava_bounce_color = Color(0.96, 0.28, 0.06, 1)
-shader_parameter/lava_bounce_amount = 0.08
+shader_parameter/fill_color = Color(0.27, 0.18, 0.16, 1)
+shader_parameter/fill_amount = 0.016
+shader_parameter/ambient_color = Color(0.16, 0.1, 0.14, 1)
+shader_parameter/ambient_amount = 0.01
+shader_parameter/lava_bounce_color = Color(0.46, 0.22, 0.1, 1)
+shader_parameter/lava_bounce_amount = 0.012
 shader_parameter/lava_bounce_start = 0.49
 
-[sub_resource type="ShaderMaterial" id="Scene6PostFXMat"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_dw032"]
 resource_local_to_scene = true
 shader = ExtResource("3_postfx")
 shader_parameter/barrel_amount = 0.04
@@ -81,8 +85,13 @@ shader_parameter/grain_scale = 1.6
 shader_parameter/heat_haze_strength = 1.35
 shader_parameter/heat_haze_speed = 0.31
 shader_parameter/heat_haze_scale = 7.2
-shader_parameter/heat_haze_top_weight = 0.18
+shader_parameter/heat_haze_top_weight = 0.1
+shader_parameter/heat_haze_lower_focus = 0.3
 shader_parameter/heat_haze_vertical = 0.12
+shader_parameter/heat_haze_character_protection = 1.0
+shader_parameter/heat_haze_p1_center = Vector2(0.25, 0.58)
+shader_parameter/heat_haze_p2_center = Vector2(0.75, 0.58)
+shader_parameter/heat_haze_character_radius = Vector2(0.15, 0.34)
 shader_parameter/impact_strength = 0.0
 shader_parameter/impact_invert = 0.0
 shader_parameter/impact_center = Vector2(0.5, 0.55)
@@ -94,11 +103,22 @@ shader_parameter/impact_th_in = 0.13
 shader_parameter/impact_white = 0.86
 shader_parameter/impact_px = 3.0
 
-[node name="BattleScreen6" instance=ExtResource("1_base")]
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_ba0gr"]
 
-[node name="Stage" parent="StageSlot" parent_id_path=PackedInt32Array(924300025) index="0" instance=ExtResource("2_scene6")]
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_gmbvd"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_d0c7y"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_ldm43"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_2e6wl"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_ah7aj"]
+
+[node name="BattleScreen6" unique_id=1346818190 instance=ExtResource("1_base")]
+
+[node name="Stage" parent="StageSlot" parent_id_path=PackedInt32Array(924300025) index="0" unique_id=1182508117 instance=ExtResource("2_scene6")]
 layout_mode = 1
-mouse_filter = 2
 pointer_parallax = true
 demo_click_shake = false
 
@@ -109,35 +129,39 @@ self_modulate = Color(0.34, 0.08, 0.12, 0.58)
 self_modulate = Color(0.34, 0.08, 0.12, 0.58)
 
 [node name="P1CharDisplay" parent="." index="5" unique_id=1642938575]
-rim_color = Color(1, 0.56, 0.24, 1)
-rim_strength = 0.1
+rim_color = Color(0.48, 0.28, 0.16, 1)
+rim_strength = 0.02
 rim_width = 1.0
-backlight = 0.25
-shadow_tint = Color(0.46, 0.18, 0.22, 1)
+backlight = 0.18
+shadow_tint = Color(0.34, 0.23, 0.3, 1)
 light_dir = Vector2(-0.62, 1)
-skin_warmth = Color(1.04, 1, 0.94, 1)
-warmth_amount = 0.055
-fill_color = Color(0.46, 0.13, 0.08, 1)
-fill_amount = 0.045
+skin_warmth = Color(0.72, 0.64, 0.7, 1)
+warmth_amount = 0.12
+fill_color = Color(0.27, 0.18, 0.16, 1)
+fill_amount = 0.018
 
 [node name="AnimatedSprite2D" parent="P1CharDisplay/SubViewport" parent_id_path=PackedInt32Array(1642938575, 1325957388) index="1" unique_id=1622338484]
-material = SubResource("Scene6P1CharacterMat")
+material = SubResource("ShaderMaterial_qrrme")
+scale = Vector2(2, 2)
+frame_progress = 0.9830427
 
 [node name="P2CharDisplay" parent="." index="6" unique_id=915119977]
-rim_color = Color(1, 0.56, 0.24, 1)
-rim_strength = 0.09
-rim_width = 1.0
-backlight = 0.23
-shadow_tint = Color(0.46, 0.18, 0.22, 1)
-light_dir = Vector2(-0.62, 1)
 flip_h = true
-skin_warmth = Color(1.04, 1, 0.94, 1)
-warmth_amount = 0.05
-fill_color = Color(0.46, 0.13, 0.08, 1)
-fill_amount = 0.038
+rim_color = Color(0.48, 0.28, 0.16, 1)
+rim_strength = 0.02
+rim_width = 1.0
+backlight = 0.17
+shadow_tint = Color(0.34, 0.23, 0.3, 1)
+light_dir = Vector2(-0.62, 1)
+skin_warmth = Color(0.74, 0.62, 0.56, 1)
+fill_color = Color(0.27, 0.18, 0.16, 1)
+fill_amount = 0.016
 
 [node name="AnimatedSprite2D" parent="P2CharDisplay/SubViewport" parent_id_path=PackedInt32Array(915119977, 1325957388) index="1" unique_id=1622338484]
-material = SubResource("Scene6P2CharacterMat")
+material = SubResource("ShaderMaterial_k7b3w")
+scale = Vector2(2, 2)
+frame_progress = 0.9830427
+flip_h = true
 
 [node name="ForeDust" parent="." index="7" unique_id=844619574]
 visible = false
@@ -148,7 +172,43 @@ visible = false
 emitting = false
 
 [node name="PostFX" parent="." index="10" unique_id=516553634]
-material = SubResource("Scene6PostFXMat")
+material = SubResource("ShaderMaterial_dw032")
+
+[node name="P1EnergyCapLabel" parent="P1Hud" parent_id_path=PackedInt32Array(1074064709) index="2"]
+layout_mode = 0
+
+[node name="P1Frame0" parent="P1Hud" parent_id_path=PackedInt32Array(1074064709) index="3" unique_id=2129820687]
+offset_right = 98.0
+offset_bottom = 76.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_ba0gr")
+
+[node name="P1Frame1" parent="P1Hud" parent_id_path=PackedInt32Array(1074064709) index="4" unique_id=1566007647]
+offset_right = 744.0
+offset_bottom = 74.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_gmbvd")
+
+[node name="P1Frame2" parent="P1Hud" parent_id_path=PackedInt32Array(1074064709) index="6" unique_id=1208252427]
+offset_right = 664.0
+offset_bottom = 74.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_d0c7y")
+
+[node name="P2EnergyCapLabel" parent="P2Hud" parent_id_path=PackedInt32Array(1758094651) index="2"]
+layout_mode = 0
+
+[node name="P2Frame0" parent="P2Hud" parent_id_path=PackedInt32Array(1758094651) index="3" unique_id=1770616061]
+offset_right = 1886.0
+offset_bottom = 76.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_ldm43")
+
+[node name="P2Frame1" parent="P2Hud" parent_id_path=PackedInt32Array(1758094651) index="4" unique_id=1621653890]
+offset_right = 1258.0
+offset_bottom = 74.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_2e6wl")
+
+[node name="P2Frame2" parent="P2Hud" parent_id_path=PackedInt32Array(1758094651) index="6" unique_id=1695379356]
+offset_right = 1338.0
+offset_bottom = 74.0
+theme_override_styles/panel = SubResource("StyleBoxEmpty_ah7aj")
 
 [editable path="P1CharDisplay"]
 [editable path="P2CharDisplay"]
