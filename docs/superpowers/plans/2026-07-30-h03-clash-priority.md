@@ -172,10 +172,10 @@ Expected: h03 行为测试全部通过；普通攻击互换伤害、h02/h22/h16�
 - Modify: `design/items.md`
 - Modify: `design/items-list.md`
 - Modify: `design/items-firstrelease.md`
-- Modify comments only: `src/battle/skills/h10_jianyi.gd`
+- Modify comments only: `src/battle/skills/h10_taichuwanfa.gd`
 - Modify comments only: `src/battle/skills/h13_shuchao.gd`
 - Modify comments only: `src/battle/skills/h15_xueyong.gd`
-- Modify comments only: `src/battle/skills/h16_jifeng.gd`
+- Modify comments only: `src/battle/skills/h16_baihong.gd`
 - Modify comments only: `src/battle/skills/h20_duanzui.gd`
 - Modify comments only: `src/battle/items/t2_duyao.gd`
 - Modify: `src/battle/ai/README.md`

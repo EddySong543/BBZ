@@ -65,16 +65,16 @@ func _initialize() -> void:
 	quit()
 
 
-## 生成 / 刷新「中文名 ↔ id」对照表（从 ItemCatalog 实时取，按 tier→id 排）。
+## 生成 / 刷新「中文名 ↔ id」对照表（从 ItemCatalog 实时取，按 tier→完整无声调拼音排）。
 func _write_map_doc() -> void:
-	var items: Array[ItemData] = ItemCatalog.all()   # 已按 id 字典序
+	var items: Array[ItemData] = ItemCatalog.all()   # 已按玩家显示顺序
 	var lines: Array[String] = []
 	lines.append("# 道具「中文名 ↔ 代码 id」对照表")
 	lines.append("")
 	lines.append("> 由 `tools/import_item_art.gd` 从 `ItemCatalog` 实时生成，**勿手改**（改了会被覆盖）。")
 	lines.append("> **图标文件名 = 中文道具名**（与游戏内显示名一致·按名更新美术）；下表 id 仅代码内部用。")
 	lines.append("> ⚠ id 拼音是历史化石、≠ 显示名（如 `t1_siyecao`=最后一箭）；命名美术只看「中文名」列。")
-	lines.append("> 当前实装 %d 件（设计全集见 design/items-list.md）。" % items.size())
+	lines.append("> 当前实装 %d 件，表内各 tier 按显示名全拼排序（设计全集见 design/items-list.md）。" % items.size())
 	lines.append("")
 	for t in [1, 2, 3]:
 		lines.append("## T%d" % t)

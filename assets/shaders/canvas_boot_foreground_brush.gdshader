@@ -9,6 +9,7 @@ uniform float fringe_cleanup : hint_range(0.0, 0.5, 0.01) = 0.14;
 uniform sampler2D intro_path_texture : repeat_disable, filter_nearest;
 uniform float intro_stroke_progress : hint_range(0.0, 1.0, 0.001) = 1.0;
 uniform float intro_stroke_feather : hint_range(0.02, 0.24, 0.001) = 0.15;
+uniform float intro_layer_offset : hint_range(-0.16, 0.08, 0.005) = -0.10;
 
 varying vec4 vertex_color;
 
@@ -32,11 +33,15 @@ void fragment() {
 					fringe_cleanup + 0.22,
 					source.a));
 	float path_progress = texture(intro_path_texture, UV).r;
+	float effective_progress = clamp(
+			intro_stroke_progress + intro_layer_offset,
+			0.0,
+			1.0);
 	float intro_reveal = (
 			smoothstep(
 					path_progress - intro_stroke_feather,
 					path_progress,
-					intro_stroke_progress));
+					effective_progress));
 	if (intro_stroke_progress <= 0.001) {
 		intro_reveal = 0.0;
 	} else if (intro_stroke_progress >= 0.999) {

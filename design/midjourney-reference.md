@@ -46,7 +46,7 @@
 
 - **木骨纸芯 UI 资产**：公共前缀见 `design/ui-asset-spec-wood-paper.md` §0.5（已更新为 V8.1）。
 - **英雄高清厚涂立绘**：系列一致性用 `--oref`（ow 400-600 锁角色）+ `--sref` 锁画风；出图上 `--hd`。
-- **远征怪物**：挂点=monsters.json `art` 字段（见 design/expedition-monsters.md）。
+- **远征敌人（历史）**：旧 `monsters.json` 挂点已退役，不得据此继续出图。
 - **概念稿海选**：先 `--draft` 24 连抽探方向，选中再 Vary 出全清——省额度（规格书"F6 两连否即停产"的判断点前多一层保险）。
 
 ## 验证来源

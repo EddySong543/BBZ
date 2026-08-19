@@ -5,6 +5,10 @@ uniform float perspective_strength : hint_range(0.0, 0.35, 0.01) = 0.26;
 uniform float edge_padding : hint_range(0.0, 0.45, 0.01) = 0.04;
 uniform float group_x_min : hint_range(0.0, 1.0, 0.001) = 0.0;
 uniform float group_x_max : hint_range(0.0, 1.0, 0.001) = 1.0;
+uniform float pointer_yaw : hint_range(-1.0, 1.0, 0.001) = 0.0;
+uniform float pointer_pitch : hint_range(-1.0, 1.0, 0.001) = 0.0;
+uniform float pointer_yaw_strength : hint_range(0.0, 0.2, 0.001) = 0.105;
+uniform float pointer_pitch_strength : hint_range(0.0, 0.1, 0.001) = 0.044;
 
 uniform vec4 source_structure_color : source_color = vec4(
 		0.058824, 0.105882, 0.149020, 1.0);
@@ -22,6 +26,7 @@ uniform vec4 energy_color : source_color = vec4(
 uniform vec4 energy_peak_color : source_color = vec4(
 		0.960784, 0.909804, 0.819608, 1.0);
 
+uniform bool flow_enabled = true;
 uniform float flow_phase : hint_range(0.0, 1.0, 0.001) = 0.0;
 uniform float flow_delay : hint_range(0.0, 0.25, 0.001) = 0.0;
 uniform float flow_duration : hint_range(0.001, 0.5, 0.001) = 0.321429;
@@ -37,10 +42,13 @@ uniform vec4 outline_color : source_color = vec4(
 		0.058824, 0.105882, 0.149020, 0.88);
 uniform float outline_width_texels : hint_range(0.0, 2.0, 0.25) = 1.0;
 uniform float outline_strength : hint_range(0.0, 1.0, 0.01) = 1.0;
+uniform sampler2D intro_activation_map : filter_nearest, repeat_disable;
 uniform float intro_reveal_progress : hint_range(0.0, 1.0, 0.001) = 1.0;
-uniform float intro_reveal_feather : hint_range(0.001, 0.10, 0.001) = 0.025;
-uniform float intro_blade_width : hint_range(0.01, 0.16, 0.001) = 0.065;
-uniform float intro_blade_strength : hint_range(0.0, 1.0, 0.01) = 0.62;
+uniform float intro_reveal_feather : hint_range(0.001, 0.05, 0.001) = 0.012;
+uniform float intro_progress_delay : hint_range(0.0, 0.25, 0.001) = 0.0;
+uniform bool intro_shadow = false;
+uniform float intro_shadow_lag : hint_range(0.0, 0.20, 0.001) = 0.055;
+uniform float intro_crack_peak_width : hint_range(0.01, 0.30, 0.001) = 0.11;
 
 varying vec4 vertex_color;
 
@@ -210,6 +218,25 @@ void fragment() {
 			mix(group_x_min, group_x_max, trapezoid_uv.x),
 			0.0,
 			1.0);
+	float group_pointer_x = projected_x - 0.5;
+	float group_pointer_y = trapezoid_uv.y - 0.5;
+	float yaw_scale = (
+			1.0
+			+ group_pointer_x
+				* pointer_yaw
+				* pointer_yaw_strength);
+	float pitch_scale = (
+			1.0
+			+ group_pointer_y
+				* pointer_pitch
+				* pointer_pitch_strength);
+	float pointer_scale = max(yaw_scale * pitch_scale, 0.82);
+	trapezoid_uv = vec2(0.5) + (
+			trapezoid_uv - vec2(0.5)) / pointer_scale;
+	projected_x = clamp(
+			mix(group_x_min, group_x_max, trapezoid_uv.x),
+			0.0,
+			1.0);
 	float vertical_scale = 1.0 - strength * projected_x;
 	float source_y = 0.5 + (trapezoid_uv.y - 0.5) / vertical_scale;
 
@@ -235,7 +262,7 @@ void fragment() {
 		float flow_intensity = 0.0;
 		float release_progress = 0.0;
 
-		if (flow_active) {
+		if (flow_enabled && flow_active) {
 			float flow_progress = clamp(
 					local_phase / max(flow_duration, 0.001),
 					0.0,
@@ -257,7 +284,7 @@ void fragment() {
 					head_pixel_x,
 					flow_direction,
 					entry_ramp);
-		} else if (release_active) {
+		} else if (flow_enabled && release_active) {
 			release_progress = clamp(
 					(local_phase - flow_duration)
 					/ max(release_duration, 0.001),
@@ -385,45 +412,58 @@ void fragment() {
 					* outline_strength);
 		}
 
-		float global_title_x = mix(
-				group_x_min,
-				group_x_max,
-				source_uv.x);
-		float blade_coordinate = clamp(
-				global_title_x
-				+ (source_uv.y - 0.5) * 0.07,
+		vec2 intro_activation = texture(
+				intro_activation_map,
+				source_uv).rg;
+		float face_activation = intro_activation.r;
+		float crack_activation = intro_activation.g;
+		float delayed_progress = clamp(
+				(intro_reveal_progress - intro_progress_delay)
+					/ max(1.0 - intro_progress_delay, 0.001),
 				0.0,
 				1.0);
-		float base_reveal = (
-				1.0
-				- smoothstep(
-						intro_reveal_progress,
-						intro_reveal_progress
-						+ intro_reveal_feather,
-						blade_coordinate));
-		if (intro_reveal_progress <= 0.001) {
-			base_reveal = 0.0;
-		} else if (intro_reveal_progress >= 0.999) {
-			base_reveal = 1.0;
+		float safe_feather = max(intro_reveal_feather, 0.001);
+		float face_threshold = face_activation;
+		if (intro_shadow) {
+			face_threshold += intro_shadow_lag;
 		}
-		float intro_blade = (
-				1.0
-				- smoothstep(
-						intro_blade_width * 0.32,
-						intro_blade_width,
-						abs(
-							blade_coordinate
-							- intro_reveal_progress)));
-		intro_blade *= (
-				1.0
-				- step(0.999, intro_reveal_progress));
-		mapped_color.rgb = mix(
-				mapped_color.rgb,
-				energy_peak_color.rgb,
-				intro_blade
-					* base_reveal
-					* clamp(intro_blade_strength, 0.0, 1.0));
-		mapped_color.a *= base_reveal;
+		float face_reveal = smoothstep(
+				face_threshold - safe_feather,
+				face_threshold + safe_feather,
+				delayed_progress);
+		float crack_reveal = smoothstep(
+				crack_activation - safe_feather,
+				crack_activation + safe_feather,
+				delayed_progress);
+		float source_is_energy = energy_mask(sampled_color);
+		float pixel_reveal = mix(
+				face_reveal,
+				crack_reveal,
+				source_is_energy);
+		if (intro_shadow) {
+			pixel_reveal = face_reveal;
+		}
+		if (!intro_shadow && source_is_energy > 0.5) {
+			float crack_age = max(
+					delayed_progress - crack_activation,
+					0.0);
+			float crack_head = (
+					1.0
+					- smoothstep(
+							0.0,
+							intro_crack_peak_width,
+							crack_age));
+			mapped_color.rgb = mix(
+					mapped_color.rgb,
+					energy_peak_color.rgb,
+					crack_head * crack_reveal * 0.78);
+		}
+		if (intro_reveal_progress <= 0.001) {
+			pixel_reveal = 0.0;
+		} else if (intro_reveal_progress >= 0.999) {
+			pixel_reveal = 1.0;
+		}
+		mapped_color.a *= pixel_reveal;
 		COLOR = mapped_color * vertex_color;
 	}
 }

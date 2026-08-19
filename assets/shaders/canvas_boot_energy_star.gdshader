@@ -20,28 +20,74 @@ uniform float pulse_amount : hint_range(0.0, 0.3, 0.01) = 0.055;
 uniform float pulse_phase : hint_range(0.0, 1.0, 0.001) = 0.0;
 uniform float intro_pulse_enabled : hint_range(0.0, 1.0, 1.0) = 0.0;
 uniform float intro_pulse_progress : hint_range(0.0, 1.0, 0.001) = 0.0;
+uniform float exit_release_enabled : hint_range(0.0, 1.0, 1.0) = 0.0;
+uniform float exit_release_progress : hint_range(0.0, 1.0, 0.001) = 0.0;
+uniform vec2 pointer_tilt = vec2(0.0);
+uniform float pointer_rotation_degrees : hint_range(0.0, 12.0, 0.1) = 6.0;
+uniform float pointer_near_extension : hint_range(0.0, 0.5, 0.01) = 0.25;
+uniform float pointer_far_reduction : hint_range(0.0, 0.4, 0.01) = 0.15;
+uniform float pointer_ring_depth : hint_range(0.0, 0.4, 0.01) = 0.22;
+uniform float pointer_highlight_shift : hint_range(0.0, 0.12, 0.005) = 0.045;
+uniform float coordinate_scale : hint_range(1.0, 1.5, 0.01) = 1.25;
 
 void fragment() {
 	vec2 pixel_uv = floor(UV * grid_size + vec2(0.5)) / grid_size;
-	vec2 point = (pixel_uv - vec2(0.5)) * 2.0;
+	vec2 base_point = (
+			(pixel_uv - vec2(0.5))
+			* 2.0
+			* coordinate_scale);
+	float pointer_rotation = radians(pointer_rotation_degrees) * (
+			pointer_tilt.x - pointer_tilt.y) * 0.5;
+	float pointer_cosine = cos(pointer_rotation);
+	float pointer_sine = sin(pointer_rotation);
+	vec2 point = vec2(
+			base_point.x * pointer_cosine
+				- base_point.y * pointer_sine,
+			base_point.x * pointer_sine
+				+ base_point.y * pointer_cosine);
 	float abs_x = abs(point.x);
 	float abs_y = abs(point.y);
+	float intro_enabled = clamp(intro_pulse_enabled, 0.0, 1.0);
+	float exit_enabled = clamp(exit_release_enabled, 0.0, 1.0);
 	float outward_phase = mix(
 			fract(pulse_phase * 2.0),
 			clamp(intro_pulse_progress, 0.0, 1.0),
-			clamp(intro_pulse_enabled, 0.0, 1.0));
-	float pulse_envelope = sin(outward_phase * 3.14159265);
+			intro_enabled);
+	outward_phase = mix(
+			outward_phase,
+			clamp(exit_release_progress, 0.0, 1.0),
+			exit_enabled);
+	float transient_envelope = sin(outward_phase * 3.14159265);
+	float pulse_envelope = mix(
+			transient_envelope,
+			smoothstep(0.04, 0.72, outward_phase),
+			exit_enabled);
+	float authored_release = max(intro_enabled, exit_enabled);
 	float intro_ray_extent = mix(
 			1.0,
 			smoothstep(0.06, 0.56, outward_phase),
-			clamp(intro_pulse_enabled, 0.0, 1.0));
+			authored_release);
 
+	float horizontal_facing = sign(point.x) * pointer_tilt.x;
+	float vertical_facing = sign(point.y) * pointer_tilt.y;
+	float horizontal_pointer_scale = (
+			1.0
+			+ max(horizontal_facing, 0.0) * pointer_near_extension
+			- max(-horizontal_facing, 0.0) * pointer_far_reduction);
+	float vertical_pointer_scale = (
+			1.0
+			+ max(vertical_facing, 0.0) * pointer_near_extension
+			- max(-vertical_facing, 0.0) * pointer_far_reduction);
+	float horizontal_pointer_length = (
+			horizontal_length * horizontal_pointer_scale);
+	float vertical_pointer_length = (
+			vertical_length * vertical_pointer_scale);
 	float horizontal_progress = clamp(
-			abs_x / horizontal_length,
+			abs_x / horizontal_pointer_length,
 			0.0,
 			1.0);
 	float vertical_progress = clamp(
-			abs_y / vertical_length,
+			abs_y / vertical_pointer_length,
 			0.0,
 			1.0);
 	float horizontal_center = (
@@ -77,7 +123,7 @@ void fragment() {
 				abs(point.y - horizontal_center)))
 			* step(
 					abs_x,
-					horizontal_length * intro_ray_extent));
+					horizontal_pointer_length * intro_ray_extent));
 	float vertical_ray = (
 			(1.0 - smoothstep(
 				vertical_width,
@@ -85,7 +131,7 @@ void fragment() {
 				abs(point.x - vertical_center)))
 			* step(
 					abs_y,
-					vertical_length * intro_ray_extent));
+					vertical_pointer_length * intro_ray_extent));
 	float horizontal_pulse = (
 			1.0
 			- smoothstep(
@@ -105,11 +151,20 @@ void fragment() {
 			0.72
 			+ vertical_pulse * pulse_envelope * ray_pulse_strength);
 
-	float radial_distance = length(point);
+	vec2 ring_point = point * vec2(
+			1.0 + abs(pointer_tilt.y) * pointer_ring_depth,
+			1.0 + abs(pointer_tilt.x) * pointer_ring_depth);
+	float radial_distance = length(ring_point);
+	vec2 highlight_center = pointer_tilt * pointer_highlight_shift;
+	float highlight_distance = length(point - highlight_center);
 	float core = 1.0 - smoothstep(
 			core_radius * 0.62,
 			core_radius,
-			radial_distance);
+			length(point));
+	float core_highlight = 1.0 - smoothstep(
+			core_radius * 0.16,
+			core_radius * 0.58,
+			highlight_distance);
 	float static_ring_radius = 0.25;
 	float inner_flare_outer = min(
 			core_radius + 0.05,
@@ -117,7 +172,7 @@ void fragment() {
 	float inner_flare = 1.0 - smoothstep(
 			core_radius,
 			inner_flare_outer,
-			radial_distance);
+			length(point));
 	float static_ring = 1.0 - smoothstep(
 			0.01,
 			0.028,
@@ -129,7 +184,10 @@ void fragment() {
 	float ring_fade = (
 			1.0
 			- smoothstep(ring_fade_start, 1.0, outward_phase));
-	float ring_visibility = ring_birth * ring_fade;
+	float ring_visibility = mix(
+			ring_birth * ring_fade,
+			smoothstep(0.04, 0.34, outward_phase),
+			exit_enabled);
 	float ring_travel = smoothstep(0.04, 0.92, outward_phase);
 	float release_ring_radius = mix(
 			static_ring_radius + 0.008,
@@ -143,16 +201,32 @@ void fragment() {
 				release_ring_width + 0.025,
 				abs(radial_distance - release_ring_radius)));
 	release_ring *= ring_visibility;
-	float rays = max(horizontal_energy, vertical_energy);
+	float near_side = clamp(
+			dot(
+				normalize(point + vec2(0.0001)),
+				pointer_tilt),
+			-1.0,
+			1.0);
+	float directional_brightness = 1.0 + near_side * 0.22;
+	float rays = max(
+			horizontal_energy,
+			vertical_energy) * directional_brightness;
 	float core_release_progress = min(outward_phase / 0.32, 1.0);
-	float core_release = sin(core_release_progress * 3.14159265);
+	float transient_core_release = sin(
+			core_release_progress * 3.14159265);
+	float core_release = mix(
+			transient_core_release,
+			smoothstep(0.0, 1.0, core_release_progress),
+			exit_enabled);
 	float rings = max(
 			static_ring * (0.32 + core_release * 0.12),
 			release_ring * ring_strength);
 	float pulse = 1.0 + core_release * pulse_amount;
 	float star_alpha = clamp(
 			max(
-				max(max(core, inner_flare * 0.42), rays * 0.86),
+				max(
+					max(core, core_highlight),
+					max(inner_flare * 0.42, rays * 0.86)),
 				rings)
 			* intensity
 			* pulse,
@@ -161,7 +235,7 @@ void fragment() {
 	vec3 star_color = mix(
 			ray_color.rgb,
 			core_color.rgb,
-			max(core, inner_flare * 0.5));
+			max(max(core, core_highlight), inner_flare * 0.5));
 	star_color = mix(
 			star_color,
 			ring_color.rgb,

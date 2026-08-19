@@ -29,6 +29,7 @@ var _re_str := RegEx.new()
 var _re_line_excl := RegEx.new()
 var _re_tres := RegEx.new()
 var _re_item := RegEx.new()
+var _re_item_flavor := RegEx.new()
 var _re_tscn := RegEx.new()
 var _keys := {}   # 原文 -> Array[String] 出处（file:line，最多记 3 处）
 
@@ -39,6 +40,8 @@ func _init() -> void:
 	_re_line_excl.compile(LINE_EXCLUDE)
 	_re_tres.compile("^(hero_name|skill_description|skill_detail)\\s*=\\s*\"(.*)\"")
 	_re_item.compile("\\b(name|desc|flavor)\\s*=\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
+	# ItemCatalog 的 flavor 位于 _FLAVOR 的 `"显示名": "风味"` 字典，而非 flavor = 字段。
+	_re_item_flavor.compile("^\\s*\"(?:[^\"\\\\]|\\\\.)+\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
 	_re_tscn.compile("^(text|tooltip_text|placeholder_text|card_title|card_subtitle|card_caption)\\s*=\\s*\"(.*)\"")
 
 	# ① tr() 实参（全 src）＋ ② ui/story 动态汇点字面量
@@ -49,6 +52,7 @@ func _init() -> void:
 		_scan_by_regex(f, _re_tres, 2)
 	# ④ 道具目录
 	_scan_by_regex("res://src/battle/item_catalog.gd", _re_item, 2)
+	_scan_by_regex("res://src/battle/item_catalog.gd", _re_item_flavor, 1)
 	# ⑤ 故事关卡表
 	_scan_levels("res://assets/data/story/levels.json")
 	# ⑥ 场景文本属性

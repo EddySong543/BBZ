@@ -1,6 +1,12 @@
 shader_type canvas_item;
 render_mode unshaded, blend_mix;
 
+uniform vec2 pointer_tilt = vec2(0.0);
+uniform vec2 perspective_pivot = vec2(0.56, 0.50);
+uniform float pointer_yaw_strength : hint_range(0.0, 0.12, 0.001) = 0.052;
+uniform float pointer_pitch_strength : hint_range(0.0, 0.08, 0.001) = 0.021;
+uniform float front_hand_start : hint_range(0.5, 0.9, 0.01) = 0.62;
+uniform float front_hand_depth_boost : hint_range(1.0, 1.6, 0.01) = 1.25;
 uniform vec2 hand_center = vec2(0.82, 0.32);
 uniform vec2 hand_radius = vec2(0.27, 0.34);
 uniform float blur_texels : hint_range(0.0, 2.0, 0.1) = 1.0;
@@ -12,8 +18,15 @@ uniform vec4 rear_light_color : source_color = vec4(
 		0.909804, 0.784314, 0.439216, 1.0);
 uniform float rear_light_strength : hint_range(0.0, 0.3, 0.01) = 0.14;
 uniform float energy_phase : hint_range(0.0, 1.0, 0.001) = 0.0;
+uniform vec2 energy_transfer_center = vec2(0.505, 0.405);
+uniform vec2 energy_transfer_radius = vec2(0.20, 0.23);
+uniform float energy_transfer_strength : hint_range(0.0, 0.12, 0.005) = 0.045;
 uniform float intro_light_progress : hint_range(0.0, 1.0, 0.001) = 1.0;
 uniform float intro_silhouette_floor : hint_range(0.0, 0.2, 0.005) = 0.0;
+uniform float intro_impact_progress : hint_range(0.0, 1.0, 0.001) = 1.0;
+uniform vec4 intro_impact_color : source_color = vec4(
+		1.0, 0.76, 0.28, 1.0);
+uniform float intro_impact_strength : hint_range(0.0, 0.3, 0.005) = 0.14;
 
 varying vec4 vertex_color;
 
@@ -23,21 +36,54 @@ void vertex() {
 }
 
 
+vec2 perspective_source_uv(vec2 display_uv) {
+	vec2 local_uv = display_uv - perspective_pivot;
+	float front_mask = smoothstep(
+			front_hand_start,
+			0.98,
+			display_uv.x);
+	float depth_axis = local_uv.x * mix(
+			1.0,
+			front_hand_depth_boost,
+			front_mask);
+	float pointer_scale = max(
+			1.0
+				+ depth_axis
+					* pointer_tilt.x
+					* pointer_yaw_strength
+				+ local_uv.y
+					* pointer_tilt.y
+					* pointer_pitch_strength,
+			0.88);
+	return perspective_pivot + local_uv / pointer_scale;
+}
+
+
 void fragment() {
+	vec2 source_uv = perspective_source_uv(UV);
+	bool inside_bounds = (
+			source_uv.x >= 0.0
+			&& source_uv.x <= 1.0
+			&& source_uv.y >= 0.0
+			&& source_uv.y <= 1.0);
+	float bounds_mask = float(inside_bounds);
+	source_uv = clamp(source_uv, vec2(0.0), vec2(1.0));
+
 	vec2 texel = TEXTURE_PIXEL_SIZE * blur_texels;
-	vec4 source = texture(TEXTURE, UV);
+	vec4 source = texture(TEXTURE, source_uv);
 	vec4 blurred = (
 			source * 2.0
-			+ texture(TEXTURE, UV + vec2(texel.x, 0.0))
-			+ texture(TEXTURE, UV - vec2(texel.x, 0.0))
-			+ texture(TEXTURE, UV + vec2(0.0, texel.y))
-			+ texture(TEXTURE, UV - vec2(0.0, texel.y))
+			+ texture(TEXTURE, source_uv + vec2(texel.x, 0.0))
+			+ texture(TEXTURE, source_uv - vec2(texel.x, 0.0))
+			+ texture(TEXTURE, source_uv + vec2(0.0, texel.y))
+			+ texture(TEXTURE, source_uv - vec2(0.0, texel.y))
 		) / 6.0;
 
 	vec2 safe_radius = max(hand_radius, vec2(0.001));
-	float ellipse_distance = length((UV - hand_center) / safe_radius);
+	float ellipse_distance = length(
+			(source_uv - hand_center) / safe_radius);
 	float hand_mask = 1.0 - smoothstep(0.78, 1.08, ellipse_distance);
-	float foreground_mask = smoothstep(0.62, 0.94, UV.x);
+	float foreground_mask = smoothstep(0.62, 0.94, source_uv.x);
 	float depth_mask = hand_mask * foreground_mask;
 
 	vec4 result = mix(
@@ -52,7 +98,7 @@ void fragment() {
 
 	vec2 safe_light_radius = max(rear_light_radius, vec2(0.001));
 	float rear_distance = length(
-			(UV - rear_energy_center) / safe_light_radius);
+			(source_uv - rear_energy_center) / safe_light_radius);
 	float rear_falloff = (
 			1.0 - smoothstep(0.12, 1.0, rear_distance));
 	float energy_pulse = (
@@ -75,6 +121,65 @@ void fragment() {
 	result.rgb = min(
 			vec3(1.0),
 			result.rgb + rear_light_color.rgb * warm_light);
+
+	// The hand pulse reaches the rear shoulder and upper torso as a restrained
+	// surface response. It changes the existing pixels instead of adding a
+	// detached glow or a travelling scan band.
+	vec2 safe_transfer_radius = max(
+			energy_transfer_radius,
+			vec2(0.001));
+	float transfer_distance = length(
+			(source_uv - energy_transfer_center) / safe_transfer_radius);
+	float transfer_mask = 1.0 - smoothstep(0.42, 1.0, transfer_distance);
+	float delayed_energy_pulse = (
+			0.5
+			+ 0.5
+			* sin((energy_phase - 0.08) * 6.2831853));
+	float transfer_light = (
+			transfer_mask
+			* delayed_energy_pulse
+			* surface_response
+			* clamp(energy_transfer_strength, 0.0, 0.12)
+			* source.a);
+	result.rgb = min(
+			vec3(1.0),
+			result.rgb + rear_light_color.rgb * transfer_light);
+
+	// A single expanding light band carries the hand impact across the
+	// character. At progress 0 and 1 its envelope is zero, so the approved
+	// idle grade remains byte-for-byte equivalent at both endpoints.
+	float safe_impact_progress = clamp(
+			intro_impact_progress,
+			0.0,
+			1.0);
+	float impact_envelope = max(
+			sin(safe_impact_progress * 3.14159265),
+			0.0);
+	float impact_radius = mix(
+			0.10,
+			1.08,
+			smoothstep(0.0, 1.0, safe_impact_progress));
+	float impact_band = (
+			1.0
+			- smoothstep(
+					0.08,
+					0.24,
+					abs(rear_distance - impact_radius)));
+	float impact_fill = (
+			1.0
+			- smoothstep(
+					impact_radius * 0.38,
+					max(impact_radius, 0.001),
+					rear_distance));
+	float impact_light = (
+			(impact_band + impact_fill * 0.24)
+			* impact_envelope
+			* surface_response
+			* clamp(intro_impact_strength, 0.0, 0.3)
+			* source.a);
+	result.rgb = min(
+			vec3(1.0),
+			result.rgb + intro_impact_color.rgb * impact_light);
 
 	// Lift the whole character's exposure while a broad, soft hand light
 	// leads the change. There is no moving UV boundary, so detached hair
@@ -103,4 +208,5 @@ void fragment() {
 			intro_light);
 	result.rgb *= intro_brightness;
 	COLOR = result * vertex_color;
+	COLOR.a *= bounds_mask;
 }

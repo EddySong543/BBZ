@@ -127,7 +127,7 @@ anywhere.
 
 - **管线**：出图（直出透明底）→ `assets/import` 暂存 → pixellab 降采样/量化/清边（抠底仅作兜底工序）→ 正式目录挂点（⛔ 禁直接引用暂存区）。
 - **战斗 idle**：单帧 256px 画布·scale 2.0 定稿（改 scale 必按钉脚底公式联动·见 memory [[animal-core-theme-pivot]]）。
-- **远征怪物**：挂点=monsters.json `art` 字段。
+- **远征敌人**：旧 `monsters.json` 挂点已退役；正式素材挂点待区域生态与敌人数据结构确认后建立。
 - **英雄高清立绘**：GPT §E 锚＋已定稿立绘当参考图锁角色（h01-h34 已导入的现役立绘就是参考源）。
 - **木骨纸芯 UI 件（A1-A7）**：GPT §D 锚＋规格书 `design/ui-asset-spec-wood-paper.md`（现役 A4 GPT 版 prompt 在该文件 A4 段·尺寸/验收不变）。
 

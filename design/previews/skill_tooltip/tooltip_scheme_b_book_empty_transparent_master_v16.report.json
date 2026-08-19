@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "input": "C:\\Users\\Edzzz\\.codex\\generated_images\\019ff5d7-3a14-7b53-9ca1-def91132b085\\exec-13b58228-850f-43a0-99f7-79adaaf5deed.png",
+  "output": "D:\\Game\\BoBoZan\\Claude-Code-Game-Studios-cn-localization\\design\\previews\\skill_tooltip\\tooltip_scheme_b_book_empty_transparent_master_v16.png",
+  "background_rgb": [
+    255,
+    0,
+    255
+  ],
+  "threshold": 180.0,
+  "feather_threshold": 205.0,
+  "trimmed": true,
+  "padding": 8,
+  "width": 1704,
+  "height": 504,
+  "transparent_pixels": 755726,
+  "opaque_pixels": 816646
+}

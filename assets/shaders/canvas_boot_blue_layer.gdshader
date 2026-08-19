@@ -15,6 +15,8 @@ uniform sampler2D intro_path_texture : repeat_disable, filter_nearest;
 uniform float intro_stroke_progress : hint_range(0.0, 1.0, 0.001) = 1.0;
 uniform float intro_stroke_feather : hint_range(0.02, 0.24, 0.001) = 0.13;
 uniform float intro_layer_offset : hint_range(-0.12, 0.12, 0.005) = 0.0;
+uniform float intro_head_width : hint_range(0.02, 0.18, 0.001) = 0.075;
+uniform float intro_head_strength : hint_range(0.0, 0.6, 0.01) = 0.30;
 
 varying vec4 vertex_color;
 
@@ -105,6 +107,21 @@ void fragment() {
 	} else if (intro_stroke_progress >= 0.999) {
 		intro_reveal = 1.0;
 	}
+	float intro_head = (
+			1.0
+			- smoothstep(
+					intro_head_width * 0.28,
+					intro_head_width,
+					abs(path_progress - effective_progress)));
+	intro_head *= (
+			intro_reveal
+			* step(0.001, intro_stroke_progress)
+			* (1.0 - step(0.999, intro_stroke_progress)));
+	mixed_rgb = mix(
+			mixed_rgb,
+			palette_light,
+			intro_head
+				* clamp(intro_head_strength, 0.0, 0.6));
 	COLOR = vec4(
 			mixed_rgb,
 			mixed_alpha * intro_reveal

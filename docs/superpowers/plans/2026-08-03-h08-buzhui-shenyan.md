@@ -122,7 +122,7 @@ func retains_unused_big_defend() -> bool:
 - Modify: `design/heroes-schools.md`
 - Modify: `design/gdd/game-concept.md`
 - Modify: `design/naming-bank.md`
-- Modify: `src/battle/skills/h14_fanzhen.gd`
+- Modify: `src/battle/skills/h14_tianbuzang.gd`
 - Modify: `src/battle/skills/h23_huzhu.gd`
 
 **Interfaces:**

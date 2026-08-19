@@ -15,6 +15,10 @@ uniform vec3 escape_highlight_color = vec3(1.0, 0.86, 0.54);
 uniform float intro_path_progress : hint_range(0.0, 1.0, 0.001) = 1.0;
 uniform float intro_path_feather : hint_range(0.02, 0.24, 0.001) = 0.14;
 uniform float intro_head_width : hint_range(0.02, 0.20, 0.001) = 0.075;
+uniform vec2 intro_contact_min = vec2(0.48, 0.18);
+uniform vec2 intro_contact_max = vec2(0.76, 0.52);
+uniform float intro_late_path_threshold : hint_range(0.0, 1.0, 0.01) = 0.84;
+uniform float intro_contact_path_ceiling : hint_range(0.0, 1.0, 0.01) = 0.32;
 
 varying vec4 vertex_color;
 
@@ -106,6 +110,23 @@ void fragment() {
 	float source_path_progress = texture(
 			intro_path_texture,
 			UV).r;
+	// The authored path contains a late-valued diagonal wedge over the
+	// character contact area. Restrict that correction to existing gold
+	// pixels around the rear arm/back: the local energy and its nearby
+	// splashes now arrive with the source, while the outer arc keeps its
+	// original clockwise order.
+	float contact_region = (
+			step(intro_contact_min.x, UV.x)
+			* step(UV.x, intro_contact_max.x)
+			* step(intro_contact_min.y, UV.y)
+			* step(UV.y, intro_contact_max.y));
+	float late_path = step(
+			intro_late_path_threshold,
+			source_path_progress);
+	source_path_progress = mix(
+			source_path_progress,
+			min(source_path_progress, intro_contact_path_ceiling),
+			contact_region * late_path * step(0.001, source.a));
 	float intro_path_mask = smoothstep(
 			source_path_progress - intro_path_feather,
 			source_path_progress,

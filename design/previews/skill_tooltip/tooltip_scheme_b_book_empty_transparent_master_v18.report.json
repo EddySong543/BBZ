@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "input": "D:\\Game\\BoBoZan\\Claude-Code-Game-Studios-cn-localization\\design\\previews\\skill_tooltip\\tooltip_scheme_b_book_corrected_chroma_v18.png",
+  "output": "D:\\Game\\BoBoZan\\Claude-Code-Game-Studios-cn-localization\\design\\previews\\skill_tooltip\\tooltip_scheme_b_book_empty_transparent_master_v18.png",
+  "background_rgb": [
+    255,
+    0,
+    255
+  ],
+  "threshold": 180.0,
+  "feather_threshold": 205.0,
+  "trimmed": true,
+  "padding": 8,
+  "width": 1708,
+  "height": 503,
+  "transparent_pixels": 755107,
+  "opaque_pixels": 816907
+}
