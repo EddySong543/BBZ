@@ -85,7 +85,7 @@ func test_scene6_uses_the_authored_chilu_valley_layers_directly() -> void:
 	assert_eq((stage.get_node("BattlePlatform") as TextureRect).texture.resource_path,
 			"res://assets/scenes/scene6/scene6_battle_platform.png")
 	assert_eq((stage.get_node("BattlePlatform") as TextureRect).texture.get_size(),
-			Vector2(229.0, 132.0),
+			Vector2(301.0, 95.0),
 			"Scene6 必须使用 assets/import 新导入的平台素材")
 	assert_eq((stage.get_node("ForegroundLeft") as TextureRect).texture.resource_path,
 			"res://assets/scenes/scene6/scene6_foreground_near_left.png")
@@ -338,14 +338,16 @@ func test_scene6_platform_is_pixel_safe_and_has_local_thermal_depth() -> void:
 	assert_lte(float(platform_material.get_shader_parameter("brightness")), 1.02)
 	var platform_light := platform_material.get_shader_parameter("palette_light") as Color
 	var magma_hot := magma_material.get_shader_parameter("hot_color") as Color
-	assert_lt(platform_light.r, 0.72)
+	assert_lt(platform_light.r, 0.50)
+	assert_lte(absf(platform_light.g - platform_light.b), 0.08,
+			"Platform highlights must read as forged iron, not orange paint")
 	assert_gt(magma_hot.r - platform_light.r, 0.25,
 			"The platform may read as warm forged iron but must not become molten")
 	assert_gt(magma_hot.r, 0.80)
-	assert_gte(float(platform_material.get_shader_parameter("lava_bounce_amount")), 0.04)
-	assert_lte(float(platform_material.get_shader_parameter("lava_bounce_amount")), 0.07)
-	assert_gte(float(platform_material.get_shader_parameter("broken_reflection_amount")), 0.04)
-	assert_lte(float(platform_material.get_shader_parameter("broken_reflection_amount")), 0.06)
+	assert_gte(float(platform_material.get_shader_parameter("lava_bounce_amount")), 0.015)
+	assert_lte(float(platform_material.get_shader_parameter("lava_bounce_amount")), 0.03)
+	assert_gte(float(platform_material.get_shader_parameter("broken_reflection_amount")), 0.015)
+	assert_lte(float(platform_material.get_shader_parameter("broken_reflection_amount")), 0.035)
 	assert_gte(float(platform_material.get_shader_parameter("broken_reflection_coverage")), 0.10)
 	assert_lte(float(platform_material.get_shader_parameter("broken_reflection_coverage")), 0.20)
 	assert_true(platform_material.shader.code.contains("broken_reflection"))
