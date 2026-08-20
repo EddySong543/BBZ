@@ -12,25 +12,25 @@ shader_parameter/flash_amount = 0.0
 shader_parameter/flash_color = Color(0.72, 0.66, 0.6, 1)
 shader_parameter/flash_peak_strength = 0.0
 shader_parameter/flash_dark_response = 0.0
-shader_parameter/source_saturation = 1.0
-shader_parameter/source_contrast = 1.0
-shader_parameter/scene_exposure = 1.02
-shader_parameter/highlight_compression = 0.3
+shader_parameter/source_saturation = 1.06
+shader_parameter/source_contrast = 1.04
+shader_parameter/scene_exposure = 1.0
+shader_parameter/highlight_compression = 0.14
 shader_parameter/light_dir = Vector2(-0.62, 1)
-shader_parameter/backlight = 0.18
-shader_parameter/shadow_tint = Color(0.34, 0.23, 0.3, 1)
-shader_parameter/skin_warmth = Color(0.72, 0.64, 0.7, 1)
-shader_parameter/warmth_amount = 0.12
-shader_parameter/rim_color = Color(0.48, 0.28, 0.16, 1)
-shader_parameter/rim_strength = 0.02
-shader_parameter/rim_strength_cap = 0.035
+shader_parameter/backlight = 0.13
+shader_parameter/shadow_tint = Color(0.42, 0.28, 0.24, 1)
+shader_parameter/skin_warmth = Color(1.04, 0.96, 0.86, 1)
+shader_parameter/warmth_amount = 0.06
+shader_parameter/rim_color = Color(0.62, 0.34, 0.12, 1)
+shader_parameter/rim_strength = 0.018
+shader_parameter/rim_strength_cap = 0.025
 shader_parameter/rim_width = 1.0
-shader_parameter/fill_color = Color(0.27, 0.18, 0.16, 1)
-shader_parameter/fill_amount = 0.018
-shader_parameter/ambient_color = Color(0.16, 0.1, 0.14, 1)
-shader_parameter/ambient_amount = 0.012
-shader_parameter/lava_bounce_color = Color(0.46, 0.22, 0.1, 1)
-shader_parameter/lava_bounce_amount = 0.012
+shader_parameter/fill_color = Color(0.46, 0.22, 0.1, 1)
+shader_parameter/fill_amount = 0.012
+shader_parameter/ambient_color = Color(0.2, 0.1, 0.08, 1)
+shader_parameter/ambient_amount = 0.015
+shader_parameter/lava_bounce_color = Color(0.78, 0.32, 0.08, 1)
+shader_parameter/lava_bounce_amount = 0.02
 shader_parameter/lava_bounce_start = 0.47
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_k7b3w"]
@@ -40,25 +40,25 @@ shader_parameter/flash_amount = 0.0
 shader_parameter/flash_color = Color(0.72, 0.66, 0.6, 1)
 shader_parameter/flash_peak_strength = 0.0
 shader_parameter/flash_dark_response = 0.0
-shader_parameter/source_saturation = 1.0
-shader_parameter/source_contrast = 1.0
+shader_parameter/source_saturation = 1.06
+shader_parameter/source_contrast = 1.04
 shader_parameter/scene_exposure = 0.98
-shader_parameter/highlight_compression = 0.3
+shader_parameter/highlight_compression = 0.14
 shader_parameter/light_dir = Vector2(0.62, 1)
-shader_parameter/backlight = 0.17
-shader_parameter/shadow_tint = Color(0.34, 0.23, 0.3, 1)
-shader_parameter/skin_warmth = Color(0.74, 0.62, 0.56, 1)
-shader_parameter/warmth_amount = 0.12
-shader_parameter/rim_color = Color(0.48, 0.28, 0.16, 1)
-shader_parameter/rim_strength = 0.02
-shader_parameter/rim_strength_cap = 0.035
+shader_parameter/backlight = 0.12
+shader_parameter/shadow_tint = Color(0.42, 0.28, 0.24, 1)
+shader_parameter/skin_warmth = Color(1.04, 0.96, 0.86, 1)
+shader_parameter/warmth_amount = 0.06
+shader_parameter/rim_color = Color(0.62, 0.34, 0.12, 1)
+shader_parameter/rim_strength = 0.018
+shader_parameter/rim_strength_cap = 0.025
 shader_parameter/rim_width = 1.0
-shader_parameter/fill_color = Color(0.27, 0.18, 0.16, 1)
-shader_parameter/fill_amount = 0.016
-shader_parameter/ambient_color = Color(0.16, 0.1, 0.14, 1)
-shader_parameter/ambient_amount = 0.01
-shader_parameter/lava_bounce_color = Color(0.46, 0.22, 0.1, 1)
-shader_parameter/lava_bounce_amount = 0.012
+shader_parameter/fill_color = Color(0.46, 0.22, 0.1, 1)
+shader_parameter/fill_amount = 0.011
+shader_parameter/ambient_color = Color(0.2, 0.1, 0.08, 1)
+shader_parameter/ambient_amount = 0.015
+shader_parameter/lava_bounce_color = Color(0.78, 0.32, 0.08, 1)
+shader_parameter/lava_bounce_amount = 0.018
 shader_parameter/lava_bounce_start = 0.49
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_dw032"]
@@ -123,22 +123,28 @@ pointer_parallax = true
 demo_click_shake = false
 
 [node name="P1Shadow" parent="." index="3" unique_id=329774492]
+offset_top = 719.0
+offset_bottom = 811.0
 self_modulate = Color(0.34, 0.08, 0.12, 0.58)
 
 [node name="P2Shadow" parent="." index="4" unique_id=1318395873]
+offset_top = 721.0
+offset_bottom = 813.0
 self_modulate = Color(0.34, 0.08, 0.12, 0.58)
 
 [node name="P1CharDisplay" parent="." index="5" unique_id=1642938575]
-rim_color = Color(0.48, 0.28, 0.16, 1)
-rim_strength = 0.02
+offset_top = 262.0
+offset_bottom = 1030.0
+rim_color = Color(0.62, 0.34, 0.12, 1)
+rim_strength = 0.018
 rim_width = 1.0
-backlight = 0.18
-shadow_tint = Color(0.34, 0.23, 0.3, 1)
+backlight = 0.13
+shadow_tint = Color(0.42, 0.28, 0.24, 1)
 light_dir = Vector2(-0.62, 1)
-skin_warmth = Color(0.72, 0.64, 0.7, 1)
-warmth_amount = 0.12
-fill_color = Color(0.27, 0.18, 0.16, 1)
-fill_amount = 0.018
+skin_warmth = Color(1.04, 0.96, 0.86, 1)
+warmth_amount = 0.06
+fill_color = Color(0.46, 0.22, 0.1, 1)
+fill_amount = 0.012
 
 [node name="AnimatedSprite2D" parent="P1CharDisplay/SubViewport" parent_id_path=PackedInt32Array(1642938575, 1325957388) index="1" unique_id=1622338484]
 material = SubResource("ShaderMaterial_qrrme")
@@ -146,16 +152,19 @@ scale = Vector2(2, 2)
 frame_progress = 0.9830427
 
 [node name="P2CharDisplay" parent="." index="6" unique_id=915119977]
+offset_top = 265.0
+offset_bottom = 1033.0
 flip_h = true
-rim_color = Color(0.48, 0.28, 0.16, 1)
-rim_strength = 0.02
+rim_color = Color(0.62, 0.34, 0.12, 1)
+rim_strength = 0.018
 rim_width = 1.0
-backlight = 0.17
-shadow_tint = Color(0.34, 0.23, 0.3, 1)
+backlight = 0.12
+shadow_tint = Color(0.42, 0.28, 0.24, 1)
 light_dir = Vector2(-0.62, 1)
-skin_warmth = Color(0.74, 0.62, 0.56, 1)
-fill_color = Color(0.27, 0.18, 0.16, 1)
-fill_amount = 0.016
+skin_warmth = Color(1.04, 0.96, 0.86, 1)
+warmth_amount = 0.06
+fill_color = Color(0.46, 0.22, 0.1, 1)
+fill_amount = 0.011
 
 [node name="AnimatedSprite2D" parent="P2CharDisplay/SubViewport" parent_id_path=PackedInt32Array(915119977, 1325957388) index="1" unique_id=1622338484]
 material = SubResource("ShaderMaterial_k7b3w")

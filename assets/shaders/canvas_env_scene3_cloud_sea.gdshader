@@ -55,6 +55,12 @@ uniform float scene3_roll_phase : hint_range(0.0, 6.2832, 0.01) = 0.0;
 uniform float scene3_billow_amount : hint_range(0.0, 0.5, 0.01) = 0.0;
 uniform float scene3_billow_speed : hint_range(0.0, 2.0, 0.01) = 0.0;
 uniform float scene3_billow_phase : hint_range(0.0, 6.2832, 0.01) = 0.0;
+uniform float cloud_press_center_x : hint_range(0.0, 1.0, 0.01) = 0.5;
+uniform float cloud_press_radius : hint_range(0.04, 0.3, 0.01) = 0.13;
+uniform float cloud_press_depth : hint_range(0.0, 0.2, 0.005) = 0.14;
+uniform float cloud_press_shoulder_height : hint_range(0.0, 0.15, 0.005) = 0.07;
+uniform float cloud_press_strength : hint_range(0.0, 1.0, 0.01) = 0.0;
+uniform float cloud_press_phase : hint_range(0.0, 1.0, 0.01) = 1.0;
 uniform float bank_valley_center : hint_range(0.0, 1.0, 0.01) = 0.5;
 uniform float bank_valley_width : hint_range(0.05, 0.5, 0.01) = 0.25;
 uniform float bank_valley_depth : hint_range(0.0, 0.3, 0.01) = 0.0;
@@ -374,6 +380,33 @@ float bank_join_top(
 }
 
 
+float cloud_press_contour_offset(float screen_u, float h_units) {
+	float normalized_distance = abs(screen_u - cloud_press_center_x)
+			/ max(cloud_press_radius, 0.001);
+	float center_depression = 1.0 - smoothstep(
+			0.0, 0.58, normalized_distance);
+	float shoulder_rise = smoothstep(
+			0.28, 0.62, normalized_distance)
+			* (1.0 - smoothstep(0.62, 1.0, normalized_distance));
+
+	float press_in = smoothstep(0.0, 0.12, cloud_press_phase);
+	float press_out = 1.0 - smoothstep(0.18, 0.38, cloud_press_phase);
+	float press = press_in * press_out;
+	float rebound = smoothstep(0.18, 0.36, cloud_press_phase)
+			* (1.0 - smoothstep(0.5, 0.72, cloud_press_phase));
+	float settle_gate = smoothstep(0.56, 0.64, cloud_press_phase)
+			* (1.0 - smoothstep(0.84, 1.0, cloud_press_phase));
+	float settle = sin((cloud_press_phase - 0.56) * 18.0) * settle_gate;
+
+	float center_motion = press - rebound * 0.32 + settle * 0.07;
+	float shoulder_motion = press * 0.72 - rebound * 0.16;
+	return (
+			center_depression * cloud_press_depth * center_motion
+			- shoulder_rise * cloud_press_shoulder_height * shoulder_motion
+	) * h_units * cloud_press_strength;
+}
+
+
 float smoke_cover(
 		float cu_c,
 		float cv_c,
@@ -382,7 +415,8 @@ float smoke_cover(
 		float screen_u) {
 	float c = 0.0;
 	float valley_offset = bank_valley_offset(screen_u, h_units)
-			+ scene3_vertical_roll(screen_u, h_units, t);
+			+ scene3_vertical_roll(screen_u, h_units, t)
+			+ cloud_press_contour_offset(screen_u, h_units);
 	for (int i = -1; i <= 1; i++) {
 		c = max(c, banner(
 				cu_c,

@@ -7,7 +7,8 @@ render_mode unshaded;
 uniform vec4 shadow_color : source_color = vec4(0.025, 0.12, 0.09, 1.0);
 uniform vec4 mid_color : source_color = vec4(0.16, 0.38, 0.25, 1.0);
 uniform vec4 light_color : source_color = vec4(0.48, 0.70, 0.38, 1.0);
-uniform vec4 rune_color : source_color = vec4(0.604, 0.682, 0.725, 1.0);
+uniform vec4 rune_color : source_color = vec4(0.62, 0.79, 0.94, 1.0);
+uniform vec4 rune_core_color : source_color = vec4(0.82, 0.92, 1.0, 1.0);
 uniform float exposure : hint_range(0.5, 2.0, 0.01) = 1.18;
 uniform float palette_strength : hint_range(0.0, 1.0, 0.01) = 0.82;
 uniform float rune_threshold : hint_range(0.0, 0.8, 0.01) = 0.22;
@@ -20,6 +21,14 @@ uniform float circuit_tail : hint_range(0.08, 0.45, 0.01) = 0.24;
 uniform float base_charge : hint_range(0.0, 0.5, 0.01) = 0.10;
 uniform float energy_pixel_size_px : hint_range(1.0, 4.0, 1.0) = 2.0;
 uniform float motion_feather : hint_range(0.01, 0.12, 0.005) = 0.055;
+// Click feedback highlights only energy that is already moving through the
+// route. It never illuminates the dormant circuit or changes travel timing.
+uniform float interaction_flash : hint_range(0.0, 1.0, 0.01) = 0.0;
+uniform float interaction_flash_gain : hint_range(0.5, 2.0, 0.01) = 1.28;
+// Scene achievement feedback: the first value briefly phase-locks all four
+// stones, while the second keeps only their carved energy routes illuminated.
+uniform float achievement_sync : hint_range(0.0, 1.0, 0.01) = 0.0;
+uniform float achievement_glow : hint_range(0.0, 1.0, 0.01) = 0.0;
 
 varying vec4 node_modulate;
 
@@ -190,14 +199,23 @@ void fragment() {
 				+ (0.34 - circuit_uv.y) / 0.18 * 0.08;
 	}
 
-	float head_a = fract(TIME * pulse_speed + pulse_phase / 6.2831);
-	float head_b = fract(
-			TIME * pulse_speed * mix(
-					0.84,
-					1.12,
-					hash11(pulse_phase * 7.7))
-			+ pulse_phase / 6.2831
-			+ 0.37);
+	// Two monotonic clocks use small low-frequency phase drift instead of a
+	// fixed saw-tooth rate. The head still climbs upward, but never repeats with
+	// an obviously mechanical cadence across the four stones.
+	float clock_a = TIME * pulse_speed;
+	float clock_b = TIME * pulse_speed * mix(
+			0.78,
+			1.09,
+			hash11(pulse_phase * 7.7));
+	float drift_a = sin(clock_a * TAU * 0.37 + pulse_phase) * 0.032
+			+ sin(clock_a * TAU * 0.13 + pulse_phase * 1.61) * 0.018;
+	float drift_b = sin(clock_b * TAU * 0.29 + pulse_phase * 0.73) * 0.038
+			+ sin(clock_b * TAU * 0.17 + pulse_phase * 1.27) * 0.015;
+	float head_a = fract(clock_a + drift_a + pulse_phase / TAU);
+	float head_b = fract(clock_b + drift_b + pulse_phase / TAU + 0.37);
+	float synchronized_head = fract(TIME * 0.58);
+	head_a = mix(head_a, synchronized_head, achievement_sync);
+	head_b = mix(head_b, synchronized_head, achievement_sync);
 	// The old saw-tooth trail jumped from dark to fully lit as its head crossed
 	// a circuit pixel. Fade in behind the head and fade out at the tail instead.
 	// Spatial blocks stay crisp, but every block changes brightness continuously.
@@ -205,25 +223,32 @@ void fragment() {
 	float travel_b = fract(head_b - path_b_progress);
 	float front_fade_a = smoothstep(0.0, motion_feather, travel_a);
 	float front_fade_b = smoothstep(0.0, motion_feather, travel_b);
+	float flash = clamp(interaction_flash, 0.0, 1.0);
+	float active_tail_a = circuit_tail;
+	float active_tail_b = circuit_tail * 0.78;
 	float trail_a = front_fade_a * (
 			1.0 - smoothstep(
-					max(circuit_tail - motion_feather, motion_feather),
-					circuit_tail,
+					max(active_tail_a - motion_feather, motion_feather),
+					active_tail_a,
 					travel_a));
 	float trail_b = front_fade_b * (
 			1.0 - smoothstep(
 					max(
-							circuit_tail * 0.86 - motion_feather,
+							active_tail_b - motion_feather,
 							motion_feather),
-					circuit_tail * 0.86,
+					active_tail_b,
 					travel_b));
 	float circuit_mask = max(path_a_mask, path_b_mask) * source.a;
-	float circuit_energy = max(
-			path_a_mask * trail_a,
-			path_b_mask * trail_b) * source.a;
-	float irregular_charge = 0.84
-			+ sin(TIME * pulse_speed * 0.37 + pulse_phase) * 0.10
-			+ sin(TIME * pulse_speed * 0.19 + pulse_phase * 1.7) * 0.06;
+	float head_core_a = 1.0 - smoothstep(
+			0.0, max(motion_feather * 0.72, 0.012), travel_a);
+	float head_core_b = 1.0 - smoothstep(
+			0.0, max(motion_feather * 0.68, 0.012), travel_b);
+	float energy_a = path_a_mask * max(trail_a * 0.72, head_core_a);
+	float energy_b = path_b_mask * max(trail_b * 0.66, head_core_b);
+	float circuit_energy = max(energy_a, energy_b) * source.a;
+	float irregular_charge = 0.78
+			+ sin(clock_a * TAU * 0.41 + pulse_phase) * 0.12
+			+ sin(clock_b * TAU * 0.23 + pulse_phase * 1.7) * 0.07;
 	circuit_energy *= irregular_charge;
 
 	// Keep the channel one source pixel inside the authored silhouette. This
@@ -265,14 +290,37 @@ void fragment() {
 			groove_color,
 			carved_track * (0.18 + base_charge * 0.42));
 
-	// A single restrained hue is shared by all four stones. Light and dark
-	// variation comes from their material and animation phase, not four neon
-	// colors. No additive pass is used, keeping the effect inside Scene4's fog.
-	vec3 embedded_color = mix(rune_color.rgb, light_color.rgb, 0.14);
+	// The teal forest absorbs gray light, so the moving route uses a clearer
+	// moon-blue value contrast while remaining one restrained color family.
+	// The click pulse multiplies only pixels already owned by embedded_energy.
+	vec3 embedded_color = mix(rune_color.rgb, rune_core_color.rgb, 0.08);
+	float moving_flash = embedded_energy * flash;
+	vec3 flash_color = mix(
+			embedded_color,
+			rune_core_color.rgb,
+			flash * 0.48);
+	float achievement_energy = carved_track * surface_response
+			* clamp(achievement_glow, 0.0, 1.0);
+	float light_amount = glow_strength * embedded_energy * 1.86
+			+ moving_flash * interaction_flash_gain
+			+ achievement_energy * 0.62;
 	color = mix(
 			color,
-			embedded_color,
-			clamp(glow_strength * embedded_energy * 1.5, 0.0, 0.74));
+			flash_color,
+			clamp(light_amount, 0.0, 0.96));
+
+	// A one-pixel pale core stays on the travelling head, not the full route.
+	// It gives the slow energy enough focus against the dark green background.
+	float head_core_energy = max(
+			path_a_mask * head_core_a,
+			path_b_mask * head_core_b) * source.a
+			* interior_gate * surface_response;
+	float core_light = head_core_energy * (0.54 + glow_strength * 0.46)
+			* mix(1.0, 1.85, flash);
+	color = mix(
+			color,
+			rune_core_color.rgb,
+			clamp(core_light, 0.0, 0.9));
 
 	COLOR = vec4(clamp(color, vec3(0.0), vec3(1.0)), source.a)
 			* node_modulate;

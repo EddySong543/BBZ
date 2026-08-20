@@ -82,13 +82,16 @@ func test_scene6_uses_the_authored_chilu_valley_layers_directly() -> void:
 			stage.get_node("BattlePlatform").get_index())
 	assert_lt(stage.get_node("MidgroundRight").get_index(),
 			stage.get_node("BattlePlatform").get_index())
-	assert_eq((stage.get_node("BattlePlatform") as NinePatchRect).texture.resource_path,
+	assert_eq((stage.get_node("BattlePlatform") as TextureRect).texture.resource_path,
 			"res://assets/scenes/scene6/scene6_battle_platform.png")
+	assert_eq((stage.get_node("BattlePlatform") as TextureRect).texture.get_size(),
+			Vector2(229.0, 132.0),
+			"Scene6 必须使用 assets/import 新导入的平台素材")
 	assert_eq((stage.get_node("ForegroundLeft") as TextureRect).texture.resource_path,
 			"res://assets/scenes/scene6/scene6_foreground_near_left.png")
 	assert_eq((stage.get_node("ForegroundRight") as TextureRect).texture.resource_path,
 			"res://assets/scenes/scene6/scene6_foreground_near_right.png")
-	var platform := stage.get_node("BattlePlatform") as NinePatchRect
+	var platform := stage.get_node("BattlePlatform") as TextureRect
 	assert_lt(platform.position.x, 480.0)
 	assert_gt(platform.position.x + platform.size.x * platform.scale.x, 1440.0)
 	assert_lt(platform.position.y, 748.0)
@@ -114,11 +117,12 @@ func test_scene6_keeps_mature_baselines_and_fullscreen_preview() -> void:
 	var preview := stage.get_node("PreviewBackdrop") as ColorRect
 	assert_eq(preview.anchor_right, 1.0)
 	assert_eq(preview.anchor_bottom, 1.0)
-	assert_eq(preview.mouse_filter, Control.MOUSE_FILTER_IGNORE)
+	assert_eq(preview.mouse_filter, Control.MOUSE_FILTER_STOP,
+			"PreviewBackdrop owns Scene6 background GUI clicks below battle UI")
 	assert_eq((stage.get_node("CompositionGuides/P1Baseline") as Marker2D).position,
-			Vector2(480.0, 748.0))
+			Vector2(480.0, 752.0))
 	assert_eq((stage.get_node("CompositionGuides/P2Baseline") as Marker2D).position,
-			Vector2(1440.0, 748.0))
+			Vector2(1440.0, 755.0))
 	assert_eq((stage.get_node("CompositionGuides/PlatformBaseline") as Marker2D).position,
 			Vector2(960.0, 748.0))
 
@@ -130,7 +134,7 @@ func test_scene6_uses_a_naturally_occluded_magma_lake() -> void:
 	assert_null(stage.get_node_or_null("ForgeCore"))
 	assert_null(stage.get_node_or_null("PlatformForgeContact"))
 	assert_null(stage.get_node_or_null("UnderbridgeForge"))
-	var platform := stage.get_node_or_null("BattlePlatform") as NinePatchRect
+	var platform := stage.get_node_or_null("BattlePlatform") as TextureRect
 	var magma := stage.get_node_or_null("MagmaLake") as ColorRect
 	assert_not_null(platform)
 	assert_not_null(magma)
@@ -214,7 +218,7 @@ func test_scene6_uses_a_naturally_occluded_magma_lake() -> void:
 func test_scene6_platform_is_pixel_safe_and_has_local_thermal_depth() -> void:
 	var stage := (load(SCENE6_PATH) as PackedScene).instantiate()
 	add_child_autofree(stage)
-	var platform := stage.get_node_or_null("BattlePlatform") as NinePatchRect
+	var platform := stage.get_node_or_null("BattlePlatform") as TextureRect
 	var atmosphere := stage.get_node_or_null("ThermalAtmosphere") as ColorRect
 	var depth_heat_veil := stage.get_node_or_null("DepthHeatVeil") as ColorRect
 	var mid_ash := stage.get_node_or_null("MidAshBack") as ColorRect
@@ -233,12 +237,23 @@ func test_scene6_platform_is_pixel_safe_and_has_local_thermal_depth() -> void:
 	assert_eq(platform.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST)
 	assert_eq(platform.scale, Vector2(4.0, 4.0))
 	assert_gt(platform.size.y, 120.0)
-	assert_eq(platform.axis_stretch_horizontal,
-			NinePatchRect.AXIS_STRETCH_MODE_TILE_FIT)
+	assert_eq(platform.stretch_mode, TextureRect.STRETCH_SCALE,
+			"战斗平台只能整图放大，禁止 NinePatch 或平铺中段")
 	assert_lt(platform.position.y, 748.0)
 	assert_gt(platform.position.y + platform.size.y * platform.scale.y, 748.0)
 	assert_lte(platform.position.x, 0.0)
 	assert_gte(platform.position.x + platform.size.x * platform.scale.x, 1920.0)
+	var platform_grade := platform.material as ShaderMaterial
+	var near_grade := (stage.get_node("ForegroundLeft") as TextureRect).material \
+			as ShaderMaterial
+	assert_gt(float(platform_grade.get_shader_parameter("brightness")),
+			float(near_grade.get_shader_parameter("brightness")),
+			"The walkable platform must read brighter than the foreground frame")
+	var platform_mid := platform_grade.get_shader_parameter("palette_mid") as Color
+	var near_mid := near_grade.get_shader_parameter("palette_mid") as Color
+	assert_gt(_color_distance(platform_mid, near_mid), 0.1,
+			"Platform forged-iron mids must stay distinct from near-rock wine reds")
+	assert_gt(_color_luma(platform_mid) - _color_luma(near_mid), 0.045)
 	assert_lt(atmosphere.get_index(), magma.get_index())
 	assert_gt(depth_heat_veil.get_index(), stage.get_node("FarBackground").get_index())
 	assert_lt(depth_heat_veil.get_index(), stage.get_node("MidgroundLeft").get_index())
@@ -319,10 +334,13 @@ func test_scene6_platform_is_pixel_safe_and_has_local_thermal_depth() -> void:
 	assert_gte(float(foreground_material.get_shader_parameter("source_bias_strength")), 0.6)
 	assert_true(magma_material.shader.code.contains("occluded_magma_lake"))
 	assert_lte(float(platform_material.get_shader_parameter("saturation")), 0.68)
-	assert_lte(float(platform_material.get_shader_parameter("brightness")), 0.94)
+	assert_gte(float(platform_material.get_shader_parameter("brightness")), 0.98)
+	assert_lte(float(platform_material.get_shader_parameter("brightness")), 1.02)
 	var platform_light := platform_material.get_shader_parameter("palette_light") as Color
 	var magma_hot := magma_material.get_shader_parameter("hot_color") as Color
-	assert_lt(platform_light.r, 0.50)
+	assert_lt(platform_light.r, 0.72)
+	assert_gt(magma_hot.r - platform_light.r, 0.25,
+			"The platform may read as warm forged iron but must not become molten")
 	assert_gt(magma_hot.r, 0.80)
 	assert_gte(float(platform_material.get_shader_parameter("lava_bounce_amount")), 0.04)
 	assert_lte(float(platform_material.get_shader_parameter("lava_bounce_amount")), 0.07)
@@ -427,18 +445,24 @@ func test_scene6_reuses_character_geometry_with_red_valley_lighting() -> void:
 	add_child_autofree(screen)
 	await get_tree().process_frame
 
-	for node_name: String in ["P1CharDisplay", "P2CharDisplay"]:
+	var character_drop: Dictionary[String, float] = {
+		"P1CharDisplay": 4.0,
+		"P2CharDisplay": 7.0,
+	}
+	for node_name: String in character_drop:
 		var base_node := base.get_node(node_name) as Control
 		var scene6_node := screen.get_node("WorldGroup/%s" % node_name) as CharacterDisplay
-		assert_eq(scene6_node.position, base_node.position)
+		assert_eq(scene6_node.position,
+				base_node.position + Vector2(0.0, character_drop[node_name]),
+				"Scene6 fighters must overlap the platform surface instead of floating")
 		assert_eq(scene6_node.size, base_node.size)
 		assert_eq(scene6_node.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST)
-		assert_eq(scene6_node.rim_color, Color(0.48, 0.28, 0.16, 1.0))
+		assert_eq(scene6_node.rim_color, Color(0.62, 0.34, 0.12, 1.0))
 		assert_lte(scene6_node.rim_strength, 0.025)
-		assert_lte(scene6_node.backlight, 0.18)
-		assert_eq(scene6_node.shadow_tint, Color(0.34, 0.23, 0.3, 1.0))
-		assert_lte(scene6_node.warmth_amount, 0.12)
-		assert_eq(scene6_node.fill_color, Color(0.27, 0.18, 0.16, 1.0))
+		assert_lte(scene6_node.backlight, 0.13)
+		assert_eq(scene6_node.shadow_tint, Color(0.42, 0.28, 0.24, 1.0))
+		assert_lte(scene6_node.warmth_amount, 0.06)
+		assert_eq(scene6_node.fill_color, Color(0.46, 0.22, 0.1, 1.0))
 		assert_lte(scene6_node.fill_amount, 0.02)
 		assert_gt(scene6_node.light_dir.y, 0.0)
 		var sprite := scene6_node.get_node("SubViewport/AnimatedSprite2D") as AnimatedSprite2D
@@ -446,14 +470,23 @@ func test_scene6_reuses_character_geometry_with_red_valley_lighting() -> void:
 		assert_not_null(material)
 		assert_eq(material.shader.resource_path,
 				"res://assets/shaders/canvas_env_scene6_character_light.gdshader")
-		assert_lte(material.get_shader_parameter("lava_bounce_amount") as float, 0.015)
+		assert_lte(material.get_shader_parameter("lava_bounce_amount") as float, 0.025)
 		assert_lte(float(material.get_shader_parameter("lava_bounce_start")), 0.50)
 		assert_lte(float(material.get_shader_parameter("rim_strength_cap")), 0.04)
 		assert_eq(float(material.get_shader_parameter("flash_peak_strength")), 0.0)
 		assert_eq(float(material.get_shader_parameter("flash_dark_response")), 0.0)
 		assert_ne(material.get_shader_parameter("flash_color") as Color, Color.WHITE)
+		assert_gte(float(material.get_shader_parameter("source_saturation")), 1.04,
+				"Scene6 characters retain authored color instead of reading gray")
+		assert_gte(float(material.get_shader_parameter("source_contrast")), 1.02)
+		assert_lte(float(material.get_shader_parameter("highlight_compression")), 0.18,
+				"highlight compression cannot flatten the sprite into a hazy daytime grade")
+		assert_gte(float(material.get_shader_parameter("lava_bounce_amount")), 0.018,
+				"a constant lower amber bounce anchors the fighter in the fire cave")
 		for marker: String in ["lower_forge_bounce", "source_facing_rim", "ambient_lift"]:
 			assert_true(material.shader.code.contains(marker))
+		assert_false(material.shader.code.contains("TIME"),
+				"character environment light must remain static and never breathe or flash")
 		assert_true(material.shader.code.contains("min(rim_strength, rim_strength_cap)"))
 		assert_true(material.shader.code.contains("stable_flash"))
 		assert_true(material.shader.code.contains("flash_response"))
@@ -472,8 +505,10 @@ func test_scene6_reuses_character_geometry_with_red_valley_lighting() -> void:
 
 	var p1_shadow := screen.get_node("WorldGroup/P1Shadow") as TextureRect
 	var p2_shadow := screen.get_node("WorldGroup/P2Shadow") as TextureRect
-	assert_eq(p1_shadow.position, (base.get_node("P1Shadow") as TextureRect).position)
-	assert_eq(p2_shadow.position, (base.get_node("P2Shadow") as TextureRect).position)
+	assert_eq(p1_shadow.position,
+			(base.get_node("P1Shadow") as TextureRect).position + Vector2(0.0, 4.0))
+	assert_eq(p2_shadow.position,
+			(base.get_node("P2Shadow") as TextureRect).position + Vector2(0.0, 7.0))
 	assert_eq(p1_shadow.self_modulate, Color(0.34, 0.08, 0.12, 0.58))
 	assert_eq(p2_shadow.self_modulate, Color(0.34, 0.08, 0.12, 0.58))
 
@@ -501,3 +536,12 @@ func test_scene6_reuses_character_geometry_with_red_valley_lighting() -> void:
 		assert_true(post_material.shader.code.contains("character_protection"))
 	base.free()
 	BattleSetup.reset()
+
+
+func _color_distance(left: Color, right: Color) -> float:
+	return Vector3(left.r, left.g, left.b).distance_to(
+			Vector3(right.r, right.g, right.b))
+
+
+func _color_luma(color: Color) -> float:
+	return color.r * 0.299 + color.g * 0.587 + color.b * 0.114

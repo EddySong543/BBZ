@@ -32,6 +32,8 @@
 [ext_resource type="Shader" uid="uid://3d265upgppmc" path="res://assets/shaders/canvas_env_scene3_distant_mountain_grade.gdshader" id="37_distant_mountain_grade"]
 [ext_resource type="Shader" uid="uid://ctqff5bg7wdco" path="res://assets/shaders/canvas_env_scene3_cloud_floor.gdshader" id="38_cloud_floor"]
 [ext_resource type="Script" uid="uid://i487qwohrja7" path="res://src/ui/components/scene3_flying_fish_school.gd" id="40_flying_fish"]
+[ext_resource type="Script" path="res://src/ui/components/scene3_cloud_interaction.gd" id="41_cloud_interaction"]
+[ext_resource type="Script" path="res://src/ui/components/scene3_vertical_fish_easter_egg.gd" id="42_vertical_fish"]
 
 [sub_resource type="ShaderMaterial" id="DistantMountainMidMat"]
 resource_local_to_scene = true
@@ -434,6 +436,9 @@ shader_parameter/scene3_roll_phase = 0.3
 shader_parameter/scene3_billow_amount = 0.28
 shader_parameter/scene3_billow_speed = 0.56
 shader_parameter/scene3_billow_phase = 0.9
+shader_parameter/cloud_press_radius = 0.17
+shader_parameter/cloud_press_depth = 0.11
+shader_parameter/cloud_press_shoulder_height = 0.055
 shader_parameter/bank_valley_center = 0.2825
 shader_parameter/bank_valley_width = 0.31
 shader_parameter/bank_valley_depth = 0.07
@@ -501,6 +506,9 @@ shader_parameter/scene3_roll_phase = 2.1
 shader_parameter/scene3_billow_amount = 0.38
 shader_parameter/scene3_billow_speed = 0.82
 shader_parameter/scene3_billow_phase = 1.7
+shader_parameter/cloud_press_radius = 0.15
+shader_parameter/cloud_press_depth = 0.12
+shader_parameter/cloud_press_shoulder_height = 0.06
 shader_parameter/bank_valley_center = 0.2825
 shader_parameter/bank_valley_width = 0.31
 shader_parameter/bank_valley_depth = 0.07
@@ -707,6 +715,9 @@ shader_parameter/scene3_roll_phase = 4.0
 shader_parameter/scene3_billow_amount = 0.46
 shader_parameter/scene3_billow_speed = 1.02
 shader_parameter/scene3_billow_phase = 3.1
+shader_parameter/cloud_press_radius = 0.13
+shader_parameter/cloud_press_depth = 0.14
+shader_parameter/cloud_press_shoulder_height = 0.07
 shader_parameter/bank_valley_center = 0.34
 shader_parameter/bank_valley_width = 0.31
 shader_parameter/bank_valley_depth = 0.07
@@ -1110,6 +1121,22 @@ seed_offset = 91
 metadata/parallax_factor = 0.8
 metadata/_edit_lock_ = true
 
+[node name="VerticalFishEasterEgg" type="Node2D" parent="."]
+script = ExtResource("42_vertical_fish")
+minimum_clicks_before_roll = 3
+trigger_probability = 0.05
+trigger_delay_sec = 0.07
+retrigger_cooldown = 6.0
+fish_count_min = 2
+fish_count_max = 3
+surface_y = 846.0
+top_y = -80.0
+flight_duration = 0.78
+stagger_sec = 0.035
+fish_tint = Color(0.76, 0.86, 0.82, 0.96)
+metadata/parallax_factor = 0.72
+metadata/_edit_lock_ = true
+
 [node name="MainChain" type="TextureRect" parent="." unique_id=102152380]
 self_modulate = Color(0.72, 0.76, 0.7, 1)
 texture_filter = 1
@@ -1146,10 +1173,10 @@ self_modulate = Color(1, 0.96, 0.92, 1)
 texture_filter = 1
 material = SubResource("LeftCliffGradeMat")
 layout_mode = 0
-offset_left = -374.0
-offset_top = 220.0
-offset_right = 281.0
-offset_bottom = 1307.0
+offset_left = -341.0
+offset_top = 217.0
+offset_right = 314.0
+offset_bottom = 1304.0
 mouse_filter = 2
 texture = ExtResource("7_left")
 expand_mode = 1
@@ -1199,6 +1226,29 @@ color = Color(0.76, 0.84, 0.8, 0.82)
 metadata/parallax_factor = 1.2
 metadata/_edit_lock_ = true
 
+[node name="CloudSeaClickDisturbance" type="Control" parent="."]
+layout_mode = 0
+offset_left = -137.0
+offset_top = 674.0
+offset_right = 2040.0
+offset_bottom = 1084.0
+mouse_filter = 1
+script = ExtResource("41_cloud_interaction")
+cloud_target_path = NodePath("../CloudSeaFront")
+secondary_cloud_target_path = NodePath("../CloudSeaMid")
+tertiary_cloud_target_path = NodePath("../CloudSeaBack")
+click_cooldown = 0.2
+cloud_effect_lifetime = 0.72
+primary_strength = 0.72
+secondary_delay = 0.06
+secondary_lifetime = 0.78
+secondary_strength = 0.46
+tertiary_delay = 0.12
+tertiary_lifetime = 0.92
+tertiary_strength = 0.22
+metadata/parallax_factor = 1.2
+metadata/_edit_lock_ = true
+
 [node name="FrontFog" type="ColorRect" parent="." unique_id=1758706211]
 material = SubResource("FrontFogMat")
 layout_mode = 0
@@ -1210,3 +1260,5 @@ mouse_filter = 2
 color = Color(0, 0, 0, 0)
 metadata/parallax_factor = 1.35
 metadata/_edit_lock_ = true
+
+[connection signal="cloud_disturbed" from="CloudSeaClickDisturbance" to="VerticalFishEasterEgg" method="_on_cloud_disturbed"]

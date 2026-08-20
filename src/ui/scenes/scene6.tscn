@@ -13,6 +13,12 @@
 [ext_resource type="Shader" uid="uid://d1uwtlwc1b8wq" path="res://assets/shaders/canvas_env_scene6_midground_lava.gdshader" id="10_mid_lava"]
 [ext_resource type="Shader" uid="uid://c23utvi2sn2vh" path="res://assets/shaders/canvas_env_scene6_thermal_atmosphere.gdshader" id="11_thermal_atmosphere"]
 [ext_resource type="Shader" uid="uid://cof1pr0w0msw7" path="res://assets/shaders/canvas_env_scene6_mid_ash_back.gdshader" id="13_mid_ash"]
+[ext_resource type="Script" uid="uid://cdf1fgn4v0veh" path="res://src/ui/components/scene6_click_interaction.gd" id="14_click_interaction"]
+[ext_resource type="Script" uid="uid://blfqbfhtoy830" path="res://src/ui/components/scene6_click_effect_canvas.gd" id="15_click_fx"]
+[ext_resource type="Texture2D" uid="uid://e6h6sqjmif4k" path="res://assets/scenes/scene6/scene6_secret_sword_hilt.png" id="16_secret_hilt"]
+[ext_resource type="Texture2D" uid="uid://m5c7i6sweidd" path="res://assets/scenes/scene6/scene6_secret_sword_tip.png" id="17_secret_tip"]
+[ext_resource type="Script" uid="uid://buru7falvy1cc" path="res://src/ui/components/scene6_magma_secrets.gd" id="18_magma_secrets"]
+[ext_resource type="Texture2D" uid="uid://dtab0iu7vb8d6" path="res://assets/scenes/scene6/scene6_secret_chilu_kings_blade.png" id="19_legendary_blade"]
 
 [sub_resource type="ShaderMaterial" id="Scene6FarGradeMat"]
 resource_local_to_scene = true
@@ -186,22 +192,22 @@ shader_parameter/core_color = Color(1, 0.6, 0.16, 1)
 [sub_resource type="ShaderMaterial" id="Scene6PlatformGradeMat"]
 resource_local_to_scene = true
 shader = ExtResource("9_depth_grade")
-shader_parameter/brightness = 0.94
-shader_parameter/saturation = 0.62
-shader_parameter/contrast = 1.08
-shader_parameter/tint_color = Color(0.62, 0.34, 0.42, 1)
-shader_parameter/tint_strength = 0.12
-shader_parameter/highlight_rolloff = 0.18
-shader_parameter/palette_shadow = Color(0.022, 0.016, 0.034, 1)
-shader_parameter/palette_mid = Color(0.17, 0.052, 0.064, 1)
-shader_parameter/palette_light = Color(0.46, 0.125, 0.078, 1)
-shader_parameter/palette_strength = 0.7
+shader_parameter/brightness = 1.0
+shader_parameter/saturation = 0.66
+shader_parameter/contrast = 1.12
+shader_parameter/tint_color = Color(0.95, 0.62, 0.34, 1)
+shader_parameter/tint_strength = 0.14
+shader_parameter/highlight_rolloff = 0.14
+shader_parameter/palette_shadow = Color(0.03, 0.02, 0.026, 1)
+shader_parameter/palette_mid = Color(0.26, 0.115, 0.052, 1)
+shader_parameter/palette_light = Color(0.68, 0.29, 0.105, 1)
+shader_parameter/palette_strength = 0.74
 shader_parameter/palette_source_dark = 0.025
-shader_parameter/palette_source_light = 0.52
+shader_parameter/palette_source_light = 0.48
 shader_parameter/lava_bounce_color = Color(1, 0.25, 0.05, 1)
-shader_parameter/lava_bounce_amount = 0.04
+shader_parameter/lava_bounce_amount = 0.045
 shader_parameter/lava_bounce_start = 0.5
-shader_parameter/broken_reflection_amount = 0.05
+shader_parameter/broken_reflection_amount = 0.06
 shader_parameter/broken_reflection_coverage = 0.16
 shader_parameter/broken_reflection_start = 0.5
 shader_parameter/broken_reflection_end = 0.78
@@ -300,6 +306,7 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("1_stage")
 idle_amplitude = 5.0
+demo_click_shake = false
 metadata/framework_only = false
 metadata/theme_name = "赤炉剑谷"
 
@@ -310,7 +317,6 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 2
 color = Color(0.055, 0.008, 0.014, 1)
 metadata/_edit_lock_ = true
 
@@ -372,6 +378,18 @@ stretch_mode = 5
 metadata/parallax_factor = 0.55
 metadata/_edit_lock_ = true
 
+[node name="MidgroundClickFX" type="Control" parent="." unique_id=1001792509]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("15_click_fx")
+pixel_size = 3.0
+metadata/parallax_factor = 0.55
+
 [node name="MidAshBack" type="ColorRect" parent="." unique_id=1954258897]
 texture_filter = 1
 material = SubResource("Scene6MidAshBackMat")
@@ -408,21 +426,46 @@ mouse_filter = 2
 metadata/parallax_factor = 1.0
 metadata/_edit_lock_ = true
 
-[node name="BattlePlatform" type="NinePatchRect" parent="." unique_id=1261622324]
+[node name="MagmaClickFX" type="Control" parent="." unique_id=971764001]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("15_click_fx")
+metadata/parallax_factor = 1.0
+
+[node name="MagmaSecrets" type="Control" parent="." unique_id=1658160657]
+texture_filter = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("18_magma_secrets")
+sword_hilt_texture = ExtResource("16_secret_hilt")
+sword_tip_texture = ExtResource("17_secret_tip")
+legendary_blade_texture = ExtResource("19_legendary_blade")
+legendary_scale = 2.5
+metadata/parallax_factor = 1.0
+
+[node name="BattlePlatform" type="TextureRect" parent="." unique_id=1261622324]
 texture_filter = 1
 material = SubResource("Scene6PlatformGradeMat")
 layout_mode = 0
-offset_left = -29.0
-offset_top = 527.0
-offset_right = 463.0
-offset_bottom = 675.25
+offset_left = -157.0
+offset_top = 475.0
+offset_right = 398.0
+offset_bottom = 663.0
 scale = Vector2(4, 4)
+mouse_filter = 2
 texture = ExtResource("4_platform")
-patch_margin_left = 28
-patch_margin_right = 28
-axis_stretch_horizontal = 2
+stretch_mode = 0
 metadata/parallax_factor = 1.0
-metadata/_edit_lock_ = true
 
 [node name="ForegroundLeft" type="TextureRect" parent="." unique_id=39270639]
 texture_filter = 1
@@ -454,6 +497,19 @@ stretch_mode = 5
 metadata/parallax_factor = 1.25
 metadata/_edit_lock_ = true
 
+[node name="ForegroundClickFX" type="Control" parent="." unique_id=381708286]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("15_click_fx")
+pixel_size = 3.0
+metadata/parallax_factor = 1.25
+metadata/_edit_lock_ = true
+
 [node name="ForegroundEmbers" type="ColorRect" parent="." unique_id=1695408010]
 texture_filter = 1
 material = SubResource("Scene6ForegroundEmbersMat")
@@ -465,13 +521,16 @@ mouse_filter = 2
 metadata/parallax_factor = 1.32
 metadata/_edit_lock_ = true
 
+[node name="ClickInteraction" type="Node" parent="." unique_id=1757549130]
+script = ExtResource("14_click_interaction")
+
 [node name="CompositionGuides" type="Node2D" parent="." unique_id=1984986322]
 
 [node name="P1Baseline" type="Marker2D" parent="CompositionGuides" unique_id=463990273]
-position = Vector2(480, 748)
+position = Vector2(480, 752)
 
 [node name="P2Baseline" type="Marker2D" parent="CompositionGuides" unique_id=1334342367]
-position = Vector2(1440, 748)
+position = Vector2(1440, 755)
 
 [node name="PlatformBaseline" type="Marker2D" parent="CompositionGuides" unique_id=1088287546]
 position = Vector2(960, 748)

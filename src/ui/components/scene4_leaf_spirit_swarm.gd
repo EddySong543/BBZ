@@ -7,8 +7,8 @@ signal swarm_finished
 const FRAME_WIDTH := 16
 const FRAME_HEIGHT := 14
 const FRAME_COUNT := 4
-const POOL_SIZE := 5
-const FLAP_FPS := 5.0
+const POOL_SIZE := 24
+const FLAP_FPS := 5.4
 
 const OUTLINE_COLOR := Color("#173530")
 const BODY_SHADOW_COLOR := Color("#789d9b")
@@ -16,49 +16,54 @@ const BODY_COLOR := Color("#b8d3cd")
 const BODY_LIGHT_COLOR := Color("#d7e4db")
 const WING_SHADOW_COLOR := Color("#5f9180")
 const WING_COLOR := Color("#8eb7a0")
-const EYE_COLOR := Color("#e0a75b")
+const EYE_COLOR := Color("#b9dff2")
 
-@export_group("Schedule")
-@export var auto_start := true
+@export_group("Achievement swarm")
+@export_range(18, POOL_SIZE, 1) var spirit_count_min := 18
+@export_range(18, POOL_SIZE, 1) var spirit_count_max := 24
+@export_range(2.0, 8.0, 0.1) var flight_duration_min := 4.4
+@export_range(2.0, 8.0, 0.1) var flight_duration_max := 5.8
+@export_range(1.0, 4.0, 0.1) var spirit_scale_min := 1.8
+@export_range(1.0, 4.0, 0.1) var spirit_scale_max := 2.7
+@export var spirit_tint := Color(0.9, 0.98, 1.0, 0.96)
+@export var seed_offset := 404
+
+@export_group("Ambient schedule")
+@export var auto_ambient := true
 @export_range(0.0, 60.0, 0.1) var initial_delay_sec := 8.0
 @export_range(10.0, 60.0, 0.5) var interval_min_sec := 22.0
 @export_range(10.0, 60.0, 0.5) var interval_max_sec := 38.0
-
-@export_group("Swarm")
-@export_range(1, POOL_SIZE, 1) var spirit_count_min := 2
-@export_range(1, POOL_SIZE, 1) var spirit_count_max := 3
-@export_range(1.0, 8.0, 0.1) var flight_duration_min := 3.4
-@export_range(1.0, 8.0, 0.1) var flight_duration_max := 4.5
-@export_range(1.0, 5.0, 0.1) var spirit_scale_min := 2.3
-@export_range(1.0, 5.0, 0.1) var spirit_scale_max := 2.9
-@export var spirit_tint := Color(0.92, 0.98, 0.98, 0.94)
-@export var seed_offset := 404
+@export_range(1, 5, 1) var ambient_spirit_count_min := 2
+@export_range(1, 5, 1) var ambient_spirit_count_max := 3
+@export_range(1.0, 8.0, 0.1) var ambient_flight_duration_min := 3.4
+@export_range(1.0, 8.0, 0.1) var ambient_flight_duration_max := 4.5
+@export_range(1.0, 5.0, 0.1) var ambient_spirit_scale_min := 2.3
+@export_range(1.0, 5.0, 0.1) var ambient_spirit_scale_max := 2.9
 
 static var _shared_atlas: ImageTexture
 
 var _rng := RandomNumberGenerator.new()
-var _event_timer: Timer
 var _pool: Array[Sprite2D] = []
 var _active_spirits: Array[Dictionary] = []
+var _ambient_timer: Timer
+var _active_swarm_kind := &""
 
 
 func _ready() -> void:
 	_rng.seed = hash("%s:%d" % [get_path(), seed_offset])
-	_event_timer = Timer.new()
-	_event_timer.name = "EventTimer"
-	_event_timer.one_shot = true
-	_event_timer.timeout.connect(_on_event_timer_timeout)
-	add_child(_event_timer)
 	_create_pool()
+	_ambient_timer = Timer.new()
+	_ambient_timer.name = "AmbientTimer"
+	_ambient_timer.one_shot = true
+	_ambient_timer.timeout.connect(_on_ambient_timer_timeout)
+	add_child(_ambient_timer)
 	set_process(false)
-	if auto_start:
-		_event_timer.start(maxf(initial_delay_sec, 0.05))
+	if auto_ambient:
+		_ambient_timer.start(maxf(initial_delay_sec, 0.05))
 
 
 func _process(delta: float) -> void:
-	for active_index: int in range(
-			_active_spirits.size() - 1, -1, -1
-	):
+	for active_index: int in range(_active_spirits.size() - 1, -1, -1):
 		var state: Dictionary = _active_spirits[active_index]
 		state["elapsed"] = float(state["elapsed"]) + delta
 		var elapsed := float(state["elapsed"]) - float(state["delay"])
@@ -78,8 +83,8 @@ func _process(delta: float) -> void:
 		var destination := state["destination"] as Vector2
 		var point := _cubic_bezier(
 				start, control_a, control_b, destination, flight_t)
-		var bob_phase := float(state["bob_phase"])
-		var bob := sin(linear_t * TAU * 2.15 + bob_phase) * 4.0
+		var bob := sin(
+				linear_t * TAU * 2.0 + float(state["bob_phase"])) * 4.0
 		sprite.position = (point + Vector2(0.0, bob)).round()
 
 		var tangent := _cubic_bezier_tangent(
@@ -87,15 +92,15 @@ func _process(delta: float) -> void:
 		var direction := int(state["direction"])
 		sprite.flip_h = direction < 0
 		sprite.rotation = clampf(
-				atan2(tangent.y, absf(tangent.x)) * 0.32 * direction,
-				-0.18,
-				0.18)
-		sprite.frame = int(
-				floor((elapsed * FLAP_FPS) + float(state["frame_phase"]))
-		) % FRAME_COUNT
+				atan2(tangent.y, absf(tangent.x)) * 0.26 * direction,
+				-0.16,
+				0.16)
+		sprite.frame = int(floor(
+				elapsed * FLAP_FPS + float(state["frame_phase"])
+		)) % FRAME_COUNT
 
-		var fade_in := smoothstep(0.0, 0.12, linear_t)
-		var fade_out := 1.0 - smoothstep(0.82, 1.0, linear_t)
+		var fade_in := smoothstep(0.0, 0.09, linear_t)
+		var fade_out := 1.0 - smoothstep(0.84, 1.0, linear_t)
 		var color := state["color"] as Color
 		color.a *= minf(fade_in, fade_out)
 		sprite.modulate = color
@@ -106,26 +111,39 @@ func _process(delta: float) -> void:
 
 	if _active_spirits.is_empty():
 		set_process(false)
+		_active_swarm_kind = &""
 		swarm_finished.emit()
-		if auto_start:
-			_schedule_next_event()
+		_schedule_next_ambient()
 
 
-func trigger_swarm(direction_override: int = 0) -> bool:
-	if not _active_spirits.is_empty():
-		return false
-	_event_timer.stop()
+func trigger_achievement_swarm() -> bool:
+	_ambient_timer.stop()
+	_clear_active_spirits()
 	var count := _rng.randi_range(
 			mini(spirit_count_min, spirit_count_max),
 			maxi(spirit_count_min, spirit_count_max))
 	count = mini(count, _pool.size())
-	var direction := direction_override
-	if direction == 0:
-		direction = 1 if _rng.randf() < 0.5 else -1
-	else:
-		direction = 1 if direction_override > 0 else -1
 	for spirit_index: int in count:
+		var direction := 1 if spirit_index % 2 == 0 else -1
 		_activate_spirit(spirit_index, count, direction)
+	_active_swarm_kind = &"achievement"
+	set_process(true)
+	swarm_started.emit(count)
+	return true
+
+
+func trigger_ambient_swarm() -> bool:
+	if not _active_spirits.is_empty():
+		return false
+	_ambient_timer.stop()
+	var count := _rng.randi_range(
+			mini(ambient_spirit_count_min, ambient_spirit_count_max),
+			maxi(ambient_spirit_count_min, ambient_spirit_count_max))
+	count = mini(count, _pool.size())
+	var direction := 1 if _rng.randf() < 0.5 else -1
+	for spirit_index: int in count:
+		_activate_spirit(spirit_index, count, direction, true)
+	_active_swarm_kind = &"ambient"
 	set_process(true)
 	swarm_started.emit(count)
 	return true
@@ -135,16 +153,34 @@ func get_active_spirit_count() -> int:
 	return _active_spirits.size()
 
 
+func get_visible_spirit_count() -> int:
+	var count := 0
+	for sprite: Sprite2D in _pool:
+		if sprite.visible:
+			count += 1
+	return count
+
+
+func get_active_swarm_kind() -> StringName:
+	return _active_swarm_kind
+
+
+func is_ambient_timer_running() -> bool:
+	return _ambient_timer != null and not _ambient_timer.is_stopped()
+
+
 func get_pool_size() -> int:
 	return _pool.size()
 
 
-func _on_event_timer_timeout() -> void:
-	trigger_swarm()
+func _on_ambient_timer_timeout() -> void:
+	trigger_ambient_swarm()
 
 
-func _schedule_next_event() -> void:
-	_event_timer.start(_rng.randf_range(
+func _schedule_next_ambient() -> void:
+	if not auto_ambient or _ambient_timer == null:
+		return
+	_ambient_timer.start(_rng.randf_range(
 			minf(interval_min_sec, interval_max_sec),
 			maxf(interval_min_sec, interval_max_sec)))
 
@@ -154,7 +190,7 @@ func _create_pool() -> void:
 		_shared_atlas = _create_atlas()
 	for spirit_index: int in POOL_SIZE:
 		var sprite := Sprite2D.new()
-		sprite.name = "LeafSpirit%d" % (spirit_index + 1)
+		sprite.name = "AchievementLeafSpirit%d" % (spirit_index + 1)
 		sprite.texture = _shared_atlas
 		sprite.hframes = FRAME_COUNT
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -167,9 +203,69 @@ func _create_pool() -> void:
 func _activate_spirit(
 		spirit_index: int,
 		spirit_count: int,
-		direction: int
+		direction: int,
+		ambient := false
 ) -> void:
 	var sprite := _pool[spirit_index]
+	if ambient:
+		_activate_ambient_spirit(
+				sprite, spirit_index, spirit_count, direction)
+		return
+	var lane := spirit_index % 6
+	var start_x := _rng.randf_range(70.0, 390.0)
+	var end_x := _rng.randf_range(1240.0, 1850.0)
+	if direction < 0:
+		start_x = 1920.0 - start_x
+		end_x = 1920.0 - end_x
+	var start := Vector2(
+			start_x,
+			_rng.randf_range(700.0, 890.0) + float(lane) * 18.0)
+	var destination := Vector2(
+			end_x,
+			_rng.randf_range(150.0, 500.0))
+	var control_a := start + Vector2(
+			float(direction) * _rng.randf_range(250.0, 520.0),
+			-_rng.randf_range(170.0, 360.0))
+	var control_b := destination + Vector2(
+			-float(direction) * _rng.randf_range(180.0, 420.0),
+			_rng.randf_range(20.0, 170.0))
+	var spirit_scale := _rng.randf_range(
+			minf(spirit_scale_min, spirit_scale_max),
+			maxf(spirit_scale_min, spirit_scale_max))
+	sprite.scale = Vector2.ONE * spirit_scale
+	sprite.position = start.round()
+	sprite.frame = spirit_index % FRAME_COUNT
+	sprite.visible = false
+
+	var color := spirit_tint
+	var value_variation := _rng.randf_range(0.9, 1.04)
+	color.r *= value_variation
+	color.g *= value_variation
+	color.b *= value_variation
+	_active_spirits.append({
+		"sprite": sprite,
+		"elapsed": 0.0,
+		"delay": float(spirit_index) * _rng.randf_range(0.055, 0.095),
+		"duration": _rng.randf_range(
+				minf(flight_duration_min, flight_duration_max),
+				maxf(flight_duration_min, flight_duration_max)),
+		"start": start,
+		"control_a": control_a,
+		"control_b": control_b,
+		"destination": destination,
+		"direction": direction,
+		"bob_phase": _rng.randf_range(0.0, TAU),
+		"frame_phase": _rng.randf_range(0.0, float(FRAME_COUNT)),
+		"color": color,
+	})
+
+
+func _activate_ambient_spirit(
+		sprite: Sprite2D,
+		spirit_index: int,
+		spirit_count: int,
+		direction: int
+) -> void:
 	var centered_index := float(spirit_index) - float(spirit_count - 1) * 0.5
 	var start_x := _rng.randf_range(280.0, 410.0)
 	var end_x := _rng.randf_range(1490.0, 1620.0)
@@ -189,11 +285,12 @@ func _activate_spirit(
 			-float(direction) * _rng.randf_range(260.0, 350.0),
 			_rng.randf_range(35.0, 105.0))
 	var spirit_scale := _rng.randf_range(
-			minf(spirit_scale_min, spirit_scale_max),
-			maxf(spirit_scale_min, spirit_scale_max))
+			minf(ambient_spirit_scale_min, ambient_spirit_scale_max),
+			maxf(ambient_spirit_scale_min, ambient_spirit_scale_max))
 	sprite.scale = Vector2.ONE * spirit_scale
 	sprite.position = start.round()
-	sprite.frame = spirit_index % FRAME_COUNT
+	sprite.flip_h = direction < 0
+	sprite.frame = _rng.randi_range(0, FRAME_COUNT - 1)
 	sprite.visible = false
 
 	var color := spirit_tint
@@ -206,8 +303,8 @@ func _activate_spirit(
 		"elapsed": 0.0,
 		"delay": float(spirit_index) * _rng.randf_range(0.18, 0.27),
 		"duration": _rng.randf_range(
-				minf(flight_duration_min, flight_duration_max),
-				maxf(flight_duration_min, flight_duration_max)),
+				minf(ambient_flight_duration_min, ambient_flight_duration_max),
+				maxf(ambient_flight_duration_min, ambient_flight_duration_max)),
 		"start": start,
 		"control_a": control_a,
 		"control_b": control_b,
@@ -227,18 +324,21 @@ func _release_spirit(active_index: int) -> void:
 	_active_spirits.remove_at(active_index)
 
 
+func _clear_active_spirits() -> void:
+	for state: Dictionary in _active_spirits:
+		var sprite := state["sprite"] as Sprite2D
+		sprite.visible = false
+		sprite.rotation = 0.0
+	_active_spirits.clear()
+	_active_swarm_kind = &""
+
+
 func _flight_progress(linear_t: float) -> float:
-	if linear_t < 0.38:
-		return smoothstep(0.0, 0.38, linear_t) * 0.43
-	if linear_t < 0.56:
-		return lerpf(
-				0.43,
-				0.47,
-				smoothstep(0.38, 0.56, linear_t))
-	return lerpf(
-			0.47,
-			1.0,
-			smoothstep(0.56, 1.0, linear_t))
+	if linear_t < 0.34:
+		return smoothstep(0.0, 0.34, linear_t) * 0.39
+	if linear_t < 0.5:
+		return lerpf(0.39, 0.45, smoothstep(0.34, 0.5, linear_t))
+	return lerpf(0.45, 1.0, smoothstep(0.5, 1.0, linear_t))
 
 
 func _cubic_bezier(
@@ -286,20 +386,14 @@ static func _create_atlas() -> ImageTexture:
 
 static func _draw_spirit_frame(image: Image, frame_index: int) -> void:
 	var origin_x := frame_index * FRAME_WIDTH
-	var left_tips := [
-		Vector2i(1, 4),
-		Vector2i(2, 1),
-		Vector2i(0, 5),
-		Vector2i(2, 9),
+	var left_tips: Array[Vector2i] = [
+		Vector2i(1, 4), Vector2i(2, 1), Vector2i(0, 5), Vector2i(2, 9),
 	]
-	var right_tips := [
-		Vector2i(14, 4),
-		Vector2i(13, 1),
-		Vector2i(15, 5),
-		Vector2i(13, 9),
+	var right_tips: Array[Vector2i] = [
+		Vector2i(14, 4), Vector2i(13, 1), Vector2i(15, 5), Vector2i(13, 9),
 	]
-	var left_tip := left_tips[frame_index] as Vector2i
-	var right_tip := right_tips[frame_index] as Vector2i
+	var left_tip := left_tips[frame_index]
+	var right_tip := right_tips[frame_index]
 	_fill_triangle(
 			image,
 			Vector2i(origin_x + 6, 5),

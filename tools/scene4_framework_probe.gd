@@ -26,6 +26,9 @@ func _ready() -> void:
 	stage.set("_pnx", 0.0)
 	stage.call("_process", 0.0)
 	screen.call("_process", 0.0)
+	var achievement_spirits := stage.get_node("AchievementLeafSpirits")
+	var achievement_layer_started_inert := (
+			int(achievement_spirits.call("get_active_spirit_count")) == 0)
 	await _shot(ProbeOutput.path("scene4_framework_center.png"))
 	stage.set("_pnx", 1.0)
 	stage.call("_process", 0.0)
@@ -34,16 +37,6 @@ func _ready() -> void:
 	stage.set("_pnx", 0.0)
 	stage.call("_process", 0.0)
 	screen.call("_process", 0.0)
-	var leaf_spirits := stage.get_node("LeafSpirits")
-	var leaf_spirits_triggered := bool(leaf_spirits.call("trigger_swarm", 1))
-	var leaf_spirit_count := int(
-			leaf_spirits.call("get_active_spirit_count"))
-	await get_tree().create_timer(0.75).timeout
-	await _shot(ProbeOutput.path("scene4_leaf_spirits_early.png"))
-	await get_tree().create_timer(0.95).timeout
-	await _shot(ProbeOutput.path("scene4_leaf_spirits_mid.png"))
-	await get_tree().create_timer(1.15).timeout
-	await _shot(ProbeOutput.path("scene4_leaf_spirits_late.png"))
 	await get_tree().create_timer(2.4).timeout
 	await _shot(ProbeOutput.path("scene4_ambient_fx_later.png"))
 	await get_tree().create_timer(2.4).timeout
@@ -76,14 +69,15 @@ func _ready() -> void:
 			world_delta,
 			" error=",
 			sync_error,
-			" leaf_spirits=",
-			leaf_spirit_count)
+			" old_leaf_spirits_removed=",
+			not stage.has_node("LeafSpirits"),
+			" achievement_layer_started_inert=",
+			achievement_layer_started_inert)
 	BattleSetup.reset()
 	var passed := (
 			is_zero_approx(sync_error)
-			and leaf_spirits_triggered
-			and leaf_spirit_count >= 2
-			and leaf_spirit_count <= 3
+			and not stage.has_node("LeafSpirits")
+			and achievement_layer_started_inert
 	)
 	get_tree().quit(0 if passed else 1)
 

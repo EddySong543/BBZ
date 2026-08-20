@@ -23,7 +23,8 @@ const FOREGROUND_FOG_SHADER_PATH := "res://assets/shaders/canvas_env_scene4_fore
 const CHARACTER_SHADER_PATH := "res://assets/shaders/canvas_env_scene4_character_light.gdshader"
 const SHADOW_SHADER_PATH := "res://assets/shaders/canvas_env_scene4_root_contact_shadow.gdshader"
 const POSTFX_SHADER_PATH := "res://assets/shaders/post_fx_color_grade.gdshader"
-const LEAF_SPIRIT_SCRIPT_PATH := "res://src/ui/components/scene4_leaf_spirit_swarm.gd"
+const ACHIEVEMENT_SPIRIT_SCRIPT_PATH := (
+		"res://src/ui/components/scene4_leaf_spirit_swarm.gd")
 
 
 func test_scene4_has_an_independent_shared_battle_entry() -> void:
@@ -54,38 +55,47 @@ func test_scene4_has_an_independent_shared_battle_entry() -> void:
 	BattleSetup.reset()
 
 
-func test_scene4_leaf_spirits_are_low_frequency_procedural_pixel_creatures() -> void:
+func test_scene4_shares_one_pool_between_ambient_and_achievement_spirits() -> void:
 	var stage := (load(SCENE4_PATH) as PackedScene).instantiate()
 	add_child_autofree(stage)
 	await get_tree().process_frame
 
-	var spirits := stage.get_node("LeafSpirits")
+	assert_false(stage.has_node("LeafSpirits"))
+	var spirits := stage.get_node_or_null("AchievementLeafSpirits")
 	assert_not_null(spirits)
-	assert_eq(spirits.get_script().resource_path, LEAF_SPIRIT_SCRIPT_PATH)
-	assert_between(float(spirits.interval_min_sec), 22.0, 24.0)
-	assert_between(float(spirits.interval_max_sec), 36.0, 38.0)
-	assert_eq(int(spirits.spirit_count_min), 2)
-	assert_eq(int(spirits.spirit_count_max), 3)
-	assert_gte(float(spirits.spirit_scale_min), 2.2)
-	assert_lte(float(spirits.spirit_scale_max), 3.1)
-	assert_eq(int(spirits.call("get_pool_size")), 5)
+	if spirits != null:
+		assert_eq(spirits.get_script().resource_path,
+				ACHIEVEMENT_SPIRIT_SCRIPT_PATH)
+		assert_eq(int(spirits.call("get_pool_size")), 24)
+		assert_eq(int(spirits.call("get_active_spirit_count")), 0)
+		assert_true(bool(spirits.auto_ambient))
+		assert_eq(float(spirits.initial_delay_sec), 8.0)
+		assert_eq(float(spirits.interval_min_sec), 22.0)
+		assert_eq(float(spirits.interval_max_sec), 38.0)
+		assert_eq(int(spirits.ambient_spirit_count_min), 2)
+		assert_eq(int(spirits.ambient_spirit_count_max), 3)
+		assert_eq(float(spirits.ambient_flight_duration_min), 3.4)
+		assert_eq(float(spirits.ambient_flight_duration_max), 4.5)
+		assert_eq(float(spirits.ambient_spirit_scale_min), 2.3)
+		assert_eq(float(spirits.ambient_spirit_scale_max), 2.9)
+		assert_true(bool(spirits.call("is_ambient_timer_running")))
+	var top_leaves := stage.get_node("BackgroundTopLeaves2") as TextureRect
+	assert_null(top_leaves.get_script())
+	assert_eq(top_leaves.mouse_filter, Control.MOUSE_FILTER_IGNORE)
 
-	var source := FileAccess.get_file_as_string(LEAF_SPIRIT_SCRIPT_PATH)
-	assert_true(source.contains("Image.create"))
-	assert_true(source.contains("_cubic_bezier"))
-	assert_true(source.contains("_flight_progress"))
-	assert_false(source.contains("res://assets/"))
 
-	assert_true(bool(spirits.call("trigger_swarm", 1)))
+func test_scene4_ambient_spirits_return_and_achievement_swarm_preempts_them() -> void:
+	var stage := (load(SCENE4_PATH) as PackedScene).instantiate()
+	add_child_autofree(stage)
 	await get_tree().process_frame
+	var spirits := stage.get_node("AchievementLeafSpirits")
+
+	assert_true(bool(spirits.call("trigger_ambient_swarm")))
 	assert_between(int(spirits.call("get_active_spirit_count")), 2, 3)
-	var first_sprite := spirits.get_child(1) as Sprite2D
-	assert_not_null(first_sprite)
-	assert_not_null(first_sprite.texture)
-	assert_eq(first_sprite.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST)
-	assert_eq(first_sprite.hframes, 4)
-	assert_eq(first_sprite.texture.get_width() / first_sprite.hframes, 16)
-	assert_eq(first_sprite.texture.get_height(), 14)
+	assert_eq(String(spirits.call("get_active_swarm_kind")), "ambient")
+	assert_true(bool(spirits.call("trigger_achievement_swarm")))
+	assert_between(int(spirits.call("get_active_spirit_count")), 18, 24)
+	assert_eq(String(spirits.call("get_active_swarm_kind")), "achievement")
 
 
 func test_scene4_connects_formal_tree_assets_to_expected_layers() -> void:
@@ -118,7 +128,15 @@ func test_scene4_connects_formal_tree_assets_to_expected_layers() -> void:
 		assert_not_null(art.texture)
 		assert_eq(art.texture.resource_path, expected_assets[node_path])
 		assert_eq(art.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST)
-		assert_eq(art.mouse_filter, Control.MOUSE_FILTER_IGNORE)
+		if node_path in [
+			"RuinStone1",
+			"RuinStone2",
+			"RuinStone3",
+			"RuinStone4",
+		]:
+			assert_eq(art.mouse_filter, Control.MOUSE_FILTER_PASS)
+		else:
+			assert_eq(art.mouse_filter, Control.MOUSE_FILTER_IGNORE)
 		if node_path in replacement_dimensions:
 			assert_eq(
 					art.texture.get_size(),
@@ -170,18 +188,22 @@ func test_scene4_separates_platform_from_bottom_canopy_without_moving_authored_a
 	var shadow_material := depth_shadow.material as ShaderMaterial
 	assert_not_null(shadow_material)
 	assert_eq(shadow_material.shader.resource_path, DEPTH_GRADE_SHADER_PATH)
-	assert_lte(float(shadow_material.get_shader_parameter("brightness")), 0.4)
-	assert_gte(float(shadow_material.get_shader_parameter("palette_strength")), 0.9)
+	assert_between(float(shadow_material.get_shader_parameter("brightness")), 0.4, 0.44)
+	assert_between(float(shadow_material.get_shader_parameter("palette_strength")), 0.82, 0.86)
 
 	assert_gte(bottom_leaves.modulate.a, 0.99)
-	assert_between(float(bottom_material.get_shader_parameter("brightness")), 0.58, 0.62)
-	assert_between(float(bottom_material.get_shader_parameter("saturation")), 0.46, 0.5)
-	assert_between(float(bottom_material.get_shader_parameter("contrast")), 0.72, 0.76)
-	assert_between(float(bottom_material.get_shader_parameter("haze_strength")), 0.16, 0.2)
+	assert_between(float(bottom_material.get_shader_parameter("brightness")), 0.67, 0.71)
+	assert_between(float(bottom_material.get_shader_parameter("saturation")), 0.72, 0.76)
+	assert_between(float(bottom_material.get_shader_parameter("contrast")), 1.08, 1.12)
+	assert_between(float(bottom_material.get_shader_parameter("haze_strength")), 0.1, 0.14)
 	var bottom_mid := bottom_material.get_shader_parameter("palette_mid") as Color
 	var platform_mid := platform_material.get_shader_parameter("palette_mid") as Color
 	assert_lt(bottom_mid.g - bottom_mid.b, platform_mid.g - platform_mid.b)
-	assert_between(float(platform_material.get_shader_parameter("contrast")), 0.94, 0.97)
+	assert_between(float(platform_material.get_shader_parameter("brightness")), 0.94, 0.98)
+	assert_between(float(platform_material.get_shader_parameter("contrast")), 1.16, 1.2)
+	var platform_light := platform_material.get_shader_parameter("palette_light") as Color
+	assert_gt(platform_light.g, platform_light.r)
+	assert_gt(platform_light.r, platform_light.b)
 
 
 func test_scene4_grades_every_environment_asset_by_depth_role() -> void:
@@ -203,34 +225,37 @@ func test_scene4_grades_every_environment_asset_by_depth_role() -> void:
 		assert_not_null(material)
 		assert_not_null(material.shader)
 		assert_eq(material.shader.resource_path, DEPTH_GRADE_SHADER_PATH)
-		assert_lte(float(material.get_shader_parameter("brightness")), 0.9)
-		assert_lte(float(material.get_shader_parameter("saturation")), 0.8)
-		assert_gte(float(material.get_shader_parameter("palette_strength")), 0.65)
+		assert_lte(float(material.get_shader_parameter("brightness")), 0.98)
+		assert_lte(float(material.get_shader_parameter("saturation")), 0.82)
+		assert_gte(float(material.get_shader_parameter("palette_strength")), 0.84)
 		var palette_mid := material.get_shader_parameter("palette_mid") as Color
 		assert_gt(palette_mid.g, palette_mid.b)
-		assert_gt(palette_mid.b, palette_mid.r)
+		if node_name == "BattlePlatform":
+			assert_gt(palette_mid.r, palette_mid.b)
+		else:
+			assert_gt(palette_mid.b, palette_mid.r)
 
 	var far_forest_material := (
 			stage.get_node("FarForest") as TextureRect
 	).material as ShaderMaterial
 	assert_between(
 			float(far_forest_material.get_shader_parameter("brightness")),
-			0.74,
-			0.78)
+			0.72,
+			0.76)
 	assert_between(
 			float(far_forest_material.get_shader_parameter("saturation")),
-			0.48,
-			0.52)
+			0.72,
+			0.76)
 	assert_between(
 			float(far_forest_material.get_shader_parameter("contrast")),
-			0.6,
-			0.64)
+			1.08,
+			1.12)
 	assert_between(
 			float(far_forest_material.get_shader_parameter("haze_strength")),
-			0.36,
-			0.4)
+			0.1,
+			0.14)
 	var far_mid := far_forest_material.get_shader_parameter("palette_mid") as Color
-	assert_lte(absf(far_mid.g - far_mid.b), 0.03)
+	assert_between(far_mid.g - far_mid.b, 0.04, 0.07)
 	assert_true(bool(far_forest_material.get_shader_parameter(
 			"lower_alpha_fade_enabled")))
 	assert_between(
@@ -255,31 +280,31 @@ func test_scene4_grades_every_environment_asset_by_depth_role() -> void:
 	).material as ShaderMaterial
 	assert_between(
 			float(tree2_material.get_shader_parameter("brightness")),
-			0.65,
-			0.69)
+			0.69,
+			0.73)
 	assert_between(
 			float(tree2_material.get_shader_parameter("saturation")),
-			0.63,
-			0.69)
+			0.72,
+			0.76)
 	assert_between(
 			float(tree2_material.get_shader_parameter("contrast")),
-			0.82,
-			0.86)
+			1.08,
+			1.12)
 	assert_between(
 			float(tree2_material.get_shader_parameter("tint_strength")),
-			0.22,
-			0.3)
+			0.27,
+			0.31)
 	assert_between(
 			float(tree2_material.get_shader_parameter("haze_strength")),
-			0.15,
-			0.19)
+			0.03,
+			0.05)
 	assert_lt(
 			float(tree2_material.get_shader_parameter("brightness")),
 			float(tree1_material.get_shader_parameter("brightness")))
 	assert_lte(
 			float(tree2_material.get_shader_parameter("contrast")),
 			float(tree1_material.get_shader_parameter("contrast")))
-	assert_gt(
+	assert_eq(
 			float(tree2_material.get_shader_parameter("haze_strength")),
 			float(tree1_material.get_shader_parameter("haze_strength")))
 	for palette_parameter: String in [
@@ -300,7 +325,7 @@ func test_scene4_grades_every_environment_asset_by_depth_role() -> void:
 	assert_gt(sky_mid.g, sky_mid.b)
 	assert_gt(sky_light.get_luminance(), sky_mid.get_luminance())
 
-	var shared_relic_energy_color := Color(0.604, 0.682, 0.725, 1)
+	var shared_relic_energy_color := Color(0.62, 0.79, 0.94, 1)
 	for stone_name: String in [
 		"RuinStone1",
 		"RuinStone2",
@@ -313,8 +338,8 @@ func test_scene4_grades_every_environment_asset_by_depth_role() -> void:
 		assert_eq(stone_material.shader.resource_path, RELIC_GLOW_SHADER_PATH)
 		assert_between(
 				float(stone_material.get_shader_parameter("glow_strength")),
-				0.53,
-				0.58)
+				0.64,
+				0.7)
 		assert_between(
 				float(stone_material.get_shader_parameter("exposure")),
 				0.83,
@@ -339,20 +364,20 @@ func test_scene4_grades_every_environment_asset_by_depth_role() -> void:
 				0.15)
 		assert_between(
 				float(stone_material.get_shader_parameter("circuit_tail")),
-				0.33,
-				0.41)
+				0.19,
+				0.25)
 		assert_between(
 				float(stone_material.get_shader_parameter("base_charge")),
-				0.14,
-				0.19)
+				0.12,
+				0.16)
 		assert_eq(
 				float(stone_material.get_shader_parameter(
 						"energy_pixel_size_px")),
 				1.0)
 		assert_between(
 				float(stone_material.get_shader_parameter("motion_feather")),
-				0.05,
-				0.07)
+				0.04,
+				0.051)
 		assert_true(stone_material.shader.code.contains("hash11"))
 		assert_true(stone_material.shader.code.contains("vertical_segment"))
 		assert_true(stone_material.shader.code.contains("horizontal_segment"))
@@ -360,6 +385,9 @@ func test_scene4_grades_every_environment_asset_by_depth_role() -> void:
 		assert_true(stone_material.shader.code.contains("snapped_y"))
 		assert_true(stone_material.shader.code.contains("path_a_progress"))
 		assert_true(stone_material.shader.code.contains("energy_pixel_size"))
+		assert_true(stone_material.shader.code.contains("drift_a"))
+		assert_true(stone_material.shader.code.contains("interaction_flash"))
+		assert_false(stone_material.shader.code.contains("interaction_energy"))
 		assert_true(stone_material.shader.code.contains("front_fade_a"))
 		assert_true(stone_material.shader.code.contains("interior_gate"))
 		assert_true(stone_material.shader.code.contains("groove_color"))
@@ -431,20 +459,20 @@ func test_scene4_grades_every_environment_asset_by_depth_role() -> void:
 	assert_gte(background_bottom_leaves.modulate.a, 0.99)
 	assert_between(
 			float(background_bottom_material.get_shader_parameter("brightness")),
-			0.58,
-			0.62)
+			0.67,
+			0.71)
 	assert_between(
 			float(background_bottom_material.get_shader_parameter("saturation")),
-			0.46,
-			0.5)
-	assert_between(
-			float(background_bottom_material.get_shader_parameter("contrast")),
 			0.72,
 			0.76)
 	assert_between(
+			float(background_bottom_material.get_shader_parameter("contrast")),
+			1.08,
+			1.12)
+	assert_between(
 			float(background_bottom_material.get_shader_parameter("haze_strength")),
-			0.16,
-			0.2)
+			0.1,
+			0.14)
 	assert_between(
 			float(background_bottom_material.get_shader_parameter(
 					"alpha_cleanup_threshold")),
@@ -458,7 +486,7 @@ func test_scene4_grades_every_environment_asset_by_depth_role() -> void:
 
 	var foreground_tree_contracts: Dictionary[String, Dictionary] = {
 		"LeftTree2": {
-			"brightness": 0.68,
+			"brightness": 0.60,
 			"strength": 2.4,
 			"speed": 0.87,
 			"period": 7.22,
@@ -469,7 +497,7 @@ func test_scene4_grades_every_environment_asset_by_depth_role() -> void:
 			"y_max": 0.72,
 		},
 		"RightTree2": {
-			"brightness": 0.72,
+			"brightness": 0.62,
 			"strength": 2.1,
 			"speed": 0.58,
 			"period": 10.83,
@@ -551,9 +579,9 @@ func test_scene4_grades_every_environment_asset_by_depth_role() -> void:
 			(stage.get_node("BattlePlatform") as TextureRect).material
 			as ShaderMaterial
 	)
-	assert_between(float(platform_material.get_shader_parameter("brightness")), 0.8, 0.84)
-	assert_between(float(platform_material.get_shader_parameter("saturation")), 0.66, 0.72)
-	assert_between(float(platform_material.get_shader_parameter("contrast")), 0.94, 0.97)
+	assert_between(float(platform_material.get_shader_parameter("brightness")), 0.94, 0.98)
+	assert_between(float(platform_material.get_shader_parameter("saturation")), 0.8, 0.84)
+	assert_between(float(platform_material.get_shader_parameter("contrast")), 1.16, 1.2)
 	assert_between(float(platform_material.get_shader_parameter("haze_strength")), 0.03, 0.06)
 
 
@@ -732,6 +760,9 @@ func test_scene4_reuses_character_geometry_but_owns_environment_materials() -> v
 		var forest_color := material.get_shader_parameter("forest_ambient_color") as Color
 		assert_gt(forest_color.g, forest_color.r)
 		assert_gt(forest_color.g, forest_color.b)
+		var rim_color := material.get_shader_parameter("rim_color") as Color
+		assert_gt(rim_color.b, rim_color.g)
+		assert_gt(rim_color.g, rim_color.r)
 		light_directions.append(material.get_shader_parameter("light_dir") as Vector2)
 		scene_exposures.append(
 				float(material.get_shader_parameter("scene_exposure")))
@@ -757,7 +788,12 @@ func test_scene4_reuses_character_geometry_but_owns_environment_materials() -> v
 	var post_material := post_fx.material as ShaderMaterial
 	assert_not_null(post_material)
 	assert_eq(post_material.shader.resource_path, POSTFX_SHADER_PATH)
-	assert_lte(float(post_material.get_shader_parameter("tint_strength")), 0.12)
+	assert_almost_eq(float(post_material.get_shader_parameter("brightness")), 0.99, 0.001)
+	assert_almost_eq(float(post_material.get_shader_parameter("contrast")), 1.14, 0.001)
+	assert_almost_eq(float(post_material.get_shader_parameter("saturation")), 1.0, 0.001)
+	assert_almost_eq(float(post_material.get_shader_parameter("tint_strength")), 0.04, 0.001)
+	assert_almost_eq(float(post_material.get_shader_parameter("split_strength")), 0.11, 0.001)
+	assert_eq(float(post_material.get_shader_parameter("grain_amount")), 0.0)
 
 	for dust_name: String in ["ForeDust", "LowerDust"]:
 		var dust := screen.get_node(dust_name) as GPUParticles2D

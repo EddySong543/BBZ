@@ -47,6 +47,11 @@ uniform float shape_wave_feather : hint_range(0.0, 0.2, 0.005) = 0.06;
 uniform float gust_strength : hint_range(0.0, 1.0, 0.01) = 0.0;
 uniform float gust_direction : hint_range(-1.0, 1.0, 0.1) = 1.0;
 uniform float gust_px : hint_range(0.0, 16.0, 0.1) = 7.0;
+uniform float crop_circle_strength : hint_range(0.0, 1.0, 0.01) = 0.0;
+uniform float crop_circle_reveal : hint_range(0.0, 1.0, 0.01) = 0.0;
+uniform vec2 crop_circle_center = vec2(0.5, 0.55);
+uniform float crop_circle_depth_scale : hint_range(0.7, 1.1, 0.01) = 1.0;
+uniform vec2 crop_circle_half_size = vec2(0.36, 0.085);
 
 
 float smooth_triangle_wave(float value) {
@@ -134,6 +139,64 @@ vec2 traveling_shape_wave(vec2 uv) {
 }
 
 
+vec2 crop_circle_space(vec2 screen_uv) {
+	vec2 half_size = crop_circle_half_size * crop_circle_depth_scale;
+	return (screen_uv - crop_circle_center) / max(half_size, vec2(0.001));
+}
+
+
+float crop_circle_mask(vec2 screen_uv) {
+	vec2 circle_uv = crop_circle_space(screen_uv);
+	float radius = length(circle_uv);
+	float outer_oval = 1.0 - smoothstep(
+			0.12,
+			0.26,
+			abs(radius - 0.88));
+	vec2 inner_space = vec2(
+			(circle_uv.x + 0.08) / 0.64,
+			circle_uv.y / 0.7);
+	float inner_oval = 1.0 - smoothstep(
+			0.12,
+			0.25,
+			abs(length(inner_space) - 0.64));
+	float upper_pressed_lane = 1.0 - smoothstep(
+			0.1,
+			0.26,
+			abs(circle_uv.y - 0.2 - sin(circle_uv.x * 3.7) * 0.1));
+	float lower_pressed_lane = 1.0 - smoothstep(
+			0.1,
+			0.26,
+			abs(circle_uv.y + 0.2 + sin(circle_uv.x * 3.7) * 0.1));
+	float lane_extent = 1.0 - smoothstep(0.58, 0.82, abs(circle_uv.x));
+	float pressed_lane = max(upper_pressed_lane, lower_pressed_lane) * lane_extent;
+	float center_lay = (1.0 - smoothstep(
+			0.22,
+			0.5,
+			length(vec2(circle_uv.x / 0.5, circle_uv.y / 0.68)))) * 0.7;
+	float broken_rows = mix(
+			0.92,
+			1.0,
+			smoothstep(-0.25, 0.45, sin(circle_uv.x * 27.0 + circle_uv.y * 9.0)));
+	float formation = max(
+			max(outer_oval, inner_oval * 0.94),
+			max(pressed_lane * 0.88, center_lay));
+	float formation_edge = 1.0 - smoothstep(0.94, 1.06, radius);
+	return clamp(formation * formation_edge * broken_rows, 0.0, 1.0);
+}
+
+
+vec2 crop_circle_uv_offset(vec2 screen_uv, float pressed_mask) {
+	vec2 circle_uv = crop_circle_space(screen_uv);
+	float radius = max(length(circle_uv), 0.001);
+	vec2 radial = circle_uv / radius;
+	vec2 tangent = vec2(-radial.y, radial.x);
+	float comb_direction = sin(circle_uv.x * 5.4 + circle_uv.y * 2.8);
+	vec2 laid_wheat = tangent * comb_direction * vec2(0.014, 0.008);
+	laid_wheat += vec2(radial.x * 0.006, 0.019 + abs(radial.x) * 0.006);
+	return laid_wheat * pressed_mask;
+}
+
+
 void vertex() {
 	float geometry_mask = smoothstep(
 			geometry_y_start - geometry_y_feather,
@@ -179,6 +242,7 @@ void vertex() {
 	offset_px += detail_px * detail_motion;
 	offset_px += gust_strength * gust_px * gust_motion;
 	VERTEX.x += offset_px * bend_weight * edge_pin;
+
 	VERTEX.x += shape_motion.y * shape_wave_horizontal_px
 			* wave_geometry_mask;
 	VERTEX.y -= shape_motion.x * shape_wave_vertical_px
@@ -191,7 +255,30 @@ void fragment() {
 		discard;
 	}
 	vec2 source_uv = vec2(mix(UV.x, 1.0 - UV.x, mirror_texture), UV.y);
+	vec2 crop_space = crop_circle_space(SCREEN_UV);
+	float crop_radius = length(crop_space);
+	float crop_pattern = crop_circle_mask(SCREEN_UV);
+	float crop_reveal_gate = smoothstep(
+			crop_radius - 0.14,
+			crop_radius + 0.08,
+			crop_circle_reveal * 1.08);
+	float crop_pressed = crop_pattern * crop_reveal_gate * crop_circle_strength;
+	vec2 crop_source_uv = clamp(
+			source_uv + crop_circle_uv_offset(SCREEN_UV, crop_pressed),
+			vec2(0.001),
+			vec2(0.999));
+	vec2 secondary_crop_source_uv = clamp(
+			source_uv + crop_circle_uv_offset(SCREEN_UV, crop_pressed)
+					* vec2(-0.72, 1.48),
+			vec2(0.001),
+			vec2(0.999));
 	vec4 source_texel = texture(TEXTURE, source_uv);
+	vec4 combed_source = texture(TEXTURE, crop_source_uv);
+	vec4 secondary_combed_source = texture(TEXTURE, secondary_crop_source_uv);
+	float comb_variation = 0.28 + 0.2 * (
+			0.5 + 0.5 * sin(crop_space.x * 8.2 - crop_space.y * 3.4));
+	combed_source = mix(combed_source, secondary_combed_source, comb_variation);
+	source_texel = mix(source_texel, combed_source, crop_pressed * 0.96);
 	vec4 texel = source_texel * COLOR;
 	float field_mask = field_band_mask(UV.y) * texel.a;
 	float source_highlight = source_highlight_mask(source_texel) * field_mask;
@@ -222,5 +309,9 @@ void fragment() {
 			texel.rgb,
 			depth_haze_color.rgb,
 			far_depth_mask * depth_haze_strength);
+
+	float orientation_light = 0.62 + 0.8 * (
+			0.5 + 0.5 * sin(crop_space.x * 3.6 - crop_space.y * 1.8));
+	texel.rgb *= mix(1.0, orientation_light, crop_pressed);
 	COLOR = texel;
 }

@@ -60,6 +60,10 @@ var _cloud_puffs: Array[Dictionary] = []
 var _event_active := false
 
 
+static func shared_fish_atlas() -> ImageTexture:
+	return _fish_atlas()
+
+
 func _ready() -> void:
 	_rng.seed = int(Time.get_ticks_usec()) + seed_offset
 	_create_pool()

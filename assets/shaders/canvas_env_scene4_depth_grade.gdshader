@@ -86,8 +86,7 @@ void fragment() {
 			sway_depth_influence);
 	float displacement_px = sway_wave * sway_strength_px
 			* sway_weight * y_gate * x_gate;
-	// Blend only between the two neighbouring source pixels. This removes the
-	// old 6 fps stepping while retaining crisp vertical pixel rows.
+	// The approved passive wind keeps a horizontal source-pixel edge blend.
 	vec2 source_pixel = UV * source_size - vec2(displacement_px, 0.0);
 	vec2 base_pixel = floor(source_pixel);
 	float smooth_blend_x = smoothstep(0.12, 0.88, fract(source_pixel.x));
@@ -96,12 +95,12 @@ void fragment() {
 			snapped_blend_x,
 			smooth_blend_x,
 			sway_blend_strength);
-	vec2 sample_uv_a = (
+	vec2 sample_uv_a = clamp((
 			base_pixel + vec2(0.5, 0.5)
-	) / max(source_size, vec2(1.0));
-	vec2 sample_uv_b = (
+	) / max(source_size, vec2(1.0)), vec2(0.0), vec2(1.0));
+	vec2 sample_uv_b = clamp((
 			base_pixel + vec2(1.5, 0.5)
-	) / max(source_size, vec2(1.0));
+	) / max(source_size, vec2(1.0)), vec2(0.0), vec2(1.0));
 	vec4 source = texture(TEXTURE, UV);
 	if (sway_strength_px > 0.001) {
 		source = mix(

@@ -31,6 +31,8 @@
 [ext_resource type="Shader" uid="uid://c4os1ia3mvhmi" path="res://assets/shaders/canvas_env_scene2_waterfall_mountain_grade.gdshader" id="31_waterfall_mountain_grade"]
 [ext_resource type="Shader" uid="uid://dx5fwcmstbdf1" path="res://assets/shaders/canvas_env_scene2_tyndall.gdshader" id="32_tyndall"]
 [ext_resource type="Shader" uid="uid://bklxb5l1aw6jg" path="res://assets/shaders/canvas_env_scene2_bridge_light.gdshader" id="33_bridge_light"]
+[ext_resource type="Script" path="res://src/ui/components/scene2_water_interaction.gd" id="34_water_interaction"]
+[ext_resource type="Script" path="res://src/ui/components/scene2_waterfall_fish_leap.gd" id="35_fish_leap"]
 
 [sub_resource type="ShaderMaterial" id="SkyGradeMat"]
 shader = ExtResource("14_sky_grade")
@@ -1099,6 +1101,48 @@ color = Color(0, 0, 0, 0)
 metadata/parallax_factor = 0.18
 metadata/_edit_lock_ = true
 
+[node name="WaterfallClickSplash" type="Control" parent="."]
+layout_mode = 0
+offset_left = 555.0
+offset_top = -150.0
+offset_right = 1275.0
+offset_bottom = 1066.0
+mouse_filter = 1
+script = ExtResource("34_water_interaction")
+water_target_path = NodePath("../Waterfall")
+max_effects = 4
+effect_lifetime = 0.75
+click_cooldown = 0.1
+pixel_size = 4.0
+waterfall_hit_y_min = 0.12
+waterfall_hit_y_max = 0.81
+bright_color = Color(0.62, 0.82, 0.8, 0.82)
+foam_color = Color(0.92, 0.94, 0.84, 0.94)
+shadow_color = Color(0.08, 0.25, 0.29, 0.46)
+metadata/parallax_factor = 0.18
+metadata/_edit_lock_ = true
+
+[node name="WaterfallFishLeap" type="Control" parent="."]
+texture_filter = 1
+layout_mode = 0
+offset_left = 555.0
+offset_top = -150.0
+offset_right = 1275.0
+offset_bottom = 1066.0
+mouse_filter = 2
+script = ExtResource("35_fish_leap")
+water_target_path = NodePath("../Waterfall")
+trigger_clicks = 3
+trigger_chance = 0.25
+golden_fish_chance = 0.05
+pity_clicks = 7
+leap_lifetime = 1.2
+retrigger_cooldown = 6.0
+jump_height = 172.0
+pixel_size = 4.0
+metadata/parallax_factor = 0.18
+metadata/_edit_lock_ = true
+
 [node name="WaterfallRidgeContact" type="TextureRect" parent="." unique_id=146865893]
 texture_filter = 1
 material = SubResource("WaterfallMountainGroupMat")
@@ -1350,6 +1394,26 @@ color = Color(0, 0, 0, 0)
 metadata/parallax_factor = 1.18
 metadata/_edit_lock_ = true
 
+[node name="RiverClickRipple" type="Control" parent="."]
+layout_mode = 0
+offset_left = -48.0
+offset_top = 867.46
+offset_right = 1968.0
+offset_bottom = 1084.5515
+mouse_filter = 1
+script = ExtResource("34_water_interaction")
+effect_kind = 1
+water_target_path = NodePath("../River")
+max_effects = 6
+effect_lifetime = 1.25
+click_cooldown = 0.12
+pixel_size = 4.0
+bright_color = Color(0.48, 0.72, 0.72, 0.72)
+foam_color = Color(0.74, 0.86, 0.8, 0.68)
+shadow_color = Color(0.06, 0.2, 0.24, 0.46)
+metadata/parallax_factor = 1.18
+metadata/_edit_lock_ = true
+
 [node name="FogFront" type="ColorRect" parent="." unique_id=1843815292]
 material = SubResource("FogFrontMat")
 layout_mode = 0
@@ -1405,3 +1469,5 @@ local_coords = true
 process_material = SubResource("PollenNearMat")
 metadata/parallax_factor = 1.5
 metadata/_edit_lock_ = true
+
+[connection signal="effect_spawned" from="WaterfallClickSplash" to="WaterfallFishLeap" method="_on_waterfall_effect_spawned"]

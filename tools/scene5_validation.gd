@@ -19,6 +19,8 @@ const CHAFF_ATLAS_PATH := (
 		"res://assets/scenes/scene5/scene5_wind_chaff_atlas.png")
 const WIND_SCRIPT_PATH := (
 		"res://src/ui/components/scene5_wind_field.gd")
+const CROP_CIRCLE_SCRIPT_PATH := (
+		"res://src/ui/components/scene5_crop_circle.gd")
 const WHEAT_MESH_SCRIPT_PATH := (
 		"res://src/ui/components/scene5_wheat_mesh.gd")
 const PIXEL_CLOUD_SHADER_PATH := (
@@ -36,6 +38,8 @@ func _initialize() -> void:
 
 	if ResourceLoader.exists(SCENE5_PATH):
 		var stage := (load(SCENE5_PATH) as PackedScene).instantiate() as BattleStage
+		root.add_child(stage)
+		await process_frame
 		var expected_layers: Array[String] = [
 			"Sky",
 			"SunRayField",
@@ -44,8 +48,12 @@ func _initialize() -> void:
 			"HorizonHaze",
 			"DistantWheat",
 			"MidFarWheat",
+			"ClickLeavesMidFar",
 			"FarWheat",
+			"ClickLeavesFar",
 			"FarWheatCoverBack",
+			"ClickLeavesCover",
+			"CropCircle",
 			"MidFieldHaze",
 			"Atmosphere",
 			"AmbientChaff",
@@ -222,6 +230,124 @@ func _initialize() -> void:
 		if float(near_material.get_shader_parameter("sway_px")) < 5.0 \
 				or float(near_material.get_shader_parameter("gust_px")) < 8.0:
 			failures.append("Scene5 near wheat response is still too restrained")
+		if near_material.shader.code.contains("click_bend"):
+			failures.append("Scene5 near wheat still contains removed click bending")
+		var click_leaf_names: Array[String] = [
+			"ClickLeavesMidFar",
+			"ClickLeavesFar",
+			"ClickLeavesCover",
+		]
+		var last_click_factor := 0.0
+		var last_click_alpha := 0.0
+		var expected_click_amounts: Array[int] = [6, 8, 10]
+		for index: int in click_leaf_names.size():
+			var leaf_name := click_leaf_names[index]
+			var click_particles := stage.get_node_or_null(leaf_name) as CPUParticles2D
+			if click_particles == null or not click_particles.one_shot \
+					or click_particles.texture == null \
+					or click_particles.texture.get_size() != Vector2(6.0, 3.0):
+				failures.append("Scene5 %s far streak particles are not connected" % leaf_name)
+				continue
+			var click_factor := float(click_particles.get_meta("parallax_factor"))
+			if click_factor <= last_click_factor \
+					or click_particles.amount != expected_click_amounts[index] \
+					or click_particles.lifetime > 1.8 \
+					or click_particles.fixed_fps != 0 \
+					or not click_particles.fract_delta \
+					or click_particles.direction.y != -1.0 \
+					or click_particles.initial_velocity_max > 34.0 \
+					or click_particles.gravity.y < 14.0 \
+					or click_particles.emission_shape \
+							!= CPUParticles2D.EMISSION_SHAPE_RECTANGLE \
+					or click_particles.color.a <= last_click_alpha \
+					or click_particles.color.a > 0.62:
+				failures.append("Scene5 %s lacks visible depth-matched pixel streaks" % leaf_name)
+			last_click_factor = click_factor
+			last_click_alpha = click_particles.color.a
+		var click_leaf_paths: Array[NodePath] = wind_field.get("click_leaf_paths") \
+				if wind_field != null else []
+		if click_leaf_paths.size() != 9 \
+				or not wind_field.has_signal("far_wheat_clicked") \
+				or not wind_field.has_method("try_trigger_at_canvas_position") \
+				or wind_field.has_method("trigger_near_click") \
+				or not wind_field.has_method("trigger_far_leaves") \
+				or not wind_field.has_method("get_streak_group_count") \
+				or int(wind_field.call("get_streak_group_count")) != 3 \
+				or not is_equal_approx(
+						float(wind_field.get("click_repeat_radius_px")), 160.0):
+			failures.append("Scene5 click controller is incomplete")
+		var wind_source := FileAccess.get_file_as_string(WIND_SCRIPT_PATH)
+		if not wind_source.contains("_group_is_active") \
+				or not wind_source.contains("click_repeat_radius_px"):
+			failures.append("Scene5 far streak pool cannot separate active locations")
+		var crop_circle := stage.get_node_or_null("CropCircle")
+		var crop_script := crop_circle.get_script() as Script \
+				if crop_circle != null else null
+		var crop_layer_paths: Array[NodePath] = crop_circle.get(
+				"wheat_layer_paths") if crop_circle != null else []
+		if crop_circle == null or crop_script == null \
+				or crop_script.resource_path != CROP_CIRCLE_SCRIPT_PATH \
+				or crop_layer_paths.size() != 3 \
+				or int(crop_circle.get("required_clicks")) != 5 \
+				or not is_equal_approx(
+						float(crop_circle.get("trigger_probability")), 0.08) \
+				or not is_equal_approx(
+						float(crop_circle.get("achievement_window_sec")), 8.0) \
+				or not is_equal_approx(
+						float(crop_circle.get("cluster_radius_px")), 320.0) \
+				or not is_equal_approx(
+						float(crop_circle.get("reveal_duration_sec")), 1.2) \
+				or not is_equal_approx(
+						float(crop_circle.get("hold_duration_sec")), 4.5) \
+				or not is_equal_approx(
+						float(crop_circle.get("recover_duration_sec")), 1.5) \
+				or not crop_circle.has_method("is_achievement_completed") \
+				or not crop_circle.has_method("is_visual_active"):
+			failures.append("Scene5 crop-circle achievement contract is incomplete")
+		var crop_source := FileAccess.get_file_as_string(CROP_CIRCLE_SCRIPT_PATH)
+		if not crop_source.contains("_rng.randf()") \
+				or crop_source.contains("cooldown"):
+			failures.append("Scene5 crop circle is not a random low-probability secret")
+		var crop_depth_scale := 0.0
+		for layer_name: String in [
+			"MidFarWheat",
+			"FarWheat",
+			"FarWheatCoverBack",
+		]:
+			var crop_material := (stage.get_node(layer_name) as CanvasItem).material \
+					as ShaderMaterial
+			var depth_scale := float(crop_material.get_shader_parameter(
+					"crop_circle_depth_scale"))
+			var half_size := crop_material.get_shader_parameter(
+					"crop_circle_half_size") as Vector2
+			if depth_scale <= crop_depth_scale \
+					or half_size.x < 0.34 \
+					or half_size.y > 0.1 \
+					or half_size.x / maxf(half_size.y, 0.001) < 3.5 \
+					or float(crop_material.get_shader_parameter(
+							"crop_circle_strength")) != 0.0 \
+					or float(crop_material.get_shader_parameter(
+							"crop_circle_reveal")) != 0.0:
+				failures.append(
+						"Scene5 crop circle does not span three ordered wheat depths")
+			crop_depth_scale = depth_scale
+		if not near_material.shader.code.contains("crop_circle_mask") \
+				or not near_material.shader.code.contains("crop_circle_uv_offset") \
+				or not near_material.shader.code.contains(
+						"texture(TEXTURE, crop_source_uv)") \
+				or not near_material.shader.code.contains("SCREEN_UV") \
+				or near_material.shader.code.contains("pressed_gold"):
+			failures.append(
+					"Scene5 crop circle is not integrated into the source wheat texture")
+		var sky_input := stage.get_node("Sky") as Control
+		var platform_input := stage.get_node("BattlePlatform") as Control
+		if wind_field.get("click_input_target_path") != NodePath("../Sky") \
+				or sky_input.mouse_filter != Control.MOUSE_FILTER_PASS \
+				or platform_input.mouse_filter != Control.MOUSE_FILTER_IGNORE \
+				or not wind_source.contains("func _on_click_input_gui_input") \
+				or wind_source.contains("leaf_tween") \
+				or wind_source.contains("func _unhandled_input"):
+			failures.append("Scene5 click response bypasses the real GUI input path")
 		var ambient := stage.get_node_or_null("AmbientChaff") as GPUParticles2D
 		var gust := stage.get_node_or_null("GustChaff") as GPUParticles2D
 		for particles: GPUParticles2D in [ambient, gust]:
