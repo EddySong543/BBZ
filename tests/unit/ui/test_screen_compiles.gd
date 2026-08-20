@@ -780,37 +780,79 @@ func test_unified_codex_frames_reduced_book_on_smoky_backdrop() -> void:
 			"烟褐背景保持比例覆盖 1920x1080")
 	assert_eq(backdrop.mouse_filter, Control.MOUSE_FILTER_IGNORE,
 			"背景不拦截书页与侧签输入")
+	var backdrop_material := backdrop.material as ShaderMaterial
+	assert_not_null(backdrop_material, "烟褐背景使用独立微动效材质")
+	if backdrop_material != null:
+		assert_eq(backdrop_material.shader.resource_path,
+				"res://assets/shaders/canvas_ui_codex_backdrop_motion.gdshader")
+		assert_almost_eq(float(backdrop_material.get_shader_parameter("drift_pixels")),
+				4.0, 0.001, "背景纹理总漂移控制在 4px")
+		assert_lte(float(backdrop_material.get_shader_parameter("moving_mix")), 0.1,
+				"移动层只占一成以内，不抢书页注意力")
+		assert_lte(float(backdrop_material.get_shader_parameter("breathe_strength")), 0.015,
+				"中心呼吸光保持克制")
+	var backdrop_image := backdrop.texture.get_image()
+	var backdrop_center := backdrop_image.get_pixel(
+			int(backdrop_image.get_width() / 2.0), int(backdrop_image.get_height() / 2.0))
+	var backdrop_corner := backdrop_image.get_pixel(10, 10)
+	assert_gt(backdrop_center.r, backdrop_center.g,
+			"烟褐中心保持暖红分量高于绿色")
+	assert_gt(backdrop_center.g, backdrop_center.b,
+			"烟褐中心不偏蓝灰")
+	assert_gt(backdrop_corner.r + backdrop_corner.g + backdrop_corner.b, 0.3,
+			"背景边缘仍是可见烟褐色而不是纯黑")
+	assert_gt(backdrop_center.r + backdrop_center.g + backdrop_center.b,
+			backdrop_corner.r + backdrop_corner.g + backdrop_corner.b,
+			"书本背后仅做克制的中心提亮")
 	assert_eq(host.position, UnifiedCodexScreen.BOOK_ORIGIN,
 			"书本左侧留出真实侧签空间")
 	assert_eq(host.size, Vector2(1920, 1080), "内部书页继续使用原始设计坐标")
 	assert_eq(host.scale, UnifiedCodexScreen.BOOK_SCALE,
 			"英雄与道具共享同一缩书比例")
-	assert_eq(host.size * host.scale, Vector2(1680, 945),
-			"书本显示尺寸锁定为 1680x945")
-	assert_eq(book_shadow.position, UnifiedCodexScreen.BOOK_ORIGIN + Vector2(12, 12),
-			"接触影只向右下偏移 12px")
-	assert_eq(book_shadow.size, Vector2(1680, 945),
+	assert_eq(UnifiedCodexScreen.BOOK_ORIGIN, Vector2(230, 130),
+			"书本按通过预览居中并留出完整暖色边距")
+	assert_eq(UnifiedCodexScreen.BOOK_SCALE, Vector2(0.76, 0.76),
+			"书本从过大的 87.5% 回到预览约 76% 占比")
+	assert_almost_eq((host.size * host.scale).x, 1459.2, 0.01)
+	assert_almost_eq((host.size * host.scale).y, 820.8, 0.01)
+	assert_eq(book_shadow.position, UnifiedCodexScreen.BOOK_ORIGIN + Vector2(14, 14),
+			"接触影按较小书本克制右下偏移")
+	assert_eq(book_shadow.size, host.size * host.scale,
 			"接触影与缩小后的书本边界一致")
 	assert_gt(book_shadow.color.a, 0.0, "烟褐背景上保留克制的书本接触影")
 	assert_eq(chapter_hero.text, "英雄")
 	assert_eq(chapter_item.text, "道具")
+	var hero_idle_art := chapter_hero.get_node("IdleArt") as TextureRect
+	var hero_selected_art := chapter_hero.get_node("SelectedArt") as TextureRect
+	var item_idle_art := chapter_item.get_node("IdleArt") as TextureRect
+	var item_selected_art := chapter_item.get_node("SelectedArt") as TextureRect
+	assert_false(hero_idle_art.visible, "英雄选中时不叠加灰暗未选中纸签")
+	assert_true(hero_selected_art.visible, "英雄选中时使用加宽加高的亮纸签")
+	assert_true(item_idle_art.visible, "道具未选中时使用缩短并藏入书后的纸签")
+	assert_false(item_selected_art.visible)
+	assert_eq(hero_selected_art.texture.resource_path,
+			"res://assets/ui/codex/bookmark_chapter_selected.png")
+	assert_eq(hero_idle_art.texture.resource_path,
+			"res://assets/ui/codex/bookmark_chapter_idle.png")
+	assert_not_null(chapter_hero.get_node_or_null("ChapterIcon"),
+			"主签保留通过预览中的图形索引")
 	assert_lt(normal.size.x, chapter_item.size.x, "稀有度子标签比主章节标签更小")
 	assert_gt(normal.position.x + rarity_group.position.x, chapter_item.position.x,
 			"稀有度子标签向书页内缩，形成二级层级")
 	assert_lt(chapter_hero.position.x, UnifiedCodexScreen.BOOK_ORIGIN.x,
 			"章节签主体位于缩书后释放的左侧背景区")
 	assert_lte(chapter_hero.position.x + chapter_hero.size.x,
-			UnifiedCodexScreen.BOOK_ORIGIN.x + 40.0,
-			"选中章节签只有根部插入书封，不挤占左页内容")
+			UnifiedCodexScreen.BOOK_ORIGIN.x + 50.0,
+			"主签点击区根部位于书封下方，不挤占左页内容")
 	assert_lte(chapter_item.position.x + chapter_item.size.x,
-			UnifiedCodexScreen.BOOK_ORIGIN.x + 60.0,
-			"未选章节签向书内收起，但仍停在封皮区")
+			UnifiedCodexScreen.BOOK_ORIGIN.x + 50.0,
+			"两种状态共用稳定点击区并由书封遮住插入根部")
 	assert_lte(normal.position.x + rarity_group.position.x + normal.size.x,
 			UnifiedCodexScreen.BOOK_ORIGIN.x + 24.0,
 			"稀有度小侧签保持在背景边距，只让根部藏入封皮")
 	assert_false(rarity_group.visible, "英雄图鉴中稀有度标签保持收起")
-	assert_lt(chapter_hero.position.x, chapter_item.position.x,
-			"选中主签向左抽出，未选中主签向右藏入书页")
+	assert_eq(chapter_hero.position.x, chapter_item.position.x,
+			"主签点击区域固定，选中与未选中差异由独立纸签资产表达")
 	assert_eq(chapter_hero.scale, Vector2.ONE, "侧签切换不使用破坏真像素的缩放动效")
 	var hero_gallery := screen.call("get_gallery", 0) as Control
 	assert_not_null(hero_gallery)
@@ -821,13 +863,19 @@ func test_unified_codex_frames_reduced_book_on_smoky_backdrop() -> void:
 	screen.call("show_section", 1)
 	assert_true(rarity_group.visible, "进入道具图鉴后展开普通/稀有/传说快速索引")
 	await get_tree().create_timer(0.28).timeout
-	assert_lt(chapter_item.position.x, chapter_hero.position.x,
-			"切到道具后，道具签向左抽出、英雄签向右收回")
+	assert_true(item_selected_art.visible, "切到道具后切换为加宽加高的选中纸签")
+	assert_false(item_idle_art.visible)
+	assert_true(hero_idle_art.visible, "英雄签同步切回较短的未选中纸签")
+	assert_false(hero_selected_art.visible)
 	assert_eq((rarity_group.get_node("Normal") as Button).position.y, 0.0)
-	assert_eq((rarity_group.get_node("Rare") as Button).position.y, 34.0)
-	assert_eq((rarity_group.get_node("Legendary") as Button).position.y, 68.0)
-	assert_eq((rarity_group.get_node("Normal") as Button).size.y, 30.0,
+	assert_eq((rarity_group.get_node("Rare") as Button).position.y, 52.0)
+	assert_eq((rarity_group.get_node("Legendary") as Button).position.y, 104.0)
+	assert_eq((rarity_group.get_node("Normal") as Button).size.y, 48.0,
 			"稀有度签收紧为连续的页码索引组")
+	var normal_selected_art := normal.get_node("SelectedArt") as TextureRect
+	var rare_idle_art := (rarity_group.get_node("Rare") as Button).get_node("IdleArt") as TextureRect
+	assert_true(normal_selected_art.visible, "普通档选中签比未选中二级签多露一段")
+	assert_true(rare_idle_art.visible, "其余稀有度保持较短未选中状态")
 	var item_gallery := screen.call("get_gallery", 1) as Control
 	assert_not_null(item_gallery)
 	assert_eq(item_gallery.position, Vector2.ZERO)
@@ -861,8 +909,10 @@ func test_unified_codex_frames_reduced_book_on_smoky_backdrop() -> void:
 
 func test_codex_bookmark_assets_are_hard_edge_true_pixel_pngs() -> void:
 	var specs := {
-		"res://assets/ui/codex/bookmark_chapter_left.png": Vector2i(148, 48),
-		"res://assets/ui/codex/bookmark_rarity_left.png": Vector2i(102, 32),
+		"res://assets/ui/codex/bookmark_chapter_idle.png": Vector2i(184, 72),
+		"res://assets/ui/codex/bookmark_chapter_selected.png": Vector2i(184, 72),
+		"res://assets/ui/codex/bookmark_rarity_idle.png": Vector2i(116, 48),
+		"res://assets/ui/codex/bookmark_rarity_selected.png": Vector2i(116, 48),
 	}
 	for path: String in specs:
 		assert_true(FileAccess.file_exists(path), "%s 存在" % path)
@@ -874,10 +924,16 @@ func test_codex_bookmark_assets_are_hard_edge_true_pixel_pngs() -> void:
 		assert_eq(image.get_pixel(0, 0).a, 0.0, "%s 外露左上角削角" % path)
 		assert_eq(image.get_pixel(0, image.get_height() - 1).a, 0.0,
 				"%s 外露左下角削角" % path)
-		assert_eq(image.get_pixel(image.get_width() - 1, 0).a, 1.0,
-				"%s 插入书页的右上角保持平直实心" % path)
-		assert_eq(image.get_pixel(image.get_width() - 1, image.get_height() - 1).a, 1.0,
-				"%s 插入书页的右下角保持平直实心" % path)
+		var selected_asset := path.ends_with("selected.png")
+		var first_opaque_x := image.get_width()
+		for x: int in image.get_width():
+			if image.get_pixel(x, int(image.get_height() / 2.0)).a > 0.0:
+				first_opaque_x = x
+				break
+		if selected_asset:
+			assert_lte(first_opaque_x, 4, "%s 选中态完整向左抽出" % path)
+		else:
+			assert_gte(first_opaque_x, 18, "%s 未选中态明显藏入书页" % path)
 		var hard_alpha := true
 		for y: int in image.get_height():
 			for x: int in image.get_width():

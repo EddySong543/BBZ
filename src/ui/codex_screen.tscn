@@ -1,15 +1,30 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://src/ui/codex_screen.gd" id="1_script"]
-[ext_resource type="Texture2D" path="res://assets/ui/codex/bookmark_chapter_left.png" id="2_chapter"]
-[ext_resource type="Texture2D" path="res://assets/ui/codex/bookmark_rarity_left.png" id="3_rarity"]
-[ext_resource type="Texture2D" path="res://assets/ui/codex/codex_smoky_brown_backdrop.png" id="4_backdrop"]
+[ext_resource type="Texture2D" path="res://assets/ui/codex/bookmark_chapter_idle.png" id="2_chapter_idle"]
+[ext_resource type="Texture2D" path="res://assets/ui/codex/bookmark_chapter_selected.png" id="3_chapter_selected"]
+[ext_resource type="Texture2D" path="res://assets/ui/codex/bookmark_rarity_idle.png" id="4_rarity_idle"]
+[ext_resource type="Texture2D" path="res://assets/ui/codex/bookmark_rarity_selected.png" id="5_rarity_selected"]
+[ext_resource type="Texture2D" path="res://assets/ui/codex/codex_smoky_brown_backdrop.png" id="6_backdrop"]
+[ext_resource type="Texture2D" path="res://assets/ui/codex/bookmark_icon_hero.png" id="7_hero_icon"]
+[ext_resource type="Texture2D" path="res://assets/ui/codex/bookmark_icon_item.png" id="8_item_icon"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_ui_codex_backdrop_motion.gdshader" id="9_backdrop_shader"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_backdrop"]
+shader = ExtResource("9_backdrop_shader")
+shader_parameter/drift_pixels = 4.0
+shader_parameter/drift_period = 22.0
+shader_parameter/moving_mix = 0.08
+shader_parameter/breathe_strength = 0.012
+shader_parameter/breathe_period = 18.0
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_chapter"]
-content_margin_right = 18.0
+content_margin_left = 50.0
+content_margin_right = 8.0
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_rarity"]
-content_margin_right = 12.0
+content_margin_left = 4.0
+content_margin_right = 4.0
 
 [node name="CodexScreen" type="Control"]
 layout_mode = 3
@@ -21,6 +36,7 @@ grow_vertical = 2
 script = ExtResource("1_script")
 
 [node name="Backdrop" type="TextureRect" parent="."]
+material = SubResource("ShaderMaterial_backdrop")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -29,27 +45,18 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 texture_filter = 1
-texture = ExtResource("4_backdrop")
+texture = ExtResource("6_backdrop")
 expand_mode = 1
 stretch_mode = 6
 
 [node name="BookContactShadow" type="ColorRect" parent="."]
 layout_mode = 0
-offset_left = 132.0
-offset_top = 78.0
-offset_right = 1812.0
-offset_bottom = 1023.0
+offset_left = 244.0
+offset_top = 144.0
+offset_right = 1703.2
+offset_bottom = 964.8
 mouse_filter = 2
-color = Color(0.141176, 0.109804, 0.0901961, 0.3)
-
-[node name="GalleryHost" type="Control" parent="."]
-layout_mode = 0
-offset_left = 120.0
-offset_top = 66.0
-offset_right = 2040.0
-offset_bottom = 1146.0
-scale = Vector2(0.875, 0.875)
-mouse_filter = 2
+color = Color(0.141176, 0.109804, 0.0901961, 0.32)
 
 [node name="BookmarkLayer" type="Control" parent="."]
 layout_mode = 0
@@ -59,9 +66,10 @@ mouse_filter = 2
 
 [node name="HeroBookmark" type="Button" parent="BookmarkLayer"]
 layout_mode = 0
-offset_top = 190.0
-offset_right = 148.0
-offset_bottom = 238.0
+offset_left = 96.0
+offset_top = 230.0
+offset_right = 280.0
+offset_bottom = 302.0
 mouse_filter = 0
 focus_mode = 1
 toggle_mode = true
@@ -71,7 +79,8 @@ theme_override_styles/pressed = SubResource("StyleBoxEmpty_chapter")
 theme_override_styles/focus = SubResource("StyleBoxEmpty_chapter")
 text = "英雄"
 
-[node name="Art" type="TextureRect" parent="BookmarkLayer/HeroBookmark"]
+[node name="IdleArt" type="TextureRect" parent="BookmarkLayer/HeroBookmark"]
+visible = false
 show_behind_parent = true
 layout_mode = 1
 anchors_preset = 15
@@ -81,14 +90,40 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 texture_filter = 1
-texture = ExtResource("2_chapter")
+texture = ExtResource("2_chapter_idle")
 expand_mode = 1
+
+[node name="SelectedArt" type="TextureRect" parent="BookmarkLayer/HeroBookmark"]
+show_behind_parent = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture_filter = 1
+texture = ExtResource("3_chapter_selected")
+expand_mode = 1
+
+[node name="ChapterIcon" type="TextureRect" parent="BookmarkLayer/HeroBookmark"]
+layout_mode = 0
+offset_left = 30.0
+offset_top = 20.0
+offset_right = 62.0
+offset_bottom = 52.0
+mouse_filter = 2
+texture_filter = 1
+texture = ExtResource("7_hero_icon")
+expand_mode = 1
+stretch_mode = 5
 
 [node name="ItemBookmark" type="Button" parent="BookmarkLayer"]
 layout_mode = 0
-offset_top = 256.0
-offset_right = 148.0
-offset_bottom = 304.0
+offset_left = 96.0
+offset_top = 318.0
+offset_right = 280.0
+offset_bottom = 390.0
 mouse_filter = 0
 focus_mode = 1
 toggle_mode = true
@@ -98,7 +133,7 @@ theme_override_styles/pressed = SubResource("StyleBoxEmpty_chapter")
 theme_override_styles/focus = SubResource("StyleBoxEmpty_chapter")
 text = "道具"
 
-[node name="Art" type="TextureRect" parent="BookmarkLayer/ItemBookmark"]
+[node name="IdleArt" type="TextureRect" parent="BookmarkLayer/ItemBookmark"]
 show_behind_parent = true
 layout_mode = 1
 anchors_preset = 15
@@ -108,22 +143,48 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 texture_filter = 1
-texture = ExtResource("2_chapter")
+texture = ExtResource("2_chapter_idle")
 expand_mode = 1
+
+[node name="SelectedArt" type="TextureRect" parent="BookmarkLayer/ItemBookmark"]
+visible = false
+show_behind_parent = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture_filter = 1
+texture = ExtResource("3_chapter_selected")
+expand_mode = 1
+
+[node name="ChapterIcon" type="TextureRect" parent="BookmarkLayer/ItemBookmark"]
+layout_mode = 0
+offset_left = 29.0
+offset_top = 19.0
+offset_right = 63.0
+offset_bottom = 53.0
+mouse_filter = 2
+texture_filter = 1
+texture = ExtResource("8_item_icon")
+expand_mode = 1
+stretch_mode = 5
 
 [node name="RarityBookmarks" type="Control" parent="BookmarkLayer"]
 visible = false
 layout_mode = 0
-offset_left = 36.0
-offset_top = 314.0
-offset_right = 138.0
-offset_bottom = 412.0
+offset_left = 116.0
+offset_top = 420.0
+offset_right = 232.0
+offset_bottom = 572.0
 mouse_filter = 2
 
 [node name="Normal" type="Button" parent="BookmarkLayer/RarityBookmarks"]
 layout_mode = 0
-offset_right = 102.0
-offset_bottom = 30.0
+offset_right = 116.0
+offset_bottom = 48.0
 mouse_filter = 0
 focus_mode = 1
 toggle_mode = true
@@ -133,7 +194,8 @@ theme_override_styles/pressed = SubResource("StyleBoxEmpty_rarity")
 theme_override_styles/focus = SubResource("StyleBoxEmpty_rarity")
 text = "普通"
 
-[node name="Art" type="TextureRect" parent="BookmarkLayer/RarityBookmarks/Normal"]
+[node name="IdleArt" type="TextureRect" parent="BookmarkLayer/RarityBookmarks/Normal"]
+visible = false
 show_behind_parent = true
 layout_mode = 1
 anchors_preset = 15
@@ -143,24 +205,48 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 texture_filter = 1
-texture = ExtResource("3_rarity")
+texture = ExtResource("4_rarity_idle")
 expand_mode = 1
 
-[node name="TierStripe" type="ColorRect" parent="BookmarkLayer/RarityBookmarks/Normal"]
+[node name="SelectedArt" type="TextureRect" parent="BookmarkLayer/RarityBookmarks/Normal"]
+show_behind_parent = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture_filter = 1
+texture = ExtResource("5_rarity_selected")
+expand_mode = 1
+
+[node name="IdleStripe" type="ColorRect" parent="BookmarkLayer/RarityBookmarks/Normal"]
+visible = false
 show_behind_parent = true
 layout_mode = 0
-offset_left = 10.0
+offset_left = 20.0
+offset_top = 10.0
+offset_right = 26.0
+offset_bottom = 38.0
+mouse_filter = 2
+color = Color(0.35, 0.62, 0.75, 1)
+
+[node name="SelectedStripe" type="ColorRect" parent="BookmarkLayer/RarityBookmarks/Normal"]
+show_behind_parent = true
+layout_mode = 0
+offset_left = 2.0
 offset_top = 8.0
-offset_right = 14.0
-offset_bottom = 24.0
+offset_right = 8.0
+offset_bottom = 40.0
 mouse_filter = 2
 color = Color(0.35, 0.62, 0.75, 1)
 
 [node name="Rare" type="Button" parent="BookmarkLayer/RarityBookmarks"]
 layout_mode = 0
-offset_top = 34.0
-offset_right = 102.0
-offset_bottom = 64.0
+offset_top = 52.0
+offset_right = 116.0
+offset_bottom = 100.0
 mouse_filter = 0
 focus_mode = 1
 toggle_mode = true
@@ -170,7 +256,7 @@ theme_override_styles/pressed = SubResource("StyleBoxEmpty_rarity")
 theme_override_styles/focus = SubResource("StyleBoxEmpty_rarity")
 text = "稀有"
 
-[node name="Art" type="TextureRect" parent="BookmarkLayer/RarityBookmarks/Rare"]
+[node name="IdleArt" type="TextureRect" parent="BookmarkLayer/RarityBookmarks/Rare"]
 show_behind_parent = true
 layout_mode = 1
 anchors_preset = 15
@@ -180,24 +266,49 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 texture_filter = 1
-texture = ExtResource("3_rarity")
+texture = ExtResource("4_rarity_idle")
 expand_mode = 1
 
-[node name="TierStripe" type="ColorRect" parent="BookmarkLayer/RarityBookmarks/Rare"]
+[node name="SelectedArt" type="TextureRect" parent="BookmarkLayer/RarityBookmarks/Rare"]
+visible = false
+show_behind_parent = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture_filter = 1
+texture = ExtResource("5_rarity_selected")
+expand_mode = 1
+
+[node name="IdleStripe" type="ColorRect" parent="BookmarkLayer/RarityBookmarks/Rare"]
 show_behind_parent = true
 layout_mode = 0
-offset_left = 10.0
+offset_left = 20.0
+offset_top = 10.0
+offset_right = 26.0
+offset_bottom = 38.0
+mouse_filter = 2
+color = Color(0.55, 0.42, 0.69, 1)
+
+[node name="SelectedStripe" type="ColorRect" parent="BookmarkLayer/RarityBookmarks/Rare"]
+visible = false
+show_behind_parent = true
+layout_mode = 0
+offset_left = 2.0
 offset_top = 8.0
-offset_right = 14.0
-offset_bottom = 24.0
+offset_right = 8.0
+offset_bottom = 40.0
 mouse_filter = 2
 color = Color(0.55, 0.42, 0.69, 1)
 
 [node name="Legendary" type="Button" parent="BookmarkLayer/RarityBookmarks"]
 layout_mode = 0
-offset_top = 68.0
-offset_right = 102.0
-offset_bottom = 98.0
+offset_top = 104.0
+offset_right = 116.0
+offset_bottom = 152.0
 mouse_filter = 0
 focus_mode = 1
 toggle_mode = true
@@ -207,7 +318,7 @@ theme_override_styles/pressed = SubResource("StyleBoxEmpty_rarity")
 theme_override_styles/focus = SubResource("StyleBoxEmpty_rarity")
 text = "传说"
 
-[node name="Art" type="TextureRect" parent="BookmarkLayer/RarityBookmarks/Legendary"]
+[node name="IdleArt" type="TextureRect" parent="BookmarkLayer/RarityBookmarks/Legendary"]
 show_behind_parent = true
 layout_mode = 1
 anchors_preset = 15
@@ -217,15 +328,49 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 texture_filter = 1
-texture = ExtResource("3_rarity")
+texture = ExtResource("4_rarity_idle")
 expand_mode = 1
 
-[node name="TierStripe" type="ColorRect" parent="BookmarkLayer/RarityBookmarks/Legendary"]
+[node name="SelectedArt" type="TextureRect" parent="BookmarkLayer/RarityBookmarks/Legendary"]
+visible = false
+show_behind_parent = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture_filter = 1
+texture = ExtResource("5_rarity_selected")
+expand_mode = 1
+
+[node name="IdleStripe" type="ColorRect" parent="BookmarkLayer/RarityBookmarks/Legendary"]
 show_behind_parent = true
 layout_mode = 0
-offset_left = 10.0
-offset_top = 8.0
-offset_right = 14.0
-offset_bottom = 24.0
+offset_left = 20.0
+offset_top = 10.0
+offset_right = 26.0
+offset_bottom = 38.0
 mouse_filter = 2
 color = Color(0.75, 0.57, 0.24, 1)
+
+[node name="SelectedStripe" type="ColorRect" parent="BookmarkLayer/RarityBookmarks/Legendary"]
+visible = false
+show_behind_parent = true
+layout_mode = 0
+offset_left = 2.0
+offset_top = 8.0
+offset_right = 8.0
+offset_bottom = 40.0
+mouse_filter = 2
+color = Color(0.75, 0.57, 0.24, 1)
+
+[node name="GalleryHost" type="Control" parent="."]
+layout_mode = 0
+offset_left = 230.0
+offset_top = 130.0
+offset_right = 2150.0
+offset_bottom = 1210.0
+scale = Vector2(0.76, 0.76)
+mouse_filter = 2

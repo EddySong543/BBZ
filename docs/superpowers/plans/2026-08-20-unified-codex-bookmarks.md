@@ -3,7 +3,7 @@
 
 **Goal:** Present the merged hero/item codex as a reduced open book on a low-saturation smoky-brown backdrop, with the approved long chapter tabs and expandable rarity tabs fully outside the pages.
 
-**Architecture:** Keep `HeroGalleryScreen` and `ItemGalleryScreen` unchanged at their authored 1920x1080 coordinate system. `CodexScreen` owns the full-screen backdrop and a 1920x1080 `GalleryHost` positioned at `(120, 66)` with uniform scale `0.875`; the bookmark layer stays in the unscaled 1920x1080 screen coordinate system. Existing cached galleries, continuous item pagination, rarity signals, close routing, and main-menu entry remain authoritative.
+**Architecture:** Keep `HeroGalleryScreen` and `ItemGalleryScreen` unchanged at their authored 1920x1080 coordinate system. `CodexScreen` owns the full-screen backdrop and a 1920x1080 `GalleryHost` positioned at `(230, 130)` with uniform scale `0.76`; the bookmark layer stays in the unscaled 1920x1080 screen coordinate system. Existing cached galleries, continuous item pagination, rarity signals, close routing, and main-menu entry remain authoritative.
 
 **Tech Stack:** Godot 4.7, GDScript, GUT, lossless PNG UI art, nearest-neighbour canvas rendering.
 
@@ -39,10 +39,10 @@
 
 **Interfaces:**
 - Consumes: `GALLERY_SCENES`, `show_section(section: int)`, `select_tier(tier: int)`, and `tier_changed(tier: int)`.
-- Produces: `BOOK_ORIGIN := Vector2(120, 66)` and `BOOK_SCALE := Vector2(0.875, 0.875)` as the single framing contract.
+- Produces: `BOOK_ORIGIN := Vector2(230, 130)` and `BOOK_SCALE := Vector2(0.76, 0.76)` as the single framing contract.
 
 - [ ] Add a full-rect mouse-ignoring `TextureRect` backdrop behind `GalleryHost` using `STRETCH_KEEP_ASPECT_COVERED`.
-- [ ] Set the authored 1920x1080 `GalleryHost` to position `(120, 66)`, scale `(0.875, 0.875)`, and pivot `(0, 0)`.
+- [ ] Set the authored 1920x1080 `GalleryHost` to position `(230, 130)`, scale `(0.76, 0.76)`, and pivot `(0, 0)`.
 - [ ] Keep instantiated galleries at position zero and scale one inside the scaled host so their internal coordinates and state logic remain untouched.
 - [ ] Reposition approved chapter tabs against the reduced book's left cover and keep rarity tabs entirely in the exposed backdrop margin.
 - [ ] Retain horizontal-only tab interaction, fixed-scale buttons, reverse collapse, state caching, and continuous pagination synchronization.
@@ -57,7 +57,7 @@
 - Consumes: `CodexScreen.BOOK_ORIGIN`, `CodexScreen.BOOK_SCALE`, and the existing public codex navigation API.
 - Produces: automated geometry, backdrop, cache, rarity jump, and transition checks.
 
-- [ ] Replace obsolete full-screen-book assertions with exact host position/scale and transformed 1680x945 bounds.
+- [ ] Replace obsolete full-screen-book assertions with exact host position/scale and transformed 1459.2x820.8 bounds.
 - [ ] Assert the backdrop texture path, full-screen cover mode, non-interactive mouse filter, and non-black smoky-brown color data.
 - [ ] Assert chapter and rarity tabs remain outside the transformed page area and never use scale animation.
 - [ ] Retain tests for tier jumps, continuous page crossing, selected-tab synchronization, cached section state, and main-menu icon-only routing.

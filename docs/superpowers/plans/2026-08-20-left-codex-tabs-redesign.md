@@ -1,5 +1,7 @@
 # Left Codex Tabs Redesign Implementation Plan
 
+> Superseded for final book framing and backdrop geometry by `2026-08-20-unified-codex-bookmarks.md`; this document remains the asset-direction and main-menu-entry history.
+
 > **For agentic workers:** Execute inline in the current BBZ workspace; preserve unrelated dirty-worktree changes and use `tools/run_godot.ps1` for all Godot runs.
 
 **Goal:** Replace the rejected right-facing codex tabs with tactile left-edge inserted tabs and make the main-menu codex entry exactly reuse the battle codex button visual.

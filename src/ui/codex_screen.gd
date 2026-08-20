@@ -13,21 +13,19 @@ const GALLERY_SCENES: Array[PackedScene] = [
 	preload("res://src/ui/hero_gallery_screen.tscn"),
 	preload("res://src/ui/item_gallery_screen.tscn"),
 ]
-const BOOK_ORIGIN := Vector2(120.0, 66.0)
-const BOOK_SCALE := Vector2(0.875, 0.875)
+const BOOK_ORIGIN := Vector2(230.0, 130.0)
+const BOOK_SCALE := Vector2(0.76, 0.76)
 const INK := Color("34281D")
 const INK_SOFT := Color("675746")
-const SELECTED_PAPER := Color.WHITE
-const IDLE_PAPER := Color("DDD2C1")
-const CHAPTER_SELECTED_X := 6.0
-const CHAPTER_IDLE_X := 30.0
+const CHAPTER_SELECTED_X := 96.0
+const CHAPTER_IDLE_X := 96.0
 const RARITY_SELECTED_X := 0.0
-const RARITY_IDLE_X := 12.0
-const HOVER_PULL := 6.0
+const RARITY_IDLE_X := 0.0
+const HOVER_PULL := 4.0
 const PRESS_INSET := 3.0
 const TAB_TWEEN_DURATION := 0.16
-const RARITY_TARGET_Y: Array[float] = [0.0, 34.0, 68.0]
-const RARITY_COLLAPSED_Y: Array[float] = [-18.0, -14.0, -10.0]
+const RARITY_TARGET_Y: Array[float] = [0.0, 52.0, 104.0]
+const RARITY_COLLAPSED_Y: Array[float] = [-22.0, -16.0, -10.0]
 
 @export_enum("英雄", "道具") var initial_section: int = Section.HERO
 
@@ -131,15 +129,30 @@ func _refresh_rarity_bookmarks(tier: int, animate: bool = true) -> void:
 
 func _set_bookmark_state(button: Button, selected: bool, animate: bool) -> void:
 	button.button_pressed = selected
+	_set_bookmark_art(button, selected)
 	var chapter := button == hero_bookmark or button == item_bookmark
 	var selected_x := CHAPTER_SELECTED_X if chapter else RARITY_SELECTED_X
 	var idle_x := CHAPTER_IDLE_X if chapter else RARITY_IDLE_X
 	var target_x := selected_x if selected else idle_x
 	if not selected and bool(_hovered_tabs.get(button, false)):
 		target_x -= HOVER_PULL
-	var target_color := SELECTED_PAPER if selected else IDLE_PAPER
 	button.add_theme_color_override("font_color", INK if selected else INK_SOFT)
-	_animate_bookmark(button, target_x, target_color, animate)
+	_animate_bookmark(button, target_x, Color.WHITE, animate)
+
+
+func _set_bookmark_art(button: Button, selected: bool) -> void:
+	var idle_art := button.get_node_or_null("IdleArt") as CanvasItem
+	var selected_art := button.get_node_or_null("SelectedArt") as CanvasItem
+	if idle_art != null:
+		idle_art.visible = not selected
+	if selected_art != null:
+		selected_art.visible = selected
+	var idle_stripe := button.get_node_or_null("IdleStripe") as CanvasItem
+	var selected_stripe := button.get_node_or_null("SelectedStripe") as CanvasItem
+	if idle_stripe != null:
+		idle_stripe.visible = not selected
+	if selected_stripe != null:
+		selected_stripe.visible = selected
 
 
 func _animate_bookmark(button: Button, target_x: float, target_color: Color, animate: bool) -> void:
@@ -207,10 +220,8 @@ func _finish_rarity_close() -> void:
 
 func _on_bookmark_down(button: Button) -> void:
 	_kill_button_tween(button)
-	var tween := create_tween().bind_node(button)
-	tween.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	tween.tween_property(button, "position:x", button.position.x + PRESS_INSET, 0.05)
-	_tab_tweens[button] = tween
+	# 三像素压入必须在按下帧即可读到；松开仍用短 cubic tween 回弹。
+	button.position.x += PRESS_INSET
 
 
 func _on_bookmark_up(button: Button) -> void:
