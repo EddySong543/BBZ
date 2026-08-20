@@ -1,8 +1,9 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://src/ui/codex_screen.gd" id="1_script"]
 [ext_resource type="Texture2D" path="res://assets/ui/codex/bookmark_chapter_left.png" id="2_chapter"]
 [ext_resource type="Texture2D" path="res://assets/ui/codex/bookmark_rarity_left.png" id="3_rarity"]
+[ext_resource type="Texture2D" path="res://assets/ui/codex/codex_smoky_brown_backdrop.png" id="4_backdrop"]
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_chapter"]
 content_margin_right = 18.0
@@ -19,10 +20,35 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_script")
 
+[node name="Backdrop" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture_filter = 1
+texture = ExtResource("4_backdrop")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="BookContactShadow" type="ColorRect" parent="."]
+layout_mode = 0
+offset_left = 132.0
+offset_top = 78.0
+offset_right = 1812.0
+offset_bottom = 1023.0
+mouse_filter = 2
+color = Color(0.141176, 0.109804, 0.0901961, 0.3)
+
 [node name="GalleryHost" type="Control" parent="."]
 layout_mode = 0
-offset_right = 1920.0
-offset_bottom = 1080.0
+offset_left = 120.0
+offset_top = 66.0
+offset_right = 2040.0
+offset_bottom = 1146.0
+scale = Vector2(0.875, 0.875)
 mouse_filter = 2
 
 [node name="BookmarkLayer" type="Control" parent="."]

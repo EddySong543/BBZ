@@ -94,7 +94,7 @@
 - **使用免费，获取受限**：道具用时不耗能；一次性、三槽上限、部署锁定、升级/补充各 1 能共同约束强度。
 - 伤害类道具遵循统一的「普通 → 穿防 → 真伤」三级阶梯，每件加伤道具按级定价。
 
-当前正式池 **96 件**（T1 31 / T2 39 / T3 26），覆盖进攻 / 防御 / 治疗 / 能量 / 节奏 / 状态 / 干扰 / 导出 / 博弈 等维度。清单真相源见 `design/items-firstrelease.md`；后续拓展池见 `design/items-list.md`；历史设计见 `design/items.md`。实装位置 `src/battle/item_catalog.gd` + `src/battle/items/*.gd`。
+当前正式池 **114 件**（T1 34 / T2 52 / T3 28），覆盖进攻 / 防御 / 治疗 / 能量 / 节奏 / 状态 / 干扰 / 导出 / 博弈 等维度。清单真相源见 `design/items-firstrelease.md`；后续拓展池见 `design/items-list.md`；历史设计见 `design/items.md`。实装位置 `src/battle/item_catalog.gd` + `src/battle/items/*.gd`。
 
 2026-08-10 当前强度基准：T1 负责简单稳定的基础效果，T2 负责通用连接，T3 负责高影响一次性计划或带真实代价 / 期限 / 反制的 build-around；目录估值分别以 ≥2 / 4 / 6 为当前校验线。
 
@@ -168,7 +168,7 @@ E_回合结束 = E_回合开始 − C_本回合消耗 + G_本回合获得
 - **HeroData** (`src/battle/hero_data.gd`) — 英雄数据 Resource，提供池子 + 资源路径
 - **BattleCore** (`src/battle/battle_core.gd`) — 战斗逻辑核心（v4，单一核心；纯逻辑、可 headless）
 - **HeroSkill** (`src/battle/hero_skill.gd` + `src/battle/skills/*.gd`) — 英雄技能组件（每英雄一文件，24 个）
-- **道具系统** (`src/battle/item_catalog.gd` + `src/battle/items/*.gd`) — 当前正式池 96 件道具（T1 31 / T2 39 / T3 26），不占动作、使用免费
+- **道具系统** (`src/battle/item_catalog.gd` + `src/battle/items/*.gd`) — 当前正式池 114 件道具（T1 34 / T2 52 / T3 28），不占动作、使用免费
 - **FontManager** (`src/core/font_manager.gd` autoload) — 像素字体加载
 - **BattleSetup** (`src/battle/battle_setup.gd` autoload) — 场景间传递阵容
 - **UI 对战界面** (`src/ui/battle_screen.tscn` + `.gd`) — 同时盲选 vs AI + juice
@@ -223,7 +223,7 @@ E_回合结束 = E_回合开始 − C_本回合消耗 + G_本回合获得
 
 ### 道具实装
 
-- [x] 道具系统：3 选 1 装备、不占动作、部署锁定；当前正式池 96 件（T1 31 / T2 39 / T3 26）可用
+- [x] 道具系统：3 选 1 装备、不占动作、部署锁定；当前正式池 114 件（T1 34 / T2 52 / T3 28）可用
 
 ### 工程保护
 

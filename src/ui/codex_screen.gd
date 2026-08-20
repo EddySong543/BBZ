@@ -1,7 +1,8 @@
 extends Control
 class_name CodexScreen
 
-## 英雄与道具共享同一本满屏图鉴；此节点只叠加左缘夹页索引，不改变成熟书页几何。
+## 英雄与道具共享同一本图鉴；此节点负责烟褐衬底、统一缩书构图与左缘夹页索引。
+## 两套成熟书页仍在各自的 1920x1080 设计坐标中运行，不重排内部节点。
 
 signal section_changed(section: int)
 
@@ -12,6 +13,8 @@ const GALLERY_SCENES: Array[PackedScene] = [
 	preload("res://src/ui/hero_gallery_screen.tscn"),
 	preload("res://src/ui/item_gallery_screen.tscn"),
 ]
+const BOOK_ORIGIN := Vector2(120.0, 66.0)
+const BOOK_SCALE := Vector2(0.875, 0.875)
 const INK := Color("34281D")
 const INK_SOFT := Color("675746")
 const SELECTED_PAPER := Color.WHITE
