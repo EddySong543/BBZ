@@ -288,6 +288,8 @@ func test_draft_popup_new_frame_size_position_and_palette() -> void:
 	popup.setup([ItemCatalog.make("t2_feibiao")], false, "升级道具（3 选 1）")
 	var frame := popup.find_child("ItemFrame", true, false) as TextureRect
 	var cell := popup.find_child("ItemCell", true, false) as ColorRect
+	var shadow := popup.find_child("BottomShadow", true, false) as TextureRect
+	var art_shadow := popup.find_child("ItemArtShadow", true, false) as TextureRect
 	var slot_pos := Vector2(ItemDraftPopup.CARD_W * 0.5 - 64.0, 92.0)
 	var slot_size := Vector2(128.0, 128.0)
 	var inset := slot_size.x * ItemDraftPopup.CELL_INSET_RATIO
@@ -295,6 +297,13 @@ func test_draft_popup_new_frame_size_position_and_palette() -> void:
 			"升级三选一外框位置补偿透明边")
 	assert_eq(frame.size, slot_size * ItemDraftPopup.FRAME_ART_SCALE,
 			"升级三选一外框按新素材放大")
+	assert_not_null(shadow, "升级三选一道具框补上共享右下阴影")
+	assert_eq(shadow.position, frame.position + ItemFrameStyle.DROP_SHADOW_OFFSET,
+			"升级三选一阴影与战斗道具栏同向偏移")
+	assert_eq(shadow.size, frame.size, "阴影严格沿用外框 alpha 轮廓")
+	assert_not_null(art_shadow, "升级三选一道具美术补上右下 alpha 投影")
+	assert_lt(art_shadow.get_index(), frame.get_index(),
+			"升级三选一图案投影落在格底上且由外框收边")
 	assert_eq(cell.position, slot_pos + Vector2.ONE * inset,
 			"升级三选一格底限制在内孔起点")
 	assert_almost_eq(cell.size.x, slot_size.x - inset * 2.0, 0.001,
@@ -325,6 +334,12 @@ func test_item_frame_style_is_the_single_palette_source() -> void:
 	assert_eq(ITEM_GALLERY_SCREEN.FRAME_MID, ItemFrameStyle.FRAME_MID)
 	assert_eq(ItemSlotRow.FRAME_MID_T, ItemFrameStyle.FRAME_MID)
 	assert_eq(ItemDraftPopup.FRAME_MID, ItemFrameStyle.FRAME_MID)
+	assert_eq(ItemFrameStyle.CELL_TOP[1], Color("6E9BD2"),
+			"普通填充回退为原蓝色")
+	assert_eq(ItemFrameStyle.CELL_TOP[2], Color("9A7FD0"),
+			"稀有填充回退为原紫色")
+	assert_eq(ItemFrameStyle.LEGENDARY_TINT, Color.WHITE,
+			"传说填充回退为原金底贴图色")
 
 
 func test_battle_screen_script_compiles_with_m3_wiring() -> void:

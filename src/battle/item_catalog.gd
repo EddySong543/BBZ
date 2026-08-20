@@ -4,7 +4,7 @@ extends RefCounted
 ## 道具目录（ADR-003 D1）。集中数据源：id → 元数据 + 一句话描述 + 效果参数 + 逻辑脚本。
 ## 逻辑在 src/battle/items/<id>.gd（继承 ItemEffect）。make(id) 构造一件 ItemData（含独立 effect 实例）。
 ##
-## 当前已实装 = 正式池 96 件（T1 31 / T2 39 / T3 26·含中立 / 趣味）= design/items-firstrelease.md（真相源）。
+## 当前已实装 = 正式池 114 件（T1 34 / T2 52 / T3 28·含中立 / 趣味）= design/items-firstrelease.md（真相源）。
 ## 全集候选与历史废案见 design/items-list.md；未入选件按版本逐批复审。
 ##
 ## 道具均为字符串 id（tier 前缀拼音），无数字编号。⚠ id 拼音为历史化石、≠ 当前显示名
@@ -430,6 +430,80 @@ const _DEF := {
 		tier = 3, ev = 6, name = "均能斗", dim = "博弈", role = "能量重分", seq = _S_PRE, target = _T_SELF,
 		desc = "合并双方当前能量，再平均分配。", params = {},
 		script = preload("res://src/battle/items/t3_junneng_dou.gd")},
+	# ========== 背包构筑首批（The Bazaar / Backpack Battles 启发）==========
+	"t1_jicun_pai": {
+		name = "寄存牌", dim = "能量", role = "背包转换", seq = _S_ANY, target = _T_SELF,
+		desc = "选择另一件可使用的道具，将其随机放回背包，立即获得1点能量。", params = {energy = 2, requires_backpack = true},
+		script = preload("res://src/battle/items/t1_jicun_pai.gd")},
+	"t1_tingxia_tong": {
+		name = "听匣筒", dim = "博弈", role = "背包信息", seq = _S_ANY, target = _T_ENEMY,
+		desc = "随机揭示敌方背包中至多3件道具，直到本场战斗结束。", params = {count = 3, requires_backpack = true},
+		script = preload("res://src/battle/items/t1_tingxia_tong.gd")},
+	"t2_yawu_piao": {
+		tier = 2, ev = 4, name = "押物票", dim = "博弈", role = "道具读心", seq = _S_PRE, target = _T_ENEMY,
+		desc = "押注敌方一件可使用的道具；本回合其若被使用，我方获得2点能量。", params = {energy = 4, requires_backpack = true},
+		script = preload("res://src/battle/items/t2_yawu_piao.gd")},
+	"t2_huigou_quan": {
+		tier = 2, ev = 4, name = "回购券", dim = "中立", role = "临时复制", seq = _S_ANY, target = _T_SELF,
+		desc = "选择本场已经使用的一件普通道具，将1件同名临时道具随机放入背包。", params = {requires_backpack = true},
+		script = preload("res://src/battle/items/t2_huigou_quan.gd")},
+	"t2_baojia_feng": {
+		tier = 2, ev = 4, name = "保价封", dim = "防御", role = "反制保值", seq = _S_PRE, target = _T_SELF,
+		desc = "选择另一件可使用的道具；本回合它若被反制，则不消耗并随机放回背包。", params = {requires_backpack = true},
+		script = preload("res://src/battle/items/t2_baojia_feng.gd")},
+	"t2_yingji_xiang": {
+		tier = 2, ev = 4, name = "应急箱", dim = "中立", role = "即时补充", seq = _S_ANY, target = _T_SELF,
+		desc = "从自己的背包随机抽取1件普通道具，填入本物腾出的道具框并立即可用。", params = {requires_backpack = true},
+		script = preload("res://src/battle/items/t2_yingji_xiang.gd")},
+	"t2_huanqian_tong": {
+		tier = 2, ev = 4, name = "换签筒", dim = "中立", role = "背包换件", seq = _S_ANY, target = _T_SELF,
+		desc = "选择另一件道具，将其随机放回背包，随后免费抽取一次道具。", params = {requires_backpack = true},
+		script = preload("res://src/battle/items/t2_huanqian_tong.gd")},
+	"t2_chenglu_zhan": {
+		tier = 2, ev = 4, name = "承露盏", dim = "导出", role = "治疗→能量", seq = _S_PRE, target = _T_SELF,
+		desc = "本回合内，我方溢出的生命回复转为等量能量。", params = {requires_backpack = true},
+		script = preload("res://src/battle/items/t2_chenglu_zhan.gd")},
+	"t2_naying_hulu": {
+		tier = 2, ev = 4, name = "纳盈葫芦", dim = "导出", role = "能量→治疗", seq = _S_PRE, target = _T_SELF,
+		desc = "本回合内，我方获得的溢出能量转为回复生命最低的存活英雄。", params = {requires_backpack = true},
+		script = preload("res://src/battle/items/t2_naying_hulu.gd")},
+	# ========== 参考游戏转译批（Marvel Snap / 宝可梦 / 洛克王国 / 游戏王）==========
+	"t1_gufeng_zhui": {
+		name = "孤锋锥", dim = "进攻", role = "孤注", seq = _S_PRE, target = _T_SELF,
+		desc = "仅当我方没有其他可使用的道具时使用；本回合内，我方下一次攻击的总伤害增加2点。", params = {bonus = 4},
+		script = preload("res://src/battle/items/t1_gufeng_zhui.gd")},
+	"t2_cuiyong_pai": {
+		tier = 2, ev = 4, name = "催用牌", dim = "博弈", role = "道具施压", seq = _S_PRE, target = _T_ENEMY,
+		desc = "选择敌方一件可使用的道具；本回合结束时若仍未使用，将其锁定1回合。", params = {},
+		script = preload("res://src/battle/items/t2_cuiyong_pai.gd")},
+	"t2_dingming_wan": {
+		tier = 2, ev = 4, name = "定命丸", dim = "防御", role = "保底治疗", seq = _S_PRE, target = _T_SELF,
+		desc = "我方出战英雄的生命不足3点时，回复至3点。", params = {hp = 6},
+		script = preload("res://src/battle/items/t2_dingming_wan.gd")},
+	"t2_duyong_feng": {
+		tier = 2, ev = 4, name = "独用封", dim = "干扰", role = "道具限流", seq = _S_PRE, target = _T_SELF,
+		desc = "本回合内，双方只有首件道具生效。", params = {},
+		script = preload("res://src/battle/items/t2_duyong_feng.gd")},
+	"t2_pianfeng_jia": {
+		tier = 2, ev = 4, name = "偏锋甲", dim = "博弈", role = "攻击分流", seq = _S_PRE, target = _T_SELF,
+		desc = "本回合内，敌方「波」无法对我方造成伤害，但其「大波」的总伤害增加2点。", params = {big_bonus = 4},
+		script = preload("res://src/battle/items/t2_pianfeng_jia.gd")},
+	"t3_xiling_ling": {
+		tier = 3, ev = 6, name = "息灵铃", dim = "干扰", role = "技能清场", seq = _S_PRE, target = _T_SELF,
+		desc = "本回合内，双方所有英雄技能无效。", params = {},
+		script = preload("res://src/battle/items/t3_xiling_ling.gd")},
+	"t2_jingwen_zhou": {
+		tier = 2, ev = 4, name = "净纹帚", dim = "状态", role = "命中成果清场", seq = _S_PRE, target = _T_SELF,
+		desc = "清除双方所有由攻击命中产生、尚未结算的英雄技能效果。", params = {},
+		script = preload("res://src/battle/items/t2_jingwen_zhou.gd")},
+	"t3_yiyuan_deng": {
+		tier = 3, ev = 6, name = "遗愿灯", dim = "节奏", role = "牺牲调度", seq = _S_PRE, target = _T_SELF,
+		desc = "使我方出战英雄死亡；死亡结算成功后，选择我方一名未出战英雄，使其回复至生命上限并登场。本回合我方无法行动。", params = {},
+		script = preload("res://src/battle/items/t3_yiyuan_deng.gd")},
+	"t2_huiliu_zhu": {
+		tier = 2, ev = 4, name = "回流珠", dim = "能量", role = "精确支付", seq = _S_PRE, target = _T_SELF,
+		desc = "本回合内，我方行动若正好耗尽能量，行动结算后获得2点能量。", params = {energy = 4},
+		script = preload("res://src/battle/items/t2_huiliu_zhu.gd")},
 }
 
 
@@ -511,30 +585,30 @@ const _FLAVOR := {
 ## 玩家显示顺序：先按 tier，再按显示名的【完整无声调拼音】排序；同拼音以稳定 id 兜底。
 ## 不使用中文 Unicode 码点或历史 id 排序。多音字口径：还=huan、秘=mi、血=xue。
 const DISPLAY_ORDER := [
-	# T1（31）
+	# T1（34）
 	"t1_qipao", "t1_xiangjiaopi", "t1_moli_yuanquan", "t1_deneng_hufu",
-	"t1_dutu_yingbi", "t1_fentong_mupai", "t1_houshou", "t1_houzhen_qian", "t1_huanfang_kou",
-	"t1_huifeng_qiao", "t1_fengzhixue", "t1_jiedu_yaoshui", "t1_jijiu_ling",
+	"t1_dutu_yingbi", "t1_fentong_mupai", "t1_gufeng_zhui", "t1_houshou", "t1_houzhen_qian", "t1_huanfang_kou",
+	"t1_huifeng_qiao", "t1_fengzhixue", "t1_jicun_pai", "t1_jiedu_yaoshui", "t1_jijiu_ling",
 	"t1_lzhi_fali", "t1_lzhi_shengming", "t1_jiudun", "t1_hushenfu",
-	"t1_feibiao", "t1_tongqian", "t1_ronglu", "t1_tengman_xianjing",
+	"t1_feibiao", "t1_tongqian", "t1_ronglu", "t1_tengman_xianjing", "t1_tingxia_tong",
 	"t1_weihouzhen", "t1_xianshou", "t1_xuedu_jie", "t1_xixie_yaya",
 	"t1_xunxing_zhui", "t1_xuzhen_qi", "t1_yaohuo", "t1_yazhen_zhui",
 	"t1_podun_zhou", "t1_siyecao",
-	# T2（39）
-	"t2_baolie", "t2_daishang_san", "t2_dianjiang_gu", "t2_dianjinshi", "t2_difeng_kou", "t2_dingshen", "t2_duyao",
+	# T2（52）
+	"t2_baojia_feng", "t2_baolie", "t2_chenglu_zhan", "t2_cuiyong_pai", "t2_daishang_san", "t2_dianjiang_gu", "t2_dianjinshi", "t2_difeng_kou", "t2_dingming_wan", "t2_dingshen", "t2_duyao", "t2_duyong_feng",
 	"t2_fencun_chi", "t2_feibiao", "t2_fengmai_zhen", "t2_fengyin", "t2_fuying_suo",
-	"t2_guiying_pai", "t2_huanhundan", "t2_huizhao_jing", "t2_huzhen_ding", "t2_jiandun", "t2_jieyin_pei",
-	"t2_lianxin_suo", "t2_lieyin", "t2_daijia", "t2_miwu_doupeng", "t2_huoshou", "t2_ningxue_gao", "t2_jike", "t2_nuanyu",
-	"t2_pomoshi", "t2_fali", "t2_shengming", "t2_mojing", "t2_shitiechong",
+	"t2_guiying_pai", "t2_huanhundan", "t2_huanqian_tong", "t2_huigou_quan", "t2_huiliu_zhu", "t2_huizhao_jing", "t2_huzhen_ding", "t2_jiandun", "t2_jieyin_pei", "t2_jingwen_zhou",
+	"t2_lianxin_suo", "t2_lieyin", "t2_daijia", "t2_miwu_doupeng", "t2_huoshou", "t2_naying_hulu", "t2_ningxue_gao", "t2_jike", "t2_nuanyu",
+	"t2_pianfeng_jia", "t2_pomoshi", "t2_fali", "t2_shengming", "t2_mojing", "t2_shitiechong",
 	"t2_shizhi_jiasuo", "t2_shuangsheng", "t2_suoquan_sai", "t2_caoren", "t2_xingjun_yaonang",
-	"t2_qiubite", "t2_yijia_huan", "t2_zhenwen_zhen",
-	# T3（26）
+	"t2_qiubite", "t2_yawu_piao", "t2_yijia_huan", "t2_yingji_xiang", "t2_zhenwen_zhen",
+	# T3（28）
 	"t3_budongmingwang", "t3_yujin", "t3_hedinghong", "t3_huanming_qi",
 	"t3_jieming_deng", "t3_jubao_pen", "t3_judingsanhua", "t3_junneng_dou",
 	"t3_lianhuan_gu", "t3_longxi", "t3_mengdie", "t3_morihuozhong",
 	"t3_qingnang_huopen", "t3_qingyuanbaolian", "t3_sanqi_zhong",
 	"t3_fali", "t3_shengming", "t3_sheming_quan", "t3_shixinding",
-	"t3_tianluodiwang", "t3_tinglong", "t3_xumingxiang", "t3_yemingzhu",
+	"t3_tianluodiwang", "t3_tinglong", "t3_xiling_ling", "t3_xumingxiang", "t3_yemingzhu", "t3_yiyuan_deng",
 	"t3_zhaohun_fan", "t3_jianyi", "t3_yiqi",
 ]
 

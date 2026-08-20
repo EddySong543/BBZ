@@ -4,6 +4,9 @@ extends Node
 
 var p1_heroes: Array[HeroData] = []
 var p2_heroes: Array[HeroData] = []
+## 赛前构筑完成后注入的战斗背包道具 id；两侧均为空时保持旧版经济兼容路径。
+var p1_item_backpack: Array[String] = []
+var p2_item_backpack: Array[String] = []
 var overtime := false   # 加时赛局（Q5·2026-07-03）：白板 1v1（阵容=overtime_roster 组的 3 人·板凳 0 血）·无道具经济
 
 # ── 远征 PvE 交接 ──
@@ -88,6 +91,8 @@ func _copy_hp(values: Array) -> Array[int]:
 func reset() -> void:
 	p1_heroes = []
 	p2_heroes = []
+	p1_item_backpack.clear()
+	p2_item_backpack.clear()
 	overtime = false
 	pve_mode = false
 	pve_player_hp.clear()

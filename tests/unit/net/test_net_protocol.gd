@@ -88,7 +88,7 @@ func test_net_protocol_field_ranges_rejected() -> void:
 	var bad_item_choice_length := NetProtocol.msg_submit_turn(0, 1, -1, [0, 1])
 	bad_item_choice_length["item_slot_choices"] = [-1]
 	assert_eq(NetProtocol.validate_c2s(bad_item_choice_length), "bad_item_slot_choices")
-	for bad_choice: Variant in [-2, 3, "1"]:
+	for bad_choice: Variant in [-2, NetProtocol.MAX_ITEM_CHOICE + 1, "1"]:
 		var bad_item_choice := NetProtocol.msg_submit_turn(0, 1, -1, [0])
 		bad_item_choice["item_slot_choices"] = [bad_choice]
 		assert_eq(NetProtocol.validate_c2s(bad_item_choice), "bad_item_slot_choices")

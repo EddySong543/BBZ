@@ -11,6 +11,9 @@ func test_left_click_moves_one_grid_cell_through_existing_map_rules() -> void:
 	await get_tree().process_frame
 	screen._on_hero_selected(HeroDataScript.create_launch_pool()[0])
 	await get_tree().process_frame
+	assert_eq(screen._grid_movement.get_script().resource_path,
+			"res://src/expedition/grid_movement_controller.gd",
+			"远征与主界面必须引用同一移动控制器，不能再保留两套手感逻辑")
 
 	var start: Vector2i = screen.map.player
 	var target := Vector2i(-1, -1)

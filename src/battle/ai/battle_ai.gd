@@ -126,6 +126,9 @@ static func _threshold_upgrade_slot(b: BattleCore, side: int, reserve: int) -> i
 static func _apply_economy(b: BattleCore, side: int, rng: RandomNumberGenerator, reserve: int, upgrade_slot: int, smart: bool = true) -> void:
 	if side < 0 or side >= b.slots.size() or b.slots[side].size() < BattleCore.SLOT_COUNT:
 		return
+	# 背包工具包含槽目标、私有候选或必须抢在资源结算前登记的转换效果，
+	# 不能走下方无目标的通用 use_slot。所有选择只读取当前公开栏与自己的背包真相。
+	_use_ready_backpack_tools(b, side, upgrade_slot, rng, smart)
 	# 点金石先于其他道具：选择一件 ready T1，再从缓存的 T3 三选一；产物锁定到下回合。
 	_use_ready_pointstones(b, side, upgrade_slot, rng, smart)
 	# 随身熔炉需要明确燃料且立即产能：先挑当前价值最低的另一件就绪道具烧掉，
@@ -164,7 +167,7 @@ static func _apply_economy(b: BattleCore, side: int, rng: RandomNumberGenerator,
 				continue
 		var ready_item: ItemData = b.slot_item(side, s)
 		if BattleCore.item_requires_enemy_item_slot_target(ready_item):
-			var enemy_slot: int = _best_enemy_locked_item_target(b, side)
+			var enemy_slot: int = _best_enemy_item_target(b, side, ready_item)
 			if enemy_slot >= 0 and _should_use_ready_item(b, side, s, ready_item):
 				b.use_slot(side, s, -1, enemy_slot)
 			continue
@@ -195,6 +198,91 @@ static func _apply_economy(b: BattleCore, side: int, rng: RandomNumberGenerator,
 			if not opts2.is_empty():
 				b.pick_draft(side, s, _pick_choice(b, side, opts2, rng, smart))
 			break
+
+
+## 需要目标或选择的背包工具，以及必须先于治疗/产能登记的双向转换件。
+static func _use_ready_backpack_tools(b: BattleCore, side: int, upgrade_slot: int,
+		rng: RandomNumberGenerator, smart: bool) -> void:
+	for source_slot: int in range(BattleCore.SLOT_COUNT):
+		if source_slot == upgrade_slot or not b.slot_ready(side, source_slot):
+			continue
+		var data: ItemData = b.slot_item(side, source_slot)
+		if data == null:
+			continue
+		match data.item_id:
+			"t1_jicun_pai":
+				if b.energy[side] >= b.energy_max[side]:
+					continue
+				var deposit_target: int = _best_friendly_slot_item_target(
+					b, side, source_slot, upgrade_slot, true, false)
+				if deposit_target >= 0:
+					b.use_slot(side, source_slot, -1, deposit_target)
+			"t2_baojia_feng":
+				if _ready_hostile_item_count(b, 1 - side) <= 0:
+					continue
+				var insured_target: int = _best_friendly_slot_item_target(
+					b, side, source_slot, upgrade_slot, true, true)
+				if insured_target >= 0:
+					b.use_slot(side, source_slot, -1, insured_target)
+			"t2_huanqian_tong":
+				var exchange_target: int = _best_friendly_slot_item_target(
+					b, side, source_slot, upgrade_slot, false, false)
+				if exchange_target < 0:
+					continue
+				var exchange_options: Array = b.begin_exchange_draft(
+						side, source_slot, exchange_target)
+				if not exchange_options.is_empty():
+					b.use_slot(side, source_slot, -1, exchange_target,
+						_pick_choice(b, side, exchange_options, rng, smart))
+			"t2_huigou_quan":
+				var repurchase_options: Array = b.begin_repurchase_draft(side, source_slot)
+				if not repurchase_options.is_empty():
+					b.use_slot(side, source_slot, -1, -1,
+						_pick_choice(b, side, repurchase_options, rng, smart))
+			"t2_yingji_xiang":
+				if _backpack_has_tier(b, side, 1):
+					b.use_slot(side, source_slot)
+			"t2_chenglu_zhan":
+				if b.energy[side] < b.energy_max[side] \
+						and _has_healing_route_this_turn(b, side, source_slot):
+					b.use_slot(side, source_slot)
+			"t2_naying_hulu":
+				var active: int = b.active_index[side]
+				if b.hp[side][active] < b.max_hp[side][active] \
+						and _can_overflow_energy_this_turn(b, side, source_slot):
+					b.use_slot(side, source_slot)
+
+
+static func _best_friendly_slot_item_target(b: BattleCore, side: int, source_slot: int,
+		upgrade_slot: int, ready_only: bool, prefer_high: bool) -> int:
+	var best_slot: int = -1
+	var best_score: float = -INF if prefer_high else INF
+	for target_slot: int in range(BattleCore.SLOT_COUNT):
+		if target_slot == source_slot or target_slot == upgrade_slot:
+			continue
+		if ready_only and not b.slot_ready(side, target_slot):
+			continue
+		var slot: Dictionary = b.slots[side][target_slot]
+		var candidate: ItemData = b.slot_item(side, target_slot)
+		if candidate == null or bool(slot.get("used", false)):
+			continue
+		var score: float = score_item_option(b, side, candidate)
+		if best_slot < 0 or (prefer_high and score > best_score) \
+				or (not prefer_high and score < best_score):
+			best_score = score
+			best_slot = target_slot
+	return best_slot
+
+
+static func _backpack_has_tier(b: BattleCore, side: int, tier: int) -> bool:
+	if not b.battle_backpack_enabled:
+		return false
+	for entry_variant in b.battle_backpacks[side]:
+		var entry: Dictionary = entry_variant
+		var data: ItemData = ItemCatalog.make(String(entry.get("item_id", "")))
+		if data != null and data.tier == tier:
+			return true
+	return false
 
 
 ## 连续处理当前 ready 的点金石。AI 选择机会成本最低的 T1 目标，再按局面评估三个 T3 候选。
@@ -365,7 +453,9 @@ static func _is_attack_turn(_b: BattleCore, _side: int, action: int,
 
 ## 进攻向道具判定：维度=进攻（chip/增伤）或角色以「进攻」开头（进攻→X 导出骑乘，如血魔的獠牙）。
 static func _is_attack_item(data: ItemData) -> bool:
-	return data != null and (data.dimension == "进攻" or data.role.contains("攻") or data.role == "易伤") \
+	if data == null or data.item_id == "t2_pianfeng_jia":
+		return false
+	return (data.dimension == "进攻" or data.role.contains("攻") or data.role == "易伤") \
 		and not _is_action_commit_item(data)
 
 
@@ -380,13 +470,14 @@ static func _is_action_commit_item(data: ItemData) -> bool:
 		"t1_yazhen_zhui",
 		"t1_xunxing_zhui",
 		"t2_fuying_suo",
+		"t2_huiliu_zhu",
 		"t2_jieyin_pei",
 		"t2_nuanyu",
 	]
 
 
 static func _requires_item_slot_target(data: ItemData) -> bool:
-	return data != null and data.item_id in [FURNACE_ITEM_ID, POINTSTONE_ITEM_ID]
+	return data != null and BattleCore.item_requires_friendly_item_slot_target(data)
 
 
 static func _best_friendly_item_target(b: BattleCore, side: int, data: ItemData) -> int:
@@ -480,15 +571,27 @@ static func _best_friendly_item_target(b: BattleCore, side: int, data: ItemData)
 					best_gain = gain
 					best_swap = slot
 			return best_swap
+		"t3_yiyuan_deng":
+			var active: int = b.active_index[side]
+			if b.hp[side][active] > 2 * BattleCore.HP_UNIT:
+				return -1
+			var best_heal: int = 0
+			var best_reserve: int = -1
+			for slot in b.living_reserves(side):
+				var missing: int = b.max_hp[side][slot] - b.hp[side][slot]
+				if missing > best_heal:
+					best_heal = missing
+					best_reserve = slot
+			return best_reserve
 	return -1
 
 
-static func _best_enemy_locked_item_target(b: BattleCore, side: int) -> int:
+static func _best_enemy_item_target(b: BattleCore, side: int, data: ItemData) -> int:
 	var best: int = -1
 	var best_tier: int = -1
 	var opponent: int = 1 - side
 	for slot in range(BattleCore.SLOT_COUNT):
-		if not b.valid_enemy_locked_item_target(side, slot):
+		if not b.valid_enemy_item_target_for(data, side, slot):
 			continue
 		var item: ItemData = b.slot_item(opponent, slot)
 		var tier: int = item.tier if item != null else 0
@@ -496,6 +599,10 @@ static func _best_enemy_locked_item_target(b: BattleCore, side: int) -> int:
 			best_tier = tier
 			best = slot
 	return best
+
+
+static func _best_enemy_locked_item_target(b: BattleCore, side: int) -> int:
+	return _best_enemy_item_target(b, side, ItemCatalog.make("t2_shizhi_jiasuo"))
 
 
 ## 非进攻 T3 在选动作前处理；只拦截当前公开信息已证明白板的使用。
@@ -558,6 +665,23 @@ static func _should_use_ready_item(b: BattleCore, side: int, source_slot: int,
 				< _ready_hostile_item_count(b, 1 - side)
 		"t2_shizhi_jiasuo":
 			return _best_enemy_locked_item_target(b, side) >= 0
+		"t2_yawu_piao", "t2_cuiyong_pai":
+			return _best_enemy_item_target(b, side, data) >= 0
+		"t2_dingming_wan":
+			return b.hp[side][active] > 0 \
+				and b.hp[side][active] < int(data.params.get("hp", 6))
+		"t2_duyong_feng":
+			return _ready_item_count(b, side) == 1 \
+				and _ready_item_count(b, 1 - side) >= 2
+		"t2_pianfeng_jia":
+			var opponent: int = 1 - side
+			return b.usable_energy(opponent) >= b.action_cost(
+				opponent, ActionDef.Action.ATTACK) \
+				and b.usable_energy(opponent) < b.action_cost(
+					opponent, ActionDef.Action.BIG_ATTACK)
+		"t2_jingwen_zhou":
+			return _pending_hit_skill_effect_count(b, 1 - side) \
+				> _pending_hit_skill_effect_count(b, side)
 		"t2_guiying_pai":
 			return not b.living_reserves(side).is_empty() \
 				and int(b.item_buffs[side].get("return_camp_heal", 0)) == 0
@@ -592,6 +716,18 @@ static func _should_use_ready_item(b: BattleCore, side: int, source_slot: int,
 			return _ready_item_count(b, 1 - side) > _ready_item_count(b, side)
 		"t3_junneng_dou":
 			return b.energy[1 - side] > b.energy[side]
+		"t3_xiling_ling":
+			return _team_skill_pressure(b, 1 - side) > _team_skill_pressure(b, side)
+		"t3_yiyuan_deng":
+			return _best_friendly_item_target(b, side, data) >= 0
+		"t1_tingxia_tong":
+			return b.battle_backpack_enabled \
+				and b.battle_backpacks[1 - side].size() \
+				> b.revealed_backpack_items_for(side, 1 - side).size()
+		"t2_chenglu_zhan", "t2_naying_hulu", "t1_jicun_pai", \
+				"t2_baojia_feng", "t2_huanqian_tong", "t2_huigou_quan", \
+				"t2_yingji_xiang":
+			return false   # 有目标/候选/结算顺序要求，已由背包工具预处理。
 		_:
 			return true
 
@@ -611,6 +747,52 @@ static func _has_ready_healing_item(b: BattleCore, side: int, excluded_slot: int
 		if item != null and int(item.params.get("heal", 0)) > 0:
 			return true
 	return false
+
+
+static func _has_healing_route_this_turn(b: BattleCore, side: int,
+		excluded_slot: int = -1) -> bool:
+	if _has_ready_healing_item(b, side, excluded_slot) or _has_relic(b, side, "t3_xumingxiang"):
+		return true
+	for use_variant in b.item_uses[side]:
+		var use: Dictionary = use_variant
+		var data: ItemData = use.get("data", null)
+		if data != null and int(data.params.get("heal", 0)) > 0:
+			return true
+	return false
+
+
+static func _can_overflow_energy_this_turn(b: BattleCore, side: int,
+		excluded_slot: int = -1) -> bool:
+	if b.energy[side] >= b.energy_max[side]:
+		return true   # 「攒」是公开合法的保底产能来源。
+	var gap: int = b.energy_max[side] - b.energy[side]
+	for slot in range(BattleCore.SLOT_COUNT):
+		if slot == excluded_slot or not b.slot_ready(side, slot):
+			continue
+		var data: ItemData = b.slot_item(side, slot)
+		if data != null and int(data.params.get("energy", 0)) > gap:
+			return true
+	return false
+
+
+static func _pending_hit_skill_effect_count(b: BattleCore, side: int) -> int:
+	var count: int = 0
+	for slot in range(b.hp[side].size()):
+		for key in ["poison", "jianqi", "vuln"]:
+			if int(b.get_status(side, slot, key, 0)) > 0:
+				count += 1
+	return count
+
+
+static func _team_skill_pressure(b: BattleCore, side: int) -> int:
+	var pressure: int = 0
+	for slot in range(b.heroes[side].size()):
+		if b.hp[side][slot] <= 0:
+			continue
+		var hero_id: String = (b.heroes[side][slot] as HeroData).hero_id
+		if hero_id.begins_with("h") and hero_id.length() == 3:
+			pressure += 1
+	return pressure
 
 
 static func _has_ready_item_id(b: BattleCore, side: int, item_id: String) -> bool:
@@ -690,6 +872,14 @@ static func _should_commit_action_item(b: BattleCore, side: int, action: int,
 		"t2_nuanyu":
 			return (action in ActionDef.DEFEND_ACTIONS or second_action in ActionDef.DEFEND_ACTIONS) \
 				and _has_injured_living_hero(b, side)
+		"t2_huiliu_zhu":
+			var first_exact: bool = action >= 0 and b.action_cost(side, action) > 0 \
+				and b.energy[side] == b.action_cost(side, action)
+			var second_exact: bool = second_action >= 0 \
+				and b.action_cost(side, second_action) > 0 \
+				and b.energy[side] == b.action_cost(side, action) \
+					+ b.action_cost(side, second_action)
+			return first_exact or second_exact
 		_:
 			return false
 

@@ -1,6 +1,6 @@
 extends GutTest
 
-## 31 件 Tier-1 道具行为锁定测试（ADR-003）。
+## Tier-1 道具行为锁定测试（ADR-003）。
 ## 无特别说明时使用无技能英雄，隔离道具效果与英雄逻辑。半点制：1HP=2 半点、1能量=2 半能。
 
 const A := ActionDef.Action
@@ -49,8 +49,8 @@ func _energy_after(id: String, action0: int, action1: int, start: int = 6) -> in
 
 # === 正式池 / 玩家文案 ===
 
-func test_catalog_has_31_t1_items_and_no_guike() -> void:
-	assert_eq(ItemCatalog.all_tier1().size(), 31)
+func test_catalog_has_current_t1_items_and_no_guike() -> void:
+	assert_eq(ItemCatalog.all_tier1().size(), 34)
 	assert_false(ItemCatalog.ids().has("t1_guike"))
 	for item in ItemCatalog.all_tier1():
 		assert_gte(item.ev_half, 2, "%s 不应继续按旧 0.5 基准估值" % item.item_id)
@@ -84,6 +84,9 @@ func test_t1_player_copy_matches_approved_text() -> void:
 		"t1_tengman_xianjing": "本回合内，敌方切换后，换下的英雄受到1点伤害。",
 		"t1_jiedu_yaoshui": "清除我方出战英雄的毒素；若没有毒素则清除脆弱。成功清除后，其回复1点生命。",
 		"t1_xunxing_zhui": "本回合内，我方下一次「波」可以指定任意一名敌方英雄，但总伤害减少0.5点。",
+		"t1_jicun_pai": "选择另一件可使用的道具，将其随机放回背包，立即获得1点能量。",
+		"t1_tingxia_tong": "随机揭示敌方背包中至多3件道具，直到本场战斗结束。",
+		"t1_gufeng_zhui": "仅当我方没有其他可使用的道具时使用；本回合内，我方下一次攻击的总伤害增加2点。",
 	}
 	for id in expected:
 		assert_eq(ItemCatalog.make(id).description, expected[id], id)
@@ -132,9 +135,22 @@ func test_t2_player_copy_and_value_match_approved_rebase() -> void:
 		"t2_huzhen_ding": "选择我方一名未出战英雄，使其获得2点护盾。",
 		"t2_fengmai_zhen": "本回合内，双方无法回复生命。",
 		"t2_suoquan_sai": "下回合，敌方无法获得能量。",
+		"t2_yawu_piao": "押注敌方一件可使用的道具；本回合其若被使用，我方获得2点能量。",
+		"t2_huigou_quan": "选择本场已经使用的一件普通道具，将1件同名临时道具随机放入背包。",
+		"t2_baojia_feng": "选择另一件可使用的道具；本回合它若被反制，则不消耗并随机放回背包。",
+		"t2_yingji_xiang": "从自己的背包随机抽取1件普通道具，填入本物腾出的道具框并立即可用。",
+		"t2_huanqian_tong": "选择另一件道具，将其随机放回背包，随后免费抽取一次道具。",
+		"t2_chenglu_zhan": "本回合内，我方溢出的生命回复转为等量能量。",
+		"t2_naying_hulu": "本回合内，我方获得的溢出能量转为回复生命最低的存活英雄。",
+		"t2_cuiyong_pai": "选择敌方一件可使用的道具；本回合结束时若仍未使用，将其锁定1回合。",
+		"t2_dingming_wan": "我方出战英雄的生命不足3点时，回复至3点。",
+		"t2_duyong_feng": "本回合内，双方只有首件道具生效。",
+		"t2_pianfeng_jia": "本回合内，敌方「波」无法对我方造成伤害，但其「大波」的总伤害增加2点。",
+		"t2_jingwen_zhou": "清除双方所有由攻击命中产生、尚未结算的英雄技能效果。",
+		"t2_huiliu_zhu": "本回合内，我方行动若正好耗尽能量，行动结算后获得2点能量。",
 	}
 	assert_eq(ItemCatalog.all_tier2().size(), expected.size())
-	assert_eq(ItemCatalog.all().size(), 96)
+	assert_eq(ItemCatalog.all().size(), 114)
 	for deleted_id in ["t2_shaizi", "t2_wudouwawa", "t2_xiongyao"]:
 		assert_false(ItemCatalog.ids().has(deleted_id), "%s 已移出正式目录" % deleted_id)
 	for id in expected:
@@ -171,6 +187,8 @@ func test_t3_player_copy_value_and_params_match_approved_rebase() -> void:
 		"t3_yemingzhu": "我方接下来3次切换时，对敌方出战英雄造成1点伤害，切换登场的英雄获得1点护盾。",
 		"t3_jianyi": "本回合内，我方「波」若命中，下回合第一次「大波」不消耗能量。",
 		"t3_yiqi": "本回合无敌。",
+		"t3_xiling_ling": "本回合内，双方所有英雄技能无效。",
+		"t3_yiyuan_deng": "使我方出战英雄死亡；死亡结算成功后，选择我方一名未出战英雄，使其回复至生命上限并登场。本回合我方无法行动。",
 	}
 	var expected_params := {
 		"t3_budongmingwang": {relic = true, charges = 3, stack_mode = "extend_charges"},
@@ -199,8 +217,10 @@ func test_t3_player_copy_value_and_params_match_approved_rebase() -> void:
 		"t3_yemingzhu": {relic = true, charges = 3, dmg = 2, armor = 2, stack_mode = "extend_charges"},
 		"t3_jianyi": {},
 		"t3_yiqi": {},
+		"t3_xiling_ling": {},
+		"t3_yiyuan_deng": {},
 	}
-	assert_eq(ItemCatalog.all_tier3().size(), 26)
+	assert_eq(ItemCatalog.all_tier3().size(), 28)
 	for id in expected_copy:
 		var item := ItemCatalog.make(id)
 		assert_eq(item.description, expected_copy[id], id)
@@ -241,6 +261,9 @@ func test_t1_items_keep_only_live_fixed_t2_upgrade_targets() -> void:
 		"t1_tengman_xianjing": "",
 		"t1_jiedu_yaoshui": "",
 		"t1_xunxing_zhui": "",
+		"t1_jicun_pai": "",
+		"t1_tingxia_tong": "",
+		"t1_gufeng_zhui": "",
 	}
 	assert_eq(ItemCatalog.all_tier1().size(), expected.size())
 	for id in expected:
@@ -250,31 +273,31 @@ func test_t1_items_keep_only_live_fixed_t2_upgrade_targets() -> void:
 func test_catalog_uses_tier_then_toneless_full_pinyin_order() -> void:
 	var expected := [
 		"t1_qipao", "t1_xiangjiaopi", "t1_moli_yuanquan", "t1_deneng_hufu",
-		"t1_dutu_yingbi", "t1_fentong_mupai", "t1_houshou", "t1_houzhen_qian", "t1_huanfang_kou",
-		"t1_huifeng_qiao", "t1_fengzhixue", "t1_jiedu_yaoshui", "t1_jijiu_ling",
+		"t1_dutu_yingbi", "t1_fentong_mupai", "t1_gufeng_zhui", "t1_houshou", "t1_houzhen_qian", "t1_huanfang_kou",
+		"t1_huifeng_qiao", "t1_fengzhixue", "t1_jicun_pai", "t1_jiedu_yaoshui", "t1_jijiu_ling",
 		"t1_lzhi_fali", "t1_lzhi_shengming", "t1_jiudun", "t1_hushenfu",
-		"t1_feibiao", "t1_tongqian", "t1_ronglu", "t1_tengman_xianjing",
+		"t1_feibiao", "t1_tongqian", "t1_ronglu", "t1_tengman_xianjing", "t1_tingxia_tong",
 		"t1_weihouzhen", "t1_xianshou", "t1_xuedu_jie", "t1_xixie_yaya",
 		"t1_xunxing_zhui", "t1_xuzhen_qi", "t1_yaohuo", "t1_yazhen_zhui",
 		"t1_podun_zhou", "t1_siyecao",
-		"t2_baolie", "t2_daishang_san", "t2_dianjiang_gu", "t2_dianjinshi", "t2_difeng_kou", "t2_dingshen", "t2_duyao",
+		"t2_baojia_feng", "t2_baolie", "t2_chenglu_zhan", "t2_cuiyong_pai", "t2_daishang_san", "t2_dianjiang_gu", "t2_dianjinshi", "t2_difeng_kou", "t2_dingming_wan", "t2_dingshen", "t2_duyao", "t2_duyong_feng",
 		"t2_fencun_chi", "t2_feibiao", "t2_fengmai_zhen", "t2_fengyin", "t2_fuying_suo",
-		"t2_guiying_pai", "t2_huanhundan", "t2_huizhao_jing", "t2_huzhen_ding", "t2_jiandun", "t2_jieyin_pei",
-		"t2_lianxin_suo", "t2_lieyin", "t2_daijia", "t2_miwu_doupeng", "t2_huoshou", "t2_ningxue_gao", "t2_jike", "t2_nuanyu",
-		"t2_pomoshi", "t2_fali", "t2_shengming", "t2_mojing", "t2_shitiechong",
+		"t2_guiying_pai", "t2_huanhundan", "t2_huanqian_tong", "t2_huigou_quan", "t2_huiliu_zhu", "t2_huizhao_jing", "t2_huzhen_ding", "t2_jiandun", "t2_jieyin_pei", "t2_jingwen_zhou",
+		"t2_lianxin_suo", "t2_lieyin", "t2_daijia", "t2_miwu_doupeng", "t2_huoshou", "t2_naying_hulu", "t2_ningxue_gao", "t2_jike", "t2_nuanyu",
+		"t2_pianfeng_jia", "t2_pomoshi", "t2_fali", "t2_shengming", "t2_mojing", "t2_shitiechong",
 		"t2_shizhi_jiasuo", "t2_shuangsheng", "t2_suoquan_sai", "t2_caoren", "t2_xingjun_yaonang",
-		"t2_qiubite", "t2_yijia_huan", "t2_zhenwen_zhen",
+		"t2_qiubite", "t2_yawu_piao", "t2_yijia_huan", "t2_yingji_xiang", "t2_zhenwen_zhen",
 		"t3_budongmingwang", "t3_yujin", "t3_hedinghong", "t3_huanming_qi",
 		"t3_jieming_deng", "t3_jubao_pen", "t3_judingsanhua", "t3_junneng_dou",
 		"t3_lianhuan_gu", "t3_longxi", "t3_mengdie", "t3_morihuozhong",
 		"t3_qingnang_huopen", "t3_qingyuanbaolian", "t3_sanqi_zhong",
 		"t3_fali", "t3_shengming", "t3_sheming_quan", "t3_shixinding",
-		"t3_tianluodiwang", "t3_tinglong", "t3_xumingxiang", "t3_yemingzhu",
+		"t3_tianluodiwang", "t3_tinglong", "t3_xiling_ling", "t3_xumingxiang", "t3_yemingzhu", "t3_yiyuan_deng",
 		"t3_zhaohun_fan", "t3_jianyi", "t3_yiqi",
 	]
 	assert_eq(ItemCatalog.ids(), expected)
 	assert_eq(ItemCatalog.all().map(func(item: ItemData) -> String: return item.item_id), expected)
-	assert_eq(ItemCatalog.all_tier1().map(func(item: ItemData) -> String: return item.item_id), expected.slice(0, 31))
+	assert_eq(ItemCatalog.all_tier1().map(func(item: ItemData) -> String: return item.item_id), expected.slice(0, 34))
 
 
 # === 基础价值抬升 ===

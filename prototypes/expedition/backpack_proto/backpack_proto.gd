@@ -30,7 +30,7 @@ var mouse_pos: Vector2
 
 func _ready() -> void:
 	var th := Theme.new()
-	th.default_font = load("res://assets/font/ark-pixel-16px-proportional-zh_cn.ttf")
+	th.default_font = load("res://assets/font/zlabs_pixel_ui.tres")
 	th.default_font_size = 16
 	theme = th
 	rng.seed = 20260706

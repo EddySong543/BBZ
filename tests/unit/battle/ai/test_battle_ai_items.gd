@@ -689,6 +689,194 @@ func test_t3_option_scoring_reads_poison_switch_and_attack_conditions() -> void:
 		"至臻剑意的免费大波窗口应成为噬心钉可续攻的真实组合")
 
 
+# === 背包首批 + 参考游戏转译批 AI 收口 ===
+
+func test_ai_uses_backpack_tools_with_real_targets_and_private_choices() -> void:
+	var deposit := _battle(0)
+	deposit.configure_battle_backpacks([], ["t1_lzhi_shengming"])
+	deposit.econ_init()
+	deposit.slots[1][0] = _ready_slot("t1_jicun_pai")
+	deposit.slots[1][1] = _ready_slot("t1_jiudun")
+	BattleAI.run_item_economy(deposit, 1, _rng())
+	assert_false(deposit.slot_ready(1, 0), "寄存牌应在缺能时选择另一件就绪道具")
+	assert_true(bool(deposit.slots[1][1]["used"]), "被寄存的目标槽应当腾空")
+	assert_eq(deposit.energy[1], BattleCore.HP_UNIT, "寄存牌应立即获得1点能量")
+
+	var repurchase := _battle(BattleAI.AI_ITEM_ENERGY_RESERVE)
+	repurchase.configure_battle_backpacks([], [])
+	repurchase.econ_init()
+	repurchase.slots[1][0] = _ready_slot("t2_huigou_quan")
+	repurchase.used_item_history[1].append({item_id = "t1_xianshou", tier = 1})
+	BattleAI.run_item_economy(repurchase, 1, _rng())
+	assert_false(repurchase.slot_ready(1, 0), "回购券有合法历史目标时应选择候选")
+	assert_eq(String((repurchase.battle_backpacks[1][0] as Dictionary)["item_id"]),
+		"t1_xianshou")
+	assert_true(bool((repurchase.battle_backpacks[1][0] as Dictionary)["temporary"]),
+		"回购产物必须保持临时物件身份")
+
+	var exchange := _battle(BattleAI.AI_ITEM_ENERGY_RESERVE)
+	exchange.configure_battle_backpacks([], ["t1_lzhi_shengming", "t2_jiandun"])
+	exchange.econ_init()
+	exchange.slots[1][0] = _ready_slot("t2_huanqian_tong")
+	exchange.slots[1][1] = _ready_slot("t1_xianshou")
+	BattleAI.run_item_economy(exchange, 1, _rng())
+	assert_false(exchange.slot_ready(1, 0), "换签筒应选择另一件道具与背包候选")
+	assert_ne(exchange.slot_item(1, 1).item_id, "t1_xianshou")
+	assert_false(exchange.slot_ready(1, 1), "换入道具必须锁定一回合")
+
+
+func test_ai_uses_remaining_backpack_tools_only_with_real_value() -> void:
+	var insurance := _battle(BattleAI.AI_ITEM_ENERGY_RESERVE)
+	insurance.configure_battle_backpacks([], [])
+	insurance.econ_init()
+	insurance.slots[1][0] = _ready_slot("t2_baojia_feng")
+	insurance.slots[1][1] = _ready_slot("t3_yiqi")
+	insurance.slots[0][0] = _ready_slot("t1_yaohuo")
+	BattleAI.run_item_economy(insurance, 1, _rng())
+	assert_false(insurance.slot_ready(1, 0), "存在敌方负面道具时应为高价值道具投保")
+	assert_eq(int((insurance.item_uses[1][0] as Dictionary)["item_slot_target"]), 1)
+
+	var emergency := _battle(BattleAI.AI_ITEM_ENERGY_RESERVE)
+	emergency.configure_battle_backpacks([], ["t1_xianshou", "t2_jiandun"])
+	emergency.econ_init()
+	emergency.slots[1][0] = _ready_slot("t2_yingji_xiang")
+	BattleAI.run_item_economy(emergency, 1, _rng())
+	assert_eq((emergency.slot_item(1, 0) as ItemData).item_id, "t1_xianshou",
+		"应急箱应从背包取出普通道具并立即替换来源槽")
+	assert_true(emergency.slot_ready(1, 0), "应急箱替换结果必须可以在本回合继续使用")
+
+	var listen := _battle(BattleAI.AI_ITEM_ENERGY_RESERVE)
+	listen.configure_battle_backpacks(
+		["t1_xianshou", "t1_jiudun", "t2_jiandun"], [])
+	listen.econ_init()
+	listen.slots[1][0] = _ready_slot("t1_tingxia_tong")
+	BattleAI.run_item_economy(listen, 1, _rng())
+	assert_false(listen.slot_ready(1, 0), "敌方背包仍有未知道具时应使用听匣筒")
+
+
+func test_ai_arms_conversion_items_only_when_their_route_exists() -> void:
+	var dew := _battle(BattleAI.AI_ITEM_ENERGY_RESERVE)
+	dew.configure_battle_backpacks([], [])
+	dew.econ_init()
+	dew.energy[1] = 0
+	dew.slots[1][0] = _ready_slot("t2_chenglu_zhan")
+	dew.slots[1][1] = _ready_slot("t3_shengming")
+	BattleAI.run_item_economy(dew, 1, _rng())
+	assert_false(dew.slot_ready(1, 0), "本回合存在治疗来源且能量未满时应登记承露盏")
+
+	var gourd := _battle(BattleAI.AI_ITEM_ENERGY_RESERVE)
+	gourd.configure_battle_backpacks([], [])
+	gourd.econ_init()
+	gourd.energy[1] = gourd.energy_max[1]
+	gourd.hp[1][0] = 4
+	gourd.slots[1][0] = _ready_slot("t2_naying_hulu")
+	BattleAI.run_item_economy(gourd, 1, _rng())
+	assert_false(gourd.slot_ready(1, 0), "有受伤目标且攒会溢出时应登记纳盈葫芦")
+
+	var blank := _battle(BattleAI.AI_ITEM_ENERGY_RESERVE)
+	blank.configure_battle_backpacks([], [])
+	blank.econ_init()
+	blank.slots[1][0] = _ready_slot("t2_chenglu_zhan")
+	BattleAI.run_item_economy(blank, 1, _rng())
+	assert_true(blank.slot_ready(1, 0), "没有治疗来源时不得空放承露盏")
+
+
+func test_ai_targets_enemy_ready_items_for_wager_and_use_pressure() -> void:
+	for source_id in ["t2_yawu_piao", "t2_cuiyong_pai"]:
+		var b := _battle(BattleAI.AI_ITEM_ENERGY_RESERVE)
+		b.configure_battle_backpacks([], [])
+		b.econ_init()
+		b.slots[1][0] = _ready_slot(source_id)
+		b.slots[0][0] = _ready_slot("t1_xianshou")
+		b.slots[0][1] = _ready_slot("t3_yiqi")
+		BattleAI.run_item_economy(b, 1, _rng())
+		assert_false(b.slot_ready(1, 0), "%s 应对公开就绪道具选择目标" % source_id)
+		assert_eq(int((b.item_uses[1][0] as Dictionary)["item_slot_target"]), 1,
+			"应优先施压价值更高的传说道具")
+
+
+func test_ai_holds_blank_new_items_and_uses_live_windows() -> void:
+	var pill_blank := _battle(BattleAI.AI_ITEM_ENERGY_RESERVE)
+	pill_blank.slots[1][0] = _ready_slot("t2_dingming_wan")
+	BattleAI.run_item_economy(pill_blank, 1, _rng())
+	assert_true(pill_blank.slot_ready(1, 0), "生命不少于3点时不得浪费定命丸")
+
+	var pill_live := _battle(BattleAI.AI_ITEM_ENERGY_RESERVE)
+	pill_live.hp[1][0] = 2
+	pill_live.slots[1][0] = _ready_slot("t2_dingming_wan")
+	BattleAI.run_item_economy(pill_live, 1, _rng())
+	assert_false(pill_live.slot_ready(1, 0), "低于3点时应使用定命丸")
+
+	var broom_blank := _battle(BattleAI.AI_ITEM_ENERGY_RESERVE)
+	broom_blank.slots[1][0] = _ready_slot("t2_jingwen_zhou")
+	BattleAI.run_item_economy(broom_blank, 1, _rng())
+	assert_true(broom_blank.slot_ready(1, 0), "没有待清命中成果时不得空放净纹帚")
+
+	var broom_live := _battle(BattleAI.AI_ITEM_ENERGY_RESERVE)
+	broom_live.set_status(0, 0, "poison", 3)
+	broom_live.slots[1][0] = _ready_slot("t2_jingwen_zhou")
+	BattleAI.run_item_economy(broom_live, 1, _rng())
+	assert_false(broom_live.slot_ready(1, 0), "敌方待结算命中成果更多时应使用净纹帚")
+
+	var armor_blank := _battle(BattleAI.AI_ITEM_ENERGY_RESERVE)
+	armor_blank.energy[0] = 3 * ActionDef.ENERGY_UNIT
+	armor_blank.slots[1][0] = _ready_slot("t2_pianfeng_jia")
+	BattleAI.run_item_economy(armor_blank, 1, _rng())
+	assert_true(armor_blank.slot_ready(1, 0), "敌方可用大波时不得主动给其增伤")
+
+	var armor_live := _battle(BattleAI.AI_ITEM_ENERGY_RESERVE)
+	armor_live.energy[0] = ActionDef.ENERGY_UNIT
+	armor_live.slots[1][0] = _ready_slot("t2_pianfeng_jia")
+	BattleAI.run_item_economy(armor_live, 1, _rng())
+	assert_false(armor_live.slot_ready(1, 0), "敌方只能用波时应使用偏锋甲")
+
+	var limiter := _battle(BattleAI.AI_ITEM_ENERGY_RESERVE)
+	limiter.slots[1][0] = _ready_slot("t2_duyong_feng")
+	limiter.slots[0][0] = _ready_slot("t1_xianshou")
+	limiter.slots[0][1] = _ready_slot("t1_jiudun")
+	BattleAI.run_item_economy(limiter, 1, _rng())
+	assert_false(limiter.slot_ready(1, 0), "我方仅一件、敌方至少两件时应使用独用封")
+
+	var silence := _battle(BattleAI.AI_ITEM_ENERGY_RESERVE)
+	silence.heroes[0][0] = _hero("h01", 10)
+	silence.heroes[0][1] = _hero("h06", 10)
+	silence.slots[1][0] = _ready_slot("t3_xiling_ling")
+	BattleAI.run_item_economy(silence, 1, _rng())
+	assert_false(silence.slot_ready(1, 0), "敌方英雄技能压力更高时应使用息灵铃")
+
+
+func test_ai_uses_last_wish_only_for_a_real_sacrifice_handoff() -> void:
+	var blank := _battle(BattleAI.AI_ITEM_ENERGY_RESERVE)
+	blank.slots[1][0] = _ready_slot("t3_yiyuan_deng")
+	BattleAI.run_item_economy(blank, 1, _rng())
+	assert_true(blank.slot_ready(1, 0), "满血出战且替补无治疗收益时不得使用遗愿灯")
+
+	var live := _battle(BattleAI.AI_ITEM_ENERGY_RESERVE)
+	live.hp[1] = [2, 4, 12]
+	live.max_hp[1] = [20, 20, 20]
+	live.slots[1][0] = _ready_slot("t3_yiyuan_deng")
+	BattleAI.run_item_economy(live, 1, _rng())
+	assert_false(live.slot_ready(1, 0), "残血出战应把遗愿灯交给治疗收益最大的替补")
+	assert_eq(int((live.item_uses[1][0] as Dictionary)["target"]), 1)
+
+
+func test_ai_commits_exact_spend_refund_and_lone_attack_boost() -> void:
+	var refund := _battle(ActionDef.ENERGY_UNIT)
+	refund.slots[1][0] = _ready_slot("t2_huiliu_zhu")
+	BattleAI.commit_attack_items(refund, 1, A.ATTACK)
+	assert_false(refund.slot_ready(1, 0), "能量正好支付波时应提交回流珠")
+
+	var no_refund := _battle(2 * ActionDef.ENERGY_UNIT)
+	no_refund.slots[1][0] = _ready_slot("t2_huiliu_zhu")
+	BattleAI.commit_attack_items(no_refund, 1, A.ATTACK)
+	assert_true(no_refund.slot_ready(1, 0), "行动不会耗尽能量时应保留回流珠")
+
+	var lone := _battle(BattleAI.AI_ITEM_ENERGY_RESERVE)
+	lone.slots[1][0] = _ready_slot("t1_gufeng_zhui")
+	BattleAI.commit_attack_items(lone, 1, A.ATTACK)
+	assert_false(lone.slot_ready(1, 0), "孤锋锥为唯一可用道具时应随攻击提交")
+
+
 func test_lianhuan_gu_expands_ai_choices_into_two_different_public_actions() -> void:
 	var b := _battle(20)
 	b.slots[1][0] = _ready_slot("t3_lianhuan_gu")

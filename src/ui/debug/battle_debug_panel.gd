@@ -96,8 +96,8 @@ func _dbg_next_hero_enemy() -> void:
 
 
 ## 把 player 出战英雄换成英雄池里下一个（h01→h02→…→h12→h01·跳过无美术的）。
-## 仅替换 HeroData + 重置该槽位 HP/护盾为新英雄满血 → 立绘/头像/名字/技能卡/爱心数全套联动刷新。
-## ⚠ 纯美术巡检用：不走结算管线，被动/技能状态不迁移。
+## 完整替换该槽位的 HeroData + HeroSkill，并清掉旧英雄的槽位运行时状态。
+## 仍是 DEBUG 巡检入口：不重建整局，但当前出战位会执行离场/初始化/登场 hook。
 func _dbg_next_hero(player: int) -> void:
 	if _art_pool.is_empty():
 		for h in HeroData.create_pool_heroes():
@@ -117,12 +117,37 @@ func _dbg_next_hero(player: int) -> void:
 		if _art_pool[i].hero_id == cur_id:
 			idx = i
 			break
-	var next_hero: HeroData = _art_pool[(idx + 1) % _art_pool.size()]
-
-	_battle.heroes[player][slot] = next_hero
-	_battle.max_hp[player][slot] = int(next_hero.max_hp) * BattleCore.HP_UNIT
-	_battle.hp[player][slot] = _battle.max_hp[player][slot]
-	_battle.shield[player][slot] = 0
+	var next_hero := _art_pool[(idx + 1) % _art_pool.size()].duplicate(true) as HeroData
+	var old_skill: HeroSkill = _battle.get_skill(player, slot)
+	if slot == _battle.active_index[player] and old_skill != null:
+		old_skill.on_switch_out(_battle, player, slot)
+	var next_max_hp := int(next_hero.max_hp) * BattleCore.HP_UNIT
+	_battle._apply_hero_runtime_snapshot(player, slot, {
+		hero = next_hero,
+		hp = next_max_hp,
+		max_hp = next_max_hp,
+		shield = 0,
+		pending_damage = 0,
+		statuses = {},
+		death_processed = false,
+		killer = -1,
+	})
+	_battle.selected_action[player] = -1
+	_battle._switch_to[player] = -1
+	_battle._active_target[player] = -1
+	_battle._attack_target[player] = -1
+	_battle._second_action[player] = -1
+	_battle._second_attack_target[player] = -1
+	_battle._empowered_wave[player] = false
+	_battle._split_big_wave[player] = false
+	_battle._blood_payment[player] = false
+	_battle._blood_payment_source[player] = -1
+	_battle._energy_cap_discount[player] = false
+	var next_skill: HeroSkill = _battle.get_skill(player, slot)
+	if next_skill != null:
+		next_skill.on_setup(_battle, player, slot)
+		if slot == _battle.active_index[player]:
+			next_skill.on_switch_in(_battle, player, slot)
 
 	state_changed.emit()
 	print("debug: P%d 出战英雄 → %s (%s)" % [player + 1, next_hero.hero_id, next_hero.hero_name])

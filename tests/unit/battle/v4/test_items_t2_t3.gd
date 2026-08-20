@@ -500,5 +500,5 @@ func test_all_t2_t3_construct_and_run() -> void:
 
 
 func test_catalog_tier_counts() -> void:
-	assert_eq(ItemCatalog.all_tier2().size(), 39, "删除3件旧道具并完成两批稀有连接件后的T2件数")
-	assert_eq(ItemCatalog.all_tier3().size(), 26, "完成本轮传说扩充后的T3实装件数")
+	assert_eq(ItemCatalog.all_tier2().size(), 52, "完成背包与参考游戏转译批后的T2件数")
+	assert_eq(ItemCatalog.all_tier3().size(), 28, "完成参考游戏转译批后的T3件数")

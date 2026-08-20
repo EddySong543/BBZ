@@ -21,6 +21,11 @@ const FRAME_HIGHLIGHT := {
 	1: Color("#B9D9F2"), 2: Color("#D6B1F2"), 3: Color("#F7DE9A"),
 }
 
+const DROP_SHADOW_OFFSET := Vector2(2.0, 4.0)
+const DROP_SHADOW_COLOR := Color(0.02, 0.012, 0.008, 0.34)
+const ITEM_ART_SHADOW_OFFSET := Vector2(2.0, 3.0)
+const ITEM_ART_SHADOW_COLOR := Color(0.02, 0.012, 0.008, 0.38)
+
 const LEGENDARY_TINT := Color.WHITE
 const LEGENDARY_TOP_DARKENING := 0.18
 const FRAME_ART_SCALE := 87.25 / 68.0
@@ -42,13 +47,63 @@ static func apply_frame_palette(material: ShaderMaterial, tier: int) -> void:
 	material.set_shader_parameter("highlight_color", FRAME_HIGHLIGHT[key])
 
 
-static func make_cell_material(tier: int, pixel_grid: float, corner_radius: float = 0.0) -> ShaderMaterial:
+static func make_cell_material(tier: int, pixel_grid: float,
+		corner_radius: float = 0.0) -> ShaderMaterial:
 	var material := ShaderMaterial.new()
 	material.shader = CELL_SHADER
 	apply_cell_palette(material, tier)
 	material.set_shader_parameter("corner_radius", corner_radius)
 	material.set_shader_parameter("pixel_grid", pixel_grid)
 	return material
+
+
+static func make_shadow_material(color: Color = DROP_SHADOW_COLOR) -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = FRAME_SHADER
+	var opaque_color := Color(color.r, color.g, color.b, 1.0)
+	material.set_shader_parameter("shadow_color", opaque_color)
+	material.set_shader_parameter("mid_color", opaque_color)
+	material.set_shader_parameter("highlight_color", opaque_color)
+	return material
+
+
+static func make_frame_shadow(frame_position: Vector2, frame_size: Vector2,
+		node_name: String = "BottomShadow", offset: Vector2 = DROP_SHADOW_OFFSET,
+		color: Color = DROP_SHADOW_COLOR) -> TextureRect:
+	var shadow := TextureRect.new()
+	shadow.name = node_name
+	shadow.texture = FRAME_TEXTURE
+	shadow.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	shadow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	shadow.stretch_mode = TextureRect.STRETCH_SCALE
+	shadow.position = frame_position + offset
+	shadow.size = frame_size
+	shadow.material = make_shadow_material(color)
+	shadow.self_modulate = Color(1.0, 1.0, 1.0, color.a)
+	shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return shadow
+
+
+## 道具图案投影与框体投影分层：它只复制图案 alpha，位于格底之上、金属框之下。
+## 大图最多放大到 2 倍偏移，避免图鉴详情页出现悬浮过高的长投影。
+static func item_art_shadow_offset(art_size: Vector2) -> Vector2:
+	var scale_factor := clampf(minf(art_size.x, art_size.y) / 64.0, 1.0, 2.0)
+	return (ITEM_ART_SHADOW_OFFSET * scale_factor).round()
+
+
+static func make_item_art_shadow(texture: Texture2D, art_position: Vector2,
+		art_size: Vector2, node_name: String = "ItemArtShadow") -> TextureRect:
+	var shadow := TextureRect.new()
+	shadow.name = node_name
+	shadow.texture = texture
+	shadow.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	shadow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	shadow.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	shadow.position = art_position + item_art_shadow_offset(art_size)
+	shadow.size = art_size
+	shadow.self_modulate = ITEM_ART_SHADOW_COLOR
+	shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return shadow
 
 
 static func apply_cell_palette(material: ShaderMaterial, tier: int, tint_multiplier: Color = Color.WHITE) -> void:

@@ -43,10 +43,13 @@ var _rate_last_ms: Array[int] = [0, 0]
 var _rate_warned: Array[bool] = [false, false]
 
 
-func start(team0: Array, team1: Array, seed_v: int, send_cb: Callable) -> void:
+func start(team0: Array, team1: Array, seed_v: int, send_cb: Callable,
+		backpacks: Array = []) -> void:
 	_send = send_cb
 	battle = BattleCore.new()
 	battle.setup(team0, team1, seed_v)
+	if backpacks.size() == 2:
+		battle.configure_battle_backpacks(backpacks[0], backpacks[1])
 	battle.econ_init()
 	phase = Phase.SELECT
 	_pending = [null, null]
@@ -105,7 +108,7 @@ func handle(player: int, msg: Variant) -> void:
 		"econ_pick":
 			_on_econ_pick(player, d)
 		"item_draft":
-			_on_pointstone_draft(player, int(d["slot"]), int(d["target"]))
+			_on_item_draft(player, int(d["slot"]), int(d["target"]))
 		"death_switch":
 			_on_death_switch(player, int(d["slot"]))
 
@@ -154,9 +157,12 @@ func _apply_payload(core: BattleCore, player: int, d: Dictionary) -> bool:
 		var item_target: int = -1 if item_slot_targets.is_empty() else int(item_slot_targets[index])
 		var item_choice: int = -1 if item_slot_choices.is_empty() else int(item_slot_choices[index])
 		var source_item: ItemData = core.slot_item(player, source_slot)
-		if source_item != null and source_item.item_id == "t2_dianjinshi":
+		if source_item != null and source_item.item_id in [
+				"t2_dianjinshi", "t2_huanqian_tong", "t2_huigou_quan"]:
 			# 候选必须先由权威 item_draft 入口生成并缓存；客户端不能凭空猜下标触发新随机。
-			if item_choice < 0 or (core.slots[player][source_slot]["upg_draft"] as Array).is_empty():
+			var cache_key: String = "draft" if source_item.item_id == "t2_huanqian_tong" \
+				else "upg_draft"
+			if item_choice < 0 or (core.slots[player][source_slot][cache_key] as Array).is_empty():
 				return false
 		elif item_choice != -1:
 			return false
@@ -344,20 +350,34 @@ func _on_econ_draft(player: int, slot: int, upgrade: bool) -> void:
 		slot = slot, upgrade = upgrade, options = ids})
 
 
-## 点金石候选属于本次道具使用的私有信息：权威核心生成并缓存，只有本人收到。
-## 目标变化时核心沿用来源槽的同一组候选，避免通过反复点选重掷。
-func _on_pointstone_draft(player: int, slot: int, target: int) -> void:
+## 带候选的道具由权威核心生成并缓存，只有本人收到；客户端只能提交候选下标。
+func _on_item_draft(player: int, slot: int, target: int) -> void:
 	if not _econ_gate(player):
 		return
-	var options: Array = battle.begin_pointstone_draft(player, slot, target)
+	if slot < 0 or slot >= battle.slots[player].size() or not battle.slot_ready(player, slot):
+		_send.call(player, NetProtocol.msg_error("draft_unavailable"))
+		return
+	var data: ItemData = battle.slot_item(player, slot)
+	var options: Array = []
+	if data != null:
+		match data.item_id:
+			"t2_dianjinshi":
+				options = battle.begin_pointstone_draft(player, slot, target)
+			"t2_huanqian_tong":
+				options = battle.begin_exchange_draft(player, slot, target)
+			"t2_huigou_quan":
+				if target == -1:
+					options = battle.begin_repurchase_draft(player, slot)
 	if options.is_empty():
 		_send.call(player, NetProtocol.msg_error("draft_unavailable"))
 		return
 	var ids: Array[String] = []
 	for item_variant in options:
 		ids.append((item_variant as ItemData).item_id)
-	_send.call(player, {v = NetProtocol.PROTO_VERSION, kind = "pointstone_offer",
-		slot = slot, target = target, options = ids})
+	var offer_kind: String = "pointstone_offer" if data.item_id == "t2_dianjinshi" \
+		else "item_choice_offer"
+	_send.call(player, {v = NetProtocol.PROTO_VERSION, kind = offer_kind,
+		slot = slot, target = target, item_id = data.item_id, options = ids})
 
 
 func _on_econ_pick(player: int, d: Dictionary) -> void:
@@ -400,8 +420,23 @@ func _snap_for(viewer: int) -> Dictionary:
 	for sl in (s["slots"] as Array)[opp]:
 		(sl as Dictionary)["draft"] = []
 		(sl as Dictionary)["upg_draft"] = []
+		(sl as Dictionary)["draft_entry_uids"] = []
 		if bool(battle.info_distortion[opp].get("hide_item_bar", false)):
 			(sl as Dictionary)["item"] = ""
+	if bool(s.get("battle_backpack_enabled", false)):
+		var packed_bags: Array = s["battle_backpacks"]
+		var hidden_bag: Array = []
+		for entry_variant in packed_bags[opp]:
+			var entry: Dictionary = (entry_variant as Dictionary).duplicate(true)
+			var uid: int = int(entry.get("uid", -1))
+			if not BattleCore._revealed_uid(battle.revealed_backpack_uids[viewer], uid):
+				entry["item_id"] = ""
+			hidden_bag.append(entry)
+		packed_bags[opp] = hidden_bag
+		(s["used_item_history"] as Array)[opp] = []
+		var private_reveals: Array = [{}, {}]
+		private_reveals[viewer] = battle.revealed_backpack_uids[viewer].duplicate(true)
+		s["revealed_backpack_uids"] = private_reveals
 	(s["info_distortion"] as Array)[opp] = {}
 	return s
 
@@ -426,6 +461,9 @@ func _view(viewer: int = -1) -> Dictionary:
 		game_over = battle.game_over,
 		winner = battle.winner,
 		slots = packed_slots,
+		backpack_counts = [battle.battle_backpacks[0].size(), battle.battle_backpacks[1].size()],
+		revealed_enemy_backpack = battle.revealed_backpack_items_for(viewer, 1 - viewer) \
+			if viewer in [0, 1] and battle.battle_backpack_enabled else [],
 	}
 
 

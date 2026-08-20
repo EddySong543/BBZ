@@ -4,7 +4,7 @@
 ## 形态：全屏=地图本身（⛔背景/衬底），进图后不显示旧四角调试 HUD，
 ## 背包=按 B 唤出的整理浮层（背包格+拾取区+装备栏+保险槽同屏整理），
 ## 玩家=所选英雄的 idle 像素人物 token 在高密度全屏格视窗中探索（柔和跟随·逐格起伏·驻足轻摆）。
-## 设计规范：design/ui-design-system.md（全暖色系·暖骨框·Ark Pixel·⛔夜色衬底）。
+## 设计规范：design/ui-design-system.md（全暖色系·暖骨框·Z工坊像素黑体·⛔夜色衬底）。
 ## 规则源：design/expedition-map.md / expedition-backpack.md。逻辑层 = expedition_map_state / expedition_backpack_state。
 ##
 ## 操作：WASD/方向键移动 ｜ E/F 互动 ｜ B 背包浮层 ｜ 浮层内：左键拾/放·R 旋转·右键放回·U 用消耗品·X 丢弃 ｜ ESC 关浮层/返回。
@@ -13,7 +13,7 @@ extends Control
 signal movement_finished(cell: Vector2i, completed: bool)
 
 const MapState := preload("res://src/expedition/expedition_map_state.gd")
-const GridPathfinderScript := preload("res://src/expedition/grid_pathfinder.gd")
+const GridMovementControllerScript := preload("res://src/expedition/grid_movement_controller.gd")
 const QingfengLayout := preload("res://src/expedition/maps/qingfeng_ricefield_layout.gd")
 const Backpack := preload("res://src/expedition/expedition_backpack_state.gd")
 const SearchState := preload("res://src/expedition/expedition_search_state.gd")
@@ -58,16 +58,16 @@ const TOKEN_OFFSET := TOKEN_CELL_FOOT_POINT - TOKEN_FOOT_ANCHOR
 const TOKEN_RENDER_COMPENSATION: float = 1.0
 const TOKEN_IDLE_BASE_FPS: float = 8.0
 const TOKEN_IDLE_REF_FRAMES: float = 6.0
-const TOKEN_STEP_LOGICAL_PX: float = 5.0
-const TOKEN_STEP_HOP_STEPS: float = 2.0
-const TOKEN_STEP_WOBBLE_AMPLITUDE: float = 0.026
-const TOKEN_TURN_SWITCH_PROGRESS: float = 0.38
-const TOKEN_TURN_SQUEEZE_MIN: float = 0.82
-const TOKEN_TURN_SCALE_STEP: float = 0.05
+const TOKEN_STEP_LOGICAL_PX: float = GridMovementControllerScript.LOGICAL_PIXEL_STEP
+const TOKEN_STEP_HOP_STEPS: float = GridMovementControllerScript.HOP_STEPS
+const TOKEN_STEP_WOBBLE_AMPLITUDE: float = GridMovementControllerScript.WOBBLE_AMPLITUDE
+const TOKEN_TURN_SWITCH_PROGRESS: float = GridMovementControllerScript.TURN_SWITCH_PROGRESS
+const TOKEN_TURN_SQUEEZE_MIN: float = GridMovementControllerScript.TURN_SQUEEZE_MIN
+const TOKEN_TURN_SCALE_STEP: float = GridMovementControllerScript.TURN_SCALE_STEP
 # 镜头与 token 共用这一份连续视觉坐标；临界阻尼不会过冲，连续输入也不会重启两条 Tween。
-const CAMERA_CRITICAL_DAMPING: float = 18.0
-const CAMERA_MAX_STEP: float = 1.0 / 20.0
-const CAMERA_SNAP_DISTANCE: float = 0.05
+const CAMERA_CRITICAL_DAMPING: float = GridMovementControllerScript.CRITICAL_DAMPING
+const CAMERA_MAX_STEP: float = GridMovementControllerScript.MAX_FRAME_STEP
+const CAMERA_SNAP_DISTANCE: float = GridMovementControllerScript.SNAP_DISTANCE
 # 镜头只在32×18真实逻辑地图范围内移动，不以不可交互浓雾假格补边。
 const CAMERA_FOG_PADDING_COLS: int = 0
 const CAMERA_FOG_PADDING_ROWS: int = 0
@@ -215,8 +215,8 @@ var _token_turn_from_sign: float = 1.0
 var _token_turn_target_sign: float = 1.0
 var _token_turn_active: bool = false
 var _queued_move_direction: Vector2i = Vector2i.ZERO
-var _movement_generation: int = 0
 var _click_route_active: bool = false
+var _grid_movement: GridMovementController
 var _wheat_wave_pulses: Array[Dictionary] = []
 var _wheat_wave_runtime_frames: Array[Texture2D] = []
 var _hero_idle_frames: SpriteFrames
@@ -240,6 +240,7 @@ func _resume_from_battle() -> void:
 	var st: Dictionary = BattleSetup.expedition_state
 	BattleSetup.expedition_state = {}
 	map = st["map"]
+	_configure_grid_movement()
 	bp = st["bp"]
 	search_state = st.get("search_state", SearchState.new())
 	open_container_cell = Vector2i(st.get("open_container_cell", Vector2i(-1, -1)))
@@ -945,6 +946,7 @@ func _new_run(p_seed: int, leader: HeroData = null) -> void:
 	_camera_initialized = false
 	_camera_visual_velocity = Vector2.ZERO
 	_token_step_active = false
+	_configure_grid_movement()
 	for child: Node in fx_layer.get_children():   # 清掉上一局残留的飘字/格闪
 		child.queue_free()
 	terrain_mat.set_shader_parameter("seed_f", float(p_seed % 977))
@@ -952,6 +954,55 @@ func _new_run(p_seed: int, leader: HeroData = null) -> void:
 	_set_atmosphere_active(true)
 	_log("踏入晴风稻田（种子 %d）。" % p_seed)
 	_refresh()
+
+
+func _configure_grid_movement() -> void:
+	_grid_movement = GridMovementControllerScript.new()
+	_grid_movement.configure(
+			map.player,
+			Rect2i(Vector2i.ZERO, Vector2i(MapState.WIDTH, MapState.HEIGHT)),
+			float(MAP_CELL), TOKEN_OFFSET,
+			_is_walkable_map_cell, _commit_expedition_step)
+	_grid_movement.step_attempted.connect(_on_shared_step_attempted)
+	_grid_movement.movement_finished.connect(_on_shared_movement_finished)
+	_sync_legacy_movement_state()
+
+
+func _commit_expedition_step(direction: Vector2i) -> Dictionary:
+	if map == null or map.over:
+		return {"moved": false, "kind": "blocked", "msgs": []}
+	return map.try_move(direction)
+
+
+func _on_shared_step_attempted(previous_cell: Vector2i, direction: Vector2i,
+		result: Dictionary) -> void:
+	if bool(result.get("moved", false)):
+		_queued_move_direction = direction
+		_trigger_wheat_wave(previous_cell, map.player, direction)
+	if bool(result.get("moved", false)) and search_state != null:
+		search_state.close_container("moved")
+		open_container_cell = Vector2i(-1, -1)
+	for message: String in result.get("msgs", []):
+		_log(message)
+	match String(result.get("kind", "blocked")):
+		"monster":
+			pending_flee_from = previous_cell
+			_flash_cell(map.player, COL_MONSTER)
+			_token_bump()
+			_enter_real_battle(map.player)
+		"event":
+			_float_text(map.player, "可互动", COL_EVENT)
+		"chest":
+			_float_text(map.player, "可搜索", COL_CHEST)
+		"ext":
+			_float_text(map.player, "发现撤离点", COL_EXT_OPEN)
+	_sync_legacy_movement_state()
+	_refresh()
+
+
+func _on_shared_movement_finished(cell: Vector2i, completed: bool) -> void:
+	_click_route_active = false
+	movement_finished.emit(cell, completed)
 
 
 func _log(msg: String) -> void:
@@ -1036,31 +1087,21 @@ func _update_terrain_data() -> void:
 	_terrain_tex.update(_terrain_img)
 
 
-## 静态模式下只更新角色的逻辑格位置；跟随模式使用临界阻尼并限制在真实地图边界内。
+## 两个界面都由 GridMovementController 维护逻辑格与连续视觉坐标；这里仅负责远征镜头投影。
 func _update_map_camera() -> void:
 	if map == null:
 		return
-	var next_target: Vector2 = _token_origin_for_cell(map.player)
-	if camera_follow_enabled and _camera_initialized \
-			and next_target.distance_squared_to(_camera_target_token_origin) > 0.01:
-		_begin_token_step(_camera_visual_token_origin, next_target, _queued_move_direction)
-	_queued_move_direction = Vector2i.ZERO
-	_camera_target_token_origin = next_target
-	if not camera_follow_enabled:
-		_token_step_active = false
-		_set_player_visual_origin(_camera_target_token_origin)
-		if not _camera_initialized:
-			_camera_initialized = true
-			_camera_visual_token_origin = _camera_target_token_origin
-			_camera_visual_velocity = Vector2.ZERO
-			map_world.position = _camera_world_offset_for_visual(_camera_visual_token_origin)
-			_sync_atmosphere_to_camera()
-		return
+	if _grid_movement == null:
+		_configure_grid_movement()
 	if not _camera_initialized:
-		_camera_initialized = true
-		_camera_visual_token_origin = _camera_target_token_origin
-		_camera_visual_velocity = Vector2.ZERO
-		_apply_camera_visual_position()
+		_grid_movement.snap_to_cell(map.player)
+	elif _grid_movement.current_cell != map.player:
+		_grid_movement.adopt_committed_cell(map.player, _queued_move_direction)
+	_queued_move_direction = Vector2i.ZERO
+	if not camera_follow_enabled:
+		_grid_movement.snap_to_cell(map.player)
+	_sync_legacy_movement_state()
+	_apply_camera_visual_position()
 
 
 func _token_origin_for_cell(player_cell: Vector2i) -> Vector2:
@@ -1094,36 +1135,32 @@ func _camera_axis_offset(desired_offset: float, view_size: float,
 	return clampf(desired_offset, view_size - extension_end, -extension_start)
 
 
-## 解析式临界阻尼：位置与速度均连续；越界保护保证任何帧率下都不会越过目标后回弹。
+## 与主界面调用同一个解析式临界阻尼实现；本脚本不再保留第二套跟随算法。
 func _step_camera_follow(delta: float) -> void:
-	if not camera_follow_enabled or not _camera_initialized:
+	if not camera_follow_enabled or _grid_movement == null:
 		return
-	var remaining: Vector2 = _camera_target_token_origin - _camera_visual_token_origin
-	if remaining.length_squared() <= CAMERA_SNAP_DISTANCE * CAMERA_SNAP_DISTANCE:
-		_camera_visual_token_origin = _camera_target_token_origin
-		_camera_visual_velocity = Vector2.ZERO
-		_apply_camera_visual_position()
-		_finish_token_step_visuals()
-		return
-	var step: float = clampf(delta, 0.0, CAMERA_MAX_STEP)
-	if step <= 0.0:
-		_apply_camera_visual_position()
-		return
-	var displacement: Vector2 = _camera_visual_token_origin - _camera_target_token_origin
-	var decay: float = exp(-CAMERA_CRITICAL_DAMPING * step)
-	var velocity_term: Vector2 = (
-			_camera_visual_velocity + displacement * CAMERA_CRITICAL_DAMPING) * step
-	var next_position: Vector2 = (
-			_camera_target_token_origin + (displacement + velocity_term) * decay)
-	var next_velocity: Vector2 = (
-			_camera_visual_velocity - velocity_term * CAMERA_CRITICAL_DAMPING) * decay
-	# 新目标可能在连续输入中改变；若惯性会把视觉坐标送过目标，直接在目标处停稳。
-	if remaining.dot(next_position - _camera_target_token_origin) > 0.0:
-		next_position = _camera_target_token_origin
-		next_velocity = Vector2.ZERO
-	_camera_visual_token_origin = next_position
-	_camera_visual_velocity = next_velocity
+	_grid_movement.process(delta)
+	_sync_legacy_movement_state()
+	_click_route_active = _grid_movement.route_active
 	_apply_camera_visual_position()
+
+
+func _sync_legacy_movement_state() -> void:
+	if _grid_movement == null:
+		return
+	_camera_initialized = _grid_movement.initialized
+	_camera_visual_token_origin = _grid_movement.visual_origin
+	_camera_target_token_origin = _grid_movement.target_origin
+	_camera_visual_velocity = _grid_movement.visual_velocity
+	_token_step_active = _grid_movement.step_active
+	_token_step_start_origin = _grid_movement.step_start_origin
+	_token_step_target_origin = _grid_movement.step_target_origin
+	_token_step_direction = _grid_movement.step_direction
+	_token_step_side = _grid_movement.step_side
+	_player_facing_sign = _grid_movement.facing_sign
+	_token_turn_from_sign = _grid_movement.turn_from_sign
+	_token_turn_target_sign = _grid_movement.turn_target_sign
+	_token_turn_active = _grid_movement.turn_active
 
 
 func _apply_camera_visual_position() -> void:
@@ -1136,7 +1173,9 @@ func _apply_camera_visual_position() -> void:
 func _set_player_visual_origin(origin: Vector2) -> void:
 	var step_offset := Vector2.ZERO
 	if _token_step_active:
-		step_offset = _token_step_offset_at(_token_step_progress_at(origin))
+		step_offset = _grid_movement.step_offset() \
+				if _legacy_state_tracks_shared_controller() \
+				else _token_step_offset_at(_token_step_progress_at(origin))
 	player_token.position = origin + step_offset
 	if player_backdrop != null:
 		player_backdrop.position = origin - TOKEN_OFFSET
@@ -1246,6 +1285,11 @@ func _sync_terrain_vision_center(token_origin: Vector2) -> void:
 	terrain_mat.set_shader_parameter("vision_center_cell", cell_center / float(MAP_CELL))
 
 
+func _legacy_state_tracks_shared_controller() -> bool:
+	return _grid_movement != null and _camera_visual_token_origin.distance_squared_to(
+			_grid_movement.visual_origin) <= 0.0001
+
+
 func _set_player_visual_visible(show_visual: bool) -> void:
 	player_token.visible = show_visual
 	if player_backdrop != null:
@@ -1257,6 +1301,8 @@ func _set_player_visual_visible(show_visual: bool) -> void:
 
 
 func _camera_is_moving() -> bool:
+	if _grid_movement != null:
+		return camera_follow_enabled and _grid_movement.is_moving()
 	return camera_follow_enabled and _camera_initialized and (
 			_camera_visual_token_origin.distance_squared_to(_camera_target_token_origin)
 			> CAMERA_SNAP_DISTANCE * CAMERA_SNAP_DISTANCE)
@@ -1273,9 +1319,14 @@ func _process(delta: float) -> void:
 	if player_token != null and player_token.texture != null:
 		_update_token_idle_frame(_anim_time)
 		if _token_step_active:
-			var step_progress: float = _token_step_progress_at(_camera_visual_token_origin)
-			player_token.rotation = _token_step_rotation_at(step_progress)
-			player_token.scale = _token_scale_at_step_progress(step_progress)
+			if _legacy_state_tracks_shared_controller():
+				player_token.rotation = _grid_movement.token_rotation()
+				player_token.scale = _grid_movement.token_scale(TOKEN_RENDER_COMPENSATION)
+			else:
+				var step_progress: float = _token_step_progress_at(
+						_camera_visual_token_origin)
+				player_token.rotation = _token_step_rotation_at(step_progress)
+				player_token.scale = _token_scale_at_step_progress(step_progress)
 		else:
 			# SpriteFrames已经包含正式idle；静止时不再叠加正弦旋转或扫动。
 			player_token.rotation = 0.0
@@ -1795,46 +1846,16 @@ func _on_map_view_gui_input(event: InputEvent) -> void:
 func request_move_to_cell(destination_cell: Vector2i) -> bool:
 	if map == null or map.over or select_overlay.visible or bp_overlay.visible or dialog.visible:
 		return false
-	if not _is_walkable_map_cell(destination_cell):
+	if _grid_movement == null or not _is_walkable_map_cell(destination_cell):
 		return false
-	_movement_generation += 1
-	_follow_click_route(destination_cell, _movement_generation)
-	return true
-
-
-func _follow_click_route(destination_cell: Vector2i, generation: int) -> void:
-	var bounds := Rect2i(Vector2i.ZERO, Vector2i(MapState.WIDTH, MapState.HEIGHT))
-	var path: Array[Vector2i] = GridPathfinderScript.find_path(
-			map.player, destination_cell, bounds, _is_walkable_map_cell)
-	if destination_cell != map.player and path.is_empty():
-		movement_finished.emit(map.player, false)
-		return
-	_click_route_active = true
-	for next_cell: Vector2i in path:
-		while _camera_is_moving():
-			await get_tree().process_frame
-			if not is_instance_valid(self) or generation != _movement_generation:
-				return
-		if generation != _movement_generation or map == null or map.over \
-				or select_overlay.visible or bp_overlay.visible or dialog.visible:
-			_click_route_active = false
-			movement_finished.emit(map.player if map != null else Vector2i(-1, -1), false)
-			return
-		var direction: Vector2i = next_cell - map.player
-		var result_kind: String = _move_one_step(direction)
-		if result_kind != "move":
-			break
-	while _camera_is_moving():
-		await get_tree().process_frame
-		if not is_instance_valid(self) or generation != _movement_generation:
-			return
-	_click_route_active = false
-	var completed: bool = map != null and map.player == destination_cell
-	movement_finished.emit(map.player if map != null else Vector2i(-1, -1), completed)
+	var accepted: bool = _grid_movement.request_path(destination_cell)
+	_click_route_active = _grid_movement.route_active
+	return accepted
 
 
 func _cancel_click_route() -> void:
-	_movement_generation += 1
+	if _grid_movement != null:
+		_grid_movement.cancel_route()
 	_click_route_active = false
 
 
@@ -1893,12 +1914,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_cancel_click_route()
 		_try_interact_current_cell()
 		return
-	var dir := Vector2i.ZERO
-	match key:
-		KEY_W, KEY_UP: dir = Vector2i.UP
-		KEY_S, KEY_DOWN: dir = Vector2i.DOWN
-		KEY_A, KEY_LEFT: dir = Vector2i.LEFT
-		KEY_D, KEY_RIGHT: dir = Vector2i.RIGHT
+	var dir: Vector2i = GridMovementControllerScript.direction_from_key(event)
 	if dir == Vector2i.ZERO:
 		return
 	_cancel_click_route()
@@ -1906,32 +1922,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _move_one_step(dir: Vector2i) -> String:
-	if map == null or map.over or absi(dir.x) + absi(dir.y) != 1:
+	if map == null or map.over or _grid_movement == null:
 		return "blocked"
-	var prev: Vector2i = map.player
-	var res: Dictionary = map.try_move(dir)
-	if bool(res.get("moved", false)):
-		_queued_move_direction = dir
-		_trigger_wheat_wave(prev, map.player, dir)
-	if bool(res.get("moved", false)) and search_state != null:
-		search_state.close_container("moved")
-		open_container_cell = Vector2i(-1, -1)
-	for m: String in res.get("msgs", []):
-		_log(m)
-	match String(res["kind"]):
-		"monster":
-			pending_flee_from = prev
-			_flash_cell(map.player, COL_MONSTER)
-			_token_bump()
-			_enter_real_battle(map.player)
-		"event":
-			_float_text(map.player, "可互动", COL_EVENT)
-		"chest":
-			_float_text(map.player, "可搜索", COL_CHEST)
-		"ext":
-			_float_text(map.player, "发现撤离点", COL_EXT_OPEN)
-	_refresh()
-	return String(res["kind"])
+	return _grid_movement.request_keyboard_step(dir)
 
 
 ## 当前格统一主动交互入口。容器采用逐件、可中断续搜的回合制搜索；

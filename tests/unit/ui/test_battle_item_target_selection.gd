@@ -144,7 +144,8 @@ func test_friendly_target_items_require_and_preview_an_explicit_hero() -> void:
 
 
 func test_new_friendly_reserve_items_reject_the_active_hero() -> void:
-	for item_id in ["t1_houzhen_qian", "t2_jieyin_pei", "t2_daishang_san", "t2_xingjun_yaonang"]:
+	for item_id in ["t1_houzhen_qian", "t2_jieyin_pei", "t2_daishang_san",
+			"t2_xingjun_yaonang", "t3_yiyuan_deng"]:
 		var screen := _screen(_battle([item_id], 8))
 		assert_true(screen._toggle_ready_item_selection(0))
 		assert_eq(screen._pending_item_hero_target_slot, 0)
@@ -162,6 +163,17 @@ func test_shizhi_jiasuo_uses_an_enemy_locked_item_slot_target() -> void:
 	assert_true(screen._is_valid_enemy_item_slot_target(0, 1))
 	assert_true(screen._complete_enemy_item_slot_target(0, 1))
 	assert_eq(screen.selected_item_targets, {0: 1})
+
+
+func test_ready_item_pressure_tools_target_an_enemy_ready_slot() -> void:
+	for item_id in ["t2_yawu_piao", "t2_cuiyong_pai"]:
+		var screen := _screen(_battle([item_id], 8))
+		screen.battle.slots[1][1] = _ready_slot("t2_feibiao")
+		assert_true(screen._toggle_ready_item_selection(0))
+		assert_eq(screen._pending_enemy_item_target_slot, 0)
+		assert_true(screen._is_valid_enemy_item_slot_target(0, 1))
+		assert_true(screen._complete_enemy_item_slot_target(0, 1))
+		assert_eq(screen.selected_item_targets, {0: 1})
 
 
 func test_selected_xunxing_pendant_arms_enemy_targeting_for_wave_only() -> void:

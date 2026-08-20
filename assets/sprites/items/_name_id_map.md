@@ -3,7 +3,7 @@
 > 由 `tools/import_item_art.gd` 从 `ItemCatalog` 实时生成，**勿手改**（改了会被覆盖）。
 > **图标文件名 = 中文道具名**（与游戏内显示名一致·按名更新美术）；下表 id 仅代码内部用。
 > ⚠ id 拼音是历史化石、≠ 显示名（如 `t1_siyecao`=最后一箭）；命名美术只看「中文名」列。
-> 当前实装 96 件，表内各 tier 按显示名全拼排序（设计全集见 design/items-list.md）。
+> 当前实装 114 件，表内各 tier 按显示名全拼排序（设计全集见 design/items-list.md）。
 
 ## T1
 
@@ -15,11 +15,13 @@
 | 得能护符 | `t1_deneng_hufu` | 防御 |
 | 赌徒的硬币 | `t1_dutu_yingbi` | 进攻 |
 | 分痛木牌 | `t1_fentong_mupai` | 中立 |
+| 孤锋锥 | `t1_gufeng_zhui` | 进攻 |
 | 后手 | `t1_houshou` | 防御 |
 | 候阵签 | `t1_houzhen_qian` | 节奏 |
 | 换防扣 | `t1_huanfang_kou` | 节奏 |
 | 回锋鞘 | `t1_huifeng_qiao` | 防御 |
 | 回马枪 | `t1_fengzhixue` | 节奏 |
+| 寄存牌 | `t1_jicun_pai` | 能量 |
 | 解毒药水 | `t1_jiedu_yaoshui` | 防御 |
 | 急救铃 | `t1_jijiu_ling` | 导出 |
 | 劣质法力药水 | `t1_lzhi_fali` | 能量 |
@@ -30,6 +32,7 @@
 | 算命铜钱 | `t1_tongqian` | 博弈 |
 | 随身熔炉 | `t1_ronglu` | 中立 |
 | 藤蔓陷阱 | `t1_tengman_xianjing` | 干扰 |
+| 听匣筒 | `t1_tingxia_tong` | 博弈 |
 | 尾后针 | `t1_weihouzhen` | 中立 |
 | 先手 | `t1_xianshou` | 进攻 |
 | 血渡结 | `t1_xuedu_jie` | 中立 |
@@ -45,13 +48,18 @@
 
 | 中文名（= 图标文件名） | 代码 id（仅代码内部） | 维度 |
 |---|---|---|
+| 保价封 | `t2_baojia_feng` | 防御 |
 | 爆裂卷轴 | `t2_baolie` | 能量 |
+| 承露盏 | `t2_chenglu_zhan` | 导出 |
+| 催用牌 | `t2_cuiyong_pai` | 博弈 |
 | 代伤伞 | `t2_daishang_san` | 防御 |
 | 点将鼓 | `t2_dianjiang_gu` | 进攻 |
 | 点金石 | `t2_dianjinshi` | 中立 |
 | 抵锋扣 | `t2_difeng_kou` | 导出 |
+| 定命丸 | `t2_dingming_wan` | 防御 |
 | 定身符 | `t2_dingshen` | 干扰 |
 | 毒药瓶 | `t2_duyao` | 状态 |
+| 独用封 | `t2_duyong_feng` | 干扰 |
 | 分寸尺 | `t2_fencun_chi` | 博弈 |
 | 锋利的飞镖 | `t2_feibiao` | 进攻 |
 | 封脉针 | `t2_fengmai_zhen` | 干扰 |
@@ -59,18 +67,24 @@
 | 缚影索 | `t2_fuying_suo` | 干扰 |
 | 归营牌 | `t2_guiying_pai` | 调度 |
 | 还魂丹 | `t2_huanhundan` | 防御 |
+| 换签筒 | `t2_huanqian_tong` | 中立 |
+| 回购券 | `t2_huigou_quan` | 中立 |
+| 回流珠 | `t2_huiliu_zhu` | 能量 |
 | 回照镜 | `t2_huizhao_jing` | 防御 |
 | 护阵钉 | `t2_huzhen_ding` | 防御 |
 | 坚固的护盾 | `t2_jiandun` | 防御 |
 | 借印佩 | `t2_jieyin_pei` | 进攻 |
+| 净纹帚 | `t2_jingwen_zhou` | 状态 |
 | 连心锁 | `t2_lianxin_suo` | 中立 |
 | 猎物印记 | `t2_lieyin` | 状态 |
 | 力量的代价 | `t2_daijia` | 进攻 |
 | 迷雾斗篷 | `t2_miwu_doupeng` | 博弈 |
 | 秘银充能护手 | `t2_huoshou` | 导出 |
+| 纳盈葫芦 | `t2_naying_hulu` | 导出 |
 | 凝血膏 | `t2_ningxue_gao` | 导出 |
 | 扭曲的饥渴 | `t2_jike` | 导出 |
 | 暖玉 | `t2_nuanyu` | 防御 |
+| 偏锋甲 | `t2_pianfeng_jia` | 博弈 |
 | 破魔矢 | `t2_pomoshi` | 进攻 |
 | 普通法力药水 | `t2_fali` | 能量 |
 | 普通生命药水 | `t2_shengming` | 防御 |
@@ -82,7 +96,9 @@
 | 替身草人 | `t2_caoren` | 节奏 |
 | 行军药囊 | `t2_xingjun_yaonang` | 防御 |
 | 心脏掌握魔法 | `t2_qiubite` | 进攻 |
+| 押物票 | `t2_yawu_piao` | 博弈 |
 | 移甲环 | `t2_yijia_huan` | 防御 |
+| 应急箱 | `t2_yingji_xiang` | 中立 |
 | 镇纹针 | `t2_zhenwen_zhen` | 干扰 |
 
 ## T3
@@ -110,8 +126,10 @@
 | 噬心钉 | `t3_shixinding` | 进攻 |
 | 天罗地网 | `t3_tianluodiwang` | 干扰 |
 | 停龙剑 | `t3_tinglong` | 能量 |
+| 息灵铃 | `t3_xiling_ling` | 干扰 |
 | 续命香 | `t3_xumingxiang` | 防御 |
 | 夜明珠 | `t3_yemingzhu` | 节奏 |
+| 遗愿灯 | `t3_yiyuan_deng` | 节奏 |
 | 招魂幡 | `t3_zhaohun_fan` | 防御 |
 | 至臻剑意 | `t3_jianyi` | 进攻 |
 | 周天罡气 | `t3_yiqi` | 博弈 |

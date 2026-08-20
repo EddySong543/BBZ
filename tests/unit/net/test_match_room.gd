@@ -193,7 +193,8 @@ func test_match_room_requires_and_executes_lianhuan_second_action() -> void:
 
 func test_match_room_rejects_missing_or_illegal_friendly_hero_target() -> void:
 	for item_id in ["t2_yijia_huan", "t2_huzhen_ding", "t2_jieyin_pei",
-			"t2_daishang_san", "t2_xingjun_yaonang", "t1_houzhen_qian"]:
+			"t2_daishang_san", "t2_xingjun_yaonang", "t1_houzhen_qian",
+			"t3_yiyuan_deng"]:
 		var sent: Array = [[], []]
 		var room := MatchRoom.new()
 		room.start(_team("a", 5), _team("b", 5), SEED,
@@ -229,6 +230,37 @@ func test_match_room_routes_shizhi_target_to_an_enemy_item_slot() -> void:
 	_pump(t)
 	assert_eq(int(room.battle.slots[1][2]["since"]), 1)
 	assert_false(room.battle.slot_ready(1, 2))
+
+
+func test_match_room_routes_ready_item_pressure_and_last_wish_targets() -> void:
+	for pressure_id in ["t2_yawu_piao", "t2_cuiyong_pai"]:
+		var t := _table(5)
+		var room: MatchRoom = t.room
+		var c0: MatchClient = t.clients[0]
+		var c1: MatchClient = t.clients[1]
+		room.battle.configure_battle_backpacks([], [])
+		room.battle.slots[0][0] = _ready_item_slot(pressure_id)
+		room.battle.slots[1][2] = _ready_item_slot("t2_feibiao")
+		_pump(t)
+		c0.submit(A.CHARGE, -1, [0], false, false, false, false, [], -1, false, [2])
+		c1.submit(A.CHARGE)
+		_pump(t)
+		assert_null(room.battle.slots[0][0]["item"], "%s 应接受敌方就绪槽目标" % pressure_id)
+
+	var wish_table := _table(5)
+	var wish_room: MatchRoom = wish_table.room
+	var wish_c0: MatchClient = wish_table.clients[0]
+	var wish_c1: MatchClient = wish_table.clients[1]
+	wish_room.battle.hp[0] = [2, 4, 8]
+	wish_room.battle.max_hp[0] = [10, 10, 10]
+	wish_room.battle.slots[0][0] = _ready_item_slot("t3_yiyuan_deng")
+	_pump(wish_table)
+	wish_c0.submit(A.CHARGE, -1, [0], false, false, false, false, [], -1, false, [1])
+	wish_c1.submit(A.CHARGE)
+	_pump(wish_table)
+	assert_eq(wish_room.battle.hp[0][0], 0, "遗愿灯应完成原出战英雄死亡结算")
+	assert_eq(wish_room.battle.hp[0][1], 10, "协议副目标应被回满并登场")
+	assert_eq(wish_room.battle.active_index[0], 1)
 
 
 func test_miwu_snapshots_hide_only_the_opponent_item_ids() -> void:

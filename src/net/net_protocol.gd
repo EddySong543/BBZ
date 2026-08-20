@@ -37,6 +37,7 @@ const MAX_GV_LEN := 16         # 版本串上限（版本握手）
 const MAX_RTK_LEN := 64        # 重连令牌上限（中局重连身份凭据·2026-07-17 审计修复）
 
 const MAX_ITEM_SLOTS := 3      # 与 BattleCore.SLOT_COUNT 一致（入包范围校验用·防超长数组）
+const MAX_ITEM_CHOICE := 255   # 回购券可从整场普通道具历史中选择，不再限定三选一。
 const MAX_ACTION := 16         # 动作枚举安全上限（真合法性由 match_room 按 legal_actions 判）
 const MAX_TEAM_SLOT := 2       # 槽位 0..2
 const MAX_FREE_SWITCHES := 1   # h07 每回合最多一次免费切换；协议入口同步收紧
@@ -134,7 +135,7 @@ static func validate_c2s(msg: Variant) -> String:
 			for item_target in item_slot_targets:
 				if not _is_int(item_target) or int(item_target) < -1 or int(item_target) > MAX_TEAM_SLOT:
 					return "bad_item_slot_targets"
-			# 与 item_slots 逐位对应；-1=该道具无需选择，0..2=点金石私有候选下标。
+			# 与 item_slots 逐位对应；-1=无需选择，否则为服务器缓存的私有候选下标。
 			var item_slot_choices: Array = []
 			if d.has("item_slot_choices"):
 				var choices_v: Variant = d["item_slot_choices"]
@@ -147,7 +148,8 @@ static func validate_c2s(msg: Variant) -> String:
 				item_slot_choices.resize((slots as Array).size())
 				item_slot_choices.fill(-1)
 			for item_choice in item_slot_choices:
-				if not _is_int(item_choice) or int(item_choice) < -1 or int(item_choice) > 2:
+				if not _is_int(item_choice) or int(item_choice) < -1 \
+						or int(item_choice) > MAX_ITEM_CHOICE:
 					return "bad_item_slot_choices"
 			if not (d.get("double", false) is bool):
 				return "bad_double_flag"
@@ -177,7 +179,7 @@ static func validate_c2s(msg: Variant) -> String:
 		"item_draft":
 			if not _slot_ok(d):
 				return "bad_slot"
-			if not _is_int(d.get("target")) or int(d["target"]) < 0 \
+			if not _is_int(d.get("target")) or int(d["target"]) < -1 \
 					or int(d["target"]) > MAX_TEAM_SLOT or int(d["target"]) == int(d["slot"]):
 				return "bad_item_target"
 		"econ_pick":

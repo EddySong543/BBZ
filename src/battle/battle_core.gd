@@ -80,6 +80,11 @@ var timed_item_effects: Array = [[], []]     # 团队级定时道具效果；不
 var _imod: Array = [{}, {}]                  # 本回合道具修正器累加器（resolve 内重置·transient）
 var relics: Array = [[], []]                 # relics[player] = Array[{data:ItemData, state:Dictionary}]：激活的遗物（持久·每回合 tick）
 var slots: Array = [[], []]                  # slots[player] = Array[Dictionary]：道具经济槽位（econ_init 后填充；测试不填→走 give_item）
+var battle_backpack_enabled: bool = false    # 赛前背包已注入；false 保持旧版全局 T1 draft
+var battle_backpacks: Array = [[], []]       # 真实物件：{uid,item_id,temporary}
+var used_item_history: Array = [[], []]      # 本场已实际消耗记录：{item_id,tier}
+var revealed_backpack_uids: Array = [{}, {}] # viewer -> {enemy item uid:true}，仅私有视图读取
+var _next_backpack_uid: int = 1
 
 var turn_number: int = 0
 var game_over: bool = false
@@ -184,6 +189,11 @@ func setup(p1_heroes: Array, p2_heroes: Array, seed_value: int = 0) -> void:
 	_imod = [{}, {}]
 	relics = [[], []]
 	slots = [[], []]
+	battle_backpack_enabled = false
+	battle_backpacks = [[], []]
+	used_item_history = [[], []]
+	revealed_backpack_uids = [{}, {}]
+	_next_backpack_uid = 1
 	turn_number = 0
 	game_over = false
 	winner = WINNER_UNDECIDED
@@ -244,7 +254,7 @@ func hp_display(half: int) -> float:
 ## （2026-07-04 Eddy 批：被动 +1 能/回合 = 白给收入不加成——
 ##   虚日站场挂机躺赚 0.5/回合的通胀漏洞；只有主动来源（攒/转化/combo/道具）吃加成）。
 func _gain_energy(player: int, amount: int, boostable: bool = true,
-		passive: bool = false) -> int:
+		passive: bool = false, allow_overflow_conversion: bool = true) -> int:
 	if amount <= 0:
 		return 0
 	var lock_turn: int = int(item_buffs[player].get("energy_gain_lock_turn", -1))
@@ -253,15 +263,27 @@ func _gain_energy(player: int, amount: int, boostable: bool = true,
 	if (passive and lock_turn == turn_number + 1) \
 			or (not passive and lock_turn == turn_number):
 		return 0
-	if energy[player] >= energy_max[player]:
-		return 0
 	if boostable:
 		var sk: HeroSkill = _skills[player][active_index[player]]
 		if sk != null:
 			amount += sk.energy_gain_bonus(self, player, active_index[player])
 	var before: int = energy[player]
-	energy[player] = mini(energy[player] + amount, energy_max[player])
+	if energy[player] < energy_max[player]:
+		energy[player] = mini(energy[player] + amount, energy_max[player])
 	var gained: int = energy[player] - before
+	var overflow: int = maxi(0, amount - gained)
+	if allow_overflow_conversion and overflow > 0:
+		if int(item_buffs[player].get("energy_overflow_turn", -1)) != turn_number:
+			item_buffs[player]["energy_overflow_turn"] = turn_number
+			item_buffs[player]["unconverted_energy_overflow"] = 0
+		item_buffs[player]["unconverted_energy_overflow"] = int(
+			item_buffs[player].get("unconverted_energy_overflow", 0)) + overflow
+	if allow_overflow_conversion and overflow > 0 \
+			and int(item_buffs[player].get("overflow_energy_to_heal_turn", -1)) == turn_number:
+		_convert_pending_energy_overflow_to_heal(player)
+	elif allow_overflow_conversion and overflow > 0 \
+			and bool(item_mod(player, "overflow_energy_to_heal", false)):
+		_convert_pending_energy_overflow_to_heal(player)
 	if not passive and gained > 0:
 		item_buffs[player]["active_energy_gain_turn"] = turn_number
 		var armor: int = int(item_mod(player, "first_active_energy_gain_shield", 0))
@@ -269,6 +291,28 @@ func _gain_energy(player: int, amount: int, boostable: bool = true,
 			shield[player][active_index[player]] += armor
 			set_item_mod(player, "first_active_energy_gain_shield", 0)
 	return gained
+
+
+func _convert_pending_energy_overflow_to_heal(player: int) -> void:
+	var overflow: int = int(item_buffs[player].get("unconverted_energy_overflow", 0))
+	if overflow <= 0:
+		return
+	item_buffs[player]["unconverted_energy_overflow"] = 0
+	var living: Array = living_heroes(player)
+	if not living.is_empty():
+		var lowest: int = int(living[0])
+		for slot_variant in living:
+			var slot: int = int(slot_variant)
+			if hp[player][slot] < hp[player][lowest]:
+				lowest = slot
+		_heal(player, lowest, overflow, false)
+
+
+func arm_overflow_energy_to_heal(player: int) -> void:
+	item_buffs[player]["overflow_energy_to_heal_turn"] = turn_number
+	set_item_mod(player, "overflow_energy_to_heal", true)
+	if int(item_buffs[player].get("energy_overflow_turn", -1)) == turn_number:
+		_convert_pending_energy_overflow_to_heal(player)
 
 
 ## 永久降低一方的团队能量上限；返回实际降低的半能量。
@@ -415,6 +459,13 @@ func usable_energy(player: int) -> int:
 func _eff_skill(player: int, slot: int) -> HeroSkill:
 	if int(get_status(player, slot, "silenced", 0)) > 0:
 		return null
+	# 息灵铃公开提交后，双方在同一选择阶段就必须按“技能无效”计算动作合法性。
+	for side in [0, 1]:
+		for use_variant in item_uses[side]:
+			var use: Dictionary = use_variant
+			var data: ItemData = use.get("data", null)
+			if data != null and data.item_id == "t3_xiling_ling":
+				return null
 	return _skills[player][slot]
 
 
@@ -558,6 +609,8 @@ func _projected_energy_after_primary(player: int) -> int:
 	var projected: int = usable_energy(player)
 	if not _blood_payment[player]:
 		projected -= cost
+		if cost > 0 and projected == 0:
+			projected += _queued_exact_spend_refund(player)
 	if action == ActionDef.Action.CHARGE:
 		var gain: int = int(ActionDef.BASE_ACTION_DEF[action]["energy_gain"])
 		var skill: HeroSkill = _skills[player][active_index[player]]
@@ -565,6 +618,25 @@ func _projected_energy_after_primary(player: int) -> int:
 			gain += skill.energy_gain_bonus(self, player, active_index[player])
 		projected = mini(projected + gain, energy_max[player])
 	return maxi(projected, 0)
+
+
+func _queued_exact_spend_refund(player: int) -> int:
+	var amount: int = 0
+	for use_variant in item_uses[player]:
+		var use: Dictionary = use_variant
+		var data: ItemData = use.get("data", null)
+		if data != null and data.item_id == "t2_huiliu_zhu":
+			amount += int(data.params.get("energy", 4))
+	return amount
+
+
+func _settle_exact_spend_refund(player: int, events: Array, step: int = 1) -> void:
+	var amount: int = int(item_mod(player, "exact_spend_refund_pending", 0))
+	if amount <= 0:
+		return
+	set_item_mod(player, "exact_spend_refund_pending", 0)
+	var gained: int = _gain_energy(player, amount)
+	events.append({id = "exact_spend_refund", player = player, amount = gained, step = step})
 
 
 ## 连环鼓的第二行动只接受五个公共动作；不含切换、英雄主动技及其额外付款形态。
@@ -637,7 +709,8 @@ func can_target_any_enemy_with_base_attack(player: int,
 
 
 ## 统一回血入口。返回实际回复量（半点）。
-func _heal(player: int, slot: int, amount: int) -> int:
+func _heal(player: int, slot: int, amount: int,
+		allow_overflow_conversion: bool = true) -> int:
 	if slot < 0 or slot >= hp[player].size() or hp[player][slot] <= 0 or amount <= 0:
 		return 0
 	# 凝血膏先把“生命回复”改写为护盾，因此可以在封脉针的禁疗规则下正常产甲。
@@ -648,7 +721,12 @@ func _heal(player: int, slot: int, amount: int) -> int:
 		return 0
 	var before: int = hp[player][slot]
 	hp[player][slot] = mini(hp[player][slot] + amount, max_hp[player][slot])
-	return hp[player][slot] - before
+	var healed: int = hp[player][slot] - before
+	var overflow: int = maxi(0, amount - healed)
+	if allow_overflow_conversion and overflow > 0 \
+			and bool(item_mod(player, "overheal_to_energy", false)):
+		_gain_energy(player, overflow, true, false, false)
+	return healed
 
 
 ## 当前出战英雄的主动技是否可用（has_active + cap 未满 + 费用够 + 组件自定前置 + 锁招收口）。
@@ -1055,7 +1133,7 @@ static func item_requires_friendly_hero_target(data: ItemData) -> bool:
 		"t1_houzhen_qian",
 		"t2_yijia_huan", "t2_huzhen_ding", "t2_jieyin_pei", "t2_daishang_san",
 		"t2_xingjun_yaonang",
-		"t3_huanming_qi", "t3_zhaohun_fan",
+		"t3_huanming_qi", "t3_zhaohun_fan", "t3_yiyuan_deng",
 	]
 
 
@@ -1064,6 +1142,7 @@ static func item_requires_friendly_reserve_target(data: ItemData) -> bool:
 	return data != null and data.item_id in [
 		"t1_houzhen_qian",
 		"t2_huzhen_ding", "t2_jieyin_pei", "t2_daishang_san", "t2_xingjun_yaonang",
+		"t3_yiyuan_deng",
 	]
 
 
@@ -1074,7 +1153,16 @@ static func item_requires_friendly_dead_hero_target(data: ItemData) -> bool:
 
 ## 需要明确选择敌方道具槽的道具；复用 item_slot_targets，不新增联机字段。
 static func item_requires_enemy_item_slot_target(data: ItemData) -> bool:
-	return data != null and data.item_id == "t2_shizhi_jiasuo"
+	return data != null and data.item_id in [
+		"t2_shizhi_jiasuo", "t2_yawu_piao", "t2_cuiyong_pai",
+	]
+
+
+static func item_requires_friendly_item_slot_target(data: ItemData) -> bool:
+	return data != null and data.item_id in [
+		"t1_ronglu", "t1_jicun_pai", "t2_dianjinshi", "t2_baojia_feng",
+		"t2_huanqian_tong",
+	]
 
 
 func is_living_reserve(player: int, slot: int) -> bool:
@@ -1102,6 +1190,100 @@ func valid_enemy_locked_item_target(player: int, slot: int) -> bool:
 	return int(target_slot.get("state", SlotState.SEALED)) == SlotState.CHARGING \
 		and target_slot.get("item", null) != null and not bool(target_slot.get("used", false)) \
 		and turn_number <= int(target_slot.get("since", -1))
+
+
+func valid_enemy_ready_item_target(player: int, slot: int) -> bool:
+	var opponent: int = 1 - player
+	return slot >= 0 and slot < slots[opponent].size() and slot_ready(opponent, slot)
+
+
+func valid_enemy_item_target_for(data: ItemData, player: int, slot: int) -> bool:
+	if data == null:
+		return false
+	return valid_enemy_ready_item_target(player, slot) \
+		if data.item_id in ["t2_yawu_piao", "t2_cuiyong_pai"] \
+		else valid_enemy_locked_item_target(player, slot)
+
+
+## 孤锋锥只在自己是当前唯一仍可使用的槽位道具时合法。
+func is_only_ready_item_slot(player: int, data: ItemData) -> bool:
+	if data == null or player < 0 or player >= slots.size():
+		return false
+	var ready_count: int = 0
+	for slot_index in range(slots[player].size()):
+		if slot_ready(player, slot_index):
+			ready_count += 1
+	return ready_count == 1
+
+
+func queued_item_slot_target(player: int, item_id: String) -> int:
+	for use_variant in item_uses[player]:
+		var use: Dictionary = use_variant
+		var data: ItemData = use.get("data", null)
+		if data != null and data.item_id == item_id:
+			return int(use.get("item_slot_target", -1))
+	return -1
+
+
+func _mark_item_slot_used_this_turn(player: int, source_slot: int) -> void:
+	if source_slot < 0:
+		return
+	var used: Array = item_buffs[player].get("used_item_slots_this_turn", [])
+	if not used.has(source_slot):
+		used.append(source_slot)
+	item_buffs[player]["used_item_slots_this_turn"] = used
+
+
+func _mark_item_countered_this_turn(player: int, source_slot: int) -> void:
+	if source_slot < 0:
+		return
+	var countered: Array = item_buffs[player].get("countered_item_slots_this_turn", [])
+	if not countered.has(source_slot):
+		countered.append(source_slot)
+	item_buffs[player]["countered_item_slots_this_turn"] = countered
+
+
+func _record_consumed_item(player: int, data: ItemData) -> void:
+	if data != null:
+		used_item_history[player].append({item_id = data.item_id, tier = data.tier})
+
+
+func arm_item_wager(player: int, enemy_slot: int, amount: int) -> void:
+	if amount <= 0:
+		return
+	var wagers: Array = item_mod(player, "item_wagers", [])
+	wagers.append({slot = enemy_slot, amount = amount})
+	set_item_mod(player, "item_wagers", wagers)
+
+
+func arm_item_insurance(player: int, own_slot: int) -> void:
+	if own_slot < 0:
+		return
+	var insured: Array = item_mod(player, "insured_item_slots", [])
+	if not insured.has(own_slot):
+		insured.append(own_slot)
+	set_item_mod(player, "insured_item_slots", insured)
+
+
+func _insured_slot(player: int, source_slot: int) -> bool:
+	return (item_mod(player, "insured_item_slots", []) as Array).has(source_slot)
+
+
+func _return_countered_insured_item(player: int, source_slot: int,
+		item_id: String, events: Array) -> void:
+	if not battle_backpack_enabled or not _insured_slot(player, source_slot):
+		return
+	var temporary: bool = false
+	var uid: int = -1
+	if source_slot >= 0 and source_slot < slots[player].size():
+		temporary = bool(slots[player][source_slot].get("temporary", false))
+		uid = int(slots[player][source_slot].get("instance_uid", -1))
+	var entry: Dictionary = {uid = uid, item_id = item_id, temporary = temporary}
+	if uid < 0 or _bag_entry_index(player, uid) >= 0:
+		entry = _new_backpack_entry(item_id, temporary)
+	battle_backpacks[player].append(entry)
+	events.append({id = "insured_item_returned", player = player,
+		slot = source_slot, item_id = item_id})
 
 
 ## 封印卷轴：只封下一回合；同一到期回合的多件合并为多次抵消。
@@ -1241,6 +1423,9 @@ func _begin_item_transaction(player: int) -> void:
 		slots = _snap_pack_slots(player),
 		relics = _snap_pack_relics(player),
 		item_uses = _snap_pack_uses(player),
+		backpack = battle_backpacks[player].duplicate(true),
+		used_item_history = used_item_history[player].duplicate(true),
+		revealed_backpack_uids = revealed_backpack_uids[player].duplicate(true),
 	}
 	item_buffs[player][_ITEM_TX_ACTIONS] = []
 
@@ -1361,6 +1546,69 @@ func delay_enemy_locked_item(player: int, slot: int, turns: int) -> bool:
 	var opponent: int = 1 - player
 	slots[opponent][slot]["since"] = int(slots[opponent][slot]["since"]) + turns
 	return true
+
+
+## 催用牌：记录被点名的敌方就绪槽；回合末仍是同一件且未使用时，锁定下回合。
+func arm_use_or_lock(player: int, slot: int) -> void:
+	if not valid_enemy_ready_item_target(player, slot):
+		return
+	var opponent: int = 1 - player
+	var watched: Dictionary = slots[opponent][slot]
+	var watches: Array = item_mod(player, "use_or_lock_watches", [])
+	watches.append({
+		target_player = opponent,
+		slot = slot,
+		instance_uid = int(watched.get("instance_uid", -1)),
+		item_id = String((watched.get("item", null) as ItemData).item_id),
+	})
+	set_item_mod(player, "use_or_lock_watches", watches)
+
+
+## 净纹帚：只清除三种由基础攻击命中产生、会留待后续结算的英雄技能成果。
+func clear_pending_hit_skill_effects() -> int:
+	var cleared: int = 0
+	for side in [0, 1]:
+		for slot in range(statuses[side].size()):
+			for key in ["poison", "jianqi", "vuln"]:
+				if int(get_status(side, slot, key, 0)) > 0:
+					(statuses[side][slot] as Dictionary).erase(key)
+					cleared += 1
+	return cleared
+
+
+## 遗愿灯：实际牺牲与指定替补登场统一留给揭示后的核心死亡链。
+func arm_last_wish(player: int, target: int) -> void:
+	if is_living_reserve(player, target):
+		set_item_mod(player, "last_wish_target", target)
+
+
+func _resolve_last_wishes(actions: Array[int], events: Array) -> void:
+	for player in [0, 1]:
+		var target: int = int(item_mod(player, "last_wish_target", -1))
+		if target < 0:
+			continue
+		# 无论牺牲是否被还魂丹等最低层保险拦下，本回合的行动机会都已经支付。
+		actions[player] = -2
+		selected_action[player] = -2
+		_second_action[player] = -1
+		_second_attack_target[player] = -1
+		var sacrificed: int = active_index[player]
+		var before: int = hp[player][sacrificed]
+		lose_life(player, sacrificed, before, events, "last_wish")
+		_resolve_deaths(actions, events)
+		if hp[player][sacrificed] > 0 or not is_living_reserve(player, target):
+			events.append({id = "last_wish_failed", player = player, slot = sacrificed})
+			continue
+		var healed: int = _heal(player, target, maxi(0, max_hp[player][target] - hp[player][target]))
+		if execute_death_switch(player, target):
+			for event_index in range(events.size() - 1, -1, -1):
+				var event: Dictionary = events[event_index]
+				if String(event.get("id", "")) == "force_switch_prompt" \
+						and int(event.get("player", -1)) == player:
+					events.remove_at(event_index)
+					break
+			events.append({id = "last_wish_entry", player = player, from = sacrificed,
+				to = target, amount = healed})
 
 
 ## 借印佩：一件对应一个后排英雄；整次攻击结算时逐件兑现一次。
@@ -1596,10 +1844,13 @@ func _replay_item_action(player: int, action: Dictionary, suppress_effect: bool)
 		slots[player][source_slot]["used"] = true
 	info_distortion[player].erase("hide_item_bar")
 	data.effect.on_consumed(self, player, int(action.get("target", player)), data)
+	_record_consumed_item(player, data)
+	_mark_item_slot_used_this_turn(player, source_slot)
 	var sealed: bool = bool(action.get("sealed", false))
 	if sealed:
 		_consume_due_item_seal(player)
 	if suppress_effect or sealed:
+		_mark_item_countered_this_turn(player, source_slot)
 		return
 	var target: int = int(action.get("target", player))
 	var item_slot_target: int = int(action.get("item_slot_target", -1))
@@ -1609,7 +1860,9 @@ func _replay_item_action(player: int, action: Dictionary, suppress_effect: bool)
 				return
 			slots[player][item_slot_target]["used"] = true
 			_gain_energy(player, int(data.params.get("energy", 4)))
-			item_uses[player].append({data = data, when = data.resolved_when(), target = target})
+			_append_slot_item_use(player, data, target, source_slot, item_slot_target,
+				int(slots[player][source_slot].get("instance_uid", -1)),
+				bool(slots[player][source_slot].get("temporary", false)))
 		"t2_dianjinshi":
 			if item_slot_target < 0 or item_slot_target >= slots[player].size():
 				return
@@ -1623,9 +1876,47 @@ func _replay_item_action(player: int, action: Dictionary, suppress_effect: bool)
 			target_slot["used"] = false
 			target_slot["draft"] = []
 			target_slot["upg_draft"] = []
-			item_uses[player].append({data = data, when = data.resolved_when(), target = target})
+			_append_slot_item_use(player, data, target, source_slot, item_slot_target,
+				int(slots[player][source_slot].get("instance_uid", -1)),
+				bool(slots[player][source_slot].get("temporary", false)))
+		"t1_jicun_pai":
+			_return_slot_item_to_backpack(player, item_slot_target)
+			_gain_energy(player, int(data.params.get("energy", 2)))
+			_append_slot_item_use(player, data, target, source_slot, item_slot_target,
+				int(slots[player][source_slot].get("instance_uid", -1)),
+				bool(slots[player][source_slot].get("temporary", false)))
+		"t2_huigou_quan":
+			add_item_to_battle_backpack(player, String(action.get("chosen_id", "")), true)
+			_append_slot_item_use(player, data, target, source_slot, item_slot_target,
+				int(slots[player][source_slot].get("instance_uid", -1)),
+				bool(slots[player][source_slot].get("temporary", false)))
+		"t2_yingji_xiang":
+			var emergency_entry: Dictionary = _take_bag_entry(
+				player, int(action.get("chosen_bag_uid", -1)))
+			_put_entry_in_slot(player, source_slot, emergency_entry, true)
+			_append_slot_item_use(player, data, target, source_slot, item_slot_target, -1, false)
+		"t2_huanqian_tong":
+			var returned_entry: Dictionary = _return_slot_item_to_backpack(player, item_slot_target)
+			var chosen_uid: int = int(action.get("chosen_bag_uid", -1))
+			var chosen_entry: Dictionary = returned_entry if chosen_uid < 0 \
+				else _take_bag_entry(player, chosen_uid)
+			if chosen_uid < 0:
+				_take_bag_entry(player, int(returned_entry.get("uid", -1)))
+			_put_entry_in_slot(player, item_slot_target, chosen_entry, false)
+			_append_slot_item_use(player, data, target, source_slot, item_slot_target,
+				int(slots[player][source_slot].get("instance_uid", -1)),
+				bool(slots[player][source_slot].get("temporary", false)))
 		_:
+			var uses_before: int = item_uses[player].size()
 			_replay_item_effect(player, target, data)
+			if item_uses[player].size() > uses_before:
+				var replayed: Dictionary = item_uses[player][item_uses[player].size() - 1]
+				replayed["source_slot"] = source_slot
+				replayed["item_slot_target"] = item_slot_target
+				replayed["instance_uid"] = int(slots[player][source_slot].get(
+					"instance_uid", -1)) if source_slot >= 0 else -1
+				replayed["temporary"] = bool(slots[player][source_slot].get(
+					"temporary", false)) if source_slot >= 0 else false
 
 
 func _restore_item_transaction(player: int, events: Array) -> void:
@@ -1639,9 +1930,60 @@ func _restore_item_transaction(player: int, events: Array) -> void:
 	slots[player] = _snap_unpack_slots(snapshot.get("slots", []))
 	relics[player] = _snap_unpack_relics(snapshot.get("relics", []))
 	item_uses[player] = _snap_unpack_uses(snapshot.get("item_uses", []))
+	battle_backpacks[player] = (snapshot.get("backpack", []) as Array).duplicate(true)
+	used_item_history[player] = (snapshot.get("used_item_history", []) as Array).duplicate(true)
+	revealed_backpack_uids[player] = (snapshot.get("revealed_backpack_uids", {}) as Dictionary).duplicate(true)
 	for action_index in range(actions.size()):
 		_replay_item_action(player, actions[action_index], action_index == 0)
+	# 后续全局规则（独用封）仍需读取同一份原始提交顺序并可能再次原子重放。
+	item_buffs[player][_ITEM_TX_SNAPSHOT] = snapshot
+	item_buffs[player][_ITEM_TX_ACTIONS] = actions
 	events.append({id = "tianluo_first_item_rolled_back", player = player})
+
+
+## 独用封：恢复第一件提交前的状态，只重放各方原始首件；其余来源照常消耗但效果无效。
+## 若该方首件已被天罗抵消，则本方没有任何道具效果可以保留。
+func _restore_item_transaction_first_only(player: int, suppress_first: bool,
+		events: Array) -> void:
+	var snapshot_variant: Variant = item_buffs[player].get(_ITEM_TX_SNAPSHOT, null)
+	if snapshot_variant == null:
+		return
+	var snapshot: Dictionary = snapshot_variant
+	var actions: Array = (item_buffs[player].get(_ITEM_TX_ACTIONS, []) as Array).duplicate(true)
+	var tianluo_lock: int = int(item_buffs[player].get("tianluo_switch_lock_turn", -1))
+	energy[player] = int(snapshot.get("energy", energy[player]))
+	item_buffs[player] = (snapshot.get("item_buffs", {}) as Dictionary).duplicate(true)
+	slots[player] = _snap_unpack_slots(snapshot.get("slots", []))
+	relics[player] = _snap_unpack_relics(snapshot.get("relics", []))
+	item_uses[player] = _snap_unpack_uses(snapshot.get("item_uses", []))
+	battle_backpacks[player] = (snapshot.get("backpack", []) as Array).duplicate(true)
+	used_item_history[player] = (snapshot.get("used_item_history", []) as Array).duplicate(true)
+	revealed_backpack_uids[player] = (snapshot.get(
+		"revealed_backpack_uids", {}) as Dictionary).duplicate(true)
+	for action_index in range(actions.size()):
+		_replay_item_action(player, actions[action_index], suppress_first or action_index > 0)
+	if tianluo_lock >= 0:
+		item_buffs[player]["tianluo_switch_lock_turn"] = tianluo_lock
+	item_buffs[player][_ITEM_TX_SNAPSHOT] = snapshot
+	item_buffs[player][_ITEM_TX_ACTIONS] = actions
+	events.append({id = "single_item_rule_applied", player = player,
+		first_countered = suppress_first})
+
+
+func _resolve_single_item_rule(tianluo_affected: Array[bool], events: Array) -> void:
+	var active: bool = false
+	for player in [0, 1]:
+		if tianluo_affected[player]:
+			continue
+		var actions: Array = item_buffs[player].get(_ITEM_TX_ACTIONS, [])
+		if not actions.is_empty() \
+				and String((actions[0] as Dictionary).get("item_id", "")) == "t2_duyong_feng":
+			active = true
+			break
+	if not active:
+		return
+	for player in [0, 1]:
+		_restore_item_transaction_first_only(player, tianluo_affected[player], events)
 
 
 func _discard_item_transactions() -> void:
@@ -1734,7 +2076,7 @@ func _action_valid_after_tianluo(player: int, action: int) -> bool:
 func _revalidate_tianluo_actions(affected: Array[bool], actions: Array[int],
 		events: Array) -> void:
 	for player in [0, 1]:
-		if affected[player] and not _action_valid_after_tianluo(player, actions[player]):
+		if not _action_valid_after_tianluo(player, actions[player]):
 			_fallback_action_to_charge(player, actions, events)
 
 
@@ -1755,8 +2097,6 @@ func _resolve_tianluo_requests(events: Array) -> Array[bool]:
 		_restore_item_transaction(victim, events)
 		item_buffs[victim]["tianluo_switch_lock_turn"] = turn_number
 		events.append({id = "tianluo_applied", player = victim})
-	_settle_pending_free_switches(affected, events)
-	_discard_item_transactions()
 	return affected
 
 
@@ -1783,12 +2123,44 @@ func _resolve_hostile_item_counters(events: Array) -> void:
 				and not data.effect.resolves_before_hostile_item_counters()
 			if hostile and charges[defender] > 0:
 				charges[defender] -= 1
+				var source_slot: int = int(use.get("source_slot", -1))
+				_mark_item_countered_this_turn(attacker, source_slot)
+				_return_countered_insured_item(attacker, source_slot, data.item_id, events)
 				events.append({id = "item_countered", player = attacker,
 					source_player = defender, item_id = data.item_id,
 					counter_item_id = "t2_huizhao_jing"})
 				continue
 			kept.append(use)
 		item_uses[attacker] = kept
+
+
+func _collect_item_insurance(events: Array) -> void:
+	for player in [0, 1]:
+		for use_variant in item_uses[player]:
+			var use: Dictionary = use_variant
+			var data: ItemData = use.get("data", null)
+			if data != null and data.item_id == "t2_baojia_feng":
+				arm_item_insurance(player, int(use.get("item_slot_target", -1)))
+		for slot_variant in item_buffs[player].get("countered_item_slots_this_turn", []):
+			var source_slot: int = int(slot_variant)
+			if not _insured_slot(player, source_slot) or source_slot < 0 \
+					or source_slot >= slots[player].size():
+				continue
+			var data: ItemData = slots[player][source_slot].get("item", null)
+			if data != null:
+				_return_countered_insured_item(player, source_slot, data.item_id, events)
+
+
+func _resolve_item_wagers(events: Array) -> void:
+	for player in [0, 1]:
+		var opponent: int = 1 - player
+		var used_slots: Array = item_buffs[opponent].get("used_item_slots_this_turn", [])
+		for wager_variant in item_mod(player, "item_wagers", []):
+			var wager: Dictionary = wager_variant
+			if used_slots.has(int(wager.get("slot", -1))):
+				var gained: int = _gain_energy(player, int(wager.get("amount", 0)))
+				events.append({id = "item_wager_won", player = player,
+					slot = int(wager.get("slot", -1)), amount = gained})
 
 
 func _resolve_mengdie_requests(events: Array) -> void:
@@ -1922,6 +2294,7 @@ func _resolve_lianhuan_second_actions(first_actions: Array[int], requested: Arra
 			continue
 	var saved_selected: Array[int] = selected_action.duplicate()
 	var saved_targets: Array[int] = _attack_target.duplicate()
+	var exact_spend_refunds: Array[int] = [0, 0]
 	for player in [0, 1]:
 		if ActionDef.is_attack(first_actions[player]):
 			_consume_next_attack_item_mods(player)
@@ -1950,6 +2323,8 @@ func _resolve_lianhuan_second_actions(first_actions: Array[int], requested: Arra
 			events.append({id = "lianhuan_second_cancelled", player = player,
 				reason = "insufficient_energy"})
 			continue
+		if cost > 0 and usable_energy(player) == cost:
+			exact_spend_refunds[player] = int(item_mod(player, "exact_spend_refund", 0))
 		energy[player] -= cost
 		if actions[player] == ActionDef.Action.BIG_ATTACK \
 				and int(item_buffs[player].get("free_big_attack_until_turn", -1)) == turn_number:
@@ -2003,6 +2378,8 @@ func _resolve_lianhuan_second_actions(first_actions: Array[int], requested: Arra
 			+ int(item_mod(player, "turn_base_attack_total_bonus", 0)) \
 			- int(item_mod(player, "atk_penalty", 0)) \
 			- int(item_mod(player, "base_attack_total_penalty", 0))
+		if action == ActionDef.Action.BIG_ATTACK:
+			damage += int(item_mod(1 - player, "enemy_big_wave_total_bonus", 0))
 		if action == ActionDef.Action.ATTACK:
 			damage -= int(item_mod(player, "next_wave_target_penalty", 0))
 		damage = maxi(damage, 0)
@@ -2031,6 +2408,8 @@ func _resolve_lianhuan_second_actions(first_actions: Array[int], requested: Arra
 		hits[player] = {damage = damage, kind = kind, pen = pen,
 			riders = item_mod(player, "riders", []), action = true, active = false,
 			src_slot = source_slot, target_slot = target_slot,
+			force_zero_damage = action == ActionDef.Action.ATTACK and bool(item_mod(
+				1 - player, "enemy_wave_no_damage", false)),
 			consume_true_damage = bool(item_mod(player, "next_base_attack_true_damage", false)),
 			whole_attack_extra_hits = extra_hits}
 		if wave_upgraded:
@@ -2070,6 +2449,10 @@ func _resolve_lianhuan_second_actions(first_actions: Array[int], requested: Arra
 				self, defender, context, relic["data"], relic["state"], events)
 		_resolve_dianjiang_after_hit(player, context, events)
 		_consume_next_attack_item_mods(player)
+	for player in [0, 1]:
+		if exact_spend_refunds[player] > 0:
+			set_item_mod(player, "exact_spend_refund_pending", exact_spend_refunds[player])
+			_settle_exact_spend_refund(player, events, 2)
 	selected_action = saved_selected
 	_attack_target = saved_targets
 
@@ -2153,16 +2536,202 @@ const DRAFT_DIM_WEIGHT := 2.0          # 抽卡 3 选 1 里维度命中我方阵
 const STARTER_ITEM_IDS := ["t1_feibiao", "t1_jiudun", "t1_lzhi_shengming"]  # slot0 自带随机池（后期改玩家自选 T1/T2 携带·PvE）
 
 
+func _empty_econ_slot() -> Dictionary:
+	return {state = SlotState.EMPTY, item = null, since = -1, used = false,
+		draft = [], upg_draft = [], draft_entry_uids = [], instance_uid = -1,
+		temporary = false}
+
+
+func _new_backpack_entry(item_id: String, temporary: bool = false) -> Dictionary:
+	var entry := {uid = _next_backpack_uid, item_id = item_id, temporary = temporary}
+	_next_backpack_uid += 1
+	return entry
+
+
+func configure_battle_backpacks(player0_ids: Array, player1_ids: Array) -> void:
+	battle_backpack_enabled = true
+	battle_backpacks = [[], []]
+	used_item_history = [[], []]
+	revealed_backpack_uids = [{}, {}]
+	_next_backpack_uid = 1
+	for player in [0, 1]:
+		var ids: Array = player0_ids if player == 0 else player1_ids
+		var copies: Dictionary = {}
+		for id_variant in ids:
+			var item_id: String = String(id_variant)
+			var data: ItemData = ItemCatalog.make(item_id)
+			if data == null or data.tier >= 3 or int(copies.get(item_id, 0)) >= 2:
+				continue
+			copies[item_id] = int(copies.get(item_id, 0)) + 1
+			battle_backpacks[player].append(_new_backpack_entry(item_id))
+
+
+func add_item_to_battle_backpack(player: int, item_id: String,
+		temporary: bool = false) -> int:
+	if not battle_backpack_enabled or player < 0 or player > 1 \
+			or ItemCatalog.make(item_id) == null:
+		return -1
+	var entry: Dictionary = _new_backpack_entry(item_id, temporary)
+	battle_backpacks[player].append(entry)
+	return int(entry["uid"])
+
+
+func _bag_entry_index(player: int, uid: int) -> int:
+	for index in range(battle_backpacks[player].size()):
+		if int((battle_backpacks[player][index] as Dictionary).get("uid", -1)) == uid:
+			return index
+	return -1
+
+
+func _take_bag_entry(player: int, uid: int) -> Dictionary:
+	var index: int = _bag_entry_index(player, uid)
+	if index < 0:
+		return {}
+	var entry: Dictionary = battle_backpacks[player][index]
+	battle_backpacks[player].remove_at(index)
+	return entry
+
+
+func _put_entry_in_slot(player: int, slot_index: int, entry: Dictionary,
+		ready_now: bool) -> bool:
+	if entry.is_empty() or slot_index < 0 or slot_index >= slots[player].size():
+		return false
+	var data: ItemData = ItemCatalog.make(String(entry.get("item_id", "")))
+	if data == null:
+		return false
+	var slot: Dictionary = slots[player][slot_index]
+	slot["item"] = data
+	slot["state"] = SlotState.CHARGING
+	slot["since"] = -1 if ready_now else turn_number
+	slot["used"] = false
+	slot["draft"] = []
+	slot["upg_draft"] = []
+	slot["draft_entry_uids"] = []
+	slot["instance_uid"] = int(entry.get("uid", -1))
+	slot["temporary"] = bool(entry.get("temporary", false))
+	return true
+
+
+func _return_slot_item_to_backpack(player: int, slot_index: int) -> Dictionary:
+	if not battle_backpack_enabled or slot_index < 0 or slot_index >= slots[player].size():
+		return {}
+	var slot: Dictionary = slots[player][slot_index]
+	var data: ItemData = slot.get("item", null)
+	if data == null:
+		return {}
+	var uid: int = int(slot.get("instance_uid", -1))
+	var entry: Dictionary = {uid = uid, item_id = data.item_id,
+		temporary = bool(slot.get("temporary", false))}
+	if uid < 0 or _bag_entry_index(player, uid) >= 0:
+		entry = _new_backpack_entry(data.item_id, bool(slot.get("temporary", false)))
+	battle_backpacks[player].append(entry)
+	slot["used"] = true
+	return entry
+
+
+func _sample_bag_entries(entries: Array, count: int) -> Array:
+	var pool: Array = entries.duplicate(true)
+	var out: Array = []
+	while not pool.is_empty() and out.size() < count:
+		out.append(pool.pop_at(rng.randi_range(0, pool.size() - 1)))
+	return out
+
+
+func _cache_bag_draft(slot: Dictionary, entries: Array) -> Array:
+	slot["draft"] = []
+	slot["draft_entry_uids"] = []
+	for entry_variant in entries:
+		var entry: Dictionary = entry_variant
+		var data: ItemData = ItemCatalog.make(String(entry.get("item_id", "")))
+		if data == null:
+			continue
+		(slot["draft"] as Array).append(data)
+		(slot["draft_entry_uids"] as Array).append(int(entry.get("uid", -1)))
+	return slot["draft"]
+
+
+func begin_repurchase_draft(player: int, source_slot: int) -> Array:
+	if not battle_backpack_enabled or source_slot < 0 or source_slot >= slots[player].size():
+		return []
+	var source: Dictionary = slots[player][source_slot]
+	var data: ItemData = source.get("item", null)
+	if data == null or data.item_id != "t2_huigou_quan" or not slot_ready(player, source_slot):
+		return []
+	if (source.get("upg_draft", []) as Array).is_empty():
+		var seen: Dictionary = {}
+		for history_variant in used_item_history[player]:
+			var history: Dictionary = history_variant
+			var id: String = String(history.get("item_id", ""))
+			if int(history.get("tier", 0)) == 1 and not seen.has(id):
+				seen[id] = true
+				(source["upg_draft"] as Array).append(ItemCatalog.make(id))
+	return source["upg_draft"]
+
+
+func begin_exchange_draft(player: int, source_slot: int, target_slot: int) -> Array:
+	if not battle_backpack_enabled or source_slot < 0 or source_slot >= slots[player].size() \
+			or target_slot < 0 or target_slot >= slots[player].size() or target_slot == source_slot:
+		return []
+	var source: Dictionary = slots[player][source_slot]
+	var source_data: ItemData = source.get("item", null)
+	var target_data: ItemData = slots[player][target_slot].get("item", null)
+	if source_data == null or source_data.item_id != "t2_huanqian_tong" \
+			or target_data == null or bool(slots[player][target_slot].get("used", false)) \
+			or not slot_ready(player, source_slot):
+		return []
+	if (source.get("draft", []) as Array).is_empty():
+		var pool: Array = battle_backpacks[player].duplicate(true)
+		pool.append({uid = -1, item_id = target_data.item_id,
+			temporary = bool(slots[player][target_slot].get("temporary", false))})
+		_cache_bag_draft(source, _sample_bag_entries(pool, 3))
+	return source["draft"]
+
+
+func reveal_enemy_backpack(viewer: int, count: int) -> Array[String]:
+	var owner: int = 1 - viewer
+	var candidates: Array = []
+	for entry_variant in battle_backpacks[owner]:
+		var entry: Dictionary = entry_variant
+		if not _revealed_uid(revealed_backpack_uids[viewer], int(entry.get("uid", -1))):
+			candidates.append(entry)
+	var revealed: Array[String] = []
+	for entry_variant in _sample_bag_entries(candidates, maxi(0, count)):
+		var entry: Dictionary = entry_variant
+		revealed_backpack_uids[viewer][int(entry["uid"])] = true
+		revealed.append(String(entry["item_id"]))
+	return revealed
+
+
+func revealed_backpack_items_for(viewer: int, owner: int) -> Array[String]:
+	var out: Array[String] = []
+	if viewer < 0 or viewer > 1 or owner != 1 - viewer:
+		return out
+	for entry_variant in battle_backpacks[owner]:
+		var entry: Dictionary = entry_variant
+		if _revealed_uid(revealed_backpack_uids[viewer], int(entry.get("uid", -1))):
+			out.append(String(entry.get("item_id", "")))
+	return out
+
+
+static func _revealed_uid(reveals: Dictionary, uid: int) -> bool:
+	return reveals.has(uid) or reveals.has(str(uid))
+
+
 ## 启用经济并初始化槽位（实战由 battle_screen 调；单元测试不调 → 槽空、不影响既有行为）。
 func econ_init() -> void:
 	slots = [[], []]
+	if battle_backpack_enabled:
+		for player in [0, 1]:
+			for _slot_index in range(SLOT_COUNT):
+				slots[player].append(_empty_econ_slot())
+		return
 	for p in [0, 1]:
 		# slot0 = 自带随机 T1：开局即公开亮相（明牌电报），since=解锁回合 → 解锁当回合仍锁、
 		# turn_number 3(显示回合4)才 slot_ready（统一锁定规则：新道具出现回合锁定、下回合可用）。
 		var sid: String = STARTER_ITEM_IDS[rng.randi() % STARTER_ITEM_IDS.size()]
-		slots[p].append({state = SlotState.CHARGING, item = ItemCatalog.make(sid), since = int(SLOT_UNLOCK_TURN[0]), used = false, draft = [], upg_draft = []})
+		slots[p].append({state = SlotState.CHARGING, item = ItemCatalog.make(sid), since = int(SLOT_UNLOCK_TURN[0]), used = false, draft = [], upg_draft = [], draft_entry_uids = [], instance_uid = -1, temporary = false})
 		for _s in range(SLOT_COUNT - 1):
-			slots[p].append({state = SlotState.SEALED, item = null, since = -1, used = false, draft = [], upg_draft = []})
+			slots[p].append({state = SlotState.SEALED, item = null, since = -1, used = false, draft = [], upg_draft = [], draft_entry_uids = [], instance_uid = -1, temporary = false})
 	_econ_unlock()
 
 
@@ -2229,7 +2798,10 @@ func can_draw_slot(player: int, s: int) -> bool:
 func begin_draft(player: int, s: int) -> Array:
 	var sl: Dictionary = slots[player][s]
 	if (sl["draft"] as Array).is_empty():
-		sl["draft"] = _lineup_weighted_draft(player, _draft_pool(), 3)
+		if battle_backpack_enabled:
+			_cache_bag_draft(sl, _sample_bag_entries(battle_backpacks[player], 3))
+		else:
+			sl["draft"] = _lineup_weighted_draft(player, _draft_pool(), 3)
 	return sl["draft"]
 
 
@@ -2241,12 +2813,42 @@ func pick_draft(player: int, s: int, choice: int) -> bool:
 	if choice < 0 or choice >= opts.size():
 		return false
 	var sl: Dictionary = slots[player][s]
-	sl["item"] = ItemCatalog.make((opts[choice] as ItemData).item_id)   # 独立实例
-	sl["state"] = SlotState.CHARGING
-	sl["since"] = turn_number
-	sl["draft"] = []
-	sl["upg_draft"] = []   # 新件 → 旧升级候选作废
+	if battle_backpack_enabled:
+		var uids: Array = sl.get("draft_entry_uids", [])
+		if choice >= uids.size():
+			return false
+		var entry: Dictionary = _take_bag_entry(player, int(uids[choice]))
+		if not _put_entry_in_slot(player, s, entry, false):
+			return false
+	else:
+		sl["item"] = ItemCatalog.make((opts[choice] as ItemData).item_id)   # 独立实例
+		sl["state"] = SlotState.CHARGING
+		sl["since"] = turn_number
+		sl["draft"] = []
+		sl["upg_draft"] = []   # 新件 → 旧升级候选作废
 	return true
+
+
+func _random_t1_bag_entry(player: int) -> Dictionary:
+	var candidates: Array = []
+	for entry_variant in battle_backpacks[player]:
+		var entry: Dictionary = entry_variant
+		var data: ItemData = ItemCatalog.make(String(entry.get("item_id", "")))
+		if data != null and data.tier == 1:
+			candidates.append(entry)
+	if candidates.is_empty():
+		return {}
+	var chosen: Dictionary = candidates[rng.randi_range(0, candidates.size() - 1)]
+	return _take_bag_entry(player, int(chosen.get("uid", -1)))
+
+
+func _append_slot_item_use(player: int, data: ItemData, resolved_target: int,
+		source_slot: int, item_slot_target: int, instance_uid: int,
+		temporary: bool) -> void:
+	item_uses[player].append({data = data, when = data.resolved_when(),
+		target = resolved_target, source_slot = source_slot,
+		item_slot_target = item_slot_target, instance_uid = instance_uid,
+		temporary = temporary})
 
 
 ## 用某个已就绪的槽（提交到盲选 item_uses；用后标记 → 结算末置 EMPTY）。
@@ -2258,8 +2860,15 @@ func use_slot(player: int, s: int, target_override: int = -1, item_slot_target: 
 	var data: ItemData = slots[player][s]["item"]
 	if data == null or data.effect == null:
 		return false
+	if bool(data.params.get("requires_backpack", false)) and not battle_backpack_enabled:
+		return false
+	var source_uid: int = int(slots[player][s].get("instance_uid", -1))
+	var source_temporary: bool = bool(slots[player][s].get("temporary", false))
 	var fuel: ItemData = null
 	var upgraded: ItemData = null
+	var repurchased_data: ItemData = null
+	var selected_choice_id: String = ""
+	var selected_bag_uid: int = -1
 	if data.item_id == "t1_ronglu":
 		if item_slot_target < 0 or item_slot_target >= slots[player].size() \
 				or item_slot_target == s or not slot_ready(player, item_slot_target):
@@ -2271,36 +2880,67 @@ func use_slot(player: int, s: int, target_override: int = -1, item_slot_target: 
 		upgraded = _pointstone_upgrade(player, s, item_slot_target, item_choice)
 		if upgraded == null:
 			return false
+	elif data.item_id in ["t1_jicun_pai", "t2_baojia_feng"]:
+		if item_slot_target < 0 or item_slot_target >= slots[player].size() \
+				or item_slot_target == s or not slot_ready(player, item_slot_target):
+			return false
+	elif data.item_id == "t2_huanqian_tong":
+		var exchange_options: Array = begin_exchange_draft(player, s, item_slot_target)
+		if item_choice < 0 or item_choice >= exchange_options.size():
+			return false
+		selected_choice_id = (exchange_options[item_choice] as ItemData).item_id
+		selected_bag_uid = int((slots[player][s].get("draft_entry_uids", []) as Array)[item_choice])
+	elif data.item_id == "t2_huigou_quan":
+		var repurchase_options: Array = begin_repurchase_draft(player, s)
+		if item_choice < 0 or item_choice >= repurchase_options.size():
+			return false
+		repurchased_data = repurchase_options[item_choice]
+		selected_choice_id = repurchased_data.item_id
+	elif data.item_id == "t2_yingji_xiang":
+		var t1_entries: Array = []
+		for entry_variant in battle_backpacks[player]:
+			var entry: Dictionary = entry_variant
+			var entry_data: ItemData = ItemCatalog.make(String(entry.get("item_id", "")))
+			if entry_data != null and entry_data.tier == 1:
+				t1_entries.append(entry)
+		if t1_entries.is_empty():
+			return false
+		var emergency_choice: Dictionary = t1_entries[rng.randi_range(0, t1_entries.size() - 1)]
+		selected_choice_id = String(emergency_choice.get("item_id", ""))
+		selected_bag_uid = int(emergency_choice.get("uid", -1))
 	elif item_requires_enemy_item_slot_target(data):
-		if not valid_enemy_locked_item_target(player, item_slot_target):
+		if not valid_enemy_item_target_for(data, player, item_slot_target):
 			return false
 	if item_requires_friendly_hero_target(data) and target_override < 0:
 		return false
 	var resolved_target: int = item_slot_target if item_requires_enemy_item_slot_target(data) \
+			or item_requires_friendly_item_slot_target(data) \
 		else _resolve_item_target(player, data, target_override)
 	if not data.effect.can_use(self, player, resolved_target, data):
 		return false
 	_begin_item_transaction(player)
 	info_distortion[player].erase("hide_item_bar")
 	data.effect.on_consumed(self, player, resolved_target, data)
+	_record_consumed_item(player, data)
+	_mark_item_slot_used_this_turn(player, s)
 	# 封印卷轴只抵消效果：正式槽道具照常消耗；带副目标的道具不消耗/改写副目标。
 	var sealed: bool = _consume_due_item_seal(player)
 	_record_item_action(player, {item_id = data.item_id, source_slot = s,
 		target = resolved_target, item_slot_target = item_slot_target,
+		item_choice = item_choice, chosen_id = selected_choice_id,
+		chosen_bag_uid = selected_bag_uid,
 		upgraded_id = upgraded.item_id if upgraded != null else "", sealed = sealed})
 	if sealed:
 		slots[player][s]["used"] = true
+		_mark_item_countered_this_turn(player, s)
 		return true
 	if data.item_id == "t1_ronglu":
 		# 炉与燃料在一次校验成功后同时锁定，产能立即到账，可支付本回合行动。
 		slots[player][s]["used"] = true
 		slots[player][item_slot_target]["used"] = true
 		_gain_energy(player, int(data.params.get("energy", 4)))
-		item_uses[player].append({
-			data = data,
-			when = data.resolved_when(),
-			target = resolved_target,
-		})
+		_append_slot_item_use(player, data, resolved_target, s, item_slot_target,
+			source_uid, source_temporary)
 		return true
 	if data.item_id == "t2_dianjinshi":
 		slots[player][s]["used"] = true
@@ -2311,11 +2951,43 @@ func use_slot(player: int, s: int, target_override: int = -1, item_slot_target: 
 		target_slot["used"] = false
 		target_slot["draft"] = []
 		target_slot["upg_draft"] = []
-		item_uses[player].append({
-			data = data,
-			when = data.resolved_when(),
-			target = resolved_target,
-		})
+		_append_slot_item_use(player, data, resolved_target, s, item_slot_target,
+			source_uid, source_temporary)
+		return true
+	if data.item_id == "t1_jicun_pai":
+		slots[player][s]["used"] = true
+		_return_slot_item_to_backpack(player, item_slot_target)
+		_gain_energy(player, int(data.params.get("energy", 2)))
+		_append_slot_item_use(player, data, resolved_target, s, item_slot_target,
+			source_uid, source_temporary)
+		return true
+	if data.item_id == "t2_huigou_quan":
+		slots[player][s]["used"] = true
+		add_item_to_battle_backpack(player, repurchased_data.item_id, true)
+		_append_slot_item_use(player, data, resolved_target, s, item_slot_target,
+			source_uid, source_temporary)
+		return true
+	if data.item_id == "t2_yingji_xiang":
+		slots[player][s]["used"] = true
+		var emergency_entry: Dictionary = _take_bag_entry(player, selected_bag_uid)
+		if not _put_entry_in_slot(player, s, emergency_entry, true):
+			return false
+		_append_slot_item_use(player, data, resolved_target, s, item_slot_target,
+			source_uid, source_temporary)
+		return true
+	if data.item_id == "t2_huanqian_tong":
+		slots[player][s]["used"] = true
+		var source: Dictionary = slots[player][s]
+		var chosen_uid: int = selected_bag_uid
+		var returned_entry: Dictionary = _return_slot_item_to_backpack(player, item_slot_target)
+		var chosen_entry: Dictionary = returned_entry if chosen_uid < 0 \
+			else _take_bag_entry(player, chosen_uid)
+		if chosen_uid < 0:
+			_take_bag_entry(player, int(returned_entry.get("uid", -1)))
+		if not _put_entry_in_slot(player, item_slot_target, chosen_entry, false):
+			return false
+		_append_slot_item_use(player, data, resolved_target, s, item_slot_target,
+			source_uid, source_temporary)
 		return true
 	slots[player][s]["used"] = true
 	if bool(data.params.get("relic", false)):
@@ -2327,11 +2999,8 @@ func use_slot(player: int, s: int, target_override: int = -1, item_slot_target: 
 			return true
 	if data.item_id == "t2_mojing":
 		_commit_magic_crystal(player, data)
-	item_uses[player].append({
-		data = data,
-		when = data.resolved_when(),
-		target = resolved_target,
-	})
+	_append_slot_item_use(player, data, resolved_target, s, item_slot_target,
+		source_uid, source_temporary)
 	return true
 
 
@@ -2361,7 +3030,7 @@ func begin_upgrade_draft(player: int, s: int) -> Array:
 	var sl: Dictionary = slots[player][s]
 	if (sl["upg_draft"] as Array).is_empty():
 		var item: ItemData = sl["item"]
-		var pool: Array = ItemCatalog.all_for_tier(item.tier + 1) if item != null else []
+		var pool: Array = _tier_pool_for_mode(item.tier + 1) if item != null else []
 		var fav: String = item.upgrade_to if item != null else ""
 		sl["upg_draft"] = _weighted_draft_pick(pool, fav, 3)
 	return sl["upg_draft"]
@@ -2410,7 +3079,9 @@ func pick_upgrade(player: int, s: int, choice: int) -> bool:
 func can_refill(player: int, s: int) -> bool:
 	if pve_no_econ:
 		return false   # 远征 PvE：空槽不可花能补充（无局内经济）
-	return int(slots[player][s]["state"]) == SlotState.EMPTY and usable_energy(player) >= ITEM_REFILL_COST
+	return int(slots[player][s]["state"]) == SlotState.EMPTY \
+		and usable_energy(player) >= ITEM_REFILL_COST \
+		and (not battle_backpack_enabled or not battle_backpacks[player].is_empty())
 
 
 ## 补充：付 1 能，EMPTY→可抽（格已在，故立即 3 选 1；返回选项供 UI；随后 pick_draft）。
@@ -2429,7 +3100,16 @@ func start_refill(player: int, s: int) -> Array:
 
 ## 抽卡池 = T1 池（解锁 3 选 1 / 补充 3 选 1 均只出 T1；T2/T3 只走升级线·2026-07-03）。
 func _draft_pool() -> Array:
-	return ItemCatalog.all_tier1()
+	return _tier_pool_for_mode(1)
+
+
+func _tier_pool_for_mode(tier: int) -> Array:
+	var out: Array = []
+	for item_variant in ItemCatalog.all_for_tier(tier):
+		var data: ItemData = item_variant
+		if battle_backpack_enabled or not bool(data.params.get("requires_backpack", false)):
+			out.append(data)
+	return out
 
 
 ## 我方阵容维度集合（keys=维度名）。只认阵容标签、不认战况——每局静态，
@@ -2494,7 +3174,11 @@ func _econ_after_resolve() -> void:
 				sl["state"] = SlotState.EMPTY
 				sl["item"] = null
 				sl["used"] = false
+				sl["draft"] = []
 				sl["upg_draft"] = []
+				sl["draft_entry_uids"] = []
+				sl["instance_uid"] = -1
+				sl["temporary"] = false
 
 
 # === 加时赛（2026-07-03 Eddy 定·Q5；2026-07-05 修订：不限回合 → 30 回合骤死裁决）===
@@ -2598,6 +3282,11 @@ func clone() -> BattleCore:
 	c._imod = _imod.duplicate(true)
 	c.relics = relics.duplicate(true)
 	c.slots = slots.duplicate(true)
+	c.battle_backpack_enabled = battle_backpack_enabled
+	c.battle_backpacks = battle_backpacks.duplicate(true)
+	c.used_item_history = used_item_history.duplicate(true)
+	c.revealed_backpack_uids = revealed_backpack_uids.duplicate(true)
+	c._next_backpack_uid = _next_backpack_uid
 	c.turn_number = turn_number
 	c.game_over = game_over
 	c.winner = winner
@@ -2640,7 +3329,7 @@ func clone() -> BattleCore:
 #       b.select_action(0, ...)                           # 恢复后战局含随机流逐位一致，直接续打
 # 行为锁定：tests/unit/battle/v4/test_battle_snapshot.gd
 
-const SNAPSHOT_VERSION := 18
+const SNAPSHOT_VERSION := 19
 const HERO_RES_DIR := "res://assets/data/heroes/"
 ## 快照必需键（2026-07-17 终审修复·schema 门）：⚠新增引擎状态字段的"三处同步"升级为四处——
 ## clone() / to_snapshot()+from_snapshot() / 本表 / 快照测试。
@@ -2648,6 +3337,7 @@ const SNAP_REQUIRED_KEYS: Array[String] = ["v", "heroes", "active_index", "energ
 	"shield", "pending_damage", "statuses", "selected_action", "switch_to", "forced_pull",
 	"active_target", "attack_target", "second_action", "second_attack_target", "pending_death_switch", "death_processed", "empowered_wave", "split_big_wave", "blood_payment", "blood_payment_source", "energy_cap_discount", "free_switch_usage_turn", "free_switch_uses", "pending_free_switches", "killer",
 	"last_action", "items", "item_uses", "info_distortion", "item_buffs", "timed_item_effects", "imod", "relics", "slots",
+	"battle_backpack_enabled", "battle_backpacks", "used_item_history", "revealed_backpack_uids", "next_backpack_uid",
 	"turn_number", "game_over", "winner", "overtime_mode", "action_lock_turn", "action_locked",
 	"energy_burn_turn", "upgrade_next_wave", "retained_big_defend", "retained_big_defend_until_turn",
 	"pve_no_econ", "rng_seed", "rng_state"]
@@ -2693,6 +3383,11 @@ func to_snapshot() -> Dictionary:
 		imod = _imod.duplicate(true),
 		relics = [_snap_pack_relics(0), _snap_pack_relics(1)],
 		slots = [_snap_pack_slots(0), _snap_pack_slots(1)],
+		battle_backpack_enabled = battle_backpack_enabled,
+		battle_backpacks = battle_backpacks.duplicate(true),
+		used_item_history = used_item_history.duplicate(true),
+		revealed_backpack_uids = revealed_backpack_uids.duplicate(true),
+		next_backpack_uid = _next_backpack_uid,
 		turn_number = turn_number,
 		game_over = game_over,
 		winner = winner,
@@ -2763,6 +3458,13 @@ func from_snapshot(d: Dictionary) -> bool:
 	_imod = s["imod"]
 	relics = [_snap_unpack_relics(s["relics"][0]), _snap_unpack_relics(s["relics"][1])]
 	slots = [_snap_unpack_slots(s["slots"][0]), _snap_unpack_slots(s["slots"][1])]
+	battle_backpack_enabled = bool(s["battle_backpack_enabled"])
+	battle_backpacks = s["battle_backpacks"]
+	used_item_history = s["used_item_history"]
+	var reveals: Array[Dictionary] = []
+	reveals.assign(s["revealed_backpack_uids"])
+	revealed_backpack_uids = reveals
+	_next_backpack_uid = int(s["next_backpack_uid"])
 	turn_number = int(s["turn_number"])
 	game_over = bool(s["game_over"])
 	winner = int(s["winner"])
@@ -2850,14 +3552,18 @@ static func _snap_unpack_items(arr: Array) -> Array:
 func _snap_pack_uses(p: int) -> Array:
 	var out: Array = []
 	for u in item_uses[p]:
-		out.append({id = _snap_item_id(u["data"]), when = int(u["when"]), target = int(u["target"])})
+		out.append({id = _snap_item_id(u["data"]), when = int(u["when"]), target = int(u["target"]),
+			source_slot = int(u.get("source_slot", -1)), item_slot_target = int(u.get("item_slot_target", -1)),
+			instance_uid = int(u.get("instance_uid", -1)), temporary = bool(u.get("temporary", false))})
 	return out
 
 
 static func _snap_unpack_uses(arr: Array) -> Array:
 	var out: Array = []
 	for u in arr:
-		out.append({data = _snap_item_make(String(u["id"])), when = int(u["when"]), target = int(u["target"])})
+		out.append({data = _snap_item_make(String(u["id"])), when = int(u["when"]), target = int(u["target"]),
+			source_slot = int(u.get("source_slot", -1)), item_slot_target = int(u.get("item_slot_target", -1)),
+			instance_uid = int(u.get("instance_uid", -1)), temporary = bool(u.get("temporary", false))})
 	return out
 
 
@@ -2881,7 +3587,9 @@ func _snap_pack_slots(p: int) -> Array:
 		out.append({state = int(sl.get("state", SlotState.CHARGING)),
 			item = _snap_item_id(sl.get("item", null)), since = int(sl.get("since", -1)),
 			used = bool(sl.get("used", false)), draft = _snap_pack_items(sl.get("draft", [])),
-			upg_draft = _snap_pack_items(sl.get("upg_draft", []))})
+			upg_draft = _snap_pack_items(sl.get("upg_draft", [])),
+			draft_entry_uids = (sl.get("draft_entry_uids", []) as Array).duplicate(),
+			instance_uid = int(sl.get("instance_uid", -1)), temporary = bool(sl.get("temporary", false))})
 	return out
 
 
@@ -2891,7 +3599,9 @@ static func _snap_unpack_slots(arr: Array) -> Array:
 		out.append({state = int(sl.get("state", SlotState.CHARGING)),
 			item = _snap_item_make(String(sl.get("item", ""))), since = int(sl.get("since", -1)),
 			used = bool(sl.get("used", false)), draft = _snap_unpack_items(sl.get("draft", [])),
-			upg_draft = _snap_unpack_items(sl.get("upg_draft", []))})
+			upg_draft = _snap_unpack_items(sl.get("upg_draft", [])),
+			draft_entry_uids = (sl.get("draft_entry_uids", []) as Array).duplicate(),
+			instance_uid = int(sl.get("instance_uid", -1)), temporary = bool(sl.get("temporary", false))})
 	return out
 
 
@@ -3026,7 +3736,11 @@ func resolve() -> Dictionary:
 		for use_s in item_uses[p]:
 			use_s["data"].effect.setup_pre(self, p, use_s["data"])
 	var tianluo_affected: Array[bool] = _resolve_tianluo_requests(events)
+	_resolve_single_item_rule(tianluo_affected, events)
+	_settle_pending_free_switches(tianluo_affected, events)
+	_discard_item_transactions()
 	_flush_pending_item_events(events)
+	_collect_item_insurance(events)
 	_resolve_hostile_item_counters(events)
 	# 天罗已完成首件道具裁定；剩余规则件在普通 apply_pre 前统一预设，避免点击顺序改变结果。
 	for p in [0, 1]:
@@ -3038,9 +3752,12 @@ func resolve() -> Dictionary:
 	#   借引擎全程 null-check 统一收口其【所有 hook】(=unique 失效)。resolve 末还原 + 递减时长。
 	#   只递减本回合生效过的（cast 当回合 silenced 在本 swap 之后才写入 → 不计 → 恰好 2 个完整回合）。
 	var _silenced_swap: Array = []
+	var global_skill_silence: bool = bool(item_mod(0, "global_skill_silence", false)) \
+		or bool(item_mod(1, "global_skill_silence", false))
 	for sp in [0, 1]:
 		for ss in range(_skills[sp].size()):
-			if int(get_status(sp, ss, "silenced", 0)) > 0 and _skills[sp][ss] != null:
+			if (global_skill_silence or int(get_status(sp, ss, "silenced", 0)) > 0) \
+					and _skills[sp][ss] != null:
 				_silenced_swap.append([sp, ss, _skills[sp][ss]])
 				_skills[sp][ss] = null
 
@@ -3121,9 +3838,11 @@ func resolve() -> Dictionary:
 		for use_a in item_uses[p]:
 			if int(use_a["when"]) == ItemData.Seq.PRE:
 				use_a["data"].effect.apply_pre(self, p, int(use_a["target"]), use_a["data"])
+	_resolve_item_wagers(events)
 	# h07 免费切换在道具揭示前完成；新切换道具在此对已完成的切换补结算一次。
 	_resolve_retroactive_switch_items(events)
 	_flush_pending_item_events(events)
+	_resolve_last_wishes(a, events)
 	# 遗物·Phase IS：注入本回合被动修正器（_imod）。新激活的遗物本回合也在此生效。
 	for p in [0, 1]:
 		for relic in relics[p]:
@@ -3157,7 +3876,13 @@ func resolve() -> Dictionary:
 					saved = ENERGY_CAP_DISCOUNT_AMOUNT,
 					new_max = energy_max[p],
 				})
+		var energy_before_payment: int = usable_energy(p)
+		var exact_energy_spend: bool = not _blood_payment[p] and resolved_cost > 0 \
+			and energy_before_payment == resolved_cost
 		_pay_action_cost(p, resolved_cost, events)
+		if exact_energy_spend:
+			set_item_mod(p, "exact_spend_refund_pending", int(item_mod(
+				p, "exact_spend_refund", 0)))
 		if a[p] == ActionDef.Action.BIG_ATTACK \
 				and int(item_buffs[p].get("free_big_attack_until_turn", -1)) == turn_number:
 			item_buffs[p].erase("free_big_attack_until_turn")
@@ -3223,7 +3948,8 @@ func resolve() -> Dictionary:
 		_apply_hero_runtime_snapshot(p, source_slot, snapshot as Dictionary)
 		# Phase 0.3 已经过了；若复制来的英雄正处于沉默中，补入本拍的临时技能换位，
 		# 保证它不会在后续命中/回合末 hook 中越过沉默，并沿用统一的回合末递减/还原。
-		if int(get_status(p, source_slot, "silenced", 0)) > 0 and _skills[p][source_slot] != null:
+		if (global_skill_silence or int(get_status(p, source_slot, "silenced", 0)) > 0) \
+				and _skills[p][source_slot] != null:
 			_silenced_swap.append([p, source_slot, _skills[p][source_slot]])
 			_skills[p][source_slot] = null
 		events.append({
@@ -3310,6 +4036,8 @@ func resolve() -> Dictionary:
 				+ int(item_mod(p, "turn_base_attack_total_bonus", 0)) \
 				- int(item_mod(p, "atk_penalty", 0)) \
 				- int(item_mod(p, "base_attack_total_penalty", 0))
+			if a[p] == ActionDef.Action.BIG_ATTACK:
+				total_delta += int(item_mod(1 - p, "enemy_big_wave_total_bonus", 0))
 			if a[p] == ActionDef.Action.ATTACK:
 				total_delta -= int(item_mod(p, "next_wave_target_penalty", 0))
 			if total_delta >= 0:
@@ -3350,6 +4078,8 @@ func resolve() -> Dictionary:
 				hitlists[p].append({damage = hit_damage, kind = kind, pen = pen,
 					riders = item_mod(p, "riders", []), action = true, active = false,
 					src_slot = aslot, target_slot = target_slot,
+					force_zero_damage = a[p] == ActionDef.Action.ATTACK and bool(item_mod(
+						1 - p, "enemy_wave_no_damage", false)),
 					consume_true_damage = true_damage_attack and damage_index == 0,
 					whole_attack_extra_hits = (int(item_mod(
 						p, "whole_attack_extra_hit_effects", 0)) if damage_index == 0 else 0)})
@@ -3467,6 +4197,8 @@ func resolve() -> Dictionary:
 	for p in [0, 1]:
 		if ActionDef.is_attack(a[p]):
 			_resolve_dianjiang_after_hit(p, base_attack_contexts[p], events)
+	for p in [0, 1]:
+		_settle_exact_spend_refund(p, events)
 
 	# 连环鼓第二行动在第一行动完整结算后执行；第二行动只读取自身阶段的攻防，
 	# 因此第一阶段的「防」不会跨阶段挡第二阶段的「波」。
@@ -3559,12 +4291,18 @@ func resolve() -> Dictionary:
 			item_buffs[p].erase("switch_lock_until_turn")
 		item_buffs[p].erase("tianluo_switch_lock_turn")
 		item_buffs[p].erase("actual_switches_this_turn")
+		item_buffs[p].erase("used_item_slots_this_turn")
+		item_buffs[p].erase("countered_item_slots_this_turn")
+		item_buffs[p].erase("overflow_energy_to_heal_turn")
+		item_buffs[p].erase("energy_overflow_turn")
+		item_buffs[p].erase("unconverted_energy_overflow")
 		if int(item_buffs[p].get("active_energy_gain_turn", -1)) <= turn_number:
 			item_buffs[p].erase("active_energy_gain_turn")
 		if int(item_buffs[p].get("energy_gain_lock_turn", -1)) <= turn_number:
 			item_buffs[p].erase("energy_gain_lock_turn")
 		if int(item_buffs[p].get("free_big_attack_until_turn", -1)) <= turn_number:
 			item_buffs[p].erase("free_big_attack_until_turn")
+	_resolve_use_or_lock_watches(events)
 	_expire_due_item_seals()
 	_econ_after_resolve()
 	# 聚宝盆必须在已用槽正式清空后看最终空位；补入件从本回合锁定，下回合才可用。
@@ -3660,6 +4398,32 @@ func _resolve_end_turn_entries(actions: Array[int], events: Array) -> void:
 		set_item_mod(player, "end_turn_entries", [])
 	# 登场/离场技能、换防扣、夜明珠或对手的切换惩罚都可能再制造死亡。
 	_resolve_deaths(actions, events)
+
+
+func _resolve_use_or_lock_watches(events: Array) -> void:
+	for source_player in [0, 1]:
+		for watch_variant in item_mod(source_player, "use_or_lock_watches", []):
+			var watch: Dictionary = watch_variant
+			var target_player: int = int(watch.get("target_player", -1))
+			var slot_index: int = int(watch.get("slot", -1))
+			if target_player < 0 or slot_index < 0 or slot_index >= slots[target_player].size():
+				continue
+			var used_slots: Array = item_buffs[target_player].get("used_item_slots_this_turn", [])
+			if used_slots.has(slot_index):
+				continue
+			var slot: Dictionary = slots[target_player][slot_index]
+			var current: ItemData = slot.get("item", null)
+			if current == null or current.item_id != String(watch.get("item_id", "")):
+				continue
+			var watched_uid: int = int(watch.get("instance_uid", -1))
+			if watched_uid >= 0 and int(slot.get("instance_uid", -1)) != watched_uid:
+				continue
+			slot["state"] = SlotState.CHARGING
+			slot["since"] = turn_number + 1
+			slot["used"] = false
+			events.append({id = "item_use_or_locked", player = target_player,
+				source_player = source_player, slot = slot_index,
+				item_id = current.item_id})
 
 
 ## 把一个英雄槽位的“英雄本体状态”拍成独立快照。HeroData 深拷，避免转变方与敌方共享可变资源。
@@ -3916,7 +4680,8 @@ func _apply_resolve_hit(attacker_player: int, hit: Dictionary, actions: Array[in
 		target_slot,
 		is_base_attack,
 		outcome,
-		int(hit.get("whole_attack_extra_hits", 0)))
+		int(hit.get("whole_attack_extra_hits", 0)),
+		bool(hit.get("force_zero_damage", false)))
 	if is_base_attack:
 		base_context["target_slot"] = int(outcome.get("target_slot", target_slot))
 		base_context["connected"] = bool(base_context.get("connected", false)) \
@@ -3998,7 +4763,8 @@ func _consume_fatal_damage_immunity(target_player: int, slot: int, hp_damage: in
 func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_action: int, pen: int,
 		def_action: int, events: Array, item_riders: Array = [], src: String = "action",
 		attacker_slot: int = -1, target_slot: int = -1, is_base_attack: bool = false,
-		outcome: Dictionary = {}, whole_attack_extra_hits: int = 0) -> int:
+		outcome: Dictionary = {}, whole_attack_extra_hits: int = 0,
+		force_zero_damage: bool = false) -> int:
 	outcome["connected"] = false
 	outcome["defeated"] = false
 	outcome["damage_total"] = 0
@@ -4034,6 +4800,9 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		if redirect_target >= 0:
 			redirected_damage = mini(raw, redirect_pool)
 			raw -= redirected_damage
+	if force_zero_damage:
+		redirected_damage = 0
+		redirect_target = -1
 
 	# Stage B4: 防御动作门（大防挡全部；防挡波，不挡大波/穿防攻击）
 	var eff_def: int = def_action
@@ -4145,6 +4914,9 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 	if skill != null:
 		dmg = skill.modify_incoming_damage(dmg, atk_action, self, target_player, slot, attacker_player)
 	dmg = maxi(dmg, 0)
+	# 偏锋甲不是防御：波仍穿过防御门并结算命中技能，但整次攻击最终不造成伤害。
+	if force_zero_damage and is_base_attack:
+		dmg = 0
 	# 分寸尺按整次基础攻击共用一个预算；毒素、脆弱与英雄减伤都先结算，再封顶。
 	if is_base_attack and int(item_mod(attacker_player, "base_attack_damage_cap", -1)) >= 0:
 		var cap_remaining: int = maxi(0, int(item_mod(

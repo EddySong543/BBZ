@@ -61,7 +61,7 @@ func _on_msg(d: Dictionary) -> void:
 			draft_offer = {}
 		"draft_offer":
 			draft_offer = d
-		"pointstone_offer":
+		"pointstone_offer", "item_choice_offer":
 			draft_offer = d
 		"resolve":
 			view = d["view"]
@@ -131,8 +131,12 @@ func request_refill(slot: int) -> void:
 	transport.send(NetProtocol.msg_econ_refill(turn, slot))
 
 
-func request_pointstone_draft(slot: int, target: int) -> void:
+func request_item_draft(slot: int, target: int) -> void:
 	transport.send(NetProtocol.msg_item_draft(turn, slot, target))
+
+
+func request_pointstone_draft(slot: int, target: int) -> void:
+	request_item_draft(slot, target)
 
 
 func pick(slot: int, choice: int, upgrade: bool = false) -> void:

@@ -13,6 +13,7 @@ signal resolved(choice: int)
 const CARD_W := 263.0                 # =贴图实寸（源 1052×1420 ÷4 整数倍降采样·2026-07-14）
 const CARD_H := 355.0
 const CARD_GAP := 28.0
+const PAGE_SIZE := 3
 const SCREEN_W := 1920.0
 const SCREEN_H := 1080.0
 
@@ -35,6 +36,12 @@ const INK := Color(0.24, 0.19, 0.12)  # 墨字（亮纸主文字·与战斗悬�
 
 var _can_cancel := true
 var _done := false   # 防重复 resolve（连点 / ESC 抢答）
+var _options: Array = []
+var _page: int = 0
+var _cards: Array[Control] = []
+var _page_label: Label
+var _prev_button: Button
+var _next_button: Button
 
 
 func _make_tier_frame_material(tier: int) -> ShaderMaterial:
@@ -43,6 +50,7 @@ func _make_tier_frame_material(tier: int) -> ShaderMaterial:
 
 func setup(options: Array, can_cancel: bool = true, title_text: String = "抽取道具（3 选 1）") -> void:
 	_can_cancel = can_cancel
+	_options = options.duplicate()
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP   # 吃掉所有背景点击（模态）
 
@@ -61,41 +69,89 @@ func setup(options: Array, can_cancel: bool = true, title_text: String = "抽取
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(title)
 
-	var n: int = options.size()
-	var total_w: float = n * CARD_W + maxf(0.0, (n - 1)) * CARD_GAP
-	var start_x: float = (SCREEN_W - total_w) * 0.5
 	var card_y: float = (SCREEN_H - CARD_H) * 0.5
-	for i in range(n):
-		var item: ItemData = options[i]
-		_build_card(item, Vector2(start_x + i * (CARD_W + CARD_GAP), card_y), i)
+	_build_page()
+	if _options.size() > PAGE_SIZE:
+		_prev_button = _make_nav_button(tr("上一页"), Vector2(430.0, card_y + CARD_H + 36.0))
+		_next_button = _make_nav_button(tr("下一页"), Vector2(SCREEN_W - 590.0, card_y + CARD_H + 36.0))
+		_prev_button.pressed.connect(_change_page.bind(-1))
+		_next_button.pressed.connect(_change_page.bind(1))
+		add_child(_prev_button)
+		add_child(_next_button)
+		_page_label = Label.new()
+		_page_label.position = Vector2(SCREEN_W * 0.5 - 80.0, card_y + CARD_H + 36.0)
+		_page_label.size = Vector2(160.0, 48.0)
+		_page_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_page_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_page_label.add_theme_color_override("font_color", INK)
+		add_child(_page_label)
+		_refresh_page_nav()
 
 	if can_cancel:
-		var cancel := Button.new()
-		cancel.text = tr("取消")
-		cancel.size = Vector2(160.0, 48.0)
-		cancel.position = Vector2((SCREEN_W - 160.0) * 0.5, card_y + CARD_H + 36.0)
-		cancel.focus_mode = Control.FOCUS_NONE
-		for st in ["normal", "hover", "pressed", "disabled", "focus"]:
-			cancel.add_theme_stylebox_override(st, StyleBoxEmpty.new())
-		cancel.add_theme_color_override("font_color", INK)
-		var plate := NinePatchRect.new()   # 导航钮皮（与主菜单/图鉴返回一个语言）
-		plate.texture = NAV_PLATE_TEX
-		plate.patch_margin_left = 22    # =主菜单 NAV_PLATE_MARGIN_X/Y·v14 净面
-		plate.patch_margin_right = 22
-		plate.patch_margin_top = 20
-		plate.patch_margin_bottom = 20
-		plate.axis_stretch_horizontal = NinePatchRect.AXIS_STRETCH_MODE_TILE
-		plate.axis_stretch_vertical = NinePatchRect.AXIS_STRETCH_MODE_TILE
-		plate.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		plate.show_behind_parent = true
-		plate.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		cancel.add_child(plate)
+		var cancel := _make_nav_button(tr("取消"), Vector2(
+			(SCREEN_W - 160.0) * 0.5,
+			card_y + CARD_H + (94.0 if _options.size() > PAGE_SIZE else 36.0)))
 		cancel.pressed.connect(_resolve.bind(-1))
 		add_child(cancel)
 
 
-func _build_card(item: ItemData, pos: Vector2, idx: int) -> void:
+func _make_nav_button(label: String, position_value: Vector2) -> Button:
+	var button := Button.new()
+	button.text = label
+	button.size = Vector2(160.0, 48.0)
+	button.position = position_value
+	button.focus_mode = Control.FOCUS_NONE
+	for style_name in ["normal", "hover", "pressed", "disabled", "focus"]:
+		button.add_theme_stylebox_override(style_name, StyleBoxEmpty.new())
+	button.add_theme_color_override("font_color", INK)
+	var plate := NinePatchRect.new()
+	plate.texture = NAV_PLATE_TEX
+	plate.patch_margin_left = 22
+	plate.patch_margin_right = 22
+	plate.patch_margin_top = 20
+	plate.patch_margin_bottom = 20
+	plate.axis_stretch_horizontal = NinePatchRect.AXIS_STRETCH_MODE_TILE
+	plate.axis_stretch_vertical = NinePatchRect.AXIS_STRETCH_MODE_TILE
+	plate.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	plate.show_behind_parent = true
+	plate.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(plate)
+	return button
+
+
+func _build_page() -> void:
+	for card in _cards:
+		if is_instance_valid(card):
+			card.queue_free()
+	_cards.clear()
+	var first: int = _page * PAGE_SIZE
+	var count: int = mini(PAGE_SIZE, _options.size() - first)
+	var total_w: float = count * CARD_W + maxf(0.0, (count - 1)) * CARD_GAP
+	var start_x: float = (SCREEN_W - total_w) * 0.5
+	var card_y: float = (SCREEN_H - CARD_H) * 0.5
+	for local_index in range(count):
+		var option_index: int = first + local_index
+		var card: Control = _build_card(_options[option_index], Vector2(
+			start_x + local_index * (CARD_W + CARD_GAP), card_y), option_index)
+		_cards.append(card)
+
+
+func _change_page(delta: int) -> void:
+	var page_count: int = ceili(float(_options.size()) / float(PAGE_SIZE))
+	_page = clampi(_page + delta, 0, page_count - 1)
+	_build_page()
+	_refresh_page_nav()
+
+
+func _refresh_page_nav() -> void:
+	var page_count: int = ceili(float(_options.size()) / float(PAGE_SIZE))
+	_prev_button.disabled = _page <= 0
+	_next_button.disabled = _page >= page_count - 1
+	_page_label.text = tr("%d / %d") % [_page + 1, page_count]
+
+
+func _build_card(item: ItemData, pos: Vector2, idx: int) -> Control:
 	var card := Button.new()
 	card.flat = true
 	card.focus_mode = Control.FOCUS_NONE
@@ -136,6 +192,10 @@ func _build_card(item: ItemData, pos: Vector2, idx: int) -> void:
 	if tex != null:
 		# 格底（图鉴格同配方：四角深阶色+中心略浅·传说=gold_bottom）——铺在阶框下。
 		var slot_rect := Rect2(Vector2(CARD_W * 0.5 - 64.0, 92.0), Vector2(128.0, 128.0))
+		var frame_position := slot_rect.position + slot_rect.size * FRAME_OFFSET_RATIO
+		var frame_size := slot_rect.size * FRAME_ART_SCALE
+		card.add_child(ItemFrameStyle.make_frame_shadow(
+				frame_position, frame_size, "BottomShadow"))
 		var cell_inset := slot_rect.size.x * CELL_INSET_RATIO
 		var cell := ColorRect.new()
 		cell.name = "ItemCell"
@@ -147,22 +207,26 @@ func _build_card(item: ItemData, pos: Vector2, idx: int) -> void:
 		var cm := ItemFrameStyle.make_cell_material(tier, 128.0 / 6.0)
 		cell.material = cm
 		card.add_child(cell)
+		var icon_position := Vector2(CARD_W * 0.5 - 48.0, 108.0)
+		var icon_size := Vector2(96.0, 96.0)
+		card.add_child(ItemFrameStyle.make_item_art_shadow(
+				tex, icon_position, icon_size))
 		# 阶框+图标：补偿新素材透明边，使金属外沿仍与 128px 图标槽对齐。
 		var frame := TextureRect.new()
 		frame.name = "ItemFrame"
 		frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		frame.stretch_mode = TextureRect.STRETCH_SCALE
 		frame.texture = ITEM_FRAME_TEX
-		frame.position = slot_rect.position + slot_rect.size * FRAME_OFFSET_RATIO
-		frame.size = slot_rect.size * FRAME_ART_SCALE
+		frame.position = frame_position
+		frame.size = frame_size
 		frame.material = _make_tier_frame_material(tier)
 		frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card.add_child(frame)
 		var icon := TextureRect.new()
 		icon.texture = tex
-		icon.position = Vector2(CARD_W * 0.5 - 48.0, 108.0)
-		icon.size = Vector2(96.0, 96.0)
+		icon.position = icon_position
+		icon.size = icon_size
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST   # 像素清晰
@@ -178,7 +242,7 @@ func _build_card(item: ItemData, pos: Vector2, idx: int) -> void:
 	card.add_child(divider)
 
 	# 描述=墨字直书纸面·定宽手动换行（2026-07-11 Eddy：AUTOWRAP 在长中文描述上溢出卡底被截）：
-	# 每行统一字数（宽度/字号），行数超出描述区高度 → 降号 16→12（Ark Pixel 整数倍档）重排。
+	# 每行统一字数（宽度/字号），行数超出描述区高度 → 降号 16→12（Z工坊 12px 基准）重排。
 	var desc_text: String = tr(item.description) if item != null else ""
 	var box_w := CARD_W - 60.0
 	var box_h := CARD_H - desc_top - 28.0
@@ -197,6 +261,7 @@ func _build_card(item: ItemData, pos: Vector2, idx: int) -> void:
 	desc_lbl.add_theme_color_override("font_color", INK)
 	desc_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(desc_lbl)
+	return card
 
 
 ## 手动定宽换行：每行固定 chars 个字符（CJK 等宽·统一每行字数·保留已有换行）。

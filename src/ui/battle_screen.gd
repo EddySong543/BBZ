@@ -11,6 +11,10 @@ const A := ActionDef.Action
 const ACTIVE := ActionDef.ACTIVE
 const FURNACE_ITEM_ID := "t1_ronglu"
 const POINTSTONE_ITEM_ID := "t2_dianjinshi"
+const DEPOSIT_ITEM_ID := "t1_jicun_pai"
+const INSURANCE_ITEM_ID := "t2_baojia_feng"
+const EXCHANGE_ITEM_ID := "t2_huanqian_tong"
+const REPURCHASE_ITEM_ID := "t2_huigou_quan"
 const ENERGY_COST_SHEET := preload("res://assets/ui/icons/energy_idle.png")
 const HEART_COST_SHEET := preload("res://assets/ui/icons/heart_idle.png")
 const LONGYUJI_SKILL_ICON := preload("res://assets/sprites/heroes/h05/h05_skill.png")
@@ -148,7 +152,7 @@ const COUNTDOWN_ALERT_OUTLINE_COLOR := Color(0.07, 0.04, 0.02, 0.86)
 @export_range(0.0, 6.0, 0.5) var countdown_ornament_underlay_width: float = 3.0
 
 enum State { TURN_INTRO, PLAYER_SELECT, RESOLVING, HERO_SELECT, GAME_OVER }
-enum ItemSlotTargetMode { NONE, CONSUMES, TRANSFORMS }
+enum ItemSlotTargetMode { NONE, CONSUMES, TRANSFORMS, PRESERVES }
 
 var battle: BattleCore
 var state: int = State.TURN_INTRO
@@ -239,9 +243,9 @@ var selected_item_slots: Array[int] = []
 var selected_item_targets: Dictionary = {}
 ## 需要明确选择己方英雄的道具参数：使用槽 -> 己方英雄槽（移甲环、护阵钉）。
 var selected_item_hero_targets: Dictionary = {}
-## 点金石 3 选 1 的候选下标：使用槽 -> 0..2。其余道具缺省为 -1。
+## 道具私有候选下标：使用槽 -> 候选下标。其余道具缺省为 -1。
 var selected_item_choices: Dictionary = {}
-## 联机端仅在本人内存保留点金石私有候选 id，便于显示与取消后复核，不写入公共视图。
+## 联机端仅在本人内存保留私有候选 id，便于显示与取消后复核，不写入公共视图。
 var selected_item_choice_options: Dictionary = {}
 ## 首次点需要槽目标的道具后暂存；只有再点合法目标完成配对，来源才进入 selected_item_slots。
 var _pending_item_target_slot: int = -1
@@ -250,7 +254,7 @@ var _pending_item_hero_target_slot: int = -1
 ## 正在等待玩家点击敌方锁定道具槽的来源槽（时滞枷锁）。
 var _pending_enemy_item_target_slot: int = -1
 var _item_target_prompt_frames: Array[int] = []
-## 联机请求点金石候选后等待权威私发的 {source,target}；期间不允许再次改动该配对。
+## 联机请求带选择的道具候选后等待权威私发的 {source,target,item_id}；期间不允许改动配对。
 var _pending_pointstone_offer: Dictionary = {}
 var _drafting := false   # draft 弹窗打开中：拦截重入 + 暂停回合计时
 var _ai_rng := RandomNumberGenerator.new()   # 任务 B：AI 道具抽取选择用（与游戏 rng 分离）
@@ -380,6 +384,8 @@ func _ready() -> void:
 	var pve_player_hp: Array = BattleSetup.pve_player_hp.duplicate()
 	var pve_opponent_hp: Array = BattleSetup.pve_opponent_hp.duplicate()
 	var pve_seed: int = BattleSetup.pve_seed
+	var p1_item_backpack: Array[String] = BattleSetup.p1_item_backpack.duplicate()
+	var p2_item_backpack: Array[String] = BattleSetup.p2_item_backpack.duplicate()
 	var p0: Array
 	var p1: Array
 	if _net:
@@ -404,6 +410,8 @@ func _ready() -> void:
 	if not _net:
 		BattleSetup.reset()   # 消费即清空：防止下一局（未经 BP）复用本局阵容
 		battle.setup(p0, p1, pve_seed if _pve and pve_seed != 0 else randi())
+		if not p1_item_backpack.is_empty() or not p2_item_backpack.is_empty():
+			battle.configure_battle_backpacks(p1_item_backpack, p2_item_backpack)
 	if _overtime:
 		# 加时赛（Q5·2026-07-03；2026-07-05 修订）：白板满血 1v1——slot0 出战、其余队友 0 血躺板凳
 		# （同归余烬·引擎/UI 全程正常 3 人局零特判）；无道具经济（不 econ_init）、被动能量照常、
@@ -1692,21 +1700,23 @@ func _net_open_offer(offer: Dictionary) -> void:
 	var options: Array = []
 	for id in offer.get("options", []):
 		options.append(ItemCatalog.make(String(id)))
-	if String(offer.get("kind", "")) == "pointstone_offer":
+	if String(offer.get("kind", "")) in ["pointstone_offer", "item_choice_offer"]:
 		var source: int = int(offer.get("slot", -1))
 		var target: int = int(offer.get("target", -1))
+		var item_id: String = String(offer.get("item_id", POINTSTONE_ITEM_ID))
 		if _pending_pointstone_offer.get("source", -1) != source \
-				or _pending_pointstone_offer.get("target", -1) != target:
+				or _pending_pointstone_offer.get("target", -1) != target \
+				or String(_pending_pointstone_offer.get("item_id", "")) != item_id:
 			_pending_pointstone_offer.clear()
 			_update_all()
 			return
 		var pointstone_choice: int = await _show_draft(
-			source, options, tr("点金石：选择传说道具（3 选 1）"))
+			source, options, _item_choice_title(item_id, options.size()))
 		_pending_pointstone_offer.clear()
 		if pointstone_choice >= 0:
-			_complete_pointstone_pair(source, target, pointstone_choice,
+			_complete_item_choice(source, target, pointstone_choice,
 				offer.get("options", []))
-		else:
+		elif target >= 0:
 			_pending_item_target_slot = source
 		_update_all()
 		return
@@ -2971,13 +2981,13 @@ enum TipContentKind { PLAIN, SKILL, ITEM, AVATAR_SKILL }
 @export_group("悬停说明框")
 @export var tip_size_s := Vector2(320.0, 96.0)    # 基础动作、技能分支
 @export var tip_size_l := Vector2(480.0, 144.0)   # 主动技能、技能说明、道具说明
-@export var tip_size_item := Vector2(222.0, 144.0)   # 具名道具：图标+名称+正文需要独立纵向空间
+@export var tip_size_item := Vector2(222.0, 128.0)   # 具名道具：紧凑标题行 + 最多三行正文
 @export var tip_size_avatar_skill := Vector2(340.0, 116.0)   # 去掉标题后收短高度：技能图标 + 单段说明
 @export_range(0.5, 2.0, 0.01) var tip_texture_brightness := 1.28
 @export_subgroup("字距")
 @export_range(-4, 8, 1) var tip_glyph_spacing: int = 0
 @export_subgroup("S 框文字与留白")
-@export_range(8, 32, 1) var tip_font_size_s: int = 16
+@export_range(8, 32, 1) var tip_font_size_s: int = 18
 @export_range(-4, 12, 1) var tip_line_spacing_s: int = 1
 @export_range(0.0, 32.0, 1.0) var tip_padding_horizontal_s := 12.0
 @export_range(0.0, 32.0, 1.0) var tip_padding_vertical_s := 8.0
@@ -2986,15 +2996,21 @@ enum TipContentKind { PLAIN, SKILL, ITEM, AVATAR_SKILL }
 @export_range(-4, 12, 1) var tip_line_spacing_l: int = 1
 @export_range(0.0, 32.0, 1.0) var tip_padding_horizontal_l := 12.0
 @export_range(0.0, 32.0, 1.0) var tip_padding_vertical_l := 8.0
+@export_subgroup("分框视觉轴")
+## 正值向右；每类提示独立保存，禁止再用一个全局值同时推动 S/L。
+@export_range(-8.0, 8.0, 1.0) var tip_optical_center_shift_s := 0.0
+@export_range(-8.0, 8.0, 1.0) var tip_optical_center_shift_l := 0.0
+@export_range(-8.0, 8.0, 1.0) var tip_optical_center_shift_item := 3.0
+@export_range(-8.0, 8.0, 1.0) var tip_optical_center_shift_avatar_skill := 0.0
 @export_subgroup("道具说明排版")
-## 正值越大，道具名称与正文组成的整块越向上移动。
-@export_range(0.0, 24.0, 1.0) var item_tip_vertical_lift := 11.0
-## 以微型空行字号控制名称和正文的视觉间隔；值越大，两者越疏。
-@export_range(1, 64, 1) var item_tip_title_body_gap: int = 12
+## 正值越大，道具名称与正文组成的整块越向上移动；常规布局保持 0。
+@export_range(0.0, 12.0, 1.0) var item_tip_vertical_lift := 0.0
+## 名称行与正文的真实像素间距；默认只留一个短呼吸位。
+@export_range(1, 64, 1) var item_tip_title_body_gap: int = 8
 const ITEM_TIP_ICON_SIZE := 32.0
 const ITEM_TIP_ICON_TITLE_GAP := 6.0
-const ITEM_TIP_MIN_COLUMN_WIDTH := 150.0
-const ITEM_TIP_BASE_TOP := 12.0
+const ITEM_TIP_COLUMN_INSET := 8.0
+const ITEM_TIP_BASE_TOP := 2.0
 @export_group("")
 
 const TIP_GAP := 12.0                # 提示框与目标控件的间距(px)
@@ -3032,7 +3048,7 @@ func _build_hover_tips() -> void:
 	# 中央纸面直接拉伸，避免纹理在宽/高方向周期性平铺成明显点阵；20px 九宫格仍锁定边框与四角。
 	_tip_stylebox.axis_stretch_horizontal = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
 	_tip_stylebox.axis_stretch_vertical = StyleBoxTexture.AXIS_STRETCH_MODE_STRETCH
-	_set_tip_content_margins(TipFormat.S)
+	_set_tip_content_margins(TipFormat.S, TipContentKind.PLAIN)
 	_tip_panel.add_theme_stylebox_override("panel", _tip_stylebox)
 	_tip_panel.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST   # 像素贴图必须点采样（默认线性会糊）
 	_tip_panel.visible = false
@@ -3118,7 +3134,7 @@ func _build_item_tip_header() -> void:
 	_tip_item_header.visible = false
 	_tip_content.add_child(_tip_item_header)
 	_tip_item_header.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	_tip_item_header.size = Vector2(ITEM_TIP_MIN_COLUMN_WIDTH, ITEM_TIP_ICON_SIZE)
+	_tip_item_header.size = Vector2.ZERO
 
 	_tip_item_icon = TextureRect.new()
 	_tip_item_icon.name = "ItemIcon"
@@ -3314,7 +3330,7 @@ func _show_tip_at(target: Rect2, text: String, format: int, centered: bool = fal
 	var is_named_item := content_kind == TipContentKind.ITEM and item_data != null
 	var tip_size: Vector2 = tip_size_avatar_skill if is_avatar_skill else (
 		tip_size_item if is_named_item else (tip_size_s if format == TipFormat.S else tip_size_l))
-	_set_tip_content_margins(format)
+	_set_tip_content_margins(format, content_kind)
 	var is_short := format == TipFormat.S
 	_tip_label.visible = is_short
 	_tip_rich.visible = not is_short
@@ -3367,13 +3383,27 @@ func _make_tip_font(font_size: int) -> FontVariation:
 	return variation
 
 
-func _set_tip_content_margins(format: int) -> void:
+func _tip_optical_center_shift(format: int, content_kind: int) -> float:
+	match content_kind:
+		TipContentKind.ITEM:
+			return tip_optical_center_shift_item
+		TipContentKind.AVATAR_SKILL:
+			return tip_optical_center_shift_avatar_skill
+	return tip_optical_center_shift_s if format == TipFormat.S \
+		else tip_optical_center_shift_l
+
+
+func _set_tip_content_margins(format: int,
+		content_kind: int = TipContentKind.PLAIN) -> void:
 	var horizontal := tip_padding_horizontal_s if format == TipFormat.S \
 		else tip_padding_horizontal_l
 	var vertical := tip_padding_vertical_s if format == TipFormat.S \
 		else tip_padding_vertical_l
-	_tip_stylebox.content_margin_left = horizontal
-	_tip_stylebox.content_margin_right = horizontal
+	var optical_shift := _tip_optical_center_shift(format, content_kind)
+	# 回归记录：第三次对齐复发的根因是把道具 L 的 +3px 补偿错误提升为全局轴，
+	# 导致原本居中的底部 S 与头像技能一起右移。只允许在此按内容类型分流。
+	_tip_stylebox.content_margin_left = horizontal + optical_shift
+	_tip_stylebox.content_margin_right = horizontal - optical_shift
 	_tip_stylebox.content_margin_top = vertical
 	_tip_stylebox.content_margin_bottom = vertical
 
@@ -3417,12 +3447,13 @@ func _set_l_tip_text(text: String, content_kind: int, item_data: ItemData = null
 	var body_text := "\n".join(body_lines)
 	var group_top := ITEM_TIP_BASE_TOP - item_tip_vertical_lift
 	var content_width := tip_size_item.x - tip_padding_horizontal_l * 2.0
-	var column_width := _item_tip_column_width(title, body_lines, content_width)
-	var column_left := floorf((content_width - column_width) * 0.5)
-	_configure_item_tip_header(title, item_data, Vector2(column_left, group_top), column_width)
-	# 标题行与正文共用同一个居中内容列；换行后仍在列内左对齐。
+	# 固定左右对称内容轴：不再根据每件道具的标题/正文长度改变列宽，彻底消除视觉漂移。
+	var column_left := ITEM_TIP_COLUMN_INSET
+	var column_width := content_width - ITEM_TIP_COLUMN_INSET * 2.0
+	_configure_item_tip_header(title, item_data, group_top, content_width)
+	# 正文维持左右对称内容列；顶部图标+名称则按实际组合宽度独立居中。
 	_tip_rich.offset_left = column_left
-	_tip_rich.offset_right = -(content_width - column_left - column_width)
+	_tip_rich.offset_right = -column_left
 	_tip_rich.offset_top = group_top + ITEM_TIP_ICON_SIZE + item_tip_title_body_gap
 	_tip_rich.offset_bottom = 0.0
 	_tip_rich.vertical_alignment = VERTICAL_ALIGNMENT_TOP
@@ -3432,30 +3463,27 @@ func _set_l_tip_text(text: String, content_kind: int, item_data: ItemData = null
 		_tip_rich.push_color(Color(0.27, 0.21, 0.14))
 		_tip_rich.add_text(_keep_tip_terms_together(body_text))
 		_tip_rich.pop_all()
-
-
-func _item_tip_column_width(title: String, body_lines: Array[String], content_width: float) -> float:
-	var title_font := _make_tip_font(tip_font_size_l + 1)
-	var body_font := _make_tip_font(tip_font_size_l)
-	var title_width := title_font.get_string_size(
-			_keep_tip_terms_together(title), HORIZONTAL_ALIGNMENT_LEFT, -1.0,
-			tip_font_size_l + 1).x
-	var natural_width := ITEM_TIP_ICON_SIZE + ITEM_TIP_ICON_TITLE_GAP + title_width
-	for line in body_lines:
-		natural_width = maxf(natural_width, body_font.get_string_size(
-				_keep_tip_terms_together(line), HORIZONTAL_ALIGNMENT_LEFT, -1.0,
-				tip_font_size_l).x)
-	return clampf(ceilf(natural_width), minf(ITEM_TIP_MIN_COLUMN_WIDTH, content_width), content_width)
-
-
-func _configure_item_tip_header(title: String, item_data: ItemData, position: Vector2,
-		column_width: float) -> void:
-	_tip_item_header.position = position
-	_tip_item_header.size = Vector2(column_width, ITEM_TIP_ICON_SIZE)
-	_tip_item_header.visible = true
-	_tip_item_title.text = _keep_tip_terms_together(title)
+func _configure_item_tip_header(title: String, item_data: ItemData, top: float,
+		content_width: float) -> void:
+	var protected_title := _keep_tip_terms_together(title)
+	_tip_item_title.text = protected_title
 	_tip_item_icon.texture = ItemCatalog.load_icon(item_data.item_id) if item_data != null else null
 	_tip_item_icon.visible = _tip_item_icon.texture != null
+	var icon_width := ITEM_TIP_ICON_SIZE if _tip_item_icon.visible else 0.0
+	var icon_gap := ITEM_TIP_ICON_TITLE_GAP if _tip_item_icon.visible else 0.0
+	var title_font := _tip_item_title.get_theme_font("font")
+	var title_font_size := _tip_item_title.get_theme_font_size("font_size")
+	var measured_title_width := ceilf(title_font.get_string_size(
+			protected_title, HORIZONTAL_ALIGNMENT_LEFT, -1.0, title_font_size).x)
+	var title_width := minf(measured_title_width,
+			maxf(content_width - icon_width - icon_gap, 0.0))
+	var group_width := icon_width + icon_gap + title_width
+	var group_left := floorf((content_width - group_width) * 0.5)
+	_tip_item_header.position = Vector2(group_left, top)
+	_tip_item_header.size = Vector2(group_width, ITEM_TIP_ICON_SIZE)
+	_tip_item_title.offset_left = icon_width + icon_gap
+	_tip_item_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_tip_item_header.visible = true
 
 
 ## U+2060 只影响断行、不绘制；保护高频规则词，避免“能/量”“大/防”被拆到两行。
@@ -3579,6 +3607,8 @@ func _target_owner_for_slot(s: int) -> int:
 		var owner: int = int(owner_variant)
 		if BattleCore.item_requires_enemy_item_slot_target(_effective_slot_item(owner)):
 			continue
+		if _slot_target_mode(owner) == ItemSlotTargetMode.PRESERVES:
+			continue
 		if int(selected_item_targets[owner_variant]) == s:
 			return owner
 	return -1
@@ -3601,10 +3631,12 @@ func _slot_target_mode(s: int) -> int:
 	if item == null:
 		return ItemSlotTargetMode.NONE
 	match item.item_id:
-		FURNACE_ITEM_ID:
+		FURNACE_ITEM_ID, DEPOSIT_ITEM_ID:
 			return ItemSlotTargetMode.CONSUMES
-		POINTSTONE_ITEM_ID:
+		POINTSTONE_ITEM_ID, EXCHANGE_ITEM_ID:
 			return ItemSlotTargetMode.TRANSFORMS
+		INSURANCE_ITEM_ID:
+			return ItemSlotTargetMode.PRESERVES
 		_:
 			return ItemSlotTargetMode.NONE
 
@@ -3613,16 +3645,20 @@ func _is_valid_item_slot_target(owner: int, target: int) -> bool:
 	if battle == null or owner == target or target < 0 or target >= battle.slots[PLAYER].size():
 		return false
 	var preview: BattleCore = _battle_after_selected_items()
-	if not preview.slot_ready(PLAYER, owner) or not preview.slot_ready(PLAYER, target):
+	if not preview.slot_ready(PLAYER, owner):
 		return false
 	var owner_item: ItemData = preview.slot_item(PLAYER, owner)
 	var target_item: ItemData = preview.slot_item(PLAYER, target)
 	if owner_item == null or target_item == null:
 		return false
 	if owner_item.item_id == FURNACE_ITEM_ID:
-		return true
+		return preview.slot_ready(PLAYER, target)
+	if owner_item.item_id == DEPOSIT_ITEM_ID or owner_item.item_id == INSURANCE_ITEM_ID:
+		return preview.slot_ready(PLAYER, target)
 	if owner_item.item_id == POINTSTONE_ITEM_ID:
-		return target_item.tier == 1
+		return preview.slot_ready(PLAYER, target) and target_item.tier == 1
+	if owner_item.item_id == EXCHANGE_ITEM_ID:
+		return true
 	return false
 
 
@@ -3634,13 +3670,15 @@ func _remove_item_target_owner(owner: int) -> void:
 		selected_item_slots.erase(owner)
 		return
 	var target := int(selected_item_targets[owner])
+	var mode: int = _slot_target_mode(owner)
 	selected_item_targets.erase(owner)
 	selected_item_slots.erase(owner)
 	if BattleCore.item_requires_enemy_item_slot_target(_effective_slot_item(owner)):
 		if _pending_enemy_item_target_slot == owner:
 			_pending_enemy_item_target_slot = -1
 		return
-	selected_item_slots.erase(target)
+	if mode != ItemSlotTargetMode.PRESERVES:
+		selected_item_slots.erase(target)
 	if selected_item_targets.has(target):
 		_remove_item_target_owner(target)
 	if _pending_item_target_slot == owner or _pending_item_target_slot == target:
@@ -3670,14 +3708,17 @@ func _clear_item_selection_for_slot(s: int) -> void:
 
 
 ## 新配对的目标必须先退出旧的普通使用、旧来源目标或自身下游关系，确保一槽只属一组。
-func _clear_item_selection_for_new_target(s: int) -> void:
+func _clear_item_selection_for_new_target(s: int, owner: int = -1) -> void:
+	var preserves_target: bool = owner >= 0 \
+		and _slot_target_mode(owner) == ItemSlotTargetMode.PRESERVES
 	selected_item_hero_targets.erase(s)
 	if selected_item_targets.has(s):
 		_remove_item_target_owner(s)
-	var owner := _target_owner_for_slot(s)
-	if owner >= 0:
-		_remove_item_target_owner(owner)
-	selected_item_slots.erase(s)
+	var prior_owner := _target_owner_for_slot(s)
+	if prior_owner >= 0:
+		_remove_item_target_owner(prior_owner)
+	if not preserves_target:
+		selected_item_slots.erase(s)
 	if _pending_item_target_slot == s:
 		_pending_item_target_slot = -1
 
@@ -3716,19 +3757,34 @@ func _highlighted_item_slots() -> Array[int]:
 	return highlighted
 
 
-## 3 选 1 完成后才把点金石加入本回合提交。目标不会加入 selected_item_slots，确保新 T3 锁定一回合。
-func _complete_pointstone_pair(owner: int, target: int, choice: int,
+## 私有候选完成后才把道具加入本回合提交；目标是否被替换由 BattleCore 权威执行。
+func _complete_item_choice(owner: int, target: int, choice: int,
 		option_ids: Array = []) -> bool:
-	if choice < 0 or choice > 2 or not _is_valid_item_slot_target(owner, target):
+	if choice < 0 or choice >= option_ids.size():
 		return false
-	_clear_item_selection_for_new_target(target)
-	selected_item_targets[owner] = target
+	var item: ItemData = _effective_slot_item(owner)
+	if item == null:
+		return false
+	if item.item_id == REPURCHASE_ITEM_ID:
+		if target != -1:
+			return false
+	else:
+		if not _is_valid_item_slot_target(owner, target):
+			return false
+		_clear_item_selection_for_new_target(target, owner)
+		selected_item_targets[owner] = target
 	selected_item_choices[owner] = choice
 	selected_item_choice_options[owner] = option_ids.duplicate()
 	if not selected_item_slots.has(owner):
 		selected_item_slots.append(owner)
 	_pending_item_target_slot = -1
 	return true
+
+
+## 旧定向测试与调试探针沿用的点金石入口；正式流程已泛化为道具私有候选。
+func _complete_pointstone_pair(owner: int, target: int, choice: int,
+		option_ids: Array = []) -> bool:
+	return _complete_item_choice(owner, target, choice, option_ids)
 
 
 ## 就绪槽的使用点选。槽目标道具先进入待选；合法配对后才进入提交数组。
@@ -3753,12 +3809,12 @@ func _toggle_ready_item_selection(s: int) -> bool:
 			_pending_item_target_slot = -1
 			return true
 		if _slot_target_mode(owner) == ItemSlotTargetMode.TRANSFORMS:
-			return false   # 点金石还需 3 选 1，由槽点击入口异步完成。
+			return false   # 变换目标还需私有候选选择，由槽点击入口异步完成。
 		# 配对验证必须基于“目标退出旧使用/旧配对”后的棋盘；否则已选择使用的新 T2 会因 used=true
 		# 被误判为不能改作熔炉燃料。非法目标则完整恢复旧选择，不制造破坏性误点。
 		var previous_slots: Array[int] = selected_item_slots.duplicate()
 		var previous_targets: Dictionary = selected_item_targets.duplicate()
-		_clear_item_selection_for_new_target(s)
+		_clear_item_selection_for_new_target(s, owner)
 		if not _is_valid_item_slot_target(owner, s):
 			selected_item_slots = previous_slots
 			selected_item_targets = previous_targets
@@ -3864,7 +3920,7 @@ func _is_valid_enemy_item_slot_target(owner: int, target: int) -> bool:
 		return false
 	var item: ItemData = battle.slot_item(PLAYER, owner)
 	return BattleCore.item_requires_enemy_item_slot_target(item) \
-		and battle.valid_enemy_locked_item_target(PLAYER, target)
+		and battle.valid_enemy_item_target_for(item, PLAYER, target)
 
 
 func _complete_enemy_item_slot_target(owner: int, target: int) -> bool:
@@ -3885,12 +3941,53 @@ func _on_p2_item_target_clicked(slot: int) -> void:
 		_start_ai_think()
 
 
-func _pending_target_owner_is_pointstone() -> bool:
+func _pending_target_owner_needs_choice() -> bool:
 	return _pending_item_target_slot >= 0 \
 		and _slot_target_mode(_pending_item_target_slot) == ItemSlotTargetMode.TRANSFORMS
 
 
-func _select_pointstone_target_local(target: int) -> void:
+func _item_choice_options_local(owner: int, target: int) -> Array:
+	var item: ItemData = _effective_slot_item(owner)
+	if item == null:
+		return []
+	match item.item_id:
+		POINTSTONE_ITEM_ID:
+			return battle.begin_pointstone_draft(PLAYER, owner, target)
+		EXCHANGE_ITEM_ID:
+			return battle.begin_exchange_draft(PLAYER, owner, target)
+		REPURCHASE_ITEM_ID:
+			return battle.begin_repurchase_draft(PLAYER, owner)
+	return []
+
+
+func _item_choice_title(item_id: String, count: int) -> String:
+	match item_id:
+		POINTSTONE_ITEM_ID:
+			return tr("点金石：选择传说道具（3 选 1）")
+		EXCHANGE_ITEM_ID:
+			return tr("换签筒：选择替换道具（%d 选 1）") % count
+		REPURCHASE_ITEM_ID:
+			return tr("回购券：选择已使用的普通道具")
+	return tr("选择道具")
+
+
+func _select_item_choice_local(owner: int, target: int) -> void:
+	var item: ItemData = _effective_slot_item(owner)
+	if item == null:
+		return
+	var options: Array = _item_choice_options_local(owner, target)
+	if options.is_empty():
+		return
+	var choice: int = await _show_draft(
+		owner, options, _item_choice_title(item.item_id, options.size()))
+	if choice >= 0:
+		var option_ids: Array[String] = []
+		for item_variant in options:
+			option_ids.append((item_variant as ItemData).item_id)
+		_complete_item_choice(owner, target, choice, option_ids)
+
+
+func _select_choice_target_local(target: int) -> void:
 	var owner: int = _pending_item_target_slot
 	if owner < 0:
 		return
@@ -3898,41 +3995,36 @@ func _select_pointstone_target_local(target: int) -> void:
 		_pending_item_target_slot = -1
 		_update_all()
 		return
-	# 选作升级目标即放弃其原本的“本回合使用”选择。
-	selected_item_slots.erase(target)
+	# 选作变换目标即放弃其原本的“本回合使用”选择。
+	_clear_item_selection_for_new_target(target, owner)
 	if not _is_valid_item_slot_target(owner, target):
 		return
-	var options: Array = battle.begin_pointstone_draft(PLAYER, owner, target)
-	if options.is_empty():
-		return
-	var choice: int = await _show_draft(owner, options, tr("点金石：选择传说道具（3 选 1）"))
-	if choice >= 0:
-		var option_ids: Array[String] = []
-		for item_variant in options:
-			option_ids.append((item_variant as ItemData).item_id)
-		_complete_pointstone_pair(owner, target, choice, option_ids)
-	else:
+	await _select_item_choice_local(owner, target)
+	if not selected_item_choices.has(owner):
 		_pending_item_target_slot = owner
 	_update_all()
 	_start_ai_think()
 
 
-func _request_pointstone_target_net(target: int) -> void:
+func _request_item_choice_net(owner: int, target: int) -> void:
 	if not _pending_pointstone_offer.is_empty():
 		return
-	var owner: int = _pending_item_target_slot
 	if owner < 0:
 		return
 	if owner == target:
 		_pending_item_target_slot = -1
 		_update_all()
 		return
-	selected_item_slots.erase(target)
-	if not _is_valid_item_slot_target(owner, target):
+	if target >= 0:
+		_clear_item_selection_for_new_target(target, owner)
+		if not _is_valid_item_slot_target(owner, target):
+			return
+	var item: ItemData = _effective_slot_item(owner)
+	if item == null:
 		return
-	_pending_pointstone_offer = {source = owner, target = target}
+	_pending_pointstone_offer = {source = owner, target = target, item_id = item.item_id}
 	_pending_item_target_slot = -1
-	BattleSetup.net_session.client.request_pointstone_draft(owner, target)
+	BattleSetup.net_session.client.request_item_draft(owner, target)
 	_update_all()
 
 
@@ -3951,8 +4043,11 @@ func _on_p1_slot_clicked(s: int) -> void:
 					BattleSetup.net_session.client.request_draft(s, false)
 			BattleCore.SlotState.CHARGING:
 				if battle.slot_ready(PLAYER, s):
-					if _pending_target_owner_is_pointstone():
-						_request_pointstone_target_net(s)
+					if _pending_target_owner_needs_choice():
+						_request_item_choice_net(_pending_item_target_slot, s)
+					elif (battle.slot_item(PLAYER, s) as ItemData).item_id == REPURCHASE_ITEM_ID \
+							and not selected_item_slots.has(s):
+						_request_item_choice_net(s, -1)
 					elif _toggle_ready_item_selection(s):
 						_update_all()
 			BattleCore.SlotState.EMPTY:
@@ -3968,8 +4063,12 @@ func _on_p1_slot_clicked(s: int) -> void:
 				_update_all()
 		BattleCore.SlotState.CHARGING:
 			if battle.slot_ready(PLAYER, s):
-				if _pending_target_owner_is_pointstone():
-					await _select_pointstone_target_local(s)
+				if _pending_target_owner_needs_choice():
+					await _select_choice_target_local(s)
+				elif (battle.slot_item(PLAYER, s) as ItemData).item_id == REPURCHASE_ITEM_ID \
+						and not selected_item_slots.has(s):
+					await _select_item_choice_local(s, -1)
+					_update_all()
 				elif _toggle_ready_item_selection(s):
 					_update_all()
 		BattleCore.SlotState.EMPTY:

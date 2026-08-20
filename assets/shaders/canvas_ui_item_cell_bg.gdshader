@@ -30,7 +30,6 @@ uniform float glow_radius : hint_range(0.1, 0.9) = 0.55;   // (保留·当前内
 uniform vec4 inner_color : source_color = vec4(1.0, 1.0, 1.0, 1.0); // 中心亮色（=稀有度亮调·参传说 gold_bottom 中心亮/四角深）
 uniform float vertical_gradient : hint_range(0.0, 1.0) = 0.0; // 1=上暗(fill_color)→下亮(inner_color)；默认保留径向模式
 uniform float material_lighting : hint_range(0.0, 1.0) = 0.0; // 1=偏上局部柔光+暗角+弱底部反光，代替整面轴向渐变
-
 // 与 round_mask / pixel_frame 同一套像素台阶圆角逻辑（多层一起切·不露方角）。
 float corner_round_alpha(vec2 uv, float rr, float pg) {
 	if (rr <= 0.0) return 1.0;
