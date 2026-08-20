@@ -799,9 +799,12 @@ func test_unified_codex_frames_reduced_book_on_smoky_backdrop() -> void:
 			"稀有度子标签向书页内缩，形成二级层级")
 	assert_lt(chapter_hero.position.x, UnifiedCodexScreen.BOOK_ORIGIN.x,
 			"章节签主体位于缩书后释放的左侧背景区")
-	assert_lte(chapter_item.position.x + chapter_item.size.x,
+	assert_lte(chapter_hero.position.x + chapter_hero.size.x,
 			UnifiedCodexScreen.BOOK_ORIGIN.x + 40.0,
-			"章节签只有根部插入书封，不挤占左页内容")
+			"选中章节签只有根部插入书封，不挤占左页内容")
+	assert_lte(chapter_item.position.x + chapter_item.size.x,
+			UnifiedCodexScreen.BOOK_ORIGIN.x + 60.0,
+			"未选章节签向书内收起，但仍停在封皮区")
 	assert_lte(normal.position.x + rarity_group.position.x + normal.size.x,
 			UnifiedCodexScreen.BOOK_ORIGIN.x + 24.0,
 			"稀有度小侧签保持在背景边距，只让根部藏入封皮")
