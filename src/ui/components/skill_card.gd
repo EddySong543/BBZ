@@ -99,7 +99,7 @@ func _ready() -> void:
 	_refresh_text()
 
 
-## 像素字体（assets/font 的 Ark Pixel，关 AA），经 FontManager autoload。
+## 像素字体（assets/font 的 Z工坊像素黑体，关 AA），经 FontManager autoload。
 ## 深褐墨字 + 浅描边，压在羊皮纸内页上可读（图鉴质感）。
 ## TypeLabel(英雄名标题)颜色与加粗在 _refresh_text 设；DescLabel 是 RichTextLabel，
 ## 字体/颜色用 normal_font/default_color 键，【技能名】加粗靠 BBCode 描边。

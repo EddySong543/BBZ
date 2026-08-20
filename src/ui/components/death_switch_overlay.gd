@@ -8,6 +8,8 @@ const HeroFrameScene := preload("res://src/ui/components/hero_frame.tscn")
 const ReserveHpRowScript := preload("res://src/ui/components/reserve_hp_row.gd")
 const RoundLabelOrnamentsComponent := preload("res://src/ui/components/round_label_ornaments.gd")
 const FRAME_SIZE := 112.0
+const HP_ROW_SIZE := Vector2(92.0, 28.0)
+const HP_ROW_Y := FRAME_SIZE + 30.0
 const PORTRAIT_SIZE := 115.5
 const PORTRAIT_RISE := 16.5
 const NORMAL_TEXT_COLOR := Color("#F2E8CC")
@@ -110,9 +112,11 @@ func _create_frame_entry(
 
 	var hp_row := ReserveHpRowScript.new() as ReserveHpRow
 	hp_row.name = "HpRow"
-	hp_row.position = Vector2(0.0, FRAME_SIZE + 30.0)
-	hp_row.size = Vector2(FRAME_SIZE, 40.0)
-	hp_row.icon_slant = -4.0 if player_color.b >= player_color.r else 4.0
+	# 与顶部替补血量使用同一 92x28 版心和现役数字投影，避免死亡换人保留旧宽框比例。
+	hp_row.position = Vector2((FRAME_SIZE - HP_ROW_SIZE.x) * 0.5, HP_ROW_Y)
+	hp_row.size = HP_ROW_SIZE
+	hp_row.icon_slant = -3.0 if player_color.b >= player_color.r else 3.0
+	hp_row.bottom_shadow_enabled = true
 	hp_row.set_values(hp, 0.0)
 	wrap.add_child(hp_row)
 

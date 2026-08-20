@@ -1,6 +1,6 @@
-[gd_resource type="Theme" load_steps=2 format=3]
+[gd_resource type="Theme" format=3 uid="uid://dyxxmay8gl8ke"]
 
-[ext_resource type="FontFile" path="res://assets/font/ark-pixel-12px-proportional-zh_cn.ttf" id="1_font"]
+[ext_resource type="FontVariation" path="res://assets/font/zlabs_pixel_ui.tres" id="1_font"]
 
 [resource]
 default_font = ExtResource("1_font")

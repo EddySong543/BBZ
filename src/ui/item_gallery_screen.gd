@@ -1,5 +1,7 @@
 extends Control
 
+signal tier_changed(tier: int)
+
 ## 道具图鉴。书本、导航、网格根和详情区均由场景承载，方便在 Godot 中可视化调整。
 ## 脚本只填入真实道具卡、刷新选中内容与处理交互，不再动态搭建整套页面。
 ## 第一批统一规则：复用英雄图鉴的羊皮纸书和返回入口；删除总标题、计数与标题装饰线；
@@ -72,6 +74,7 @@ var _current_page: int = 0
 
 # 详情板部件（_build_detail_panel 一次建好）
 var _d_icon: TextureRect
+var _d_icon_shadow: TextureRect
 var _d_icon_fallback: Label
 var _d_cell_mat: ShaderMaterial     # 右页大图鉴格底材质（稀有度色/传说金底按选中件重设·2026-07-14）
 var _d_frame: TextureRect           # 右页大回纹阶框（128 源 ×2=256 整数放大·2026-07-14）
@@ -256,6 +259,15 @@ func _select_tier(t: int) -> void:
 	_load_tier_item(clampi(t, 1, 3), 0)
 
 
+## 统一图鉴侧签的公开入口；保留 _select_tier 供既有调试与测试调用。
+func select_tier(t: int) -> void:
+	_select_tier(t)
+
+
+func get_current_tier() -> int:
+	return _tier
+
+
 func _load_tier_item(tier: int, item_index: int) -> void:
 	_tier = clampi(tier, 1, 3)
 	_items = ItemCatalog.all_for_tier(_tier)
@@ -266,6 +278,7 @@ func _load_tier_item(tier: int, item_index: int) -> void:
 	_refresh_page_visibility()
 	if not _items.is_empty():
 		_select(safe_index)
+	tier_changed.emit(_tier)
 
 
 func _adjacent_nonempty_tier(direction: int) -> int:
@@ -357,6 +370,10 @@ func _make_item_card(item: ItemData, idx: int) -> Button:
 	card.add_child(_make_selection_pointer(box))
 	# 格底：深炭中性格（ref15——亮页上的暗格·彩色图标自己跳）；传说铺金云纹美术。
 	var slot_rect := Rect2(Vector2.ZERO, Vector2(box, box))
+	var frame_position := slot_rect.position + slot_rect.size * FRAME_OFFSET_RATIO
+	var frame_size := slot_rect.size * FRAME_ART_SCALE
+	card.add_child(ItemFrameStyle.make_frame_shadow(
+			frame_position, frame_size, "BottomShadow"))
 	var cell_inset := box * CELL_INSET_RATIO
 	var cell := ColorRect.new()
 	cell.name = "Cell"
@@ -367,25 +384,30 @@ func _make_item_card(item: ItemData, idx: int) -> Button:
 	var cm := ItemFrameStyle.make_cell_material(item.tier, box / 6.0)
 	cell.material = cm
 	card.add_child(cell)
+	var tex: Texture2D = ItemCatalog.load_icon(item.item_id)
+	var isz := box * (70.0 / 92.0)
+	var icon_position := Vector2((box - isz) * 0.5, (box - isz) * 0.5)
+	var icon_size := Vector2(isz, isz)
+	if tex != null:
+		card.add_child(ItemFrameStyle.make_item_art_shadow(
+				tex, icon_position, icon_size))
 	# 回纹阶框（2026-07-13 换皮：头像框素材同源换色三阶变体·原稀有度像素框 shader 退役）
 	var frame := TextureRect.new()
 	frame.name = "Frame"   # 选中提亮要取（2026-07-14）
 	frame.texture = ITEM_FRAME_TEX
 	frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	frame.position = slot_rect.position + slot_rect.size * FRAME_OFFSET_RATIO
-	frame.size = slot_rect.size * FRAME_ART_SCALE
+	frame.position = frame_position
+	frame.size = frame_size
 	frame.material = _make_tier_frame_material(item.tier)
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(frame)
 	# 图标（居中于暗格）
-	var tex: Texture2D = ItemCatalog.load_icon(item.item_id)
 	if tex != null:
 		var icon := TextureRect.new()
 		icon.texture = tex
-		var isz := box * (70.0 / 92.0)
-		icon.position = Vector2((box - isz) * 0.5, (box - isz) * 0.5)
-		icon.size = Vector2(isz, isz)
+		icon.position = icon_position
+		icon.size = icon_size
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -425,6 +447,8 @@ func _build_detail_panel() -> void:
 	_d_frame = $DetailArea/DetailFrame as TextureRect
 	_d_frame.material = _d_frame.material.duplicate()
 	_d_frame_mat = _d_frame.material as ShaderMaterial
+	_d_icon_shadow = $DetailArea/ItemArtShadow as TextureRect
+	_d_icon_shadow.self_modulate = ItemFrameStyle.ITEM_ART_SHADOW_COLOR
 	_d_icon = $DetailArea/ItemIcon as TextureRect
 	_d_icon_fallback = $DetailArea/ItemIconFallback as Label
 	_d_rarity_mark = $DetailArea/RarityBadge/TypeMark as Control
@@ -464,9 +488,12 @@ func _select(idx: int) -> void:
 	var tex: Texture2D = ItemCatalog.load_icon(it.item_id)
 	if tex != null:
 		_d_icon.texture = tex
+		_d_icon_shadow.texture = tex
+		_d_icon_shadow.visible = true
 		_d_icon.visible = true
 		_d_icon_fallback.visible = false
 	else:
+		_d_icon_shadow.visible = false
 		_d_icon.visible = false
 		_d_icon_fallback.text = tr(it.item_name)
 		_d_icon_fallback.visible = true
@@ -477,9 +504,13 @@ func _select(idx: int) -> void:
 	if _d_pop_tween != null and _d_pop_tween.is_valid():
 		_d_pop_tween.kill()
 	_d_icon.pivot_offset = _d_icon.size * 0.5
+	_d_icon_shadow.pivot_offset = _d_icon_shadow.size * 0.5
 	_d_icon.scale = Vector2(1.06, 1.06)
-	_d_pop_tween = create_tween()
+	_d_icon_shadow.scale = Vector2(1.06, 1.06)
+	_d_pop_tween = create_tween().set_parallel(true)
 	_d_pop_tween.tween_property(_d_icon, "scale", Vector2.ONE, 0.12)\
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_d_pop_tween.tween_property(_d_icon_shadow, "scale", Vector2.ONE, 0.12)\
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	_d_name.text = tr(it.item_name)
 	_d_name.add_theme_color_override("font_color", DETAIL_NAME_INK)

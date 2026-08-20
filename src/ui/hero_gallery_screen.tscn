@@ -5,7 +5,7 @@
 [ext_resource type="Texture2D" uid="uid://b325uplujdf5c" path="res://assets/ui/hero_codex_book.png" id="3_book"]
 [ext_resource type="Texture2D" uid="uid://dth8e07q41pet" path="res://assets/ui/hero_codex_portrait_wash.png" id="4_wash"]
 [ext_resource type="Script" uid="uid://dscb38dq2t215" path="res://src/ui/components/hero_gallery_grid_preview.gd" id="5_grid_preview"]
-[ext_resource type="FontFile" uid="uid://b5u0blnymq02m" path="res://assets/font/ark-pixel-12px-proportional-zh_cn.ttf" id="6_back_font"]
+[ext_resource type="FontVariation" path="res://assets/font/zlabs_pixel_ui.tres" id="6_back_font"]
 [ext_resource type="Texture2D" uid="uid://cq7w4kpww2rkq" path="res://assets/ui/icons/heart_idle.png" id="7_heart"]
 [ext_resource type="Script" uid="uid://bosrg5fr7rmtv" path="res://src/ui/components/hero_gallery_skill_type_mark.gd" id="8_skill_type"]
 

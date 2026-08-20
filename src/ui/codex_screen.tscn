@@ -1,0 +1,205 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://src/ui/codex_screen.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/ui/codex/bookmark_chapter_left.png" id="2_chapter"]
+[ext_resource type="Texture2D" path="res://assets/ui/codex/bookmark_rarity_left.png" id="3_rarity"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_chapter"]
+content_margin_right = 18.0
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_rarity"]
+content_margin_right = 12.0
+
+[node name="CodexScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="GalleryHost" type="Control" parent="."]
+layout_mode = 0
+offset_right = 1920.0
+offset_bottom = 1080.0
+mouse_filter = 2
+
+[node name="BookmarkLayer" type="Control" parent="."]
+layout_mode = 0
+offset_right = 1920.0
+offset_bottom = 1080.0
+mouse_filter = 2
+
+[node name="HeroBookmark" type="Button" parent="BookmarkLayer"]
+layout_mode = 0
+offset_top = 190.0
+offset_right = 148.0
+offset_bottom = 238.0
+mouse_filter = 0
+focus_mode = 1
+toggle_mode = true
+theme_override_styles/normal = SubResource("StyleBoxEmpty_chapter")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_chapter")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_chapter")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_chapter")
+text = "英雄"
+
+[node name="Art" type="TextureRect" parent="BookmarkLayer/HeroBookmark"]
+show_behind_parent = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture_filter = 1
+texture = ExtResource("2_chapter")
+expand_mode = 1
+
+[node name="ItemBookmark" type="Button" parent="BookmarkLayer"]
+layout_mode = 0
+offset_top = 256.0
+offset_right = 148.0
+offset_bottom = 304.0
+mouse_filter = 0
+focus_mode = 1
+toggle_mode = true
+theme_override_styles/normal = SubResource("StyleBoxEmpty_chapter")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_chapter")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_chapter")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_chapter")
+text = "道具"
+
+[node name="Art" type="TextureRect" parent="BookmarkLayer/ItemBookmark"]
+show_behind_parent = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture_filter = 1
+texture = ExtResource("2_chapter")
+expand_mode = 1
+
+[node name="RarityBookmarks" type="Control" parent="BookmarkLayer"]
+visible = false
+layout_mode = 0
+offset_left = 36.0
+offset_top = 314.0
+offset_right = 138.0
+offset_bottom = 412.0
+mouse_filter = 2
+
+[node name="Normal" type="Button" parent="BookmarkLayer/RarityBookmarks"]
+layout_mode = 0
+offset_right = 102.0
+offset_bottom = 30.0
+mouse_filter = 0
+focus_mode = 1
+toggle_mode = true
+theme_override_styles/normal = SubResource("StyleBoxEmpty_rarity")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_rarity")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_rarity")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_rarity")
+text = "普通"
+
+[node name="Art" type="TextureRect" parent="BookmarkLayer/RarityBookmarks/Normal"]
+show_behind_parent = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture_filter = 1
+texture = ExtResource("3_rarity")
+expand_mode = 1
+
+[node name="TierStripe" type="ColorRect" parent="BookmarkLayer/RarityBookmarks/Normal"]
+show_behind_parent = true
+layout_mode = 0
+offset_left = 10.0
+offset_top = 8.0
+offset_right = 14.0
+offset_bottom = 24.0
+mouse_filter = 2
+color = Color(0.35, 0.62, 0.75, 1)
+
+[node name="Rare" type="Button" parent="BookmarkLayer/RarityBookmarks"]
+layout_mode = 0
+offset_top = 34.0
+offset_right = 102.0
+offset_bottom = 64.0
+mouse_filter = 0
+focus_mode = 1
+toggle_mode = true
+theme_override_styles/normal = SubResource("StyleBoxEmpty_rarity")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_rarity")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_rarity")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_rarity")
+text = "稀有"
+
+[node name="Art" type="TextureRect" parent="BookmarkLayer/RarityBookmarks/Rare"]
+show_behind_parent = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture_filter = 1
+texture = ExtResource("3_rarity")
+expand_mode = 1
+
+[node name="TierStripe" type="ColorRect" parent="BookmarkLayer/RarityBookmarks/Rare"]
+show_behind_parent = true
+layout_mode = 0
+offset_left = 10.0
+offset_top = 8.0
+offset_right = 14.0
+offset_bottom = 24.0
+mouse_filter = 2
+color = Color(0.55, 0.42, 0.69, 1)
+
+[node name="Legendary" type="Button" parent="BookmarkLayer/RarityBookmarks"]
+layout_mode = 0
+offset_top = 68.0
+offset_right = 102.0
+offset_bottom = 98.0
+mouse_filter = 0
+focus_mode = 1
+toggle_mode = true
+theme_override_styles/normal = SubResource("StyleBoxEmpty_rarity")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_rarity")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_rarity")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_rarity")
+text = "传说"
+
+[node name="Art" type="TextureRect" parent="BookmarkLayer/RarityBookmarks/Legendary"]
+show_behind_parent = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture_filter = 1
+texture = ExtResource("3_rarity")
+expand_mode = 1
+
+[node name="TierStripe" type="ColorRect" parent="BookmarkLayer/RarityBookmarks/Legendary"]
+show_behind_parent = true
+layout_mode = 0
+offset_left = 10.0
+offset_top = 8.0
+offset_right = 14.0
+offset_bottom = 24.0
+mouse_filter = 2
+color = Color(0.75, 0.57, 0.24, 1)

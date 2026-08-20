@@ -1,16 +1,18 @@
 extends Node
 
-## Pixel font manager — loads Ark Pixel TTF, disables antialias, provides apply helpers.
+## Pixel font manager — loads the shared Z Labs Pixel UI preset:
+## grayscale antialiasing + light embolden + 6% vertical compression.
 
-var f12: FontFile
-var f16: FontFile
+const UI_FONT_PATH := "res://assets/font/zlabs_pixel_ui.tres"
+
+var f12: Font
+var f16: Font
 
 
 func _ready() -> void:
-	f12 = load("res://assets/font/ark-pixel-12px-proportional-zh_cn.ttf")
-	f12.antialiasing = TextServer.FONT_ANTIALIASING_NONE
-	f16 = load("res://assets/font/ark-pixel-16px-proportional-zh_cn.ttf")
-	f16.antialiasing = TextServer.FONT_ANTIALIASING_NONE
+	f12 = load(UI_FONT_PATH)
+	# Z工坊当前只有 12px 基准；保留 f16 公开别名，避免破坏成熟调用端。
+	f16 = f12
 
 
 func apply(label: Label, px_size: int) -> void:
@@ -27,11 +29,6 @@ func apply_btn(btn: Button, px_size: int) -> void:
 	btn.add_theme_font_size_override("font_size", px_size)
 
 
-func _best_font(px_size: int) -> FontFile:
-	# 12 整倍数→f12，16 整倍数→f16，其余退回 f12。
-	# （2026-06-10 试过全 f12 与字号全归整，Eddy 均否——非整倍数的轻微缩放可接受。）
-	if px_size % 12 == 0:
-		return f12
-	if px_size % 16 == 0:
-		return f16
+func _best_font(px_size: int) -> Font:
+	# 保留现有字号层级，所有尺寸统一由 CN 字体渲染。
 	return f12

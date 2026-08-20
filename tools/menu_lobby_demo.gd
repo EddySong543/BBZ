@@ -55,17 +55,15 @@ const TIER_STEEL := {
 	"edge_inner": Color(0.52, 0.64, 0.88), "edge_outer": Color(0.04, 0.05, 0.10),
 }
 
-var _f12: FontFile
-var _f16: FontFile
+var _f12: Font
+var _f16: Font
 var _wave_mat: ShaderMaterial
 
 
 func _initialize() -> void:
 	# 脚本模式下 _ready 不会在 _initialize 期间触发 → 不走 FontManager，直接加载字体
-	_f12 = load("res://assets/font/ark-pixel-12px-proportional-zh_cn.ttf")
-	_f12.antialiasing = TextServer.FONT_ANTIALIASING_NONE
-	_f16 = load("res://assets/font/ark-pixel-16px-proportional-zh_cn.ttf")
-	_f16.antialiasing = TextServer.FONT_ANTIALIASING_NONE
+	_f12 = load("res://assets/font/zlabs_pixel_ui.tres")
+	_f16 = _f12
 
 	_build_background()
 	_build_ui()

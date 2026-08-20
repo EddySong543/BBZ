@@ -484,7 +484,8 @@ func _layout_skill_row() -> void:
 	_d_skill_name.position = Vector2(x0 + icon_block, y0)
 	_d_skill_name.size = Vector2(name_w + 8, 32)
 	var tag_x := x0 + icon_block + name_w + tag_gap
-	_d_tag_group.position = Vector2(tag_x, y0)
+	# 标签高 34px、技能名行高 32px；上提 1px 后几何中心与新字体基线严格一致。
+	_d_tag_group.position = Vector2(tag_x, y0 - 1.0)
 
 
 # ============================================================

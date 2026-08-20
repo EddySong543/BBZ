@@ -1,0 +1,7 @@
+Built-in ImageGen mode, generated as two separate transparent source images.
+
+Chapter source: one blank horizontal parchment page-edge index tab, front-on and approximately 2.1:1. Straight top and bottom, a clean stepped exposed end, warm beige paper, dark coffee outer pixel border, restrained tan inner line. No text, icon, shadow, ornament, pattern, blur, gradient, noise, or extra objects.
+
+Rarity source: one blank compact secondary parchment index tab, front-on and approximately 2.6:1. Simpler and thinner than the chapter tab, with the same restrained paper and coffee border language. No text, rarity stripe, icon, shadow, ornament, pattern, blur, gradient, noise, or extra objects.
+
+Both sources were requested on a flat #FF00FF chroma-key background, but ImageGen returned native transparency. `tools/prepare_codex_bookmarks.py` trims, quantizes, hardens alpha, reduces to a logical pixel grid, and upscales exactly 2x with nearest-neighbour sampling.

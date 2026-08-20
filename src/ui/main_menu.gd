@@ -27,6 +27,10 @@ var _cancel_btn: Button   # 匹配中才出现的「✕ 取消匹配」（_setup
 ## 2026-06-13 Eddy 选 B「典籍朱印」全局铺；2026-07-13 换 GPT 导航钮贴图
 ## （米金纸面+角上回纹折·9-slice 中段平铺·jelly 程序板/STEEL 色组退役）。
 const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")   # 235×55·v14 净面版（2026-07-16 Eddy 定内饰多余·img_inner_clear 去回纹钩+内线·只留深咖外框+净纸面）
+const CODEX_ICON_TEX := preload("res://assets/ui/icons/codex_book.png")
+const CODEX_JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")
+const UI_BOTTOM_SHADOW_OFFSET := Vector2(3.0, 6.0)
+const UI_BOTTOM_SHADOW_COLOR := Color(0.02, 0.012, 0.008, 0.52)
 const PIXEL_FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")   # 身份带悬停金晕外环
 const NAV_PLATE_MARGIN_X := 22.0   # 9-slice 边距（v14 净面后内里全纸·任意≥框厚均可·沿用实钩期数值）
 const NAV_PLATE_MARGIN_Y := 20.0
@@ -312,13 +316,18 @@ func _show_cancel_button(on: bool) -> void:
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 
-## 底坞：英雄/道具/商店三入口。美术与顶部设置/退出统一——同款 jelly 羊皮板
+## 底坞：图鉴/商店双入口。美术与顶部设置/退出统一——同款 jelly 羊皮板
 ## （_apply_plate·2026-06-28 同步；原纯色双层坞底+段间分隔线弃用，质感与其余功能钮不一致）。
-## 「小队」已删（2026-06-12 Eddy）；「英雄」接英雄图鉴、「道具」接道具图鉴，商店仍占位。
+## 英雄与道具合并到统一图鉴；旧 NavItems 节点保留为场景兼容占位，但不再显示或接收输入。
 func _setup_dock() -> void:
+	$UI/NavItems.visible = false
+	$UI/NavItems.disabled = true
+	$UI/NavItems.focus_mode = Control.FOCUS_NONE
+	var codex_btn := $UI/NavHeroes as Button
+	_setup_battle_codex_button(codex_btn)
+	codex_btn.pressed.connect(_on_codex_pressed)
 	var navs: Array = [
-		[$UI/NavHeroes, "英雄", "hero"],
-		[$UI/NavItems, "道具", "potion"], [$UI/NavShop, "商店", "coin"],
+		[$UI/NavShop, "商店", "coin"],
 	]
 	for i in navs.size():
 		var btn: Button = navs[i][0]
@@ -327,27 +336,93 @@ func _setup_dock() -> void:
 		FontManager.apply_btn(btn, 24)
 		btn.add_theme_color_override("font_color", INK)   # 羊皮板上→墨字
 		_add_icon(btn, Rect2(30, 19, 32, 32), navs[i][2])
-		if btn == $UI/NavHeroes:
-			btn.pressed.connect(_on_heroes_pressed)   # 英雄图鉴（2026-06-12 实装）
-		elif btn == $UI/NavItems:
-			btn.pressed.connect(_on_items_pressed)    # 道具图鉴（2026-06-26 实装）
-		else:
-			btn.pressed.connect(_on_placeholder_pressed.bind(navs[i][1]))
+		btn.pressed.connect(_on_placeholder_pressed.bind(navs[i][1]))
 		_attach_juice(btn)
 
 
-## 英雄图鉴入口：波幕转场（menu↔bp 同语言）。匹配中不离队。
-func _on_heroes_pressed() -> void:
-	if _match_state != MatchState.IDLE:
-		return
-	TransitionManager.transition_to("res://src/ui/hero_gallery_screen.tscn")
+## 与战斗 UI 的 BtnCodex 同尺寸、同材质、同 64px 图标；主菜单不再另造长条图鉴入口。
+func _setup_battle_codex_button(btn: Button) -> void:
+	btn.text = ""
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.clip_text = true
+	for state: String in ["normal", "hover", "pressed", "focus", "disabled"]:
+		btn.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+
+	var bg := ColorRect.new()
+	bg.name = "Bg"
+	bg.color = Color.WHITE
+	var material := ShaderMaterial.new()
+	material.shader = CODEX_JELLY_SHADER
+	material.set_shader_parameter("fill_top", Color(0.92, 0.87, 0.70))
+	material.set_shader_parameter("fill_bottom", Color(0.76, 0.68, 0.50))
+	material.set_shader_parameter("edge_inner", Color(1.0, 0.95, 0.80))
+	material.set_shader_parameter("edge_outer", Color(0.1, 0.09, 0.11))
+	material.set_shader_parameter("fill_alpha", 1.0)
+	material.set_shader_parameter("pixel_grid", 38.0)
+	material.set_shader_parameter("corner", 0.22)
+	material.set_shader_parameter("edge_px", 2.0)
+	material.set_shader_parameter("aspect", 1.0)
+	material.set_shader_parameter("noise_amt", 0.08)
+	material.set_shader_parameter("wear", 0.24)
+	material.set_shader_parameter("solid_rim", true)
+	material.set_shader_parameter("rim_px", 1.5)
+	bg.material = material
+	bg.show_behind_parent = true
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	btn.add_child(bg)
+
+	var book := TextureRect.new()
+	book.name = "BookIcon"
+	book.texture = CODEX_ICON_TEX
+	book.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	book.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	book.offset_left = 22.0
+	book.offset_top = 22.0
+	book.offset_right = -22.0
+	book.offset_bottom = -22.0
+	book.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	book.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	book.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	btn.add_child(book)
+	_attach_juice(btn)
+	_attach_codex_bottom_shadow(btn)
 
 
-## 道具图鉴入口：波幕转场（menu↔gallery 同语言）。匹配中不离队。
-func _on_items_pressed() -> void:
+func _attach_codex_bottom_shadow(btn: Button) -> void:
+	var source_bg := btn.get_node("Bg") as ColorRect
+	var shadow := ColorRect.new()
+	shadow.name = "BottomShadow"
+	shadow.color = Color.WHITE
+	var material := (source_bg.material as ShaderMaterial).duplicate() as ShaderMaterial
+	var opaque_shadow := Color(
+			UI_BOTTOM_SHADOW_COLOR.r,
+			UI_BOTTOM_SHADOW_COLOR.g,
+			UI_BOTTOM_SHADOW_COLOR.b,
+			1.0)
+	for parameter: String in ["fill_top", "fill_bottom", "edge_inner", "edge_outer"]:
+		material.set_shader_parameter(parameter, opaque_shadow)
+	material.set_shader_parameter("fill_alpha", 1.0)
+	material.set_shader_parameter("noise_amt", 0.0)
+	material.set_shader_parameter("wear", 0.0)
+	shadow.material = material
+	shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shadow.show_behind_parent = true
+	shadow.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	shadow.offset_left = UI_BOTTOM_SHADOW_OFFSET.x
+	shadow.offset_top = UI_BOTTOM_SHADOW_OFFSET.y
+	shadow.offset_right = UI_BOTTOM_SHADOW_OFFSET.x
+	shadow.offset_bottom = UI_BOTTOM_SHADOW_OFFSET.y
+	shadow.self_modulate = Color(1.0, 1.0, 1.0, UI_BOTTOM_SHADOW_COLOR.a)
+	btn.add_child(shadow)
+	btn.move_child(shadow, 0)
+
+
+## 统一图鉴入口：波幕转场；匹配中不离队。
+func _on_codex_pressed() -> void:
 	if _match_state != MatchState.IDLE:
 		return
-	TransitionManager.transition_to("res://src/ui/item_gallery_screen.tscn")
+	TransitionManager.transition_to("res://src/ui/codex_screen.tscn")
 
 
 # ============================================================
@@ -369,7 +444,7 @@ func _animate_in() -> void:
 	var order: Array = [
 		$UI/ModeTower, $UI/ModeMatch, $UI/ModeStory,
 		$UI/IdentityButton, $UI/QuitButton, $UI/SettingsButton,
-		$UI/NavHeroes, $UI/NavItems, $UI/NavShop,
+		$UI/NavHeroes, $UI/NavShop,
 	]
 	var step := 0.0
 	for n in order:
@@ -555,12 +630,12 @@ func _set_btn_left_margin(btn: Button, left: float) -> void:
 		btn.add_theme_stylebox_override(s, sb)
 
 
-## 程序绘制像素 icon（PixelGlyphs 12×12 白剪影+黑描边·原生 16 含留白 → ×2 显示=32px）。
+## 导航 icon。图鉴复用项目既有书本图标，其余仍由 PixelGlyphs 程序绘制。
 ## 美术期换素材：替换 Icon 节点的 texture 即可，位置不动。
 func _add_icon(host: Control, r: Rect2, icon_name: String) -> void:
 	var icon := TextureRect.new()
 	icon.name = "Icon"
-	icon.texture = PixelGlyphs.icon_texture(icon_name)
+	icon.texture = CODEX_ICON_TEX if icon_name == "codex" else PixelGlyphs.icon_texture(icon_name)
 	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	icon.stretch_mode = TextureRect.STRETCH_SCALE
 	icon.position = r.position

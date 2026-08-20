@@ -17,6 +17,13 @@ func test_overlay_uses_battle_diamond_frame_without_second_countdown() -> void:
 	assert_true(avatar.diamond_mode, "候选头像启用战斗 UI 菱形模式")
 	assert_not_null(avatar.get_node_or_null("DiamondFrame"), "菱形框节点已建立")
 	assert_true(avatar.bottom_shadow_enabled, "沿用战斗菱形头像的定向下投影")
+	var hp_row := overlay.find_child("HpRow", true, false) as ReserveHpRow
+	assert_eq(hp_row.size, DeathSwitchOverlay.HP_ROW_SIZE,
+			"死亡换人血量组件同步顶部替补的最新 92x28 版心")
+	assert_true(hp_row.bottom_shadow_enabled,
+			"死亡换人的血条和数字都启用最新版投影")
+	assert_eq(hp_row.number_shadow_offset, Vector2(2.0, 3.0),
+			"死亡换人数字使用现役整数像素右下投影")
 	assert_null(overlay.find_child("ConfirmButton", true, false),
 		"换人仍为点击头像直接选择，不新增确认层")
 

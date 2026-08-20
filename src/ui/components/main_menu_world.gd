@@ -6,7 +6,7 @@ extends Control
 signal movement_finished(cell: Vector2i, completed: bool)
 
 const QingfengLayout := preload("res://src/expedition/maps/qingfeng_ricefield_layout.gd")
-const GridPathfinderScript := preload("res://src/expedition/grid_pathfinder.gd")
+const GridMovementControllerScript := preload("res://src/expedition/grid_movement_controller.gd")
 const HeroDataScript := preload("res://src/battle/hero_data.gd")
 const ProfileStore := preload("res://src/core/player_profile.gd")
 const VISUAL_MAP_SCENE := preload("res://src/expedition/maps/qingfeng_ricefield_visual_map.tscn")
@@ -15,17 +15,21 @@ const GROUND_CELL_SHADER := preload("res://assets/shaders/canvas_ui_expedition_g
 const ATMOSPHERE_SHADER := preload("res://assets/shaders/canvas_ui_qingfeng_atmosphere.gdshader")
 
 const MAP_CELL: float = 120.0
-const MAP_RENDER_SCALE: float = 1.2
-const RENDERED_CELL: float = MAP_CELL * MAP_RENDER_SCALE
-const VISIBLE_COLS: int = 13
-const VISIBLE_ROWS: int = 7
-const VIEW_SIZE := Vector2(VISIBLE_COLS * RENDERED_CELL, VISIBLE_ROWS * RENDERED_CELL)
+const MAP_RENDER_SCALE := Vector2(4.0 / 3.0, 1.5)
+const RENDERED_CELL_SIZE := Vector2(
+		MAP_CELL * MAP_RENDER_SCALE.x,
+		MAP_CELL * MAP_RENDER_SCALE.y)
+const VISIBLE_COLS: int = 12
+const VISIBLE_ROWS: int = 6
+const VIEW_SIZE := Vector2(VISIBLE_COLS, VISIBLE_ROWS) * RENDERED_CELL_SIZE
 const MAP_WORLD_SIZE := Vector2(QingfengLayout.WIDTH * MAP_CELL, QingfengLayout.HEIGHT * MAP_CELL)
-const HOME_CELL := QingfengLayout.START
 const MAP_BOUNDS := Rect2i(Vector2i.ZERO, Vector2i(QingfengLayout.WIDTH, QingfengLayout.HEIGHT))
-const WALK_STEP_DURATION: float = 0.22
-const MAX_BUFFERED_KEY_STEPS: int = 2
-
+const CENTER_SPAWN_CELLS: Array[Vector2i] = [
+	Vector2i(15, 8),
+	Vector2i(16, 8),
+	Vector2i(15, 9),
+	Vector2i(16, 9),
+]
 const TOKEN_SIZE := Vector2(208.0, 208.0)
 const TOKEN_FOOT_ANCHOR := Vector2(104.0, 156.0)
 const TOKEN_CELL_FOOT_POINT := Vector2(60.0, 90.0)
@@ -34,6 +38,8 @@ const TOKEN_CONTENT_SCALE: float = 1.125
 const H01_SOURCE_FOOT_MIDPOINT := Vector2(128.0, 182.0)
 const TOKEN_IDLE_BASE_FPS: float = 8.0
 const TOKEN_IDLE_REF_FRAMES: float = 6.0
+const TOKEN_ASPECT_COMPENSATION := Vector2(
+		MAP_RENDER_SCALE.y / MAP_RENDER_SCALE.x, 1.0)
 
 const DESTINATION_CELLS: Dictionary = {
 	"match": Vector2i(12, 14),
@@ -63,25 +69,29 @@ var _anim_time: float = 0.0
 var _focused_destination: String = ""
 var _selected_destination: String = ""
 var _transition_active: bool = false
-var _move_tween: Tween
 var _shadow_lift: float = 0.0
 var _move_direction: Vector2 = Vector2.ZERO
 var _current_token_origin: Vector2 = Vector2.ZERO
 var _current_logical_origin: Vector2 = Vector2.ZERO
-var _current_cell: Vector2i = HOME_CELL
-var _movement_generation: int = 0
-var _keyboard_step_queue: Array[Vector2i] = []
-var _keyboard_runner_active: bool = false
+var _spawn_cell: Vector2i = CENTER_SPAWN_CELLS[0]
+var _current_cell: Vector2i = CENTER_SPAWN_CELLS[0]
+var _grid_movement: GridMovementController
 
 
 func _ready() -> void:
+	_spawn_cell = CENTER_SPAWN_CELLS.pick_random()
+	_current_cell = _spawn_cell
 	_build_world()
 	resized.connect(_layout_view)
 	_layout_view()
 	_load_profile_hero()
-	_set_token_origin(_token_origin_for_cell(HOME_CELL), 0.0, Vector2.ZERO)
-	_current_logical_origin = _token_origin_for_cell(HOME_CELL)
-	_update_camera_for_token_origin(_current_logical_origin)
+	_grid_movement = GridMovementControllerScript.new()
+	_grid_movement.configure(
+			_spawn_cell, MAP_BOUNDS, MAP_CELL, TOKEN_OFFSET,
+			_is_main_cell_walkable, _commit_main_step)
+	_grid_movement.step_committed.connect(_on_shared_step_committed)
+	_grid_movement.movement_finished.connect(_on_shared_movement_finished)
+	_apply_shared_movement_visual()
 	set_process(true)
 
 
@@ -104,7 +114,7 @@ func _build_world() -> void:
 	map_world = Control.new()
 	map_world.name = "MapWorld"
 	map_world.size = MAP_WORLD_SIZE
-	map_world.scale = Vector2.ONE * MAP_RENDER_SCALE
+	map_world.scale = MAP_RENDER_SCALE
 	map_world.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	map_view.add_child(map_world)
 
@@ -187,7 +197,9 @@ func _build_atmosphere() -> void:
 func _layout_view() -> void:
 	if map_view == null:
 		return
-	map_view.position = ((size - VIEW_SIZE) * 0.5).round()
+	# 主界面使用 1920×1080 设计坐标；12×6 格已经精确铺满，不再按临时
+	# headless viewport 尺寸居中，否则会重新露出兜底外圈。
+	map_view.position = Vector2.ZERO
 	_update_camera_for_token_origin(_token_origin_for_cell(_current_cell))
 
 
@@ -240,6 +252,7 @@ func _draw_destinations() -> void:
 
 func _draw_player_shadow() -> void:
 	var width: float = round(lerpf(62.0, 42.0, _shadow_lift) * 0.5) * 2.0
+	width *= TOKEN_ASPECT_COMPENSATION.x
 	var height: float = round(lerpf(12.0, 8.0, _shadow_lift))
 	var opacity: float = lerpf(0.46, 0.24, _shadow_lift)
 	var center := TOKEN_CELL_FOOT_POINT + Vector2(_move_direction.x * 2.0 * _shadow_lift, 2.0)
@@ -307,7 +320,10 @@ func focus_destination(destination_id: String) -> void:
 		var target_cell: Vector2i = DESTINATION_CELLS[destination_id]
 		var horizontal: float = signf(float(target_cell.x - _current_cell.x))
 		if not is_zero_approx(horizontal):
-			player_token.scale.x = absf(player_token.scale.x) * horizontal
+			_grid_movement.facing_sign = horizontal
+			_grid_movement.turn_from_sign = horizontal
+			_grid_movement.turn_target_sign = horizontal
+			player_token.scale = _token_scale_for_render(_grid_movement.token_scale())
 	marker_art.queue_redraw()
 
 
@@ -318,10 +334,10 @@ func play_confirmation(destination_id: String) -> void:
 	_selected_destination = destination_id
 	marker_art.queue_redraw()
 	var destination_cell: Vector2i = DESTINATION_CELLS[destination_id]
-	_cancel_keyboard_steps()
-	_movement_generation += 1
-	var generation: int = _movement_generation
-	await _walk_path_to(destination_cell, generation)
+	if not _grid_movement.request_path(destination_cell):
+		_transition_active = false
+		return
+	await movement_finished
 	if not is_instance_valid(self):
 		return
 	_transition_active = false
@@ -330,89 +346,44 @@ func play_confirmation(destination_id: String) -> void:
 func reset_home() -> void:
 	_selected_destination = ""
 	marker_art.queue_redraw()
-	request_move_to_cell(HOME_CELL)
+	request_move_to_cell(_spawn_cell)
 
 
 func request_move_to_cell(destination_cell: Vector2i) -> bool:
-	if _transition_active or not MAP_BOUNDS.has_point(destination_cell):
+	if _transition_active or _grid_movement == null:
 		return false
-	_cancel_keyboard_steps()
-	_movement_generation += 1
-	_walk_path_to(destination_cell, _movement_generation)
-	return true
+	return _grid_movement.request_path(destination_cell)
 
 
 func request_step(direction: Vector2i) -> bool:
-	if _transition_active or absi(direction.x) + absi(direction.y) != 1:
+	if _transition_active or _grid_movement == null:
 		return false
-	if not _keyboard_runner_active:
-		_movement_generation += 1
-		_keyboard_runner_active = true
-		_keyboard_step_queue.append(direction)
-		_run_keyboard_steps(_movement_generation)
-	elif _keyboard_step_queue.size() < MAX_BUFFERED_KEY_STEPS:
-		_keyboard_step_queue.append(direction)
-	return true
+	return _grid_movement.request_keyboard_step(direction) != "blocked"
 
 
-func _run_keyboard_steps(generation: int) -> void:
-	while not _keyboard_step_queue.is_empty():
-		if generation != _movement_generation:
-			return
-		var direction: Vector2i = _keyboard_step_queue.pop_front()
-		var next_cell: Vector2i = _current_cell + direction
-		if not MAP_BOUNDS.has_point(next_cell):
-			continue
-		await _walk_one_cell(next_cell)
-		if not is_instance_valid(self) or generation != _movement_generation:
-			return
-	_keyboard_runner_active = false
-	movement_finished.emit(_current_cell, true)
+func _is_main_cell_walkable(cell: Vector2i) -> bool:
+	return MAP_BOUNDS.has_point(cell)
 
 
-func _cancel_keyboard_steps() -> void:
-	_keyboard_step_queue.clear()
-	_keyboard_runner_active = false
+func _commit_main_step(direction: Vector2i) -> Dictionary:
+	var next_cell: Vector2i = _grid_movement.current_cell + direction
+	var moved: bool = MAP_BOUNDS.has_point(next_cell)
+	return {
+		"moved": moved,
+		"kind": "move" if moved else "blocked",
+		"cell": next_cell,
+	}
 
 
-func _walk_path_to(destination_cell: Vector2i, generation: int) -> bool:
-	var path: Array[Vector2i] = GridPathfinderScript.find_path(
-			_current_cell, destination_cell, MAP_BOUNDS,
-			func(_cell: Vector2i) -> bool: return true)
-	if destination_cell != _current_cell and path.is_empty():
-		movement_finished.emit(_current_cell, false)
-		return false
-	for next_cell: Vector2i in path:
-		if generation != _movement_generation:
-			return false
-		await _walk_one_cell(next_cell)
-		if not is_instance_valid(self) or generation != _movement_generation:
-			return false
-	movement_finished.emit(_current_cell, true)
-	return true
+func _on_shared_step_committed(_from_cell: Vector2i, to_cell: Vector2i,
+		direction: Vector2i, _result: Dictionary) -> void:
+	_current_cell = to_cell
+	_move_direction = Vector2(direction)
 
 
-func _walk_one_cell(next_cell: Vector2i) -> void:
-	var step: Vector2i = next_cell - _current_cell
-	if absi(step.x) + absi(step.y) != 1:
-		return
-	var from_origin: Vector2 = _current_logical_origin
-	var to_origin: Vector2 = _token_origin_for_cell(next_cell)
-	_move_direction = Vector2(step)
-	if _move_tween != null and _move_tween.is_valid():
-		_move_tween.kill()
-	_move_tween = create_tween()
-	_move_tween.tween_method(
-			_set_walk_progress.bind(from_origin, to_origin, _move_direction),
-			0.0, 1.0, WALK_STEP_DURATION
-	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	await _move_tween.finished
-	if not is_instance_valid(self):
-		return
-	_current_cell = next_cell
-	_current_logical_origin = to_origin
-	_set_token_origin(to_origin, 0.0, _move_direction)
-	_update_camera_for_token_origin(to_origin)
+func _on_shared_movement_finished(cell: Vector2i, completed: bool) -> void:
+	_current_cell = cell
+	movement_finished.emit(cell, completed)
 
 
 func _on_map_view_gui_input(event: InputEvent) -> void:
@@ -435,27 +406,14 @@ func _cell_from_view_position(view_position: Vector2) -> Vector2i:
 
 
 func _view_position_for_cell(cell: Vector2i) -> Vector2:
-	return map_world.position + (Vector2(cell) + Vector2.ONE * 0.5) * RENDERED_CELL
+	return map_world.position + (Vector2(cell) + Vector2.ONE * 0.5) \
+			* RENDERED_CELL_SIZE
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not (event is InputEventKey):
+	var direction: Vector2i = GridMovementControllerScript.direction_from_key(event)
+	if direction == Vector2i.ZERO:
 		return
-	var key_event := event as InputEventKey
-	if not key_event.pressed:
-		return
-	var direction := Vector2i.ZERO
-	match key_event.keycode:
-		KEY_W:
-			direction = Vector2i.UP
-		KEY_S:
-			direction = Vector2i.DOWN
-		KEY_A:
-			direction = Vector2i.LEFT
-		KEY_D:
-			direction = Vector2i.RIGHT
-		_:
-			return
 	if request_step(direction):
 		get_viewport().set_input_as_handled()
 
@@ -482,30 +440,23 @@ func get_visual_contract() -> Dictionary:
 		"visible_columns": VISIBLE_COLS,
 		"visible_rows": VISIBLE_ROWS,
 		"view_size": VIEW_SIZE,
-		"rendered_cell": RENDERED_CELL,
+		"rendered_cell_size": RENDERED_CELL_SIZE,
+		"render_scale": MAP_RENDER_SCALE,
 		"destination_count": DESTINATION_CELLS.size(),
 		"ground_cell_count": QingfengLayout.WIDTH * QingfengLayout.HEIGHT,
 		"hero_frame_count": _hero_textures.size(),
 		"hero_foot_anchor": TOKEN_FOOT_ANCHOR,
+		"spawn_cell": _spawn_cell,
+		"center_spawn_cells": CENTER_SPAWN_CELLS,
 		"current_cell": _current_cell,
 		"click_to_move": map_view != null and map_view.gui_input.is_connected(
 				_on_map_view_gui_input),
 		"wasd_to_move": true,
-		"keyboard_buffered_steps": MAX_BUFFERED_KEY_STEPS,
+		"shared_movement_controller": _grid_movement != null,
+		"movement_controller_script": _grid_movement.get_script().resource_path \
+				if _grid_movement != null else "",
+		"movement_damping": GridMovementControllerScript.CRITICAL_DAMPING,
 	}
-
-
-func _set_walk_progress(progress: float, from_origin: Vector2, to_origin: Vector2,
-		direction: Vector2) -> void:
-	var arc: float = sin(progress * PI)
-	var logical_origin: Vector2 = from_origin.lerp(to_origin, progress)
-	var hop := Vector2(direction.x * round(arc) * 5.0, -round(arc * 2.0) * 5.0)
-	_current_logical_origin = logical_origin
-	_set_token_origin(logical_origin + hop, arc, direction)
-	_update_camera_for_token_origin(logical_origin)
-	var facing: float = signf(direction.x)
-	if not is_zero_approx(facing):
-		player_token.scale = Vector2(facing, 1.0 + arc * 0.04)
 
 
 func _set_token_origin(origin: Vector2, lift: float, direction: Vector2) -> void:
@@ -523,8 +474,34 @@ func _token_origin_for_cell(cell: Vector2i) -> Vector2:
 
 func _process(delta: float) -> void:
 	_anim_time += delta
+	if _grid_movement != null:
+		_grid_movement.process(delta)
+		_apply_shared_movement_visual()
 	_update_hero_frame()
 	if atmosphere_material != null:
 		atmosphere_material.set_shader_parameter("anim_time", _anim_time)
 	if not _focused_destination.is_empty() or not _selected_destination.is_empty():
 		marker_art.queue_redraw()
+
+
+func _apply_shared_movement_visual() -> void:
+	if _grid_movement == null or player_token == null or player_shadow == null:
+		return
+	_current_cell = _grid_movement.current_cell
+	_current_logical_origin = _grid_movement.visual_origin
+	var rendered_origin: Vector2 = _grid_movement.quantized_visual_origin()
+	var step_offset: Vector2 = _grid_movement.step_offset()
+	_current_token_origin = rendered_origin + step_offset
+	_move_direction = _grid_movement.step_direction
+	_shadow_lift = sin(_grid_movement.step_progress() * PI) \
+			if _grid_movement.step_active else 0.0
+	player_token.position = _current_token_origin
+	player_token.rotation = _grid_movement.token_rotation()
+	player_token.scale = _token_scale_for_render(_grid_movement.token_scale())
+	player_shadow.position = rendered_origin - TOKEN_OFFSET
+	player_shadow.queue_redraw()
+	_update_camera_for_token_origin(rendered_origin)
+
+
+func _token_scale_for_render(movement_scale: Vector2) -> Vector2:
+	return movement_scale * TOKEN_ASPECT_COMPENSATION

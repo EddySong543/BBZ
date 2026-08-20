@@ -16,7 +16,7 @@
 [ext_resource type="Texture2D" uid="uid://1wrmooe2eynb" path="res://assets/ui/icons/Fang_idle.png" id="19_fang"]
 [ext_resource type="Texture2D" uid="uid://bg6qynpwqkgmw" path="res://assets/ui/icons/DaFang_idle.png" id="20_dafang"]
 [ext_resource type="Shader" uid="uid://nr0mkp6afjoy" path="res://assets/shaders/canvas_button_jelly.gdshader" id="21_jelly"]
-[ext_resource type="FontFile" uid="uid://crf26hvhxwgim" path="res://assets/font/ark-pixel-16px-proportional-zh_cn.ttf" id="23_pixelfont"]
+[ext_resource type="FontVariation" path="res://assets/font/zlabs_pixel_ui.tres" id="23_pixelfont"]
 [ext_resource type="Script" uid="uid://cjou81ur7el87" path="res://src/ui/components/reserve_hp_row.gd" id="24_reservehp"]
 [ext_resource type="Script" uid="uid://dvdbihej8rx16" path="res://src/ui/components/icon_badge.gd" id="25_iconbadge"]
 [ext_resource type="Shader" uid="uid://bqm1rtkp2e21g" path="res://assets/shaders/canvas_fx_finisher_veil.gdshader" id="26_finveil"]
@@ -219,8 +219,9 @@ script = ExtResource("1_battle_gd")
 tip_size_s = Vector2(144, 66)
 tip_size_l = Vector2(222, 122)
 tip_glyph_spacing = 1
-item_tip_vertical_lift = 12.0
-item_tip_title_body_gap = 24
+tip_font_size_s = 18
+item_tip_vertical_lift = 0.0
+item_tip_title_body_gap = 8
 
 [node name="StageSlot" type="Control" parent="." unique_id=924300025]
 layout_mode = 1

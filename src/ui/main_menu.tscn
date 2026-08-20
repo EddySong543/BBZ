@@ -129,25 +129,27 @@ prominent = true
 
 [node name="NavHeroes" type="Button" parent="UI"]
 layout_mode = 0
-offset_left = 64.0
-offset_top = 970.0
-offset_right = 224.0
+offset_left = 176.0
+offset_top = 932.0
+offset_right = 284.0
 offset_bottom = 1040.0
-text = "英雄"
 
 [node name="NavItems" type="Button" parent="UI"]
+visible = false
 layout_mode = 0
 offset_left = 224.0
 offset_top = 970.0
 offset_right = 384.0
 offset_bottom = 1040.0
+focus_mode = 0
+disabled = true
 text = "道具"
 
 [node name="NavShop" type="Button" parent="UI"]
 layout_mode = 0
-offset_left = 384.0
+offset_left = 304.0
 offset_top = 970.0
-offset_right = 544.0
+offset_right = 464.0
 offset_bottom = 1040.0
 text = "商店"
 

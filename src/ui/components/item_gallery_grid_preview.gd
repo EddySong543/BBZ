@@ -64,6 +64,9 @@ func _draw() -> void:
 		var frame_rect := Rect2(
 			origin + Vector2.ONE * box_size * FRAME_OFFSET_RATIO,
 			Vector2.ONE * box_size * FRAME_ART_SCALE)
+		draw_texture_rect(ITEM_FRAME_TEX,
+			Rect2(frame_rect.position + ItemFrameStyle.DROP_SHADOW_OFFSET, frame_rect.size),
+			false, ItemFrameStyle.DROP_SHADOW_COLOR)
 		draw_texture_rect(ITEM_FRAME_TEX, frame_rect, false)
 		draw_line(
 			origin + Vector2(12.0, box_size + 10.0),

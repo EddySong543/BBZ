@@ -11,10 +11,10 @@ const ROWS: Array = [
 	# [说明, 字体路径, 显示尺寸(整数倍), 描边(=1字体像素)]
 	["Fusion Pixel 10px  x12 = 120px",
 		"res://assets/font/fusion-pixel-10px-proportional-zh_hans.ttf", 120, 12],
-	["Ark Pixel 12px  x10 = 120px",
-		"res://assets/font/ark-pixel-12px-proportional-zh_cn.ttf", 120, 10],
-	["Ark Pixel 16px  x8 = 128px",
-		"res://assets/font/ark-pixel-16px-proportional-zh_cn.ttf", 128, 8],
+	["Z工坊像素黑体 12px  x10 = 120px",
+		"res://assets/font/zlabs_pixel_ui.tres", 120, 10],
+	["Z工坊像素黑体 12px  @128px",
+		"res://assets/font/zlabs_pixel_ui.tres", 128, 8],
 ]
 const CHAR_COLORS: Array = [
 	Color(0.30, 0.60, 1.00),   # 波₁ 蓝
@@ -31,8 +31,7 @@ func _initialize() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.add_child(bg)
 
-	var caption_font := load("res://assets/font/ark-pixel-12px-proportional-zh_cn.ttf") as FontFile
-	caption_font.antialiasing = TextServer.FONT_ANTIALIASING_NONE
+	var caption_font := load("res://assets/font/zlabs_pixel_ui.tres") as Font
 
 	var y := 40.0
 	for row_v in ROWS:
@@ -46,8 +45,7 @@ func _initialize() -> void:
 		bg.add_child(cap)
 		y += 44.0
 
-		var font := load(row[1]) as FontFile
-		font.antialiasing = TextServer.FONT_ANTIALIASING_NONE
+		var font := load(row[1]) as Font
 		var x := 60.0
 		for i in TITLE.length():
 			var lb := Label.new()

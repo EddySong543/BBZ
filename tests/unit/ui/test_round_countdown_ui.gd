@@ -203,8 +203,51 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 	assert_false(item_tip.begins_with("【") or item_tip.contains("】\n"),
 			"已有道具名称不再显示书名括号")
 	screen._on_item_slot_hovered(0)
+	await get_tree().process_frame
 	assert_true(screen._tip_item_header.visible,
 			"具名道具说明显示图标与名称顶部行")
+	assert_eq(screen.tip_font_size_s, 18,
+			"五个基础动作短说明字号提升到 18px")
+	assert_eq(screen._tip_label.get_theme_font_size("font_size"), 18,
+			"基础动作说明实际使用放大后的字号")
+	assert_eq(screen.tip_optical_center_shift_s, 0.0,
+			"底部按钮 S 框保留几何中心，不继承道具补偿")
+	assert_eq(screen.tip_optical_center_shift_l, 0.0,
+			"普通技能 L 框保留几何中心")
+	assert_eq(screen.tip_optical_center_shift_avatar_skill, 0.0,
+			"顶部头像技能说明恢复几何中心")
+	assert_eq(screen.tip_optical_center_shift_item, 3.0,
+			"只有道具 L 框保留已通过的向右 3px 视觉补偿")
+	assert_almost_eq(screen._tip_stylebox.content_margin_left
+			- screen._tip_stylebox.content_margin_right,
+			screen.tip_optical_center_shift_item * 2.0, 0.01,
+			"当前道具 L 框只由自身视觉轴补偿")
+	assert_almost_eq(screen._tip_content.get_global_rect().get_center().x
+			- screen._tip_panel.get_global_rect().get_center().x,
+			screen.tip_optical_center_shift_item, 0.01,
+			"道具 L 的实际内容矩形沿已通过的视觉轴居中")
+	screen._set_tip_content_margins(screen.TipFormat.S, screen.TipContentKind.PLAIN)
+	assert_eq(screen._tip_stylebox.content_margin_left,
+			screen._tip_stylebox.content_margin_right,
+			"底部 S 框左右边距恢复对称")
+	screen._set_tip_content_margins(screen.TipFormat.L,
+			screen.TipContentKind.AVATAR_SKILL)
+	assert_eq(screen._tip_stylebox.content_margin_left,
+			screen._tip_stylebox.content_margin_right,
+			"头像技能框左右边距恢复对称")
+	screen._set_tip_content_margins(screen.TipFormat.L, screen.TipContentKind.ITEM)
+	var big_defend_tip: String = screen._action_tip(ActionDef.Action.BIG_DEFEND)
+	assert_eq(big_defend_tip, "抵挡「波」、「大波」",
+			"大防 S 框完整回退到先前括号文案")
+	var battle_item_material := screen.p1_item_row._cell_mats[0] as ShaderMaterial
+	assert_eq(float(battle_item_material.get_shader_parameter("vertical_gradient")), 1.0,
+			"战斗普通道具格回退为静态纵向渐变")
+	var battle_icon_shadow := screen.p1_item_row._icon_shadows[0] as TextureRect
+	assert_true(battle_icon_shadow.visible, "战斗道具美术具备落在格底上的 alpha 投影")
+	assert_eq(battle_icon_shadow.texture, screen.p1_item_row._icons[0].texture,
+			"图案投影严格复制当前道具纹理")
+	assert_lt(battle_icon_shadow.get_index(), screen.p1_item_row._tex_frames[0].get_index(),
+			"图案投影位于格底上方、金属框下方")
 	assert_almost_eq(screen._tip_item_icon.size.x, 32.0, 0.01,
 			"顶部只保留整像素尺寸的道具图标，避免缩放边框破损")
 	assert_eq(screen._tip_item_icon.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST,
@@ -212,22 +255,26 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 	assert_almost_eq(screen._tip_item_title.position.x
 			- screen._tip_item_icon.get_rect().end.x, 6.0, 0.01,
 			"道具名紧跟图标并保留最小可读间距")
-	assert_almost_eq(screen._tip_rich.offset_left,
-			screen._tip_item_header.position.x, 0.01,
-			"下方正文最左侧与道具图标最左侧严格对齐")
 	var item_content_width: float = screen.tip_size_item.x - screen.tip_padding_horizontal_l * 2.0
-	assert_almost_eq(screen._tip_item_header.position.x,
-			item_content_width - screen._tip_item_header.get_rect().end.x, 1.0,
-			"图标、名称与正文共用的内容列在说明框中整体居中")
-	assert_gt(screen._tip_rich.offset_top,
-			screen._tip_item_header.position.y + screen._tip_item_icon.size.y,
-			"正文位于顶部道具行下方")
+	assert_almost_eq(screen._tip_item_header.position.x + screen._tip_item_header.size.x * 0.5,
+			item_content_width * 0.5, 0.51,
+			"顶部图标与名称按实际组合宽度整体居中")
+	assert_almost_eq(screen._tip_rich.offset_left, 8.0, 0.01,
+			"下方正文保持稳定的独立左轴")
+	assert_almost_eq(screen._tip_rich.offset_right,
+			-screen._tip_rich.offset_left, 0.01,
+			"正文区域以等量左右内缩保持整体居中")
+	assert_almost_eq(screen._tip_item_header.position.y, 2.0, 0.01,
+			"标题行贴近内容区顶部，不再造成整体下坠")
+	assert_almost_eq(screen._tip_rich.offset_top,
+			screen._tip_item_header.position.y + screen._tip_item_icon.size.y + 8.0, 0.01,
+			"正文与标题只保留 8px 可读间距")
 	assert_eq(screen._tip_panel.size, screen.tip_size_item,
-			"具名道具使用独立高度，避免新增顶部行挤压说明正文")
-	assert_eq(screen.item_tip_vertical_lift, 12.0,
-			"道具标题整体上移量暴露为可手调参数")
-	assert_eq(screen.item_tip_title_body_gap, 24,
-			"道具名称与正文间隔遵循场景中的当前手调值")
+			"具名道具使用 222x128 紧凑框，消除底部无效留白")
+	assert_eq(screen.item_tip_vertical_lift, 0.0,
+			"固定轴线默认不再叠加历史上移补偿")
+	assert_eq(screen.item_tip_title_body_gap, 8,
+			"道具名称与正文保持一个短呼吸位")
 	var gap_property: Dictionary = {}
 	for property: Dictionary in screen.get_property_list():
 		if property.get("name", "") == "item_tip_title_body_gap":
@@ -235,6 +282,18 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 			break
 	assert_true(String(gap_property.get("hint_string", "")).contains("64"),
 			"道具名称与正文间距的 Inspector 上限扩展到 64")
+	var stable_body_right: float = screen._tip_rich.offset_right
+	screen._set_l_tip_text("短名\n短说明", screen.TipContentKind.ITEM)
+	assert_almost_eq(screen._tip_item_header.position.x + screen._tip_item_header.size.x * 0.5,
+			item_content_width * 0.5, 0.51,
+			"短道具名仍按自身组合宽度居中")
+	screen._set_l_tip_text("很长的道具名称\n这是一段会自动换行的较长道具说明文字",
+			screen.TipContentKind.ITEM)
+	assert_almost_eq(screen._tip_item_header.position.x + screen._tip_item_header.size.x * 0.5,
+			item_content_width * 0.5, 0.51,
+			"长道具名受限于内容宽度后仍保持整体居中")
+	assert_almost_eq(screen._tip_rich.offset_right, stable_body_right, 0.01,
+			"不同正文长度始终保留相同的对称右内缩")
 	screen._set_l_tip_text("点击抽取道具", screen.TipContentKind.ITEM)
 	assert_false(screen._tip_item_header.visible,
 			"空槽状态不显示无意义的道具框顶部行")

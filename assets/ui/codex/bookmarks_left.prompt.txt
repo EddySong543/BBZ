@@ -1,0 +1,13 @@
+Built-in ImageGen mode. Two separate transparent source images were generated.
+
+Chapter source:
+A blank horizontal parchment chapter index for the LEFT edge of an open codex. The exposed/free end is on the LEFT with two restrained stepped chamfers. The RIGHTMOST portion is a straight square insertion throat with a pressed vertical seam. Warm cotton paper, coffee hard edge, short fibres, front-on 2D pixel art. No text, symbol, ornament, pseudo-3D, detached shadow, glow, blur, or extra objects.
+
+Rarity source:
+A smaller, thinner blank secondary page marker using the same mandatory LEFT-exposed / RIGHT-inserted construction. Quiet warm paper and coffee edge, subtle fibres, clean center for two Chinese characters, no baked rarity color or text.
+
+Generated sources:
+- C:\Users\Edzzz\.codex\generated_images\019fd59a-47f5-72a1-abf9-4e8d2cfeb825\exec-8333b5ca-8b2e-45a4-a6ae-85d06f524fa7.png
+- C:\Users\Edzzz\.codex\generated_images\019fd59a-47f5-72a1-abf9-4e8d2cfeb825\exec-c18a7dd9-9c32-4ce2-b6c1-abc8746536af.png
+
+`tools/prepare_codex_bookmarks.py` preserves source luminance texture, applies a seven-tone warm paper palette, enforces the left-only stepped silhouette and square right insertion edge, hardens alpha, and upscales exactly 2x with nearest-neighbour sampling.

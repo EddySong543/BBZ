@@ -8,7 +8,7 @@ extends SceneTree
 
 const OUT := "D:/Game/BoBoZan/_probe_output/palette_mock.png"
 const JELLY := preload("res://assets/shaders/canvas_button_jelly.gdshader")
-const FONT_PATH := "res://assets/font/ark-pixel-12px-proportional-zh_cn.ttf"
+const FONT_PATH := "res://assets/font/zlabs_pixel_ui.tres"
 const BTN := 108.0
 const GAP := 24.0
 const PAPER_TOP := Color(0.92, 0.87, 0.70)
@@ -66,8 +66,7 @@ func _initialize() -> void:
 	root.add_child(bg)
 	await process_frame
 	bg.size = root.get_visible_rect().size
-	var font := load(FONT_PATH) as FontFile
-	font.antialiasing = TextServer.FONT_ANTIALIASING_NONE
+	var font := load(FONT_PATH) as Font
 	var rows: Array = [
 		["现行（9 色相）", row_current],
 		["四色版：攻红/防蓝各两档·攒金·结束绿·技能墨金·情报图鉴纸", row_four],
