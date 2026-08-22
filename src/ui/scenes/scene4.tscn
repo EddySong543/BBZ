@@ -46,9 +46,14 @@ shader_parameter/haze_strength = 0.12
 shader_parameter/palette_shadow = Color(0.023529, 0.14902, 0.145098, 1)
 shader_parameter/palette_mid = Color(0.133333, 0.34902, 0.298039, 1)
 shader_parameter/palette_light = Color(0.415686, 0.647059, 0.509804, 1)
-shader_parameter/palette_strength = 0.9
+shader_parameter/palette_strength = 0.74
 shader_parameter/palette_source_dark = 0.05
 shader_parameter/palette_source_light = 0.58
+shader_parameter/pixel_relief_strength = 0.12
+shader_parameter/pixel_relief_height = 0.9
+shader_parameter/pixel_relief_light_dir = Vector2(-0.72, -0.69)
+shader_parameter/pixel_relief_light_color = Color(0.458824, 0.737255, 0.701961, 1)
+shader_parameter/pixel_relief_shadow_color = Color(0.011765, 0.105882, 0.109804, 1)
 shader_parameter/sway_strength_px = 0.0
 shader_parameter/sway_speed = 0.72
 shader_parameter/sway_phase = 0.0
@@ -208,9 +213,14 @@ shader_parameter/haze_strength = 0.04
 shader_parameter/palette_shadow = Color(0.015686, 0.133333, 0.121569, 1)
 shader_parameter/palette_mid = Color(0.12549, 0.341176, 0.270588, 1)
 shader_parameter/palette_light = Color(0.568627, 0.713725, 0.356863, 1)
-shader_parameter/palette_strength = 0.84
+shader_parameter/palette_strength = 0.78
 shader_parameter/palette_source_dark = 0.035
 shader_parameter/palette_source_light = 0.57
+shader_parameter/pixel_relief_strength = 0.2
+shader_parameter/pixel_relief_height = 1.4
+shader_parameter/pixel_relief_light_dir = Vector2(-0.52, -0.85)
+shader_parameter/pixel_relief_light_color = Color(0.545098, 0.819608, 0.74902, 1)
+shader_parameter/pixel_relief_shadow_color = Color(0.011765, 0.090196, 0.101961, 1)
 shader_parameter/sway_strength_px = 0.0
 shader_parameter/sway_speed = 0.72
 shader_parameter/sway_phase = 0.0
@@ -247,9 +257,14 @@ shader_parameter/haze_strength = 0.04
 shader_parameter/palette_shadow = Color(0.015686, 0.133333, 0.121569, 1)
 shader_parameter/palette_mid = Color(0.12549, 0.341176, 0.270588, 1)
 shader_parameter/palette_light = Color(0.568627, 0.713725, 0.356863, 1)
-shader_parameter/palette_strength = 0.84
+shader_parameter/palette_strength = 0.76
 shader_parameter/palette_source_dark = 0.035
 shader_parameter/palette_source_light = 0.57
+shader_parameter/pixel_relief_strength = 0.16
+shader_parameter/pixel_relief_height = 1.2
+shader_parameter/pixel_relief_light_dir = Vector2(-0.62, -0.78)
+shader_parameter/pixel_relief_light_color = Color(0.482353, 0.760784, 0.713725, 1)
+shader_parameter/pixel_relief_shadow_color = Color(0.011765, 0.090196, 0.101961, 1)
 shader_parameter/sway_strength_px = 0.0
 shader_parameter/sway_speed = 0.72
 shader_parameter/sway_phase = 0.0
@@ -661,7 +676,7 @@ metadata/parallax_factor = 0.0
 metadata/_edit_lock_ = true
 
 [node name="FarForest" type="TextureRect" parent="." unique_id=909562868]
-modulate = Color(1, 1, 1, 0.92)
+modulate = Color(1, 1, 1, 1)
 texture_filter = 1
 material = SubResource("Scene4FarForestMat")
 layout_mode = 1
@@ -678,11 +693,11 @@ mouse_filter = 2
 texture = ExtResource("12_far_forest")
 expand_mode = 1
 stretch_mode = 6
-metadata/parallax_factor = 0.04
+metadata/parallax_factor = 0.03
 metadata/_edit_lock_ = true
 
 [node name="RuinStone1" type="TextureRect" parent="." unique_id=902910827]
-modulate = Color(0.92, 1, 0.92, 0.76)
+modulate = Color(0.92, 1, 0.92, 1)
 texture_filter = 1
 material = SubResource("Scene4RuinStone1Mat")
 layout_mode = 0
@@ -700,7 +715,7 @@ metadata/parallax_factor = 0.46
 metadata/_edit_lock_ = true
 
 [node name="RuinStone2" type="TextureRect" parent="." unique_id=145619908]
-modulate = Color(0.92, 1, 0.92, 0.76)
+modulate = Color(0.92, 1, 0.92, 1)
 texture_filter = 1
 material = SubResource("Scene4RuinStone2Mat")
 layout_mode = 0
@@ -718,7 +733,7 @@ metadata/parallax_factor = 0.52
 metadata/_edit_lock_ = true
 
 [node name="RuinStone3" type="TextureRect" parent="." unique_id=1023825846]
-modulate = Color(0.92, 1, 0.92, 0.76)
+modulate = Color(0.92, 1, 0.92, 1)
 texture_filter = 1
 material = SubResource("Scene4RuinStone3Mat")
 layout_mode = 0
@@ -736,7 +751,7 @@ metadata/parallax_factor = 0.46
 metadata/_edit_lock_ = true
 
 [node name="RuinStone4" type="TextureRect" parent="." unique_id=1070928605]
-modulate = Color(0.92, 1, 0.92, 0.76)
+modulate = Color(0.92, 1, 0.92, 1)
 texture_filter = 1
 material = SubResource("Scene4RuinStone4Mat")
 layout_mode = 0
@@ -787,7 +802,7 @@ scale = Vector2(3.4, 3.4)
 mouse_filter = 2
 texture = ExtResource("2_background_tree")
 expand_mode = 1
-metadata/parallax_factor = 0.22
+metadata/parallax_factor = 0.3
 metadata/_edit_lock_ = true
 
 [node name="BackgroundTree2" type="TextureRect" parent="." unique_id=319299711]
@@ -802,7 +817,7 @@ scale = Vector2(4.2, 4.2)
 mouse_filter = 2
 texture = ExtResource("7_background_tree_2")
 expand_mode = 1
-metadata/parallax_factor = 0.1
+metadata/parallax_factor = 0.14
 metadata/_edit_lock_ = true
 
 [node name="BackgroundTopLeaves2" type="TextureRect" parent="." unique_id=751513697]

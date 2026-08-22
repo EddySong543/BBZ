@@ -18,6 +18,15 @@ uniform vec4 palette_light : source_color = vec4(0.32, 0.48, 0.42, 1.0);
 uniform float palette_strength : hint_range(0.0, 1.0, 0.01) = 0.0;
 uniform float palette_source_dark : hint_range(0.0, 0.5, 0.01) = 0.04;
 uniform float palette_source_light : hint_range(0.1, 1.0, 0.01) = 0.58;
+// Optional source-pixel relief for distant forest layers. The response is
+// derived from neighbouring authored pixels, so it adds canopy volume without
+// smoothing the pixel grid or requiring a separate normal map. Zero strength
+// preserves the exact legacy grade for every layer that does not opt in.
+uniform float pixel_relief_strength : hint_range(0.0, 0.4, 0.01) = 0.0;
+uniform float pixel_relief_height : hint_range(0.1, 4.0, 0.1) = 1.0;
+uniform vec2 pixel_relief_light_dir = vec2(-0.65, -0.76);
+uniform vec4 pixel_relief_light_color : source_color = vec4(0.46, 0.74, 0.70, 1.0);
+uniform vec4 pixel_relief_shadow_color : source_color = vec4(0.02, 0.12, 0.13, 1.0);
 // Optional source-pixel sway for hanging leaves and vines. Zero strength is
 // the exact legacy/static path used by every other Scene4 layer.
 uniform float sway_strength_px : hint_range(0.0, 6.0, 0.1) = 0.0;
@@ -140,6 +149,48 @@ void fragment() {
 			palette_light.rgb,
 			smoothstep(0.52, 1.0, palette_value));
 	color = mix(color, mapped_palette, palette_strength);
+
+	// Four nearest-neighbour source samples form a tiny height gradient. Flat
+	// regions remain untouched; only authored value transitions receive a fixed
+	// canopy-facing highlight or shadow. This keeps the result pixel-clean and
+	// prevents the distant forest from reading as one uniformly graded print.
+	if (pixel_relief_strength > 0.001) {
+		vec2 texel = TEXTURE_PIXEL_SIZE;
+		vec3 luma_weights = vec3(0.299, 0.587, 0.114);
+		float relief_left = dot(texture(
+				TEXTURE,
+				clamp(UV - vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))
+		).rgb, luma_weights);
+		float relief_right = dot(texture(
+				TEXTURE,
+				clamp(UV + vec2(texel.x, 0.0), vec2(0.0), vec2(1.0))
+		).rgb, luma_weights);
+		float relief_up = dot(texture(
+				TEXTURE,
+				clamp(UV - vec2(0.0, texel.y), vec2(0.0), vec2(1.0))
+		).rgb, luma_weights);
+		float relief_down = dot(texture(
+				TEXTURE,
+				clamp(UV + vec2(0.0, texel.y), vec2(0.0), vec2(1.0))
+		).rgb, luma_weights);
+		vec2 relief_gradient = vec2(
+				relief_left - relief_right,
+				relief_up - relief_down) * pixel_relief_height;
+		vec2 relief_direction = normalize(pixel_relief_light_dir);
+		float relief_signal = clamp(
+				dot(relief_gradient, relief_direction) * 4.0,
+				-1.0,
+				1.0);
+		float relief_highlight = max(relief_signal, 0.0)
+				* pixel_relief_strength;
+		float relief_shadow = max(-relief_signal, 0.0)
+				* pixel_relief_strength;
+		color += pixel_relief_light_color.rgb * relief_highlight;
+		color = mix(
+				color,
+				color * pixel_relief_shadow_color.rgb,
+				relief_shadow);
+	}
 
 	float alpha_window = 1.0;
 	if (alpha_window_enabled) {

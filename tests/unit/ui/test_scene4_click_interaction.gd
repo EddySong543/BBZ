@@ -82,6 +82,12 @@ func test_scene4_achievement_requires_low_to_high_stones_within_eight_seconds() 
 
 	assert_eq(float(interaction.achievement_window_sec), 8.0)
 	assert_eq(float(interaction.achievement_cooldown_sec), 30.0)
+	assert_almost_eq(float(interaction.achievement_sync_rise_sec), 0.75, 0.001)
+	assert_almost_eq(float(interaction.achievement_sync_hold_sec), 2.8, 0.001)
+	assert_almost_eq(float(interaction.achievement_sync_fall_sec), 0.8, 0.001)
+	assert_almost_eq(float(interaction.achievement_glow_rise_sec), 0.95, 0.001)
+	assert_almost_eq(float(interaction.achievement_glow_hold_sec), 4.6, 0.001)
+	assert_almost_eq(float(interaction.achievement_glow_fall_sec), 1.0, 0.001)
 	assert_false(bool(interaction.call("is_achievement_completed")))
 	for stone_name: StringName in [
 		&"RuinStone4",
@@ -95,6 +101,37 @@ func test_scene4_achievement_requires_low_to_high_stones_within_eight_seconds() 
 	assert_true(bool(interaction.call("is_achievement_on_cooldown")))
 	assert_eq(int(interaction.call("get_achievement_trigger_count")), 1)
 	assert_eq(int(interaction.call("get_achievement_progress")), 0)
+	assert_eq(int(spirits.call("get_active_spirit_count")), 0,
+			"能量渐入完成前不得提前召唤精灵")
+	for stone_name: String in [
+		"RuinStone1", "RuinStone2", "RuinStone3", "RuinStone4",
+	]:
+		var material := (
+				stage.get_node(stone_name) as TextureRect
+		).material as ShaderMaterial
+		assert_lte(float(material.get_shader_parameter("achievement_glow")), 0.001)
+		assert_lte(float(material.get_shader_parameter("achievement_sync")), 0.001)
+
+	await get_tree().create_timer(0.3).timeout
+	for stone_name: String in [
+		"RuinStone1", "RuinStone2", "RuinStone3", "RuinStone4",
+	]:
+		var material := (
+				stage.get_node(stone_name) as TextureRect
+		).material as ShaderMaterial
+		assert_between(
+				float(material.get_shader_parameter("achievement_sync")),
+				0.45,
+				0.98,
+				"同步能量必须经过可见中间值")
+		assert_between(
+				float(material.get_shader_parameter("achievement_glow")),
+				0.3,
+				0.9,
+				"持续发光必须经过可见中间值")
+	assert_eq(int(spirits.call("get_active_spirit_count")), 0)
+
+	await get_tree().create_timer(0.7).timeout
 	var first_swarm_count := int(spirits.call("get_active_spirit_count"))
 	assert_gte(first_swarm_count, 18)
 	assert_lte(first_swarm_count, 24)
@@ -154,8 +191,10 @@ func test_scene4_achievement_energy_restores_after_the_brief_effect() -> void:
 	add_child_autofree(stage)
 	await get_tree().process_frame
 	var interaction := stage.get_node("ClickInteraction")
+	interaction.achievement_sync_rise_sec = 0.02
 	interaction.achievement_sync_hold_sec = 0.04
 	interaction.achievement_sync_fall_sec = 0.04
+	interaction.achievement_glow_rise_sec = 0.02
 	interaction.achievement_glow_hold_sec = 0.04
 	interaction.achievement_glow_fall_sec = 0.04
 	for stone_name: StringName in [
@@ -179,8 +218,10 @@ func test_scene4_achievement_can_retrigger_only_after_long_cooldown() -> void:
 	await get_tree().process_frame
 	var interaction := stage.get_node("ClickInteraction")
 	interaction.achievement_cooldown_sec = 0.08
+	interaction.achievement_sync_rise_sec = 0.02
 	interaction.achievement_sync_hold_sec = 0.02
 	interaction.achievement_sync_fall_sec = 0.02
+	interaction.achievement_glow_rise_sec = 0.02
 	interaction.achievement_glow_hold_sec = 0.02
 	interaction.achievement_glow_fall_sec = 0.02
 	var sequence: Array[StringName] = [

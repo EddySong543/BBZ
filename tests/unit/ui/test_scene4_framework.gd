@@ -227,7 +227,7 @@ func test_scene4_grades_every_environment_asset_by_depth_role() -> void:
 		assert_eq(material.shader.resource_path, DEPTH_GRADE_SHADER_PATH)
 		assert_lte(float(material.get_shader_parameter("brightness")), 0.98)
 		assert_lte(float(material.get_shader_parameter("saturation")), 0.82)
-		assert_gte(float(material.get_shader_parameter("palette_strength")), 0.84)
+		assert_gte(float(material.get_shader_parameter("palette_strength")), 0.72)
 		var palette_mid := material.get_shader_parameter("palette_mid") as Color
 		assert_gt(palette_mid.g, palette_mid.b)
 		if node_name == "BattlePlatform":
@@ -316,6 +316,77 @@ func test_scene4_grades_every_environment_asset_by_depth_role() -> void:
 				tree2_material.get_shader_parameter(palette_parameter),
 				tree1_material.get_shader_parameter(palette_parameter))
 
+	var relief_contracts := {
+		"FarForest": {
+			"strength": 0.12,
+			"height": 0.9,
+			"palette_strength": 0.74,
+			"parallax_factor": 0.03,
+		},
+		"BackgroundTree2": {
+			"strength": 0.16,
+			"height": 1.2,
+			"palette_strength": 0.76,
+			"parallax_factor": 0.14,
+		},
+		"BackgroundTree": {
+			"strength": 0.2,
+			"height": 1.4,
+			"palette_strength": 0.78,
+			"parallax_factor": 0.3,
+		},
+	}
+	assert_true(far_forest_material.shader.code.contains("pixel_relief_strength"))
+	assert_true(far_forest_material.shader.code.contains("TEXTURE_PIXEL_SIZE"))
+	assert_true(far_forest_material.shader.code.contains(
+			"uniform float pixel_relief_strength : hint_range(0.0, 0.4, 0.01) = 0.0;"))
+	for node_name: String in relief_contracts:
+		var layer := stage.get_node(node_name) as TextureRect
+		var material := layer.material as ShaderMaterial
+		var contract: Dictionary = relief_contracts[node_name]
+		assert_almost_eq(
+				float(material.get_shader_parameter("pixel_relief_strength")),
+				float(contract["strength"]),
+				0.001)
+		assert_almost_eq(
+				float(material.get_shader_parameter("pixel_relief_height")),
+				float(contract["height"]),
+				0.001)
+		assert_almost_eq(
+				float(material.get_shader_parameter("palette_strength")),
+				float(contract["palette_strength"]),
+				0.001)
+		assert_almost_eq(
+				float(layer.get_meta("parallax_factor")),
+				float(contract["parallax_factor"]),
+				0.001)
+	var far_forest := stage.get_node("FarForest") as TextureRect
+	assert_eq(far_forest.modulate.a, 1.0)
+	assert_lt(
+			float(far_forest.get_meta("parallax_factor")),
+			float((stage.get_node("BackgroundTree2") as TextureRect).get_meta(
+					"parallax_factor")))
+	assert_lt(
+			float((stage.get_node("BackgroundTree2") as TextureRect).get_meta(
+					"parallax_factor")),
+			float((stage.get_node("BackgroundTree") as TextureRect).get_meta(
+					"parallax_factor")))
+	for static_grade_name: String in [
+		"BackgroundBottomLeaves",
+		"BackgroundTopLeaves2",
+		"BattlePlatform",
+		"LeftTree2",
+		"RightTree2",
+	]:
+		var static_material := (
+				stage.get_node(static_grade_name) as TextureRect
+		).material as ShaderMaterial
+		var relief_override: Variant = static_material.get_shader_parameter(
+				"pixel_relief_strength")
+		assert_true(
+				relief_override == null or is_zero_approx(float(relief_override)),
+				"%s 不得继承远景浮雕" % static_grade_name)
+
 	var sky_material := (
 			stage.get_node("Sky") as TextureRect
 	).material as ShaderMaterial
@@ -351,7 +422,8 @@ func test_scene4_grades_every_environment_asset_by_depth_role() -> void:
 		assert_eq(
 				stone_material.get_shader_parameter("rune_color"),
 				shared_relic_energy_color)
-		assert_almost_eq(stone.modulate.a, 0.76, 0.001)
+		assert_almost_eq(stone.modulate.a, 1.0, 0.001,
+				"石碑实体必须保持不透明，仅纹理外轮廓使用源 alpha")
 		assert_lte(
 				float(stone_material.get_shader_parameter("rune_threshold")),
 				0.07)
@@ -388,6 +460,28 @@ func test_scene4_grades_every_environment_asset_by_depth_role() -> void:
 		assert_true(stone_material.shader.code.contains("drift_a"))
 		assert_true(stone_material.shader.code.contains("interaction_flash"))
 		assert_false(stone_material.shader.code.contains("interaction_energy"))
+		assert_false(stone_material.shader.code.contains("synchronized_head"),
+				"彩蛋不得把原本爬行中的能量头强制刷新到统一进度")
+		assert_false(stone_material.shader.code.contains(
+				"achievement_energy = carved_track"),
+				"彩蛋不得直接显现完整休眠回路")
+		assert_true(stone_material.shader.code.contains(
+				"achievement_energy = embedded_energy"),
+				"彩蛋只能增强当前正在爬行的能量")
+		assert_true(stone_material.shader.code.contains(
+				"achievement_head_energy = head_core_energy"),
+				"彩蛋高亮必须继续跟随当前能量头")
+		assert_true(stone_material.shader.code.contains(
+				"achievement_extension = smoothstep"),
+				"彩蛋回路必须从当前能量头平滑延展")
+		assert_true(stone_material.shader.code.contains(
+				"active_tail_a = mix(circuit_tail"),
+				"A 路径必须通过增长当前尾迹显现")
+		assert_true(stone_material.shader.code.contains(
+				"active_tail_b = mix("))
+		assert_true(stone_material.shader.code.contains(
+				"circuit_tail * 0.78"),
+				"B 路径必须通过增长当前尾迹显现")
 		assert_true(stone_material.shader.code.contains("front_fade_a"))
 		assert_true(stone_material.shader.code.contains("interior_gate"))
 		assert_true(stone_material.shader.code.contains("groove_color"))
@@ -751,7 +845,10 @@ func test_scene4_reuses_character_geometry_but_owns_environment_materials() -> v
 				float(material.get_shader_parameter("forest_ambient_amount")),
 				0.36,
 				0.45)
-		assert_lte(float(material.get_shader_parameter("scene_exposure")), 0.85)
+		assert_between(
+				float(material.get_shader_parameter("scene_exposure")),
+				0.84,
+				0.86)
 		assert_lte(float(material.get_shader_parameter("flash_peak_strength")), 0.3)
 		assert_lte(float(material.get_shader_parameter("flash_dark_response")), 0.5)
 		assert_lte(float(material.get_shader_parameter("rim_peak_strength")), 0.25)

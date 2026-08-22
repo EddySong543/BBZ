@@ -34,10 +34,12 @@ const HIT_PRIORITY: Array[StringName] = [
 @export_group("Scene achievement")
 @export_range(1.0, 15.0, 0.1) var achievement_window_sec := 8.0
 @export_range(10.0, 90.0, 1.0) var achievement_cooldown_sec := 30.0
-@export_range(0.02, 3.0, 0.01) var achievement_sync_hold_sec := 1.6
-@export_range(0.02, 1.5, 0.01) var achievement_sync_fall_sec := 0.45
-@export_range(0.02, 8.0, 0.01) var achievement_glow_hold_sec := 3.4
-@export_range(0.02, 1.5, 0.01) var achievement_glow_fall_sec := 0.6
+@export_range(0.02, 1.5, 0.01) var achievement_sync_rise_sec := 0.75
+@export_range(0.02, 3.0, 0.01) var achievement_sync_hold_sec := 2.8
+@export_range(0.02, 1.5, 0.01) var achievement_sync_fall_sec := 0.8
+@export_range(0.02, 1.5, 0.01) var achievement_glow_rise_sec := 0.95
+@export_range(0.02, 8.0, 0.01) var achievement_glow_hold_sec := 4.6
+@export_range(0.02, 1.5, 0.01) var achievement_glow_fall_sec := 1.0
 @export var achievement_spirits_path := NodePath("../AchievementLeafSpirits")
 
 @export_group("Hit testing")
@@ -223,11 +225,19 @@ func _complete_achievement() -> void:
 	achievement_progress_changed.emit(0, ACHIEVEMENT_SEQUENCE.size())
 	_achievement_trigger_count += 1
 	_achievement_cooldown_timer.start(achievement_cooldown_sec)
-	_set_all_relic_parameter("achievement_glow", 1.0)
-	_set_all_relic_parameter("achievement_sync", 1.0)
 	_kill_parameter_tween("achievement:sync")
+	_kill_parameter_tween("achievement:glow")
+	_kill_parameter_tween("achievement:spirits")
+	_set_all_relic_parameter("achievement_glow", 0.0)
+	_set_all_relic_parameter("achievement_sync", 0.0)
 	var sync_tween := create_tween()
 	_parameter_tweens["achievement:sync"] = sync_tween
+	sync_tween.tween_method(
+		_set_achievement_sync_strength,
+		0.0,
+		1.0,
+		achievement_sync_rise_sec
+	).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	sync_tween.tween_interval(achievement_sync_hold_sec)
 	sync_tween.tween_method(
 			_set_achievement_sync_strength,
@@ -235,9 +245,14 @@ func _complete_achievement() -> void:
 			0.0,
 			achievement_sync_fall_sec
 	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_kill_parameter_tween("achievement:glow")
 	var glow_tween := create_tween()
 	_parameter_tweens["achievement:glow"] = glow_tween
+	glow_tween.tween_method(
+		_set_achievement_glow_strength,
+		0.0,
+		1.0,
+		achievement_glow_rise_sec
+	).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	glow_tween.tween_interval(achievement_glow_hold_sec)
 	glow_tween.tween_method(
 			_set_achievement_glow_strength,
@@ -245,9 +260,12 @@ func _complete_achievement() -> void:
 			0.0,
 			achievement_glow_fall_sec
 	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	var spirits := get_node_or_null(achievement_spirits_path)
-	if spirits != null and spirits.has_method("trigger_achievement_swarm"):
-		spirits.call("trigger_achievement_swarm")
+	var spirits_tween := create_tween()
+	_parameter_tweens["achievement:spirits"] = spirits_tween
+	spirits_tween.tween_interval(maxf(
+			achievement_sync_rise_sec,
+			achievement_glow_rise_sec))
+	spirits_tween.tween_callback(_trigger_achievement_spirits)
 	achievement_effect_triggered.emit(_achievement_trigger_count)
 	if not _achievement_has_completed_once:
 		_achievement_has_completed_once = true
@@ -260,6 +278,12 @@ func _set_achievement_sync_strength(value: float) -> void:
 
 func _set_achievement_glow_strength(value: float) -> void:
 	_set_all_relic_parameter("achievement_glow", value)
+
+
+func _trigger_achievement_spirits() -> void:
+	var spirits := get_node_or_null(achievement_spirits_path)
+	if spirits != null and spirits.has_method("trigger_achievement_swarm"):
+		spirits.call("trigger_achievement_swarm")
 
 
 func _set_all_relic_parameter(parameter_name: StringName, value: float) -> void:

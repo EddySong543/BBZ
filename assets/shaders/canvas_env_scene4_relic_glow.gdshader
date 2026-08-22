@@ -25,8 +25,9 @@ uniform float motion_feather : hint_range(0.01, 0.12, 0.005) = 0.055;
 // route. It never illuminates the dormant circuit or changes travel timing.
 uniform float interaction_flash : hint_range(0.0, 1.0, 0.01) = 0.0;
 uniform float interaction_flash_gain : hint_range(0.5, 2.0, 0.01) = 1.28;
-// Scene achievement feedback: the first value briefly phase-locks all four
-// stones, while the second keeps only their carved energy routes illuminated.
+// Scene achievement feedback uses one tail-extension envelope and one light
+// envelope. The extension starts at each moving head and grows backward along
+// its existing path; neither value changes clocks, drift, or head positions.
 uniform float achievement_sync : hint_range(0.0, 1.0, 0.01) = 0.0;
 uniform float achievement_glow : hint_range(0.0, 1.0, 0.01) = 0.0;
 
@@ -213,9 +214,6 @@ void fragment() {
 			+ sin(clock_b * TAU * 0.17 + pulse_phase * 1.27) * 0.015;
 	float head_a = fract(clock_a + drift_a + pulse_phase / TAU);
 	float head_b = fract(clock_b + drift_b + pulse_phase / TAU + 0.37);
-	float synchronized_head = fract(TIME * 0.58);
-	head_a = mix(head_a, synchronized_head, achievement_sync);
-	head_b = mix(head_b, synchronized_head, achievement_sync);
 	// The old saw-tooth trail jumped from dark to fully lit as its head crossed
 	// a circuit pixel. Fade in behind the head and fade out at the tail instead.
 	// Spatial blocks stay crisp, but every block changes brightness continuously.
@@ -224,8 +222,17 @@ void fragment() {
 	float front_fade_a = smoothstep(0.0, motion_feather, travel_a);
 	float front_fade_b = smoothstep(0.0, motion_feather, travel_b);
 	float flash = clamp(interaction_flash, 0.0, 1.0);
-	float active_tail_a = circuit_tail;
-	float active_tail_b = circuit_tail * 0.78;
+	float achievement_extension = smoothstep(
+			0.0,
+			1.0,
+			clamp(achievement_sync, 0.0, 1.0));
+	// Growing travel distance keeps the reveal anchored to head_a/head_b. It
+	// does not light a second mask or restart either path's TIME-based motion.
+	float active_tail_a = mix(circuit_tail, 0.94, achievement_extension);
+	float active_tail_b = mix(
+			circuit_tail * 0.78,
+			0.90,
+			achievement_extension);
 	float trail_a = front_fade_a * (
 			1.0 - smoothstep(
 					max(active_tail_a - motion_feather, motion_feather),
@@ -292,18 +299,22 @@ void fragment() {
 
 	// The teal forest absorbs gray light, so the moving route uses a clearer
 	// moon-blue value contrast while remaining one restrained color family.
-	// The click pulse multiplies only pixels already owned by embedded_energy.
+	// Click and achievement feedback multiply only pixels already owned by
+	// embedded_energy, so neither event can reveal the full carved route.
 	vec3 embedded_color = mix(rune_color.rgb, rune_core_color.rgb, 0.08);
 	float moving_flash = embedded_energy * flash;
+	float achievement_boost = clamp(
+			achievement_sync * 0.52 + achievement_glow * 0.72,
+			0.0,
+			1.0);
+	float achievement_energy = embedded_energy * achievement_boost;
 	vec3 flash_color = mix(
 			embedded_color,
 			rune_core_color.rgb,
-			flash * 0.48);
-	float achievement_energy = carved_track * surface_response
-			* clamp(achievement_glow, 0.0, 1.0);
+			clamp(flash * 0.48 + achievement_boost * 0.24, 0.0, 0.68));
 	float light_amount = glow_strength * embedded_energy * 1.86
 			+ moving_flash * interaction_flash_gain
-			+ achievement_energy * 0.62;
+			+ achievement_energy * 0.78;
 	color = mix(
 			color,
 			flash_color,
@@ -315,8 +326,10 @@ void fragment() {
 			path_a_mask * head_core_a,
 			path_b_mask * head_core_b) * source.a
 			* interior_gate * surface_response;
+	float achievement_head_energy = head_core_energy * achievement_boost;
 	float core_light = head_core_energy * (0.54 + glow_strength * 0.46)
-			* mix(1.0, 1.85, flash);
+			* mix(1.0, 1.85, flash)
+			+ achievement_head_energy * 0.46;
 	color = mix(
 			color,
 			rune_core_color.rgb,

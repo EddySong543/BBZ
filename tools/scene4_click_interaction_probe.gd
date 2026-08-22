@@ -18,8 +18,10 @@ func _ready() -> void:
 	var interaction := stage.get_node("ClickInteraction")
 	# Compress only the probe's achievement presentation so it can verify both
 	# the active and restored states without changing authored scene defaults.
+	interaction.achievement_sync_rise_sec = 0.08
 	interaction.achievement_sync_hold_sec = 0.25
 	interaction.achievement_sync_fall_sec = 0.15
+	interaction.achievement_glow_rise_sec = 0.12
 	interaction.achievement_glow_hold_sec = 0.35
 	interaction.achievement_glow_fall_sec = 0.15
 	interaction.achievement_cooldown_sec = 2.0
