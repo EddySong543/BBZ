@@ -17,6 +17,8 @@ signal reveal_suppressed(canvas_position: Vector2)
 @export var sword_hilt_texture: Texture2D
 @export var sword_tip_texture: Texture2D
 @export var legendary_blade_texture: Texture2D
+@export var front_props_layer_path := NodePath("../MagmaSecretFrontProps")
+@export var platform_path := NodePath("../BattlePlatform")
 @export_range(2, 10, 1) var clicks_per_reveal: int = 4
 @export_range(2.5, 7.0, 0.1) var reveal_cooldown_sec: float = 4.1
 @export_range(0.01, 0.30, 0.01) var legendary_chance: float = 0.10
@@ -37,6 +39,7 @@ signal reveal_suppressed(canvas_position: Vector2)
 @export_range(0.0, 16.0, 1.0) var submerge_padding_px: float = 4.0
 @export_range(0.45, 0.9, 0.01) var hilt_visible_fraction: float = 0.78
 @export_range(0.45, 0.9, 0.01) var tip_visible_fraction: float = 0.64
+@export_range(0.45, 0.80, 0.01) var front_depth_ratio: float = 0.62
 
 const RIPPLE_LIFETIME_SEC := 0.72
 const RIPPLE_PIXEL_SIZE := 4.0
@@ -98,10 +101,15 @@ var _return_contact_armed: bool = false
 var _return_contact_ripple_count: int = 0
 var _closure_bubbles: Array[ClosureBubbleState] = []
 var _closure_bubble_spawn_count: int = 0
+var _front_props_layer: Control
+var _platform: TextureRect
+var _active_front_depth: bool = false
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_front_props_layer = get_node_or_null(front_props_layer_path) as Control
+	_platform = get_node_or_null(platform_path) as TextureRect
 	_rng.randomize()
 	set_process(false)
 
@@ -155,6 +163,7 @@ func active_secret_count() -> int:
 			or _active_pocket.is_queued_for_deletion():
 		_active_pocket = null
 		_active_kind = -1
+		_active_front_depth = false
 	return 1 if _active_pocket != null else 0
 
 
@@ -184,6 +193,14 @@ func get_closure_bubble_spawn_count() -> int:
 
 func active_closure_bubble_count() -> int:
 	return _closure_bubbles.size()
+
+
+func is_active_secret_in_front_depth() -> bool:
+	return active_secret_count() > 0 and _active_front_depth
+
+
+func get_active_secret_pocket() -> Control:
+	return _active_pocket if active_secret_count() > 0 else null
 
 
 func get_active_secret_positions() -> Array[Vector2]:
@@ -233,7 +250,9 @@ func _spawn_secret(secret_kind: int, local_click: Vector2) -> void:
 	pocket.size = Vector2(pocket_width, surface_y - pocket_top + 4.0).round()
 	pocket.clip_contents = true
 	pocket.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(pocket)
+	var front_depth := _should_use_front_depth(local_click)
+	var pocket_parent: Control = _front_props_layer if front_depth else self
+	pocket_parent.add_child(pocket)
 
 	var sprite := Sprite2D.new()
 	sprite.name = _sprite_name_for_kind(secret_kind)
@@ -254,6 +273,7 @@ func _spawn_secret(secret_kind: int, local_click: Vector2) -> void:
 	sprite.position = submerged_position
 	_active_pocket = pocket
 	_active_kind = secret_kind
+	_active_front_depth = front_depth
 	_last_spawn_kind = secret_kind
 	_next_allowed_reveal_msec = Time.get_ticks_msec() \
 			+ int(reveal_cooldown_sec * 1000.0)
@@ -272,7 +292,7 @@ func _spawn_secret(secret_kind: int, local_click: Vector2) -> void:
 	_active_surface_position = surface_position
 	_return_contact_armed = false
 	if legendary:
-		_spawn_legendary_forge_aura(surface_position)
+		_spawn_legendary_forge_aura(surface_position, front_depth)
 	_spawn_ripple(surface_position, false, legendary)
 	_animate_secret(sprite, pocket, submerged_position, peak_position,
 			surface_position, secret_kind)
@@ -346,6 +366,7 @@ func _animate_secret(
 		_active_pocket = null
 		_active_sprite = null
 		_active_kind = -1
+		_active_front_depth = false
 		_return_contact_armed = false
 		pocket.queue_free()
 	)
@@ -513,7 +534,10 @@ func _legendary_light_presence(phase: float) -> float:
 	return fade_in * fade_out
 
 
-func _spawn_legendary_forge_aura(surface_position: Vector2) -> void:
+func _spawn_legendary_forge_aura(
+		surface_position: Vector2,
+		front_depth: bool
+) -> void:
 	_clear_legendary_forge_aura()
 	var aura := ColorRect.new()
 	aura.name = "LegendaryForgeAuraRuntime"
@@ -531,12 +555,28 @@ func _spawn_legendary_forge_aura(surface_position: Vector2) -> void:
 	aura_material.set_shader_parameter("seed",
 			float(_valid_click_count * 31 + 17) + surface_position.x * 0.013)
 	aura.material = aura_material
-	var environment_parent := get_parent()
-	environment_parent.add_child(aura)
-	# Insert the aura immediately before MagmaSecrets in Scene6. It therefore
-	# stays behind the platform, foreground and the outer battle HUD.
-	environment_parent.move_child(aura, get_index())
+	if front_depth and is_instance_valid(_front_props_layer):
+		_front_props_layer.add_child(aura)
+		# The furnace glow shares the selected depth band but stays behind its prop.
+		_front_props_layer.move_child(aura, 0)
+	else:
+		var environment_parent := get_parent()
+		environment_parent.add_child(aura)
+		# Back-depth light remains behind the platform and foreground.
+		environment_parent.move_child(aura, get_index())
 	_legendary_forge_aura = aura
+
+
+func _should_use_front_depth(local_click: Vector2) -> bool:
+	if not is_instance_valid(_front_props_layer) or not is_instance_valid(_platform):
+		return false
+	var click_canvas := get_global_transform_with_canvas() * local_click
+	var platform_transform := _platform.get_global_transform_with_canvas()
+	var platform_top := platform_transform * Vector2.ZERO
+	var platform_bottom := platform_transform * Vector2(0.0, _platform.size.y)
+	var depth_split_y := lerpf(
+			platform_top.y, platform_bottom.y, front_depth_ratio)
+	return click_canvas.y >= depth_split_y
 
 
 func _update_legendary_forge_aura() -> void:

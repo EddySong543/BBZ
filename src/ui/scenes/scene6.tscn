@@ -19,6 +19,7 @@
 [ext_resource type="Texture2D" uid="uid://m5c7i6sweidd" path="res://assets/scenes/scene6/scene6_secret_sword_tip.png" id="17_secret_tip"]
 [ext_resource type="Script" uid="uid://buru7falvy1cc" path="res://src/ui/components/scene6_magma_secrets.gd" id="18_magma_secrets"]
 [ext_resource type="Texture2D" uid="uid://dtab0iu7vb8d6" path="res://assets/scenes/scene6/scene6_secret_chilu_kings_blade.png" id="19_legendary_blade"]
+[ext_resource type="Shader" uid="uid://dt448f37gvo1m" path="res://assets/shaders/canvas_env_scene6_platform_lava.gdshader" id="20_platform_lava"]
 
 [sub_resource type="ShaderMaterial" id="Scene6FarGradeMat"]
 resource_local_to_scene = true
@@ -191,24 +192,38 @@ shader_parameter/core_color = Color(1, 0.6, 0.16, 1)
 
 [sub_resource type="ShaderMaterial" id="Scene6PlatformGradeMat"]
 resource_local_to_scene = true
-shader = ExtResource("9_depth_grade")
-shader_parameter/brightness = 0.98
-shader_parameter/saturation = 0.48
-shader_parameter/contrast = 1.08
-shader_parameter/tint_color = Color(0.85, 0.72, 0.68, 1)
-shader_parameter/tint_strength = 0.08
-shader_parameter/highlight_rolloff = 0.16
-shader_parameter/palette_shadow = Color(0.035, 0.025, 0.035, 1)
-shader_parameter/palette_mid = Color(0.2, 0.12, 0.13, 1)
-shader_parameter/palette_light = Color(0.44, 0.24, 0.2, 1)
-shader_parameter/palette_strength = 0.65
+shader = ExtResource("20_platform_lava")
+shader_parameter/brightness = 1.0
+shader_parameter/saturation = 0.66
+shader_parameter/contrast = 1.06
+shader_parameter/tint_color = Color(0.78, 0.5, 0.46, 1)
+shader_parameter/tint_strength = 0.04
+shader_parameter/highlight_rolloff = 0.14
+shader_parameter/palette_shadow = Color(0.032, 0.02, 0.032, 1)
+shader_parameter/palette_mid = Color(0.205, 0.112, 0.12, 1)
+shader_parameter/palette_light = Color(0.46, 0.235, 0.205, 1)
+shader_parameter/palette_strength = 0.48
 shader_parameter/palette_source_dark = 0.025
-shader_parameter/palette_source_light = 0.46
-shader_parameter/lava_bounce_color = Color(0.78, 0.22, 0.05, 1)
-shader_parameter/lava_bounce_amount = 0.02
-shader_parameter/lava_bounce_start = 0.58
-shader_parameter/broken_reflection_amount = 0.025
-shader_parameter/broken_reflection_coverage = 0.16
+shader_parameter/palette_source_light = 0.54
+shader_parameter/lava_hot_color = Color(1, 0.31, 0.055, 1)
+shader_parameter/lava_core_color = Color(1, 0.61, 0.17, 1)
+shader_parameter/fissure_source_restore = 0.74
+shader_parameter/lava_base_heat = 0.18
+shader_parameter/lava_pulse_strength = 0.36
+shader_parameter/lava_moving_gain = 0.09
+shader_parameter/lava_cycle_sec = 10.8
+shader_parameter/lava_flow_cycles = 4.4
+shader_parameter/lava_phase = 1.1
+shader_parameter/lava_flow_axis = Vector2(0.04, 1)
+shader_parameter/lava_red_threshold = 0.54
+shader_parameter/lava_orange_threshold = 0.07
+shader_parameter/lava_luma_threshold = 0.25
+shader_parameter/motion_feather = 0.17
+shader_parameter/lava_bounce_color = Color(0.72, 0.16, 0.035, 1)
+shader_parameter/lava_bounce_amount = 0.018
+shader_parameter/lava_bounce_start = 0.62
+shader_parameter/broken_reflection_amount = 0.02
+shader_parameter/broken_reflection_coverage = 0.14
 shader_parameter/broken_reflection_start = 0.5
 shader_parameter/broken_reflection_end = 0.78
 shader_parameter/broken_reflection_segments = 96.0
@@ -451,20 +466,34 @@ sword_hilt_texture = ExtResource("16_secret_hilt")
 sword_tip_texture = ExtResource("17_secret_tip")
 legendary_blade_texture = ExtResource("19_legendary_blade")
 legendary_scale = 2.5
+front_props_layer_path = NodePath("../MagmaSecretFrontProps")
+platform_path = NodePath("../BattlePlatform")
+front_depth_ratio = 0.62
 metadata/parallax_factor = 1.0
 
 [node name="BattlePlatform" type="TextureRect" parent="." unique_id=1261622324]
 texture_filter = 1
 material = SubResource("Scene6PlatformGradeMat")
 layout_mode = 0
-offset_left = -157.0
-offset_top = 493.5
-offset_right = 398.0
-offset_bottom = 668.75
+offset_left = -72.0
+offset_top = 670.0
+offset_right = 444.0
+offset_bottom = 771.75
 scale = Vector2(4, 4)
 mouse_filter = 2
 texture = ExtResource("4_platform")
-stretch_mode = 0
+expand_mode = 1
+metadata/parallax_factor = 1.0
+
+[node name="MagmaSecretFrontProps" type="Control" parent="."]
+texture_filter = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 metadata/parallax_factor = 1.0
 
 [node name="ForegroundLeft" type="TextureRect" parent="." unique_id=39270639]

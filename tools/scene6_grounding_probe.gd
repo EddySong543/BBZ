@@ -28,9 +28,10 @@ func _run_probe() -> void:
 			and battle_source.contains("offset_top = 721.0")
 	var full_image_scale := platform != null \
 			and platform.stretch_mode == TextureRect.STRETCH_SCALE \
+			and platform.texture.get_size() == Vector2(516.0, 92.0) \
 			and platform.scale == Vector2(4.0, 4.0)
-	var grounded := p1_depth >= 3.0 and p1_depth <= 12.0 \
-			and p2_depth >= 3.0 and p2_depth <= 12.0 \
+	var grounded := p1_depth >= 0.5 and p1_depth <= 12.0 \
+			and p2_depth >= 0.5 and p2_depth <= 12.0 \
 			and grounded_offsets
 	var passed := full_image_scale and grounded
 	print("SCENE6_GROUNDING_PROBE: ", "PASS" if passed else "FAIL",

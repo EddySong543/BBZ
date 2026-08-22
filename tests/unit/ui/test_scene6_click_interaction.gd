@@ -9,15 +9,18 @@ func test_scene6_click_effect_canvases_follow_visual_occlusion_order() -> void:
 	var mid_fx := stage.get_node_or_null("MidgroundClickFX") as Control
 	var magma_fx := stage.get_node_or_null("MagmaClickFX") as Control
 	var magma_secrets := stage.get_node_or_null("MagmaSecrets") as Control
+	var front_props := stage.get_node_or_null("MagmaSecretFrontProps") as Control
 	var foreground_fx := stage.get_node_or_null("ForegroundClickFX") as Control
 	var interaction := stage.get_node_or_null("ClickInteraction") \
 			as Scene6ClickInteraction
 	assert_not_null(mid_fx)
 	assert_not_null(magma_fx)
 	assert_not_null(magma_secrets)
+	assert_not_null(front_props)
 	assert_not_null(foreground_fx)
 	assert_not_null(interaction)
 	if mid_fx == null or magma_fx == null or magma_secrets == null \
+			or front_props == null \
 			or foreground_fx == null:
 		return
 	assert_gt(mid_fx.get_index(), stage.get_node("MidgroundRight").get_index())
@@ -26,12 +29,43 @@ func test_scene6_click_effect_canvases_follow_visual_occlusion_order() -> void:
 	assert_lt(magma_fx.get_index(), stage.get_node("BattlePlatform").get_index())
 	assert_gt(magma_secrets.get_index(), magma_fx.get_index())
 	assert_lt(magma_secrets.get_index(), stage.get_node("BattlePlatform").get_index())
+	assert_gt(front_props.get_index(), stage.get_node("BattlePlatform").get_index())
+	assert_lt(front_props.get_index(), stage.get_node("ForegroundLeft").get_index())
+	assert_lt(front_props.get_index(), stage.get_node("ForegroundRight").get_index())
+	assert_false(front_props.clip_contents)
 	assert_false(magma_secrets.clip_contents)
 	assert_eq(magma_secrets.anchor_right, 1.0)
 	assert_eq(magma_secrets.anchor_bottom, 1.0)
 	assert_gt(foreground_fx.get_index(), stage.get_node("ForegroundRight").get_index())
 	assert_lt(foreground_fx.get_index(), stage.get_node("ForegroundEmbers").get_index())
 	assert_false(stage.demo_click_shake)
+
+
+func test_magma_secret_depth_band_follows_surface_y_and_respects_foreground() -> void:
+	var back_stage := SCENE6.instantiate() as BattleStage
+	add_child_autofree(back_stage)
+	await get_tree().process_frame
+	var back_secrets := back_stage.get_node("MagmaSecrets") as Scene6MagmaSecrets
+	back_secrets.reveal_cooldown_sec = 0.0
+	back_secrets.legend_roll_override = 1.0
+	for _click: int in back_secrets.clicks_per_reveal:
+		back_secrets.register_molten_click(Vector2(420.0, 860.0))
+	assert_false(back_secrets.is_active_secret_in_front_depth())
+	assert_eq(back_secrets.get_node("HiltPocketRuntime").get_parent(), back_secrets)
+
+	var front_stage := SCENE6.instantiate() as BattleStage
+	add_child_autofree(front_stage)
+	await get_tree().process_frame
+	var front_secrets := front_stage.get_node("MagmaSecrets") as Scene6MagmaSecrets
+	var front_layer := front_stage.get_node("MagmaSecretFrontProps") as Control
+	front_secrets.reveal_cooldown_sec = 0.0
+	front_secrets.legend_roll_override = 1.0
+	for _click: int in front_secrets.clicks_per_reveal:
+		front_secrets.register_molten_click(Vector2(1420.0, 1000.0))
+	assert_true(front_secrets.is_active_secret_in_front_depth())
+	assert_true(front_layer.has_node("HiltPocketRuntime"))
+	assert_gt(front_layer.get_index(), front_stage.get_node("BattlePlatform").get_index())
+	assert_lt(front_layer.get_index(), front_stage.get_node("ForegroundLeft").get_index())
 
 
 func test_scene6_click_targets_spawn_distinct_pixel_effects() -> void:
@@ -191,7 +225,8 @@ func test_magma_secret_cooldown_turns_early_attempt_into_splash_only() -> void:
 	assert_eq(secrets.get_suppressed_reveal_count(), 1)
 	assert_eq(secrets.get_tip_spawn_count(), 0)
 	assert_eq(secrets.pending_secret_count(), 0)
-	await get_tree().create_timer(0.18).timeout
+	# Keep a frame-scheduling margin beyond the 0.30 s wall-clock cooldown.
+	await get_tree().create_timer(0.22).timeout
 	for _click: int in 4:
 		assert_true(interaction.try_trigger_at_canvas_position(magma_point))
 	assert_eq(secrets.get_tip_spawn_count(), 1)
@@ -221,22 +256,26 @@ func test_low_probability_legendary_blade_has_distinct_runtime_contract() -> voi
 			Scene6MagmaSecrets.SecretKind.LEGENDARY_BLADE)
 	assert_eq(secrets.active_secret_count(), 1)
 	assert_gt(secrets.active_ripple_count(), 0)
-	var pocket := secrets.get_node("LegendaryPocketRuntime") as Control
+	var pocket := secrets.get_active_secret_pocket()
 	var sprite := pocket.get_child(0) as Sprite2D
 	var aura := stage.get_node_or_null("LegendaryForgeAuraRuntime") as ColorRect
 	assert_eq(pocket.name, "LegendaryPocketRuntime")
 	assert_eq(sprite.name, "ChiluKingsBlade")
-	assert_eq(pocket.get_parent(), secrets,
-			"传奇巨剑必须与普通浮起物共享 MagmaSecrets 遮挡层")
+	var front_layer := stage.get_node("MagmaSecretFrontProps") as Control
+	var expected_parent: Control = front_layer \
+			if secrets.is_active_secret_in_front_depth() else secrets
+	assert_eq(pocket.get_parent(), expected_parent,
+			"传奇巨剑必须跟随点击液面的前后纵深层")
 	assert_eq(pocket.z_index, 0,
 			"传奇巨剑不得通过全局 z_index 越过外层战斗按钮")
-	assert_lt(secrets.get_index(), stage.get_node("BattlePlatform").get_index(),
-			"传奇巨剑必须像普通浮起物一样被平台自然遮挡")
 	assert_not_null(aura)
 	if aura != null:
-		assert_eq(aura.get_parent(), stage)
-		assert_lt(aura.get_index(), secrets.get_index())
-		assert_lt(aura.get_index(), stage.get_node("BattlePlatform").get_index())
+		assert_eq(aura.get_parent(), expected_parent if expected_parent == front_layer \
+				else stage)
+		if expected_parent == front_layer:
+			assert_lt(aura.get_index(), pocket.get_index())
+		else:
+			assert_lt(aura.get_index(), secrets.get_index())
 		assert_eq(aura.mouse_filter, Control.MOUSE_FILTER_IGNORE)
 		assert_gt(aura.size.x, float(sprite.texture.get_width()) * sprite.scale.x)
 		assert_true(aura.material is ShaderMaterial)
@@ -386,7 +425,8 @@ func test_legendary_blade_clears_the_surface_and_hovers_in_open_air() -> void:
 	for _click: int in secrets.clicks_per_reveal:
 		secrets.register_molten_click(Vector2(1420.0, 936.0))
 	await get_tree().create_timer(0.075).timeout
-	var pocket := secrets.get_node("LegendaryPocketRuntime") as Control
+	var pocket := stage.get_node(
+			"MagmaSecretFrontProps/LegendaryPocketRuntime") as Control
 	var sprite := pocket.get_child(0) as Sprite2D
 	var surface_local_y := pocket.size.y - 4.0
 	var sprite_bottom := sprite.position.y \

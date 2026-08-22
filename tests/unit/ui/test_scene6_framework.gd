@@ -85,8 +85,8 @@ func test_scene6_uses_the_authored_chilu_valley_layers_directly() -> void:
 	assert_eq((stage.get_node("BattlePlatform") as TextureRect).texture.resource_path,
 			"res://assets/scenes/scene6/scene6_battle_platform.png")
 	assert_eq((stage.get_node("BattlePlatform") as TextureRect).texture.get_size(),
-			Vector2(301.0, 95.0),
-			"Scene6 必须使用 assets/import 新导入的平台素材")
+			Vector2(516.0, 92.0),
+			"Scene6 必须使用精修后的完整平台素材")
 	assert_eq((stage.get_node("ForegroundLeft") as TextureRect).texture.resource_path,
 			"res://assets/scenes/scene6/scene6_foreground_near_left.png")
 	assert_eq((stage.get_node("ForegroundRight") as TextureRect).texture.resource_path,
@@ -235,8 +235,11 @@ func test_scene6_platform_is_pixel_safe_and_has_local_thermal_depth() -> void:
 			or foreground_embers == null or magma == null:
 		return
 	assert_eq(platform.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST)
+	assert_eq(platform.texture.get_size(), Vector2(516.0, 92.0),
+			"平台节点调整不得替换精修后的完整源图")
 	assert_eq(platform.scale, Vector2(4.0, 4.0))
-	assert_gt(platform.size.y, 120.0)
+	assert_gt(platform.size.y * platform.scale.y, 350.0,
+			"完整平台放大后必须保留足够的前景厚度")
 	assert_eq(platform.stretch_mode, TextureRect.STRETCH_SCALE,
 			"战斗平台只能整图放大，禁止 NinePatch 或平铺中段")
 	assert_lt(platform.position.y, 748.0)
@@ -352,6 +355,48 @@ func test_scene6_platform_is_pixel_safe_and_has_local_thermal_depth() -> void:
 	assert_lte(float(platform_material.get_shader_parameter("broken_reflection_coverage")), 0.20)
 	assert_true(platform_material.shader.code.contains("broken_reflection"))
 	assert_true(platform_material.shader.code.contains("reflection_gate"))
+	assert_eq(platform_material.shader.resource_path,
+			"res://assets/shaders/canvas_env_scene6_platform_lava.gdshader")
+	assert_gte(float(platform_material.get_shader_parameter("fissure_source_restore")), 0.70)
+	assert_gt(float(platform_material.get_shader_parameter("lava_pulse_strength")), 0.0)
+	assert_lte(float(platform_material.get_shader_parameter("lava_pulse_strength")), 0.45)
+	assert_lte(float(platform_material.get_shader_parameter("lava_moving_gain")), 0.12)
+	for marker: String in [
+		"source_pixel", "platform_lava_mask", "thermal_flow", "fissure_source_restore"
+	]:
+		assert_true(platform_material.shader.code.contains(marker))
+	assert_false(platform_material.shader.code.contains("texture(TEXTURE, UV +"),
+			"Platform silhouette must stay fixed; only authored fissure light may move")
+
+
+func test_scene6_platform_has_no_generated_gray_edge_specks() -> void:
+	var texture := load(
+			"res://assets/scenes/scene6/scene6_battle_platform.png") as Texture2D
+	assert_not_null(texture)
+	if texture == null:
+		return
+	var image := texture.get_image()
+	var gray_specks := 0
+	var warm_fissure_pixels := 0
+	for y: int in image.get_height():
+		for x: int in image.get_width():
+			var pixel := image.get_pixel(x, y)
+			if pixel.a < 0.5:
+				continue
+			var channel_min := minf(pixel.r, minf(pixel.g, pixel.b))
+			var channel_max := maxf(pixel.r, maxf(pixel.g, pixel.b))
+			if channel_min >= 40.0 / 255.0 \
+					and channel_max - channel_min <= 55.0 / 255.0:
+				gray_specks += 1
+			var luma := pixel.r * 0.2126 + pixel.g * 0.7152 + pixel.b * 0.0722
+			if pixel.r >= 138.0 / 255.0 \
+					and pixel.g - pixel.b >= 18.0 / 255.0 \
+					and luma >= 0.25:
+				warm_fissure_pixels += 1
+	assert_eq(gray_specks, 0,
+			"Generated neutral-gray pixels become white specks after 4x scaling")
+	assert_gt(warm_fissure_pixels, 1500,
+			"Speck cleanup must preserve the authored molten fissure network")
 
 
 func test_scene6_layers_share_a_depth_palette_and_midground_lava_motion() -> void:
