@@ -583,6 +583,18 @@ func test_boot_title_uses_white_gold_palette_on_black_stage() -> void:
 		assert_false(shader_source.contains("square_fragment"))
 
 
+func test_boot_title_has_no_plus_badges() -> void:
+	var boot := await _instantiate_boot()
+	var title_column := boot.get_node("TitleColumn") as Control
+	for node_name: String in [
+		"ChinesePlus",
+		"ChinesePlusShadow",
+		"EnglishPlus",
+		"EnglishPlusShadow",
+	]:
+		assert_null(title_column.get_node_or_null(node_name),
+				"Boot 中英文标题不再保留加号节点")
+
 func test_boot_title_uses_one_horizontal_perspective_field() -> void:
 	var boot := await _instantiate_boot()
 	var title_column := boot.get_node("TitleColumn") as Control

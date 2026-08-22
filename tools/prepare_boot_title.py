@@ -23,11 +23,6 @@ OUTPUT_PATHS = {
     "bo_middle": ROOT / "assets/ui/boot/title_bo_middle.png",
     "zan_bottom": ROOT / "assets/ui/boot/title_zan_bottom.png",
 }
-LEGACY_PATHS = (
-    ROOT / "assets/ui/boot/title_bobozan.png",
-    ROOT / "assets/ui/boot/title_bobozan.png.import",
-)
-
 CELL_SIZE = 9
 CANVAS_CELLS = (28, 28)
 EXPECTED_SIZE = (
@@ -400,12 +395,6 @@ def main() -> None:
             f"Wrote {output_path.relative_to(ROOT)} "
             f"({image.width}x{image.height}, RGBA, sha256={digest})"
         )
-
-    for legacy_path in LEGACY_PATHS:
-        if legacy_path.exists():
-            legacy_path.unlink()
-            print(f"Removed {legacy_path.relative_to(ROOT)}")
-
 
 if __name__ == "__main__":
     main()

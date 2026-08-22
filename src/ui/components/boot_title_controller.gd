@@ -63,7 +63,10 @@ var _pointer_tilt: Vector2 = Vector2.ZERO
 
 func _ready() -> void:
 	_cache_materials()
-	if _materials.size() != 3:
+	if (
+		_materials.size() != 3
+		or _shadow_materials.size() != 3
+	):
 		return
 	_apply_shared_parameters()
 	_start_phase_tween()
@@ -189,7 +192,6 @@ func _cache_materials() -> void:
 	if _english_material == null or _english_shadow_material == null:
 		push_error("Boot English subtitle requires title ShaderMaterials.")
 
-
 func _apply_shared_parameters() -> void:
 	var safe_period := maxf(flow_period_seconds, 0.001)
 	var normalized_flow_duration := clampf(
@@ -270,7 +272,8 @@ func _apply_pointer_tilt() -> void:
 	var yaw_strength := tan(deg_to_rad(pointer_yaw_degrees))
 	var pitch_strength := tan(deg_to_rad(pointer_pitch_degrees))
 	for shader_material: ShaderMaterial in (
-			_materials + _shadow_materials):
+			_materials
+			+ _shadow_materials):
 		shader_material.set_shader_parameter(
 			&"pointer_yaw",
 			_pointer_tilt.x)
@@ -301,8 +304,6 @@ func _apply_pointer_tilt() -> void:
 		shader_material.set_shader_parameter(
 			&"pointer_pitch_strength",
 			pitch_strength)
-
-
 func _apply_english_parameters(
 	safe_period: float,
 	normalized_flow_duration: float,

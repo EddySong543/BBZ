@@ -233,6 +233,7 @@ func test_boot_intro_keeps_composition_anchored_without_shake() -> void:
 func test_boot_title_pointer_tilt_uses_one_shared_perspective_plane() -> void:
 	var boot := await _instantiate_boot()
 	var title := boot.get_node("TitleColumn") as BootTitleController
+	title.call(&"preview_pointer_tilt", Vector2.ZERO)
 	var material_nodes: Array[TextureRect] = [
 		boot.get_node("TitleColumn/BoTop") as TextureRect,
 		boot.get_node("TitleColumn/BoMiddle") as TextureRect,
@@ -267,6 +268,8 @@ func test_boot_title_pointer_tilt_uses_one_shared_perspective_plane() -> void:
 	assert_true(
 		(material_nodes[0].material as ShaderMaterial)
 			.shader.code.contains("group_pointer_x"))
+	assert_null(boot.get_node_or_null("TitleColumn/ChinesePlus"))
+	assert_null(boot.get_node_or_null("TitleColumn/EnglishPlus"))
 
 
 func test_boot_enter_prompt_keeps_decoration_lines_static() -> void:
@@ -538,6 +541,10 @@ func test_boot_title_intro_grows_from_authored_energy_cuts_without_ghosts() -> v
 	assert_eq(
 		english_shadow_material.get_shader_parameter(&"intro_shadow"),
 		true)
+	assert_null(boot.get_node_or_null("TitleColumn/ChinesePlus"))
+	assert_null(boot.get_node_or_null("TitleColumn/ChinesePlusShadow"))
+	assert_null(boot.get_node_or_null("TitleColumn/EnglishPlus"))
+	assert_null(boot.get_node_or_null("TitleColumn/EnglishPlusShadow"))
 	assert_almost_eq(
 		float(title_material.get_shader_parameter(&"intro_progress_delay")),
 		0.0,
