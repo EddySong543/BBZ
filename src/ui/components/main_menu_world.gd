@@ -13,23 +13,45 @@ const VISUAL_MAP_SCENE := preload("res://src/expedition/maps/qingfeng_ricefield_
 const GRASS_TILE_TEXTURE := preload("res://assets/tilesets/qingfeng_ricefield/grass_ref37_ref39_plain_v1.png")
 const GROUND_CELL_SHADER := preload("res://assets/shaders/canvas_ui_expedition_ground_cell.gdshader")
 const ATMOSPHERE_SHADER := preload("res://assets/shaders/canvas_ui_qingfeng_atmosphere.gdshader")
+const PORTAL_STONE_SHADER := preload("res://assets/shaders/canvas_ui_portal_stone_energy.gdshader")
+const PORTAL_STONE_TEXTURES: Array[Texture2D] = [
+	preload("res://assets/ui/main_menu/stone1.png"),
+	preload("res://assets/ui/main_menu/stone2.png"),
+	preload("res://assets/ui/main_menu/stone3.png"),
+	preload("res://assets/ui/main_menu/stone4.png"),
+]
 
 const MAP_CELL: float = 120.0
-const MAP_RENDER_SCALE := Vector2(4.0 / 3.0, 1.5)
+const MAP_RENDER_SCALE := Vector2(16.0 / 15.0, 1.0)
 const RENDERED_CELL_SIZE := Vector2(
 		MAP_CELL * MAP_RENDER_SCALE.x,
 		MAP_CELL * MAP_RENDER_SCALE.y)
-const VISIBLE_COLS: int = 12
-const VISIBLE_ROWS: int = 6
+const VISIBLE_COLS: int = 15
+const VISIBLE_ROWS: int = 9
 const VIEW_SIZE := Vector2(VISIBLE_COLS, VISIBLE_ROWS) * RENDERED_CELL_SIZE
 const MAP_WORLD_SIZE := Vector2(QingfengLayout.WIDTH * MAP_CELL, QingfengLayout.HEIGHT * MAP_CELL)
 const MAP_BOUNDS := Rect2i(Vector2i.ZERO, Vector2i(QingfengLayout.WIDTH, QingfengLayout.HEIGHT))
-const CENTER_SPAWN_CELLS: Array[Vector2i] = [
-	Vector2i(15, 8),
-	Vector2i(16, 8),
-	Vector2i(15, 9),
-	Vector2i(16, 9),
+const HUB_CENTER_CELL := Vector2i(16, 9)
+const CENTER_ENTRY_CELLS: Array[Vector2i] = [
+	Vector2i(15, 8), Vector2i(16, 8), Vector2i(17, 8),
+	Vector2i(15, 9), Vector2i(16, 9), Vector2i(17, 9),
+	Vector2i(15, 10), Vector2i(16, 10), Vector2i(17, 10),
 ]
+const PORTAL_STONE_CELLS: Array[Vector2i] = [
+	Vector2i(15, 8), Vector2i(17, 8),
+	Vector2i(15, 10), Vector2i(17, 10),
+]
+const PORTAL_STONE_SIZE := Vector2(128.0, 128.0)
+const PORTAL_STONE_FOOT_ANCHORS: Array[Vector2] = [
+	Vector2(63.0, 119.0), Vector2(65.5, 116.0),
+	Vector2(64.0, 114.0), Vector2(64.0, 104.0),
+]
+const PORTAL_STONE_SCALE: float = 0.72
+const PORTAL_FLOAT_AMPLITUDE: float = 3.0
+const PORTAL_FLOAT_PERIOD: float = 3.8
+const PORTAL_ACTIVATION_DURATION: float = 0.39
+const PORTAL_ENERGY_GOLD := Color("FFC44F")
+const PORTAL_ENERGY_BLUE := Color("48A8FF")
 const TOKEN_SIZE := Vector2(208.0, 208.0)
 const TOKEN_FOOT_ANCHOR := Vector2(104.0, 156.0)
 const TOKEN_CELL_FOOT_POINT := Vector2(60.0, 90.0)
@@ -41,16 +63,9 @@ const TOKEN_IDLE_REF_FRAMES: float = 6.0
 const TOKEN_ASPECT_COMPENSATION := Vector2(
 		MAP_RENDER_SCALE.y / MAP_RENDER_SCALE.x, 1.0)
 
-const DESTINATION_CELLS: Dictionary = {
-	"match": Vector2i(12, 14),
-	"story": Vector2i(16, 13),
-	"expedition": Vector2i(20, 14),
-}
-const DESTINATION_COLORS: Dictionary = {
-	"match": Color("d96255"),
-	"story": Color("a993df"),
-	"expedition": Color("e3b94e"),
-}
+# 匹配与远征已经改为底部直接入口；展示地图不再绘制或保留对应目的地格。
+const DESTINATION_CELLS: Dictionary = {}
+const DESTINATION_COLORS: Dictionary = {}
 
 var map_view: Control
 var map_world: Control
@@ -62,9 +77,17 @@ var atmosphere_layer: ColorRect
 var atmosphere_material: ShaderMaterial
 var player_shadow: Control
 var player_token: TextureRect
+var portal_stones: Array[TextureRect] = []
+var portal_stone_shadows: Array[Control] = []
 
 var _hero_frames: SpriteFrames
 var _hero_textures: Array[Texture2D] = []
+var _portal_stone_home_positions: Array[Vector2] = []
+var _portal_stone_materials: Array[ShaderMaterial] = []
+var _portal_stone_lifts: Array[float] = []
+var _portal_energy_mix: float = 0.0
+var _portal_energy_color: Color = Color.WHITE
+var _portal_energy_tween: Tween
 var _anim_time: float = 0.0
 var _focused_destination: String = ""
 var _selected_destination: String = ""
@@ -73,13 +96,13 @@ var _shadow_lift: float = 0.0
 var _move_direction: Vector2 = Vector2.ZERO
 var _current_token_origin: Vector2 = Vector2.ZERO
 var _current_logical_origin: Vector2 = Vector2.ZERO
-var _spawn_cell: Vector2i = CENTER_SPAWN_CELLS[0]
-var _current_cell: Vector2i = CENTER_SPAWN_CELLS[0]
+var _spawn_cell: Vector2i = HUB_CENTER_CELL
+var _current_cell: Vector2i = HUB_CENTER_CELL
 var _grid_movement: GridMovementController
 
 
 func _ready() -> void:
-	_spawn_cell = CENTER_SPAWN_CELLS.pick_random()
+	_spawn_cell = HUB_CENTER_CELL
 	_current_cell = _spawn_cell
 	_build_world()
 	resized.connect(_layout_view)
@@ -154,6 +177,8 @@ func _build_world() -> void:
 	marker_art.draw.connect(_draw_destinations)
 	map_world.add_child(marker_art)
 
+	_build_portal_stones()
+
 	player_shadow = Control.new()
 	player_shadow.name = "PlayerShadow"
 	player_shadow.size = Vector2.ONE * MAP_CELL
@@ -171,6 +196,102 @@ func _build_world() -> void:
 	player_token.pivot_offset = TOKEN_FOOT_ANCHOR
 	player_token.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	map_world.add_child(player_token)
+
+
+func _build_portal_stones() -> void:
+	portal_stones.clear()
+	portal_stone_shadows.clear()
+	_portal_stone_home_positions.clear()
+	_portal_stone_materials.clear()
+	_portal_stone_lifts.clear()
+	for index: int in PORTAL_STONE_CELLS.size():
+		var stone_cell: Vector2i = PORTAL_STONE_CELLS[index]
+		var stone_shadow := Control.new()
+		stone_shadow.name = "PortalStoneShadow%d" % (index + 1)
+		stone_shadow.position = Vector2(stone_cell) * MAP_CELL
+		stone_shadow.size = Vector2.ONE * MAP_CELL
+		stone_shadow.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		stone_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		stone_shadow.z_index = roundi(stone_shadow.position.y + TOKEN_CELL_FOOT_POINT.y) - 1
+		stone_shadow.draw.connect(_draw_portal_stone_shadow.bind(stone_shadow, index))
+		map_world.add_child(stone_shadow)
+		portal_stone_shadows.append(stone_shadow)
+		_portal_stone_lifts.append(0.0)
+
+		var stone := TextureRect.new()
+		stone.name = "PortalStone%d" % (index + 1)
+		stone.texture = PORTAL_STONE_TEXTURES[index]
+		stone.size = PORTAL_STONE_SIZE
+		stone.pivot_offset = PORTAL_STONE_FOOT_ANCHORS[index]
+		stone.scale = TOKEN_ASPECT_COMPENSATION * PORTAL_STONE_SCALE
+		stone.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		stone.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		stone.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		stone.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var home_position: Vector2 = Vector2(stone_cell) * MAP_CELL \
+				+ TOKEN_CELL_FOOT_POINT - PORTAL_STONE_FOOT_ANCHORS[index]
+		stone.position = home_position
+		stone.z_index = roundi(Vector2(stone_cell).y * MAP_CELL + TOKEN_CELL_FOOT_POINT.y)
+		var stone_material := ShaderMaterial.new()
+		stone_material.shader = PORTAL_STONE_SHADER
+		stone_material.set_shader_parameter("energy_color", PORTAL_ENERGY_GOLD)
+		stone_material.set_shader_parameter("energy_mix", 0.0)
+		stone.material = stone_material
+		map_world.add_child(stone)
+		portal_stones.append(stone)
+		_portal_stone_home_positions.append(home_position)
+		_portal_stone_materials.append(stone_material)
+
+
+func _draw_portal_stone_shadow(shadow: Control, index: int) -> void:
+	if index < 0 or index >= _portal_stone_lifts.size():
+		return
+	var height_factor: float = clampf(
+			-_portal_stone_lifts[index] / PORTAL_FLOAT_AMPLITUDE, -1.0, 1.0)
+	var width: float = (40.0 - height_factor * 3.0) * TOKEN_ASPECT_COMPENSATION.x
+	var height: float = 10.0
+	var opacity: float = 0.28 - height_factor * 0.055
+	var center: Vector2 = TOKEN_CELL_FOOT_POINT + Vector2(0.0, 3.0)
+	shadow.draw_set_transform(center, 0.0, Vector2(width / height, 1.0))
+	shadow.draw_circle(Vector2.ZERO, height * 0.5,
+			Color(0.02, 0.055, 0.045, opacity), true, -1.0, false)
+	shadow.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func set_portal_energy(color: Color) -> void:
+	if _portal_energy_tween != null and _portal_energy_tween.is_valid():
+		_portal_energy_tween.kill()
+	_set_portal_energy_mix(0.0)
+	_portal_energy_color = color
+	for stone_material: ShaderMaterial in _portal_stone_materials:
+		stone_material.set_shader_parameter("energy_color", color)
+	_portal_energy_tween = create_tween().bind_node(self)
+	_portal_energy_tween.tween_method(
+			_set_portal_energy_mix, 0.0, 0.30, 0.06)
+	_portal_energy_tween.tween_method(
+			_set_portal_energy_mix, 0.30, 0.06, 0.05)
+	_portal_energy_tween.tween_method(
+			_set_portal_energy_mix, 0.06, 0.64, 0.08)
+	_portal_energy_tween.tween_method(
+			_set_portal_energy_mix, 0.64, 0.22, 0.06)
+	_portal_energy_tween.tween_method(
+			_set_portal_energy_mix, 0.22, 1.0, 0.14
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+
+func reset_portal_energy() -> void:
+	if _portal_energy_tween != null and _portal_energy_tween.is_valid():
+		_portal_energy_tween.kill()
+	_portal_energy_tween = create_tween().bind_node(self)
+	_portal_energy_tween.tween_method(
+			_set_portal_energy_mix, _portal_energy_mix, 0.0, 0.20
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+
+func _set_portal_energy_mix(value: float) -> void:
+	_portal_energy_mix = clampf(value, 0.0, 1.0)
+	for stone_material: ShaderMaterial in _portal_stone_materials:
+		stone_material.set_shader_parameter("energy_mix", _portal_energy_mix)
 
 
 func _build_atmosphere() -> void:
@@ -197,7 +318,7 @@ func _build_atmosphere() -> void:
 func _layout_view() -> void:
 	if map_view == null:
 		return
-	# 主界面使用 1920×1080 设计坐标；12×6 格已经精确铺满，不再按临时
+	# 主界面使用 1920×1080 设计坐标；15×9 格已经精确铺满，不再按临时
 	# headless viewport 尺寸居中，否则会重新露出兜底外圈。
 	map_view.position = Vector2.ZERO
 	_update_camera_for_token_origin(_token_origin_for_cell(_current_cell))
@@ -447,7 +568,21 @@ func get_visual_contract() -> Dictionary:
 		"hero_frame_count": _hero_textures.size(),
 		"hero_foot_anchor": TOKEN_FOOT_ANCHOR,
 		"spawn_cell": _spawn_cell,
-		"center_spawn_cells": CENTER_SPAWN_CELLS,
+		"hub_center_cell": HUB_CENTER_CELL,
+		"center_entry_cells": CENTER_ENTRY_CELLS,
+		"portal_stone_count": portal_stones.size(),
+		"portal_stone_cells": PORTAL_STONE_CELLS,
+		"portal_stone_texture_paths": PORTAL_STONE_TEXTURES.map(
+				func(texture: Texture2D) -> String: return texture.resource_path),
+		"portal_stone_foot_anchors": PORTAL_STONE_FOOT_ANCHORS,
+		"portal_stone_scale": PORTAL_STONE_SCALE,
+		"portal_stone_shadow_count": portal_stone_shadows.size(),
+		"portal_cell_foot_point": TOKEN_CELL_FOOT_POINT,
+		"portal_float_amplitude": PORTAL_FLOAT_AMPLITUDE,
+		"portal_float_period": PORTAL_FLOAT_PERIOD,
+		"portal_activation_duration": PORTAL_ACTIVATION_DURATION,
+		"portal_energy_mix": _portal_energy_mix,
+		"portal_energy_color": _portal_energy_color,
 		"current_cell": _current_cell,
 		"click_to_move": map_view != null and map_view.gui_input.is_connected(
 				_on_map_view_gui_input),
@@ -474,6 +609,7 @@ func _token_origin_for_cell(cell: Vector2i) -> Vector2:
 
 func _process(delta: float) -> void:
 	_anim_time += delta
+	_update_portal_stones()
 	if _grid_movement != null:
 		_grid_movement.process(delta)
 		_apply_shared_movement_visual()
@@ -482,6 +618,18 @@ func _process(delta: float) -> void:
 		atmosphere_material.set_shader_parameter("anim_time", _anim_time)
 	if not _focused_destination.is_empty() or not _selected_destination.is_empty():
 		marker_art.queue_redraw()
+
+
+func _update_portal_stones() -> void:
+	for index: int in portal_stones.size():
+		var phase: float = float(index) * TAU / float(portal_stones.size())
+		var lift: float = sin(_anim_time * TAU / PORTAL_FLOAT_PERIOD + phase) \
+				* PORTAL_FLOAT_AMPLITUDE
+		_portal_stone_lifts[index] = lift
+		portal_stones[index].position = _portal_stone_home_positions[index] \
+				+ Vector2(0.0, lift)
+		_portal_stone_materials[index].set_shader_parameter("anim_time", _anim_time)
+		portal_stone_shadows[index].queue_redraw()
 
 
 func _apply_shared_movement_visual() -> void:
@@ -499,6 +647,9 @@ func _apply_shared_movement_visual() -> void:
 	player_token.rotation = _grid_movement.token_rotation()
 	player_token.scale = _token_scale_for_render(_grid_movement.token_scale())
 	player_shadow.position = rendered_origin - TOKEN_OFFSET
+	var foot_y: int = roundi(rendered_origin.y + TOKEN_FOOT_ANCHOR.y)
+	player_shadow.z_index = foot_y - 1
+	player_token.z_index = foot_y
 	player_shadow.queue_redraw()
 	_update_camera_for_token_origin(rendered_origin)
 

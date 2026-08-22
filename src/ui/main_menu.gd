@@ -5,6 +5,7 @@ extends Control
 
 const BP_SCENE := "res://src/ui/bp_screen.tscn"
 const PROFILE_SCENE := "res://src/ui/profile_screen.tscn"
+const BACKPACK_OVERLAY_SCENE := preload("res://src/ui/backpack_screen.tscn")
 const ProfileStore := preload("res://src/core/player_profile.gd")   # 个人资料存档（headless 安全走 preload）
 
 # ---- 匹配状态机：IDLE 点入口=开始；SEARCHING 再点/ESC/取消钮=取消；FOUND 锁输入。----
@@ -14,13 +15,9 @@ enum MatchState { IDLE, SEARCHING, FOUND }
 ## 本地测试模拟匹配时长（秒）。联机接入后弃用。
 @export var mock_match_seconds: float = 3.0
 
-const MATCH_TITLE := "匹配对战"
-const MATCH_SUB := "1v1 同时盲选对决"
-
 var _match_state: int = MatchState.IDLE
 var _search_elapsed: float = 0.0
-var _last_dots: int = -1     # 匹配中标题省略号点数（变化才拼串 + 赋值·避免每帧 setter 触发重排）
-var _last_secs: int = -1     # 匹配中副标计时秒数（同上）
+var _last_secs: int = -1     # 匹配中 tooltip 计时秒数（变化时才更新）
 var _cancel_btn: Button   # 匹配中才出现的「✕ 取消匹配」（_setup_modes 建·常态隐藏）
 
 ## 小件像素底板（设置/退出/底坞导航/段位徽章用）。
@@ -28,6 +25,7 @@ var _cancel_btn: Button   # 匹配中才出现的「✕ 取消匹配」（_setup
 ## （米金纸面+角上回纹折·9-slice 中段平铺·jelly 程序板/STEEL 色组退役）。
 const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")   # 235×55·v14 净面版（2026-07-16 Eddy 定内饰多余·img_inner_clear 去回纹钩+内线·只留深咖外框+净纸面）
 const CODEX_ICON_TEX := preload("res://assets/ui/icons/codex_book.png")
+const BACKPACK_ICON_TEX := preload("res://assets/ui/icons/backpack.png")
 const CODEX_JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")
 const UI_BOTTOM_SHADOW_OFFSET := Vector2(3.0, 6.0)
 const UI_BOTTOM_SHADOW_COLOR := Color(0.02, 0.012, 0.008, 0.52)
@@ -35,14 +33,12 @@ const PIXEL_FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.
 const NAV_PLATE_MARGIN_X := 22.0   # 9-slice 边距（v14 净面后内里全纸·任意≥框厚均可·沿用实钩期数值）
 const NAV_PLATE_MARGIN_Y := 20.0
 const INK := Color(0.20, 0.14, 0.08)        # 墨（羊皮上的字/图标）
-const INK_SOFT := Color(0.42, 0.34, 0.24)   # 淡墨（次级字）
 const CREAM := Color(0.95, 0.91, 0.80)      # 暖米白（直接压在暗波上的字·非羊皮上）
 
-@onready var _coming_soon: Label = $UI/ComingSoon
-@onready var _match_entry: MainMenuEntry = $UI/ModeMatch
+@onready var _match_entry: Button = $UI/ModeMatch
 @onready var _menu_world: MainMenuWorld = $MenuWorld
 
-var _toast_tween: Tween
+var _backpack_overlay: BackpackScreen
 
 
 func _ready() -> void:
@@ -51,9 +47,7 @@ func _ready() -> void:
 	_setup_settings()
 	_setup_modes()
 	_setup_dock()
-	FontManager.apply(_coming_soon, 40)
-	_coming_soon.add_theme_color_override("font_color", CREAM)
-	_coming_soon.modulate.a = 0.0
+	_setup_backpack_overlay()
 	# 设置面板仍通过既有广播刷新主界面颜色，世界组件只重绘视觉层。
 	add_to_group("wave_flow_bg")
 	_play_intro()
@@ -196,36 +190,13 @@ func _open_settings() -> void:
 	add_child(panel)
 
 
-## 三个世界入口：直接点击；悬停只联动地图目标与角色朝向。
+## 匹配与远征改为底部直接入口，不再与展示地图的目标格绑定。
 func _setup_modes() -> void:
-	var entries: Array[MainMenuEntry] = [
-		$UI/ModeMatch as MainMenuEntry,
-		$UI/ModeStory as MainMenuEntry,
-		$UI/ModeTower as MainMenuEntry,
-	]
-	for entry: MainMenuEntry in entries:
-		entry.mouse_entered.connect(_menu_world.focus_destination.bind(entry.destination_id))
-		entry.mouse_exited.connect(_menu_world.focus_destination.bind(""))
-		entry.focus_entered.connect(_menu_world.focus_destination.bind(entry.destination_id))
-		entry.focus_exited.connect(_menu_world.focus_destination.bind(""))
-	($UI/ModeMatch as MainMenuEntry).pressed.connect(_on_match_pressed)
-	($UI/ModeStory as MainMenuEntry).pressed.connect(_on_story_pressed)
-	($UI/ModeTower as MainMenuEntry).pressed.connect(_on_expedition_pressed)
+	($UI/ModeMatch as Button).pressed.connect(_on_match_pressed)
+	($UI/ModeTower as Button).pressed.connect(_on_expedition_pressed)
 	_build_cancel_button()
 	_build_net_button()
 	_match_entry.grab_focus()
-
-
-## 故事模式入口：选关壳（关卡/文本全占位·待小传定稿填内容）。匹配中不离队。
-func _on_story_pressed() -> void:
-	if _match_state != MatchState.IDLE:
-		return
-	_set_mode_entries_enabled(false)
-	($UI/ModeStory as MainMenuEntry).flash_confirm()
-	await _menu_world.play_confirmation("story")
-	if not is_instance_valid(self):
-		return
-	TransitionManager.transition_to("res://src/ui/story_screen.tscn")
 
 
 ## M1：局域网对战入口（右下低调工具钮，不与三个世界入口抢层级）。
@@ -248,8 +219,8 @@ func _on_expedition_pressed() -> void:
 	if _match_state != MatchState.IDLE:
 		return
 	_set_mode_entries_enabled(false)
-	($UI/ModeTower as MainMenuEntry).flash_confirm()
-	await _menu_world.play_confirmation("expedition")
+	_menu_world.set_portal_energy(MainMenuWorld.PORTAL_ENERGY_GOLD)
+	await get_tree().create_timer(MainMenuWorld.PORTAL_ACTIVATION_DURATION).timeout
 	if not is_instance_valid(self):
 		return
 	TransitionManager.transition_to("res://src/expedition/expedition_screen.tscn")
@@ -265,7 +236,7 @@ func _build_cancel_button() -> void:
 	var btn_size := Vector2(220, 52)
 	_cancel_btn.position = Vector2(
 		card.position.x + (card.size.x - btn_size.x) * 0.5,
-		card.position.y + card.size.y + 16.0)
+		card.position.y - 68.0)
 	_cancel_btn.size = btn_size
 	for s in ["normal", "hover", "pressed", "focus", "disabled"]:
 		_cancel_btn.add_theme_stylebox_override(s, StyleBoxEmpty.new())
@@ -302,7 +273,7 @@ func _on_cancel_btn_pressed() -> void:
 
 ## 取消钮显隐：出现=淡入上浮；收起=即时隐藏（取消瞬间不该有残影挡点击）。
 func _show_cancel_button(on: bool) -> void:
-	var home_y: float = ($UI/ModeMatch as Control).position.y + ($UI/ModeMatch as Control).size.y + 16.0
+	var home_y: float = ($UI/ModeMatch as Control).position.y - 68.0
 	if not on:
 		_cancel_btn.visible = false
 		_cancel_btn.position.y = home_y
@@ -316,35 +287,33 @@ func _show_cancel_button(on: bool) -> void:
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 
-## 底坞：图鉴/商店双入口。美术与顶部设置/退出统一——同款 jelly 羊皮板
-## （_apply_plate·2026-06-28 同步；原纯色双层坞底+段间分隔线弃用，质感与其余功能钮不一致）。
-## 英雄与道具合并到统一图鉴；旧 NavItems 节点保留为场景兼容占位，但不再显示或接收输入。
+## 底部四入口：匹配、远征、图鉴、背包共用战斗图鉴方钮语言，点击即执行。
 func _setup_dock() -> void:
-	$UI/NavItems.visible = false
-	$UI/NavItems.disabled = true
-	$UI/NavItems.focus_mode = Control.FOCUS_NONE
-	var codex_btn := $UI/NavHeroes as Button
-	_setup_battle_codex_button(codex_btn)
-	codex_btn.pressed.connect(_on_codex_pressed)
-	var navs: Array = [
-		[$UI/NavShop, "商店", "coin"],
-	]
-	for i in navs.size():
-		var btn: Button = navs[i][0]
-		_apply_plate(btn)                 # 与设置/退出同款 jelly 羊皮板（统一三按钮美术）
-		_set_btn_left_margin(btn, 40.0)   # 文字让出左侧 icon 锚位
-		FontManager.apply_btn(btn, 24)
-		btn.add_theme_color_override("font_color", INK)   # 羊皮板上→墨字
-		_add_icon(btn, Rect2(30, 19, 32, 32), navs[i][2])
-		btn.pressed.connect(_on_placeholder_pressed.bind(navs[i][1]))
-		_attach_juice(btn)
+	_setup_square_dock_button(
+		$UI/ModeMatch as Button, PixelGlyphs.icon_texture("duel"), "匹配", true)
+	_setup_square_dock_button(
+		$UI/ModeTower as Button, PixelGlyphs.icon_texture("flag"), "远征", true)
+	_setup_square_dock_button(
+		$UI/NavHeroes as Button, CODEX_ICON_TEX, "图鉴", false)
+	_setup_square_dock_button(
+		$UI/NavBackpack as Button, BACKPACK_ICON_TEX, "背包", false)
+	($UI/NavHeroes as Button).pressed.connect(_on_codex_pressed)
+	($UI/NavBackpack as Button).pressed.connect(_on_backpack_pressed)
 
 
-## 与战斗 UI 的 BtnCodex 同尺寸、同材质、同 64px 图标；主菜单不再另造长条图鉴入口。
-func _setup_battle_codex_button(btn: Button) -> void:
+func _setup_backpack_overlay() -> void:
+	_backpack_overlay = BACKPACK_OVERLAY_SCENE.instantiate() as BackpackScreen
+	_backpack_overlay.name = "BackpackOverlay"
+	add_child(_backpack_overlay)
+	_backpack_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+
+## 与战斗 UI 的 BtnCodex 同尺寸、同材质；底部入口只显示居中图标。
+func _setup_square_dock_button(
+		btn: Button, icon_texture: Texture2D, tooltip: String, tint_icon: bool) -> void:
 	btn.text = ""
-	btn.focus_mode = Control.FOCUS_NONE
 	btn.clip_text = true
+	btn.tooltip_text = tr(tooltip)
 	for state: String in ["normal", "hover", "pressed", "focus", "disabled"]:
 		btn.add_theme_stylebox_override(state, StyleBoxEmpty.new())
 
@@ -372,24 +341,25 @@ func _setup_battle_codex_button(btn: Button) -> void:
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	btn.add_child(bg)
 
-	var book := TextureRect.new()
-	book.name = "BookIcon"
-	book.texture = CODEX_ICON_TEX
-	book.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	book.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	book.offset_left = 22.0
-	book.offset_top = 22.0
-	book.offset_right = -22.0
-	book.offset_bottom = -22.0
-	book.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	book.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	book.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	btn.add_child(book)
+	var icon := TextureRect.new()
+	icon.name = "BookIcon" if btn == $UI/NavHeroes else "Icon"
+	icon.texture = icon_texture
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	icon.offset_left = 22.0
+	icon.offset_top = 22.0
+	icon.offset_right = -22.0
+	icon.offset_bottom = -22.0
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.modulate = INK if tint_icon else Color.WHITE
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	btn.add_child(icon)
 	_attach_juice(btn)
-	_attach_codex_bottom_shadow(btn)
+	_attach_bottom_shadow(btn)
 
 
-func _attach_codex_bottom_shadow(btn: Button) -> void:
+func _attach_bottom_shadow(btn: Button) -> void:
 	var source_bg := btn.get_node("Bg") as ColorRect
 	var shadow := ColorRect.new()
 	shadow.name = "BottomShadow"
@@ -425,11 +395,17 @@ func _on_codex_pressed() -> void:
 	TransitionManager.transition_to("res://src/ui/codex_screen.tscn")
 
 
+func _on_backpack_pressed() -> void:
+	if _match_state != MatchState.IDLE:
+		return
+	_backpack_overlay.open()
+
+
 # ============================================================
 # 入场 / 转场
 # ============================================================
 
-## 入场：世界先落定，三个入口与边缘功能随后浮入。
+## 入场：世界先落定，两个入口与边缘功能随后浮入。
 func _play_intro() -> void:
 	# Boot 转场余势只作用于世界，不改变地图构图。
 	pivot_offset = size * 0.5
@@ -442,9 +418,9 @@ func _play_intro() -> void:
 ## 入口入场：远征主入口先出现，其余入口与边缘件跟进。
 func _animate_in() -> void:
 	var order: Array = [
-		$UI/ModeTower, $UI/ModeMatch, $UI/ModeStory,
+		$UI/ModeTower, $UI/ModeMatch,
 		$UI/IdentityButton, $UI/QuitButton, $UI/SettingsButton,
-		$UI/NavHeroes, $UI/NavShop,
+		$UI/NavHeroes, $UI/NavBackpack,
 	]
 	var step := 0.0
 	for n in order:
@@ -475,11 +451,6 @@ func _on_match_pressed() -> void:
 
 
 func _begin_match_entry() -> void:
-	_set_mode_entries_enabled(false)
-	_match_entry.flash_confirm()
-	await _menu_world.play_confirmation("match")
-	if not is_instance_valid(self) or _match_state != MatchState.IDLE:
-		return
 	_start_search()
 
 
@@ -496,38 +467,34 @@ func _unhandled_input(event: InputEvent) -> void:
 func _start_search() -> void:
 	_match_state = MatchState.SEARCHING
 	_search_elapsed = 0.0
-	_last_dots = -1
 	_last_secs = -1
 	_set_mode_entries_enabled(true)
 	_set_side_cards_enabled(false)
-	_match_entry.set_emphasized(true)
-	_match_entry.set_status("匹配中", "0:00")
+	_set_match_button_emphasized(true)
+	_set_match_button_status("匹配中", "0:00")
+	_menu_world.set_portal_energy(MainMenuWorld.PORTAL_ENERGY_BLUE)
 	_show_cancel_button(true)
 
 
 func _cancel_search() -> void:
 	_match_state = MatchState.IDLE
-	_match_entry.set_emphasized(false)
-	_match_entry.set_status(MATCH_TITLE, MATCH_SUB)
+	_set_match_button_emphasized(false)
+	_set_match_button_status("匹配", "")
+	_menu_world.reset_portal_energy()
 	_show_cancel_button(false)
 	_set_side_cards_enabled(true)
 	_menu_world.reset_home()
 
 
-## 匹配中每帧：标题省略号逐点（0.5s/点）+ 副标正计时每秒跳；到时触发成功。
+## 匹配中每帧只维护状态计时；底栏保持纯图标，计时写入悬停提示。
 func _process(delta: float) -> void:
 	if _match_state != MatchState.SEARCHING:
 		return
 	_search_elapsed += delta
-	var dots := int(_search_elapsed * 2.0) % 4
-	if dots != _last_dots:
-		_last_dots = dots
-		_match_entry.set_status(tr("匹配中") + ".".repeat(dots),
-				_match_entry.get_node("Subtitle").text)
 	var secs := int(_search_elapsed)
 	if secs != _last_secs:
 		_last_secs = secs
-		_match_entry.set_status(tr("匹配中") + ".".repeat(_last_dots),
+		_set_match_button_status("匹配中",
 				"%d:%02d" % [floori(secs / 60.0), secs % 60])
 	if _search_elapsed >= mock_match_seconds:
 		_on_match_found()
@@ -536,19 +503,18 @@ func _process(delta: float) -> void:
 ## 匹配成功：地图入口闪亮、屏幕轻震后进入备战。
 func _on_match_found() -> void:
 	_match_state = MatchState.FOUND
-	_match_entry.set_status("敌方已找到！", "")
+	_set_match_button_status("已找到", "")
 	_show_cancel_button(false)
-	_match_entry.flash_confirm()
-	_menu_world.flash_destination("match")
+	_flash_dock_button(_match_entry)
 	_shake_screen()
 	await get_tree().create_timer(0.45).timeout
 	# 波幕转场（BP 重做 2A）：胜方色波卷入 → 切 BP → 波退去揭幕
 	TransitionManager.transition_to(BP_SCENE)
 
 
-## 匹配中另外两个入口压暗禁点；底栏与设置保持可用。
+## 匹配中远征入口压暗禁点；底栏与设置保持可用。
 func _set_side_cards_enabled(on: bool) -> void:
-	for n in [$UI/ModeStory, $UI/ModeTower]:
+	for n in [$UI/ModeTower]:
 		var card := n as Button
 		card.disabled = not on
 		var tw := create_tween()
@@ -558,12 +524,28 @@ func _set_side_cards_enabled(on: bool) -> void:
 
 
 func _set_mode_entries_enabled(on: bool) -> void:
-	for entry: MainMenuEntry in [
-		$UI/ModeMatch as MainMenuEntry,
-		$UI/ModeStory as MainMenuEntry,
-		$UI/ModeTower as MainMenuEntry,
+	for entry: Button in [
+		$UI/ModeMatch as Button,
+		$UI/ModeTower as Button,
 	]:
 		entry.disabled = not on
+
+
+func _set_match_button_status(title: String, timer_text: String) -> void:
+	_match_entry.tooltip_text = tr(title) if timer_text.is_empty() \
+			else "%s %s" % [tr(title), timer_text]
+
+
+func _set_match_button_emphasized(on: bool) -> void:
+	var bg := _match_entry.get_node_or_null("Bg") as ColorRect
+	if bg != null:
+		bg.self_modulate = Color("FFD4B8") if on else Color.WHITE
+
+
+func _flash_dock_button(button: Button) -> void:
+	var tween := create_tween().bind_node(button)
+	tween.tween_property(button, "modulate", Color(1.0, 0.82, 0.58), 0.08)
+	tween.tween_property(button, "modulate", Color.WHITE, 0.14)
 
 
 ## 匹配成功轻震屏：±6px 衰减抖 5 下回位（菜单唯一震屏点，幅度克制）。
@@ -574,18 +556,6 @@ func _shake_screen() -> void:
 		tw.tween_property(self, "position",
 			Vector2(randf_range(-amp, amp), randf_range(-amp, amp)), 0.04)
 	tw.tween_property(self, "position", Vector2.ZERO, 0.05)
-
-
-## 占位功能提示：淡入 → 停留 → 淡出。
-func _on_placeholder_pressed(feature: String) -> void:
-	_coming_soon.text = tr("%s · 敬请期待") % tr(feature)
-	if _toast_tween != null and _toast_tween.is_valid():
-		_toast_tween.kill()
-	_coming_soon.modulate.a = 0.0
-	_toast_tween = create_tween()
-	_toast_tween.tween_property(_coming_soon, "modulate:a", 1.0, 0.2)
-	_toast_tween.tween_interval(0.9)
-	_toast_tween.tween_property(_coming_soon, "modulate:a", 0.0, 0.4)
 
 
 # ============================================================
