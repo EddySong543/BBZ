@@ -40,6 +40,9 @@ extends Control
 		queue_redraw()
 ## 实际帧数（0 = 用 hframes×vframes 全部；网格末尾有空白格时填实际帧数）。
 @export var frame_count: int = 0
+## 自定义播放顺序，填写图集中的原始帧索引；为空时按左上到右下顺序播放。
+## 例如 [0, 1, 2, 5, 6, 7] 会跳过第 4、5 格，适合保留源图集但排除坏帧。
+@export var playback_frames: PackedInt32Array = PackedInt32Array()
 ## 悬停播放速度（帧/秒）。
 @export var fps: float = 10.0
 ## 悬停时是否循环（false = 播一遍后停在末帧）。
@@ -96,9 +99,20 @@ func _ready() -> void:
 
 func _total_frames() -> int:
 	var grid := hframes * vframes
+	var available := playback_frames.size() if not playback_frames.is_empty() else grid
 	if frame_count > 0:
-		return mini(frame_count, grid)
-	return grid
+		return mini(frame_count, available)
+	return available
+
+
+func _source_frame_index(sequence_frame: int) -> int:
+	var grid := hframes * vframes
+	if grid <= 0:
+		return 0
+	if playback_frames.is_empty():
+		return clampi(sequence_frame, 0, grid - 1)
+	var sequence_index := clampi(sequence_frame, 0, playback_frames.size() - 1)
+	return clampi(playback_frames[sequence_index], 0, grid - 1)
 
 
 ## 返回指定帧的 AtlasTexture，供别处静态显示同一图标（如回合揭示气泡）。
@@ -184,9 +198,14 @@ func _draw() -> void:
 		return
 	var total := _total_frames()
 	var f := clampi(_frame, 0, maxi(total - 1, 0))
+	var source_frame := _source_frame_index(f)
 	var fw := sheet.get_width() / hframes
 	var fh := sheet.get_height() / vframes
-	var src := Rect2((f % hframes) * fw, (f / hframes) * fh, fw, fh)
+	var src := Rect2(
+			(source_frame % hframes) * fw,
+			(source_frame / hframes) * fh,
+			fw,
+			fh)
 
 	# 在按钮矩形内留 inset，居中放一个正方形（帧本身为正方形）；content_scale 微调大小。
 	var inset := minf(size.x, size.y) * inset_ratio

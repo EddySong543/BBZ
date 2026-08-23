@@ -1,10 +1,17 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene format=3 uid="uid://cnieumjrsn0r0"]
 
-[ext_resource type="Script" path="res://src/ui/backpack_screen.gd" id="1_script"]
-[ext_resource type="Texture2D" path="res://assets/ui/icons/backpack.png" id="2_backpack"]
-[ext_resource type="Script" path="res://src/ui/components/backpack_grid_view.gd" id="3_grid"]
+[ext_resource type="Script" uid="uid://cf4mugr6c131f" path="res://src/ui/backpack_screen.gd" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://gokgde4dlpak" path="res://assets/ui/backpack/backpack_open.png" id="2_backpack"]
+[ext_resource type="Script" uid="uid://casxa4ku70tv6" path="res://src/ui/components/backpack_grid_view.gd" id="3_grid"]
 
-[node name="BackpackScreen" type="Control"]
+[sub_resource type="AtlasTexture" id="AtlasTexture_backpack_open"]
+atlas = ExtResource("2_backpack")
+region = Rect2(128, 32, 384, 448)
+filter_clip = true
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_close"]
+
+[node name="BackpackScreen" type="Control" unique_id=837549727]
 z_index = 4096
 layout_mode = 3
 anchors_preset = 15
@@ -12,42 +19,39 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 0
 script = ExtResource("1_script")
 
-[node name="Backdrop" type="ColorRect" parent="."]
+[node name="Backdrop" type="ColorRect" parent="." unique_id=1548430747]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 0
 color = Color(0.025, 0.035, 0.045, 0.28)
 
-[node name="PanelShadow" type="TextureRect" parent="."]
+[node name="PanelShadow" type="TextureRect" parent="." unique_id=740870005]
 self_modulate = Color(0.01, 0.006, 0.004, 0.66)
 texture_filter = 1
 layout_mode = 0
-offset_left = 524.0
-offset_top = 104.0
-offset_right = 1420.0
-offset_bottom = 1000.0
+offset_left = 540.0
+offset_top = 48.0
+offset_right = 1404.0
+offset_bottom = 1056.0
 mouse_filter = 2
-texture = ExtResource("2_backpack")
+texture = SubResource("AtlasTexture_backpack_open")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="Panel" type="Control" parent="."]
+[node name="Panel" type="Control" parent="." unique_id=1763382616]
 texture_filter = 1
-layout_mode = 0
-offset_left = 512.0
-offset_top = 92.0
-offset_right = 1408.0
-offset_bottom = 988.0
-mouse_filter = 0
+anchors_preset = 0
+offset_left = 528.0
+offset_top = 36.0
+offset_right = 1392.0
+offset_bottom = 1044.0
 
-[node name="BackpackAsset" type="TextureRect" parent="Panel"]
+[node name="BackpackAsset" type="TextureRect" parent="Panel" unique_id=473512240]
 texture_filter = 1
 layout_mode = 1
 anchors_preset = 15
@@ -56,24 +60,61 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-texture = ExtResource("2_backpack")
+texture = SubResource("AtlasTexture_backpack_open")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="Grid" type="Control" parent="Panel"]
+[node name="Grid" type="Control" parent="Panel" unique_id=1770612552]
+editor_description = "Inspector 手动调整：选中本节点，在 Layout > Transform > Position 修改整组格子位置。当前 Position=(246,357)，Size=(364,520)；只改 Position 不会改变单格尺寸。"
 texture_filter = 1
-layout_mode = 0
-offset_left = 184.0
-offset_top = 210.0
-offset_right = 712.0
-offset_bottom = 738.0
-mouse_filter = 0
+anchors_preset = 0
+offset_left = 246.0
+offset_top = 357.0
+offset_right = 610.0
+offset_bottom = 877.0
 script = ExtResource("3_grid")
 
-[node name="BackButton" type="Button" parent="Panel"]
+[node name="CloseButton" type="Button" parent="Panel" unique_id=1002195382]
+editor_description = "Inspector 手动调整：选中本节点，在 Layout > Transform 中修改 Position；Size 保持 54×54。该坐标相对背包本体，拖动背包时按钮会自动跟随。"
 layout_mode = 0
-offset_left = 700.0
-offset_top = 54.0
-offset_right = 864.0
-offset_bottom = 104.0
-text = "←  收起"
+offset_left = 831.0
+offset_top = 90.0
+offset_right = 885.0
+offset_bottom = 144.0
+focus_mode = 0
+mouse_default_cursor_shape = 2
+theme_override_styles/normal = SubResource("StyleBoxEmpty_close")
+theme_override_styles/normal_mirrored = SubResource("StyleBoxEmpty_close")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_close")
+theme_override_styles/pressed_mirrored = SubResource("StyleBoxEmpty_close")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_close")
+theme_override_styles/hover_mirrored = SubResource("StyleBoxEmpty_close")
+theme_override_styles/hover_pressed = SubResource("StyleBoxEmpty_close")
+theme_override_styles/hover_pressed_mirrored = SubResource("StyleBoxEmpty_close")
+theme_override_styles/disabled = SubResource("StyleBoxEmpty_close")
+theme_override_styles/disabled_mirrored = SubResource("StyleBoxEmpty_close")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_close")
+flat = true
+
+[node name="Patch" type="Polygon2D" parent="Panel/CloseButton" unique_id=782525736]
+position = Vector2(-7, 11)
+color = Color(0.294118, 0.141176, 0.0705882, 1)
+polygon = PackedVector2Array(9, 4, 44, 4, 50, 10, 50, 44, 44, 50, 9, 50, 4, 44, 4, 10)
+
+[node name="PatchInset" type="Line2D" parent="Panel/CloseButton" unique_id=1096751467]
+position = Vector2(-7, 11)
+points = PackedVector2Array(11, 8, 42, 8, 46, 12, 46, 42, 42, 46, 11, 46, 8, 42, 8, 12, 11, 8)
+width = 2.0
+default_color = Color(0.541176, 0.321569, 0.160784, 1)
+
+[node name="StrokeA" type="Line2D" parent="Panel/CloseButton" unique_id=1196207779]
+position = Vector2(-7, 11)
+points = PackedVector2Array(16, 15, 21, 21, 27, 27, 33, 34, 39, 40)
+width = 3.0
+default_color = Color(0.905882, 0.780392, 0.552941, 1)
+
+[node name="StrokeB" type="Line2D" parent="Panel/CloseButton" unique_id=1101509579]
+position = Vector2(-7, 11)
+points = PackedVector2Array(39, 15, 33, 21, 28, 27, 21, 34, 16, 40)
+width = 3.0
+default_color = Color(0.905882, 0.780392, 0.552941, 1)

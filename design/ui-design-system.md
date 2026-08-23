@@ -245,10 +245,10 @@
 
 ## 8. 工作流（怎么落地·谁把关）
 
-1. **Claude 能自检的**（🟢 截图回路已通）：布局/构图/主次/比例/大色块配色/明显瑕疵。
-   做法：**带窗口**跑 shot-runner（**不加 `--headless`**，headless 卡 `frame_post_draw`）：主菜单 `tools/menu_shot_runner.tscn` / 图鉴 `gallery_shot_runner.tscn`·`item_gallery_shot.tscn` / 战斗 `battle_shot.tscn` → 存 PNG（项目外或 res/ gitignore）→ `Read` PNG → 改→截→再看。
+1. **Codex 能自检的**：布局/构图/主次/比例/大色块配色/明显瑕疵，统一通过 Godot 日志、几何断言、像素数据分析与不落盘探针验证。
+   做法：先跑 Import 与定向 GUT，再用不保存图片的探针输出节点几何、遮挡关系、锚点、像素边界和材质参数；不得生成或读取截图。
 2. **Claude 仍弱、必走 AI-gen/美术 + Eddy 把关**：自定义像素字形、从零画 logo、像素级笔形精修。
-3. **终审永远是 Eddy F6**（截图自检只减往返，不替代）。⛔ 别把预览截图堆进 BoBoZan 目录。
+3. **终审永远是 Eddy F6**；自动化证据只减少往返，不替代人工体验验收。
 4. **美术友好（🟢）**：UI 默认完整 `.tscn` 化，节点命名表意带类型后缀；颜色/StyleBox 长期抽 `.tres`；未来换美术的位置加注释。美术替换 = Inspector 换资源，**不该回头改 .gd**。
 5. ⚠ Eddy 常在编辑器手改 `.tscn`/Inspector → **改场景前先 grep 重读磁盘真实版本**，别用旧缓存覆盖他的参数。
 

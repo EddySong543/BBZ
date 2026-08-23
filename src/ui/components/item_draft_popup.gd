@@ -30,7 +30,7 @@ const FRAME_ART_SCALE := ItemFrameStyle.FRAME_ART_SCALE
 const FRAME_OFFSET_RATIO := ItemFrameStyle.FRAME_OFFSET_RATIO
 const CELL_INSET_RATIO := ItemFrameStyle.CELL_INSET_RATIO
 const TIER_INK := {   # 卡名墨色三阶（=item_gallery_screen.TIER_INK 同源·稀有度不染卡面）
-	1: Color("34608F"), 2: Color("6B3D96"), 3: Color("8F6A1E"),
+	1: Color("3769A6"), 2: Color("543F8F"), 3: Color("BB812C"),
 }
 const INK := Color(0.24, 0.19, 0.12)  # 墨字（亮纸主文字·与战斗悬停提示同源）
 

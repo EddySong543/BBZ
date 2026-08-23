@@ -67,18 +67,18 @@ mouse_filter = 2
 editor_description = "可视化编辑：拖动此节点即可整体移动当前页的 12 个英雄头像。Inspector 中可调整列数、头像尺寸、行列间距、隔行错位与书页弧度；运行时真实头像会使用同一套参数。"
 anchors_preset = 0
 offset_left = 188.0
-offset_top = 265.0
+offset_top = 255.0
 offset_right = 945.0
-offset_bottom = 958.0
+offset_bottom = 948.0
 mouse_filter = 2
 script = ExtResource("5_grid_preview")
 
 [node name="PageNavigation" type="Control" parent="PoolArea" unique_id=452072941]
 editor_description = "可视化编辑：左页翻页入口。位置、字号和间距均可直接调整；运行时只更新页码与可用状态。"
 anchors_preset = 0
-offset_left = 173.0
+offset_left = 188.0
 offset_top = 916.0
-offset_right = 930.0
+offset_right = 945.0
 offset_bottom = 970.0
 mouse_filter = 2
 
@@ -99,7 +99,7 @@ theme_override_styles/pressed = SubResource("StyleBoxEmpty_back")
 theme_override_styles/hover = SubResource("StyleBoxEmpty_back")
 theme_override_styles/disabled = SubResource("StyleBoxEmpty_back")
 theme_override_styles/focus = SubResource("StyleBoxEmpty_back")
-text = "<<< 上一页"
+text = "上一页"
 
 [node name="PageIndicator" type="Label" parent="PoolArea/PageNavigation" unique_id=162284521]
 layout_mode = 0
@@ -130,7 +130,7 @@ theme_override_styles/pressed = SubResource("StyleBoxEmpty_back")
 theme_override_styles/hover = SubResource("StyleBoxEmpty_back")
 theme_override_styles/disabled = SubResource("StyleBoxEmpty_back")
 theme_override_styles/focus = SubResource("StyleBoxEmpty_back")
-text = "下一页 >>>"
+text = "下一页"
 
 [node name="DetailArea" type="Control" parent="." unique_id=1392610854]
 layout_mode = 1
@@ -196,9 +196,9 @@ vertical_alignment = 1
 editor_description = "可视化编辑：主/被动长方形标签。运行时位于技能名后方，并与技能图标、技能名作为一组整体居中。"
 anchors_preset = 0
 offset_left = 1450.0
-offset_top = 768.0
+offset_top = 744.0
 offset_right = 1530.0
-offset_bottom = 802.0
+offset_bottom = 778.0
 mouse_filter = 2
 
 [node name="TypeMark" type="Control" parent="DetailArea/SkillTypeGroup" unique_id=814600065]

@@ -4,7 +4,7 @@
 
 **Goal:** Make the unified codex reproduce the approved side-tab states and book/background proportions, while adding restrained motion only to the smoky-brown backdrop.
 
-**Architecture:** Keep hero and item galleries authored at 1920x1080 and scale only `GalleryHost`. Replace the single stretched bookmark texture with deterministic idle/selected state textures derived from the approved generated paper source. Animate the background in a dedicated canvas shader that retains a fixed sharp base and mixes a very faint, manually interpolated moving texture layer.
+**Architecture:** Keep hero and item galleries authored at 1920x1080 and scale only `GalleryHost`. Replace scripted paper simulation with four external ImageGen idle/selected sources followed only by chroma cleanup, hard-alpha reduction, and integer scaling. Keep the static smoky-brown texture shader-free and place the faint procedural motion on a separate transparent layer so material failure cannot black out the background.
 
 **Tech Stack:** Godot 4 Control UI, GDScript, canvas_item shader, Pillow asset reduction, GUT.
 
@@ -37,10 +37,10 @@
 - Modify: `src/ui/codex_screen.tscn`
 - Modify: `src/ui/codex_screen.gd`
 
-- [ ] Set `GalleryHost` to a centered 0.76 scale, leaving the approved amount of warm background visible.
+- [ ] Set `GalleryHost` to scale 0.84 at `(210, 86)`, preserving side-tab space while restoring text readability.
 - [ ] Give each bookmark separate idle and selected art nodes and preserve one click target.
 - [ ] Switch state art in `_set_bookmark_state()` while retaining short press/hover motion.
-- [ ] Apply slow subpixel-interpolated drift and low-amplitude center breathing only to `Backdrop`.
+- [ ] Keep `Backdrop` static and shader-free; apply slow procedural warm-veil motion only to `BackdropMotion`.
 
 ### Task 3: Guard runtime contracts
 
@@ -48,6 +48,6 @@
 - Modify: `tests/unit/ui/test_screen_compiles.gd`
 - Modify: `tools/codex_bookmark_probe.gd`
 
-- [ ] Assert 0.76 framing, separate state textures, selected/idle visible bounds, and motion shader parameters.
+- [ ] Assert 0.84 framing, generated separate state textures, selected/idle visible bounds, static background fallback, and motion-overlay parameters.
 - [ ] Run the full GUT suite and the non-saving codex bookmark probe.
 - [ ] Run `git diff --check` and report without committing.

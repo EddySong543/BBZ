@@ -8,17 +8,23 @@ const FRAME_TEXTURE := preload("res://assets/ui/item_frame.png")
 const CELL_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_item_frame_palette.gdshader")
 const LEGENDARY_TEXTURE := preload("res://assets/ui/gold_bottom.png")
+const ItemCatalogScript := preload("res://src/battle/item_catalog.gd")
 
-const CELL_TOP := {1: Color("#6E9BD2"), 2: Color("#9A7FD0")}
-const CELL_BOTTOM := {1: Color("#88AEDE"), 2: Color("#B098E0")}
+# C 宝石方案：基准色管身份，同色相的小幅明暗只负责像素层次。
+const CELL_TOP := {
+	1: ItemCatalogScript.RARITY_NORMAL, 2: ItemCatalogScript.RARITY_RARE,
+}
+const CELL_BOTTOM := {1: Color("#5B8BC7"), 2: Color("#7863B0")}
 const FRAME_SHADOW := {
-	1: Color("#102C4A"), 2: Color("#2A1246"), 3: Color("#4A2F08"),
+	1: Color("#1C3655"), 2: Color("#2B2049"), 3: Color("#5F4217"),
 }
 const FRAME_MID := {
-	1: Color("#4A86C2"), 2: Color("#8050BC"), 3: Color("#C78F27"),
+	1: ItemCatalogScript.RARITY_NORMAL,
+	2: ItemCatalogScript.RARITY_RARE,
+	3: ItemCatalogScript.RARITY_LEGENDARY,
 }
 const FRAME_HIGHLIGHT := {
-	1: Color("#B9D9F2"), 2: Color("#D6B1F2"), 3: Color("#F7DE9A"),
+	1: Color("#9BB8DD"), 2: Color("#ACA0CF"), 3: Color("#E9C794"),
 }
 
 const DROP_SHADOW_OFFSET := Vector2(2.0, 4.0)
@@ -26,7 +32,7 @@ const DROP_SHADOW_COLOR := Color(0.02, 0.012, 0.008, 0.34)
 const ITEM_ART_SHADOW_OFFSET := Vector2(2.0, 3.0)
 const ITEM_ART_SHADOW_COLOR := Color(0.02, 0.012, 0.008, 0.38)
 
-const LEGENDARY_TINT := Color.WHITE
+const LEGENDARY_TINT := Color("#F0CA82")
 const LEGENDARY_TOP_DARKENING := 0.18
 const FRAME_ART_SCALE := 87.25 / 68.0
 const FRAME_OFFSET_RATIO := Vector2(-9.6 / 68.0, -10.0 / 68.0)

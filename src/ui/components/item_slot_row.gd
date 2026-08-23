@@ -49,7 +49,9 @@ const LEGENDARY_TOP_DARKENING := ItemFrameStyle.LEGENDARY_TOP_DARKENING
 const FRAME_EDGE_OUTER := Color(0.16, 0.10, 0.06)   # 框外轮廓=深咖（与图鉴同）
 const FRAME_ART_SIZE := Vector2.ONE * SLOT_W * ItemFrameStyle.FRAME_ART_SCALE
 const FRAME_ART_OFFSET := Vector2(SLOT_W, SLOT_H) * ItemFrameStyle.FRAME_OFFSET_RATIO
-const CELL_INSET := SLOT_W * ItemFrameStyle.CELL_INSET_RATIO
+## 战斗栏的小尺寸框会把共享 5.5px 内缩落在半像素，最近邻取样后左边偶发 1px 接缝。
+## 使用整数 4px 让填充在四边都压进框体约 2px；只修战斗栏，不改图鉴的大框比例。
+const CELL_INSET := 4.0
 const CELL_CORNER := 0.18                            # 圆角（格底与框一致·与图鉴同·全圆角无方角）
 const CELL_GRID := 23.0    # 像素格数（= 图鉴 BOX/6）。用「格数」而非 SLOT_W/6 → 边框按比例随框缩放、不会在小框上变粗（2026-06-28 Eddy：去掉过厚棕边·与图鉴完全一致）
 const EDGE_OUTER := Color(0.11, 0.09, 0.075)    # 统一暗轮廓（暖黑·与暖色UI同温·任何色相都干净）

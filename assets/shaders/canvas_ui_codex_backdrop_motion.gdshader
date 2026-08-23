@@ -1,36 +1,26 @@
 shader_type canvas_item;
-render_mode unshaded;
+render_mode unshaded, blend_mix;
 
-uniform float drift_pixels : hint_range(0.0, 8.0, 0.25) = 4.0;
-uniform float drift_period : hint_range(8.0, 40.0, 0.5) = 22.0;
-uniform float moving_mix : hint_range(0.0, 0.15, 0.005) = 0.08;
-uniform float breathe_strength : hint_range(0.0, 0.03, 0.001) = 0.012;
-uniform float breathe_period : hint_range(8.0, 30.0, 0.5) = 18.0;
+uniform vec4 veil_color : source_color = vec4(0.34, 0.25, 0.17, 1.0);
+uniform float motion_alpha : hint_range(0.0, 0.06, 0.001) = 0.028;
+uniform float drift_speed : hint_range(0.0, 0.08, 0.002) = 0.034;
+uniform float pixel_grid : hint_range(24.0, 120.0, 1.0) = 72.0;
+
+float hash21(vec2 point) {
+	return fract(sin(dot(point, vec2(127.1, 311.7))) * 43758.5453123);
+}
 
 void fragment() {
-	vec4 vertex_tint = COLOR;
-	vec2 safe_uv = (UV - vec2(0.5)) * 0.985 + vec2(0.5);
-	float drift_phase = TIME * 6.28318530718 / drift_period;
-	vec2 drift = vec2(sin(drift_phase), cos(drift_phase * 0.73))
-			* drift_pixels * TEXTURE_PIXEL_SIZE;
-	vec4 fixed_layer = texture(TEXTURE, safe_uv);
-	vec2 moving_uv = clamp(safe_uv + drift, vec2(0.002), vec2(0.998));
-	vec2 moving_pixel = moving_uv / TEXTURE_PIXEL_SIZE - vec2(0.5);
-	vec2 base_pixel = floor(moving_pixel);
-	vec2 blend_amount = smoothstep(vec2(0.0), vec2(1.0), fract(moving_pixel));
-	vec2 uv00 = (base_pixel + vec2(0.5)) * TEXTURE_PIXEL_SIZE;
-	vec2 uv10 = uv00 + vec2(TEXTURE_PIXEL_SIZE.x, 0.0);
-	vec2 uv01 = uv00 + vec2(0.0, TEXTURE_PIXEL_SIZE.y);
-	vec2 uv11 = uv00 + TEXTURE_PIXEL_SIZE;
-	vec4 moving_top = mix(texture(TEXTURE, uv00), texture(TEXTURE, uv10), blend_amount.x);
-	vec4 moving_bottom = mix(texture(TEXTURE, uv01), texture(TEXTURE, uv11), blend_amount.x);
-	vec4 moving_layer = mix(moving_top, moving_bottom, blend_amount.y);
-	vec3 color = mix(fixed_layer.rgb, moving_layer.rgb, moving_mix);
-
-	vec2 centered = (UV - vec2(0.5)) * vec2(1.0, 0.78);
-	float center_mask = 1.0 - smoothstep(0.08, 0.72, length(centered));
-	float breathe = sin(TIME * 6.28318530718 / breathe_period)
-			* breathe_strength * center_mask;
-	color *= 1.0 + breathe;
-	COLOR = vec4(color, fixed_layer.a) * vertex_tint;
+	vec2 aspect_uv = vec2(UV.x * 1.7777778, UV.y);
+	vec2 pixel_cell = floor(aspect_uv * pixel_grid);
+	float time_phase = TIME * drift_speed;
+	float broad_wave = sin((pixel_cell.x * 0.075) + (pixel_cell.y * 0.052) + time_phase);
+	float cross_wave = sin((pixel_cell.x * -0.041) + (pixel_cell.y * 0.089) - time_phase * 0.73);
+	float static_grain = hash21(pixel_cell);
+	float field = clamp(0.5 + broad_wave * 0.22 + cross_wave * 0.16
+			+ (static_grain - 0.5) * 0.08, 0.0, 1.0);
+	vec2 centered = (UV - vec2(0.5)) * vec2(1.0, 0.76);
+	float center_falloff = 1.0 - smoothstep(0.18, 0.78, length(centered));
+	float alpha = motion_alpha * mix(0.38, 1.0, field) * mix(0.62, 1.0, center_falloff);
+	COLOR = vec4(veil_color.rgb, alpha);
 }

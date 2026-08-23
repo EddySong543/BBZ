@@ -25,6 +25,7 @@ const GOLD_SEL := Color("C99032")
 const SELECTED_NAME_INK := Color("9A6828")
 const POINTER_COLOR := Color("7B5E3E")
 const POINTER_SIZE := Vector2(20.0, 36.0)
+const SKILL_SECTION_OFFSET_Y := -24.0
 
 # ── 1920×1080 双栏几何 ──
 const PAGE_L := Rect2(50, 158, 886, 836)
@@ -35,6 +36,7 @@ const COLS := 4
 const CARDS_PER_PAGE := 12
 const BOX := 104.0
 const NAME_H := 36.0
+const NAME_TOP_GAP := 7.0
 const STEP_X := 170.0
 const ROW_H := 196.0
 
@@ -59,6 +61,8 @@ var _sel_idx: int = -1
 var _current_page: int = 0
 var _sel_tweens: Array[Tween] = []        # 选中书签落位 tween（换选先 kill 全部）
 var _pop_tween: Tween                     # 右页展示落位微弹
+## 统一图鉴外壳会自行提供返回入口与章节切换；嵌入时不重复播放整本书的入场。
+@export var embedded_in_codex: bool = false
 
 # 详情板部件（_build_detail_panel 一次建好）
 var _d_anim: AnimatedSprite2D
@@ -96,7 +100,8 @@ func _ready() -> void:
 	_setup_page_navigation()
 	_build_detail_panel()
 	_select(0)
-	_play_intro()
+	if not embedded_in_codex:
+		_play_intro()
 
 
 # ============================================================
@@ -123,6 +128,10 @@ func _setup_top() -> void:
 
 
 func _style_back_button() -> void:
+	if embedded_in_codex:
+		back_btn.visible = false
+		back_btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		return
 	back_btn.text = tr("<<< 返回")
 	back_btn.focus_mode = Control.FOCUS_ALL
 	back_btn.pressed.connect(_back_to_menu)
@@ -297,7 +306,7 @@ func _build_pool() -> void:
 		var name_lbl := Label.new()
 		name_lbl.name = "HeroName"
 		name_lbl.text = tr(h.hero_name)
-		name_lbl.position = Vector2(-16.0, box + 4.0)
+		name_lbl.position = Vector2(-16.0, box + NAME_TOP_GAP)
 		name_lbl.size = Vector2(box + 32.0, NAME_H)
 		name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		name_lbl.vertical_alignment = VERTICAL_ALIGNMENT_TOP
@@ -368,20 +377,20 @@ func _build_detail_panel() -> void:
 	_d_skill_name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_d_detail_rule = ColorRect.new()
 	_d_detail_rule.name = "DetailRule"
-	_d_detail_rule.position = Vector2(px + 86, py + 680)
+	_d_detail_rule.position = Vector2(px + 86, py + 680 + SKILL_SECTION_OFFSET_Y)
 	_d_detail_rule.size = Vector2(2, 60)
 	_d_detail_rule.color = Color(BONE_LINE, 0.82)
 	_d_detail_rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	detail_area.add_child(_d_detail_rule)
 	_d_detail_pin = ColorRect.new()
 	_d_detail_pin.name = "DetailPin"
-	_d_detail_pin.position = Vector2(px + 84, py + 674)
+	_d_detail_pin.position = Vector2(px + 84, py + 674 + SKILL_SECTION_OFFSET_Y)
 	_d_detail_pin.size = Vector2(6, 6)
 	_d_detail_pin.color = Color(BONE_LINE, 0.92)
 	_d_detail_pin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	detail_area.add_child(_d_detail_pin)
 	_d_detail = _make_label(
-		Vector2(px + 112, py + 670),
+		Vector2(px + 112, py + 670 + SKILL_SECTION_OFFSET_Y),
 		Vector2(PAGE_R.size.x - 214, 126), 22, INK)
 	_d_detail.name = "SkillDetail"
 	_d_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -477,7 +486,7 @@ func _layout_skill_row() -> void:
 	var tag_w := 80.0
 	var total: float = icon_block + name_w + tag_gap + tag_w
 	var x0: float = PAGE_R.position.x + (PAGE_R.size.x - total) * 0.5
-	var y0: float = PAGE_R.position.y + 610
+	var y0: float = PAGE_R.position.y + 610 + SKILL_SECTION_OFFSET_Y
 	if icon_on:
 		_d_skill_icon.position = Vector2(x0, y0)
 		_d_skill_icon.size = Vector2(32, 32)

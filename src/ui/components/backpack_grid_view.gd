@@ -6,10 +6,13 @@ class_name BackpackGridView
 signal cell_pressed(index: int)
 
 const ItemCatalogScript := preload("res://src/battle/item_catalog.gd")
-const GRID_FILL := Color("241A13")
-const GRID_EDGE := Color("91683E")
-const GRID_SEAM := Color("5D432D")
+const GRID_FILL := Color("211713")
+const GRID_CELL := Color("4B352B")
+const GRID_CELL_LINE := Color("6A5042")
+const GRID_OUTLINE := Color("120C0A")
 const GRID_HOVER := Color("D3A94F")
+const GRID_FIBER_LIGHT := Color(0.67, 0.49, 0.36, 0.13)
+const GRID_FIBER_DARK := Color(0.10, 0.055, 0.035, 0.16)
 const ITEM_SHADOW := Color(0.02, 0.01, 0.0, 0.68)
 
 @export_range(1, 12, 1) var rows: int = 6
@@ -67,16 +70,18 @@ func cell_rect(index: int) -> Rect2:
 func _draw() -> void:
 	if rows <= 0 or columns <= 0:
 		return
-	# 外轮廓与格线全部落在整数像素；相邻格只共享一条 2px 线，不制造空隙。
+	# ref43 的格面关系：深咖分隔缝包住低饱和栗木棕槽面，不模拟受光或凹凸。
 	draw_rect(Rect2(Vector2.ZERO, size), GRID_FILL, true)
-	draw_rect(Rect2(Vector2.ONE * 2.0, size - Vector2.ONE * 4.0), GRID_EDGE, false, 4.0)
 	var cell_size := Vector2(size.x / float(columns), size.y / float(rows))
-	for column: int in range(1, columns):
-		var x := roundf(cell_size.x * column)
-		draw_rect(Rect2(x - 1.0, 2.0, 2.0, size.y - 4.0), GRID_SEAM, true)
-	for row: int in range(1, rows):
-		var y := roundf(cell_size.y * row)
-		draw_rect(Rect2(2.0, y - 1.0, size.x - 4.0, 2.0), GRID_SEAM, true)
+	for row: int in rows:
+		for column: int in columns:
+			var cell := Rect2(Vector2(column, row) * cell_size, cell_size)
+			var slot := cell.grow(-2.0)
+			draw_rect(slot, GRID_CELL, true)
+			draw_rect(slot, GRID_CELL_LINE, false, 1.0)
+			_draw_cell_fibers(slot, row, column)
+	# 外缘与内部格缝使用同一暗色体系，避免形成另一层装饰边框。
+	draw_rect(Rect2(Vector2.ONE, size - Vector2.ONE * 2.0), GRID_OUTLINE, false, 2.0)
 	for placement_value: Variant in placements:
 		var placement := placement_value as Dictionary
 		var item := placement.get("item", {}) as Dictionary
@@ -161,6 +166,23 @@ func _placement_bounds(anchor: Vector2i, shape: Array) -> Rect2:
 func _fit_square(bounds: Rect2) -> Rect2:
 	var side := minf(bounds.size.x, bounds.size.y)
 	return Rect2(bounds.position + (bounds.size - Vector2.ONE * side) * 0.5, Vector2.ONE * side)
+
+
+## 只用两笔 1px 断续纤维打破纯色色块；位置由格坐标决定，不形成木板或凹槽错觉。
+func _draw_cell_fibers(slot: Rect2, row: int, column: int) -> void:
+	var seed := row * 37 + column * 19
+	var usable_width := maxi(8, int(slot.size.x) - 18)
+	var x0 := slot.position.x + 7.0 + float(seed % usable_width)
+	var y0 := slot.position.y + 9.0 + float((seed * 3) % maxi(8, int(slot.size.y) - 18))
+	var length0 := 7.0 + float(seed % 7)
+	x0 = minf(x0, slot.end.x - length0 - 6.0)
+	draw_line(Vector2(x0, y0), Vector2(x0 + length0, y0), GRID_FIBER_LIGHT, 1.0)
+
+	var x1 := slot.position.x + 6.0 + float((seed * 5 + 3) % usable_width)
+	var y1 := slot.position.y + 8.0 + float((seed * 7 + 5) % maxi(8, int(slot.size.y) - 16))
+	var length1 := 5.0 + float((seed + 2) % 6)
+	x1 = minf(x1, slot.end.x - length1 - 6.0)
+	draw_line(Vector2(x1, y1), Vector2(x1 + length1, y1), GRID_FIBER_DARK, 1.0)
 
 
 func _draw_hover_cell(index: int) -> void:

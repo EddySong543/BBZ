@@ -12,7 +12,9 @@ const LEGENDARY_BG := ItemFrameStyle.LEGENDARY_TEXTURE
 const ITEM_FRAME_TEX := ItemFrameStyle.FRAME_TEXTURE
 const TIER_LABEL := {1: "普通", 2: "稀有", 3: "传说"}
 const TIER_TAG_COLOR := {
-	1: Color("7FA4B2"), 2: Color("A08AAC"), 3: Color("C39A4B"),
+	1: ItemCatalog.RARITY_NORMAL,
+	2: ItemCatalog.RARITY_RARE,
+	3: ItemCatalog.RARITY_LEGENDARY,
 }
 const DETAIL_NAME_INK := Color("302820")
 const LEGENDARY_BG_TINT := ItemFrameStyle.LEGENDARY_TINT
@@ -21,13 +23,10 @@ const MENU_SCENE := "res://src/ui/main_menu.tscn"
 
 # 道具格恢复与战斗道具栏完全同源的格底 shader 与三阶配色。
 
-# ── 选中态：与英雄图鉴完全同步。真实框材质转金，外侧只显示单色粗像素三角箭头。──
+# ── 选中态：保留道具自身稀有度框色，仅用书页指针和名称墨色表达选中。──
 const POINTER_COLOR := Color("7B5E3E")
 const POINTER_SIZE := Vector2(20.0, 36.0)
 const SELECTED_NAME_INK := Color("9A6828")
-const FRAME_SELECTED_SHADOW := Color("704A1E")
-const FRAME_SELECTED_MID := Color("C99032")
-const FRAME_SELECTED_HIGHLIGHT := Color("F2D28B")
 
 # （2026-07-13 衬底换宣纸山水贴图：深靛 NIGHT_* 三常量与 _retint_background 退役——
 #   背景图不透明满屏盖住 Background 节点·gallery_background.tscn 本体不动=英雄图鉴共用。）
@@ -85,6 +84,8 @@ var _d_rarity_label: Label
 var _d_desc: Label
 var _d_flavor: Label
 var _d_pop_tween: Tween             # 右页图标落位微弹（快速方向键换件时先 kill 再建）
+## 统一图鉴外壳会自行提供返回入口与章节切换；嵌入时不重复播放整本书的入场。
+@export var embedded_in_codex: bool = false
 var _sel_tweens: Array[Tween] = []  # 选中动效 tween（pop+呼吸·换选先 kill 全部）
 
 @onready var item_grid: Control = $PoolArea/ItemGrid
@@ -105,7 +106,8 @@ func _ready() -> void:
 	_build_detail_panel()
 	_setup_page_navigation()
 	_select_tier(1)
-	_play_intro()
+	if not embedded_in_codex:
+		_play_intro()
 
 
 # ============================================================
@@ -133,6 +135,10 @@ func _setup_top() -> void:
 
 
 func _style_back_button() -> void:
+	if embedded_in_codex:
+		back_btn.visible = false
+		back_btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		return
 	back_btn.text = tr("<<< 返回")
 	back_btn.focus_mode = Control.FOCUS_NONE
 	FontManager.apply_btn(back_btn, 24)
@@ -336,14 +342,10 @@ func _set_tier_frame_palette(m: ShaderMaterial, tier: int) -> void:
 	ItemFrameStyle.apply_frame_palette(m, tier)
 
 
-func _set_item_frame_selected(frame: TextureRect, tier: int, selected: bool) -> void:
+func _set_item_frame_selected(frame: TextureRect, tier: int, _selected: bool) -> void:
 	var material := frame.material as ShaderMaterial
-	if selected:
-		material.set_shader_parameter("shadow_color", FRAME_SELECTED_SHADOW)
-		material.set_shader_parameter("mid_color", FRAME_SELECTED_MID)
-		material.set_shader_parameter("highlight_color", FRAME_SELECTED_HIGHLIGHT)
-	else:
-		_set_tier_frame_palette(material, tier)
+	# 选中不再把蓝/紫阶级框覆盖成旧金框；语义色在所有交互状态保持稳定。
+	_set_tier_frame_palette(material, tier)
 
 
 func _make_selection_pointer(box: float) -> Control:
@@ -372,8 +374,6 @@ func _make_item_card(item: ItemData, idx: int) -> Button:
 	var slot_rect := Rect2(Vector2.ZERO, Vector2(box, box))
 	var frame_position := slot_rect.position + slot_rect.size * FRAME_OFFSET_RATIO
 	var frame_size := slot_rect.size * FRAME_ART_SCALE
-	card.add_child(ItemFrameStyle.make_frame_shadow(
-			frame_position, frame_size, "BottomShadow"))
 	var cell_inset := box * CELL_INSET_RATIO
 	var cell := ColorRect.new()
 	cell.name = "Cell"
