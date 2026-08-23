@@ -21,6 +21,8 @@ const LONGYUJI_SKILL_ICON := preload("res://assets/sprites/heroes/h05/h05_skill.
 const ANCHAO_SKILL_ICON := preload("res://assets/sprites/heroes/h13/h13_skill.png")
 const H24_SKILL_ICON := preload("res://assets/sprites/heroes/h24/h24_skill.png")
 const HERO_FRAME_SCENE := preload("res://src/ui/components/hero_frame.tscn")
+const BACKPACK_OVERLAY_SCENE := preload("res://src/ui/backpack_screen.tscn")
+const BACKPACK_ICON := preload("res://assets/ui/icons/backpack.png")
 
 # 动作按钮"能量消耗"金币（1 能量 1 球）= battle_screen_base.tscn 内每个按钮下的 CostPips 节点，
 # 位置/大小/间距在 Godot 编辑器里可视化调整（可视化设计·任务2）；代码只在运行时填入数量。
@@ -108,7 +110,6 @@ const DEBUG_BUTTONS := true
 # debug 面板改运行时 load（2026-07-17 发行审计②）：preload=硬编译引用——发行导出按
 # export_presets.example.cfg 排除 src/ui/debug/** 后会让本文件编译失败；load 在
 # _build_debug_buttons 双门（联机禁用+is_debug_build）之后才执行=开发期照常·发行包可剥离。
-const BattleCodexOverlay := preload("res://src/ui/components/battle_codex_overlay.gd")   # 图鉴浮层（同上·preload 引用）
 const ProfileStore := preload("res://src/core/player_profile.gd")   # 个人资料战绩计数（同上·preload 引用）
 const RoundLabelOrnamentsComponent := preload("res://src/ui/components/round_label_ornaments.gd")
 const CentralTurnCueComponent := preload("res://src/ui/components/central_turn_cue.gd")
@@ -124,14 +125,21 @@ const HpSlantBarScript := preload("res://src/ui/components/hp_slant_bar.gd")
 @export var character_reflection_receiver_path: NodePath = ^"River"
 ## 当前角色素材的脚底在 768px SubViewport 中约为 63.5%；作为镜像与水线相接的锚点。
 @export_range(0.0, 1.0, 0.001) var character_reflection_foot_ratio: float = 0.635
-## 死亡节拍 v3（2026-07-18 Eddy 批 A 方案·倒地后在地时长定 2s）：
-## 致命定格 0.2 → 倒地 0.7 → 落地宣告（尘+轻震+遗体褪色 0.4）→ 静躺 1.6 → 消散换人。
-## death_lie_duration = 从 defeat 起播到允许消散的保底总时长（0.7 倒地 + 2.0 在地）。
-## 换人过渡按「已躺时长」补差额——玩家选人/终结慢放耗时计入，不重复罚站。
-@export var death_lie_duration: float = 2.7
-@export var kill_hitstop_duration: float = 0.2   # ① 致命定格（真实秒·普通 0.045/重击 0.075 的加重档）
-@export var death_gray_duration: float = 0.4     # ③ 遗体褪色时长（落地宣告拍）
-const DEFEAT_FALL_TIME := 0.7   # defeat 帧表标准时长（import_hero_batch 管线：帧数/0.7s）
+## 死亡五拍：短定格 → 受力衔接 → 倒地帧真实结束 → 末帧停留 → 四周侵蚀式像素瓦解。
+## 所有节拍均以事件为锚，不再假定每名英雄的 defeat 都固定为 0.7 秒。
+@export var kill_hitstop_duration: float = 0.11
+@export var death_recoil_duration: float = 0.07
+@export var death_recoil_distance: float = 8.0
+@export var death_final_frame_hold_duration: float = 0.26
+@export var death_dissolve_duration: float = 0.60
+@export_range(4, 24, 1) var death_dissolve_steps: int = 12
+@export var death_entry_duration: float = 0.24
+@export var death_entry_drop: float = 18.0
+const DEATH_DISSOLVE_OPEN_PROGRESS: float = 0.25
+const DEATH_DISSOLVE_MIDDLE_PROGRESS: float = 0.83
+const DEATH_DISSOLVE_OPEN_SHARE: float = 0.30
+const DEATH_DISSOLVE_MIDDLE_SHARE: float = 0.42
+const DEATH_DISSOLVE_CLOSE_SHARE: float = 0.28
 # 回合时限阶梯（2026-07-11 Eddy 定·由少到多·台阶绑道具解锁节奏）：回合 1-2 纯动作选择 10s →
 # 回合 3 起道具经济开动（3/4/5 逐格解锁）15s → 回合 6 起组合决策期（看描述/算对方）20s 封顶。
 const TURN_TIME_STEPS: Array = [[5, 20], [2, 15], [0, 10]]   # [起始回合(0-based), 秒]·降序查表
@@ -192,8 +200,9 @@ var _central_turn_cue
 var p1_frame_slots: Array[int] = [-1, -1, -1]
 var p2_frame_slots: Array[int] = [-1, -1, -1]
 
-var btn_codex: Button = null          # 右下「图鉴」入口（程序化创建）
+var btn_backpack: Button = null       # 右下「背包」入口（程序化创建）
 var btn_switch: Button = null         # 左下切换入口；候选头像从它向右展开
+var _switch_button_icon: HoverIcon = null
 var _switch_tray: Control = null
 var _switch_candidate_frames: Array[HeroFrame] = []
 var _switch_tray_open := false
@@ -203,7 +212,7 @@ const SWITCH_MAIN_SIZE := Vector2(108.0, 108.0)
 const SWITCH_FRAME_SIZE := 76.0
 const SWITCH_FRAME_STEP := 94.0
 var _special_icon: TextureRect = null # 技能钮内的英雄专属技能图标（2026-07-17 Eddy 点单·懒创建）
-var _codex_overlay: Control = null    # 战斗内图鉴浮层（懒创建·关闭仅隐藏）
+var _backpack_overlay: Control = null # 战斗内背包浮层（懒创建·关闭仅隐藏）
 
 @onready var buttons_ctrl: Control = $Buttons
 @onready var _death_switch_overlay: DeathSwitchOverlay = $DeathSwitchOverlay
@@ -276,11 +285,12 @@ var _overtime := false                        # 本局是否加时赛（Q5·白�
 # ── 远征 PvE：公共战斗核心 + 跨战生命/回程适配 ──
 const BattlePveScript := preload("res://src/ui/components/battle_pve.gd")   # PvE 跨战状态/回程适配层（仅 PvE 局创建）
 const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")   # 导航钮贴图（米金纸面+角折·与主菜单同源）
+const SWITCH_ICON_TEX := preload("res://assets/ui/icons/switch_hover_sheet.png")
+## 4×2 图集按左上到右下编号 0..7：排除第一行第四帧(3)、第二行第一帧(4)，
+## 新版第二行其余格也为空，因此只播放三个实际有内容的帧。
+const SWITCH_ICON_PLAYBACK_FRAMES: Array[int] = [0, 1, 2]
 var _pve := false                             # 本局=远征 PvE（BattleSetup.pve_mode·须在 reset() 前读）
 var _pved: Node = null                        # PvE 只保留真 HeroData、跨战 HP 与回程结果适配
-var _story := false                           # 本局=故事关卡（BattleSetup.story_mode·须在 reset() 前读）
-var _story_level_id := ""                     # 关卡 id（回程写 story_result 定位）
-var _story_ending := false                    # 防重复回程结算
 var _net := false                             # 本局=联机局（BattleSetup.net_session 非空·M1）
 var _net_last_turn := 0                       # 已进入选招的回合号（检测服务器 turn_begin）
 var _net_busy := false                        # 联机结算演出进行中（pump 串行防重入）
@@ -378,8 +388,6 @@ func _ready() -> void:
 	battle = BattleCore.new()
 	_overtime = BattleSetup.overtime   # 须在 reset() 前读取
 	_pve = BattleSetup.pve_mode        # 远征 PvE（任务 D）·同样须在 reset() 前读取
-	_story = BattleSetup.story_mode    # 故事关卡（任务 B 壳）·同样须在 reset() 前读取
-	_story_level_id = BattleSetup.story_level_id
 	_net = BattleSetup.net_session != null   # 联机局（M1）·net_session 不被 reset() 清（生命周期独立）
 	var pve_player_hp: Array = BattleSetup.pve_player_hp.duplicate()
 	var pve_opponent_hp: Array = BattleSetup.pve_opponent_hp.duplicate()
@@ -603,64 +611,16 @@ func _init_buttons() -> void:
 	btn_split_big_wave.pressed.connect(_on_split_big_wave_pressed)
 	split_big_wave_picker.add_child(btn_split_big_wave)
 
-	# 图鉴是非回合操作，与结束按钮组成右下工具组；左下留给向右展开的切换模块。
-	btn_codex = Button.new()
-	btn_codex.name = "BtnCodex"
-	btn_codex.text = ""   # 「图鉴」二字 → 书本图标（2026-07-18 Eddy·图标见下方 BookIcon）
-	btn_codex.focus_mode = Control.FOCUS_NONE
-	btn_codex.clip_text = true
-	# 108px 图鉴钮紧邻 108px 结束钮左侧，保留 12px 组内间距并共用底部基线。
-	btn_codex.position = Vector2(1652.0, 46.0)
-	btn_codex.size = Vector2(108.0, 108.0)
-	for st in ["normal", "hover", "pressed", "disabled", "focus"]:
-		btn_codex.add_theme_stylebox_override(st, StyleBoxEmpty.new())
-	# 微调③（2026-07-17 Eddy）：导航钮皮→与攒/波同款像素果冻框（参数抄 JellyZan·奶油纸填色保图鉴识别）。
-	var codex_bg := ColorRect.new()
-	codex_bg.name = "Bg"
-	var codex_mat := ShaderMaterial.new()
-	codex_mat.shader = preload("res://assets/shaders/canvas_button_jelly.gdshader")
-	codex_mat.set_shader_parameter("fill_top", Color(0.92, 0.87, 0.70))
-	codex_mat.set_shader_parameter("fill_bottom", Color(0.76, 0.68, 0.50))
-	codex_mat.set_shader_parameter("edge_inner", Color(1.0, 0.95, 0.80))
-	codex_mat.set_shader_parameter("edge_outer", Color(0.1, 0.09, 0.11))
-	codex_mat.set_shader_parameter("fill_alpha", 1.0)
-	codex_mat.set_shader_parameter("pixel_grid", 38.0)
-	codex_mat.set_shader_parameter("corner", 0.22)
-	codex_mat.set_shader_parameter("edge_px", 2.0)
-	codex_mat.set_shader_parameter("aspect", 1.0)
-	codex_mat.set_shader_parameter("noise_amt", 0.08)
-	codex_mat.set_shader_parameter("wear", 0.24)
-	codex_mat.set_shader_parameter("solid_rim", true)
-	codex_mat.set_shader_parameter("rim_px", 1.5)
-	codex_bg.material = codex_mat
-	codex_bg.show_behind_parent = true
-	codex_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	codex_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	btn_codex.add_child(codex_bg)
-	# 书本图标取代「图鉴」二字（2026-07-18 Eddy）：64×64 原图 **1:1 摆放**（108 钮内缩 22
-	# → 恰好 64 见方）——像素纪律：非整数倍缩放会糊，宁可留白也不拉伸。
-	var book := TextureRect.new()
-	book.name = "BookIcon"
-	book.texture = preload("res://assets/ui/icons/codex_book.png")
-	book.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	book.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	book.offset_left = 22.0
-	book.offset_top = 22.0
-	book.offset_right = -22.0
-	book.offset_bottom = -22.0
-	book.expand_mode = TextureRect.EXPAND_IGNORE_SIZE   # 小尺寸 TextureRect 必 IGNORE_SIZE
-	book.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	book.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	btn_codex.add_child(book)
-	_attach_button_juice(btn_codex)
-	btn_codex.pressed.connect(_on_codex_pressed)
-	buttons_ctrl.add_child(btn_codex)
+	# 战斗中只保留背包工具入口；图鉴入口从战斗 HUD 移除，结束按钮回到右下角。
+	btn_backpack = _make_backpack_utility_button()
+	buttons_ctrl.add_child(btn_backpack)
 	_build_switch_module()
 
 	# 顶部倒计时/回合开始已有右下定向阴影；底部按钮同步这套层级语言。
 	# 阴影是按钮子节点，会跟随现有 hover/selected 缩放，但不改变点击矩形。
 	for button: Button in action_btn_list + [
-			btn_confirm, btn_codex, btn_switch, btn_longyuji_branch, btn_split_big_wave, btn_h24_discount]:
+			btn_confirm, btn_backpack, btn_switch, btn_longyuji_branch,
+			btn_split_big_wave, btn_h24_discount]:
 		_attach_button_bottom_shadow(button)
 
 	# 镜头偏焦改由「执行动作」触发（见 _play_battle_anims）：波/大波→右聚敌、防/大防→左聚己、其余回正。
@@ -709,6 +669,58 @@ func _init_buttons() -> void:
 	# 出战角色名 / 玩家 id 的字体·字号·颜色·描边·玩家id文本 全部在 battle_screen_base.tscn 设置
 	# （像素字体 ttf 直接引用·import 已关 AA → 编辑器所见即所得，可在 Inspector 手调位置/大小）。
 	# 代码只负责把角色名文本随出战英雄更新（见 _update_hero_frames）。
+
+
+func _make_backpack_utility_button() -> Button:
+	var button := Button.new()
+	button.name = "BtnBackpack"
+	button.text = ""
+	button.focus_mode = Control.FOCUS_NONE
+	button.clip_text = true
+	button.position = Vector2(1652.0, 46.0)
+	button.size = Vector2(108.0, 108.0)
+	for state_name in ["normal", "hover", "pressed", "disabled", "focus"]:
+		button.add_theme_stylebox_override(state_name, StyleBoxEmpty.new())
+
+	var bg := ColorRect.new()
+	bg.name = "Bg"
+	bg.show_behind_parent = true
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var material := ShaderMaterial.new()
+	material.shader = preload("res://assets/shaders/canvas_button_jelly.gdshader")
+	material.set_shader_parameter("fill_top", Color(0.92, 0.87, 0.70))
+	material.set_shader_parameter("fill_bottom", Color(0.76, 0.68, 0.50))
+	material.set_shader_parameter("edge_inner", Color(1.0, 0.95, 0.80))
+	material.set_shader_parameter("edge_outer", Color(0.1, 0.09, 0.11))
+	material.set_shader_parameter("fill_alpha", 1.0)
+	material.set_shader_parameter("pixel_grid", 38.0)
+	material.set_shader_parameter("corner", 0.22)
+	material.set_shader_parameter("edge_px", 2.0)
+	material.set_shader_parameter("aspect", 1.0)
+	material.set_shader_parameter("noise_amt", 0.08)
+	material.set_shader_parameter("wear", 0.24)
+	material.set_shader_parameter("solid_rim", true)
+	material.set_shader_parameter("rim_px", 1.5)
+	bg.material = material
+	button.add_child(bg)
+
+	var icon := TextureRect.new()
+	icon.name = "BackpackIcon"
+	icon.texture = BACKPACK_ICON
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	icon.offset_left = 22.0
+	icon.offset_top = 22.0
+	icon.offset_right = -22.0
+	icon.offset_bottom = -22.0
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(icon)
+	_attach_button_juice(button)
+	button.pressed.connect(_on_backpack_pressed)
+	return button
 
 
 func _make_longyuji_branch_button() -> Button:
@@ -1008,18 +1020,12 @@ func _connect_frame_signals() -> void:
 func _build_switch_module() -> void:
 	btn_switch = Button.new()
 	btn_switch.name = "BtnSwitch"
-	btn_switch.text = tr("切换")
+	btn_switch.text = ""
 	btn_switch.focus_mode = Control.FOCUS_NONE
 	btn_switch.position = SWITCH_MAIN_POS
 	btn_switch.size = SWITCH_MAIN_SIZE
 	for st in ["normal", "hover", "pressed", "disabled", "focus"]:
 		btn_switch.add_theme_stylebox_override(st, StyleBoxEmpty.new())
-	FontManager.apply_btn(btn_switch, 28)
-	btn_switch.add_theme_color_override("font_color", Color(0.96, 0.97, 0.91))
-	btn_switch.add_theme_color_override("font_hover_color", Color.WHITE)
-	btn_switch.add_theme_color_override("font_disabled_color", Color(0.66, 0.70, 0.66))
-	btn_switch.add_theme_color_override("font_outline_color", Color(0.06, 0.08, 0.08, 0.9))
-	btn_switch.add_theme_constant_override("outline_size", 4)
 
 	var bg := ColorRect.new()
 	bg.name = "Bg"
@@ -1043,6 +1049,21 @@ func _build_switch_module() -> void:
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	btn_switch.add_child(bg)
+	_switch_button_icon = HoverIcon.new()
+	_switch_button_icon.name = "SwitchIcon"
+	_switch_button_icon.sheet = SWITCH_ICON_TEX
+	_switch_button_icon.hframes = 4
+	_switch_button_icon.vframes = 2
+	_switch_button_icon.playback_frames = PackedInt32Array(SWITCH_ICON_PLAYBACK_FRAMES)
+	_switch_button_icon.fps = 4.0
+	_switch_button_icon.loop_on_hover = true
+	_switch_button_icon.rest_frame = 0
+	_switch_button_icon.inset_ratio = 0.0
+	_switch_button_icon.content_scale = 1.0
+	_switch_button_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_switch_button_icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_switch_button_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	btn_switch.add_child(_switch_button_icon)
 	_attach_button_juice(btn_switch)
 	btn_switch.pressed.connect(_on_switch_main_pressed)
 	buttons_ctrl.add_child(btn_switch)
@@ -1169,7 +1190,10 @@ func _refresh_switch_module() -> void:
 func _set_switch_button_feedback(selected: bool) -> void:
 	if btn_switch == null:
 		return
-	btn_switch.text = tr("已选") if selected else tr("切换")
+	btn_switch.text = ""
+	if _switch_button_icon != null:
+		_switch_button_icon.self_modulate = Color(1.16, 1.10, 0.82) if selected \
+			else (Color(0.62, 0.65, 0.62) if btn_switch.disabled else Color.WHITE)
 	var previous := bool(btn_switch.get_meta("switch_selected", false))
 	if previous == selected:
 		return
@@ -1177,20 +1201,17 @@ func _set_switch_button_feedback(selected: bool) -> void:
 	_set_btn_selected(btn_switch, selected)
 
 
-# ============================================================
-# 战斗内图鉴浮层（左下「图鉴」钮呼出·2026-07-13 替换原技能展示格）
-# ============================================================
-
-## 图鉴浮层开关：懒创建（首开实例化）·再按=收起·浮层内 ESC/暗幕/返回钮均可关。
-func _on_codex_pressed() -> void:
-	if _codex_overlay == null:
-		_codex_overlay = BattleCodexOverlay.new()
-		_codex_overlay.name = "CodexOverlay"
-		add_child(_codex_overlay)
-	if _codex_overlay.visible:
-		_codex_overlay.close()
+## 背包与图鉴使用相同的场景内浮层生命周期；按入口呼出，浮层内 X / ESC 关闭。
+func _on_backpack_pressed() -> void:
+	if _backpack_overlay == null:
+		_backpack_overlay = BACKPACK_OVERLAY_SCENE.instantiate() as Control
+		_backpack_overlay.name = "BackpackOverlay"
+		add_child(_backpack_overlay)
+		_backpack_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	if _backpack_overlay.visible:
+		_backpack_overlay.call("close")
 	else:
-		_codex_overlay.open()
+		_backpack_overlay.call("open")
 
 
 # ============================================================
@@ -1660,6 +1681,7 @@ func _net_play_resolution(msg: Dictionary) -> void:
 		{events = events, p1_action = int(actions[0]), p2_action = int(actions[1])},
 		active_before, hp_before)
 	if battle.game_over:
+		await _wait_for_active_death_dissolves()
 		_net_game_over(battle.winner)   # 镜像已按本端视角翻转 → winner 直接可读
 		_net_busy = false
 		return
@@ -1681,6 +1703,8 @@ func _net_resume_death_switch() -> void:
 
 ## 联机死亡换人：本端选替补 → 上行·服务器执行后 view/turn_begin 快照跟进。
 func _net_death_switch() -> void:
+	# 正常结算必须先看完倒地末帧的四周瓦解；重连恢复没有本地 defeat 事件时直接进选择。
+	await _wait_for_death_dissolve(PLAYER)
 	state = State.HERO_SELECT
 	_set_buttons_active(false)
 	_start_death_switch_timer()
@@ -1748,32 +1772,6 @@ func _net_game_over(w: int) -> void:
 	status_label.text = msg
 	status_label.add_theme_color_override("font_color", col)
 	status_label.visible = true
-
-
-# ============================================================
-# 故事回程（任务 B 壳）——远征 PvE 段已整体迁入 battle_pve 组件（2026-07-17 拆分批②）
-# ============================================================
-
-## 故事关卡回程（任务 B 壳）：结果经 BattleSetup.story_result 写回 story_screen（远征 pve_result 同款管道）。
-## 平局不进加时——故事关=闯关判定，非胜即未通关（加时赛是 PvP 仪式）。
-func _story_finish(w: int) -> void:
-	if _story_ending:
-		return
-	_story_ending = true
-	state = State.GAME_OVER
-	_set_buttons_active(false)
-	var outcome := "lose"
-	if w == BattleCore.WINNER_P1:
-		outcome = "win"
-	elif w == BattleCore.WINNER_DRAW:
-		outcome = "draw"
-	BattleSetup.story_result = {level_id = _story_level_id, outcome = outcome}
-	var texts := {win = tr("胜利！"), lose = tr("失败"), draw = tr("平局·未通关")}
-	status_label.text = String(texts[outcome])
-	status_label.add_theme_color_override("font_color", Color("#5fd86b") if outcome == "win" else Color("#dddddd"))
-	status_label.visible = true
-	await get_tree().create_timer(1.4).timeout
-	TransitionManager.transition_to("res://src/ui/story_screen.tscn")
 
 
 # ============================================================
@@ -2134,14 +2132,12 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 ## 结算后续（本地流程尾）：终局/加时/AI 换人/玩家换人/下一回合。联机不走此路（服务器驱动相位）。
 func _post_resolution(r: Dictionary) -> void:
 	if r.get("game_over", false):
+		# 终局/同归/远征都先完成角色本体瓦解，结果 UI 不再抢跑。
+		await _wait_for_active_death_dissolves()
 		var w: int = r.get("winner", BattleCore.WINNER_UNDECIDED)
 		# 远征 PvE：胜=对手全灭·其余（含同拍双死）=队伍全灭 → 回地图结算·不走加时赛。
 		if _pve:
 			await _pved.finish("win" if w == BattleCore.WINNER_P1 else "lose")
-			return
-		# 故事关卡（任务 B 壳）：胜负立判（平局不进加时=未通关）→ 结果写回 → 回选关屏。
-		if _story:
-			await _story_finish(w)
 			return
 		# 加时赛触发（Q5）：主局双方同归 → 各自 3 选 1 白板满血 1v1；加时局再平 = 真平局（走下方正常结束）。
 		if w == BattleCore.WINNER_DRAW and not _overtime:
@@ -2164,6 +2160,7 @@ func _post_resolution(r: Dictionary) -> void:
 
 	# AI 死亡换人：与 sim 统一，用搜索 AI 对位选替补（choose_death_switch）；异常兜底首个存活替补。
 	if battle.pending_death_switch[AI]:
+		await _wait_for_death_dissolve(AI)
 		var ai_slot: int = _ai.choose_death_switch(battle, AI)
 		if ai_slot < 0:
 			var ai_reserves: Array[int] = battle.living_reserves(AI)
@@ -2174,14 +2171,9 @@ func _post_resolution(r: Dictionary) -> void:
 		else:
 			_update_all()
 
-	# 玩家死亡换人：弹浮窗（死亡节拍 v3：先看清死亡——倒地+宣告 ≈1.1s 后才弹，差额补等；
-	# AI 侧若先走完换人过渡，其耗时已计入 → 不二次等待）
+	# 玩家死亡换人：倒地末帧停留 + 12 阶瓦解全部完成后才弹出选择。
 	if battle.pending_death_switch[PLAYER]:
-		if _defeat_at_ms[PLAYER] > 0:
-			var seen := float(Time.get_ticks_msec() - _defeat_at_ms[PLAYER]) / 1000.0
-			var need := DEFEAT_FALL_TIME + death_gray_duration
-			if seen < need:
-				await get_tree().create_timer(need - seen).timeout
+		await _wait_for_death_dissolve(PLAYER)
 		await _show_death_switch_selection(PLAYER)
 
 	await get_tree().create_timer(maxf(0.1, anim_phase_duration * 0.5)).timeout
@@ -2291,7 +2283,7 @@ func _show_death_switch_selection(player: int) -> void:
 	var selected_slot: int = await _death_switch_overlay.selection_made
 	game_timer.stop()
 	battle.execute_death_switch(player, selected_slot)
-	await _death_switch_transition(player)   # 遗体消散→新人入场（秒切退役）
+	await _death_switch_transition(player)   # 遗体已瓦解 → 透明期换装 → 新人入场
 
 
 func _start_death_switch_timer() -> void:
@@ -2987,7 +2979,7 @@ enum TipContentKind { PLAIN, SKILL, ITEM, AVATAR_SKILL }
 @export_subgroup("字距")
 @export_range(-4, 8, 1) var tip_glyph_spacing: int = 0
 @export_subgroup("S 框文字与留白")
-@export_range(8, 32, 1) var tip_font_size_s: int = 18
+@export_range(8, 32, 1) var tip_font_size_s: int = 17
 @export_range(-4, 12, 1) var tip_line_spacing_s: int = 1
 @export_range(0.0, 32.0, 1.0) var tip_padding_horizontal_s := 12.0
 @export_range(0.0, 32.0, 1.0) var tip_padding_vertical_s := 8.0
@@ -4138,13 +4130,15 @@ func _update_all() -> void:
 func _update_character_displays() -> void:
 	for p in [0, 1]:
 		var cd: CharacterDisplay = p1_char_display if p == 0 else p2_char_display
-		# 死亡节拍 v3 守卫（2026-07-18 Eddy："在地最长的灰色状态成了站立 idle"修复）：
+		# 死亡节拍守卫：
 		# 出战位还是遗体（阵亡未换人 / 终局尸身）时跳过刷新——sprite_frames_path setter
-		# 会重播 idle 把遗体拉起来站好，modulate 复位也会洗掉灰化。结算尾的 _update_all
-		# 正撞在倒地中段（~0.6s）。换人后出战位是活人，刷新自然恢复。
+		# 会重播 idle 把遗体拉起来站好；结算尾的 _update_all 正撞在倒地中段。
+		# 换人后出战位是活人，刷新自然恢复。
 		if battle.hp[p][battle.active_index[p]] <= 0:
 			continue
-		cd.modulate = Color.WHITE  # 复位（死亡变暗 / 防御蓝闪 / 攒黄闪）
+		cd.modulate = Color.WHITE  # 复位防御蓝闪 / 攒黄闪等临时染色
+		cd.reset_death_dissolve()
+		cd.offset_transform_position = Vector2.ZERO
 		var h: HeroData = battle.active_hero(p)
 		if h.sprite_frames_path != "":
 			cd.sprite_frames_path = h.sprite_frames_path
@@ -4579,70 +4573,162 @@ func _finisher_impact(target_player: int, dmg_half: int) -> void:
 	var tw := create_tween()
 	tw.tween_property(cd, "scale", Vector2.ONE * (FINISHER_SCALE * 1.08), 0.06).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	tw.tween_property(cd, "scale", Vector2.ONE * FINISHER_SCALE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_play_defeat(target_player)   # 死亡演出（与普通路径一致）·慢放下 defeat 帧自然慢速展开
+	_play_defeat(target_player, false)   # 终结已自带冲击位移，不叠加普通死亡受力桥
 	var tw2 := create_tween()
 	tw2.tween_property(cd, "position:y", cd.position.y + 14.0, 0.3).set_trans(Tween.TRANS_SINE)
 	_fin_impact_tweens.append(tw)
 	_fin_impact_tweens.append(tw2)
 
 
-var _defeat_at_ms: Array[int] = [0, 0]   # 各侧 defeat 起播时刻（遗体停留拍计时用·死亡低频非热路径）
+var _defeat_at_ms: Array[int] = [0, 0]
+var _defeat_contact_at_ms: Array[int] = [0, 0]
+var _defeat_tokens: Array[int] = [0, 0]
+var _defeat_dissolve_started: Array[bool] = [false, false]
+var _defeat_dissolve_completed: Array[bool] = [false, false]
 
 
-## 死亡演出：有 defeat 表=播倒地帧动画（非循环停末帧·管线=import_hero_batch _defeat 线）；
-## 无表=阵亡变灰保底（旧路径·试点表入库前全员走此路）。换人后 _update_character_displays
-## 重载新英雄 idle + modulate 复位，两条路都被自然接管。
-func _play_defeat(player: int) -> void:
+## 普通致命击先做极短的向外受力桥，再开始倒地；终结技已有自身冲击位移，可关闭该桥。
+func _play_defeat(player: int, bridge_recoil: bool = true) -> void:
+	_defeat_tokens[player] += 1
+	var token := _defeat_tokens[player]
 	_defeat_at_ms[player] = Time.get_ticks_msec()
+	_defeat_contact_at_ms[player] = 0
+	_defeat_dissolve_started[player] = false
+	_defeat_dissolve_completed[player] = false
+	var cd := _cd(player)
+	cd.reset_death_dissolve()
+	cd.offset_transform_position = Vector2.ZERO
+	if bridge_recoil:
+		var outward := -1.0 if player == 0 else 1.0
+		var recoil := create_tween()
+		recoil.tween_property(cd, "offset_transform_position",
+				Vector2(outward * death_recoil_distance, 2.0), death_recoil_duration) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		recoil.tween_callback(_start_defeat_animation.bind(player, token))
+		recoil.tween_property(cd, "offset_transform_position", Vector2.ZERO,
+				death_recoil_duration + 0.04).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	else:
+		_start_defeat_animation(player, token)
+
+
+func _start_defeat_animation(player: int, token: int) -> void:
+	if token != _defeat_tokens[player]:
+		return
 	var cd := _cd(player)
 	if cd.has_action_anim("defeat"):
+		var callback := _on_defeat_animation_finished.bind(player, token)
+		cd.action_animation_finished.connect(callback, CONNECT_ONE_SHOT)
 		cd.play_animation("defeat", false)
-		# ③ 落地宣告排程：帧表播毕（0.7s·计时默认随 time_scale → 终结慢放下与帧表同步拉伸）。
-		# 绑 self 方法=场景中途释放（故事关卡收场等）时连接自动失效，无需手动守卫。
-		get_tree().create_timer(DEFEAT_FALL_TIME).timeout.connect(_announce_death.bind(player))
+		# 信号是主路径；此计时器只防损坏的 SpriteFrames 永不发 finished。
+		var fallback := maxf(0.12, cd.animation_duration(&"defeat") + 0.08)
+		get_tree().create_timer(fallback).timeout.connect(_announce_death.bind(player, token))
 	else:
-		cd.modulate = Color(0.35, 0.35, 0.35)
+		_announce_death(player, token)
 
 
-## ③ 死亡宣告（死亡节拍 v3）：落地瞬间蹬尘+朝倒地侧轻震（躯体的重量感），随后遗体
-## 0.4s 褪成灰蓝（生命离开的颜色信号·黑暗地牢式）。褪色走 CharacterDisplay.modulate
-## （防御蓝闪同通道·舞台立绘无 shader 拦截），换人后 _update_character_displays 复位 WHITE 自然接管。
-func _announce_death(player: int) -> void:
+func _on_defeat_animation_finished(
+		animation_name: StringName, player: int, token: int) -> void:
+	if animation_name == &"defeat":
+		_announce_death(player, token)
+
+
+## 真正落地时只触发尘与轻震；角色保持原亮度，token 防止旧定时器污染后续英雄。
+func _announce_death(player: int, token: int = -1) -> void:
+	if token >= 0 and token != _defeat_tokens[player]:
+		return
+	if _defeat_contact_at_ms[player] > 0:
+		return
+	_defeat_contact_at_ms[player] = Time.get_ticks_msec()
 	_fx._spawn_dust(player)
 	stage.shake(SHAKE_HIT * 0.6, 1.0 if player == 1 else -1.0)
-	var tw := create_tween()
-	tw.tween_property(_cd(player), "modulate", Color(0.52, 0.52, 0.58), death_gray_duration)
+	# 清掉可能残留的受击染色，但不再播放从明到暗的死亡灰化。
+	_cd(player).modulate = Color.WHITE
+	_run_death_dissolve(player, _defeat_tokens[player])
 
 
-## 死亡换人过渡（2026-07-17 Eddy：换人秒切不协调）：遗体消散 → 透明期换装 → 新人落点入场。
-## 消散=躺姿淡出+微下沉（能量散逸·非位移演出）；入场=自上小落+淡入+落地尘
-## （攻击回位蹬地尘同语言）。⚠ _update_all 在全透明期间执行=换装不可见；
-## _update_character_displays 会复位 modulate=WHITE → 换装后须重设 alpha 再淡入。
+func _wait_for_death_contact(player: int) -> void:
+	if _defeat_at_ms[player] <= 0 or _defeat_contact_at_ms[player] > 0:
+		return
+	var deadline := Time.get_ticks_msec() + 5000
+	while _defeat_contact_at_ms[player] <= 0 and Time.get_ticks_msec() < deadline:
+		await get_tree().process_frame
+	if _defeat_contact_at_ms[player] <= 0:
+		_announce_death(player, _defeat_tokens[player])
+
+
+## 倒地末帧以原亮度静止停顿后，自动开始四周向内的硬切瓦解。
+## 该协程与换人选择解耦：玩家必须先看完瓦解，之后才出现强制换人界面。
+func _run_death_dissolve(player: int, token: int) -> void:
+	if token != _defeat_tokens[player] or _defeat_dissolve_started[player]:
+		return
+	_defeat_dissolve_started[player] = true
+	await get_tree().create_timer(maxf(0.0, death_final_frame_hold_duration)).timeout
+	if token != _defeat_tokens[player]:
+		return
+	var cd := _cd(player)
+	var from_right := player == PLAYER
+	cd.set_death_dissolve(0.0, from_right, death_dissolve_steps)
+	var erosion := create_tween()
+	var duration := maxf(0.01, death_dissolve_duration)
+	# 三段式阶梯：前三阶慢咬入，中段快速扩散，最后两阶重新放慢收尾。
+	erosion.tween_method(
+			cd.set_death_dissolve.bind(from_right, death_dissolve_steps),
+			0.0, DEATH_DISSOLVE_OPEN_PROGRESS,
+			duration * DEATH_DISSOLVE_OPEN_SHARE)
+	erosion.tween_method(
+			cd.set_death_dissolve.bind(from_right, death_dissolve_steps),
+			DEATH_DISSOLVE_OPEN_PROGRESS, DEATH_DISSOLVE_MIDDLE_PROGRESS,
+			duration * DEATH_DISSOLVE_MIDDLE_SHARE)
+	erosion.tween_method(
+			cd.set_death_dissolve.bind(from_right, death_dissolve_steps),
+			DEATH_DISSOLVE_MIDDLE_PROGRESS, 1.0,
+			duration * DEATH_DISSOLVE_CLOSE_SHARE)
+	await erosion.finished
+	if token != _defeat_tokens[player]:
+		return
+	cd.set_death_dissolve(1.0, from_right, death_dissolve_steps)
+	_defeat_dissolve_completed[player] = true
+
+
+func _wait_for_death_dissolve(player: int) -> void:
+	if _defeat_at_ms[player] <= 0:
+		return
+	await _wait_for_death_contact(player)
+	if not _defeat_dissolve_started[player]:
+		_run_death_dissolve(player, _defeat_tokens[player])
+	var deadline := Time.get_ticks_msec() + 5000
+	while not _defeat_dissolve_completed[player] and Time.get_ticks_msec() < deadline:
+		await get_tree().process_frame
+	if not _defeat_dissolve_completed[player]:
+		# 损坏的 Tween/场景帧也不应永久卡死换人；保底仍是硬切完全瓦解。
+		_cd(player).set_death_dissolve(1.0, player == PLAYER, death_dissolve_steps)
+		_defeat_dissolve_completed[player] = true
+
+
+func _wait_for_active_death_dissolves() -> void:
+	for player in [PLAYER, AI]:
+		if _defeat_at_ms[player] > 0 and battle.hp[player][battle.active_index[player]] <= 0:
+			await _wait_for_death_dissolve(player)
+
+
+## 遗体已瓦解后才调用：透明期换装，再用无回弹短落位入场。
 func _death_switch_transition(player: int) -> void:
-	# ① 遗体停留拍（2026-07-18 Eddy：倒地 1 帧就切换=不协调）：普通拍到这里时倒地动画
-	#   还剩 ~0.1s 没播完——先把倒地播完并静躺够 death_lie_duration（从起播计），再开始消散。
-	#   按差额补等：终结慢放/玩家选人等已耗时的路径不重复罚站。
-	if _defeat_at_ms[player] > 0:
-		var lying := float(Time.get_ticks_msec() - _defeat_at_ms[player]) / 1000.0
-		if lying < death_lie_duration:
-			await get_tree().create_timer(death_lie_duration - lying).timeout
+	await _wait_for_death_dissolve(player)
 	var cd := _cd(player)
 	var home: Vector2 = _cd_home[player]
-	var out := create_tween().set_parallel(true)
-	out.tween_property(cd, "modulate:a", 0.0, 0.38) \
-		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	out.tween_property(cd, "position", home + Vector2(0.0, 8.0), 0.38)
-	await out.finished
-	_update_all()   # 全透明 → 秒换看不见
+	_update_all()   # 瓦解进度=1 → 换装不可见
+	cd.reset_death_dissolve()
 	cd.modulate = Color(1.0, 1.0, 1.0, 0.0)
-	cd.position = home + Vector2(0.0, -26.0)
+	cd.position = home
+	cd.offset_transform_position = Vector2(0.0, -death_entry_drop)
 	var inw := create_tween().set_parallel(true)
-	inw.tween_property(cd, "modulate:a", 1.0, 0.22)
-	inw.tween_property(cd, "position", home, 0.26) \
-		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	inw.chain().tween_callback(_fx._spawn_dust.bind(player))   # 落地蹬起尘土
+	inw.tween_property(cd, "modulate:a", 1.0, death_entry_duration * 0.75)
+	inw.tween_property(cd, "offset_transform_position", Vector2.ZERO, death_entry_duration) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	inw.chain().tween_callback(_fx._spawn_dust.bind(player))
 	await inw.finished
 	cd.position = home
+	cd.offset_transform_position = Vector2.ZERO
 
 
 func _cd(player: int) -> CharacterDisplay:

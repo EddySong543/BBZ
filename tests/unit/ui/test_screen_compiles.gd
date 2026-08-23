@@ -126,6 +126,7 @@ func test_item_gallery_first_batch_is_scene_backed_and_page_native() -> void:
 	var rarity_badge := item_screen.get_node("DetailArea/RarityBadge") as Control
 	assert_eq(book_layer.owner, item_screen, "书本根节点由场景承载")
 	assert_eq(item_grid.owner, item_screen, "道具网格根节点由场景承载")
+	assert_eq(item_grid.position.y, 255.0, "道具头像框组轻微上移 10px")
 	assert_null(item_screen.get_node_or_null("PoolArea/TierNavigation"),
 			"左页可点击稀有度索引已移除")
 	assert_eq(rarity_badge.owner, item_screen, "右页只读稀有度纸签由场景承载")
@@ -158,6 +159,10 @@ func test_item_gallery_second_batch_uses_twelve_card_pages() -> void:
 	assert_eq(grid.get("columns"), 4, "道具图鉴每页使用 4 列")
 	assert_eq(grid.get("cards_per_page"), page_size, "道具图鉴每页只展示 12 件")
 	assert_true(navigation.visible, "完整道具图鉴超过一页时显示翻页导航")
+	assert_eq(previous.text, "上一页")
+	assert_eq(next.text, "下一页", "道具图鉴移除旧三重箭头，与英雄图鉴分页文案一致")
+	assert_eq(navigation.position.x, grid.position.x,
+			"道具图鉴分页行与四列道具内容使用同一水平起点")
 	assert_eq(screen._cards.filter(func(card: Button) -> bool: return card.visible).size(),
 			mini(page_size, screen._items.size()), "第一页只显示本页道具")
 	assert_eq(indicator.text, "%02d / %02d" % [1, page_count], "页码使用两位图鉴编号")
@@ -287,13 +292,9 @@ func test_item_gallery_keeps_black_detail_name_and_legendary_asset() -> void:
 	assert_eq(float(normal_material.get_shader_parameter("vertical_gradient")), 1.0,
 			"道具图鉴普通卡片使用静态上暗下亮渐变")
 	var card_shadow := screen._cards[0].get_node_or_null("BottomShadow") as TextureRect
-	assert_not_null(card_shadow, "图鉴中的每件道具都有右下轮廓阴影")
-	assert_eq(card_shadow.position,
-			(screen._cards[0].get_node("Frame") as TextureRect).position
-			+ ItemFrameStyle.DROP_SHADOW_OFFSET,
-			"图鉴道具阴影沿统一右下方向偏移")
-	assert_not_null(screen.get_node_or_null("DetailArea/DetailShadow"),
-			"右页大号道具同样保留右下轮廓阴影")
+	assert_null(card_shadow, "左页道具框不再向书页投射外部轮廓阴影")
+	assert_null(screen.get_node_or_null("DetailArea/DetailShadow"),
+			"右页大号道具框同步移除书页投影")
 	var card_art_shadow := screen._cards[0].get_node_or_null("ItemArtShadow") as TextureRect
 	assert_not_null(card_art_shadow, "图鉴卡片的道具美术补上右下 alpha 投影")
 	assert_lt(card_art_shadow.get_index(),
@@ -352,12 +353,12 @@ func test_item_gallery_rarity_badge_tracks_selected_item_without_click_behavior(
 	var label := badge.get_node("BadgeLabel") as Label
 	assert_eq(badge.size, Vector2(80.0, 34.0), "右页复用英雄图鉴主被动标签尺寸")
 	assert_eq(label.text, "普通", "默认选择普通道具时显示普通")
-	assert_eq(ItemGalleryScreen.TIER_TAG_COLOR[1], Color("7FA4B2"),
-			"普通标签使用提亮后的书页蓝")
-	assert_eq(ItemGalleryScreen.TIER_TAG_COLOR[2], Color("A08AAC"),
-			"稀有标签使用提亮后的柔紫")
-	assert_eq(ItemGalleryScreen.TIER_TAG_COLOR[3], Color("C39A4B"),
-			"传说标签使用提亮后的古金")
+	assert_eq(ItemGalleryScreen.TIER_TAG_COLOR[1], ItemCatalog.RARITY_NORMAL,
+			"普通标签使用全局 C 方案宝石蓝")
+	assert_eq(ItemGalleryScreen.TIER_TAG_COLOR[2], ItemCatalog.RARITY_RARE,
+			"稀有标签使用全局 C 方案深紫晶")
+	assert_eq(ItemGalleryScreen.TIER_TAG_COLOR[3], ItemCatalog.RARITY_LEGENDARY,
+			"传说标签使用全局 C 方案明金")
 	assert_almost_eq(float(mark.get("edge_alpha")), 0.55, 0.001,
 			"道具稀有度标签暗边减淡，但不改英雄标签默认值")
 	assert_eq(mark.get("passive_color"), ItemGalleryScreen.TIER_TAG_COLOR[1],
@@ -374,7 +375,7 @@ func test_item_gallery_rarity_badge_tracks_selected_item_without_click_behavior(
 			"传说道具使用克制金色长方形印签")
 
 
-func test_item_gallery_selection_matches_hero_gallery_pointer_and_gold_frame() -> void:
+func test_item_gallery_selection_keeps_rarity_frame_and_uses_pointer() -> void:
 	var packed := load("res://src/ui/item_gallery_screen.tscn") as PackedScene
 	var screen := packed.instantiate()
 	add_child_autofree(screen)
@@ -390,17 +391,17 @@ func test_item_gallery_selection_matches_hero_gallery_pointer_and_gold_frame() -
 			"道具箭头与英雄箭头使用同一书页棕色")
 	assert_null(first_card.get_node_or_null("SelRing"), "移除道具图鉴旧金色呼吸外环")
 	assert_eq(first_material.get_shader_parameter("shadow_color"),
-			HeroGalleryScreen.FRAME_SELECTED_SHADOW, "选中道具框使用英雄图鉴同款金色阴影")
+			ItemGalleryScreen.FRAME_SHADOW[1], "选中普通道具仍使用 C 方案蓝色阴影")
 	assert_eq(first_material.get_shader_parameter("mid_color"),
-			HeroGalleryScreen.FRAME_SELECTED_MID, "选中道具框使用英雄图鉴同款金色主体")
+			ItemGalleryScreen.FRAME_MID[1], "选中普通道具仍使用 C 方案蓝色主体")
 	assert_eq(first_material.get_shader_parameter("highlight_color"),
-			HeroGalleryScreen.FRAME_SELECTED_HIGHLIGHT, "选中道具框使用英雄图鉴同款金色高光")
+			ItemGalleryScreen.FRAME_HIGHLIGHT[1], "选中普通道具仍使用 C 方案蓝色高光")
 	assert_eq((first_card.get_node("ItemName") as Label).get_theme_color("font_color"),
 			HeroGalleryScreen.SELECTED_NAME_INK, "选中道具名使用英雄图鉴同款克制赭色")
 	screen._select(1)
 	assert_false(first_pointer.visible, "切换道具后旧箭头立即隐藏")
 	assert_eq(first_material.get_shader_parameter("mid_color"),
-			ItemGalleryScreen.FRAME_MID[1], "旧道具框恢复自身稀有度配色")
+			ItemGalleryScreen.FRAME_MID[1], "旧道具框持续保留自身稀有度配色")
 	assert_eq((first_card.get_node("ItemName") as Label).get_theme_color("font_color"),
 			ItemGalleryScreen.INK, "切换后旧道具名恢复书页墨色")
 	assert_true(screen._cards[1].get_node("SelectionPointer").visible,
@@ -449,7 +450,30 @@ func test_battle_switch_module_expands_right_and_owns_active_switch() -> void:
 			"新模块继续复用成熟的切换动作提交语义")
 	assert_true(screen._switch_tray.visible, "选定候选后保持展开层，避免选择反馈瞬间消失")
 	assert_true(first_candidate.is_selected, "已选候选持续高亮")
-	assert_eq(screen.btn_switch.text, "已选", "切换主按钮同步表达待提交状态")
+	assert_eq(screen.btn_switch.text, "", "切换主按钮不再残留文字")
+	var switch_icon := screen.btn_switch.get_node_or_null("SwitchIcon") as HoverIcon
+	assert_not_null(switch_icon, "切换主按钮使用正式图标")
+	assert_eq(switch_icon.sheet.resource_path, "res://assets/ui/icons/switch_hover_sheet.png",
+			"切换图标使用 import 素材规范化后的正式悬停图集")
+	assert_eq(switch_icon.sheet.get_size(), Vector2(512, 256),
+			"新版 4×2 图集使用原生 128px 整数帧")
+	assert_eq(switch_icon.hframes, 4)
+	assert_eq(switch_icon.vframes, 2)
+	assert_eq(switch_icon.playback_frames, PackedInt32Array([0, 1, 2]),
+			"播放序列排除第一行第四帧、第二行第一帧和新版透明尾格")
+	assert_eq(switch_icon.fps, 3.0, "切换按钮悬停动画大幅放慢为每秒 3 帧")
+	assert_eq(switch_icon.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST,
+			"切换像素图标保持最近邻采样")
+	screen.btn_switch.mouse_entered.emit()
+	assert_true(bool(switch_icon.get("_hovering")), "悬停切换按钮后开始播放图集")
+	switch_icon.call("_process", 0.70)
+	assert_eq(switch_icon.call("_source_frame_index", int(switch_icon.get("_frame"))), 2,
+			"悬停序列只经过三个有效帧，不进入排除帧或透明尾格")
+	screen.btn_switch.mouse_exited.emit()
+	assert_eq(int(switch_icon.get("_frame")), switch_icon.rest_frame,
+			"移出按钮后回到静止帧")
+	assert_ne(switch_icon.self_modulate, Color.WHITE,
+			"待提交态以图标提金代替已选文字")
 	assert_true(bool(screen.btn_switch.get_meta("switch_selected", false)),
 			"切换主按钮保留明确的选中态")
 	BattleSetup.reset()
@@ -626,13 +650,16 @@ func test_hero_gallery_uses_twelve_card_pages_with_scene_backed_navigation() -> 
 	var indicator := screen.get_node("PoolArea/PageNavigation/PageIndicator") as Label
 	var next := screen.get_node("PoolArea/PageNavigation/NextPage") as Button
 	assert_eq(grid.get("columns"), 4, "英雄图鉴每页使用 4 列")
+	assert_eq(grid.position.y, 255.0, "英雄头像框组轻微上移 10px")
 	assert_eq(grid.get("cards_per_page"), 12, "英雄图鉴每页只展示 12 位英雄")
 	assert_lte(float(grid.get("step_x")), 170.0, "头像列距收紧，不在左页横向松散铺开")
 	assert_lte(float(grid.get("row_height")), 196.0, "头像行距收紧，形成完整名录组块")
 	assert_eq(screen.card_cards.filter(func(card: Button) -> bool: return card.visible).size(), 12,
 			"第一页运行时只显示 12 个头像")
-	assert_eq(previous.text, "<<< 上一页", "上一页与返回入口使用同一导航语言")
-	assert_eq(next.text, "下一页 >>>", "下一页与返回入口使用同一导航语言")
+	assert_eq(previous.text, "上一页", "上一页移除视觉重量过大的三重箭头")
+	assert_eq(next.text, "下一页", "下一页移除视觉重量过大的三重箭头")
+	assert_eq(navigation.position.x, grid.position.x,
+			"分页行与四列头像内容使用同一水平起点")
 	assert_true(previous.disabled, "第一页禁用上一页")
 	assert_false(next.disabled, "第一页允许进入下一页")
 	assert_eq(indicator.text, "01 / 02", "页码使用图鉴式两位编号")
@@ -735,17 +762,33 @@ func test_hero_gallery_hp_and_idle_shadow_are_scene_editable() -> void:
 	assert_gt(shadow.color.a, 0.0, "角色阴影在运行时可见")
 
 
-func test_battle_codex_tabs_use_flat_neutral_buttons() -> void:
+func test_battle_codex_overlay_uses_shared_unified_codex() -> void:
 	var overlay := BattleCodexOverlay.new()
 	add_child_autofree(overlay)
-	var hero_tab := overlay.get_node("Tab0") as Button
-	var item_tab := overlay.get_node("Tab1") as Button
-	assert_true(hero_tab.get_theme_stylebox("normal") is StyleBoxFlat,
-			"英雄页签使用平面几何按钮")
-	assert_true(item_tab.get_theme_stylebox("normal") is StyleBoxFlat,
-			"道具页签使用同一套平面几何按钮")
-	assert_null(hero_tab.find_child("Plaque", true, false),
-			"共享页签不再包含回纹牌匾节点")
+	var codex := overlay.get_node_or_null("CodexScreen") as Control
+	assert_not_null(codex, "战斗入口直接实例化全局统一图鉴")
+	assert_null(overlay.get_node_or_null("Tab0"), "战斗浮层不再维护旧版独立英雄页签")
+	assert_null(overlay.get_node_or_null("Tab1"), "战斗浮层不再维护旧版独立道具页签")
+	if codex == null:
+		return
+	assert_eq(codex.scene_file_path, "res://src/ui/codex_screen.tscn",
+			"所有入口共享同一个 PackedScene，后续图鉴更新自动全局生效")
+	assert_eq(codex.get_script(), UnifiedCodexScreen)
+	assert_not_null(codex.get_node_or_null("GalleryHost/HeroGallery"),
+			"英雄页作为场景实例保存在统一图鉴中，编辑器无需 F6 即可看到资产")
+	assert_not_null(codex.get_node_or_null("GalleryHost/ItemGallery"),
+			"道具页作为场景实例保存在统一图鉴中")
+	assert_not_null(codex.get_node_or_null("BookmarkLayer/HeroBookmark"))
+	assert_not_null(codex.get_node_or_null("BookmarkLayer/ItemBookmark"))
+	codex.call("show_section", 1)
+	var item_gallery := codex.call("get_gallery", 1) as Control
+	item_gallery.call("select_tier", 3)
+	overlay.close()
+	overlay.open()
+	assert_eq(int(item_gallery.call("get_current_tier")), 1,
+			"战斗图鉴复用实例再次打开时，道具章节重置为普通")
+	assert_eq(int(item_gallery.get("_current_page")), 0,
+			"战斗图鉴再次打开时回到普通第一页")
 
 
 func test_battle_codex_overlay_stays_non_pausing_and_closes_cleanly() -> void:
@@ -753,9 +796,28 @@ func test_battle_codex_overlay_stays_non_pausing_and_closes_cleanly() -> void:
 	add_child_autofree(overlay)
 	overlay.open()
 	assert_true(overlay.visible, "战斗图鉴仍可正常打开")
+	var codex := overlay.get_node("CodexScreen") as Control
+	assert_false((codex.get_node("BackButton") as Button).visible,
+			"浮层图鉴由暗部或 ESC 关闭，不再显示返回侧签")
+	assert_true((codex.get_node("CloseButton") as Button).visible,
+			"右页描边内显示手绘 X 关闭键")
+	assert_gt((codex.get_node("GalleryHost") as Control).offset_transform_position.y, 0.0,
+			"呼出首帧从轻微下移位置开始")
+	var entrance := codex.get("_overlay_open_tween") as Tween
+	if entrance != null and entrance.is_valid():
+		await entrance.finished
+	assert_almost_eq((codex.get_node("Backdrop") as TextureRect).self_modulate.a,
+			UnifiedCodexScreen.OVERLAY_BACKDROP_ALPHA, 0.001,
+			"场景内容仍透过图鉴外围半透明背景可见")
+	assert_eq(overlay.z_index, RenderingServer.CANVAS_ITEM_Z_MAX)
+	assert_ne(codex.process_mode, Node.PROCESS_MODE_DISABLED,
+			"打开后统一图鉴恢复输入")
 	assert_false(get_tree().paused, "打开战斗图鉴不暂停对局计时")
 	overlay.close()
+	await get_tree().create_timer(UnifiedCodexScreen.OVERLAY_CLOSE_DURATION + 0.03).timeout
 	assert_false(overlay.visible, "战斗图鉴仍可正常关闭")
+	assert_eq(codex.process_mode, Node.PROCESS_MODE_DISABLED,
+			"隐藏后整棵统一图鉴停止接收 ESC 与方向键")
 	assert_false(get_tree().paused, "关闭战斗图鉴后对局仍保持运行")
 
 
@@ -768,7 +830,10 @@ func test_unified_codex_frames_reduced_book_on_smoky_backdrop() -> void:
 	add_child_autofree(screen)
 	var backdrop := screen.get_node("Backdrop") as TextureRect
 	var book_shadow := screen.get_node("BookContactShadow") as ColorRect
+	var book_shadow_mid := book_shadow.get_node("MidFade") as ColorRect
+	var book_shadow_outer := book_shadow.get_node("OuterFade") as ColorRect
 	var host := screen.get_node("GalleryHost") as Control
+	var bookmark_layer := screen.get_node("BookmarkLayer") as Control
 	var chapter_hero := screen.get_node("BookmarkLayer/HeroBookmark") as Button
 	var chapter_item := screen.get_node("BookmarkLayer/ItemBookmark") as Button
 	var rarity_group := screen.get_node("BookmarkLayer/RarityBookmarks") as Control
@@ -780,17 +845,18 @@ func test_unified_codex_frames_reduced_book_on_smoky_backdrop() -> void:
 			"烟褐背景保持比例覆盖 1920x1080")
 	assert_eq(backdrop.mouse_filter, Control.MOUSE_FILTER_IGNORE,
 			"背景不拦截书页与侧签输入")
-	var backdrop_material := backdrop.material as ShaderMaterial
-	assert_not_null(backdrop_material, "烟褐背景使用独立微动效材质")
+	assert_null(backdrop.material, "静态烟褐底图不挂 shader，材质失效时也绝不变黑")
+	var backdrop_motion := screen.get_node("BackdropMotion") as ColorRect
+	var backdrop_material := backdrop_motion.material as ShaderMaterial
+	assert_not_null(backdrop_material, "背景微动效放在独立透明覆盖层")
 	if backdrop_material != null:
 		assert_eq(backdrop_material.shader.resource_path,
 				"res://assets/shaders/canvas_ui_codex_backdrop_motion.gdshader")
-		assert_almost_eq(float(backdrop_material.get_shader_parameter("drift_pixels")),
-				4.0, 0.001, "背景纹理总漂移控制在 4px")
-		assert_lte(float(backdrop_material.get_shader_parameter("moving_mix")), 0.1,
-				"移动层只占一成以内，不抢书页注意力")
-		assert_lte(float(backdrop_material.get_shader_parameter("breathe_strength")), 0.015,
-				"中心呼吸光保持克制")
+		assert_lte(float(backdrop_material.get_shader_parameter("motion_alpha")), 0.035,
+				"微动层透明度保持在 3.5% 以内")
+		assert_lte(float(backdrop_material.get_shader_parameter("drift_speed")), 0.04,
+				"背景暖雾保持极慢漂移")
+	assert_eq(backdrop_motion.mouse_filter, Control.MOUSE_FILTER_IGNORE)
 	var backdrop_image := backdrop.texture.get_image()
 	var backdrop_center := backdrop_image.get_pixel(
 			int(backdrop_image.get_width() / 2.0), int(backdrop_image.get_height() / 2.0))
@@ -804,78 +870,458 @@ func test_unified_codex_frames_reduced_book_on_smoky_backdrop() -> void:
 	assert_gt(backdrop_center.r + backdrop_center.g + backdrop_center.b,
 			backdrop_corner.r + backdrop_corner.g + backdrop_corner.b,
 			"书本背后仅做克制的中心提亮")
-	assert_eq(host.position, UnifiedCodexScreen.BOOK_ORIGIN,
-			"书本左侧留出真实侧签空间")
-	assert_eq(host.size, Vector2(1920, 1080), "内部书页继续使用原始设计坐标")
+	assert_almost_eq(host.position.x, UnifiedCodexScreen.BOOK_ORIGIN.x, 0.001,
+			"书本使用全局居中横坐标")
+	assert_almost_eq(host.position.y, UnifiedCodexScreen.BOOK_ORIGIN.y, 0.001,
+			"书本使用全局居中纵坐标")
+	assert_almost_eq(host.size.x, 1920.0, 0.001,
+			"内部书页继续使用原始设计宽度")
+	assert_almost_eq(host.size.y, 1080.0, 0.001,
+			"内部书页继续使用原始设计高度")
 	assert_eq(host.scale, UnifiedCodexScreen.BOOK_SCALE,
 			"英雄与道具共享同一缩书比例")
-	assert_eq(UnifiedCodexScreen.BOOK_ORIGIN, Vector2(230, 130),
-			"书本按通过预览居中并留出完整暖色边距")
-	assert_eq(UnifiedCodexScreen.BOOK_SCALE, Vector2(0.76, 0.76),
-			"书本从过大的 87.5% 回到预览约 76% 占比")
-	assert_almost_eq((host.size * host.scale).x, 1459.2, 0.01)
-	assert_almost_eq((host.size * host.scale).y, 820.8, 0.01)
-	assert_eq(book_shadow.position, UnifiedCodexScreen.BOOK_ORIGIN + Vector2(14, 14),
-			"接触影按较小书本克制右下偏移")
-	assert_eq(book_shadow.size, host.size * host.scale,
-			"接触影与缩小后的书本边界一致")
+	assert_eq(book_shadow_mid.position, Vector2(-5, -5))
+	assert_eq(book_shadow_outer.position, Vector2(-10, -10))
+	assert_lt(book_shadow_outer.color.a, book_shadow_mid.color.a)
+	assert_lt(book_shadow_mid.color.a, book_shadow.color.a,
+			"书本接触影由内向外逐层降低透明度，避免硬切边缘")
+	var expected_book_origin := (Vector2(1920, 1080) - host.size * host.scale) * 0.5
+	assert_almost_eq(UnifiedCodexScreen.BOOK_ORIGIN.x, expected_book_origin.x, 0.001,
+			"书本本体严格以 1920x1080 画布水平中心为准，不再为侧签右移")
+	assert_almost_eq(UnifiedCodexScreen.BOOK_ORIGIN.y, expected_book_origin.y, 0.001,
+			"书本本体严格以 1920x1080 画布垂直中心为准")
+	assert_eq(UnifiedCodexScreen.BOOK_SCALE, Vector2(0.84, 0.84),
+			"书本放大到 84%，保证原书页文字可读")
+	assert_eq(UnifiedCodexScreen.BOOKMARK_LAYER_ORIGIN, Vector2.ZERO,
+			"侧签直接使用最终画布坐标，不再依靠负位移换算")
+	assert_eq(UnifiedCodexScreen.BOOKMARK_LAYER_SCALE, Vector2.ONE,
+			"静态 UI 不再整体缩放 Control，文字与输入区保持最终像素尺寸")
+	assert_eq(bookmark_layer.position, UnifiedCodexScreen.BOOKMARK_LAYER_ORIGIN)
+	assert_eq(bookmark_layer.scale, UnifiedCodexScreen.BOOKMARK_LAYER_SCALE)
+	assert_almost_eq((host.size * host.scale).x, 1612.8, 0.01)
+	assert_almost_eq((host.size * host.scale).y, 907.2, 0.01)
+	assert_almost_eq(book_shadow.position.x,
+			UnifiedCodexScreen.BOOK_ORIGIN.x + 14.0, 0.001,
+			"接触影按居中书本克制右移")
+	assert_almost_eq(book_shadow.position.y,
+			UnifiedCodexScreen.BOOK_ORIGIN.y + 14.0, 0.001,
+			"接触影按居中书本克制下移")
+	assert_almost_eq(book_shadow.size.x, (host.size * host.scale).x, 0.01,
+			"接触影宽度与放大后的书本边界一致")
+	assert_almost_eq(book_shadow.size.y, (host.size * host.scale).y, 0.01,
+			"接触影高度与放大后的书本边界一致")
 	assert_gt(book_shadow.color.a, 0.0, "烟褐背景上保留克制的书本接触影")
-	assert_eq(chapter_hero.text, "英雄")
-	assert_eq(chapter_item.text, "道具")
+	assert_eq(chapter_hero.text, "", "按钮本体不再横移同一份文字")
+	assert_eq(chapter_item.text, "")
+	var hero_state_text := chapter_hero.get_node("StateText") as Label
+	var item_state_text := chapter_item.get_node("StateText") as Label
+	assert_eq(hero_state_text.text, "英雄")
+	assert_eq(item_state_text.text, "道具")
+	assert_eq(chapter_hero.size, Vector2(150, 82),
+			"主章节点击区按精修母纹理 150x82 一比一显示")
+	assert_eq(chapter_item.size, Vector2(150, 82))
+	assert_eq(chapter_hero.position, Vector2(9.6, 190.75),
+			"主签改用最终画布坐标并与居中书封接缝")
+	assert_eq(chapter_item.position, Vector2(9.6, 278.75))
+	assert_eq(chapter_item.position.y - (chapter_hero.position.y + chapter_hero.size.y), 6.0,
+			"英雄与道具主签整体下移并把组内间距收紧为 6px")
+	assert_eq(rarity_group.position.y - (chapter_item.position.y + chapter_item.size.y), 12.0,
+			"道具主签与普通子签间距同步收紧为 12px")
 	var hero_idle_art := chapter_hero.get_node("IdleArt") as TextureRect
 	var hero_selected_art := chapter_hero.get_node("SelectedArt") as TextureRect
 	var item_idle_art := chapter_item.get_node("IdleArt") as TextureRect
 	var item_selected_art := chapter_item.get_node("SelectedArt") as TextureRect
-	assert_false(hero_idle_art.visible, "英雄选中时不叠加灰暗未选中纸签")
-	assert_true(hero_selected_art.visible, "英雄选中时使用加宽加高的亮纸签")
-	assert_true(item_idle_art.visible, "道具未选中时使用缩短并藏入书后的纸签")
-	assert_false(item_selected_art.visible)
+	assert_false(hero_idle_art.visible, "选中英雄签不显示 idle 资产")
+	assert_true(hero_selected_art.visible, "选中英雄签使用 selected 资产")
+	assert_true(item_idle_art.visible, "未选中道具签使用返回签同源的 idle 资产")
+	assert_false(item_selected_art.visible, "未选中道具签不调用 selected 资产")
 	assert_eq(hero_selected_art.texture.resource_path,
 			"res://assets/ui/codex/bookmark_chapter_selected.png")
 	assert_eq(hero_idle_art.texture.resource_path,
 			"res://assets/ui/codex/bookmark_chapter_idle.png")
-	assert_not_null(chapter_hero.get_node_or_null("ChapterIcon"),
-			"主签保留通过预览中的图形索引")
+	assert_null(chapter_hero.get_node_or_null("ChapterIcon"),
+			"主章节侧签只保留文字，不再添加英雄或道具图案")
+	assert_null(chapter_item.get_node_or_null("ChapterIcon"))
+	var hero_idle_shadow := chapter_hero.get_node("IdleShadow") as TextureRect
+	var hero_selected_shadow := chapter_hero.get_node("SelectedShadow") as TextureRect
+	assert_false(hero_idle_shadow.visible)
+	assert_true(hero_selected_shadow.visible)
+	assert_eq(hero_idle_shadow.texture, hero_idle_art.texture,
+			"Godot 投影复用纸签 Alpha，不烘焙第三张阴影素材")
+	assert_eq(hero_selected_shadow.texture, hero_selected_art.texture)
+	assert_eq(hero_selected_shadow.position, UnifiedCodexScreen.BOOKMARK_SHADOW_OFFSET)
+	assert_eq(hero_selected_shadow.self_modulate, UnifiedCodexScreen.BOOKMARK_SHADOW_COLOR)
 	assert_lt(normal.size.x, chapter_item.size.x, "稀有度子标签比主章节标签更小")
 	assert_gt(normal.position.x + rarity_group.position.x, chapter_item.position.x,
 			"稀有度子标签向书页内缩，形成二级层级")
-	assert_lt(chapter_hero.position.x, UnifiedCodexScreen.BOOK_ORIGIN.x,
-			"章节签主体位于缩书后释放的左侧背景区")
-	assert_lte(chapter_hero.position.x + chapter_hero.size.x,
-			UnifiedCodexScreen.BOOK_ORIGIN.x + 50.0,
-			"主签点击区根部位于书封下方，不挤占左页内容")
-	assert_lte(chapter_item.position.x + chapter_item.size.x,
-			UnifiedCodexScreen.BOOK_ORIGIN.x + 50.0,
-			"两种状态共用稳定点击区并由书封遮住插入根部")
-	assert_lte(normal.position.x + rarity_group.position.x + normal.size.x,
-			UnifiedCodexScreen.BOOK_ORIGIN.x + 24.0,
-			"稀有度小侧签保持在背景边距，只让根部藏入封皮")
+	var chapter_canvas_left := (bookmark_layer.position.x
+			+ chapter_hero.position.x * bookmark_layer.scale.x)
+	var selected_visible_right := (chapter_canvas_left
+			+ 144.0 * bookmark_layer.scale.x)
+	var rarity_visible_right := (bookmark_layer.position.x
+			+ (rarity_group.position.x + 144.0 / 150.0 * normal.size.x)
+			* bookmark_layer.scale.x)
+	assert_almost_eq(chapter_canvas_left, 9.6, 0.01,
+			"主签在居中书本左侧安全区内完整露出")
+	assert_almost_eq(selected_visible_right, UnifiedCodexScreen.BOOK_ORIGIN.x, 0.01,
+			"选中主签精修纹理的可见右缘与书封左缘精确接缝")
+	assert_almost_eq(rarity_visible_right, UnifiedCodexScreen.BOOK_ORIGIN.x, 1.0,
+			"稀有度小侧签同样只把根部藏入书封")
+	assert_almost_eq(chapter_hero.size.x * bookmark_layer.scale.x, 150.0, 0.01,
+			"主签恢复母纹理一比一显示，适配居中书本边距")
+	assert_almost_eq(normal.size.x * bookmark_layer.scale.x, 100.0, 0.01,
+			"二级签缩至主签三分之二宽度")
 	assert_false(rarity_group.visible, "英雄图鉴中稀有度标签保持收起")
 	assert_eq(chapter_hero.position.x, chapter_item.position.x,
-			"主签点击区域固定，选中与未选中差异由独立纸签资产表达")
-	assert_eq(chapter_hero.scale, Vector2.ONE, "侧签切换不使用破坏真像素的缩放动效")
+			"主签点击区域与纸张轮廓在所有状态下固定")
+	assert_eq(chapter_hero.scale, Vector2.ONE,
+			"侧签按钮与点击区域本体始终保持原尺寸")
+	assert_eq(screen.bookmark_fold_min_scale, 0.78)
+	assert_eq(screen.bookmark_fold_collapse_duration, 0.075)
+	assert_eq(screen.bookmark_fold_expand_duration, 0.09,
+			"低幅书缝换面由 Inspector 暴露参数，不再使用夸张收缩")
+	assert_null(hero_selected_art.material)
+	assert_null(item_idle_art.material)
+	assert_null(item_selected_art.material,
+			"静态与动画过程均直接绘制原资产，不再套纹理混合 shader")
+	assert_eq(hero_selected_art.scale, Vector2.ONE)
+	assert_eq(item_idle_art.scale, Vector2.ONE)
+	assert_almost_eq(hero_state_text.position.x + hero_state_text.size.x * 0.5,
+			88.0, 0.01, "单层文字严格居中于固定纸面")
+	assert_almost_eq(item_state_text.position.x + item_state_text.size.x * 0.5,
+			88.0, 0.01)
+	assert_null(chapter_hero.get_node_or_null("SelectionMarkerMask"),
+			"正式英雄签取消金色索引")
+	assert_null(chapter_item.get_node_or_null("SelectionMarkerMask"),
+			"正式道具签取消金色索引")
+	var idle_rest_x := chapter_item.position.x
+	screen.call("_on_bookmark_hover", chapter_item, true)
+	await get_tree().create_timer(0.2).timeout
+	assert_almost_eq(chapter_item.position.x, idle_rest_x, 0.01,
+			"悬停只做轻微明暗反馈，不再把侧签从书封向左拉出空隙")
+	screen.call("_on_bookmark_hover", chapter_item, false)
 	var hero_gallery := screen.call("get_gallery", 0) as Control
 	assert_not_null(hero_gallery)
 	assert_eq(hero_gallery.position, Vector2.ZERO)
 	assert_eq(hero_gallery.scale, Vector2.ONE,
 			"英雄图鉴内部不二次缩放，由统一书本容器负责构图")
+	var prewarmed_item_gallery := screen.call("get_gallery", 1) as Control
+	assert_false(prewarmed_item_gallery.visible, "未激活章节已预热但首帧保持隐藏")
+	for gallery: Control in [hero_gallery, prewarmed_item_gallery]:
+		assert_true(bool(gallery.get("embedded_in_codex")))
+		assert_almost_eq((gallery.get_node("BookLayer") as Control).modulate.a, 1.0, 0.001,
+				"嵌入章节不重复播放透明入场，切换首帧保持完整书页")
+		assert_eq((gallery.get_node("BookLayer") as Control).position, Vector2.ZERO)
+		assert_false((gallery.get_node("TopBand/BackButton") as Button).visible,
+				"子页旧返回入口在统一外壳内隐藏")
+	var native_text_layer := screen.get_node("NativeTextLayer") as CodexNativeTextLayer
+	native_text_layer.sync_now()
+	assert_eq(native_text_layer.scale, Vector2.ONE,
+			"原生文字层不继承 0.84 书页缩放")
+	assert_gt(native_text_layer.mirror_count(), 0, "当前书页文字已复制到原生画布层")
+	var source_page_indicator := hero_gallery.get_node("PoolArea/PageNavigation/PageIndicator") as Label
+	var source_previous_page := hero_gallery.get_node("PoolArea/PageNavigation/PreviousPage") as Button
+	var source_next_page := hero_gallery.get_node("PoolArea/PageNavigation/NextPage") as Button
+	assert_almost_eq(source_page_indicator.self_modulate.a, 0.0, 0.001,
+			"缩放书页仅保留布局来源，不再重复绘制文字")
+	var native_page_indicator := native_text_layer.mirror_for_source(source_page_indicator)
+	var native_previous_page := native_text_layer.mirror_for_source(source_previous_page)
+	var native_next_page := native_text_layer.mirror_for_source(source_next_page)
+	assert_not_null(native_page_indicator)
+	assert_not_null(native_previous_page)
+	assert_not_null(native_next_page)
+	if native_page_indicator != null and native_previous_page != null and native_next_page != null:
+		assert_eq(native_page_indicator.scale, Vector2.ONE)
+		assert_eq(native_page_indicator.position, native_page_indicator.position.round(),
+				"原生文字落在整数画布坐标")
+		assert_eq(native_previous_page.get_theme_font_size("font_size"), 18,
+				"上一页不再沿用更粗大的 24px 源字号")
+		assert_eq(native_page_indicator.get_theme_font_size("font_size"), 18)
+		assert_eq(native_next_page.get_theme_font_size("font_size"), 18,
+				"上一页、页码、下一页使用同一最终字号与字重")
+		assert_eq(native_previous_page.position.y, native_page_indicator.position.y)
+		assert_eq(native_next_page.position.y, native_page_indicator.position.y,
+				"分页三项共享同一纵向中心，不再上下错位")
+		assert_eq(source_previous_page.text, "上一页")
+		assert_eq(source_next_page.text, "下一页",
+				"翻页文案不再使用视觉重量过大的三重箭头")
+		assert_eq(source_previous_page.get_parent().position.x,
+				hero_gallery.get_node("PoolArea/PortraitGrid").position.x,
+				"分页行源布局与四列头像内容使用同一水平起点")
+		assert_eq(native_page_indicator.get_theme_color("font_color"),
+				CodexNativeTextLayer.PAGE_NAVIGATION_COLOR)
+		assert_eq(native_next_page.get_theme_color("font_color"),
+				CodexNativeTextLayer.PAGE_NAVIGATION_COLOR,
+				"可用翻页文案与页码使用相同墨色和透明度")
+		assert_eq(native_previous_page.get_theme_color("font_color"),
+				CodexNativeTextLayer.PAGE_NAVIGATION_DISABLED_COLOR,
+				"仅不可用的上一页降低透明度")
+		assert_eq(native_previous_page.get_theme_constant("outline_size"), 0)
+		assert_eq(native_page_indicator.get_theme_constant("outline_size"), 0)
+		assert_eq(native_next_page.get_theme_constant("outline_size"), 0,
+				"翻页文案与页码不再继承不同的描边粗细")
+		assert_not_null(native_previous_page.get_node_or_null("NavArrow"))
+		assert_not_null(native_next_page.get_node_or_null("NavArrow"),
+				"翻页方向改由单枚原生像素三角表达")
+		assert_eq(CodexNativeTextLayer.PAGE_ARROW_GAP, 8.0,
+				"翻页箭头与相邻文字保留 8px 清晰间距")
+		var cards: Array = hero_gallery.get("card_cards") as Array
+		var first_frame := (cards[0] as Control).get_node("HeroPortraitFrame") as Control
+		var last_frame := (cards[3] as Control).get_node("HeroPortraitFrame") as Control
+		var first_center := native_text_layer.get_global_transform_with_canvas() \
+				.affine_inverse() * (first_frame.get_global_transform_with_canvas() \
+				* (first_frame.size * 0.5))
+		var last_center := native_text_layer.get_global_transform_with_canvas() \
+				.affine_inverse() * (last_frame.get_global_transform_with_canvas() \
+				* (last_frame.size * 0.5))
+		var previous_arrow := native_previous_page.get_node("NavArrow") as Polygon2D
+		var previous_group_left := native_previous_page.position.x \
+				+ previous_arrow.position.x
+		var previous_group_right := native_previous_page.position.x \
+				+ native_previous_page.size.x
+		var next_arrow := native_next_page.get_node("NavArrow") as Polygon2D
+		var next_group_left := native_next_page.position.x
+		var next_group_right := native_next_page.position.x \
+				+ next_arrow.position.x + CodexNativeTextLayer.PAGE_ARROW_WIDTH
+		assert_almost_eq((previous_group_left + previous_group_right) * 0.5,
+				first_center.x, 0.5, "上一页视觉组严格对齐第一列头像中心")
+		assert_almost_eq(native_page_indicator.position.x
+				+ native_page_indicator.size.x * 0.5,
+				(first_center.x + last_center.x) * 0.5, 0.5,
+				"页码严格对齐四列头像的视觉中心")
+		assert_almost_eq((next_group_left + next_group_right) * 0.5,
+				last_center.x, 0.5, "下一页视觉组严格对齐第四列头像中心")
+	var source_hero_name := hero_gallery.find_child("HeroName", true, false) as Label
+	assert_eq(source_hero_name.position.y,
+			HeroGalleryScreen.BOX + HeroGalleryScreen.NAME_TOP_GAP,
+			"英雄名与头像框增加 3px 克制留白，不改变已通过的水平补偿")
+	var native_hero_name := native_text_layer.mirror_for_source(source_hero_name)
+	var portrait_frame := source_hero_name.get_parent().get_node("HeroPortraitFrame") as Control
+	var frame_center_global := portrait_frame.get_global_transform_with_canvas() \
+			* (portrait_frame.size * 0.5)
+	var frame_center_local := native_text_layer.get_global_transform_with_canvas() \
+			.affine_inverse() * frame_center_global
+	assert_not_null(native_hero_name)
+	if native_hero_name != null:
+		assert_lte(absf(native_hero_name.position.x + native_hero_name.size.x * 0.5
+				- roundf(frame_center_local.x)
+				- CodexNativeTextLayer.HERO_NAME_OPTICAL_OFFSET_X), 0.5,
+				"头像名在几何居中后统一增加三个最终像素的右向字面补偿")
+		assert_eq(native_hero_name.vertical_alignment, VERTICAL_ALIGNMENT_TOP,
+				"头像名恢复原版顶部落字，不再被强制垂直居中")
+		assert_eq(native_hero_name.get_theme_font_size("font_size"), 15,
+				"头像名使用清晰但不过度放大的原生 15px")
+	var source_skill_detail := hero_gallery.find_child("SkillDetail", true, false) as Label
+	var native_skill_detail := native_text_layer.mirror_for_source(source_skill_detail)
+	assert_not_null(native_skill_detail)
+	if native_skill_detail != null:
+		var expected_skill_top := native_text_layer.get_global_transform_with_canvas() \
+				.affine_inverse() * (source_skill_detail.get_global_transform_with_canvas() \
+				* Vector2.ZERO)
+		assert_eq(native_skill_detail.vertical_alignment, VERTICAL_ALIGNMENT_TOP,
+				"右页技能正文恢复旧版顶部对齐，不再沉到说明区域下半部")
+		assert_lte(absf(native_skill_detail.position.y - roundf(expected_skill_top.y)), 1.0,
+				"技能正文原生层保持旧版说明区域顶边")
+	var skill_name := hero_gallery.get("_d_skill_name") as Label
+	var skill_icon := hero_gallery.get("_d_skill_icon") as TextureRect
+	var skill_tag := hero_gallery.get("_d_tag_group") as Control
+	var skill_rule := hero_gallery.get("_d_detail_rule") as ColorRect
+	var skill_pin := hero_gallery.get("_d_detail_pin") as ColorRect
+	assert_eq(skill_name.position.y, 744.0)
+	assert_true(not skill_icon.visible or skill_icon.position.y == 744.0)
+	assert_eq(skill_tag.position.y, 743.0)
+	assert_eq(source_skill_detail.position.y, 804.0)
+	assert_eq(skill_rule.position.y, 814.0)
+	assert_eq(skill_pin.position.y, 808.0,
+			"技能行、正文与引导线必须作为一个完整区块同步上移")
+	var unified_back := screen.get_node("BackButton") as Button
+	assert_false(unified_back.visible, "图鉴改为场景内浮层后彻底停用返回侧签")
+	var unified_close := screen.get_node("CloseButton") as Button
+	assert_true(unified_close.visible)
+	assert_eq(unified_close.position, Vector2(1643, 140),
+			"放大后的手绘 X 保持通过位置的视觉中心")
+	assert_eq(unified_close.size, Vector2(40, 40))
+	assert_true(unified_close.tooltip_text.is_empty())
+	assert_true("Inspector" in unified_close.editor_description)
+	assert_eq((unified_close.get_node("StrokeA") as Line2D).width, 3.0)
+	assert_eq((unified_close.get_node("StrokeB") as Line2D).width, 3.0)
+	assert_null(unified_close.get_node_or_null("ShadowA"))
+	assert_null(unified_close.get_node_or_null("ShadowB"))
+	assert_eq((unified_close.get_node("StrokeA") as Line2D).position, Vector2.ZERO)
+	assert_eq((unified_close.get_node("StrokeB") as Line2D).position, Vector2.ZERO,
+			"X 笔画不得单独偏移，否则视觉与点击区会分离")
+	assert_true(unified_close.flat, "关闭键命中区不得绘制 Button 装饰")
+	for style_state: StringName in UnifiedCodexScreen.CLOSE_STYLE_STATES:
+		assert_true(unified_close.has_theme_stylebox_override(style_state))
+		assert_true(unified_close.get_theme_stylebox(style_state) is StyleBoxEmpty,
+				"包括 hover_pressed 在内的关闭键状态必须全部透明：%s" % style_state)
+	screen.call("_on_close_down")
+	assert_eq(unified_close.offset_transform_position, Vector2.ZERO)
+	assert_eq((unified_close.get_node("StrokeA") as Line2D).default_color,
+			UnifiedCodexScreen.CLOSE_PRESSED_COLOR,
+			"关闭键按下只改变笔画颜色，不产生位移阴影")
+	screen.call("_on_close_up")
+	assert_eq(unified_close.offset_transform_position, Vector2.ZERO,
+			"关闭键拥有按下与松开反馈")
+	assert_false(unified_close.pressed.get_connections().is_empty())
+	assert_eq(unified_back.text, "")
+	assert_lt(unified_back.position.x, UnifiedCodexScreen.BOOK_ORIGIN.x)
+	assert_almost_eq(unified_back.position.x + unified_back.size.x,
+			UnifiedCodexScreen.BOOK_ORIGIN.x, 0.01,
+			"返回短签右缘精确止于书封接缝，点击区不压入书页")
+	assert_gte(unified_back.position.y, UnifiedCodexScreen.BOOK_ORIGIN.y,
+			"返回短签不得越出书本顶部")
+	assert_lt(unified_back.position.y + unified_back.size.y, chapter_hero.position.y,
+			"返回短签位于章节签上方并形成独立操作层级")
+	assert_true(unified_back.size.is_equal_approx(Vector2(112, 54)))
+	assert_eq(chapter_hero.position.y - (unified_back.position.y + unified_back.size.y), 48.0,
+			"整体下移后返回签到英雄签为 48px，正式侧签组内为 6px")
+	var back_art := unified_back.get_node("BackArt") as TextureRect
+	var back_shadow := unified_back.get_node("BackShadow") as TextureRect
+	var back_text := unified_back.get_node("BackText") as Label
+	assert_true(back_art.texture is AtlasTexture,
+			"返回短签从现有章节纸签裁切，不新增贴图")
+	var back_atlas := back_art.texture as AtlasTexture
+	assert_eq(back_atlas.atlas.resource_path,
+			"res://assets/ui/codex/bookmark_chapter_idle.png")
+	assert_eq(back_atlas.region, Rect2(32, 12, 112, 54))
+	assert_null(back_art.material,
+			"返回签直接绘制原资产颜色，不再参与纸色归一")
+	assert_eq(back_shadow.texture, back_art.texture)
+	assert_eq(back_shadow.position, UnifiedCodexScreen.BOOKMARK_SHADOW_OFFSET)
+	assert_eq(back_text.text, "返回")
+	assert_eq(back_text.get_theme_font_size("font_size"), 18)
+	var back_arrow := unified_back.get_node_or_null("BackArrow") as Polygon2D
+	assert_not_null(back_arrow, "返回侧签使用代码绘制的单枚像素箭头，无新增资产")
+	if back_arrow != null:
+		var arrow_min_y := INF
+		var arrow_max_y := -INF
+		for point: Vector2 in back_arrow.polygon:
+			arrow_min_y = minf(arrow_min_y, point.y)
+			arrow_max_y = maxf(arrow_max_y, point.y)
+		var arrow_center_y := back_arrow.position.y + (arrow_min_y + arrow_max_y) * 0.5
+		assert_almost_eq(arrow_center_y, unified_back.size.y * 0.5, 0.01,
+				"箭头与返回文字共享按钮纵向中心")
+	assert_false(unified_back.pressed.get_connections().is_empty())
 
 	screen.call("show_section", 1)
 	assert_true(rarity_group.visible, "进入道具图鉴后展开普通/稀有/传说快速索引")
-	await get_tree().create_timer(0.28).timeout
-	assert_true(item_selected_art.visible, "切到道具后切换为加宽加高的选中纸签")
+	assert_false(item_selected_art.visible)
+	assert_true(item_idle_art.visible,
+			"切换首帧从真实 idle 资产开始")
+	assert_eq(item_idle_art.self_modulate, Color.WHITE)
+	assert_eq(hero_idle_art.self_modulate, Color.WHITE,
+			"两张资产保持原色，不使用状态染色")
+	assert_almost_eq((prewarmed_item_gallery.get_node("BookLayer") as Control).modulate.a,
+			1.0, 0.001, "英雄切道具的首帧不再露出黑色衬底")
+	var item_transition := (screen.get("_tab_tweens") as Dictionary).get(chapter_item) as Tween
+	screen.call("_on_bookmark_hover", chapter_item, true)
+	assert_true(item_transition != null and item_transition.is_valid(),
+			"悬停反馈不再杀掉正在执行的选中状态 Tween")
+	for index: int in 3:
+		var opening_button := rarity_group.get_child(index) as Button
+		assert_eq(opening_button.position.y, UnifiedCodexScreen.RARITY_TARGET_Y[index],
+				"二级签不再位移，只按固定位置逐枚显现")
+		assert_almost_eq(opening_button.self_modulate.a, 1.0, 0.001)
+		assert_false(opening_button.visible)
+		assert_eq(opening_button.mouse_filter, Control.MOUSE_FILTER_IGNORE)
+	screen.call("_kill_button_tween", chapter_item)
+	screen.call("_set_bookmark_fold_scale", 0.82, chapter_item)
+	assert_true(item_idle_art.visible)
+	assert_false(item_selected_art.visible,
+			"收窄阶段仍只显示旧纸面，不叠加两张纸签")
+	assert_almost_eq(item_idle_art.scale.x, 0.82, 0.001)
+	assert_eq(item_idle_art.material, null)
+	assert_null(item_selected_art.material)
+	screen.call("_apply_bookmark_endpoint", chapter_item, true)
+	screen.call("_set_bookmark_fold_scale", 1.0, chapter_item)
+	screen.call("_kill_button_tween", chapter_hero)
+	screen.call("_apply_bookmark_endpoint", chapter_hero, false)
+	screen.call("_set_bookmark_fold_scale", 1.0, chapter_hero)
+	screen.call("_kill_rarity_group_tween")
+	for opening_button: Button in [
+		rarity_group.get_node("Normal") as Button,
+		rarity_group.get_node("Rare") as Button,
+		rarity_group.get_node("Legendary") as Button,
+	]:
+		screen.call("_set_rarity_button_visible", opening_button, true)
+	assert_true(item_selected_art.visible)
 	assert_false(item_idle_art.visible)
 	assert_true(hero_idle_art.visible, "英雄签同步切回较短的未选中纸签")
 	assert_false(hero_selected_art.visible)
+	for index: int in 3:
+		var opened_button := rarity_group.get_child(index) as Button
+		assert_true(opened_button.visible)
+		assert_eq(opened_button.mouse_filter, Control.MOUSE_FILTER_STOP)
 	assert_eq((rarity_group.get_node("Normal") as Button).position.y, 0.0)
-	assert_eq((rarity_group.get_node("Rare") as Button).position.y, 52.0)
-	assert_eq((rarity_group.get_node("Legendary") as Button).position.y, 104.0)
-	assert_eq((rarity_group.get_node("Normal") as Button).size.y, 48.0,
-			"稀有度签收紧为连续的页码索引组")
+	assert_eq((rarity_group.get_node("Rare") as Button).position.y, 50.0)
+	assert_eq((rarity_group.get_node("Legendary") as Button).position.y, 100.0)
+	assert_eq((rarity_group.get_node("Rare") as Button).position.y
+			- (rarity_group.get_node("Normal") as Button).position.y, 50.0,
+			"只收紧层级间距，子签彼此节距保持不变")
+	assert_eq((rarity_group.get_node("Normal") as Button).size, Vector2(100, 54),
+			"稀有度签缩至主签约三分之二，不再与章节签抢层级")
+	var rare_button := rarity_group.get_node("Rare") as Button
+	var normal_state_text := normal.get_node("StateText") as Label
+	var rare_state_text := rare_button.get_node("StateText") as Label
+	assert_almost_eq(normal_state_text.position.x + normal_state_text.size.x * 0.5,
+			58.5, 0.01, "稀有度文字统一居中于固定纸面")
+	assert_almost_eq(rare_state_text.position.x + rare_state_text.size.x * 0.5,
+			58.5, 0.01, "未选中稀有度文字居中于缩短后的可见纸面")
 	var normal_selected_art := normal.get_node("SelectedArt") as TextureRect
-	var rare_idle_art := (rarity_group.get_node("Rare") as Button).get_node("IdleArt") as TextureRect
-	assert_true(normal_selected_art.visible, "普通档选中签比未选中二级签多露一段")
+	var normal_idle_art := normal.get_node("IdleArt") as TextureRect
+	var rare_idle_art := rare_button.get_node("IdleArt") as TextureRect
+	assert_eq(normal_selected_art.texture.resource_path,
+			"res://assets/ui/codex/bookmark_chapter_selected.png")
+	assert_eq(rare_idle_art.texture.resource_path,
+			"res://assets/ui/codex/bookmark_chapter_idle.png")
+	assert_true(normal_selected_art.visible, "普通选中态使用 selected 纸面")
+	assert_false(normal_idle_art.visible)
 	assert_true(rare_idle_art.visible, "其余稀有度保持较短未选中状态")
+	var expected_stripe_colors: Array[Color] = UnifiedCodexScreen.RARITY_STRIPE_COLORS
+	for index: int in 3:
+		var rarity_button := rarity_group.get_child(index) as Button
+		var idle_stripe := rarity_button.get_node("IdleStripe") as TextureRect
+		var selected_stripe := rarity_button.get_node("SelectedStripe") as TextureRect
+		var idle_material := idle_stripe.material as ShaderMaterial
+		var selected_material := selected_stripe.material as ShaderMaterial
+		assert_not_null(idle_material)
+		assert_not_null(selected_material)
+		assert_eq(idle_material.shader.resource_path,
+				"res://assets/shaders/canvas_ui_codex_rarity_edge.gdshader")
+		assert_eq(selected_material.shader, idle_material.shader)
+		assert_eq(idle_material.get_shader_parameter("rarity_color"), expected_stripe_colors[index],
+				"三级颜色仍由代码统一写入蓝紫金色板")
+		assert_eq(selected_material.get_shader_parameter("rarity_color"),
+				expected_stripe_colors[index])
+		assert_eq(idle_stripe.clip_children, CanvasItem.CLIP_CHILDREN_DISABLED,
+				"稀有度染边 TextureRect 自身必须参与绘制，不能误设为仅供子节点裁切的遮罩")
+		assert_eq(selected_stripe.clip_children, CanvasItem.CLIP_CHILDREN_DISABLED,
+				"选中染边同样必须保持可见")
+		assert_eq(idle_stripe.texture, rarity_button.get_node("IdleArt").texture)
+		assert_eq(selected_stripe.texture, rarity_button.get_node("SelectedArt").texture)
+		assert_almost_eq(float(idle_material.get_shader_parameter("edge_end_uv")), 0.32, 0.001)
+		assert_almost_eq(float(selected_material.get_shader_parameter("edge_end_uv")), 0.16, 0.001)
+		assert_almost_eq(float(idle_material.get_shader_parameter("blend_width_uv")), 0.035, 0.001)
+		assert_almost_eq(idle_stripe.offset_left, 1.0, 0.001)
+		assert_almost_eq(selected_stripe.offset_left, 1.0, 0.001,
+				"染边整体内收 1px，避免最左侧越过纸签轮廓")
+		assert_null(idle_stripe.get_node_or_null("Fill"))
+		assert_null(selected_stripe.get_node_or_null("Fill"),
+				"贴边颜色直接染入纸签纹理，不再叠加独立线条或色块")
+		assert_not_null(rarity_button.get_node_or_null("IdleShadow"),
+				"稀有度签同样使用 Godot 投影节点")
+		assert_not_null(rarity_button.get_node_or_null("SelectedShadow"))
+		assert_null(rarity_button.get_node_or_null("SelectionMarkerMask"),
+				"普通稀有传说不再生成伸缩矩形索引")
+		assert_almost_eq(rarity_button.self_modulate.a, 1.0, 0.001,
+				"分层展开结束后纸签完全显现")
+		assert_false(rarity_button.pressed.get_connections().is_empty(),
+				"二级签保留稀有度快速跳转")
+		assert_false(rarity_button.button_down.get_connections().is_empty(),
+				"二级签保留按压反馈")
+	assert_false(chapter_hero.mouse_entered.get_connections().is_empty(),
+			"主章节签保留克制悬停反馈")
 	var item_gallery := screen.call("get_gallery", 1) as Control
 	assert_not_null(item_gallery)
 	assert_eq(item_gallery.position, Vector2.ZERO)
@@ -886,6 +1332,34 @@ func test_unified_codex_frames_reduced_book_on_smoky_backdrop() -> void:
 	assert_eq(int(item_gallery.get("_current_page")), 0)
 	assert_true(bool((rarity_group.get_node("Rare") as Button).button_pressed),
 			"快速导航后选中态同步到稀有侧签")
+	var rare_selected_art := rare_button.get_node("SelectedArt") as TextureRect
+	var rare_idle_transition_art := rare_button.get_node("IdleArt") as TextureRect
+	assert_false(rare_selected_art.visible)
+	assert_true(rare_idle_transition_art.visible,
+			"稀有度切换也始终只有一层纸面")
+	screen.call("_on_bookmark_hover", rare_button, true)
+	screen.call("_kill_button_tween", rare_button)
+	screen.call("_set_bookmark_fold_scale", 0.82, rare_button)
+	assert_true(rare_idle_transition_art.visible)
+	assert_false(rare_selected_art.visible,
+			"稀有度收窄阶段同样只显示旧纸面")
+	assert_true((rare_button.get_node("IdleStripe") as TextureRect).visible)
+	assert_false((rare_button.get_node("SelectedStripe") as TextureRect).visible)
+	assert_almost_eq(rare_idle_transition_art.scale.x, 0.82, 0.001)
+	var rare_idle_edge_material := \
+			(rare_button.get_node("IdleStripe") as TextureRect).material as ShaderMaterial
+	var rare_selected_edge_material := \
+			(rare_button.get_node("SelectedStripe") as TextureRect).material as ShaderMaterial
+	assert_not_null(rare_idle_edge_material)
+	assert_not_null(rare_selected_edge_material)
+	assert_eq(rare_idle_edge_material.shader.resource_path,
+			"res://assets/shaders/canvas_ui_codex_rarity_edge.gdshader")
+	assert_eq(rare_selected_edge_material.shader, rare_idle_edge_material.shader,
+			"纸签收窄动画不得清除或替换融入式染边材质")
+	screen.call("_apply_bookmark_endpoint", rare_button, true)
+	screen.call("_set_bookmark_fold_scale", 1.0, rare_button)
+	assert_false((rare_button.get_node("IdleStripe") as TextureRect).visible)
+	assert_true((rare_button.get_node("SelectedStripe") as TextureRect).visible)
 	(rarity_group.get_node("Normal") as Button).pressed.emit()
 	var crossing_guard := 0
 	while int(item_gallery.get("_tier")) == 1 and crossing_guard < 20:
@@ -898,10 +1372,21 @@ func test_unified_codex_frames_reduced_book_on_smoky_backdrop() -> void:
 
 	item_gallery.call("_select", 1)
 	screen.call("show_section", 0)
+	for closing_button: Button in [
+			rarity_group.get_node("Normal") as Button,
+			rarity_group.get_node("Rare") as Button,
+			rarity_group.get_node("Legendary") as Button,
+	]:
+		assert_eq(closing_button.mouse_filter, Control.MOUSE_FILTER_IGNORE,
+				"收起动效期间禁用二级签点击")
+	await get_tree().create_timer(0.22).timeout
+	assert_false(rarity_group.visible, "反向收起完成后隐藏二级签组")
 	hero_gallery.call("_turn_page", 1)
 	var hero_page := int(hero_gallery.get("_current_page"))
 	screen.call("show_section", 1)
-	assert_eq(int(item_gallery.get("_sel_idx")), 1, "返回道具章节时保留上次选中道具")
+	assert_eq(int(item_gallery.get("_tier")), 1, "返回道具章节时重置为普通")
+	assert_eq(int(item_gallery.get("_current_page")), 0, "返回道具章节时重置为第一页")
+	assert_eq(int(item_gallery.get("_sel_idx")), 0, "返回道具章节时选中普通第一页首件")
 	screen.call("show_section", 0)
 	assert_eq(int(hero_gallery.get("_current_page")), hero_page,
 			"返回英雄章节时保留上次页码")
@@ -909,10 +1394,14 @@ func test_unified_codex_frames_reduced_book_on_smoky_backdrop() -> void:
 
 func test_codex_bookmark_assets_are_hard_edge_true_pixel_pngs() -> void:
 	var specs := {
-		"res://assets/ui/codex/bookmark_chapter_idle.png": Vector2i(184, 72),
-		"res://assets/ui/codex/bookmark_chapter_selected.png": Vector2i(184, 72),
-		"res://assets/ui/codex/bookmark_rarity_idle.png": Vector2i(116, 48),
-		"res://assets/ui/codex/bookmark_rarity_selected.png": Vector2i(116, 48),
+		"res://assets/ui/codex/bookmark_chapter_idle.png": {
+			"size": Vector2i(150, 82),
+			"sha256": "A6448B554629E206DBB7FDC46359AC785A0DE6F6B4796A70D0986830AAE46AEC",
+		},
+		"res://assets/ui/codex/bookmark_chapter_selected.png": {
+			"size": Vector2i(150, 82),
+			"sha256": "8C81DD81C768888A5AF60A779236247A836DA5D4B45A6EDE03FBCA76FB369B7A",
+		},
 	}
 	for path: String in specs:
 		assert_true(FileAccess.file_exists(path), "%s 存在" % path)
@@ -920,7 +1409,10 @@ func test_codex_bookmark_assets_are_hard_edge_true_pixel_pngs() -> void:
 			continue
 		var image := Image.new()
 		assert_eq(image.load_png_from_buffer(FileAccess.get_file_as_bytes(path)), OK)
-		assert_eq(image.get_size(), specs[path], "%s 使用锁定显示尺寸" % path)
+		var spec: Dictionary = specs[path]
+		assert_eq(image.get_size(), spec["size"], "%s 使用锁定显示尺寸" % path)
+		assert_eq(FileAccess.get_sha256(path).to_upper(), spec["sha256"],
+				"%s 必须逐字节复用修正任务2通过母纹理" % path)
 		assert_eq(image.get_pixel(0, 0).a, 0.0, "%s 外露左上角削角" % path)
 		assert_eq(image.get_pixel(0, image.get_height() - 1).a, 0.0,
 				"%s 外露左下角削角" % path)
@@ -931,22 +1423,19 @@ func test_codex_bookmark_assets_are_hard_edge_true_pixel_pngs() -> void:
 				first_opaque_x = x
 				break
 		if selected_asset:
-			assert_lte(first_opaque_x, 4, "%s 选中态完整向左抽出" % path)
+			assert_eq(first_opaque_x, 5, "%s 选中态完整向左抽出" % path)
 		else:
-			assert_gte(first_opaque_x, 18, "%s 未选中态明显藏入书页" % path)
+			assert_eq(first_opaque_x, 31, "%s 未选中态明显藏入书页" % path)
 		var hard_alpha := true
+		var opaque_colors := {}
 		for y: int in image.get_height():
 			for x: int in image.get_width():
-				var alpha := image.get_pixel(x, y).a
+				var pixel := image.get_pixel(x, y)
+				var alpha := pixel.a
 				if alpha != 0.0 and alpha != 1.0:
 					hard_alpha = false
+				if alpha == 1.0:
+					opaque_colors[pixel.to_html(false)] = true
 		assert_true(hard_alpha, "%s 不保留半透明毛边" % path)
-		var exact_two_x := true
-		for logical_y: int in int(image.get_height() / 2.0):
-			for logical_x: int in int(image.get_width() / 2.0):
-				var expected := image.get_pixel(logical_x * 2, logical_y * 2)
-				for dy: int in 2:
-					for dx: int in 2:
-						if image.get_pixel(logical_x * 2 + dx, logical_y * 2 + dy) != expected:
-							exact_two_x = false
-		assert_true(exact_two_x, "%s 每个逻辑像素为无插值的 2x2 色块" % path)
+		assert_gte(opaque_colors.size(), 20,
+				"%s 保留外部美术源的纸纹与明暗层次，不再由少量色块模拟" % path)

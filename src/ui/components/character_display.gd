@@ -2,6 +2,8 @@
 class_name CharacterDisplay
 extends SubViewportContainer
 
+signal action_animation_finished(animation_name: StringName)
+
 ## Self-contained character display: SubViewport + AnimatedSprite2D.
 ## Drop into any scene, set spritesheet_path, see idle animation in editor.
 ## Supports attack/hit/defend via additional spritesheets.
@@ -164,11 +166,16 @@ extends SubViewportContainer
 
 var _sprite: AnimatedSprite2D
 var _return_to_idle: bool = false
+var _base_output_material: Material = null
+var _death_dissolve_material: ShaderMaterial = null
 
 static var _sprite_cache: Dictionary = {}
 
 
 func _ready() -> void:
+	# 存活态沿用 Scene1–7 原有渲染链，不常驻额外容器 shader。
+	# 死亡侵蚀开始时才临时挂载，替补入场/重置后立即恢复。
+	_base_output_material = material
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if get_child_count() > 0 and get_child(0) is SubViewport:
 		var vp: SubViewport = get_child(0) as SubViewport
@@ -315,12 +322,58 @@ func play_animation(anim_name: String, return_to_idle: bool = true) -> void:
 
 
 
-## Return how long animation [anim_name] lasts in seconds (frame_count / speed).
-## Falls back to 0.5 s when the animation or sprite data is missing.
+## 返回动画按逐帧相对时长计算出的真实秒数，供死亡落地事件做信号失效时的保底。
+func animation_duration(anim_name: StringName) -> float:
+	if _sprite == null or _sprite.sprite_frames == null \
+			or not _sprite.sprite_frames.has_animation(anim_name):
+		return 0.0
+	var frames := _sprite.sprite_frames
+	var speed := frames.get_animation_speed(anim_name)
+	if speed <= 0.0:
+		return 0.0
+	var duration := 0.0
+	for frame_index: int in frames.get_frame_count(anim_name):
+		duration += frames.get_frame_duration(anim_name, frame_index) / speed
+	return duration
+
+
 func _on_anim_finished() -> void:
+	var finished_animation: StringName = _sprite.animation
+	action_animation_finished.emit(finished_animation)
 	if _return_to_idle and _sprite.sprite_frames and _sprite.sprite_frames.has_animation("idle"):
 		_sprite.play("idle")
 		_return_to_idle = false
+
+
+func set_death_dissolve(progress: float, from_right: bool, steps: int = 12) -> void:
+	var normalized_progress := clampf(progress, 0.0, 1.0)
+	if normalized_progress <= 0.0:
+		if _death_dissolve_material != null:
+			_death_dissolve_material.set_shader_parameter("dissolve_progress", 0.0)
+			if material == _death_dissolve_material:
+				material = _base_output_material
+		return
+	var death_material := _ensure_death_dissolve_material()
+	material = death_material
+	death_material.set_shader_parameter("dissolve_progress", normalized_progress)
+	death_material.set_shader_parameter("dissolve_from_right", 1.0 if from_right else 0.0)
+	death_material.set_shader_parameter("dissolve_steps", float(maxi(1, steps)))
+
+
+func reset_death_dissolve() -> void:
+	set_death_dissolve(0.0, true)
+
+
+func _ensure_death_dissolve_material() -> ShaderMaterial:
+	if _death_dissolve_material != null:
+		return _death_dissolve_material
+	_death_dissolve_material = ShaderMaterial.new()
+	_death_dissolve_material.shader = preload(
+			"res://assets/shaders/canvas_ui_character_death_dissolve.gdshader")
+	_death_dissolve_material.set_shader_parameter("dissolve_progress", 0.0)
+	_death_dissolve_material.set_shader_parameter("dissolve_from_right", 1.0)
+	_death_dissolve_material.set_shader_parameter("dissolve_steps", 12.0)
+	return _death_dissolve_material
 
 
 func set_hit_flash(on: bool) -> void:

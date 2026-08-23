@@ -219,9 +219,6 @@ script = ExtResource("1_battle_gd")
 tip_size_s = Vector2(144, 66)
 tip_size_l = Vector2(222, 122)
 tip_glyph_spacing = 1
-tip_font_size_s = 18
-item_tip_vertical_lift = 0.0
-item_tip_title_body_gap = 8
 
 [node name="StageSlot" type="Control" parent="." unique_id=924300025]
 layout_mode = 1
@@ -531,9 +528,9 @@ diamond_mode = true
 bottom_shadow_enabled = true
 
 [node name="P2Frame1" parent="P2Hud" unique_id=1621653890 instance=ExtResource("3_hero_frame")]
-offset_left = 1186.0
+offset_left = 1172.0
 offset_top = 2.0
-offset_right = 1258.0
+offset_right = 1244.0
 offset_bottom = 74.0
 theme_override_styles/panel = SubResource("StyleBoxEmpty_lani7")
 diamond_mode = true
@@ -542,9 +539,9 @@ bottom_shadow_enabled = true
 [node name="P2Frame1HpRow" type="Control" parent="P2Hud" unique_id=757910723]
 texture_filter = 1
 anchors_preset = 0
-offset_left = 1178.0
+offset_left = 1164.0
 offset_top = 80.0
-offset_right = 1270.0
+offset_right = 1256.0
 offset_bottom = 108.0
 mouse_filter = 2
 script = ExtResource("24_reservehp")
@@ -552,9 +549,9 @@ icon_slant = 3.0
 bottom_shadow_enabled = true
 
 [node name="P2Frame2" parent="P2Hud" unique_id=1695379356 instance=ExtResource("3_hero_frame")]
-offset_left = 1266.0
+offset_left = 1252.0
 offset_top = 2.0
-offset_right = 1338.0
+offset_right = 1324.0
 offset_bottom = 74.0
 theme_override_styles/panel = SubResource("StyleBoxEmpty_qw8oe")
 diamond_mode = true
@@ -563,9 +560,9 @@ bottom_shadow_enabled = true
 [node name="P2Frame2HpRow" type="Control" parent="P2Hud" unique_id=1880263533]
 texture_filter = 1
 anchors_preset = 0
-offset_left = 1258.0
+offset_left = 1244.0
 offset_top = 80.0
-offset_right = 1350.0
+offset_right = 1336.0
 offset_bottom = 108.0
 mouse_filter = 2
 script = ExtResource("24_reservehp")
@@ -603,8 +600,8 @@ vertical_alignment = 1
 
 [node name="TimerLabel" type="Label" parent="." unique_id=2111037196]
 layout_mode = 0
-offset_left = 774.0
-offset_right = 1174.0
+offset_left = 760.0
+offset_right = 1160.0
 offset_bottom = 92.0
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -684,6 +681,7 @@ sheet = ExtResource("16_zan")
 hframes = 4
 vframes = 2
 frame_count = 5
+playback_frames = PackedInt32Array()
 inset_ratio = 0.14
 
 [node name="BtnAttack" type="Button" parent="Buttons" unique_id=1348519698]
@@ -726,6 +724,7 @@ sheet = ExtResource("17_bo")
 hframes = 4
 vframes = 2
 frame_count = 5
+playback_frames = PackedInt32Array()
 inset_ratio = 0.14
 content_scale = 1.08
 
@@ -786,6 +785,7 @@ sheet = ExtResource("18_dabo")
 hframes = 4
 vframes = 2
 frame_count = 7
+playback_frames = PackedInt32Array()
 fps = 12.0
 inset_ratio = 0.14
 content_scale = 1.05
@@ -846,6 +846,7 @@ sheet = ExtResource("19_fang")
 hframes = 4
 vframes = 3
 frame_count = 12
+playback_frames = PackedInt32Array()
 fps = 12.0
 inset_ratio = 0.14
 content_scale = 1.15
@@ -902,6 +903,7 @@ sheet = ExtResource("20_dafang")
 hframes = 4
 vframes = 3
 frame_count = 12
+playback_frames = PackedInt32Array()
 fps = 12.0
 inset_ratio = 0.14
 content_scale = 1.15

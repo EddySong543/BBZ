@@ -67,7 +67,7 @@ func test_battle_avatar_frames_and_bottom_buttons_use_directional_shadows() -> v
 		var bottom_buttons: Array[Button] = screen.action_btn_list.duplicate()
 		bottom_buttons.append_array([
 			screen.btn_confirm,
-			screen.btn_codex,
+			screen.btn_backpack,
 			screen.btn_longyuji_branch,
 			screen.btn_split_big_wave,
 			screen.btn_h24_discount,
@@ -150,18 +150,35 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 	add_child_autofree(screen)
 	await get_tree().process_frame
 
+	assert_almost_eq(screen.timer_label.get_global_rect().get_center().x, 960.0, 0.01,
+			"顶部倒计时严格落在 1920 画面中轴")
+	for index in [1, 2]:
+		var p1_center := (screen.p1_frames[index] as Control).get_global_rect().get_center().x
+		var p2_center := (screen.p2_frames[index] as Control).get_global_rect().get_center().x
+		assert_almost_eq(p1_center + p2_center, 1920.0, 0.01,
+				"双方对应替补头像以画面中轴严格镜像")
+
 	assert_eq(screen.btn_confirm.position.x, 1772.0,
 			"结束按钮保留原右侧 x 坐标")
 	assert_almost_eq(screen.btn_confirm.get_global_rect().get_center().y, 970.0, 0.01,
-			"结束按钮恢复到底部操作栏基线")
-	assert_eq(screen.btn_codex.position, Vector2(1652.0, 46.0),
-			"图鉴入口移动到结束按钮左侧")
-	assert_almost_eq(screen.btn_codex.get_global_rect().get_center().y,
+			"结束按钮回到右下工具行")
+	assert_null(screen.get_node_or_null("Buttons/BtnCodex"),
+			"战斗 HUD 不再生成图鉴入口")
+	assert_eq(screen.btn_backpack.position, Vector2(1652.0, 46.0),
+			"背包入口保留在结束按钮左侧")
+	assert_almost_eq(screen.btn_backpack.get_global_rect().get_center().y,
 			screen.btn_confirm.get_global_rect().get_center().y, 0.01,
-			"图鉴与结束按钮严格共用底部中心线")
+			"背包与结束按钮严格共用底部中心线")
 	assert_almost_eq(screen.btn_confirm.get_global_rect().position.x
-			- screen.btn_codex.get_global_rect().end.x, 12.0, 0.01,
-			"右下工具组使用 12px 组内间距")
+			- screen.btn_backpack.get_global_rect().end.x, 12.0, 0.01,
+			"右下背包与结束按钮使用 12px 组内间距")
+	assert_not_null(screen.btn_backpack.get_node_or_null("BackpackIcon"),
+			"战斗背包入口使用已导入的背包图标")
+	screen.btn_backpack.pressed.emit()
+	await get_tree().process_frame
+	var backpack_overlay := screen.get_node_or_null("BackpackOverlay") as Control
+	assert_not_null(backpack_overlay, "点击战斗背包入口实例化共享背包浮层")
+	assert_true(backpack_overlay.visible, "战斗背包入口会呼出背包")
 	assert_eq(screen.btn_switch.position, Vector2(30.0, 46.0),
 			"切换模块占据左下安全边距")
 	assert_eq(screen.p1_item_row.scale, Vector2.ONE * 0.92,
@@ -206,10 +223,10 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 	await get_tree().process_frame
 	assert_true(screen._tip_item_header.visible,
 			"具名道具说明显示图标与名称顶部行")
-	assert_eq(screen.tip_font_size_s, 18,
-			"五个基础动作短说明字号提升到 18px")
-	assert_eq(screen._tip_label.get_theme_font_size("font_size"), 18,
-			"基础动作说明实际使用放大后的字号")
+	assert_eq(screen.tip_font_size_s, 17,
+			"五个基础动作短说明字号回退到 17px")
+	assert_eq(screen._tip_label.get_theme_font_size("font_size"), 17,
+			"基础动作说明实际使用回退后的字号")
 	assert_eq(screen.tip_optical_center_shift_s, 0.0,
 			"底部按钮 S 框保留几何中心，不继承道具补偿")
 	assert_eq(screen.tip_optical_center_shift_l, 0.0,

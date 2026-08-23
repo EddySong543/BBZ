@@ -1838,6 +1838,39 @@ func test_scene2_postfx_skips_disabled_blur_and_inactive_impact_work() -> void:
 	scene2.free()
 
 
+func test_alive_characters_do_not_keep_the_death_shader_across_scenes() -> void:
+	for scene_number: int in range(1, 8):
+		BattleSetup.reset()
+		var packed := load(
+				"res://src/ui/battle_screen%d.tscn" % scene_number) as PackedScene
+		var screen := packed.instantiate()
+		add_child(screen)
+		await get_tree().process_frame
+		for display: CharacterDisplay in [
+				screen.p1_char_display,
+				screen.p2_char_display,
+		]:
+			assert_null(
+					display.material,
+					"Scene%d alive characters must keep their original render chain"
+					% scene_number)
+			var sprite := display.get_node(
+					"SubViewport/AnimatedSprite2D") as AnimatedSprite2D
+			assert_not_null(sprite.material,
+					"Scene%d still needs its own character-light material" % scene_number)
+			display.set_death_dissolve(0.25, true, 12)
+			var death_material := display.material as ShaderMaterial
+			assert_not_null(death_material)
+			assert_eq(
+					death_material.shader.resource_path,
+					"res://assets/shaders/canvas_ui_character_death_dissolve.gdshader")
+			display.reset_death_dissolve()
+			assert_null(display.material,
+					"Scene%d must unload the death pass after reset" % scene_number)
+		screen.free()
+		await get_tree().process_frame
+
+
 func test_battle_avatar_frames_use_editor_safe_diamond_preview() -> void:
 	var screen := (load(BATTLE1_PATH) as PackedScene).instantiate()
 	var frame := screen.get_node("P1Hud/P1Frame0") as HeroFrame
