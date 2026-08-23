@@ -21,13 +21,6 @@ var pve_result: Dictionary = {}       # {outcome:String, beats:int, team_hp:Arra
 # 远征跑动状态（跨场景寄存·battle_screen 不碰·expedition_screen 存取）：
 var expedition_state: Dictionary = {} # {map, bp, pending, log, seed, tile:Vector2i}
 
-# ── 故事模式交接（任务 B 壳·2026-07-12）──
-# 去程（story_screen 设 → battle_screen 消费）：
-var story_mode := false               # 本局=故事关卡（平局不进加时·终局写回 story_result）
-var story_level_id := ""              # 关卡 id（assets/data/story/levels.json 条目）
-# 回程（battle_screen 设 → story_screen 消费）：
-var story_result: Dictionary = {}     # {level_id:String, outcome:"win"|"lose"|"draw"}
-
 # ── 联机交接（M1·2026-07-12）──
 # 大厅屏创建（net_session.gd）→ battle_screen 消费（每帧 pump·退场 close+置空）。
 # ⚠ 不入 reset()：联机局生命周期由大厅/battle_screen 显式管理（reset 是"阵容消费即清"语义）。
@@ -87,7 +80,7 @@ func _copy_hp(values: Array) -> Array[int]:
 
 ## 清空阵容。被 battle_screen 消费后 / 一局结束 / 返回菜单时调用，
 ## 防止下一局（未重新走 BP）复用上一局残留的阵容。
-## ⚠ 不清 pve_result / expedition_state / story_result——那是远征/故事的回程通道，由各自屏消费后自清。
+## ⚠ 不清 pve_result / expedition_state——那是远征回程通道，由远征屏消费后自清。
 func reset() -> void:
 	p1_heroes = []
 	p2_heroes = []
@@ -98,5 +91,3 @@ func reset() -> void:
 	pve_player_hp.clear()
 	pve_opponent_hp.clear()
 	pve_seed = 0
-	story_mode = false
-	story_level_id = ""

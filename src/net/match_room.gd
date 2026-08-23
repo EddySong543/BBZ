@@ -13,7 +13,7 @@ extends RefCounted
 ##     upg_draft 候选+info_distortion 剥除——改包客户端偷看不到 3 选 1）。
 ##   - 提交即锁经济（_econ_gate·同批修复）：已提交方的 draft/refill/pick 全拒——防提交后
 ##     改真局让缓存动作的预检结论失效。
-##   - 平局=直接结案（线上加时赛=后续立项·同故事模式先例）。回合计时=M3（服务端计时）。
+##   - 平局=直接结案（线上加时赛=后续立项）。回合计时=M3（服务端计时）。
 ##
 ## 用法（测试/未来 match_host 同款）：
 ##   var room := MatchRoom.new()   # preload 引用

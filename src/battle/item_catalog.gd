@@ -16,6 +16,12 @@ extends RefCounted
 const _S_PRE := ItemData.Seq.PRE
 const _S_ANY := ItemData.Seq.ANY
 const _T_ENEMY := ItemData.Target.ENEMY
+
+# 道具稀有度 C「宝石高识别」方案的唯一基准色：宝石蓝 / 深紫晶 / 明金。
+# 图鉴侧签、道具框、背包占格、抽取/升级和远征语义色均应引用这里。
+const RARITY_NORMAL := Color("3E77BD")
+const RARITY_RARE := Color("6048A2")
+const RARITY_LEGENDARY := Color("D49332")
 const _T_SELF := ItemData.Target.SELF
 
 ## id → {name, dim, role, seq, target, desc(一句话), params, script}
@@ -697,9 +703,9 @@ static func load_icon(id: String) -> Texture2D:
 ## 通用约定色：普通=蓝 / 稀有=紫 / 传说=金。图鉴卡 / 战斗道具栏芯片 / 抽卡卡 统一引用。
 static func rarity_color(tier: int) -> Color:
 	match tier:
-		2: return Color("8a4fc4")   # 稀有 = 紫（高稀有度惯例色）
-		3: return Color("dca12e")   # 传说 = 金
-		_: return Color("4a7bc0")   # 普通 = 蓝（2026-06-27 Eddy：暖灰→蓝）
+		2: return RARITY_RARE
+		3: return RARITY_LEGENDARY
+		_: return RARITY_NORMAL
 
 
 ## 显示名 → id 映射（从 _DEF 实时构建，永不过时）。重名会 push_error（当前全唯一）。

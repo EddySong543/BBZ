@@ -235,7 +235,11 @@ func test_slot_row_new_frame_palette_and_inner_mask_fit() -> void:
 			"格底从新框内孔起点开始")
 	assert_eq(row._cells[0].size,
 			Vector2(ItemSlotRow.SLOT_W, ItemSlotRow.SLOT_H) - Vector2.ONE * ItemSlotRow.CELL_INSET * 2.0,
-			"格底尺寸被限制在新框内孔")
+			"格底尺寸覆盖新框内孔并压进边框收边")
+	assert_eq(ItemSlotRow.CELL_INSET, 4.0,
+			"战斗小框使用整数 4px 内缩，消除左侧半像素接缝")
+	assert_eq(row._cells[0].position, row._cells[0].position.round(),
+			"战斗格底边缘必须落在整数像素")
 	var tier_items := ["t1_feibiao", "t2_feibiao", "t3_longxi"]
 	for tier in range(1, 4):
 		b.slots[0][0]["item"] = ItemCatalog.make(tier_items[tier - 1])
@@ -334,12 +338,17 @@ func test_item_frame_style_is_the_single_palette_source() -> void:
 	assert_eq(ITEM_GALLERY_SCREEN.FRAME_MID, ItemFrameStyle.FRAME_MID)
 	assert_eq(ItemSlotRow.FRAME_MID_T, ItemFrameStyle.FRAME_MID)
 	assert_eq(ItemDraftPopup.FRAME_MID, ItemFrameStyle.FRAME_MID)
-	assert_eq(ItemFrameStyle.CELL_TOP[1], Color("6E9BD2"),
-			"普通填充回退为原蓝色")
-	assert_eq(ItemFrameStyle.CELL_TOP[2], Color("9A7FD0"),
-			"稀有填充回退为原紫色")
-	assert_eq(ItemFrameStyle.LEGENDARY_TINT, Color.WHITE,
-			"传说填充回退为原金底贴图色")
+	assert_eq(ItemCatalog.rarity_color(1), ItemCatalog.RARITY_NORMAL)
+	assert_eq(ItemCatalog.rarity_color(2), ItemCatalog.RARITY_RARE)
+	assert_eq(ItemCatalog.rarity_color(3), ItemCatalog.RARITY_LEGENDARY)
+	assert_eq(ItemFrameStyle.CELL_TOP[1], ItemCatalog.RARITY_NORMAL,
+			"普通填充同源 C 方案宝石蓝")
+	assert_eq(ItemFrameStyle.CELL_TOP[2], ItemCatalog.RARITY_RARE,
+			"稀有填充同源 C 方案深紫晶")
+	assert_eq(ItemFrameStyle.FRAME_MID[3], ItemCatalog.RARITY_LEGENDARY,
+			"传说外框主色同源 C 方案明金")
+	assert_eq(ItemFrameStyle.LEGENDARY_TINT, Color("F0CA82"),
+			"传说纹理同步 C 宝石方案的明金色调")
 
 
 func test_battle_screen_script_compiles_with_m3_wiring() -> void:

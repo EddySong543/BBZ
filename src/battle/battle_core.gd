@@ -4624,31 +4624,59 @@ func chongzhuang(attacker_player: int) -> void:
 	_apply_damage(opp, CHONGZHUANG_DAMAGE, attacker_player, ActionDef.Action.ATTACK, ActionDef.Pen.PIERCE_BIGDEF, ActionDef.Action.CHARGE, ev)
 
 
-## 把伤害"踏/溅"到 victim_player 随机一名存活替补（乌骓 h19 践踏溢出用·shield 先吸·触发 on_self_damaged·2026-07-01 由"最高血"改随机）。
-func _splash_to_reserve(victim_player: int, dmg: int) -> void:
-	if dmg <= 0 or damage_immune(victim_player):   # 周天罡气：溅射也免
-		return
-	var candidates: Array[int] = []
-	for s in range(hp[victim_player].size()):
-		if s != active_index[victim_player] and hp[victim_player][s] > 0:
-			candidates.append(s)
-	if candidates.is_empty():
-		return   # 无存活替补 → 溢出无处可去
-	var target: int = candidates[rng.randi() % candidates.size()]
-	var d: int = dmg
-	var projected_hp_damage: int = maxi(0, d - shield[victim_player][target])
-	if _consume_fatal_damage_immunity(victim_player, target, projected_hp_damage, []):
-		return
-	if shield[victim_player][target] > 0:
-		var absorbed: int = mini(shield[victim_player][target], d)
-		shield[victim_player][target] -= absorbed
-		d -= absorbed
-	if d <= 0:
-		return
-	hp[victim_player][target] -= d
-	var sk: HeroSkill = _skills[victim_player][target]
-	if sk != null:
-		sk.on_self_damaged(self, victim_player, target, d, 1 - victim_player)
+## 返回除 excluded_slot 外当前生命最高的存活英雄。并列时保留槽位较小者，避免随机数导致
+## 联机、录像与 AI 推演分歧。
+func _highest_hp_living_other(player: int, excluded_slot: int) -> int:
+	var target: int = -1
+	var highest_hp: int = -1
+	for slot in range(hp[player].size()):
+		if slot == excluded_slot or hp[player][slot] <= 0:
+			continue
+		if hp[player][slot] > highest_hp:
+			highest_hp = hp[player][slot]
+			target = slot
+	return target
+
+
+## 施加一段已经完成增伤/减伤计算的转移伤害。它不再进入伤害修正管线，避免凭空增伤；
+## 但仍单独经过目标护盾、致死免疫与受伤回调。
+func _apply_exact_transferred_damage(target_player: int, target_slot: int, amount: int,
+		attacker_player: int, events: Array, src: String) -> int:
+	if amount <= 0 or target_slot < 0 or target_slot >= hp[target_player].size() \
+			or hp[target_player][target_slot] <= 0:
+		return 0
+	var remaining: int = amount
+	var projected_hp_damage: int = maxi(0, remaining - shield[target_player][target_slot])
+	if _consume_fatal_damage_immunity(target_player, target_slot, projected_hp_damage, events):
+		return 0
+	var total_dealt: int = 0
+	if shield[target_player][target_slot] > 0:
+		var absorbed: int = mini(shield[target_player][target_slot], remaining)
+		shield[target_player][target_slot] -= absorbed
+		remaining -= absorbed
+		total_dealt += absorbed
+		events.append({id = "shield_absorb", player = target_player, slot = target_slot,
+			amount = absorbed})
+	# 兼容仍在旧快照中的旧还魂状态；与主伤害段保持同一结算语义。
+	if remaining > 0 and remaining >= hp[target_player][target_slot] \
+			and int(get_status(target_player, target_slot, "huanhun_ready", 0)) > 0:
+		var leave_hp: int = mini(hp[target_player][target_slot], int(
+			get_status(target_player, target_slot, "huanhun_ready", 0)))
+		set_status(target_player, target_slot, "huanhun_ready", 0)
+		remaining = maxi(0, hp[target_player][target_slot] - leave_hp)
+		events.append({id = "huanhun_revive", player = target_player, slot = target_slot})
+	if remaining <= 0:
+		return total_dealt
+	hp[target_player][target_slot] -= remaining
+	total_dealt += remaining
+	events.append({id = "damage_taken", player = target_player, slot = target_slot,
+		amount = remaining, src = src, pen = ActionDef.Pen.NORMAL})
+	var skill: HeroSkill = _skills[target_player][target_slot]
+	if skill != null:
+		skill.on_self_damaged(self, target_player, target_slot, remaining, attacker_player)
+	if hp[target_player][target_slot] <= 0:
+		_killer[target_player][target_slot] = attacker_player
+	return total_dealt
 
 
 ## resolve Phase 3+4 的单条 hit 公共施加器：保留伤害来源、出手槽快照与攻击型主动技回调。
@@ -4924,6 +4952,21 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		dmg = mini(dmg, cap_remaining)
 		set_item_mod(attacker_player, "base_attack_damage_cap_remaining",
 			maxi(0, cap_remaining - dmg))
+	# 乌骓 h19：在所有增伤/减伤完成后拆分最终伤害，主目标封顶，余量守恒转移。
+	# 出手槽使用命中快照；沉默或“禁用命中英雄技能”时不启用该接口。
+	var aslot: int = attacker_slot if attacker_slot >= 0 else active_index[attacker_player]
+	var atk_skill: HeroSkill = _skills[attacker_player][aslot]
+	var suppress_hit_skills: bool = is_base_attack and bool(item_mod(
+		attacker_player, "hit_hero_skills_suppressed", false))
+	var excess_transfer_damage: int = 0
+	var excess_transfer_target: int = -1
+	if is_base_attack and not suppress_hit_skills and atk_skill != null:
+		var transfer_threshold: int = atk_skill.base_attack_excess_transfer_threshold(
+			atk_action, self, attacker_player, aslot)
+		if transfer_threshold > 0 and dmg > transfer_threshold:
+			excess_transfer_damage = dmg - transfer_threshold
+			dmg = transfer_threshold
+			excess_transfer_target = _highest_hp_living_other(target_player, slot)
 
 	# Stage B6: 护盾。还魂丹在实际扣盾前按“本次会否致命”判定，触发时整次伤害归零。
 	var shield_damage := 0
@@ -4971,6 +5014,14 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 				_killer[target_player][slot] = attacker_player
 				outcome["defeated"] = was_alive
 	outcome["damage_total"] = shield_damage + dealt
+	if excess_transfer_damage > 0 and excess_transfer_target >= 0:
+		var transferred_dealt: int = _apply_exact_transferred_damage(
+			target_player, excess_transfer_target, excess_transfer_damage,
+			attacker_player, events, "h19_transfer")
+		outcome["damage_total"] = int(outcome["damage_total"]) + transferred_dealt
+		events.append({id = "h19_damage_transferred", player = target_player, from = slot,
+			to = excess_transfer_target, amount = excess_transfer_damage,
+			actual = transferred_dealt})
 	if redirected_damage > 0 and hp[target_player][redirect_target] > 0:
 		var redirected_outcome: Dictionary = {}
 		_apply_damage(target_player, redirected_damage, attacker_player, atk_action, pen,
@@ -4983,12 +5034,8 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 
 	# Stage B10: on-hit 触发（穿过防御门即算命中，按 hit_count 次；含队友监听如鸡剑气）。
 	# 出手槽优先用 hit 快照值（attacker_slot≥0），不随结算期间的实时出战位漂移。
-	var aslot: int = attacker_slot if attacker_slot >= 0 else active_index[attacker_player]
-	var suppress_hit_skills: bool = is_base_attack and bool(item_mod(
-		attacker_player, "hit_hero_skills_suppressed", false))
 	if is_base_attack and not suppress_hit_skills:
 		_queue_reserve_pursuit(attacker_player, aslot, slot)
-	var atk_skill: HeroSkill = _skills[attacker_player][aslot]
 	if is_base_attack and not suppress_hit_skills and atk_skill != null:
 		atk_skill.on_base_attack_damage_dealt(
 			self, attacker_player, aslot, target_player, slot, dealt, atk_action, events)

@@ -93,7 +93,7 @@ func test_player_profile_record_result_rejects_unknown_keys() -> void:
 	# Arrange: 全零起点
 
 	# Act: 白名单外的 mode / outcome 应被忽略（不炸不计）
-	ProfileStore.record_result("story", "win")
+	ProfileStore.record_result("unknown", "win")
 	ProfileStore.record_result("match", "crash")
 
 	# Assert

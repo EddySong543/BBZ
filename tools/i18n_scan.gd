@@ -10,12 +10,11 @@ extends SceneTree
 ##
 ## 采集面（与包裹批口径一致）：
 ##   1. src/**/*.gd 里的 tr("...") 字面量实参
-##   2. src/ui + src/story 里未包裹但经动态汇点显示的中文字面量
+##   2. src/ui 里未包裹但经动态汇点显示的中文字面量
 ##      （工厂函数实参/常量表值/默认参数——汇点已 tr(变量)）
 ##   3. assets/data/heroes/*.tres 的 hero_name / skill_description / skill_detail
 ##   4. src/battle/item_catalog.gd 的 name / desc / flavor 数据字段
-##   5. assets/data/story/levels.json 的 title / intro_lines
-##   6. src/ui/**/*.tscn 的 text / tooltip_text / placeholder_text / card_* 属性
+##   5. src/ui/**/*.tscn 的 text / tooltip_text / placeholder_text / card_* 属性
 ## 排除面：注释、push_*/printerr/assert（dev 向）、@export_group/enum（编辑器向）、
 ##   作字典键的维度色表（"进攻": Color(...)）、src/ui/debug、title_logo/pixel_glyphs（字形美术）、
 ##   src/expedition（占位内容·缓办，见 active.md 联机后续）。
@@ -44,18 +43,16 @@ func _init() -> void:
 	_re_item_flavor.compile("^\\s*\"(?:[^\"\\\\]|\\\\.)+\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
 	_re_tscn.compile("^(text|tooltip_text|placeholder_text|card_title|card_subtitle|card_caption)\\s*=\\s*\"(.*)\"")
 
-	# ① tr() 实参（全 src）＋ ② ui/story 动态汇点字面量
+	# ① tr() 实参（全 src）＋ ② ui 动态汇点字面量
 	for f in _walk("res://src", ".gd"):
-		_scan_gd(f, f.contains("/ui/") or f.contains("/story/"))
+		_scan_gd(f, f.contains("/ui/"))
 	# ③ 英雄数据
 	for f in _walk("res://assets/data/heroes", ".tres"):
 		_scan_by_regex(f, _re_tres, 2)
 	# ④ 道具目录
 	_scan_by_regex("res://src/battle/item_catalog.gd", _re_item, 2)
 	_scan_by_regex("res://src/battle/item_catalog.gd", _re_item_flavor, 1)
-	# ⑤ 故事关卡表
-	_scan_levels("res://assets/data/story/levels.json")
-	# ⑥ 场景文本属性
+	# ⑤ 场景文本属性
 	for f in _walk("res://src/ui", ".tscn"):
 		_scan_by_regex(f, _re_tscn, 2)
 
@@ -126,27 +123,6 @@ func _scan_by_regex(path: String, re: RegEx, group: int) -> void:
 			if _re_han.search(raw) != null:
 				_add(raw.c_unescape(), "%s:%d" % [path.trim_prefix("res://"), i + 1])
 	fa.close()
-
-
-func _scan_levels(path: String) -> void:
-	var fa := FileAccess.open(path, FileAccess.READ)
-	if fa == null:
-		return
-	var data: Variant = JSON.parse_string(fa.get_as_text())
-	fa.close()
-	if data == null:
-		return
-	var levels: Array = data.get("levels", []) if data is Dictionary else data
-	for lv in levels:
-		if not lv is Dictionary:
-			continue
-		var ctx := "%s(%s)" % [path.trim_prefix("res://"), String(lv.get("id", "?"))]
-		var title := String(lv.get("title", ""))
-		if _re_han.search(title) != null:
-			_add(title, ctx)
-		for ln in (lv.get("intro_lines", []) as Array):
-			if _re_han.search(String(ln)) != null:
-				_add(String(ln), ctx)
 
 
 func _add(key: String, ctx: String) -> void:

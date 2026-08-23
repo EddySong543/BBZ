@@ -9,7 +9,7 @@ extends GutTest
 ## h16【白虹】= 调度/进攻：队友基础攻击命中时，替补广寒登场并对同一目标追击 1 点伤害。
 ## h17【待重命名】= 主动技：占动作+费2能，转变为敌方当前出战英雄；复制英雄本体状态，不复制团队能量。
 ## h18【游丝引】= 防守·主动技：费1能且占行动，平均分配我方所有存活英雄的当前生命；总生命守恒、不复活、不超过上限。
-## h19【践踏】= 进攻：攻击命中时，这一击超过 1.0HP 的溢出部分碾到敌方随机替补（无封顶）。
+## h19【奔雷】= 进攻：攻击命中时，目标至多承受 1.0HP，超过部分转移给当前生命最高的另一名敌人。
 ## h20【罪已昭】= 状态·被动：命中敌方出战使其获得脆弱（vuln），受伤 +0.5，直到下场（下场清）。
 ## h21【调虎离山】= 干扰·主动技：占动作+费1能（批④降费·原2能）+每局2次+须出战，强制对手换人、揪其指定（未指定→随机）存活替补上场。
 ## h22【焚天火兆】= 控制·主动技：占动作+免费+每局2次 → 下一回合结束时双方失去全部能量。
@@ -510,18 +510,17 @@ func test_h18_old_defend_tax_and_switch_lock_are_removed() -> void:
 	assert_true(b.select_switch(1, 1), "敌方切换提交入口应恢复正常")
 
 
-# ---- h19 乌骓 践踏（攻击溢出 1.0HP 的部分碾到最高血替补）----
+# ---- h19 乌骓 奔雷（目标承受至多 1.0HP，其余伤害转移给最高生命的另一名敌人）----
 
 func test_h19_jianta_overflow_tramples_reserve() -> void:
-	# 大波(4半=2.0HP)命中 → 溢出(4−2=2半)碾到随机一名存活替补(全额·无封顶)
+	# 大波(4半=2.0HP)命中 → 原目标承受2半，余下2半转移给生命更高的slot2。
 	var b := _battle("h19", 5, 12)
+	b.hp[1] = [10, 6, 8]
 	b.select_action(0, ActionDef.Action.BIG_ATTACK)
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(b.hp[1][0], 10 - 4, "大波 4 半点命中出战")
-	# 溢出 2 半点落到随机一名替补：两替补总血 -2、且恰一人被踏
-	assert_eq(b.hp[1][1] + b.hp[1][2], 20 - 2, "溢出 2 半点碾到随机替补(总血 -2)")
-	assert_true((b.hp[1][1] == 8 and b.hp[1][2] == 10) or (b.hp[1][1] == 10 and b.hp[1][2] == 8), "恰一名替补被踏 2 半点")
+	assert_eq(b.hp[1], [8, 6, 6],
+		"大波总伤害守恒：原目标只承受1点，余下1点转移给最高生命的另一名敌人")
 
 
 func test_h19_jianta_normal_wave_no_trample() -> void:
@@ -532,6 +531,51 @@ func test_h19_jianta_normal_wave_no_trample() -> void:
 	b.resolve()
 	assert_eq(b.hp[1][0], 10 - 2, "波 2 半点命中出战")
 	assert_eq(b.hp[1][1], 10, "波不溢出(1.0≤1.0) → 替补不受踏")
+
+
+func test_h19_jianta_tied_highest_hp_uses_lower_slot_deterministically() -> void:
+	var b := _battle("h19", 5, 12)
+	b.hp[1] = [10, 8, 8]
+	b.select_action(0, ActionDef.Action.BIG_ATTACK)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+
+	assert_eq(b.hp[1], [8, 6, 8], "最高生命并列时应固定转移给槽位靠前者")
+
+
+func test_h19_jianta_transfers_damage_after_vulnerability_without_creating_damage() -> void:
+	var b := _battle("h19", 5, 12)
+	b.hp[1] = [10, 6, 8]
+	b.set_status(1, 0, "vuln", 1)
+	b.select_action(0, ActionDef.Action.BIG_ATTACK)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+
+	assert_eq(b.hp[1], [8, 6, 5],
+		"脆弱后的2.5点总伤害应拆为原目标1点、最高生命队友1.5点")
+
+
+func test_h19_jianta_primary_and_transfer_each_respect_their_own_shield() -> void:
+	var b := _battle("h19", 5, 12)
+	b.hp[1] = [10, 6, 8]
+	b.shield[1][0] = 2
+	b.shield[1][2] = 1
+	b.select_action(0, ActionDef.Action.BIG_ATTACK)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+
+	assert_eq(b.hp[1], [10, 6, 7], "两段伤害应分别经过各自目标的护盾")
+	assert_eq(b.shield[1], [0, 0, 0], "原目标吸收1点，转移目标吸收0.5点")
+
+
+func test_h19_jianta_discards_excess_when_no_other_enemy_is_alive() -> void:
+	var b := _battle("h19", 5, 12)
+	b.hp[1] = [10, 0, 0]
+	b.select_action(0, ActionDef.Action.BIG_ATTACK)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	b.resolve()
+
+	assert_eq(b.hp[1][0], 8, "没有另一名存活敌人时，原目标仍最多只承受1点")
 
 
 func test_h19_jianta_blocked_no_trample() -> void:

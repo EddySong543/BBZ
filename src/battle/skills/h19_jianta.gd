@@ -1,23 +1,12 @@
 extends HeroSkill
 
-## h19 乌骓【奔雷】被动 · 进攻 · HP5（骑兵冲锋·首个"打到后排"）
-## 乌骓攻击命中敌方出战时，这一击【超过 1.0 HP 的溢出部分】碾穿到一名【随机】敌方替补——
-##   力大才碾穿：普通波(1.0)停在出战、更猛的一击把"多出来的力"踏到后排。
-##   溢出 = dealt − 1.0HP(2 半点)，全额传递(无封顶)；波(1.0)→0 不踏 / 大波(2.0)→踏 1.0 / 加伤的更多全踏。
-##   替补伤走 shield 先吸 + 触发 on_self_damaged；被挡(dealt=0)不触发。
-##
-## 设计依据（heroes-redesign / build-design-framework）：
-##   维度 = 进攻（暗批 round 2 进攻位；roster 首个"打到后排"机制·与暗虎穿防/虎多段/龙强化波全异）。
-##   为何宽 combo：把对局从 1v1 磨血变成【压制对手整队】——
-##     ① 破对手头号防御=换人重置（替补也被踏血·换上来的也是残的→可 race 整队）；
-##     ② 配加伤、强化波把伤害顶过 1.0；③ 配集火/收割清场。
-##   "把伤害顶过 1.0"= 明确 combo 目标（奖励一切加伤/强化波/buff·框架"条件超标·自成核"）。
-##   agency / yomi：你持续踏后排、逼对手在多个残血目标间调度；对手要护替补 / 抢杀马。
-##   §4.4：需命中(被挡不触发) + 只一名替补 自限（2026-07-01 去溢出封顶 + 改随机替补）。马味=骑兵冲锋践踏一片。HP5 中坚。
+## h19 乌骓【奔雷】被动 · 进攻 · HP5
+## 乌骓的基础攻击穿过防御门后，主目标至多承受 1.0 HP；最终伤害超过 1.0 HP 的部分
+## 转移给当前生命最高的另一名存活敌方英雄。并列时按固定槽位顺序选择，保证结算确定性。
+## 转移是真正的伤害守恒，不在主目标吃满后复制伤害；没有另一名存活敌人时余量丢失。
+## 两段伤害分别经过各自目标的护盾，转移段不重复计算增伤、脆弱或英雄减伤。
 
 
-func on_deal_hit(battle: BattleCore, _player: int, _slot: int, target_player: int, _target_slot: int, dealt: int, _action: int) -> void:
-	var overflow: int = dealt - ActionDef.HP_UNIT   # 超过 1.0HP(2 半点) 的部分
-	if overflow <= 0:
-		return
-	battle._splash_to_reserve(target_player, overflow)   # 全额溢出·随机替补(2026-07-01 去封顶·去"最高血")
+func base_attack_excess_transfer_threshold(_action: int, _battle: BattleCore,
+		_player: int, _slot: int) -> int:
+	return ActionDef.HP_UNIT

@@ -9,7 +9,7 @@ extends RefCounted
 ## 战绩：record_result(mode, outcome) 纯计数器——
 ##       mode = "match"（本地匹配对战·含 AI）/ "net"（联机对战）；
 ##       outcome = "win" / "lose" / "draw"。battle_screen 两处终局各挂一行。
-##       故事/远征有各自进度存档（story_progress 等），不进这里；将来要合并生涯页再扩 mode。
+##       远征有独立进度存档，不进这里；将来要合并生涯页再扩 mode。
 ## UI（主菜单身份带 / profile_screen）只经此类读写，不自持状态（ui-code 规）。
 
 const _PATH := "user://player_profile.cfg"

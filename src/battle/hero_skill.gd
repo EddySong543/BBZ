@@ -36,6 +36,14 @@ func modify_outgoing_damage(dmg: int, _action: int, _battle: BattleCore, _player
 	return dmg
 
 
+## 基础攻击完成状态与减伤计算后，是否把超过阈值的最终伤害转移给主目标之外
+## 当前生命最高的另一名存活敌方英雄。返回半点制阈值；<= 0 表示不启用。
+## 无合法转移目标时，超过阈值的部分丢失。转移段不重复计算增伤/减伤，但单独经过其目标护盾。
+func base_attack_excess_transfer_threshold(_action: int, _battle: BattleCore,
+		_player: int, _slot: int) -> int:
+	return 0
+
+
 ## 攻击判定类型覆盖（防御门用）：出战英雄发起基础攻击(波/大波)时调用，
 ## 返回该次攻击在防御门里按哪种类型判定（ATTACK=被"防"挡 / BIG_ATTACK=穿"防"被"大防"挡）。
 ## 默认按原动作判定。当前 12 生肖无人 override（穿透档改由 attack_penetration 表达），留作扩展接口。

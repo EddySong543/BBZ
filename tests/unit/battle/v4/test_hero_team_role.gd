@@ -148,6 +148,15 @@ func test_h18_published_data_matches_approved_redesign() -> void:
 		"相柳短文案应与定稿措辞完全一致")
 
 
+func test_h19_published_data_matches_damage_transfer_rule() -> void:
+	var h := load("res://assets/data/heroes/h19.tres") as HeroData
+	assert_not_null(h, "h19 数据资源必须可加载")
+	assert_eq(h.skill_description, "奔雷", "乌骓技能名保持奔雷")
+	assert_eq(h.skill_detail,
+		"乌骓【马】攻击命中时，目标至多承受1点伤害，超过1点的部分转移给当前生命最高的另一名存活敌方英雄。",
+		"乌骓短文案应准确说明伤害守恒与确定性转移目标")
+
+
 func test_h23_published_data_matches_approved_redesign() -> void:
 	var h := load("res://assets/data/heroes/h23.tres") as HeroData
 	assert_not_null(h, "h23 数据资源必须可加载")
