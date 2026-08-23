@@ -296,32 +296,31 @@ func test_expedition_terrain_material_exposes_asset_overlay_contract() -> void:
 	assert_eq(Vector2(material.get_shader_parameter("grid_size")),
 			Vector2(QingfengLayoutScript.WIDTH, QingfengLayoutScript.HEIGHT))
 	assert_eq(float(material.get_shader_parameter("cell_px")), 120.0)
-	assert_false(screen.LIMITED_VISIBILITY_ENABLED,
-			"当前版本暂时关闭可见范围，保留shader参数只为之后恢复")
-	var feather_value: Variant = material.get_shader_parameter("vision_feather_cells")
-	var extent_value: Variant = material.get_shader_parameter("vision_half_extent_cells")
-	var center_value: Variant = material.get_shader_parameter("vision_center_cell")
-	var logic_center_value: Variant = material.get_shader_parameter("vision_logic_center_cell")
-	assert_not_null(feather_value, "迷雾材质必须公开柔边宽度参数")
-	assert_eq(Vector2(extent_value), Vector2(6, 4),
-			"可见范围必须使用接近13×9的横向近方形半径")
-	assert_not_null(center_value, "可见范围必须跟随角色所在格中心")
-	assert_not_null(logic_center_value, "迷雾必须分别记录逻辑中心与平滑视觉中心")
-	if feather_value != null:
-		assert_between(float(feather_value), 0.26, 0.30,
-				"柔边应在完整可见格外侧平滑过渡约四分之一格")
+	assert_true(screen.FOG_OF_WAR_ENABLED,
+			"正式远征必须启用战争迷雾")
+	var unseen_alpha: Variant = material.get_shader_parameter("unseen_alpha")
+	var reveal_duration: Variant = material.get_shader_parameter("reveal_duration")
+	var fog_low_color: Color = material.get_shader_parameter("fog_low_color")
+	var fog_high_color: Color = material.get_shader_parameter("fog_high_color")
+	assert_gte(float(unseen_alpha), 0.90, "未知区必须真正遮住地表信息")
+	assert_between(float(reveal_duration), 0.36, 0.60,
+			"清雾应有短促散开过程，不能瞬间硬切或拖成随身光圈")
 	var shader_source := FileAccess.get_file_as_string(TERRAIN_SHADER_PATH)
 	assert_true(shader_source.contains("texture(map_data"),
-			"视觉边界必须读取MapState写入的数据纹理，不能另算一个不一致的雾圈")
-	assert_true(shader_source.contains("max(cell_visible, boundary_feather)"),
-			"完整可见格必须保持全亮，柔化只能从其外沿进入不可见格")
-	assert_true(shader_source.contains("vision_logic_center_cell"))
-	assert_true(shader_source.contains("mask_position = grid_position"))
-	assert_true(shader_source.contains("+ vision_logic_center_cell"))
-	assert_true(shader_source.contains("- vision_center_cell"),
-			"视觉mask必须从旧中心连续滑向已经更新的逻辑中心")
-	assert_false(shader_source.contains("float signed_edge = max(edge_distance.x, edge_distance.y);"),
-			"旧解析近方形会把最后一圈格子从内部切暗，必须移除")
+			"清雾结果必须读取MapState写入的数据纹理")
+	assert_true(shader_source.contains("reveal_started_at"),
+			"新清除格必须携带散开起始时间")
+	assert_false(shader_source.contains("vision_center_cell"),
+			"地图迷雾不能继续绑定角色的随身视觉中心")
+	for fog_color: Color in [fog_low_color, fog_high_color]:
+		assert_gt(fog_color.r, 0.68, "迷雾必须是明亮暖色，不能退回阴影色")
+		assert_gt(fog_color.g, 0.62)
+		assert_gt(fog_color.b, 0.48)
+		assert_gt(fog_color.r, fog_color.b, "米白雾应保留轻微暖色倾向")
+	assert_true(shader_source.contains("fog_drift"),
+			"地图雾必须持续流动，不能只是静态米色覆盖")
+	assert_true(shader_source.contains("anim_time *"),
+			"动态雾必须由统一动画时间驱动")
 	BattleSetup.reset()
 
 
@@ -722,7 +721,7 @@ func test_search_container_reveals_one_item_before_transferring_to_pickup_area()
 	BattleSetup.reset()
 
 
-func test_expedition_run_keeps_pixel_map_data_and_token_in_sync() -> void:
+func test_expedition_run_writes_a_permanent_reveal_trail_into_map_data() -> void:
 	BattleSetup.reset()
 	var screen := (load(EXPEDITION_SCENE_PATH) as PackedScene).instantiate()
 	add_child_autofree(screen)
@@ -741,31 +740,18 @@ func test_expedition_run_keeps_pixel_map_data_and_token_in_sync() -> void:
 			"人物所在格不绘制四角强调，但必须显示独立脚底接触影")
 	assert_eq(screen.player_token.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST)
 	assert_eq(screen.canvas.mouse_filter, Control.MOUSE_FILTER_IGNORE)
-	assert_eq(Vector2(material.get_shader_parameter("vision_center_cell")),
-			Vector2(screen.map.player) + Vector2.ONE * 0.5,
-			"静止时视觉中心必须和角色格中心同步")
-	assert_eq(Vector2(material.get_shader_parameter("vision_logic_center_cell")),
-			Vector2(screen.map.player) + Vector2.ONE * 0.5)
-	var old_center: Vector2 = Vector2(material.get_shader_parameter("vision_center_cell"))
+	var start_cell: Vector2i = screen.map.player
+	var revealed_before: Dictionary = screen.map.revealed.duplicate()
+	assert_almost_eq(screen._terrain_img.get_pixelv(start_cell).g, 1.0, 0.001)
 	var move_result: Dictionary = screen.map.try_move(Vector2i.UP)
 	assert_true(bool(move_result.get("moved", false)))
 	screen._refresh()
-	var logical_target: Vector2 = Vector2(screen.map.player) + Vector2.ONE * 0.5
-	assert_eq(Vector2(material.get_shader_parameter("vision_logic_center_cell")), logical_target,
-			"玩法视野必须在移动完成时立刻更新")
-	assert_eq(Vector2(material.get_shader_parameter("vision_center_cell")), old_center,
-			"视觉雾层应从旧格开始随步行动画移动，不能逐格瞬移")
-	var previous_distance: float = old_center.distance_to(logical_target)
-	for frame: int in 120:
-		screen._step_camera_follow(1.0 / 60.0)
-		var visual_center: Vector2 = Vector2(material.get_shader_parameter("vision_center_cell"))
-		var current_distance: float = visual_center.distance_to(logical_target)
-		assert_lte(current_distance, previous_distance + 0.001,
-				"柔边视野中心必须连续趋近逻辑中心且不能反向跳动：frame=%d" % frame)
-		previous_distance = current_distance
-	var new_center: Vector2 = Vector2(material.get_shader_parameter("vision_center_cell"))
-	assert_ne(new_center, old_center)
-	assert_eq(new_center, Vector2(screen.map.player) + Vector2.ONE * 0.5)
+	assert_gt(screen.map.revealed.size(), revealed_before.size())
+	assert_true(screen.map.revealed.has(start_cell), "离开后，旧路径必须保持清雾")
+	assert_almost_eq(screen._terrain_img.get_pixelv(start_cell).g, 1.0, 0.001)
+	assert_almost_eq(screen._terrain_img.get_pixelv(screen.map.player).g, 1.0, 0.001)
+	for old_cell: Vector2i in revealed_before:
+		assert_almost_eq(screen._terrain_img.get_pixelv(old_cell).g, 1.0, 0.001)
 	BattleSetup.reset()
 
 
@@ -794,7 +780,7 @@ func test_expedition_run_has_no_legacy_corner_hud() -> void:
 	BattleSetup.reset()
 
 
-func test_expedition_world_uses_complete_thirteen_by_seven_grid() -> void:
+func test_expedition_world_temporarily_uses_complete_nineteen_by_eleven_grid() -> void:
 	BattleSetup.reset()
 	var screen := (load(EXPEDITION_SCENE_PATH) as PackedScene).instantiate()
 	add_child_autofree(screen)
@@ -806,21 +792,28 @@ func test_expedition_world_uses_complete_thirteen_by_seven_grid() -> void:
 	var map_view := screen.get_node("MapView") as Control
 	var map_world := screen.get_node("MapView/MapWorld") as Control
 	assert_true(map_view.clip_contents)
-	assert_eq(map_view.position, Vector2(24, 36),
+	assert_eq(map_view.position, Vector2(48, 12),
 			"地图视窗必须整体居中，外侧只留边框而不能裁出半格")
-	assert_lte(map_view.size.distance_to(Vector2(1872, 1008)), 0.001)
+	assert_lte(map_view.size.distance_to(Vector2(1824, 1056)), 0.001)
 	assert_eq(map_world.size, Vector2(3840, 2160))
-	assert_lte(map_world.scale.distance_to(Vector2.ONE * 1.2), 0.0001)
+	assert_lte(map_world.scale.distance_to(Vector2.ONE * 0.8), 0.0001)
 	assert_lte((screen.MAP_VIEW_SIZE / (screen.MAP_CELL * screen.MAP_RENDER_SCALE))
-			.distance_to(Vector2(13, 7)), 0.001,
+			.distance_to(Vector2(19, 11)), 0.001,
 			"上下左右必须都严格结束在完整方格边界")
+	assert_eq(screen.MAP_VIEW_COLS, MainMenuWorld.VISIBLE_COLS,
+			"主界面与远征界面必须显示相同列数")
+	assert_eq(screen.MAP_VIEW_ROWS, MainMenuWorld.VISIBLE_ROWS,
+			"主界面与远征界面必须显示相同行数")
+	assert_eq(screen.MAP_VIEW_COLS % 2, 1)
+	assert_eq(screen.MAP_VIEW_ROWS % 2, 1,
+			"奇数行列保证视窗正中心始终是完整的中心3×3")
 	assert_almost_eq(screen.player_token.size.x, 208.0, 0.01)
 	assert_almost_eq(screen.player_token.size.y, 208.0, 0.01)
 	var token_screen_size: Vector2 = (
 			screen.player_token.size * screen.TOKEN_RENDER_COMPENSATION * screen.MAP_RENDER_SCALE)
-	assert_lte(token_screen_size.distance_to(Vector2(249.6, 249.6)), 0.01)
+	assert_lte(token_screen_size.distance_to(Vector2(166.4, 166.4)), 0.01)
 	assert_gt(token_screen_size.x, screen.MAP_CELL * screen.MAP_RENDER_SCALE,
-			"人物画布必须允许武器、头发等越出144px格体")
+			"人物画布必须允许武器、头发等越出96px格体")
 	assert_eq(screen.canvas.get_parent(), map_world)
 	assert_eq(screen.player_token.get_parent(), map_world)
 	BattleSetup.reset()
@@ -839,9 +832,9 @@ func test_authored_terrain_tiles_keep_complete_grid_nearest_neighbor_scale() -> 
 			assert_eq(texture.get_size(), Vector2(60, 60),
 					"正式格继续保留60px原资产：%s" % path)
 	assert_eq(screen.MAP_CELL, 120)
-	assert_almost_eq(screen.MAP_RENDER_SCALE, 1.2, 0.0001)
-	assert_almost_eq(60.0 * 2.0 * screen.MAP_RENDER_SCALE, 144.0, 0.001,
-			"60px正式格经运行画布与视图缩放后必须显示为144px单格")
+	assert_almost_eq(screen.MAP_RENDER_SCALE, 0.8, 0.0001)
+	assert_almost_eq(60.0 * 2.0 * screen.MAP_RENDER_SCALE, 96.0, 0.001,
+			"60px正式格经运行画布与视图缩放后必须显示为96px单格")
 	BattleSetup.reset()
 
 
@@ -876,7 +869,7 @@ func test_qingfeng_atmosphere_adds_large_chaff_below_objects_and_screen_space_li
 	BattleSetup.reset()
 
 
-func test_world_visibility_is_temporarily_unlimited() -> void:
+func test_world_fog_clearance_is_permanent_instead_of_following_the_player() -> void:
 	BattleSetup.reset()
 	var screen := (load(EXPEDITION_SCENE_PATH) as PackedScene).instantiate()
 	add_child_autofree(screen)
@@ -888,12 +881,16 @@ func test_world_visibility_is_temporarily_unlimited() -> void:
 	screen.map.player = Vector2i(9, 5)
 	screen.map._reveal_around(screen.map.player)
 	screen._refresh()
-	assert_true(screen.map.revealed.has(start), "旧格仍保留在永久探索记录")
-	assert_false(screen.LIMITED_VISIBILITY_ENABLED)
-	assert_true(screen._is_cell_visible(start), "暂时去除可见范围后，旧格不得重新进入迷雾")
+	assert_true(screen.map.revealed.has(start), "旧格必须保持在永久清雾记录")
+	assert_true(screen.FOG_OF_WAR_ENABLED)
+	assert_true(screen._is_cell_visible(start), "角色走远后，旧路径不能重新被迷雾覆盖")
+	assert_true(screen._is_cell_explored(start))
 	assert_almost_eq(screen._terrain_img.get_pixelv(start).g, 1.0, 0.001)
-	assert_eq(float(screen._reveal_time[start]), -10.0, "全图可见时不播放显现动画")
 	assert_true(screen._is_cell_visible(screen.map.player))
+	assert_almost_eq(screen._terrain_img.get_pixelv(screen.map.player).g, 1.0, 0.001)
+	var unknown := Vector2i(0, 0)
+	assert_false(screen._is_cell_explored(unknown))
+	assert_almost_eq(screen._terrain_img.get_pixelv(unknown).g, 0.0, 0.001)
 	BattleSetup.reset()
 
 
@@ -947,7 +944,7 @@ func test_complete_grid_camera_clamps_at_real_map_edges() -> void:
 	screen.map.player = Vector2i(31, 17)
 	screen._camera_initialized = false
 	screen._update_map_camera()
-	assert_eq(screen.map_world.position, Vector2(-2736, -1584))
+	assert_eq(screen.map_world.position, Vector2(-1248, -672))
 	assert_gt(screen.map_world.size.x * screen.MAP_RENDER_SCALE, screen.MAP_VIEW_SIZE.x)
 	assert_gt(screen.map_world.size.y * screen.MAP_RENDER_SCALE, screen.MAP_VIEW_SIZE.y)
 	BattleSetup.reset()
@@ -1055,7 +1052,7 @@ func test_complete_grid_camera_uses_real_map_bounds_without_fake_fog_padding() -
 	await get_tree().process_frame
 
 	assert_eq(screen.map_world.size, Vector2(3840, 2160), "逻辑地图必须为32×18")
-	assert_lte(screen.map_world.scale.distance_to(Vector2.ONE * 1.2), 0.0001)
+	assert_lte(screen.map_world.scale.distance_to(Vector2.ONE * 0.8), 0.0001)
 	assert_true(screen._is_fog_extension_cell(Vector2i(-1, 0)))
 	assert_true(screen._is_fog_extension_cell(Vector2i(32, 17)))
 	assert_false(screen._is_fog_extension_cell(Vector2i(0, 0)))
@@ -1063,9 +1060,9 @@ func test_complete_grid_camera_uses_real_map_bounds_without_fake_fog_padding() -
 	assert_eq(screen._camera_extension_world_rect(), Rect2(Vector2.ZERO, screen.MAP_WORLD_SIZE))
 	var expected_offsets := [
 		Vector2.ZERO,
-		Vector2(-2736, 0),
-		Vector2(0, -1584),
-		Vector2(-2736, -1584),
+		Vector2(-1248, 0),
+		Vector2(0, -672),
+		Vector2(-1248, -672),
 	]
 	var corners := [Vector2i.ZERO, Vector2i(31, 0), Vector2i(0, 17), Vector2i(31, 17)]
 	for index: int in corners.size():

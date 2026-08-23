@@ -44,10 +44,10 @@ func _run() -> void:
 			contract.get("rendered_cell_size", Vector2.ZERO))
 	if view_size != Vector2(1920.0, 1080.0):
 		failures.append("map viewport does not cover the 1920 by 1080 design frame")
-	if rendered_cell_size != Vector2(128.0, 120.0):
-		failures.append("rendered cell is not 128 by 120")
-	if view_size / rendered_cell_size != Vector2(15.0, 9.0):
-		failures.append("viewport is not a complete 15 by 9 grid")
+	if not rendered_cell_size.is_equal_approx(Vector2(1920.0 / 19.0, 1080.0 / 11.0)):
+		failures.append("rendered cell does not match the 19 by 11 full-screen grid")
+	if not (view_size / rendered_cell_size).is_equal_approx(Vector2(19.0, 11.0)):
+		failures.append("viewport is not a complete 19 by 11 grid")
 	if world.map_view.position != Vector2.ZERO:
 		failures.append("map viewport still exposes an outer fallback ring")
 	var render_scale := Vector2(contract.get("render_scale", Vector2.ZERO))
@@ -60,11 +60,11 @@ func _run() -> void:
 		failures.append("spawn is not the unique hub center cell")
 	if Vector2i(contract.get("current_cell", Vector2i(-1, -1))) != spawn_cell:
 		failures.append("initial cell does not match this load's spawn")
-	if world._view_position_for_cell(hub_center) != view_size * 0.5:
+	if not world._view_position_for_cell(hub_center).is_equal_approx(view_size * 0.5):
 		failures.append("hub center cell is not at exact screen center")
-	if world._cell_from_view_position(Vector2(0.5, 0.5)) != Vector2i(9, 5):
+	if world._cell_from_view_position(Vector2(0.5, 0.5)) != Vector2i(7, 4):
 		failures.append("top-left screen edge cuts a grid cell")
-	if world._cell_from_view_position(Vector2(1919.5, 1079.5)) != Vector2i(23, 13):
+	if world._cell_from_view_position(Vector2(1919.5, 1079.5)) != Vector2i(25, 14):
 		failures.append("bottom-right screen edge cuts a grid cell")
 	if int(contract.get("ground_cell_count", 0)) != 576:
 		failures.append("ground cell count mismatch")
@@ -101,13 +101,15 @@ func _run() -> void:
 		if world.portal_stones[index].scale != MainMenuWorld.TOKEN_ASPECT_COMPENSATION \
 				* MainMenuWorld.PORTAL_STONE_SCALE:
 			failures.append("portal stone scale mismatch at index %d" % index)
-	world.set_portal_energy(MainMenuWorld.PORTAL_ENERGY_GOLD)
+	world.play_portal_activation(
+			MainMenuWorld.PORTAL_ENERGY_GOLD, MainMenuWorld.PORTAL_ACTIVATION_DURATION)
 	if not is_zero_approx(float(world.get("_portal_energy_mix"))):
-		failures.append("portal energy changes color directly instead of starting dark")
-	await create_timer(0.075).timeout
-	var flicker_mix: float = float(world.get("_portal_energy_mix"))
-	if flicker_mix <= 0.0 or flicker_mix >= 0.8:
-		failures.append("portal energy has no readable activation flicker stage")
+		failures.append("portal activation does not start from the white idle state")
+	await create_timer(0.18).timeout
+	var ordered_levels: Array[float] = world.get("_portal_energy_levels")
+	if ordered_levels[0] <= 0.0 or ordered_levels[1] > 0.0 \
+			or ordered_levels[2] > 0.0 or ordered_levels[3] > 0.0:
+		failures.append("portal activation is not ordered TL TR BL BR")
 	await create_timer(MainMenuWorld.PORTAL_ACTIVATION_DURATION).timeout
 	for stone: TextureRect in world.portal_stones:
 		var stone_material := stone.material as ShaderMaterial
@@ -116,14 +118,26 @@ func _run() -> void:
 			failures.append("expedition gold energy is not applied")
 		if not is_equal_approx(float(stone_material.get_shader_parameter("energy_mix")), 1.0):
 			failures.append("portal energy mix is not active")
-	world.set_portal_energy(MainMenuWorld.PORTAL_ENERGY_BLUE)
-	if not is_zero_approx(float(world.get("_portal_energy_mix"))):
-		failures.append("blue activation did not restart from dark")
-	await create_timer(MainMenuWorld.PORTAL_ACTIVATION_DURATION + 0.05).timeout
+	world.begin_portal_search(MainMenuWorld.PORTAL_ENERGY_BLUE)
+	await create_timer(1.15).timeout
+	var search_levels: Array[float] = world.get("_portal_energy_levels")
+	if search_levels[0] < 0.99 or search_levels[1] < 0.99 \
+			or search_levels[2] < 0.99 or search_levels[3] > 0.0:
+		failures.append("match search must reserve the fourth stone for connection success")
+	world.complete_portal_connection(MainMenuWorld.PORTAL_ENERGY_BLUE)
 	for stone: TextureRect in world.portal_stones:
 		if (stone.material as ShaderMaterial).get_shader_parameter("energy_color") \
 				!= MainMenuWorld.PORTAL_ENERGY_BLUE:
 			failures.append("match blue energy is not applied")
+	await world.play_portal_beam(MainMenuWorld.PORTAL_ENERGY_BLUE, 0.12)
+	if world.portal_beam == null or not world.portal_beam.visible:
+		failures.append("connected portal does not raise the center beam")
+	else:
+		var beam_rect := Rect2(world.portal_beam.position, world.portal_beam.size)
+		var base_rect := Rect2(view_size * 0.5 - rendered_cell_size * 1.5,
+				rendered_cell_size * 3.0)
+		if not is_zero_approx(beam_rect.position.y) or not beam_rect.encloses(base_rect):
+			failures.append("portal beam does not reach screen top from the center nine cells")
 	for path: String in ["UI/ModeMatch", "UI/ModeTower"]:
 		var entry := menu.get_node_or_null(path) as Button
 		if entry == null or not entry.visible or entry.disabled:
@@ -159,29 +173,19 @@ func _run() -> void:
 		await process_frame
 	if Vector2i(world.get("_current_cell")) != target:
 		failures.append("main menu click route did not reach target")
-	var key_target: Vector2i = target + Vector2i.UP * 3
+	while world._grid_movement.is_moving() and Time.get_ticks_msec() < movement_deadline:
+		await process_frame
+	if world._grid_movement.is_moving():
+		failures.append("main menu click route did not visually settle")
+	var keyboard_origin: Vector2i = Vector2i(world.get("_current_cell"))
 	var key_event := InputEventKey.new()
 	key_event.keycode = KEY_W
 	key_event.pressed = true
 	Input.parse_input_event(key_event)
-	for _index: int in 2:
-		var echo_event := InputEventKey.new()
-		echo_event.keycode = KEY_W
-		echo_event.pressed = true
-		echo_event.echo = true
-		Input.parse_input_event(echo_event)
-	movement_deadline = Time.get_ticks_msec() + 3000
-	while Vector2i(world.get("_current_cell")) != key_target \
-			and Time.get_ticks_msec() < movement_deadline:
-		await process_frame
-	if Vector2i(world.get("_current_cell")) != key_target:
-		failures.append("main menu held WASD did not commit three expedition-style steps")
-	while world._grid_movement.is_moving() and Time.get_ticks_msec() < movement_deadline:
-		await process_frame
-	if world._grid_movement.is_moving():
-		failures.append("main menu shared visual follow did not settle")
-	contract["wasd_verified"] = Vector2i(world.get("_current_cell")) == key_target
-	contract["held_wasd_steps"] = 3
+	await process_frame
+	if Vector2i(world.get("_current_cell")) != keyboard_origin:
+		failures.append("main menu still accepts WASD movement")
+	contract["mouse_only_verified"] = Vector2i(world.get("_current_cell")) == keyboard_origin
 	contract["final_cell"] = Vector2i(world.get("_current_cell"))
 	if not failures.is_empty():
 		push_error("MAIN_MENU_PROBE: %s" % "; ".join(failures))

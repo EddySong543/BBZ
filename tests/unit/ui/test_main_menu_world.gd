@@ -19,23 +19,24 @@ func test_main_menu_uses_presentation_only_qingfeng_world() -> void:
 	assert_true(bool(contract["presentation_only"]), "主界面世界必须是纯展示组件")
 	assert_true(bool(contract["uniform_grass_only"]), "当前主界面地表必须全部使用统一草方块")
 	assert_true(bool(contract["click_to_move"]), "主界面格子必须接收左键移动")
-	assert_true(bool(contract["wasd_to_move"]), "主界面必须支持 WASD 逐格移动")
+	assert_false(bool(contract["wasd_to_move"]), "主界面必须只保留鼠标左键移动")
 	assert_true(bool(contract["shared_movement_controller"]),
 			"主界面不得再维护独立移动实现")
 	assert_eq(String(contract["movement_controller_script"]),
 			"res://src/expedition/grid_movement_controller.gd")
 	assert_false(world.visual_map.visible, "远征地图的田埂、作物和容器不得混入临时草地主界面")
-	assert_eq(int(contract["visible_columns"]), 15)
-	assert_eq(int(contract["visible_rows"]), 9)
+	assert_eq(int(contract["visible_columns"]), 19)
+	assert_eq(int(contract["visible_rows"]), 11)
 	assert_eq(Vector2(contract["view_size"]), Vector2(1920.0, 1080.0),
-			"15×9 格必须精确覆盖设计分辨率，不得露出绿色兜底外圈")
+			"19×11 格必须精确覆盖设计分辨率，不得露出绿色兜底外圈")
 	var rendered_cell_size := Vector2(contract.get("rendered_cell_size", Vector2.ZERO))
-	assert_eq(rendered_cell_size, Vector2(128.0, 120.0))
+	assert_almost_eq(rendered_cell_size.x, 1920.0 / 19.0, 0.001)
+	assert_almost_eq(rendered_cell_size.y, 1080.0 / 11.0, 0.001)
 	assert_eq(Vector2(contract["view_size"]) / rendered_cell_size,
-			Vector2(15.0, 9.0), "画面四边必须以完整格结束")
+			Vector2(19.0, 11.0), "画面四边必须以完整格结束")
 	assert_eq(world.map_view.position, Vector2.ZERO)
 	assert_eq(Vector2(contract.get("render_scale", Vector2.ZERO)),
-			Vector2(16.0 / 15.0, 1.0))
+			Vector2(16.0 / 19.0, 9.0 / 11.0))
 	var screen_token_scale: Vector2 = world.player_token.scale \
 			* Vector2(contract.get("render_scale", Vector2.ONE))
 	assert_almost_eq(absf(screen_token_scale.x), absf(screen_token_scale.y), 0.001,
@@ -66,16 +67,18 @@ func test_main_menu_uses_presentation_only_qingfeng_world() -> void:
 	assert_eq(Vector2(contract["portal_cell_foot_point"]), Vector2(60.0, 90.0))
 	assert_eq(float(contract["portal_float_amplitude"]), 3.0)
 	assert_eq(float(contract["portal_float_period"]), 3.8)
-	assert_eq(float(contract["portal_activation_duration"]), 0.39)
+	assert_eq(float(contract["portal_activation_duration"]), 2.0)
+	assert_eq(contract["portal_blocked_cells"], contract["portal_stone_cells"],
+			"四颗传送石所在格必须同时是移动阻挡格")
 	assert_eq(Vector2i(contract["spawn_cell"]), Vector2i(16, 9),
 			"角色每次都必须出生在中心3×3的正中央")
 	assert_eq(Vector2i(contract["current_cell"]), Vector2i(contract["spawn_cell"]))
-	assert_eq(world._view_position_for_cell(Vector2i(contract["hub_center_cell"])),
-			Vector2(contract["view_size"]) * 0.5,
+	assert_true(world._view_position_for_cell(Vector2i(contract["hub_center_cell"]))
+			.is_equal_approx(Vector2(contract["view_size"]) * 0.5),
 			"中心3×3不得偏左、偏右、偏上或偏下")
-	assert_eq(world._cell_from_view_position(Vector2(0.5, 0.5)), Vector2i(9, 5),
+	assert_eq(world._cell_from_view_position(Vector2(0.5, 0.5)), Vector2i(7, 4),
 			"左上边缘必须从完整格开始")
-	assert_eq(world._cell_from_view_position(Vector2(1919.5, 1079.5)), Vector2i(23, 13),
+	assert_eq(world._cell_from_view_position(Vector2(1919.5, 1079.5)), Vector2i(25, 14),
 			"右下边缘必须以完整格结束")
 	assert_eq(int(contract["destination_count"]), 0,
 			"匹配与远征改为直接按钮后，展示地图不得残留目的地格")
@@ -85,12 +88,16 @@ func test_main_menu_uses_presentation_only_qingfeng_world() -> void:
 	assert_null(world.get_node_or_null("ExpeditionScreen"), "主界面不得实例化远征玩法屏")
 
 
-func test_portal_stones_float_by_position_and_accept_mode_energy_colors() -> void:
+func test_portal_stones_float_and_activate_in_corner_order() -> void:
 	var menu: Control = _make_menu()
 	var world: MainMenuWorld = menu.get_node("MenuWorld") as MainMenuWorld
 	assert_eq(world.portal_stones.size(), 4)
 	assert_eq(world.portal_stone_shadows.size(), 4)
 	for index: int in world.portal_stones.size():
+		var idle_material := world.portal_stones[index].material as ShaderMaterial
+		assert_eq(idle_material.get_shader_parameter("energy_color"), Color.WHITE)
+		assert_eq(float(idle_material.get_shader_parameter("energy_mix")), 0.0,
+				"未连接时四颗阵眼必须保持白色，而不是预先带有模式颜色")
 		var expected_foot: Vector2 = Vector2(MainMenuWorld.PORTAL_STONE_CELLS[index]) \
 				* MainMenuWorld.MAP_CELL + MainMenuWorld.TOKEN_CELL_FOOT_POINT
 		var actual_foot: Vector2 = world.get("_portal_stone_home_positions")[index] \
@@ -108,27 +115,88 @@ func test_portal_stones_float_by_position_and_accept_mode_energy_colors() -> voi
 		if not world.portal_stones[index].position.is_equal_approx(initial_positions[index]):
 			moved_count += 1
 	assert_gt(moved_count, 0, "漂浮 idle 必须直接改变四块阵眼的位置")
-	world.set_portal_energy(MainMenuWorld.PORTAL_ENERGY_GOLD)
-	assert_eq(float(world.get("_portal_energy_mix")), 0.0,
-			"激活第一帧必须先熄灭，不能直接换色")
-	await get_tree().create_timer(0.075).timeout
-	var flicker_mix: float = float(world.get("_portal_energy_mix"))
-	assert_gt(flicker_mix, 0.0)
-	assert_lt(flicker_mix, 0.8, "阵眼应处于闪烁阶段而不是直接稳定全亮")
+	world.play_portal_activation(
+			MainMenuWorld.PORTAL_ENERGY_GOLD, MainMenuWorld.PORTAL_ACTIVATION_DURATION)
+	await get_tree().create_timer(0.18).timeout
+	var levels: Array[float] = world.get("_portal_energy_levels")
+	assert_gt(levels[0], 0.0, "左上阵眼必须首先开始充能")
+	assert_eq(levels[1], 0.0)
+	assert_eq(levels[2], 0.0)
+	assert_eq(levels[3], 0.0)
 	await get_tree().create_timer(MainMenuWorld.PORTAL_ACTIVATION_DURATION).timeout
 	for stone: TextureRect in world.portal_stones:
 		var material := stone.material as ShaderMaterial
 		assert_eq(material.get_shader_parameter("energy_color"),
 				MainMenuWorld.PORTAL_ENERGY_GOLD)
 		assert_almost_eq(float(material.get_shader_parameter("energy_mix")), 1.0, 0.001)
-	world.set_portal_energy(MainMenuWorld.PORTAL_ENERGY_BLUE)
-	assert_eq(float(world.get("_portal_energy_mix")), 0.0)
-	await get_tree().create_timer(MainMenuWorld.PORTAL_ACTIVATION_DURATION + 0.05).timeout
-	for stone: TextureRect in world.portal_stones:
-		assert_eq((stone.material as ShaderMaterial).get_shader_parameter("energy_color"),
-				MainMenuWorld.PORTAL_ENERGY_BLUE)
-		assert_almost_eq(float((stone.material as ShaderMaterial).get_shader_parameter(
-				"energy_mix")), 1.0, 0.001)
+	assert_true(bool(world.get_visual_contract()["portal_connection_complete"]))
+
+
+func test_portal_stones_block_movement_and_play_recoil_feedback() -> void:
+	var menu: Control = _make_menu()
+	var world: MainMenuWorld = menu.get_node("MenuWorld") as MainMenuWorld
+	for stone_cell: Vector2i in MainMenuWorld.PORTAL_STONE_CELLS:
+		assert_false(world._is_main_cell_walkable(stone_cell))
+	assert_true(world.request_move_to_cell(Vector2i(14, 8)))
+	await world.movement_finished
+	var beside_stone := Vector2i(world.get("_current_cell"))
+	assert_eq(beside_stone, Vector2i(14, 8))
+	assert_eq(float(world._grid_movement.facing_sign), -1.0)
+	var stone_click := InputEventMouseButton.new()
+	stone_click.button_index = MOUSE_BUTTON_LEFT
+	stone_click.pressed = true
+	stone_click.position = world._view_position_for_cell(Vector2i(15, 8))
+	world._on_map_view_gui_input(stone_click)
+	assert_eq(Vector2i(world.get("_current_cell")), beside_stone)
+	assert_eq(float(world._grid_movement.facing_sign), 1.0,
+			"角色位于石头左边时点击石头，必须先转向右再播放阻挡动画")
+	await get_tree().create_timer(0.06).timeout
+	assert_gt(float(world.get("_blocked_feedback_strength")), 0.0,
+			"阻挡必须有角色前倾与阵眼反冲，不能只是静默失败")
+	var stone_shader_source := FileAccess.get_file_as_string(
+			"res://assets/shaders/canvas_ui_portal_stone_energy.gdshader")
+	assert_false(stone_shader_source.contains("impact_flash"),
+			"撞击只保留角色前倾、石头反冲与能量碰撞，不得再整石白闪")
+	assert_gt(float((world.portal_stones[0].material as ShaderMaterial).get_shader_parameter(
+			"impact_pulse")), 0.0, "撞石头仍须保留模式色能量碰撞反馈")
+
+
+func test_connected_stones_keep_flickering_and_beam_reaches_screen_top_from_nine_cell_base() -> void:
+	var menu: Control = _make_menu()
+	var world: MainMenuWorld = menu.get_node("MenuWorld") as MainMenuWorld
+	var stone_shader_source := FileAccess.get_file_as_string(
+			"res://assets/shaders/canvas_ui_portal_stone_energy.gdshader")
+	assert_true(stone_shader_source.contains("connected_flicker"),
+			"稳定模式色必须继续闪烁，不能在energy_mix=1后彻底静止")
+	assert_not_null(world.portal_beam)
+	var contract: Dictionary = world.get_visual_contract()
+	var beam_rect := Rect2(contract["portal_beam_rect"])
+	var base_rect := Rect2(contract["portal_beam_base_rect"])
+	assert_almost_eq(beam_rect.position.y, 0.0, 0.001,
+			"光柱必须一直延伸到屏幕上边界")
+	assert_eq(base_rect.size, MainMenuWorld.RENDERED_CELL_SIZE * 3.0,
+			"光柱底部必须覆盖中心3×3九格")
+	assert_almost_eq(base_rect.get_center().x, MainMenuWorld.VIEW_SIZE.x * 0.5, 0.001)
+	assert_almost_eq(base_rect.get_center().y, MainMenuWorld.VIEW_SIZE.y * 0.5, 0.001)
+	assert_true(beam_rect.encloses(base_rect), "九格阵面必须位于贯穿屏幕顶部的光柱内部")
+	assert_almost_eq(MainMenuWorld.PORTAL_BEAM_DURATION, 1.8, 0.001)
+	assert_false(world.portal_beam.visible)
+	world.complete_portal_connection(MainMenuWorld.PORTAL_ENERGY_GOLD)
+	await world.play_portal_beam(MainMenuWorld.PORTAL_ENERGY_GOLD, 0.12)
+	assert_true(world.portal_beam.visible)
+	assert_almost_eq(float(world.portal_beam_material.get_shader_parameter("beam_phase")),
+			1.0, 0.001)
+	assert_eq(world.portal_beam_material.get_shader_parameter("beam_color"),
+			MainMenuWorld.PORTAL_ENERGY_GOLD)
+
+
+func test_mode_entry_source_no_longer_calls_wave_curtain_transition() -> void:
+	var source := FileAccess.get_file_as_string("res://src/ui/main_menu.gd")
+	assert_false(source.contains(
+			"TransitionManager.transition_to(\"res://src/expedition/expedition_screen.tscn\")"))
+	assert_false(source.contains("TransitionManager.transition_to(BP_SCENE)"))
+	assert_true(source.contains("play_portal_beam"))
+	assert_true(source.contains("change_scene_to_file"))
 
 
 func test_main_menu_left_click_moves_character_across_multiple_cells() -> void:
@@ -148,30 +216,53 @@ func test_main_menu_left_click_moves_character_across_multiple_cells() -> void:
 	assert_eq(Vector2(world.get("_current_logical_origin")), world._token_origin_for_cell(target))
 
 
-func test_main_menu_held_wasd_uses_expedition_immediate_logic_and_continuous_follow() -> void:
+func test_main_menu_disables_wasd_and_keeps_mouse_as_only_movement_input() -> void:
 	var menu: Control = _make_menu()
 	var world: MainMenuWorld = menu.get_node("MenuWorld") as MainMenuWorld
 	var start: Vector2i = Vector2i(world.get("_current_cell"))
-	var key_event := InputEventKey.new()
-	key_event.keycode = KEY_W
-	key_event.pressed = true
-	world._unhandled_input(key_event)
-	for _index: int in 2:
-		var echo_event := InputEventKey.new()
-		echo_event.keycode = KEY_W
-		echo_event.pressed = true
-		echo_event.echo = true
-		world._unhandled_input(echo_event)
-	var target: Vector2i = start + Vector2i.UP * 3
-	assert_eq(Vector2i(world.get("_current_cell")), target,
-			"与远征一致：连续输入应立即提交逻辑格，不等待旧 Tween")
-	assert_ne(Vector2(world.get("_current_logical_origin")), world._token_origin_for_cell(target),
-			"视觉坐标应从当前位置连续追赶最新逻辑格")
-	await world.movement_finished
-	await get_tree().process_frame
-	assert_eq(Vector2i(world.get("_current_cell")), target)
-	assert_eq(Vector2(world.get("_current_logical_origin")), world._token_origin_for_cell(target))
-	assert_false(world._grid_movement.is_moving())
+	var source := FileAccess.get_file_as_string(
+			"res://src/ui/components/main_menu_world.gd")
+	assert_false(source.contains("func _unhandled_input"))
+	assert_false(bool(world.get_visual_contract()["wasd_to_move"]))
+	assert_eq(Vector2i(world.get("_current_cell")), start)
+
+
+func test_main_menu_hover_draws_exact_rounded_target_and_regular_route_markers() -> void:
+	var menu: Control = _make_menu()
+	var world: MainMenuWorld = menu.get_node("MenuWorld") as MainMenuWorld
+	var target: Vector2i = Vector2i(world.get("_current_cell")) + Vector2i.LEFT * 3
+	var motion := InputEventMouseMotion.new()
+	motion.position = world._view_position_for_cell(target)
+	world._on_map_view_gui_input(motion)
+	assert_eq(Vector2i(world.get("_hovered_cell")), target)
+	assert_gt((world.get("_hovered_path") as Array).size(), 0)
+	assert_true(bool(world.get_visual_contract()["route_preview_connected"]))
+	assert_true(world.route_target_outline.visible)
+	assert_eq(world.route_target_outline.position,
+			Vector2(target) * MainMenuWorld.MAP_CELL,
+			"目标描边必须与逻辑格左上角使用同一世界坐标，不能另加视觉偏移")
+	assert_eq(world.route_target_outline.size,
+			Vector2.ONE * MainMenuWorld.MAP_CELL)
+	assert_eq(world.route_target_material.shader.resource_path,
+			"res://assets/shaders/canvas_ui_grid_target_outline.gdshader")
+	assert_almost_eq(float(world.route_target_material.get_shader_parameter(
+			"cell_inset_px")), 1.0, 0.001)
+	assert_almost_eq(float(world.route_target_material.get_shader_parameter(
+			"corner_radius_px")), 16.0, 0.001)
+	assert_almost_eq(float(world.route_target_material.get_shader_parameter(
+			"pixel_step_px")), 4.0, 0.001)
+
+
+func test_global_wave_curtain_is_removed_from_all_regular_scene_changes() -> void:
+	var source := FileAccess.get_file_as_string(
+			"res://src/core/transition_manager.gd")
+	assert_false(source.contains("canvas_transition_wave.gdshader"))
+	assert_false(source.contains("WAVE_SHADER"))
+	assert_false(source.contains("_apply_winner_style"))
+	assert_null(TransitionManager.get_node_or_null("Veil"),
+			"远征返回主界面等常规切场不得再存在旧波幕节点")
+	assert_not_null(TransitionManager.get_node_or_null("BootPixelVeil"),
+			"Boot独立曝光环不是旧波幕，继续保留")
 
 
 func test_main_menu_reset_home_returns_to_this_loads_chosen_spawn() -> void:
@@ -260,7 +351,7 @@ func test_match_state_uses_icon_and_blue_portal_energy_then_restores_on_cancel()
 	var match_entry := menu.get_node("UI/ModeMatch") as Button
 	var world := menu.get_node("MenuWorld") as MainMenuWorld
 	menu.call("_start_search")
-	menu.call("_process", 1.1)
+	await get_tree().create_timer(1.15).timeout
 	assert_null(match_entry.get_node_or_null("Caption"))
 	assert_null(match_entry.get_node_or_null("Status"))
 	assert_eq(match_entry.tooltip_text, "匹配中 0:01")
@@ -268,8 +359,16 @@ func test_match_state_uses_icon_and_blue_portal_energy_then_restores_on_cancel()
 	for stone: TextureRect in world.portal_stones:
 		assert_eq((stone.material as ShaderMaterial).get_shader_parameter("energy_color"),
 				MainMenuWorld.PORTAL_ENERGY_BLUE)
+	var search_levels: Array[float] = world.get("_portal_energy_levels")
+	assert_gt(search_levels[0], 0.9)
+	assert_gt(search_levels[1], 0.9)
+	assert_gt(search_levels[2], 0.9)
+	assert_eq(search_levels[3], 0.0,
+			"匹配成功前第四颗必须保持白色，避免虚假显示连接完成")
+	world.complete_portal_connection(MainMenuWorld.PORTAL_ENERGY_BLUE)
+	assert_true(bool(world.get_visual_contract()["portal_connection_complete"]))
 	menu.call("_cancel_search")
 	assert_eq(match_entry.tooltip_text, "匹配")
 	assert_eq((match_entry.get_node("Bg") as ColorRect).self_modulate, Color.WHITE)
-	world._set_portal_energy_mix(0.0)
-	assert_eq(float(world.get_visual_contract()["portal_energy_mix"]), 0.0)
+	await get_tree().create_timer(0.35).timeout
+	assert_almost_eq(float(world.get_visual_contract()["portal_energy_mix"]), 0.0, 0.001)

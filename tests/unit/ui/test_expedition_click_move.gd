@@ -36,3 +36,37 @@ func test_left_click_moves_one_grid_cell_through_existing_map_rules() -> void:
 	assert_false(screen._click_route_active)
 	assert_true(screen.map_view.gui_input.is_connected(screen._on_map_view_gui_input))
 	BattleSetup.reset()
+
+
+func test_expedition_hover_previews_target_and_wasd_does_not_move() -> void:
+	BattleSetup.reset()
+	var screen := (load(EXPEDITION_SCENE_PATH) as PackedScene).instantiate()
+	add_child_autofree(screen)
+	await get_tree().process_frame
+	screen._on_hero_selected(HeroDataScript.create_launch_pool()[0])
+	await get_tree().process_frame
+	var start: Vector2i = screen.map.player
+	var target := Vector2i(-1, -1)
+	for direction: Vector2i in [Vector2i.UP, Vector2i.LEFT, Vector2i.RIGHT, Vector2i.DOWN]:
+		if screen._is_walkable_map_cell(start + direction):
+			target = start + direction
+			break
+	assert_ne(target, Vector2i(-1, -1))
+	var motion := InputEventMouseMotion.new()
+	motion.position = screen._map_view_position_for_cell(target)
+	screen._on_map_view_gui_input(motion)
+	assert_eq(Vector2i(screen.get("_hovered_map_cell")), target)
+	assert_gt((screen.get("_hovered_map_path") as Array).size(), 0)
+	assert_true(screen.route_target_outline.visible)
+	assert_eq(screen.route_target_outline.position,
+			Vector2(target) * float(screen.MAP_CELL))
+	assert_eq(screen.route_target_material.shader.resource_path,
+			"res://assets/shaders/canvas_ui_grid_target_outline.gdshader")
+	var key := InputEventKey.new()
+	key.keycode = KEY_W
+	key.pressed = true
+	screen._unhandled_input(key)
+	await get_tree().process_frame
+	assert_eq(screen.map.player, start,
+			"远征模式的WASD与方向键不得再触发移动")
+	BattleSetup.reset()

@@ -1,25 +1,23 @@
 shader_type canvas_item;
 render_mode blend_mix;
 
-// 晴风稻田地表上方的当前视野迷雾。
-// 地表本身始终由 GroundArtLayer 绘制；日照/云影由独立 AtmosphereLayer 负责。
-// map_data: R=墙标记（保留接口），G=当前可见，B=进入视野时刻。
+// 晴风稻田地表上方的永久探索迷雾。
+// 迷雾固定在地图坐标中；角色走过时逐格驱散，离开后不会重新覆盖。
+// map_data: R=遮挡格，G=已清雾，B=散开起始时刻，A=保留。
 uniform sampler2D map_data : filter_nearest, repeat_disable;
 uniform vec2 grid_size = vec2(18.0, 14.0);
 uniform float cell_px = 107.0;
 uniform float anim_time = 0.0;
 uniform float seed_f = 0.0;
 
-uniform vec3 fog_base : source_color = vec3(0.028, 0.105, 0.073);
-uniform float unseen_alpha : hint_range(0.0, 1.0) = 0.60;
-uniform float vignette_alpha : hint_range(0.0, 0.5) = 0.14;
-uniform float reveal_dur : hint_range(0.1, 1.5) = 0.32;
-uniform vec2 vision_center_cell = vec2(9.5, 7.5);
-uniform vec2 vision_logic_center_cell = vec2(9.5, 7.5);
-uniform vec2 vision_half_extent_cells = vec2(6.0, 4.0);
-uniform float vision_feather_cells : hint_range(0.08, 0.36) = 0.28;
+uniform vec4 fog_low_color : source_color = vec4(0.839, 0.780, 0.635, 1.0);
+uniform vec4 fog_high_color : source_color = vec4(0.961, 0.922, 0.824, 1.0);
+uniform float unseen_alpha : hint_range(0.0, 1.0) = 0.93;
+uniform float reveal_duration : hint_range(0.2, 0.8) = 0.46;
+uniform float reveal_softness : hint_range(0.04, 0.24) = 0.12;
+uniform float boundary_feather_cells : hint_range(0.04, 0.20) = 0.10;
 
-float visible_at(vec2 cell) {
+float cleared_at(vec2 cell) {
 	if (cell.x < 0.0 || cell.y < 0.0 || cell.x >= grid_size.x || cell.y >= grid_size.y) {
 		return 0.0;
 	}
@@ -27,40 +25,72 @@ float visible_at(vec2 cell) {
 	return step(0.5, texture(map_data, data_uv).g);
 }
 
+float reveal_started_at(vec2 cell) {
+	if (cell.x < 0.0 || cell.y < 0.0 || cell.x >= grid_size.x || cell.y >= grid_size.y) {
+		return 0.0;
+	}
+	vec2 data_uv = (cell + vec2(0.5)) / grid_size;
+	return texture(map_data, data_uv).b;
+}
+
+float hash21(vec2 value) {
+	value = fract(value * vec2(123.34, 456.21));
+	value += dot(value, value + 45.32);
+	return fract(value.x * value.y);
+}
+
 void fragment() {
 	vec2 grid_position = UV * grid_size;
-	// 玩法mask已经落在新逻辑格；反向采样两中心的差值，让整块雾边从旧视觉格
-	// 连续滑到新格。静止时两中心相等，采样严格回到原始tile mask。
-	vec2 mask_position = grid_position
-			+ vision_logic_center_cell
-			- vision_center_cell;
-	vec2 cell = floor(mask_position);
-	vec2 cell_uv = fract(mask_position);
-	float cell_visible = visible_at(cell);
+	vec2 cell = floor(grid_position);
+	vec2 cell_uv = fract(grid_position);
+	float cleared = cleared_at(cell);
 
-	// 可见格始终完整保亮。只有当前格不可见时，才从相邻可见格的共享边
-	// 向外铺一小段柔边；因此轮廓严格贴格且沿逻辑mask自然形成凹凸。
-	float nearest_visible_edge = 2.0;
-	if (visible_at(cell + vec2(-1.0, 0.0)) > 0.5) {
-		nearest_visible_edge = min(nearest_visible_edge, cell_uv.x);
-	}
-	if (visible_at(cell + vec2(1.0, 0.0)) > 0.5) {
-		nearest_visible_edge = min(nearest_visible_edge, 1.0 - cell_uv.x);
-	}
-	if (visible_at(cell + vec2(0.0, -1.0)) > 0.5) {
-		nearest_visible_edge = min(nearest_visible_edge, cell_uv.y);
-	}
-	if (visible_at(cell + vec2(0.0, 1.0)) > 0.5) {
-		nearest_visible_edge = min(nearest_visible_edge, 1.0 - cell_uv.y);
-	}
-	float boundary_feather = 1.0 - smoothstep(
-			0.0, vision_feather_cells, nearest_visible_edge);
-	float current_visible = max(cell_visible, boundary_feather);
-	float unseen = 1.0 - current_visible;
+	// 新清除格按各自时间戳从格心向外散开；相邻格的时间错开，形成沿脚步扩散的波。
+	float reveal_age = max(anim_time - reveal_started_at(cell), 0.0);
+	float reveal_progress = smoothstep(0.0, reveal_duration, reveal_age);
+	float local_noise = hash21(floor(grid_position * 8.0 + vec2(seed_f)));
+	float local_threshold = clamp(
+			length(cell_uv - vec2(0.5)) * 1.32 + (local_noise - 0.5) * 0.12,
+			0.0, 1.0);
+	float dispersed = 1.0 - smoothstep(
+			reveal_progress * 1.20 - reveal_softness,
+			reveal_progress * 1.20 + reveal_softness,
+			local_threshold);
 
-	// 只保留轻微边缘压暗；明确光影在独立层统一覆盖麦穗与场景物体。
-	vec2 vignette_delta = (SCREEN_UV - vec2(0.50)) * vec2(1.0, 0.94);
-	float vignette = smoothstep(0.30, 0.72, length(vignette_delta));
-	float dark_alpha = clamp(unseen * unseen_alpha + vignette * vignette_alpha, 0.0, 0.82);
-	COLOR = vec4(fog_base, dark_alpha);
+	// 只在尚未清除的一侧向外软化极窄边缘；不会把角色当前位置变成随身光圈。
+	float nearest_cleared_edge = 2.0;
+	if (cleared_at(cell + vec2(-1.0, 0.0)) > 0.5) {
+		nearest_cleared_edge = min(nearest_cleared_edge, cell_uv.x);
+	}
+	if (cleared_at(cell + vec2(1.0, 0.0)) > 0.5) {
+		nearest_cleared_edge = min(nearest_cleared_edge, 1.0 - cell_uv.x);
+	}
+	if (cleared_at(cell + vec2(0.0, -1.0)) > 0.5) {
+		nearest_cleared_edge = min(nearest_cleared_edge, cell_uv.y);
+	}
+	if (cleared_at(cell + vec2(0.0, 1.0)) > 0.5) {
+		nearest_cleared_edge = min(nearest_cleared_edge, 1.0 - cell_uv.y);
+	}
+	float boundary_feather = (1.0 - cleared) * 0.48 * (
+			1.0 - smoothstep(0.0, boundary_feather_cells, nearest_cleared_edge));
+
+	float cleared_amount = max(cleared * dispersed, boundary_feather);
+	// 地图坐标中的暖雾缓慢交错流动。两层频率与方向不同，保持轻盈但不形成随身光圈。
+	vec2 fog_drift = grid_position * vec2(0.61, 0.47);
+	float cloud_a = 0.5 + 0.5 * sin(
+			fog_drift.x + fog_drift.y * 0.72 + anim_time * 0.31 + seed_f);
+	float cloud_b = 0.5 + 0.5 * sin(
+			-fog_drift.x * 0.53 + fog_drift.y * 1.17 - anim_time * 0.19
+			+ seed_f * 1.7);
+	float cloud_mix = smoothstep(0.14, 0.88, cloud_a * 0.62 + cloud_b * 0.38);
+	vec2 drifting_grain_cell = floor(
+			(grid_position + vec2(anim_time * 0.10, -anim_time * 0.055)) * 6.0);
+	float moving_grain = hash21(drifting_grain_cell + vec2(seed_f));
+	float grain = (moving_grain - 0.5) * 0.026;
+	float fog_alpha = clamp(
+			(unseen_alpha + grain + (cloud_mix - 0.5) * 0.025)
+			* (1.0 - cleared_amount),
+			0.0, 0.97);
+	vec3 warm_fog = mix(fog_low_color.rgb, fog_high_color.rgb, cloud_mix);
+	COLOR = vec4(warm_fog * (0.985 + grain), fog_alpha);
 }

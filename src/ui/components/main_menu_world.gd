@@ -7,13 +7,18 @@ signal movement_finished(cell: Vector2i, completed: bool)
 
 const QingfengLayout := preload("res://src/expedition/maps/qingfeng_ricefield_layout.gd")
 const GridMovementControllerScript := preload("res://src/expedition/grid_movement_controller.gd")
+const GridPathfinderScript := preload("res://src/expedition/grid_pathfinder.gd")
+const GridRoutePreviewScript := preload("res://src/expedition/grid_route_preview.gd")
 const HeroDataScript := preload("res://src/battle/hero_data.gd")
 const ProfileStore := preload("res://src/core/player_profile.gd")
 const VISUAL_MAP_SCENE := preload("res://src/expedition/maps/qingfeng_ricefield_visual_map.tscn")
 const GRASS_TILE_TEXTURE := preload("res://assets/tilesets/qingfeng_ricefield/grass_ref37_ref39_plain_v1.png")
 const GROUND_CELL_SHADER := preload("res://assets/shaders/canvas_ui_expedition_ground_cell.gdshader")
+const GRID_TARGET_OUTLINE_SHADER := preload(
+		"res://assets/shaders/canvas_ui_grid_target_outline.gdshader")
 const ATMOSPHERE_SHADER := preload("res://assets/shaders/canvas_ui_qingfeng_atmosphere.gdshader")
 const PORTAL_STONE_SHADER := preload("res://assets/shaders/canvas_ui_portal_stone_energy.gdshader")
+const PORTAL_BEAM_SHADER := preload("res://assets/shaders/canvas_ui_portal_beam.gdshader")
 const PORTAL_STONE_TEXTURES: Array[Texture2D] = [
 	preload("res://assets/ui/main_menu/stone1.png"),
 	preload("res://assets/ui/main_menu/stone2.png"),
@@ -22,13 +27,11 @@ const PORTAL_STONE_TEXTURES: Array[Texture2D] = [
 ]
 
 const MAP_CELL: float = 120.0
-const MAP_RENDER_SCALE := Vector2(16.0 / 15.0, 1.0)
-const RENDERED_CELL_SIZE := Vector2(
-		MAP_CELL * MAP_RENDER_SCALE.x,
-		MAP_CELL * MAP_RENDER_SCALE.y)
-const VISIBLE_COLS: int = 15
-const VISIBLE_ROWS: int = 9
-const VIEW_SIZE := Vector2(VISIBLE_COLS, VISIBLE_ROWS) * RENDERED_CELL_SIZE
+const VISIBLE_COLS: int = 19
+const VISIBLE_ROWS: int = 11
+const VIEW_SIZE := Vector2(1920.0, 1080.0)
+const MAP_RENDER_SCALE := Vector2(16.0 / 19.0, 9.0 / 11.0)
+const RENDERED_CELL_SIZE := VIEW_SIZE / Vector2(VISIBLE_COLS, VISIBLE_ROWS)
 const MAP_WORLD_SIZE := Vector2(QingfengLayout.WIDTH * MAP_CELL, QingfengLayout.HEIGHT * MAP_CELL)
 const MAP_BOUNDS := Rect2i(Vector2i.ZERO, Vector2i(QingfengLayout.WIDTH, QingfengLayout.HEIGHT))
 const HUB_CENTER_CELL := Vector2i(16, 9)
@@ -49,7 +52,12 @@ const PORTAL_STONE_FOOT_ANCHORS: Array[Vector2] = [
 const PORTAL_STONE_SCALE: float = 0.72
 const PORTAL_FLOAT_AMPLITUDE: float = 3.0
 const PORTAL_FLOAT_PERIOD: float = 3.8
-const PORTAL_ACTIVATION_DURATION: float = 0.39
+const PORTAL_ACTIVATION_DURATION: float = 2.0
+const PORTAL_SEARCH_STEP_DELAY: float = 0.34
+const PORTAL_IGNITE_DURATION: float = 0.38
+const PORTAL_BLOCK_LEAN_DISTANCE: float = 8.0
+const PORTAL_BLOCK_RECOIL_DISTANCE: float = 5.0
+const PORTAL_BEAM_DURATION: float = 1.80
 const PORTAL_ENERGY_GOLD := Color("FFC44F")
 const PORTAL_ENERGY_BLUE := Color("48A8FF")
 const TOKEN_SIZE := Vector2(208.0, 208.0)
@@ -73,21 +81,36 @@ var visual_map: Node2D
 var visual_ground: TileMapLayer
 var ground_art: Control
 var marker_art: Control
+var route_preview_art: Control
+var route_target_outline: ColorRect
+var route_target_material: ShaderMaterial
 var atmosphere_layer: ColorRect
 var atmosphere_material: ShaderMaterial
 var player_shadow: Control
 var player_token: TextureRect
 var portal_stones: Array[TextureRect] = []
 var portal_stone_shadows: Array[Control] = []
+var portal_beam: ColorRect
+var portal_beam_material: ShaderMaterial
 
 var _hero_frames: SpriteFrames
 var _hero_textures: Array[Texture2D] = []
 var _portal_stone_home_positions: Array[Vector2] = []
 var _portal_stone_materials: Array[ShaderMaterial] = []
 var _portal_stone_lifts: Array[float] = []
+var _portal_stone_impact_offsets: Array[Vector2] = []
+var _portal_energy_levels: Array[float] = []
+var _portal_energy_tweens: Array[Tween] = []
+var _portal_sequence_tween: Tween
 var _portal_energy_mix: float = 0.0
 var _portal_energy_color: Color = Color.WHITE
-var _portal_energy_tween: Tween
+var _portal_connection_complete: bool = false
+var _portal_beam_tween: Tween
+var _portal_beam_progress: float = 0.0
+var _blocked_feedback_strength: float = 0.0
+var _blocked_feedback_direction: Vector2 = Vector2.ZERO
+var _blocked_stone_index: int = -1
+var _blocked_feedback_tween: Tween
 var _anim_time: float = 0.0
 var _focused_destination: String = ""
 var _selected_destination: String = ""
@@ -99,6 +122,9 @@ var _current_logical_origin: Vector2 = Vector2.ZERO
 var _spawn_cell: Vector2i = HUB_CENTER_CELL
 var _current_cell: Vector2i = HUB_CENTER_CELL
 var _grid_movement: GridMovementController
+var _hovered_cell: Vector2i = Vector2i(-1, -1)
+var _hovered_path: Array[Vector2i] = []
+var _pending_blocked_stone_index: int = -1
 
 
 func _ready() -> void:
@@ -112,6 +138,7 @@ func _ready() -> void:
 	_grid_movement.configure(
 			_spawn_cell, MAP_BOUNDS, MAP_CELL, TOKEN_OFFSET,
 			_is_main_cell_walkable, _commit_main_step)
+	_grid_movement.step_attempted.connect(_on_shared_step_attempted)
 	_grid_movement.step_committed.connect(_on_shared_step_committed)
 	_grid_movement.movement_finished.connect(_on_shared_movement_finished)
 	_apply_shared_movement_visual()
@@ -132,6 +159,7 @@ func _build_world() -> void:
 	map_view.clip_contents = true
 	map_view.mouse_filter = Control.MOUSE_FILTER_STOP
 	map_view.gui_input.connect(_on_map_view_gui_input)
+	map_view.mouse_exited.connect(_clear_route_preview)
 	add_child(map_view)
 
 	map_world = Control.new()
@@ -177,6 +205,30 @@ func _build_world() -> void:
 	marker_art.draw.connect(_draw_destinations)
 	map_world.add_child(marker_art)
 
+	route_preview_art = Control.new()
+	route_preview_art.name = "RoutePreview"
+	route_preview_art.size = MAP_WORLD_SIZE
+	route_preview_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	route_preview_art.z_index = 900
+	route_preview_art.draw.connect(_draw_route_preview)
+	map_world.add_child(route_preview_art)
+	route_target_outline = ColorRect.new()
+	route_target_outline.name = "RouteTargetOutline"
+	route_target_outline.size = Vector2.ONE * MAP_CELL
+	route_target_outline.color = Color.WHITE
+	route_target_outline.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	route_target_outline.z_index = 901
+	route_target_outline.visible = false
+	route_target_material = ShaderMaterial.new()
+	route_target_material.shader = GRID_TARGET_OUTLINE_SHADER
+	route_target_material.set_shader_parameter("cell_px", MAP_CELL)
+	route_target_material.set_shader_parameter("cell_inset_px", 1.0)
+	route_target_material.set_shader_parameter("corner_radius_px", 16.0)
+	route_target_material.set_shader_parameter("pixel_step_px", 4.0)
+	route_target_material.set_shader_parameter("outline_px", 4.0)
+	route_target_outline.material = route_target_material
+	map_world.add_child(route_target_outline)
+
 	_build_portal_stones()
 
 	player_shadow = Control.new()
@@ -197,6 +249,30 @@ func _build_world() -> void:
 	player_token.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	map_world.add_child(player_token)
 
+	_build_portal_beam()
+
+
+func _build_portal_beam() -> void:
+	portal_beam = ColorRect.new()
+	portal_beam.name = "PortalBeamToScreenTop"
+	var base_size: Vector2 = RENDERED_CELL_SIZE * 3.0
+	var base_top: float = VIEW_SIZE.y * 0.5 - base_size.y * 0.5
+	portal_beam.position = Vector2(VIEW_SIZE.x * 0.5 - base_size.x * 0.5, 0.0)
+	portal_beam.size = Vector2(base_size.x, base_top + base_size.y)
+	portal_beam.color = Color.WHITE
+	portal_beam.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	portal_beam.z_index = 4096
+	portal_beam.visible = false
+	portal_beam_material = ShaderMaterial.new()
+	portal_beam_material.shader = PORTAL_BEAM_SHADER
+	portal_beam_material.set_shader_parameter("beam_color", Color.WHITE)
+	portal_beam_material.set_shader_parameter("beam_phase", 0.0)
+	portal_beam_material.set_shader_parameter("base_top_uv", base_top / portal_beam.size.y)
+	portal_beam_material.set_shader_parameter(
+			"beam_aspect", portal_beam.size.x / portal_beam.size.y)
+	portal_beam.material = portal_beam_material
+	map_view.add_child(portal_beam)
+
 
 func _build_portal_stones() -> void:
 	portal_stones.clear()
@@ -204,6 +280,8 @@ func _build_portal_stones() -> void:
 	_portal_stone_home_positions.clear()
 	_portal_stone_materials.clear()
 	_portal_stone_lifts.clear()
+	_portal_stone_impact_offsets.clear()
+	_portal_energy_levels.clear()
 	for index: int in PORTAL_STONE_CELLS.size():
 		var stone_cell: Vector2i = PORTAL_STONE_CELLS[index]
 		var stone_shadow := Control.new()
@@ -217,6 +295,8 @@ func _build_portal_stones() -> void:
 		map_world.add_child(stone_shadow)
 		portal_stone_shadows.append(stone_shadow)
 		_portal_stone_lifts.append(0.0)
+		_portal_stone_impact_offsets.append(Vector2.ZERO)
+		_portal_energy_levels.append(0.0)
 
 		var stone := TextureRect.new()
 		stone.name = "PortalStone%d" % (index + 1)
@@ -234,8 +314,11 @@ func _build_portal_stones() -> void:
 		stone.z_index = roundi(Vector2(stone_cell).y * MAP_CELL + TOKEN_CELL_FOOT_POINT.y)
 		var stone_material := ShaderMaterial.new()
 		stone_material.shader = PORTAL_STONE_SHADER
-		stone_material.set_shader_parameter("energy_color", PORTAL_ENERGY_GOLD)
+		stone_material.set_shader_parameter("energy_color", Color.WHITE)
 		stone_material.set_shader_parameter("energy_mix", 0.0)
+		stone_material.set_shader_parameter("energy_phase", float(index) * 1.73)
+		stone_material.set_shader_parameter("activation_flash", 0.0)
+		stone_material.set_shader_parameter("impact_pulse", 0.0)
 		stone.material = stone_material
 		map_world.add_child(stone)
 		portal_stones.append(stone)
@@ -258,40 +341,158 @@ func _draw_portal_stone_shadow(shadow: Control, index: int) -> void:
 	shadow.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
-func set_portal_energy(color: Color) -> void:
-	if _portal_energy_tween != null and _portal_energy_tween.is_valid():
-		_portal_energy_tween.kill()
-	_set_portal_energy_mix(0.0)
+## PVE：固定两秒内按左上、右上、左下、右下依次完成，最后一颗稳定即连接成功。
+func play_portal_activation(color: Color,
+		duration: float = PORTAL_ACTIVATION_DURATION) -> void:
+	_prepare_portal_energy(color)
+	var safe_duration: float = maxf(duration, PORTAL_IGNITE_DURATION + 0.20)
+	var first_delay: float = 0.08
+	var step_delay: float = (
+			safe_duration - first_delay - PORTAL_IGNITE_DURATION - 0.08) / 3.0
+	for index: int in portal_stones.size():
+		_schedule_portal_ignite(index, first_delay + step_delay * float(index))
+	_portal_sequence_tween = create_tween().bind_node(self)
+	_portal_sequence_tween.tween_interval(safe_duration)
+	await _portal_sequence_tween.finished
+	if not is_instance_valid(self):
+		return
+	for index: int in _portal_energy_levels.size():
+		_set_portal_stone_energy_level(1.0, index)
+	_portal_connection_complete = true
+
+
+## PVP 等待是未知时长：前三颗依次锁定，第四颗保留白色直到服务器确认成功。
+func begin_portal_search(color: Color) -> void:
+	_prepare_portal_energy(color)
+	for index: int in mini(3, portal_stones.size()):
+		_schedule_portal_ignite(index, 0.04 + PORTAL_SEARCH_STEP_DELAY * float(index))
+
+
+## 快速匹配允许直接完成四颗；已有进度则由当前状态汇聚为同一拍能量闪光。
+func complete_portal_connection(color: Color) -> void:
+	_kill_portal_energy_tweens()
 	_portal_energy_color = color
-	for stone_material: ShaderMaterial in _portal_stone_materials:
-		stone_material.set_shader_parameter("energy_color", color)
-	_portal_energy_tween = create_tween().bind_node(self)
-	_portal_energy_tween.tween_method(
-			_set_portal_energy_mix, 0.0, 0.30, 0.06)
-	_portal_energy_tween.tween_method(
-			_set_portal_energy_mix, 0.30, 0.06, 0.05)
-	_portal_energy_tween.tween_method(
-			_set_portal_energy_mix, 0.06, 0.64, 0.08)
-	_portal_energy_tween.tween_method(
-			_set_portal_energy_mix, 0.64, 0.22, 0.06)
-	_portal_energy_tween.tween_method(
-			_set_portal_energy_mix, 0.22, 1.0, 0.14
-	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_portal_connection_complete = true
+	for index: int in _portal_stone_materials.size():
+		_portal_stone_materials[index].set_shader_parameter("energy_color", color)
+		_set_portal_stone_energy_level(1.0, index)
+		_portal_stone_materials[index].set_shader_parameter("activation_flash", 1.0)
+	var surge := create_tween().bind_node(self).set_parallel(true)
+	for index: int in _portal_stone_materials.size():
+		surge.tween_method(_set_portal_activation_flash.bind(index),
+				1.0, 0.0, 0.42).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_portal_energy_tweens.append(surge)
+
+
+## 四石已连接后，中心九格形成阵面；柱体从阵面一路喷涌到屏幕上边界。
+func play_portal_beam(color: Color, duration: float = PORTAL_BEAM_DURATION) -> void:
+	if not _portal_connection_complete or portal_beam == null:
+		return
+	if _portal_beam_tween != null and _portal_beam_tween.is_valid():
+		_portal_beam_tween.kill()
+	var safe_duration: float = maxf(duration, 0.08)
+	portal_beam.visible = true
+	portal_beam_material.set_shader_parameter("beam_color", color)
+	_set_portal_beam_progress(0.0)
+	_portal_beam_tween = create_tween().bind_node(self)
+	# 预热、突破、持续流动、过曝峰值；阶段分离避免短促的一次性淡入。
+	_portal_beam_tween.tween_method(
+			_set_portal_beam_progress, 0.0, 0.22, safe_duration * 0.24
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_portal_beam_tween.tween_method(
+			_set_portal_beam_progress, 0.22, 0.64, safe_duration * 0.34
+	).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	_portal_beam_tween.tween_method(
+			_set_portal_beam_progress, 0.64, 0.90, safe_duration * 0.28
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_portal_beam_tween.tween_method(
+			_set_portal_beam_progress, 0.90, 1.0, safe_duration * 0.14
+	).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
+	await _portal_beam_tween.finished
+	if is_instance_valid(self):
+		_set_portal_beam_progress(1.0)
+
+
+func _set_portal_beam_progress(value: float) -> void:
+	_portal_beam_progress = clampf(value, 0.0, 1.0)
+	if portal_beam_material != null:
+		portal_beam_material.set_shader_parameter("beam_phase", _portal_beam_progress)
 
 
 func reset_portal_energy() -> void:
-	if _portal_energy_tween != null and _portal_energy_tween.is_valid():
-		_portal_energy_tween.kill()
-	_portal_energy_tween = create_tween().bind_node(self)
-	_portal_energy_tween.tween_method(
-			_set_portal_energy_mix, _portal_energy_mix, 0.0, 0.20
-	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_kill_portal_energy_tweens()
+	if _portal_beam_tween != null and _portal_beam_tween.is_valid():
+		_portal_beam_tween.kill()
+	if portal_beam != null:
+		portal_beam.visible = false
+	_set_portal_beam_progress(0.0)
+	_portal_connection_complete = false
+	_portal_energy_color = Color.WHITE
+	for index: int in _portal_stone_materials.size():
+		_portal_stone_materials[index].set_shader_parameter("energy_color", Color.WHITE)
+		var fade := create_tween().bind_node(self)
+		fade.tween_method(_set_portal_stone_energy_level.bind(index),
+				_portal_energy_levels[index], 0.0, 0.20
+		).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		_portal_energy_tweens.append(fade)
 
 
 func _set_portal_energy_mix(value: float) -> void:
-	_portal_energy_mix = clampf(value, 0.0, 1.0)
-	for stone_material: ShaderMaterial in _portal_stone_materials:
-		stone_material.set_shader_parameter("energy_mix", _portal_energy_mix)
+	for index: int in _portal_energy_levels.size():
+		_set_portal_stone_energy_level(value, index)
+	_portal_connection_complete = value >= 0.999
+
+
+func _prepare_portal_energy(color: Color) -> void:
+	_kill_portal_energy_tweens()
+	_portal_energy_color = color
+	_portal_connection_complete = false
+	for index: int in _portal_stone_materials.size():
+		_portal_stone_materials[index].set_shader_parameter("energy_color", color)
+		_portal_stone_materials[index].set_shader_parameter("activation_flash", 0.0)
+		_set_portal_stone_energy_level(0.0, index)
+
+
+func _schedule_portal_ignite(index: int, delay: float) -> void:
+	var ignite := create_tween().bind_node(self)
+	ignite.tween_interval(maxf(delay, 0.0))
+	ignite.tween_method(_set_portal_stone_energy_level.bind(index),
+			0.0, 0.34, 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	ignite.tween_method(_set_portal_stone_energy_level.bind(index),
+			0.34, 0.12, 0.06).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	ignite.tween_method(_set_portal_stone_energy_level.bind(index),
+			0.12, 1.0, PORTAL_IGNITE_DURATION - 0.14
+	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_portal_energy_tweens.append(ignite)
+
+
+func _set_portal_stone_energy_level(value: float, index: int) -> void:
+	if index < 0 or index >= _portal_energy_levels.size():
+		return
+	var level: float = clampf(value, 0.0, 1.0)
+	_portal_energy_levels[index] = level
+	_portal_stone_materials[index].set_shader_parameter("energy_mix", level)
+	_portal_stone_materials[index].set_shader_parameter(
+			"activation_flash", sin(level * PI) * 0.72)
+	var total: float = 0.0
+	for energy_level: float in _portal_energy_levels:
+		total += energy_level
+	_portal_energy_mix = total / float(maxi(_portal_energy_levels.size(), 1))
+
+
+func _set_portal_activation_flash(value: float, index: int) -> void:
+	if index >= 0 and index < _portal_stone_materials.size():
+		_portal_stone_materials[index].set_shader_parameter(
+				"activation_flash", clampf(value, 0.0, 1.0))
+
+
+func _kill_portal_energy_tweens() -> void:
+	if _portal_sequence_tween != null and _portal_sequence_tween.is_valid():
+		_portal_sequence_tween.kill()
+	for energy_tween: Tween in _portal_energy_tweens:
+		if energy_tween != null and energy_tween.is_valid():
+			energy_tween.kill()
+	_portal_energy_tweens.clear()
 
 
 func _build_atmosphere() -> void:
@@ -318,7 +519,7 @@ func _build_atmosphere() -> void:
 func _layout_view() -> void:
 	if map_view == null:
 		return
-	# 主界面使用 1920×1080 设计坐标；15×9 格已经精确铺满，不再按临时
+	# 主界面使用 1920×1080 设计坐标；19×11 格已经精确铺满，不再按临时
 	# headless viewport 尺寸居中，否则会重新露出兜底外圈。
 	map_view.position = Vector2.ZERO
 	_update_camera_for_token_origin(_token_origin_for_cell(_current_cell))
@@ -333,7 +534,7 @@ func _update_camera_for_token_origin(token_origin: Vector2) -> void:
 	map_world.position = Vector2(
 			clampf(desired.x, VIEW_SIZE.x - rendered_map_size.x, 0.0),
 			clampf(desired.y, VIEW_SIZE.y - rendered_map_size.y, 0.0)
-	).round()
+	)
 	var camera_world_origin := -map_world.position / MAP_RENDER_SCALE
 	atmosphere_layer.position = camera_world_origin
 	atmosphere_material.set_shader_parameter("camera_world_origin_px", camera_world_origin)
@@ -473,6 +674,7 @@ func reset_home() -> void:
 func request_move_to_cell(destination_cell: Vector2i) -> bool:
 	if _transition_active or _grid_movement == null:
 		return false
+	_pending_blocked_stone_index = -1
 	return _grid_movement.request_path(destination_cell)
 
 
@@ -483,12 +685,12 @@ func request_step(direction: Vector2i) -> bool:
 
 
 func _is_main_cell_walkable(cell: Vector2i) -> bool:
-	return MAP_BOUNDS.has_point(cell)
+	return MAP_BOUNDS.has_point(cell) and not PORTAL_STONE_CELLS.has(cell)
 
 
 func _commit_main_step(direction: Vector2i) -> Dictionary:
 	var next_cell: Vector2i = _grid_movement.current_cell + direction
-	var moved: bool = MAP_BOUNDS.has_point(next_cell)
+	var moved: bool = _is_main_cell_walkable(next_cell)
 	return {
 		"moved": moved,
 		"kind": "move" if moved else "blocked",
@@ -496,26 +698,189 @@ func _commit_main_step(direction: Vector2i) -> Dictionary:
 	}
 
 
+func _on_shared_step_attempted(from_cell: Vector2i, direction: Vector2i,
+		result: Dictionary) -> void:
+	if bool(result.get("moved", false)):
+		return
+	var blocked_cell: Vector2i = from_cell + direction
+	var stone_index: int = PORTAL_STONE_CELLS.find(blocked_cell)
+	if stone_index >= 0:
+		_play_portal_blocked_feedback(Vector2(direction), stone_index)
+
+
+func _play_portal_blocked_feedback(direction: Vector2, stone_index: int) -> void:
+	if stone_index < 0 or stone_index >= portal_stones.size():
+		return
+	if _blocked_feedback_tween != null and _blocked_feedback_tween.is_valid():
+		_blocked_feedback_tween.kill()
+	if _blocked_stone_index >= 0 and _blocked_stone_index < _portal_stone_impact_offsets.size():
+		_portal_stone_impact_offsets[_blocked_stone_index] = Vector2.ZERO
+		_portal_stone_materials[_blocked_stone_index].set_shader_parameter(
+				"impact_pulse", 0.0)
+	_blocked_stone_index = stone_index
+	_blocked_feedback_direction = direction.normalized()
+	if _grid_movement != null and not is_zero_approx(_blocked_feedback_direction.x):
+		var facing: float = signf(_blocked_feedback_direction.x)
+		_grid_movement.facing_sign = facing
+		_grid_movement.turn_from_sign = facing
+		_grid_movement.turn_target_sign = facing
+		_grid_movement.turn_active = false
+	_set_portal_block_feedback(0.0, _blocked_feedback_direction, stone_index)
+	_blocked_feedback_tween = create_tween().bind_node(self)
+	_blocked_feedback_tween.tween_method(
+			_set_portal_block_feedback.bind(_blocked_feedback_direction, stone_index),
+			0.0, 1.0, 0.07).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_blocked_feedback_tween.tween_method(
+			_set_portal_block_feedback.bind(_blocked_feedback_direction, stone_index),
+			1.0, 0.0, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+func _set_portal_block_feedback(value: float, direction: Vector2,
+		stone_index: int) -> void:
+	_blocked_feedback_strength = clampf(value, 0.0, 1.0)
+	_blocked_feedback_direction = direction
+	if stone_index < 0 or stone_index >= _portal_stone_impact_offsets.size():
+		return
+	_portal_stone_impact_offsets[stone_index] = direction * roundf(
+			_blocked_feedback_strength * PORTAL_BLOCK_RECOIL_DISTANCE)
+	_portal_stone_materials[stone_index].set_shader_parameter(
+			"impact_pulse", _blocked_feedback_strength)
+
+
 func _on_shared_step_committed(_from_cell: Vector2i, to_cell: Vector2i,
 		direction: Vector2i, _result: Dictionary) -> void:
 	_current_cell = to_cell
 	_move_direction = Vector2(direction)
+	_refresh_route_preview()
 
 
 func _on_shared_movement_finished(cell: Vector2i, completed: bool) -> void:
 	_current_cell = cell
+	if completed and _pending_blocked_stone_index >= 0:
+		var stone_index: int = _pending_blocked_stone_index
+		_pending_blocked_stone_index = -1
+		var direction: Vector2i = PORTAL_STONE_CELLS[stone_index] - _current_cell
+		if absi(direction.x) + absi(direction.y) == 1:
+			_play_portal_blocked_feedback(Vector2(direction), stone_index)
+	else:
+		_pending_blocked_stone_index = -1
 	movement_finished.emit(cell, completed)
 
 
 func _on_map_view_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		_set_hovered_cell(_cell_from_view_position((event as InputEventMouseMotion).position))
+		return
 	if not (event is InputEventMouseButton):
 		return
 	var mouse_button := event as InputEventMouseButton
 	if not mouse_button.pressed or mouse_button.button_index != MOUSE_BUTTON_LEFT:
 		return
 	var destination_cell: Vector2i = _cell_from_view_position(mouse_button.position)
+	if PORTAL_STONE_CELLS.has(destination_cell):
+		_request_move_to_portal_stone(PORTAL_STONE_CELLS.find(destination_cell))
+		map_view.accept_event()
+		return
 	if request_move_to_cell(destination_cell):
 		map_view.accept_event()
+
+
+func _request_move_to_portal_stone(stone_index: int) -> bool:
+	if stone_index < 0 or stone_index >= PORTAL_STONE_CELLS.size():
+		return false
+	var stone_cell: Vector2i = PORTAL_STONE_CELLS[stone_index]
+	var direction: Vector2i = stone_cell - _current_cell
+	if absi(direction.x) + absi(direction.y) == 1:
+		_pending_blocked_stone_index = -1
+		_play_portal_blocked_feedback(Vector2(direction), stone_index)
+		return true
+	var approach: Dictionary = _find_portal_approach(stone_cell)
+	var destination := Vector2i(approach.get("destination", Vector2i(-1, -1)))
+	if destination == Vector2i(-1, -1):
+		return false
+	_pending_blocked_stone_index = stone_index
+	if not _grid_movement.request_path(destination):
+		_pending_blocked_stone_index = -1
+		return false
+	return true
+
+
+func _find_portal_approach(stone_cell: Vector2i) -> Dictionary:
+	var best_path: Array[Vector2i] = []
+	var best_destination := Vector2i(-1, -1)
+	for direction: Vector2i in GridPathfinderScript.CARDINAL_DIRECTIONS:
+		var candidate: Vector2i = stone_cell + direction
+		if not _is_main_cell_walkable(candidate):
+			continue
+		var candidate_path: Array[Vector2i] = GridPathfinderScript.find_path(
+				_current_cell, candidate, MAP_BOUNDS, _is_main_cell_walkable)
+		if candidate != _current_cell and candidate_path.is_empty():
+			continue
+		if best_destination == Vector2i(-1, -1) \
+				or candidate_path.size() < best_path.size():
+			best_destination = candidate
+			best_path = candidate_path
+	return {"destination": best_destination, "path": best_path}
+
+
+func _set_hovered_cell(cell: Vector2i) -> void:
+	if cell == _hovered_cell:
+		return
+	_hovered_cell = cell
+	_refresh_route_preview()
+
+
+func _clear_route_preview() -> void:
+	_hovered_cell = Vector2i(-1, -1)
+	_hovered_path.clear()
+	if route_target_outline != null:
+		route_target_outline.visible = false
+	if route_preview_art != null:
+		route_preview_art.queue_redraw()
+
+
+func _refresh_route_preview() -> void:
+	_hovered_path.clear()
+	if _hovered_cell == Vector2i(-1, -1) or _grid_movement == null:
+		if route_target_outline != null:
+			route_target_outline.visible = false
+		if route_preview_art != null:
+			route_preview_art.queue_redraw()
+		return
+	if route_target_outline != null:
+		route_target_outline.position = Vector2(_hovered_cell) * MAP_CELL
+		route_target_outline.visible = true
+		route_target_material.set_shader_parameter("target_color",
+				Color("F09A78") if not _is_main_cell_walkable(_hovered_cell)
+				else Color("FFE0A0"))
+	if PORTAL_STONE_CELLS.has(_hovered_cell):
+		var approach: Dictionary = _find_portal_approach(_hovered_cell)
+		_hovered_path.assign(approach.get("path", []))
+		_hovered_path.append(_hovered_cell)
+	elif _is_main_cell_walkable(_hovered_cell):
+		_hovered_path = GridPathfinderScript.find_path(
+				_current_cell, _hovered_cell, MAP_BOUNDS, _is_main_cell_walkable)
+	if route_preview_art != null:
+		route_preview_art.queue_redraw()
+
+
+func _draw_route_preview() -> void:
+	if _hovered_cell == Vector2i(-1, -1):
+		return
+	if _hovered_path.is_empty():
+		return
+	var route_cells: Array[Vector2i] = [_current_cell]
+	route_cells.append_array(_hovered_path)
+	var curve: PackedVector2Array = GridRoutePreviewScript.build_curve(
+			route_cells, MAP_CELL, 12.0, 4)
+	var phase: float = fposmod(_anim_time * 42.0, 24.0)
+	for marker: PackedVector2Array in GridRoutePreviewScript.build_markers(
+			curve, 24.0, phase, 10.0):
+		var start: Vector2 = marker[0].round()
+		var finish: Vector2 = marker[1].round()
+		route_preview_art.draw_line(start, finish, Color("FFE0A0E6"), 6.0, false)
+		route_preview_art.draw_circle(start, 3.0, Color("FFE0A0E6"), true, -1.0, false)
+		route_preview_art.draw_circle(finish, 3.0, Color("FFE0A0E6"), true, -1.0, false)
 
 
 func _cell_from_view_position(view_position: Vector2) -> Vector2i:
@@ -529,14 +894,6 @@ func _cell_from_view_position(view_position: Vector2) -> Vector2i:
 func _view_position_for_cell(cell: Vector2i) -> Vector2:
 	return map_world.position + (Vector2(cell) + Vector2.ONE * 0.5) \
 			* RENDERED_CELL_SIZE
-
-
-func _unhandled_input(event: InputEvent) -> void:
-	var direction: Vector2i = GridMovementControllerScript.direction_from_key(event)
-	if direction == Vector2i.ZERO:
-		return
-	if request_step(direction):
-		get_viewport().set_input_as_handled()
 
 
 func flash_destination(destination_id: String) -> void:
@@ -581,12 +938,24 @@ func get_visual_contract() -> Dictionary:
 		"portal_float_amplitude": PORTAL_FLOAT_AMPLITUDE,
 		"portal_float_period": PORTAL_FLOAT_PERIOD,
 		"portal_activation_duration": PORTAL_ACTIVATION_DURATION,
+		"portal_blocked_cells": PORTAL_STONE_CELLS,
 		"portal_energy_mix": _portal_energy_mix,
 		"portal_energy_color": _portal_energy_color,
+		"portal_energy_levels": _portal_energy_levels.duplicate(),
+		"portal_connection_complete": _portal_connection_complete,
+		"portal_beam_rect": Rect2(portal_beam.position, portal_beam.size) \
+				if portal_beam != null else Rect2(),
+		"portal_beam_base_rect": Rect2(
+				VIEW_SIZE * 0.5 - RENDERED_CELL_SIZE * 1.5,
+				RENDERED_CELL_SIZE * 3.0),
+		"portal_beam_visible": portal_beam != null and portal_beam.visible,
+		"portal_beam_progress": _portal_beam_progress,
+		"portal_blocked_feedback_strength": _blocked_feedback_strength,
 		"current_cell": _current_cell,
 		"click_to_move": map_view != null and map_view.gui_input.is_connected(
 				_on_map_view_gui_input),
-		"wasd_to_move": true,
+		"wasd_to_move": false,
+		"route_preview_connected": route_preview_art != null,
 		"shared_movement_controller": _grid_movement != null,
 		"movement_controller_script": _grid_movement.get_script().resource_path \
 				if _grid_movement != null else "",
@@ -618,6 +987,8 @@ func _process(delta: float) -> void:
 		atmosphere_material.set_shader_parameter("anim_time", _anim_time)
 	if not _focused_destination.is_empty() or not _selected_destination.is_empty():
 		marker_art.queue_redraw()
+	if _hovered_cell != Vector2i(-1, -1) and route_preview_art != null:
+		route_preview_art.queue_redraw()
 
 
 func _update_portal_stones() -> void:
@@ -627,9 +998,11 @@ func _update_portal_stones() -> void:
 				* PORTAL_FLOAT_AMPLITUDE
 		_portal_stone_lifts[index] = lift
 		portal_stones[index].position = _portal_stone_home_positions[index] \
-				+ Vector2(0.0, lift)
+				+ Vector2(0.0, lift) + _portal_stone_impact_offsets[index]
 		_portal_stone_materials[index].set_shader_parameter("anim_time", _anim_time)
 		portal_stone_shadows[index].queue_redraw()
+	if portal_beam_material != null:
+		portal_beam_material.set_shader_parameter("anim_time", _anim_time)
 
 
 func _apply_shared_movement_visual() -> void:
@@ -639,14 +1012,17 @@ func _apply_shared_movement_visual() -> void:
 	_current_logical_origin = _grid_movement.visual_origin
 	var rendered_origin: Vector2 = _grid_movement.quantized_visual_origin()
 	var step_offset: Vector2 = _grid_movement.step_offset()
-	_current_token_origin = rendered_origin + step_offset
+	var blocked_offset: Vector2 = _blocked_feedback_direction * roundf(
+			_blocked_feedback_strength * PORTAL_BLOCK_LEAN_DISTANCE)
+	_current_token_origin = rendered_origin + step_offset + blocked_offset
 	_move_direction = _grid_movement.step_direction
 	_shadow_lift = sin(_grid_movement.step_progress() * PI) \
 			if _grid_movement.step_active else 0.0
 	player_token.position = _current_token_origin
-	player_token.rotation = _grid_movement.token_rotation()
+	player_token.rotation = _grid_movement.token_rotation() \
+			+ _blocked_feedback_direction.x * _blocked_feedback_strength * 0.018
 	player_token.scale = _token_scale_for_render(_grid_movement.token_scale())
-	player_shadow.position = rendered_origin - TOKEN_OFFSET
+	player_shadow.position = rendered_origin - TOKEN_OFFSET + blocked_offset * 0.35
 	var foot_y: int = roundi(rendered_origin.y + TOKEN_FOOT_ANCHOR.y)
 	player_shadow.z_index = foot_y - 1
 	player_token.z_index = foot_y

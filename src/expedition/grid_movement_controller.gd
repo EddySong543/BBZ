@@ -1,8 +1,8 @@
 class_name GridMovementController
 extends RefCounted
 
-## 主界面与远征共用的格子移动核心：键盘立即提交逻辑格，点击路径逐格等待视觉落稳，
-## 角色视觉以与远征一致的临界阻尼连续追赶最新目标。
+## 主界面与远征共用的格子移动核心：点击路径在接近格心时连续衔接下一格，
+## 包括转弯也沿用同一临界阻尼速度，不在拐角等待视觉坐标完全收敛。
 
 signal step_committed(
 		from_cell: Vector2i,
@@ -17,6 +17,7 @@ const GridPathfinderScript := preload("res://src/expedition/grid_pathfinder.gd")
 const CRITICAL_DAMPING: float = 18.0
 const MAX_FRAME_STEP: float = 1.0 / 20.0
 const SNAP_DISTANCE: float = 0.05
+const CHAIN_PROGRESS: float = 0.94
 const LOGICAL_PIXEL_STEP: float = 5.0
 const HOP_STEPS: float = 2.0
 const WOBBLE_AMPLITUDE: float = 0.026
@@ -50,6 +51,7 @@ var _can_enter: Callable
 var _commit_step: Callable
 var _route: Array[Vector2i] = []
 var _route_destination: Vector2i = Vector2i(-1, -1)
+var _keyboard_buffered_direction: Vector2i = Vector2i.ZERO
 var _keyboard_finish_pending: bool = false
 
 
@@ -72,6 +74,7 @@ func snap_to_cell(cell: Vector2i) -> void:
 	step_active = false
 	turn_active = false
 	cancel_route()
+	_keyboard_buffered_direction = Vector2i.ZERO
 	_keyboard_finish_pending = false
 
 
@@ -89,8 +92,13 @@ func request_keyboard_step(direction: Vector2i) -> String:
 	if absi(direction.x) + absi(direction.y) != 1:
 		return "blocked"
 	cancel_route()
-	last_result_kind = _commit_direction(direction)
 	_keyboard_finish_pending = true
+	if is_moving():
+		# OS按键回显只保留最后一个意图；不能在视觉尚未追上时提前结算整串格子。
+		_keyboard_buffered_direction = direction
+		last_result_kind = "queued"
+		return last_result_kind
+	last_result_kind = _commit_direction(direction)
 	return last_result_kind
 
 
@@ -104,6 +112,7 @@ func request_path(destination: Vector2i) -> bool:
 		return false
 	_route_destination = destination
 	route_active = true
+	_keyboard_buffered_direction = Vector2i.ZERO
 	_keyboard_finish_pending = false
 	return true
 
@@ -112,26 +121,51 @@ func cancel_route() -> void:
 	_route.clear()
 	route_active = false
 	_route_destination = Vector2i(-1, -1)
+	_keyboard_buffered_direction = Vector2i.ZERO
 
 
 func process(delta: float) -> void:
 	_step_visual(delta)
-	if is_moving():
-		return
 	if route_active:
 		if _route.is_empty():
+			if is_moving():
+				return
 			var completed: bool = current_cell == _route_destination
 			route_active = false
 			movement_finished.emit(current_cell, completed)
 			return
-		var next_cell: Vector2i = _route.pop_front()
+		var next_cell: Vector2i = _route.front()
+		var route_direction: Vector2i = next_cell - current_cell
+		if not _can_chain_direction(route_direction):
+			return
+		_route.pop_front()
 		var result_kind: String = _commit_direction(next_cell - current_cell)
 		if result_kind != "move":
 			_route.clear()
 		return
+	if _keyboard_buffered_direction != Vector2i.ZERO:
+		if not _can_chain_direction(_keyboard_buffered_direction):
+			return
+		var buffered_direction: Vector2i = _keyboard_buffered_direction
+		_keyboard_buffered_direction = Vector2i.ZERO
+		last_result_kind = _commit_direction(buffered_direction)
+		if is_moving():
+			return
+	if is_moving():
+		return
 	if _keyboard_finish_pending:
 		_keyboard_finish_pending = false
 		movement_finished.emit(current_cell, last_result_kind != "blocked")
+
+
+func _can_chain_direction(_direction: Vector2i) -> bool:
+	if not is_moving():
+		return true
+	if not step_active or step_progress() < CHAIN_PROGRESS:
+		return false
+	# 临界阻尼只会渐近目标；若转弯必须等 is_moving() 归零，每个拐角都会多停一拍。
+	# 在接近格心时保留现有速度并切换目标，形成短促自然的圆角，而不跳过逻辑格。
+	return true
 
 
 func is_moving() -> bool:
@@ -219,6 +253,7 @@ func _commit_direction(direction: Vector2i) -> String:
 	var target_cell: Vector2i = current_cell + direction
 	if absi(direction.x) + absi(direction.y) != 1 or not bounds.has_point(target_cell):
 		last_result_kind = "blocked"
+		_face_blocked_attempt(direction)
 		step_attempted.emit(current_cell, direction, {
 			"moved": false,
 			"kind": last_result_kind,
@@ -230,6 +265,7 @@ func _commit_direction(direction: Vector2i) -> String:
 	var result: Dictionary = result_value as Dictionary if result_value is Dictionary else {}
 	if not bool(result.get("moved", false)):
 		last_result_kind = String(result.get("kind", "blocked"))
+		_face_blocked_attempt(direction)
 		step_attempted.emit(from_cell, direction, result)
 		return last_result_kind
 	current_cell = Vector2i(result.get("cell", target_cell))
@@ -238,6 +274,15 @@ func _commit_direction(direction: Vector2i) -> String:
 	step_attempted.emit(from_cell, direction, result)
 	step_committed.emit(from_cell, current_cell, direction, result)
 	return last_result_kind
+
+
+func _face_blocked_attempt(direction: Vector2i) -> void:
+	if direction.x == 0:
+		return
+	facing_sign = signf(float(direction.x))
+	turn_from_sign = facing_sign
+	turn_target_sign = facing_sign
+	turn_active = false
 
 
 func _begin_visual_step(next_target: Vector2, direction: Vector2i) -> void:

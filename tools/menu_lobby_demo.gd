@@ -157,12 +157,10 @@ func _build_cards(layer: Control) -> void:
 	_text(layer, "偷取对手 1 点能量", 17, Color("#aab8c8"), Vector2(212, 654), 280)
 
 
-# ── ③ 右下对战区：爬塔 / 故事 各一行 + 匹配对战大钮 ──
+# ── ③ 右下对战区：爬塔 + 匹配对战大钮 ──
 func _build_battle_zone(layer: Control) -> void:
-	_plate(layer, Rect2(1496, 736, 360, 76), TIER_STEEL)
-	_text(layer, "爬塔模式", 28, Color("#d4dce8"), Vector2(1496, 756), 360, HORIZONTAL_ALIGNMENT_CENTER)
 	_plate(layer, Rect2(1496, 828, 360, 76), TIER_STEEL)
-	_text(layer, "故事模式", 28, Color("#d4dce8"), Vector2(1496, 848), 360, HORIZONTAL_ALIGNMENT_CENTER)
+	_text(layer, "爬塔模式", 28, Color("#d4dce8"), Vector2(1496, 848), 360, HORIZONTAL_ALIGNMENT_CENTER)
 	var cta := _plate(layer, Rect2(1396, 920, 460, 120), TIER_GOLD)
 	cta.modulate = Color(1.12, 1.06, 0.92)   # 主 CTA 呼吸光中间帧
 	_text(layer, "匹配对战", 44, Color("#fff3d0"), Vector2(1396, 952), 460, HORIZONTAL_ALIGNMENT_CENTER)

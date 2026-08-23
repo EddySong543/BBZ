@@ -60,6 +60,7 @@ func test_bridge_apply_flee_writes_all_opponent_hp_and_retreats() -> void:
 	var map: MapState = _map(777)
 	var cell: Vector2i = _inject_encounter(map)
 	var back: Vector2i = map.start_pos
+	var explored_before_flee: Dictionary = map.revealed.duplicate()
 
 	map.apply_battle_result(cell, "flee", 4, [4], [3, 8], back)
 
@@ -67,10 +68,9 @@ func test_bridge_apply_flee_writes_all_opponent_hp_and_retreats() -> void:
 	assert_almost_eq(float(opponents[0]["hp"]), 1.5, 0.01)
 	assert_almost_eq(float(opponents[1]["hp"]), 4.0, 0.01)
 	assert_eq(map.player, back, "玩家退回进入战斗前的格子")
-	assert_true(map.visible.has(back), "脱离战斗后视野必须重新以退回格为中心")
-	for visible_cell: Vector2i in map.visible:
-		var delta: Vector2i = visible_cell - back
-		assert_true(MapState.vision_contains_delta(delta))
+	assert_true(map.revealed.has(back), "脱离战斗后退回格保持清雾")
+	for explored_cell: Vector2i in explored_before_flee:
+		assert_true(map.revealed.has(explored_cell), "战斗回退不能重新盖住已探索地图")
 	assert_false(map.over)
 
 

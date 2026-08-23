@@ -7,13 +7,15 @@
 ## 设计规范：design/ui-design-system.md（全暖色系·暖骨框·Z工坊像素黑体·⛔夜色衬底）。
 ## 规则源：design/expedition-map.md / expedition-backpack.md。逻辑层 = expedition_map_state / expedition_backpack_state。
 ##
-## 操作：WASD/方向键移动 ｜ E/F 互动 ｜ B 背包浮层 ｜ 浮层内：左键拾/放·R 旋转·右键放回·U 用消耗品·X 丢弃 ｜ ESC 关浮层/返回。
+## 操作：左键选格并移动 ｜ E/F 互动 ｜ B 背包浮层 ｜ 浮层内：左键拾/放·R 旋转·右键放回·U 用消耗品·X 丢弃 ｜ ESC 关浮层/返回。
 extends Control
 
 signal movement_finished(cell: Vector2i, completed: bool)
 
 const MapState := preload("res://src/expedition/expedition_map_state.gd")
 const GridMovementControllerScript := preload("res://src/expedition/grid_movement_controller.gd")
+const GridPathfinderScript := preload("res://src/expedition/grid_pathfinder.gd")
+const GridRoutePreviewScript := preload("res://src/expedition/grid_route_preview.gd")
 const QingfengLayout := preload("res://src/expedition/maps/qingfeng_ricefield_layout.gd")
 const Backpack := preload("res://src/expedition/expedition_backpack_state.gd")
 const SearchState := preload("res://src/expedition/expedition_search_state.gd")
@@ -24,6 +26,8 @@ const HeroDataScript := preload("res://src/battle/hero_data.gd")   # class_name 
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")
 const TERRAIN_SHADER := preload("res://assets/shaders/canvas_ui_expedition_terrain.gdshader")
 const GROUND_CELL_SHADER := preload("res://assets/shaders/canvas_ui_expedition_ground_cell.gdshader")
+const GRID_TARGET_OUTLINE_SHADER := preload(
+		"res://assets/shaders/canvas_ui_grid_target_outline.gdshader")
 const ATMOSPHERE_SHADER := preload("res://assets/shaders/canvas_ui_qingfeng_atmosphere.gdshader")
 const JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")           # 按钮果冻底（与战斗/道具弹窗同语言）
 const ITEM_CELL_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")    # 道具格底（与 PvP 道具格同源·圆角径向渐变）
@@ -32,18 +36,18 @@ const QINGFENG_VISUAL_MAP_SCENE := preload("res://src/expedition/maps/qingfeng_r
 
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
 
-# ── 布局（1920×1080·完整13×7视窗 / 32×18 晴风稻田）──
-# 逻辑格仍为120px，屏幕显示为144px；奇数行列让静止镜头始终对齐完整格。
-# 地图区1872×1008，四周留24/36px边距，不裁半格。
+# ── 布局（1920×1080·临时完整19×11视窗 / 32×18 晴风稻田）──
+# 逻辑格仍为120px，屏幕显示为96px；奇数行列让中心3×3严格位于视窗正中。
+# 地图区1824×1056，四周留48/12px边距，不裁半格。
 const MAP_CELL: int = 120
-const MAP_VIEW_COLS: int = 13
-const MAP_VIEW_ROWS: int = 7
-const MAP_RENDER_SCALE: float = 1.2
+const MAP_VIEW_COLS: int = 19
+const MAP_VIEW_ROWS: int = 11
+const MAP_RENDER_SCALE: float = 0.8
 const MAP_VIEW_SIZE := Vector2(
 		MAP_VIEW_COLS * MAP_CELL, MAP_VIEW_ROWS * MAP_CELL) * MAP_RENDER_SCALE
 const MAP_WORLD_SIZE := Vector2(MapState.WIDTH * MAP_CELL, MapState.HEIGHT * MAP_CELL)
 const MAP_VIEW_WORLD_SIZE := MAP_VIEW_SIZE / MAP_RENDER_SCALE
-const MAP_VIEW_ORIGIN := Vector2(24, 36)
+const MAP_VIEW_ORIGIN := Vector2(48, 12)
 # h01 原图双脚是全部 idle 资产的公共骨架基准：左脚(116.5,182)、右脚(139.5,182)。
 # 所有英雄使用同一原图缩放和同一坐标变换，不再被武器、披风或透明轮廓改变大小/锚点。
 const H01_SOURCE_LEFT_FOOT := Vector2(116.5, 182.0)
@@ -79,22 +83,22 @@ const BP_CELL: int = 52
 const SEL_PANEL := Rect2(440, 140, 1040, 800)
 
 # ── 色板（§2 令牌：暖骨框 / 暖米白字 / 语义色·全暖色系=Eddy 定·⛔夜色衬底）──
-const COL_BG := Color("0b1c18")            # 选人/浮层之外的兜底色；进图后由16×9地图完全覆盖
+const COL_BG := Color("0b1c18")            # 选人/浮层之外的兜底色；进图后由19×11地图覆盖
 const COL_PANEL := Color("241c12")         # 暖色深底面板
 const COL_TEXT := Color(0.95, 0.91, 0.80)  # 暖米白（禁纯白）
 const COL_TEXT_DIM := Color(0.72, 0.68, 0.58)
 const COL_FLOOR := Color("2e2417")         # 地表/迷雾全色板已入 terrain shader uniform 默认值
 const COL_MONSTER := Color("d24a44")       # 阵营红系（角宝石红）
 const COL_EVENT := Color("9b86d8")         # 干扰紫提亮档
-const COL_CHEST := Color("dca12e")         # 传说金
+const COL_CHEST := ItemCatalog.RARITY_LEGENDARY  # 传说金（道具稀有度 C 方案）
 const COL_EXT_OPEN := Color("5cb863")      # 确认绿
 const COL_EXT_CLOSED := Color("8a8f98")    # 随机灰
 const COL_PLAYER := Color("f2e08a")        # 亮金
 const COL_BONE := Color("b3a386")          # 暖骨
 const COL_GOLD_ITEM := Color("b08a3a")
-const COL_COMBAT_ITEM := Color("4a7bc0")   # 普通蓝（稀有度语义）
+const COL_COMBAT_ITEM := ItemCatalog.RARITY_NORMAL  # 普通蓝（稀有度语义）
 const COL_CONSUM_ITEM := Color("4f9d52")   # 状态绿
-const COL_RARE_ITEM := Color("8a4fc4")     # 稀有紫
+const COL_RARE_ITEM := ItemCatalog.RARITY_RARE  # 稀有紫
 const COL_OK := Color(0.4, 0.9, 0.5, 0.55)
 const COL_BAD := Color(0.95, 0.35, 0.3, 0.55)
 const GROUND_GRASS_DARK_INDEX: int = 0
@@ -139,7 +143,9 @@ const FOG_EXTENSION_SEAM_PX: float = 2.0
 const PLAYER_SHADOW_BASE_WIDTH: float = 62.0
 const PLAYER_SHADOW_MIN_WIDTH: float = 42.0
 const PLAYER_SHADOW_MAIN_COLOR := Color(0.025, 0.070, 0.050, 0.46)
-const LIMITED_VISIBILITY_ENABLED: bool = false
+const FOG_OF_WAR_ENABLED: bool = true
+const FOG_REVEAL_DURATION: float = 0.46
+const FOG_REVEAL_STAGGER_PER_CELL: float = 0.035
 
 var map: MapState
 var bp: Backpack
@@ -179,7 +185,7 @@ var test_next_hero_button: Button
 var player_backdrop: Control       # 人物脚底粗像素接触影；不参与跳步
 var player_token: TextureRect      # 英雄 idle 帧 token；静止时不叠加代码摇摆
 var teleport_fx: Control           # 传送点占用态前景动效；必须压在角色之上才不会被头像遮住
-var map_view: Control              # 屏幕空间精确13×7完整正方形格裁切窗口
+var map_view: Control              # 屏幕空间临时19×11完整正方形格裁切窗口
 var map_world: Control             # 32×18 世界容器；由镜头在完整格视窗内跟随
 var ground_art: Control            # 地表：草地、泥土
 var visual_map: Node2D             # Godot 2D面板可直接刷格的分层地图；Ground作为运行时美术数据源
@@ -188,18 +194,22 @@ var ground_cell_mat: ShaderMaterial # 统一格体：方形资产在运行时裁
 var foliage_art: Control           # 物体子层：草地上独立金色稻穗（后续可单独做拨动/摆动）
 var field_chaff: GPUParticles2D     # 大型金色稻壳/断叶，位于麦穗之上、搜索物之下
 var object_art: Control            # 物体：田界、搜索容器
-var atmosphere_layer: ColorRect    # 当前视野内的斜向日照与缓慢云影
+var atmosphere_layer: ColorRect    # 已清雾地图内的斜向日照与缓慢云影
 var atmosphere_mat: ShaderMaterial
 var marker_art: Control            # 标识：搜索目标等运行时状态
+var route_preview_art: Control     # 鼠标悬停目标格与弯曲虚线路径
+var route_target_outline: ColorRect
+var route_target_material: ShaderMaterial
 var canvas: Control                # 世界空间地图图签画布
 var bp_canvas: Control             # 屏幕空间背包物品/手持幽灵画布
 
 # ── 地形层（数据纹理驱动·地表/迷雾/揭示全在 shader）──
 var fx_layer: Control              # 地图动效层（飘字/格闪·压 token 之上·G 任务）
 var terrain_mat: ShaderMaterial
-var _terrain_img: Image            # WIDTH×HEIGHT RGBAF（R=地形类 G=当前可见 B=进入视野时刻）
+var _terrain_img: Image            # WIDTH×HEIGHT RGBAF（R=遮挡 G=已清雾 B=散开起始时刻 A=保留）
 var _terrain_tex: ImageTexture
-var _reveal_time: Dictionary = {}  # Vector2i -> float 进入当前视野的时刻（离开后擦除）
+var _fog_known_revealed: Dictionary = {}
+var _fog_reveal_time: Dictionary = {}
 var _anim_time: float = 0.0        # shader/token 统一时钟
 var _camera_initialized: bool = false
 var _camera_visual_token_origin: Vector2 = Vector2.ZERO
@@ -217,6 +227,8 @@ var _token_turn_active: bool = false
 var _queued_move_direction: Vector2i = Vector2i.ZERO
 var _click_route_active: bool = false
 var _grid_movement: GridMovementController
+var _hovered_map_cell: Vector2i = Vector2i(-1, -1)
+var _hovered_map_path: Array[Vector2i] = []
 var _wheat_wave_pulses: Array[Dictionary] = []
 var _wheat_wave_runtime_frames: Array[Texture2D] = []
 var _hero_idle_frames: SpriteFrames
@@ -250,9 +262,11 @@ func _resume_from_battle() -> void:
 	hero_portrait_path = String(st.get("hero_portrait", ""))
 	hero_idle_frames_path = String(st.get("hero_idle_frames", ""))
 	held = {}
-	_reveal_time.clear()   # 战斗回图：当前视野不重播翻显动画
-	for c: Vector2i in map.visible:
-		_reveal_time[c] = -10.0
+	_fog_known_revealed.clear()
+	_fog_reveal_time.clear()
+	for cell: Vector2i in map.revealed:
+		_fog_known_revealed[cell] = true
+		_fog_reveal_time[cell] = -10.0
 	terrain_mat.set_shader_parameter("seed_f", float(seed_value % 977))
 	_apply_token_idle_art()
 	_set_player_visual_visible(true)
@@ -319,6 +333,7 @@ func _build_map_view() -> void:
 	# PASS 让背包开启时未被地图接受的点击继续交给根节点既有整理逻辑。
 	map_view.mouse_filter = Control.MOUSE_FILTER_PASS
 	map_view.gui_input.connect(_on_map_view_gui_input)
+	map_view.mouse_exited.connect(_clear_map_route_preview)
 	add_child(map_view)
 
 	map_world = Control.new()
@@ -351,7 +366,7 @@ func _build_map_view() -> void:
 	_take_visual_map_layer("BlockingObjects")
 	_take_visual_map_layer("Containers")
 	# 柔边迷雾位于物体层上方，让边缘格中的麦穗与搜索目标一起渐隐。
-	# 物体仍只在 map.visible 中绘制，不会借半透明边缘泄露远处目标。
+	# 物体只在 map.revealed 的永久清雾区绘制，不会透过地图迷雾泄露远处目标。
 	_make_terrain_layer()
 	_build_atmosphere_layer()
 	marker_art = _make_map_art_layer("MarkerArtLayer", _draw_marker_art)
@@ -364,6 +379,24 @@ func _build_map_view() -> void:
 	canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	canvas.draw.connect(_draw_canvas)
 	map_world.add_child(canvas)
+	route_preview_art = _make_map_art_layer("RoutePreview", _draw_map_route_preview)
+	route_preview_art.z_index = 900
+	route_target_outline = ColorRect.new()
+	route_target_outline.name = "RouteTargetOutline"
+	route_target_outline.size = Vector2.ONE * float(MAP_CELL)
+	route_target_outline.color = Color.WHITE
+	route_target_outline.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	route_target_outline.z_index = 901
+	route_target_outline.visible = false
+	route_target_material = ShaderMaterial.new()
+	route_target_material.shader = GRID_TARGET_OUTLINE_SHADER
+	route_target_material.set_shader_parameter("cell_px", float(MAP_CELL))
+	route_target_material.set_shader_parameter("cell_inset_px", GROUND_MASK_INSET_PX)
+	route_target_material.set_shader_parameter("corner_radius_px", GROUND_CORNER_RADIUS_PX)
+	route_target_material.set_shader_parameter("pixel_step_px", GROUND_PIXEL_STEP_PX)
+	route_target_material.set_shader_parameter("outline_px", 4.0)
+	route_target_outline.material = route_target_material
+	map_world.add_child(route_target_outline)
 	player_backdrop = Control.new()
 	player_backdrop.name = "PlayerBackdrop"
 	player_backdrop.size = Vector2.ONE * MAP_CELL
@@ -435,13 +468,10 @@ func _make_terrain_layer() -> void:
 	terrain_mat.set_shader_parameter("map_data", _terrain_tex)
 	terrain_mat.set_shader_parameter("grid_size", Vector2(MapState.WIDTH, MapState.HEIGHT))
 	terrain_mat.set_shader_parameter("cell_px", float(MAP_CELL))
-	terrain_mat.set_shader_parameter(
-			"vision_center_cell", Vector2(MapState.WIDTH, MapState.HEIGHT) * 0.5)
-	terrain_mat.set_shader_parameter(
-			"vision_logic_center_cell", Vector2(MapState.WIDTH, MapState.HEIGHT) * 0.5)
-	terrain_mat.set_shader_parameter("vision_half_extent_cells", Vector2(
-			MapState.PLAYER_VISION_HALF_WIDTH, MapState.PLAYER_VISION_HALF_HEIGHT))
-	terrain_mat.set_shader_parameter("vision_feather_cells", 0.28)
+	terrain_mat.set_shader_parameter("fog_low_color", Color("D6C7A2"))
+	terrain_mat.set_shader_parameter("fog_high_color", Color("F5EBD2"))
+	terrain_mat.set_shader_parameter("unseen_alpha", 0.93)
+	terrain_mat.set_shader_parameter("reveal_duration", FOG_REVEAL_DURATION)
 	t.material = terrain_mat
 	map_world.add_child(t)
 
@@ -504,7 +534,7 @@ func _build_field_chaff() -> void:
 	map_world.add_child(field_chaff)
 
 
-## 光影层抵消相机位移，始终覆盖整屏；shader自行按当前视野裁掉迷雾区域。
+## 光影层抵消相机位移，始终覆盖整屏；shader自行按永久清雾数据裁掉未知区。
 func _build_atmosphere_layer() -> void:
 	atmosphere_layer = ColorRect.new()
 	atmosphere_layer.name = "AtmosphereLayer"
@@ -941,7 +971,8 @@ func _new_run(p_seed: int, leader: HeroData = null) -> void:
 	pending = []
 	held = {}
 	log_lines = []
-	_reveal_time.clear()   # 开局当前视野在首次 _refresh 盖当前钟 → 起手播一段显现
+	_fog_known_revealed.clear()
+	_fog_reveal_time.clear()
 	_wheat_wave_pulses.clear()
 	_camera_initialized = false
 	_camera_visual_velocity = Vector2.ZERO
@@ -997,11 +1028,13 @@ func _on_shared_step_attempted(previous_cell: Vector2i, direction: Vector2i,
 		"ext":
 			_float_text(map.player, "发现撤离点", COL_EXT_OPEN)
 	_sync_legacy_movement_state()
+	_refresh_map_route_preview()
 	_refresh()
 
 
 func _on_shared_movement_finished(cell: Vector2i, completed: bool) -> void:
 	_click_route_active = false
+	_refresh_map_route_preview()
 	movement_finished.emit(cell, completed)
 
 
@@ -1060,30 +1093,32 @@ func _refresh() -> void:
 
 
 func _is_cell_visible(cell: Vector2i) -> bool:
-	return map != null and (not LIMITED_VISIBILITY_ENABLED or map.visible.has(cell))
+	return map != null and (not FOG_OF_WAR_ENABLED or map.revealed.has(cell))
 
 
-## 把地图状态写进数据纹理（R=地形类 0地板/1墙 · G=当前可见 · B=进入视野时刻）。
-## 当前临时关闭可见范围：全图 G=1 且 B=-10，不播放边界显现。
+func _is_cell_explored(cell: Vector2i) -> bool:
+	return map != null and map.revealed.has(cell)
+
+
+## 把地图状态写进数据纹理：R=遮挡，G=已清雾，B=本格散开起始时刻，A=保留。
 func _update_terrain_data() -> void:
 	if map == null or _terrain_img == null:
 		return
-	# 判定使用的新mask立即写入；视觉中心仍由镜头插值逐帧推进。
-	# shader用两者的差值平移mask，既不延迟玩法，也不会让柔边逐格瞬移。
-	terrain_mat.set_shader_parameter(
-			"vision_logic_center_cell", Vector2(map.player) + Vector2.ONE * 0.5)
 	for y: int in MapState.HEIGHT:
 		for x: int in MapState.WIDTH:
 			var c := Vector2i(x, y)
-			var rev: bool = _is_cell_visible(c)
-			if not LIMITED_VISIBILITY_ENABLED:
-				_reveal_time[c] = -10.0
-			elif rev and not _reveal_time.has(c):
-				_reveal_time[c] = _anim_time
-			elif not rev:
-				_reveal_time.erase(c)
+			var revealed_now: bool = _is_cell_visible(c)
+			if revealed_now and not _fog_known_revealed.has(c):
+				_fog_known_revealed[c] = true
+				var reveal_distance: float = Vector2(c - map.player).length()
+				_fog_reveal_time[c] = _anim_time \
+						+ reveal_distance * FOG_REVEAL_STAGGER_PER_CELL
 			var tile_v: float = 1.0 if map.grid[y][x] == MapState.Tile.WALL else 0.0
-			_terrain_img.set_pixel(x, y, Color(tile_v, 1.0 if rev else 0.0, float(_reveal_time.get(c, 0.0)), 1.0))
+			_terrain_img.set_pixel(x, y, Color(
+					tile_v,
+					1.0 if revealed_now else 0.0,
+					float(_fog_reveal_time.get(c, 0.0)),
+					1.0))
 	_terrain_tex.update(_terrain_img)
 
 
@@ -1179,7 +1214,6 @@ func _set_player_visual_origin(origin: Vector2) -> void:
 	player_token.position = origin + step_offset
 	if player_backdrop != null:
 		player_backdrop.position = origin - TOKEN_OFFSET
-	_sync_terrain_vision_center(origin)
 
 
 func _quantize_world_pixel(value: Vector2) -> Vector2:
@@ -1277,14 +1311,6 @@ func _token_step_rotation_at(progress: float) -> float:
 	return (alternating + directional) * TOKEN_STEP_WOBBLE_AMPLITUDE
 
 
-## 迷雾表现中心跟随角色的平滑视觉坐标；逻辑中心在地形数据刷新时已经立即更新。
-func _sync_terrain_vision_center(token_origin: Vector2) -> void:
-	if terrain_mat == null:
-		return
-	var cell_center: Vector2 = token_origin - TOKEN_OFFSET + Vector2.ONE * MAP_CELL * 0.5
-	terrain_mat.set_shader_parameter("vision_center_cell", cell_center / float(MAP_CELL))
-
-
 func _legacy_state_tracks_shared_controller() -> bool:
 	return _grid_movement != null and _camera_visual_token_origin.distance_squared_to(
 			_grid_movement.visual_origin) <= 0.0001
@@ -1337,6 +1363,8 @@ func _process(delta: float) -> void:
 		marker_art.queue_redraw()
 		canvas.queue_redraw()   # 每帧重绘=驱动撤离点/当前格脉动（144 格 immediate 绘制·开销可忽略）
 		player_backdrop.queue_redraw()
+		if _hovered_map_cell != Vector2i(-1, -1) and route_preview_art != null:
+			route_preview_art.queue_redraw()
 		# teleport_fx 是旧预览引用兼容节点，不再参与每帧绘制。
 
 
@@ -1831,6 +1859,10 @@ func _gui_input(event: InputEvent) -> void:
 
 
 func _on_map_view_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		_set_hovered_map_cell(_raw_cell_from_map_view_position(
+				(event as InputEventMouseMotion).position))
+		return
 	if not (event is InputEventMouseButton):
 		return
 	var mouse_button := event as InputEventMouseButton
@@ -1865,12 +1897,77 @@ func _is_walkable_map_cell(cell: Vector2i) -> bool:
 			and map.grid[cell.y][cell.x] != MapState.Tile.WALL
 
 
+func _set_hovered_map_cell(cell: Vector2i) -> void:
+	if cell == _hovered_map_cell:
+		return
+	_hovered_map_cell = cell
+	_refresh_map_route_preview()
+
+
+func _clear_map_route_preview() -> void:
+	_hovered_map_cell = Vector2i(-1, -1)
+	_hovered_map_path.clear()
+	if route_target_outline != null:
+		route_target_outline.visible = false
+	if route_preview_art != null:
+		route_preview_art.queue_redraw()
+
+
+func _refresh_map_route_preview() -> void:
+	_hovered_map_path.clear()
+	if map == null or _grid_movement == null \
+			or _hovered_map_cell == Vector2i(-1, -1):
+		if route_target_outline != null:
+			route_target_outline.visible = false
+		if route_preview_art != null:
+			route_preview_art.queue_redraw()
+		return
+	if route_target_outline != null:
+		route_target_outline.position = Vector2(_hovered_map_cell) * float(MAP_CELL)
+		route_target_outline.visible = true
+		route_target_material.set_shader_parameter("target_color",
+				Color("E88972") if not _is_walkable_map_cell(_hovered_map_cell)
+				else Color("FFE0A0"))
+	if _is_walkable_map_cell(_hovered_map_cell):
+		_hovered_map_path = GridPathfinderScript.find_path(
+				map.player, _hovered_map_cell,
+				Rect2i(Vector2i.ZERO, Vector2i(MapState.WIDTH, MapState.HEIGHT)),
+				_is_walkable_map_cell)
+	if route_preview_art != null:
+		route_preview_art.queue_redraw()
+
+
+func _draw_map_route_preview() -> void:
+	if _hovered_map_cell == Vector2i(-1, -1):
+		return
+	if _hovered_map_path.is_empty():
+		return
+	var route_cells: Array[Vector2i] = [map.player]
+	route_cells.append_array(_hovered_map_path)
+	var curve: PackedVector2Array = GridRoutePreviewScript.build_curve(
+			route_cells, float(MAP_CELL), 12.0, 4)
+	var phase: float = fposmod(_anim_time * 42.0, 24.0)
+	for marker: PackedVector2Array in GridRoutePreviewScript.build_markers(
+			curve, 24.0, phase, 10.0):
+		var start: Vector2 = marker[0].round()
+		var finish: Vector2 = marker[1].round()
+		route_preview_art.draw_line(start, finish, Color("FFE0A0E6"), 6.0, false)
+		route_preview_art.draw_circle(start, 3.0, Color("FFE0A0E6"), true, -1.0, false)
+		route_preview_art.draw_circle(finish, 3.0, Color("FFE0A0E6"), true, -1.0, false)
+
+
 func _cell_from_map_view_position(view_position: Vector2) -> Vector2i:
+	var cell: Vector2i = _raw_cell_from_map_view_position(view_position)
+	return cell if _is_walkable_map_cell(cell) else Vector2i(-1, -1)
+
+
+func _raw_cell_from_map_view_position(view_position: Vector2) -> Vector2i:
 	if map_world == null:
 		return Vector2i(-1, -1)
 	var world_position: Vector2 = (view_position - map_world.position) / MAP_RENDER_SCALE
 	var cell := Vector2i(floori(world_position.x / MAP_CELL), floori(world_position.y / MAP_CELL))
-	return cell if _is_walkable_map_cell(cell) else Vector2i(-1, -1)
+	return cell if Rect2i(Vector2i.ZERO,
+			Vector2i(MapState.WIDTH, MapState.HEIGHT)).has_point(cell) else Vector2i(-1, -1)
 
 
 func _map_view_position_for_cell(cell: Vector2i) -> Vector2:
@@ -1914,17 +2011,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		_cancel_click_route()
 		_try_interact_current_cell()
 		return
-	var dir: Vector2i = GridMovementControllerScript.direction_from_key(event)
-	if dir == Vector2i.ZERO:
-		return
-	_cancel_click_route()
-	_move_one_step(dir)
-
-
-func _move_one_step(dir: Vector2i) -> String:
-	if map == null or map.over or _grid_movement == null:
-		return "blocked"
-	return _grid_movement.request_keyboard_step(dir)
 
 
 ## 当前格统一主动交互入口。容器采用逐件、可中断续搜的回合制搜索；

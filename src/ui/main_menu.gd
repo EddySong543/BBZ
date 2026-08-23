@@ -4,8 +4,10 @@ extends Control
 ## WASD 或左键点格可让角色在纯展示地图中逐格行走；入口按钮仍是主操作，不创建远征背包或结算状态。
 
 const BP_SCENE := "res://src/ui/bp_screen.tscn"
+const EXPEDITION_SCENE := "res://src/expedition/expedition_screen.tscn"
 const PROFILE_SCENE := "res://src/ui/profile_screen.tscn"
 const BACKPACK_OVERLAY_SCENE := preload("res://src/ui/backpack_screen.tscn")
+const CODEX_OVERLAY_SCRIPT := preload("res://src/ui/components/battle_codex_overlay.gd")
 const ProfileStore := preload("res://src/core/player_profile.gd")   # 个人资料存档（headless 安全走 preload）
 
 # ---- 匹配状态机：IDLE 点入口=开始；SEARCHING 再点/ESC/取消钮=取消；FOUND 锁输入。----
@@ -39,6 +41,7 @@ const CREAM := Color(0.95, 0.91, 0.80)      # 暖米白（直接压在暗波上�
 @onready var _menu_world: MainMenuWorld = $MenuWorld
 
 var _backpack_overlay: BackpackScreen
+var _codex_overlay: Control
 
 
 func _ready() -> void:
@@ -48,6 +51,7 @@ func _ready() -> void:
 	_setup_modes()
 	_setup_dock()
 	_setup_backpack_overlay()
+	_setup_codex_overlay()
 	# 设置面板仍通过既有广播刷新主界面颜色，世界组件只重绘视觉层。
 	add_to_group("wave_flow_bg")
 	_play_intro()
@@ -214,16 +218,18 @@ func _build_net_button() -> void:
 	$UI.add_child(b)
 
 
-## 远征模式入口：波幕转场（先行版·占位战斗）。匹配中不离队。
+## 远征模式入口：四石充能完成后由中心九格光柱直接传送。匹配中不离队。
 func _on_expedition_pressed() -> void:
 	if _match_state != MatchState.IDLE:
 		return
 	_set_mode_entries_enabled(false)
-	_menu_world.set_portal_energy(MainMenuWorld.PORTAL_ENERGY_GOLD)
-	await get_tree().create_timer(MainMenuWorld.PORTAL_ACTIVATION_DURATION).timeout
+	await _menu_world.play_portal_activation(
+			MainMenuWorld.PORTAL_ENERGY_GOLD, MainMenuWorld.PORTAL_ACTIVATION_DURATION)
 	if not is_instance_valid(self):
 		return
-	TransitionManager.transition_to("res://src/expedition/expedition_screen.tscn")
+	await _menu_world.play_portal_beam(MainMenuWorld.PORTAL_ENERGY_GOLD)
+	if is_instance_valid(self):
+		get_tree().change_scene_to_file(EXPEDITION_SCENE)
 
 
 ## 「✕ 取消匹配」独立小钮（匹配中才出现·匹配入口正下方居中）。
@@ -308,6 +314,13 @@ func _setup_backpack_overlay() -> void:
 	_backpack_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 
+func _setup_codex_overlay() -> void:
+	_codex_overlay = CODEX_OVERLAY_SCRIPT.new() as Control
+	_codex_overlay.name = "CodexOverlay"
+	add_child(_codex_overlay)
+	_codex_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+
 ## 与战斗 UI 的 BtnCodex 同尺寸、同材质；底部入口只显示居中图标。
 func _setup_square_dock_button(
 		btn: Button, icon_texture: Texture2D, tooltip: String, tint_icon: bool) -> void:
@@ -388,16 +401,23 @@ func _attach_bottom_shadow(btn: Button) -> void:
 	btn.move_child(shadow, 0)
 
 
-## 统一图鉴入口：波幕转场；匹配中不离队。
+## 统一图鉴入口：与背包一致地覆盖在当前主界面上；匹配中不打开。
 func _on_codex_pressed() -> void:
 	if _match_state != MatchState.IDLE:
 		return
-	TransitionManager.transition_to("res://src/ui/codex_screen.tscn")
+	if _backpack_overlay.visible:
+		_backpack_overlay.close()
+	if _codex_overlay.visible:
+		_codex_overlay.call("close")
+	else:
+		_codex_overlay.call("open")
 
 
 func _on_backpack_pressed() -> void:
 	if _match_state != MatchState.IDLE:
 		return
+	if _codex_overlay.visible:
+		_codex_overlay.call("close")
 	_backpack_overlay.open()
 
 
@@ -461,7 +481,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 # ============================================================
-# 匹配状态机：临战升温（对波加速备战）+正计时 → 对撞一拍 → 波幕转场
+# 匹配状态机：正计时 → 四石连接完成 → 中心九格光柱传送
 # ============================================================
 
 func _start_search() -> void:
@@ -472,7 +492,7 @@ func _start_search() -> void:
 	_set_side_cards_enabled(false)
 	_set_match_button_emphasized(true)
 	_set_match_button_status("匹配中", "0:00")
-	_menu_world.set_portal_energy(MainMenuWorld.PORTAL_ENERGY_BLUE)
+	_menu_world.begin_portal_search(MainMenuWorld.PORTAL_ENERGY_BLUE)
 	_show_cancel_button(true)
 
 
@@ -500,16 +520,16 @@ func _process(delta: float) -> void:
 		_on_match_found()
 
 
-## 匹配成功：地图入口闪亮、屏幕轻震后进入备战。
+## 匹配成功：四石汇聚后由中心九格光柱直接传送进备战，不再调用波幕。
 func _on_match_found() -> void:
 	_match_state = MatchState.FOUND
+	_menu_world.complete_portal_connection(MainMenuWorld.PORTAL_ENERGY_BLUE)
 	_set_match_button_status("已找到", "")
 	_show_cancel_button(false)
 	_flash_dock_button(_match_entry)
-	_shake_screen()
-	await get_tree().create_timer(0.45).timeout
-	# 波幕转场（BP 重做 2A）：胜方色波卷入 → 切 BP → 波退去揭幕
-	TransitionManager.transition_to(BP_SCENE)
+	await _menu_world.play_portal_beam(MainMenuWorld.PORTAL_ENERGY_BLUE)
+	if is_instance_valid(self):
+		get_tree().change_scene_to_file(BP_SCENE)
 
 
 ## 匹配中远征入口压暗禁点；底栏与设置保持可用。
@@ -546,17 +566,6 @@ func _flash_dock_button(button: Button) -> void:
 	var tween := create_tween().bind_node(button)
 	tween.tween_property(button, "modulate", Color(1.0, 0.82, 0.58), 0.08)
 	tween.tween_property(button, "modulate", Color.WHITE, 0.14)
-
-
-## 匹配成功轻震屏：±6px 衰减抖 5 下回位（菜单唯一震屏点，幅度克制）。
-func _shake_screen() -> void:
-	var tw := create_tween()
-	for i in 5:
-		var amp := 6.0 * (1.0 - i / 5.0)
-		tw.tween_property(self, "position",
-			Vector2(randf_range(-amp, amp), randf_range(-amp, amp)), 0.04)
-	tw.tween_property(self, "position", Vector2.ZERO, 0.05)
-
 
 # ============================================================
 # 小件样式辅助

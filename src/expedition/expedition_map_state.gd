@@ -11,13 +11,14 @@ extends RefCounted
 
 const Loot := preload("res://src/expedition/expedition_loot.gd")
 const QingfengLayout := preload("res://src/expedition/maps/qingfeng_ricefield_layout.gd")
+const FogReveal := preload("res://src/expedition/expedition_fog_reveal.gd")
 
 # ── 调优旋钮（子文档 B §9）──
 const WIDTH: int = QingfengLayout.WIDTH
 const HEIGHT: int = QingfengLayout.HEIGHT
-const PLAYER_VISION_RADIUS: int = 7 # 兼容旧调用；正式边界由下方横纵半径共同定义。
-const PLAYER_VISION_HALF_WIDTH: int = 6
-const PLAYER_VISION_HALF_HEIGHT: int = 4
+const PLAYER_VISION_RADIUS: int = FogReveal.HORIZONTAL_RADIUS # 兼容旧调用名。
+const PLAYER_VISION_HALF_WIDTH: int = FogReveal.HORIZONTAL_RADIUS
+const PLAYER_VISION_HALF_HEIGHT: int = FogReveal.VERTICAL_RADIUS
 
 enum Tile { FLOOR, WALL, START, EXT1, EXT2, EXT3, MONSTER, EVENT, CHEST }
 
@@ -25,7 +26,7 @@ var rng := RandomNumberGenerator.new()
 var seed_value: int = 0
 var grid: Array = []                # grid[y][x] = Tile
 var revealed: Dictionary = {}       # Vector2i -> true（永久探索记录，供未来地图/任务使用）
-var visible: Dictionary = {}        # Vector2i -> true（当前角色圆形视野，移动后实时重算）
+var visible: Dictionary = {}        # Vector2i -> true（兼容旧接口；与revealed一样累计清雾）
 var player: Vector2i
 var start_pos: Vector2i
 var ext_pos: Dictionary = {}        # Tile.EXT1.. -> Vector2i
@@ -200,6 +201,7 @@ func reveal_random_chest() -> Vector2i:
 		if not bool(chests[c]["revealed_by_map"]):
 			chests[c]["revealed_by_map"] = true
 			revealed[c] = true
+			visible[c] = true
 			return c
 	return Vector2i(-1, -1)
 
@@ -217,6 +219,7 @@ func mark_egg_chest() -> Vector2i:
 		chests[best]["egg"] = true
 		chests[best]["revealed_by_map"] = true
 		revealed[best] = true
+		visible[best] = true
 	return best
 
 
@@ -333,33 +336,16 @@ func _shuffle_with_rng(values: Array[Vector2i]) -> void:
 
 
 func _reveal_around(c: Vector2i) -> void:
-	visible.clear()
-	for dy: int in range(-PLAYER_VISION_HALF_HEIGHT - 1, PLAYER_VISION_HALF_HEIGHT + 2):
-		for dx: int in range(-PLAYER_VISION_HALF_WIDTH - 1, PLAYER_VISION_HALF_WIDTH + 2):
-			if not vision_contains_delta(Vector2i(dx, dy)):
-				continue
-			var n := c + Vector2i(dx, dy)
-			if n.x >= 0 and n.y >= 0 and n.x < WIDTH and n.y < HEIGHT:
-				visible[n] = true
-				revealed[n] = true
+	var footprint: Dictionary = FogReveal.compute_footprint(
+			c, Rect2i(Vector2i.ZERO, Vector2i(WIDTH, HEIGHT)))
+	for cell: Vector2i in footprint:
+		revealed[cell] = true
+		visible[cell] = true
 
 
-## 接近13×9的贴格视野。横边按列、竖边按行各自稳定凹凸一格；
-## 两组约束同时成立，因此四角自然缺格，而不是圆形、菱形或完整矩形。
+## 兼容已有调用名；这里描述的是一次清雾印章，不是随身可见范围。
 static func vision_contains_delta(delta: Vector2i) -> bool:
-	var horizontal_radius: int = PLAYER_VISION_HALF_WIDTH + _vision_edge_jitter(delta.y, 2)
-	var vertical_radius: int = PLAYER_VISION_HALF_HEIGHT + _vision_edge_jitter(delta.x, 5)
-	return absi(delta.x) <= horizontal_radius and absi(delta.y) <= vertical_radius
-
-
-static func _vision_edge_jitter(axis_index: int, salt: int) -> int:
-	var shifted: int = axis_index + 32
-	var bucket: int = posmod(shifted * shifted * 3 + shifted * 5 + salt, 7)
-	if bucket == 0:
-		return -1
-	if bucket == 6:
-		return 1
-	return 0
+	return FogReveal.contains_delta(delta)
 
 
 func _team_dead() -> bool:

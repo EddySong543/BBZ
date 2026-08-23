@@ -55,29 +55,29 @@ func test_map_currently_spawns_ground_only_but_keeps_future_anchor_pools() -> vo
 	assert_has(Layout.MONSTER_ANCHORS, Layout.BOSS_ANCHOR, "收割场敌人锚点继续保留")
 
 
-func test_map_visibility_follows_player_while_discovery_history_remains() -> void:
+func test_map_fog_clearance_stays_on_the_map_after_player_leaves() -> void:
 	var map: MapState = _make(777)
 	var start: Vector2i = map.player
-	assert_true(map.visible.has(start))
+	var starting_clearance: Dictionary = map.revealed.duplicate()
+	assert_true(starting_clearance.has(start))
 	map.player = Vector2i(16, 9)
 	map._reveal_around(map.player)
-	assert_false(map.visible.has(start), "离开角色视野的旧格必须重新进入迷雾")
-	assert_true(map.revealed.has(start), "永久探索记录仍保留，供未来地图与任务系统使用")
-	assert_true(map.visible.has(map.player), "玩家所在格始终可见")
-	var min_delta := Vector2i(99, 99)
-	var max_delta := Vector2i(-99, -99)
-	for cell: Vector2i in map.visible:
-		var delta: Vector2i = cell - map.player
-		assert_true(MapState.vision_contains_delta(delta),
-				"当前可见格必须服从稳定的贴格不规则近方形边界")
-		min_delta.x = mini(min_delta.x, delta.x)
-		min_delta.y = mini(min_delta.y, delta.y)
-		max_delta.x = maxi(max_delta.x, delta.x)
-		max_delta.y = maxi(max_delta.y, delta.y)
-	assert_gte(max_delta.x - min_delta.x + 1, 12, "视野主体宽度应接近13格")
-	assert_gte(max_delta.y - min_delta.y + 1, 8, "视野主体高度应接近9格")
-	assert_false(MapState.vision_contains_delta(Vector2i(7, 5)),
-			"近方形四角必须保留少量整格缺口，不能变成完整矩形")
+	assert_true(map.revealed.has(start), "角色离开后，出生区不能重新被迷雾覆盖")
+	assert_true(map.revealed.has(map.player), "玩家落脚区必须被永久清雾")
+	assert_gt(map.revealed.size(), starting_clearance.size())
+	for cell: Vector2i in starting_clearance:
+		assert_true(map.revealed.has(cell))
+		assert_true(map.visible.has(cell), "兼容可见集合也必须表达累计清雾区")
+
+
+func test_map_fog_clearance_is_not_line_of_sight() -> void:
+	var map: MapState = _make(777)
+	map.player = Vector2i(10, 10)
+	map.grid[10][11] = MapState.Tile.WALL
+	map._reveal_around(map.player)
+	assert_true(map.revealed.has(Vector2i(11, 10)))
+	assert_true(map.revealed.has(Vector2i(12, 10)),
+			"地图清雾不应被墙截断成随身视野")
 
 
 func test_remote_map_reveal_is_safe_when_current_map_has_no_containers() -> void:
