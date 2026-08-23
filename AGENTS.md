@@ -20,7 +20,7 @@ Codex 自动化任务必须通过 `tools/run_godot.ps1` 启动 Godot，不得直
 # Headless 工具
 & .\tools\run_godot.ps1 -Mode Tool -Target 'res://tools/xxx.gd'
 
-# 窗口截图探针（不加 --headless）
+# 窗口探针仅保留给用户明确要求的人工排障；Codex 默认不运行或保存截图
 & .\tools\run_godot.ps1 -Mode Probe -Target 'res://tools/xxx_probe.tscn'
 ```
 
@@ -29,7 +29,7 @@ Codex 自动化任务必须通过 `tools/run_godot.ps1` 启动 Godot，不得直
 - Godot：`D:\Steam\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe`
 - 项目根：启动器根据自身位置解析，不依赖调用时 cwd。
 - GUT：始终带 `-gexit`。
-- 截图探针：绝不使用 `--headless`。
+- Codex 不运行截图探针；用户明确要求人工窗口排障时，`Probe` 模式不得使用 `--headless`。
 - 自动化：等待明确退出；超时只允许终止启动器自己通过 `Start-Process` 创建并持有的 `$GodotProcess`。
 - 崩溃：抑制Windows应用程序错误对话框，改为退出码和日志，避免无人值守时永久卡住。
 
@@ -40,6 +40,18 @@ Codex 自动化任务必须通过 `tools/run_godot.ps1` 启动 Godot，不得直
 - 不覆盖、回滚或提交用户未授权的既有修改。
 - 当前 Battle UI 中断文件以 `production/session-state/active.md` 和 `docs/operations/PROJECT-TAKEOVER.md` 为准。
 - commit/push 前精确暂存本任务文件；不得使用笼统的 `git add .`。
+
+## 项目结构与临时资产规范
+
+- `src/` 只放运行代码，`assets/` 只放正式运行资源，`tests/` 只放自动化契约，`tools/` 只保留仍在使用的无截图验证工具与可重复资源构建工具。
+- 英雄正式资源与保留母版统一归入 `assets/sprites/heroes/hXX/`；原始母版放该英雄的 `source/` 子目录并加 `.gdignore`，不得堆在全局 `assets/art_src/heroes/`。
+- 场景正式资源与保留母版统一归入 `assets/scenes/sceneX/`；原始母版放该场景的 `source/` 子目录并加 `.gdignore`，不得在 `assets/art_src/scenes/` 留第二份。
+- `assets/art_src/` 仅允许保存尚未归属到英雄或场景、且确有返工价值的本地母版；名称含 `retired`、`rejected`、`unused` 的否决资产不得长期保留。
+- `assets/import/` 只作本地收件箱。接入后必须移动到正式归属目录，并同时处理源文件与 `.import`；不得让已接入资产继续滞留在 import。
+- 完整字体下载包不得放在项目中；仅保留实际使用的字体文件、对应 `.import` 和每套字体自己的许可证全文，并同步维护 `THIRD-PARTY-NOTICES.md`。
+- 禁止把 `tmp/`、`prototypes/`、截图、对比图、一次性预览和生成中间件提交到仓库。临时输出使用系统临时目录或仓库外的 `D:\Game\BoBoZan\_probe_output`。
+- Codex 不生成、读取、展示或返回截图；视觉验证使用 Godot 日志、几何断言、像素数据分析与不落盘探针。截图 runner 不再作为项目工具保留。
+- 每次资产任务结束前检查：正式引用是否指向唯一归属目录、源文件与 `.import` 是否成对、是否遗留同名/同哈希副本、临时目录是否进入 Git、是否误碰其他正在工作的 Scene/UI 文件。
 
 ## Git 提交与推送固定方法
 

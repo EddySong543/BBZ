@@ -25,6 +25,10 @@ Desktop.ini
 # *.psd/*.docx = 美术/文档源文件
 /ref/
 /res/
+/tmp/
+/prototypes/
+/design/previews/skill_tooltip/
+/design/ui-proposals/
 # 外部导入资源统一暂存区（assets/import）：内容不入库·仅保留 README 说明约定
 /assets/import/*
 !/assets/import/README.md

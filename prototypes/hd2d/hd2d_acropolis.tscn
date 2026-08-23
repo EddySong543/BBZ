@@ -1,6 +1,0 @@
-[gd_scene load_steps=2 format=3]
-
-[ext_resource type="Script" path="res://prototypes/hd2d/hd2d_acropolis.gd" id="1_acrop"]
-
-[node name="Hd2dAcropolis" type="Node3D"]
-script = ExtResource("1_acrop")

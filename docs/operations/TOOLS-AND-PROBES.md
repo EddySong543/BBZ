@@ -8,7 +8,7 @@
 
 | 类别 | 数量 | 默认权限 | 说明 |
 |---|---:|---|---|
-| 视觉探针 | 43 | 可运行 | 加载真实场景并截图；必须带窗口 |
+| 历史视觉探针 | 数量随清理变化 | 仅人工兼容 | 旧工具可能保存截图；Codex 禁用，实际再用时改为不落盘验证 |
 | 联机探针 | 6 | 条件运行 | 会占用本机端口，部分需要双进程 |
 | 写入/资源管线工具 | 22 | 禁止误跑 | 会生成、覆盖或导入项目资源，不属于只读探针 |
 | Headless 检查/模拟 | 4 | 可运行 | 不依赖画面，用于扫描、模拟或数据检查 |
@@ -24,7 +24,7 @@ Codex及无人值守任务统一使用：
 & .\tools\run_godot.ps1 -Mode Import
 & .\tools\run_godot.ps1 -Mode Test
 & .\tools\run_godot.ps1 -Mode Tool -Target 'res://tools/xxx.gd'
-& .\tools\run_godot.ps1 -Mode Probe -Target 'res://tools/xxx_probe.tscn'
+& .\tools\run_godot.ps1 -Mode Probe -Target 'res://tools/xxx_probe.tscn' # 仅用户明确要求的人工窗口排障
 ```
 
 禁止Codex替用户启动常驻 `--editor`。统一启动器会等待自己启动的Godot进程，超时只清理它自己创建并持有的进程，并将自动化崩溃转为退出码和日志。用户手动启动的Godot用于F6验收，任何情况下都不得由Codex关闭；发生冲突时停止自动化并汇报。
@@ -49,9 +49,11 @@ PowerShell 运行截图探针：
 & "D:\Steam\steamapps\common\Godot Engine\godot.windows.opt.tools.64.exe" --path "D:\Game\BoBoZan\Claude-Code-Game-Studios-cn-localization" res://tools/<探针>.tscn
 ```
 
-截图探针不得使用 `--headless`。GUT 必须带 `-gexit`。新图片引用前先运行一次 `--headless --path <项目根> --import`。
+Codex 不运行或生成截图；视觉验证使用日志、几何断言、像素数据分析和不落盘探针。用户明确要求人工窗口排障时，窗口探针不得使用 `--headless`。GUT 必须带 `-gexit`。新图片引用前先运行一次 `--headless --path <项目根> --import`。
 
-## 截图输出
+## 历史截图输出兼容
+
+以下入口只为尚未迁移的旧工具提供兼容，不是新工具模板。新探针不得保存图片；旧工具实际再次使用时应改为输出可断言的数据。
 
 新标准由 `tools/probe_output.gd` 统一处理：
 
@@ -61,14 +63,13 @@ PowerShell 运行截图探针：
 - 可在 Godot 用户参数中传 `probe-output=<绝对目录>` 覆盖。
 - 输出目录不存在时自动创建。
 
-已迁移全部6个失效的 Claude 临时 UUID 探针：cursor、gallery、identity hover、profile、settings、tip。故事探针也已使用该输出入口。
+已迁移全部6个失效的 Claude 临时 UUID 探针：cursor、gallery、identity hover、profile、settings、tip。
 
 仍有40个旧工具写到 `D:/Game/BoBoZan/`。该目录在当前唯一开发机上有效、位于仓库外，不会触发 Godot 导入；它们属于低优先级可移植性债，不是失效工具。新工具不得继续复制这种写法，旧工具在实际再次使用时迁移到统一入口。
 
 ## 存档与用户数据
 
 - Profile 探针通过 `PlayerProfile.save_enabled=false` 禁止落盘。
-- Story 探针把 `story_progress_probe.cfg` 写入统一探针输出目录，不再删除或覆盖真实 `user://story_progress.cfg`。
 - 任何新探针不得直接删除真实玩家存档；应提供可注入路径或先做可恢复备份。
 
 ## 联机探针

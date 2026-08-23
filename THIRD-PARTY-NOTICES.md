@@ -8,7 +8,7 @@
 | 组件 | 用途 | 许可证 | 许可文本 |
 |------|------|--------|----------|
 | Z工坊像素黑体 12px M CN / Z Labs Pixel 12px M CN | 全游戏 UI 字体 | SIL Open Font License 1.1 | 随包 `assets/font/ZLabsPixel-OFL.txt`（上游 https://github.com/Astro-2539/ZLabs-Pixel-12px） |
-| Ark Pixel Font（方舟像素字体·12px/16px proportional zh_cn） | 保留的旧版回退字体 | SIL Open Font License 1.1 | 随包 `assets/font/`（OFL 全文见 fusion-pixel-OFL.txt 同款条款·上游 https://github.com/TakWolf/ark-pixel-font） |
+| Ark Pixel Font（方舟像素字体·12px/16px proportional zh_cn） | 保留的旧版回退字体 | SIL Open Font License 1.1 | 随包 `assets/font/ark-pixel-OFL.txt`（上游 https://github.com/TakWolf/ark-pixel-font） |
 | Fusion Pixel Font（缝合像素字体·10px proportional zh_hans） | 小号 UI 字体 | SIL Open Font License 1.1 | 随包 `assets/font/fusion-pixel-OFL.txt`（上游 https://github.com/TakWolf/fusion-pixel-font） |
 
 OFL 1.1 要点：允许商用与随软件捆绑分发；不得单独出售字体本体；须保留版权与许可声明。

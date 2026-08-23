@@ -65,7 +65,7 @@
 
 | 位置 | 定位 |
 |------|------|
-| `tests/unit/{battle,net,core,story,ui,expedition}/**/*.gd`（38 脚本） | **当前行为的真相源**（GUT·423 用例 / 1530 断言全绿·2026-07-17·精确数以实跑为准） |
+| `tests/unit/{battle,net,core,ui,expedition}/**/*.gd` | **当前行为的真相源**（GUT·精确数以实跑为准） |
 | `tests/BEHAVIOR_NOTES.md` | 行为锁定笔记（含 v3 历史溯源） |
 
 ---
