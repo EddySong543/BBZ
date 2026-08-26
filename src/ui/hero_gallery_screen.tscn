@@ -142,6 +142,65 @@ grow_vertical = 2
 mouse_filter = 2
 metadata/_edit_lock_ = true
 
+[node name="DetailNavigation" type="Control" parent="DetailArea"]
+editor_description = "可视化编辑：右页逐个浏览入口；位置、字号和间距与左页分页行一致，运行时只更新个数与可用状态。"
+layout_mode = 0
+offset_left = 1099.0
+offset_top = 916.0
+offset_right = 1856.0
+offset_bottom = 970.0
+mouse_filter = 2
+
+[node name="PreviousItem" type="Button" parent="DetailArea/DetailNavigation"]
+layout_mode = 0
+offset_left = -38.0
+offset_right = 142.0
+offset_bottom = 54.0
+focus_mode = 0
+theme_override_colors/font_color = Color(0.278431, 0.227451, 0.168627, 0.9)
+theme_override_colors/font_pressed_color = Color(0.419608, 0.290196, 0.196078, 1)
+theme_override_colors/font_hover_color = Color(0.419608, 0.290196, 0.196078, 1)
+theme_override_colors/font_disabled_color = Color(0.439216, 0.4, 0.333333, 0.4)
+theme_override_fonts/font = ExtResource("6_back_font")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBoxEmpty_back")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_back")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_back")
+theme_override_styles/disabled = SubResource("StyleBoxEmpty_back")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_back")
+text = "上一个"
+
+[node name="ItemIndicator" type="Label" parent="DetailArea/DetailNavigation"]
+layout_mode = 0
+offset_left = 217.0
+offset_right = 397.0
+offset_bottom = 54.0
+theme_override_colors/font_color = Color(0.439216, 0.4, 0.333333, 0.68)
+theme_override_fonts/font = ExtResource("6_back_font")
+theme_override_font_sizes/font_size = 22
+text = "01 / 24"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="NextItem" type="Button" parent="DetailArea/DetailNavigation"]
+layout_mode = 0
+offset_left = 472.0
+offset_right = 652.0
+offset_bottom = 54.0
+focus_mode = 0
+theme_override_colors/font_color = Color(0.278431, 0.227451, 0.168627, 0.9)
+theme_override_colors/font_pressed_color = Color(0.419608, 0.290196, 0.196078, 1)
+theme_override_colors/font_hover_color = Color(0.419608, 0.290196, 0.196078, 1)
+theme_override_colors/font_disabled_color = Color(0.439216, 0.4, 0.333333, 0.4)
+theme_override_fonts/font = ExtResource("6_back_font")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBoxEmpty_back")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_back")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_back")
+theme_override_styles/disabled = SubResource("StyleBoxEmpty_back")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_back")
+text = "下一个"
+
 [node name="HeroPortraitWash" type="TextureRect" parent="DetailArea" unique_id=1639473584]
 editor_description = "可视化编辑：右页角色背后的蓝灰笔刷。可直接拖动和缩放。"
 texture_filter = 1
@@ -196,9 +255,9 @@ vertical_alignment = 1
 editor_description = "可视化编辑：主/被动长方形标签。运行时位于技能名后方，并与技能图标、技能名作为一组整体居中。"
 anchors_preset = 0
 offset_left = 1450.0
-offset_top = 744.0
+offset_top = 727.0
 offset_right = 1530.0
-offset_bottom = 778.0
+offset_bottom = 761.0
 mouse_filter = 2
 
 [node name="TypeMark" type="Control" parent="DetailArea/SkillTypeGroup" unique_id=814600065]

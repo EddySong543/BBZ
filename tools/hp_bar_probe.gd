@@ -2,7 +2,7 @@ extends Node
 
 ## 斜切分段血条探针（2026-07-18·任务13 血量 UI 改版取证）：直改 BattleCore 的 hp/shield
 ## 半点值 → _update_all 刷新 → 逐态抓帧，把 P1(LTR)/P2(RTL) 两条血条裁切放大上下拼一张。
-## 覆盖：满血 / 掉血露空槽 / 半点(奇数半点=末尾少一小块) / 护盾银灰覆盖 / 低血警示闪。
+## 覆盖：满血 / 掉血露空槽 / 半点(奇数半点=末尾少一小块) / 护甲银灰覆盖 / 低血警示闪。
 ##   godot --path . res://tools/hp_bar_probe.tscn
 ## 输出：D:/Game/BoBoZan/_probe_output/hpbar_*.png（仓库外·勿入库）
 

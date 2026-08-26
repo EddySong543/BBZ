@@ -7,24 +7,27 @@ extends RefCounted
 const FRAME_TEXTURE := preload("res://assets/ui/item_frame.png")
 const CELL_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_item_frame_palette.gdshader")
-const LEGENDARY_TEXTURE := preload("res://assets/ui/gold_bottom.png")
 const ItemCatalogScript := preload("res://src/battle/item_catalog.gd")
 
-# C 宝石方案：基准色管身份，同色相的小幅明暗只负责像素层次。
+# 方案 2：三档统一使用高识别完整纵向渐变；框体只做同色相的明暗分层，不压成暗底。
 const CELL_TOP := {
-	1: ItemCatalogScript.RARITY_NORMAL, 2: ItemCatalogScript.RARITY_RARE,
-}
-const CELL_BOTTOM := {1: Color("#5B8BC7"), 2: Color("#7863B0")}
-const FRAME_SHADOW := {
-	1: Color("#1C3655"), 2: Color("#2B2049"), 3: Color("#5F4217"),
-}
-const FRAME_MID := {
 	1: ItemCatalogScript.RARITY_NORMAL,
 	2: ItemCatalogScript.RARITY_RARE,
 	3: ItemCatalogScript.RARITY_LEGENDARY,
 }
+const CELL_BOTTOM := {
+	1: Color("#65A0E3"),
+	2: Color("#9870D1"),
+	3: Color("#E5B349"),
+}
+const FRAME_SHADOW := {
+	1: Color("#2E639E"), 2: Color("#56358A"), 3: Color("#9F6818"),
+}
+const FRAME_MID := {
+	1: Color("#356DB2"), 2: Color("#623DA1"), 3: Color("#AD741B"),
+}
 const FRAME_HIGHLIGHT := {
-	1: Color("#9BB8DD"), 2: Color("#ACA0CF"), 3: Color("#E9C794"),
+	1: Color("#9BC7EF"), 2: Color("#C3A5E4"), 3: Color("#F3D077"),
 }
 
 const DROP_SHADOW_OFFSET := Vector2(2.0, 4.0)
@@ -32,8 +35,6 @@ const DROP_SHADOW_COLOR := Color(0.02, 0.012, 0.008, 0.34)
 const ITEM_ART_SHADOW_OFFSET := Vector2(2.0, 3.0)
 const ITEM_ART_SHADOW_COLOR := Color(0.02, 0.012, 0.008, 0.38)
 
-const LEGENDARY_TINT := Color("#F0CA82")
-const LEGENDARY_TOP_DARKENING := 0.18
 const FRAME_ART_SCALE := 87.25 / 68.0
 const FRAME_OFFSET_RATIO := Vector2(-9.6 / 68.0, -10.0 / 68.0)
 const CELL_INSET_RATIO := 5.5 / 68.0
@@ -114,16 +115,11 @@ static func make_item_art_shadow(texture: Texture2D, art_position: Vector2,
 
 static func apply_cell_palette(material: ShaderMaterial, tier: int, tint_multiplier: Color = Color.WHITE) -> void:
 	var key := clampi(tier, 1, 3)
-	var legendary := key == 3
 	material.set_shader_parameter("fill_color", CELL_TOP.get(key, CELL_TOP[1]) * tint_multiplier)
 	material.set_shader_parameter("inner_color", CELL_BOTTOM.get(key, CELL_BOTTOM[1]) * tint_multiplier)
 	material.set_shader_parameter("center_glow", 1.0)
-	material.set_shader_parameter("vertical_gradient", 0.0 if legendary else 1.0)
+	material.set_shader_parameter("vertical_gradient", 1.0)
 	material.set_shader_parameter("material_lighting", 0.0)
 	material.set_shader_parameter("cloud_on", 0.0)
-	material.set_shader_parameter("use_tex", 1.0 if legendary else 0.0)
-	material.set_shader_parameter("tex_tint", LEGENDARY_TINT * tint_multiplier)
-	material.set_shader_parameter("tex_top_darkening",
-			LEGENDARY_TOP_DARKENING if legendary else 0.0)
-	if legendary:
-		material.set_shader_parameter("bg_tex", LEGENDARY_TEXTURE)
+	material.set_shader_parameter("use_tex", 0.0)
+	material.set_shader_parameter("tex_top_darkening", 0.0)

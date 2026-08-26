@@ -1,6 +1,8 @@
 extends Control
 class_name CodexNativeTextLayer
 
+const EffectTextFormatterScript := preload("res://src/ui/effect_text_formatter.gd")
+
 ## 将缩放书页里的文字复制到最终画布坐标中绘制。
 ## 原按钮仍保留点击区；书页纹理/框体继续由 GalleryHost 统一缩放，文字不再经过 0.84 二次采样。
 
@@ -50,12 +52,73 @@ func sync_now() -> void:
 			mirror = _make_mirror(source)
 			_mirrors[source] = mirror
 		_sync_mirror(source, mirror)
+	_reflow_effect_text_segments(sources)
 	for source: Variant in _mirrors.keys():
 		if not is_instance_valid(source) or not active_sources.has(source):
 			var stale := _mirrors[source] as Label
 			if stale != null and is_instance_valid(stale):
 				stale.queue_free()
 			_mirrors.erase(source)
+
+
+## 技能正文源节点按 22px 排版后会随书页缩到 18.48px，而清晰文字层最终取整为 19px。
+## 若仍沿用各片段的缩放坐标，长普通段会累计约 10px 误差并压住后续粗体词。
+## 此处在最终字号下重新计算整行累计宽度；关键词左右各保留 1 个最终像素给仿粗轮廓。
+func _reflow_effect_text_segments(sources: Array[Control]) -> void:
+	var lines: Dictionary = {}
+	for source: Control in sources:
+		if not source is Label or not source.has_meta(EffectTextFormatterScript.META_LINE_ID):
+			continue
+		var line_id := String(source.get_meta(EffectTextFormatterScript.META_LINE_ID))
+		if not lines.has(line_id):
+			lines[line_id] = []
+		(lines[line_id] as Array).append(source)
+	for line_variant: Variant in lines.values():
+		var line_sources: Array = line_variant as Array
+		line_sources.sort_custom(func(a: Control, b: Control) -> bool:
+			return int(a.get_meta(EffectTextFormatterScript.META_RUN_ORDER)) \
+					< int(b.get_meta(EffectTextFormatterScript.META_RUN_ORDER)))
+		if line_sources.is_empty():
+			continue
+		var first := line_sources[0] as Control
+		var parent_control := first.get_parent() as Control
+		if parent_control == null:
+			continue
+		var parent_transform := parent_control.get_global_transform_with_canvas()
+		var layer_inverse := get_global_transform_with_canvas().affine_inverse()
+		var source_center_x := float(first.get_meta(
+				EffectTextFormatterScript.META_LINE_CENTER_X))
+		var local_center := layer_inverse * (parent_transform * Vector2(
+				source_center_x, first.position.y))
+		var total_width := 0.0
+		var advances: Array[float] = []
+		for source_variant: Variant in line_sources:
+			var source := source_variant as Control
+			var mirror := _mirrors.get(source) as Label
+			if mirror == null:
+				advances.append(0.0)
+				continue
+			var advance := mirror.get_theme_font("font").get_string_size(
+					mirror.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0,
+					mirror.get_theme_font_size("font_size")).x
+			advances.append(advance)
+			total_width += float(source.get_meta(
+					EffectTextFormatterScript.META_GAP_BEFORE, 0.0)) \
+					+ advance + float(source.get_meta(
+					EffectTextFormatterScript.META_GAP_AFTER, 0.0))
+		var cursor_x := local_center.x - total_width * 0.5
+		for source_index: int in line_sources.size():
+			var source := line_sources[source_index] as Control
+			var mirror := _mirrors.get(source) as Label
+			if mirror == null:
+				continue
+			cursor_x += float(source.get_meta(
+					EffectTextFormatterScript.META_GAP_BEFORE, 0.0))
+			mirror.position.x = roundf(cursor_x)
+			mirror.size.x = ceilf(advances[source_index]) + 2.0
+			mirror.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+			cursor_x += advances[source_index] + float(source.get_meta(
+					EffectTextFormatterScript.META_GAP_AFTER, 0.0))
 
 
 func _process(_delta: float) -> void:
@@ -155,7 +218,7 @@ func _sync_page_navigation_button(
 	mirror.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var arrow := mirror.get_node("NavArrow") as Polygon2D
 	var arrow_y := roundf((mirror.size.y - PAGE_ARROW_HEIGHT) * 0.5)
-	if button.name == &"PreviousPage":
+	if String(button.name).begins_with("Previous"):
 		mirror.position.x = group_left + PAGE_ARROW_WIDTH + PAGE_ARROW_GAP
 		arrow.position = Vector2(-PAGE_ARROW_WIDTH - PAGE_ARROW_GAP, arrow_y)
 		arrow.polygon = PackedVector2Array([
@@ -177,7 +240,7 @@ func _sync_page_navigation_button(
 func _source_text_rect(source: Control) -> Rect2:
 	if not source is Button:
 		return Rect2(Vector2.ZERO, source.size)
-	if source.get_parent() != null and source.get_parent().name == &"PageNavigation":
+	if _is_page_navigation_source(source):
 		return Rect2(Vector2.ZERO, source.size)
 	var button := source as Button
 	var state := "disabled" if button.disabled else "normal"
@@ -199,7 +262,9 @@ func _source_text_rect(source: Control) -> Rect2:
 
 
 func _is_page_navigation_source(source: Control) -> bool:
-	return source.get_parent() != null and source.get_parent().name == &"PageNavigation"
+	if source.get_parent() == null:
+		return false
+	return source.get_parent().name in [&"PageNavigation", &"DetailNavigation"]
 
 
 func _is_page_navigation_button(source: Control) -> bool:

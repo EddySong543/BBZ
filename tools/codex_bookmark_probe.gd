@@ -299,13 +299,13 @@ func _run_probe() -> void:
 	var skill_tag := hero.get("_d_tag_group") as Control
 	var skill_rule := hero.get("_d_detail_rule") as ColorRect
 	var skill_pin := hero.get("_d_detail_pin") as ColorRect
-	_expect(skill_name.position.y == 744.0
-			and (not skill_icon.visible or skill_icon.position.y == 744.0)
-			and skill_tag.position.y == 743.0
-			and source_skill_detail.position.y == 804.0
-			and skill_rule.position.y == 814.0
-			and skill_pin.position.y == 808.0,
-			"技能名、图标、类型签、正文与引导线作为完整区块统一上移 24px")
+	_expect(skill_name.position.y == 728.0
+			and (not skill_icon.visible or skill_icon.position.y == 728.0)
+			and skill_tag.position.y == 727.0
+			and source_skill_detail.position.y == 788.0
+			and skill_rule.position.y == 798.0
+			and skill_pin.position.y == 792.0,
+			"技能名、图标、类型签、正文与引导线作为完整区块统一上移 40px")
 	native_text_layer.call("set_source_root", item)
 	native_text_layer.call("sync_now")
 	var item_previous := item.get_node("PoolArea/PageNavigation/PreviousPage") as Button

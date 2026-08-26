@@ -1,5 +1,7 @@
 extends Control
 
+const EffectTextFormatterScript := preload("res://src/ui/effect_text_formatter.gd")
+
 ## 技能情报双钮（2026-07-17 Eddy 方案 A·取代 SkillCard 大卡）——左钮=己方 / 右钮=敌方。
 ##
 ## 形制：底部按钮同款像素果冻框（参数抄图鉴钮）·阵营染色（蓝=己方/红=敌方·压一档饱和
@@ -201,7 +203,7 @@ func _tip_text(side: int) -> String:
 	var h: HeroData = _hero(side)
 	if h == null:
 		return ""
-	return tr(h.skill_detail)
+	return EffectTextFormatterScript.concise(tr(h.skill_detail))
 
 
 func _on_enter(side: int) -> void:

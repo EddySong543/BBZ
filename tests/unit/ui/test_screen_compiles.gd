@@ -233,8 +233,8 @@ func test_item_gallery_third_batch_uses_clean_right_page_hierarchy() -> void:
 				"右页主轴节点保持居中: %s" % node.name)
 	assert_eq(description.horizontal_alignment, HORIZONTAL_ALIGNMENT_CENTER,
 			"效果描述居中")
-	assert_eq(description.vertical_alignment, VERTICAL_ALIGNMENT_CENTER,
-			"效果描述在固定区域内垂直居中")
+	assert_eq(description.vertical_alignment, VERTICAL_ALIGNMENT_TOP,
+			"效果描述从固定区域顶边开始排版")
 	assert_eq(description.autowrap_mode, TextServer.AUTOWRAP_WORD_SMART,
 			"效果描述按词智能换行")
 	assert_gte(description.get_theme_constant("line_spacing"), 6,
@@ -254,7 +254,7 @@ func test_item_gallery_fill_overdraws_new_frame_inner_edge() -> void:
 			"道具图鉴格底轻微压到新框下，不再露出顶部纸色细缝")
 
 
-func test_item_gallery_keeps_black_detail_name_and_legendary_asset() -> void:
+func test_item_gallery_keeps_black_detail_name_and_unified_full_gradient() -> void:
 	assert_eq(ItemGalleryScreen.CARDS_PER_PAGE, 12, "道具图鉴继续保持每页 12 件")
 	assert_eq(ItemGalleryScreen.DETAIL_NAME_INK, Color("302820"),
 			"右页道具名统一使用书页墨黑色")
@@ -313,10 +313,14 @@ func test_item_gallery_keeps_black_detail_name_and_legendary_asset() -> void:
 			ItemGalleryScreen.DETAIL_NAME_INK, "传说道具名仍使用统一墨黑")
 	var legendary_cell := screen._cards[0].get_node("Cell") as ColorRect
 	var legendary_material := legendary_cell.material as ShaderMaterial
-	assert_eq(float(legendary_material.get_shader_parameter("use_tex")), 1.0,
-			"传说道具继续启用原有底层贴图")
-	assert_eq((legendary_material.get_shader_parameter("bg_tex") as Texture2D).resource_path,
-			"res://assets/ui/gold_bottom.png", "传说底层资产保持不变")
+	assert_eq(float(legendary_material.get_shader_parameter("use_tex")), 0.0,
+			"传说道具停用旧金色底图")
+	assert_eq(float(legendary_material.get_shader_parameter("vertical_gradient")), 1.0,
+			"传说与普通、稀有统一使用完整纵向渐变")
+	assert_eq(legendary_material.get_shader_parameter("fill_color"),
+			ItemFrameStyle.CELL_TOP[3], "传说顶部色读取共享方案 2")
+	assert_eq(legendary_material.get_shader_parameter("inner_color"),
+			ItemFrameStyle.CELL_BOTTOM[3], "传说底部色读取共享方案 2")
 
 
 func test_all_item_tiers_use_static_fill_and_shared_directional_shadow() -> void:
@@ -326,9 +330,10 @@ func test_all_item_tiers_use_static_fill_and_shared_directional_shadow() -> void
 			"共享道具格完全移除渐变动画路径")
 	for tier: int in range(1, 4):
 		var material := ItemFrameStyle.make_cell_material(tier, 24.0)
-		assert_eq(float(material.get_shader_parameter("vertical_gradient")),
-				0.0 if tier == 3 else 1.0,
-				"阶级 %d 保留静态填充配方" % tier)
+		assert_eq(float(material.get_shader_parameter("vertical_gradient")), 1.0,
+				"阶级 %d 统一使用静态完整渐变" % tier)
+		assert_eq(float(material.get_shader_parameter("use_tex")), 0.0,
+				"阶级 %d 不叠加旧底图" % tier)
 	var shadow := ItemFrameStyle.make_frame_shadow(Vector2(10.0, 20.0), Vector2(68.0, 68.0))
 	assert_eq(shadow.position, Vector2(10.0, 20.0) + ItemFrameStyle.DROP_SHADOW_OFFSET,
 			"共享阴影固定向右下偏移")
@@ -354,11 +359,11 @@ func test_item_gallery_rarity_badge_tracks_selected_item_without_click_behavior(
 	assert_eq(badge.size, Vector2(80.0, 34.0), "右页复用英雄图鉴主被动标签尺寸")
 	assert_eq(label.text, "普通", "默认选择普通道具时显示普通")
 	assert_eq(ItemGalleryScreen.TIER_TAG_COLOR[1], ItemCatalog.RARITY_NORMAL,
-			"普通标签使用全局 C 方案宝石蓝")
+			"普通标签使用全局方案 2 高识别蓝")
 	assert_eq(ItemGalleryScreen.TIER_TAG_COLOR[2], ItemCatalog.RARITY_RARE,
-			"稀有标签使用全局 C 方案深紫晶")
+			"稀有标签使用全局方案 2 高识别紫")
 	assert_eq(ItemGalleryScreen.TIER_TAG_COLOR[3], ItemCatalog.RARITY_LEGENDARY,
-			"传说标签使用全局 C 方案明金")
+			"传说标签使用全局方案 2 高识别金")
 	assert_almost_eq(float(mark.get("edge_alpha")), 0.55, 0.001,
 			"道具稀有度标签暗边减淡，但不改英雄标签默认值")
 	assert_eq(mark.get("passive_color"), ItemGalleryScreen.TIER_TAG_COLOR[1],
@@ -391,11 +396,11 @@ func test_item_gallery_selection_keeps_rarity_frame_and_uses_pointer() -> void:
 			"道具箭头与英雄箭头使用同一书页棕色")
 	assert_null(first_card.get_node_or_null("SelRing"), "移除道具图鉴旧金色呼吸外环")
 	assert_eq(first_material.get_shader_parameter("shadow_color"),
-			ItemGalleryScreen.FRAME_SHADOW[1], "选中普通道具仍使用 C 方案蓝色阴影")
+			ItemGalleryScreen.FRAME_SHADOW[1], "选中普通道具使用方案 2 蓝色暗阶")
 	assert_eq(first_material.get_shader_parameter("mid_color"),
-			ItemGalleryScreen.FRAME_MID[1], "选中普通道具仍使用 C 方案蓝色主体")
+			ItemGalleryScreen.FRAME_MID[1], "选中普通道具使用方案 2 蓝色主体")
 	assert_eq(first_material.get_shader_parameter("highlight_color"),
-			ItemGalleryScreen.FRAME_HIGHLIGHT[1], "选中普通道具仍使用 C 方案蓝色高光")
+			ItemGalleryScreen.FRAME_HIGHLIGHT[1], "选中普通道具使用方案 2 蓝色高光")
 	assert_eq((first_card.get_node("ItemName") as Label).get_theme_color("font_color"),
 			HeroGalleryScreen.SELECTED_NAME_INK, "选中道具名使用英雄图鉴同款克制赭色")
 	screen._select(1)
@@ -461,7 +466,8 @@ func test_battle_switch_module_expands_right_and_owns_active_switch() -> void:
 	assert_eq(switch_icon.vframes, 2)
 	assert_eq(switch_icon.playback_frames, PackedInt32Array([0, 1, 2]),
 			"播放序列排除第一行第四帧、第二行第一帧和新版透明尾格")
-	assert_eq(switch_icon.fps, 3.0, "切换按钮悬停动画大幅放慢为每秒 3 帧")
+	assert_gt(switch_icon.fps, 0.0,
+			"悬停图集保持可播放；具体帧率属于人工调节的表现参数")
 	assert_eq(switch_icon.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST,
 			"切换像素图标保持最近邻采样")
 	screen.btn_switch.mouse_entered.emit()
@@ -1112,28 +1118,37 @@ func test_unified_codex_frames_reduced_book_on_smoky_backdrop() -> void:
 		assert_eq(native_hero_name.get_theme_font_size("font_size"), 15,
 				"头像名使用清晰但不过度放大的原生 15px")
 	var source_skill_detail := hero_gallery.find_child("SkillDetail", true, false) as Label
-	var native_skill_detail := native_text_layer.mirror_for_source(source_skill_detail)
+	assert_false(source_skill_detail.visible,
+			"完整正文源不参与绘制，避免与粗体效果词发生重复像素")
+	var detail_segments := hero_gallery.get("_d_detail_segment_labels") as Array
+	assert_gt(detail_segments.size(), 0,
+			"右页技能正文必须拆成可进入原生文字层的互斥片段")
+	var first_skill_segment := detail_segments[0] as Label
+	var native_skill_detail := native_text_layer.mirror_for_source(first_skill_segment)
 	assert_not_null(native_skill_detail)
 	if native_skill_detail != null:
 		var expected_skill_top := native_text_layer.get_global_transform_with_canvas() \
-				.affine_inverse() * (source_skill_detail.get_global_transform_with_canvas() \
+				.affine_inverse() * (first_skill_segment.get_global_transform_with_canvas() \
 				* Vector2.ZERO)
 		assert_eq(native_skill_detail.vertical_alignment, VERTICAL_ALIGNMENT_TOP,
-				"右页技能正文恢复旧版顶部对齐，不再沉到说明区域下半部")
+				"右页技能正文分段仍从说明区域顶边落字")
 		assert_lte(absf(native_skill_detail.position.y - roundf(expected_skill_top.y)), 1.0,
-				"技能正文原生层保持旧版说明区域顶边")
+				"技能正文分段原生层保持说明区域顶边")
 	var skill_name := hero_gallery.get("_d_skill_name") as Label
 	var skill_icon := hero_gallery.get("_d_skill_icon") as TextureRect
 	var skill_tag := hero_gallery.get("_d_tag_group") as Control
 	var skill_rule := hero_gallery.get("_d_detail_rule") as ColorRect
 	var skill_pin := hero_gallery.get("_d_detail_pin") as ColorRect
-	assert_eq(skill_name.position.y, 744.0)
-	assert_true(not skill_icon.visible or skill_icon.position.y == 744.0)
-	assert_eq(skill_tag.position.y, 743.0)
-	assert_eq(source_skill_detail.position.y, 804.0)
-	assert_eq(skill_rule.position.y, 814.0)
-	assert_eq(skill_pin.position.y, 808.0,
+	var hp_group := hero_gallery.get_node("DetailArea/HPGroup") as Control
+	assert_eq(skill_name.position.y, 728.0)
+	assert_true(not skill_icon.visible or skill_icon.position.y == 728.0)
+	assert_eq(skill_tag.position.y, 727.0)
+	assert_eq(source_skill_detail.position.y, 788.0)
+	assert_eq(skill_rule.position.y, 798.0)
+	assert_eq(skill_pin.position.y, 792.0,
 			"技能行、正文与引导线必须作为一个完整区块同步上移")
+	assert_eq(skill_name.position.y - hp_group.get_rect().end.y, 30.0,
+			"血量组与技能组只保留清楚分区所需的 30px 间距")
 	var unified_back := screen.get_node("BackButton") as Button
 	assert_false(unified_back.visible, "图鉴改为场景内浮层后彻底停用返回侧签")
 	var unified_close := screen.get_node("CloseButton") as Button

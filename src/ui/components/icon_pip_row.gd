@@ -103,7 +103,7 @@ extends Control
 	set(v):
 		empty_modulate = v
 		queue_redraw()
-## 护盾覆盖色（银灰；先把心形去色再 × 本色 → 真银灰，不受红心原色影响）。
+## 护甲覆盖色（银灰；先把心形去色再 × 本色 → 真银灰，不受红心原色影响）。
 @export var extra_modulate: Color = Color(0.92, 0.94, 0.98, 1.0):
 	set(v):
 		extra_modulate = v
@@ -153,7 +153,7 @@ extends Control
 var _cur: float = 0.0
 var _max: float = 0.0
 var _extra: float = 0.0
-var _gray_tex: Texture2D = null   # 去色版心形(护盾银灰覆盖用；× extra_modulate = 真银灰)
+var _gray_tex: Texture2D = null   # 去色版心形(护甲银灰覆盖用；× extra_modulate = 真银灰)
 
 # 每个图标点独立的 idle 状态（错峰、偶发播放）。索引 = 槽位。
 var _phase: PackedFloat32Array = PackedFloat32Array()   # 当前段已过时间
@@ -191,7 +191,7 @@ func _process(delta: float) -> void:
 
 
 ## 低血红闪：当前值/上限 ≤ low_hp_ratio 时推进相位、每帧重绘（满/半心脉动）；
-## 恢复后重绘一次复位。空心与护盾不受影响（仅剩余血量爱心闪）。
+## 恢复后重绘一次复位。空心与护甲不受影响（仅剩余血量爱心闪）。
 func _process_low_hp_flash(delta: float) -> void:
 	var lowhp := _max > 0.0 and _cur > 0.0 and (_cur / _max) <= low_hp_ratio
 	if lowhp:
@@ -300,13 +300,13 @@ func _draw() -> void:
 	var extra_full := int(floor(extra + 0.0001))
 	var extra_half := allow_half and (extra - float(extra_full)) >= 0.49
 
-	# 总宽取「血量段」与「护盾段」较大者：护盾灰色覆盖叠在血量爱心上(从最左起)，
-	# 仅当护盾多于血量槽位时才向右延伸。空心不跳但仍占槽位以对齐索引。
+	# 总宽取「血量段」与「护甲段」较大者：护甲灰色覆盖叠在血量爱心上(从最左起)，
+	# 仅当护甲多于血量槽位时才向右延伸。空心不跳但仍占槽位以对齐索引。
 	var extra_slots := extra_full + (1 if extra_half else 0)
 	_slot_count = maxi(filled + empties, extra_slots)
 	_ensure_slots(_slot_count)
 
-	# 每个槽只画一次第 0 帧轮廓阴影；血量/空槽/护盾覆盖不会重复叠黑。
+	# 每个槽只画一次第 0 帧轮廓阴影；血量/空槽/护甲覆盖不会重复叠黑。
 	if bottom_shadow_enabled:
 		for shadow_index in range(_slot_count):
 			_draw_pip_shadow(shadow_index)
@@ -336,14 +336,14 @@ func _draw() -> void:
 		_draw_pip(slot, 1.0, empty_modulate, false)
 		slot += 1
 
-	# 第二层：护盾银灰覆盖。从最左(slot 0)起叠在血量爱心之上；用去色心形 ×
+	# 第二层：护甲银灰覆盖。从最左(slot 0)起叠在血量爱心之上；用去色心形 ×
 	# 银灰 extra_modulate → 真银灰(不受红心原色影响)；半格/整格同血量；不跳动。
 	var shield_tex: Texture2D = _gray_tex if _gray_tex != null else sheet
 	var sslot := 0
-	for _i in range(extra_full):             # 护盾满格
+	for _i in range(extra_full):             # 护甲满格
 		_draw_pip(sslot, 1.0, extra_modulate, false, shield_tex)
 		sslot += 1
-	if extra_half:                           # 护盾半格
+	if extra_half:                           # 护甲半格
 		_draw_pip(sslot, 0.5, extra_modulate, false, shield_tex)
 		sslot += 1
 
@@ -408,7 +408,7 @@ func _draw_pip_shadow(index: int) -> void:
 	draw_texture_rect_region(sheet, destination, source, bottom_shadow_color)
 
 
-## 生成去色版心形纹理：护盾用它 × 银灰 extra_modulate 得到真银灰
+## 生成去色版心形纹理：护甲用它 × 银灰 extra_modulate 得到真银灰
 ## （红心原色经乘法只会变暗红，必须先去色为灰度再上色）。sheet 变更时重建一次。
 func _rebuild_gray_tex() -> void:
 	if sheet == null:

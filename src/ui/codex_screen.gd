@@ -1,19 +1,22 @@
 extends Control
 class_name CodexScreen
 
-## 英雄与道具共享同一本图鉴；此节点负责烟褐衬底、统一缩书构图与左缘夹页索引。
-## 两套成熟书页仍在各自的 1920x1080 设计坐标中运行，不重排内部节点。
+## 英雄、道具与效果共享同一本图鉴；此节点负责烟褐衬底、统一缩书构图与左缘夹页索引。
+## 三套书页仍在各自的 1920x1080 设计坐标中运行，不重排内部节点。
 
 signal section_changed(section: int)
 
-enum Section { HERO, ITEM }
+enum Section { HERO, ITEM, EFFECT }
 
 const MAIN_MENU_SCENE := "res://src/ui/main_menu.tscn"
 const GALLERY_SCENES: Array[PackedScene] = [
 	preload("res://src/ui/hero_gallery_screen.tscn"),
 	preload("res://src/ui/item_gallery_screen.tscn"),
+	preload("res://src/ui/effect_gallery_screen.tscn"),
 ]
-const GALLERY_NODE_PATHS: Array[NodePath] = [NodePath("HeroGallery"), NodePath("ItemGallery")]
+const GALLERY_NODE_PATHS: Array[NodePath] = [
+	NodePath("HeroGallery"), NodePath("ItemGallery"), NodePath("EffectGallery"),
+]
 const ItemCatalogScript := preload("res://src/battle/item_catalog.gd")
 const DESIGN_SIZE := Vector2(1920.0, 1080.0)
 const BOOK_SCALE := Vector2(0.84, 0.84)
@@ -43,6 +46,8 @@ const OVERLAY_CLOSE_DROP := Vector2(0.0, 10.0)
 const TAB_HOVER_DURATION := 0.07
 const PRESS_RELEASE_DURATION := 0.04
 const RARITY_TARGET_Y: Array[float] = [0.0, 50.0, 100.0]
+const EFFECT_BOOKMARK_REST_Y := 366.75
+const EFFECT_BOOKMARK_ITEM_Y := 532.75
 const CHAPTER_IDLE_TEXT_INSET := 26.0
 const RARITY_IDLE_TEXT_INSET := 17.0
 const BACK_IDLE_COLOR := INK_SOFT
@@ -59,7 +64,7 @@ const CLOSE_STYLE_STATES: Array[StringName] = [
 	&"hover_pressed_mirrored", &"disabled_mirrored",
 ]
 
-@export_enum("英雄", "道具") var initial_section: int = Section.HERO
+@export_enum("英雄", "道具", "效果") var initial_section: int = Section.HERO
 @export_group("侧签选中动画", "bookmark_fold_")
 ## 越接近 1，纸签收窄幅度越小；建议保持在 0.70–0.88。
 @export_range(0.55, 0.92, 0.01) var bookmark_fold_min_scale := 0.78
@@ -73,6 +78,7 @@ const CLOSE_STYLE_STATES: Array[StringName] = [
 @onready var bookmark_layer: Control = $BookmarkLayer
 @onready var hero_bookmark: Button = $BookmarkLayer/HeroBookmark
 @onready var item_bookmark: Button = $BookmarkLayer/ItemBookmark
+@onready var effect_bookmark: Button = $BookmarkLayer/EffectBookmark
 @onready var rarity_bookmarks: Control = $BookmarkLayer/RarityBookmarks
 @onready var rarity_buttons: Array[Button] = [
 	$BookmarkLayer/RarityBookmarks/Normal,
@@ -87,7 +93,7 @@ const CLOSE_STYLE_STATES: Array[StringName] = [
 
 var embedded_close: Callable = Callable()
 var current_section: int = -1
-var _galleries: Array[Control] = [null, null]
+var _galleries: Array[Control] = [null, null, null]
 var _tab_tweens: Dictionary = {}
 var _hover_tweens: Dictionary = {}
 var _press_tweens: Dictionary = {}
@@ -101,9 +107,11 @@ var _overlay_close_tween: Tween
 
 func _ready() -> void:
 	# 主签始终压在二级签上方；二级签只离散显隐，不再做弹性位移。
+	effect_bookmark.move_to_front()
 	item_bookmark.move_to_front()
 	hero_bookmark.pressed.connect(show_section.bind(Section.HERO))
 	item_bookmark.pressed.connect(show_section.bind(Section.ITEM))
+	effect_bookmark.pressed.connect(show_section.bind(Section.EFFECT))
 	for index: int in rarity_buttons.size():
 		rarity_buttons[index].pressed.connect(_on_rarity_pressed.bind(index + 1))
 	for button: Button in _all_bookmarks():
@@ -122,14 +130,14 @@ func _ready() -> void:
 	# 图鉴已经统一为场景内浮层；旧返回签只保留为历史节点，不再参与运行时布局或输入。
 	back_button.visible = false
 	back_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# 两个章节都在首帧预热并保持隐藏，切换时不会再暴露子图鉴的透明入场帧。
-	for section: int in [Section.HERO, Section.ITEM]:
+	# 三个章节都在首帧预热并保持隐藏，切换时不会再暴露子图鉴的透明入场帧。
+	for section: int in [Section.HERO, Section.ITEM, Section.EFFECT]:
 		get_gallery(section)
-	show_section(clampi(initial_section, Section.HERO, Section.ITEM))
+	show_section(clampi(initial_section, Section.HERO, Section.EFFECT))
 
 
 func show_section(section: int) -> void:
-	var safe_section := clampi(section, Section.HERO, Section.ITEM)
+	var safe_section := clampi(section, Section.HERO, Section.EFFECT)
 	var previous_section := current_section
 	var gallery := get_gallery(safe_section)
 	# 每次重新进入道具章节都从普通第一页开始；缓存只复用节点，不再复用浏览位置。
@@ -146,6 +154,7 @@ func show_section(section: int) -> void:
 	native_text_layer.set_source_root(gallery)
 	var animate := previous_section >= 0 and previous_section != current_section
 	_refresh_chapter_bookmarks(animate)
+	_position_effect_bookmark(current_section == Section.ITEM, animate)
 	if current_section == Section.ITEM:
 		_open_rarity_bookmarks(animate)
 		_refresh_rarity_bookmarks(_item_tier(gallery), animate)
@@ -234,7 +243,7 @@ func play_overlay_close_animation() -> void:
 
 
 func get_gallery(section: int) -> Control:
-	var safe_section := clampi(section, Section.HERO, Section.ITEM)
+	var safe_section := clampi(section, Section.HERO, Section.EFFECT)
 	if _galleries[safe_section] != null:
 		return _galleries[safe_section]
 	# 两页作为 PackedScene 实例保存在 tscn 中，编辑器无需 F6 即可看到真实书本资产。
@@ -260,7 +269,7 @@ func get_gallery(section: int) -> Control:
 
 
 func _apply_bookmark_fonts() -> void:
-	for button: Button in [hero_bookmark, item_bookmark]:
+	for button: Button in [hero_bookmark, item_bookmark, effect_bookmark]:
 		FontManager.apply_btn(button, 22)
 		_prepare_bookmark_state_text(button, 22, CHAPTER_IDLE_TEXT_INSET)
 	for button: Button in rarity_buttons:
@@ -319,6 +328,7 @@ func _apply_rarity_stripe_colors() -> void:
 func _refresh_chapter_bookmarks(animate: bool = true) -> void:
 	_set_bookmark_state(hero_bookmark, current_section == Section.HERO, animate)
 	_set_bookmark_state(item_bookmark, current_section == Section.ITEM, animate)
+	_set_bookmark_state(effect_bookmark, current_section == Section.EFFECT, animate)
 
 
 func _refresh_rarity_bookmarks(tier: int, animate: bool = true) -> void:
@@ -332,7 +342,7 @@ func _set_bookmark_state(button: Button, selected: bool, animate: bool) -> void:
 	var state_changed := had_state and previous_selected != selected
 	_bookmark_selected_states[button] = selected
 	button.button_pressed = selected
-	var chapter := button == hero_bookmark or button == item_bookmark
+	var chapter := button in [hero_bookmark, item_bookmark, effect_bookmark]
 	var selected_x := CHAPTER_SELECTED_X if chapter else RARITY_SELECTED_X
 	var idle_x := CHAPTER_IDLE_X if chapter else RARITY_IDLE_X
 	var target_x := selected_x if selected else idle_x
@@ -485,6 +495,14 @@ func _finish_rarity_close() -> void:
 		button.mouse_filter = Control.MOUSE_FILTER_STOP
 
 
+## 道具展开二级稀有度签时，把下一枚主签顺势下排；离开道具后恢复紧凑主签间距。
+## 只移动新增的效果签，不改已经通过的英雄、道具与稀有度坐标。
+func _position_effect_bookmark(after_rarity: bool, _animate: bool) -> void:
+	var target_y := EFFECT_BOOKMARK_ITEM_Y if after_rarity else EFFECT_BOOKMARK_REST_Y
+	# 点击矩形与纸签画面必须始终一致；这里做离散插入，不给主签留下移动中的误触区域。
+	effect_bookmark.position.y = target_y
+
+
 func _on_bookmark_down(button: Button) -> void:
 	_kill_press_tween(button)
 	# visual-only 位移不改变点击矩形，也不会破坏侧签与书封的静态接缝。
@@ -617,6 +635,8 @@ func _is_bookmark_selected(button: Button) -> bool:
 		return current_section == Section.HERO
 	if button == item_bookmark:
 		return current_section == Section.ITEM
+	if button == effect_bookmark:
+		return current_section == Section.EFFECT
 	var rarity_index := rarity_buttons.find(button)
 	if rarity_index < 0 or current_section != Section.ITEM:
 		return false
@@ -624,7 +644,7 @@ func _is_bookmark_selected(button: Button) -> bool:
 
 
 func _all_bookmarks() -> Array[Button]:
-	var buttons: Array[Button] = [hero_bookmark, item_bookmark]
+	var buttons: Array[Button] = [hero_bookmark, item_bookmark, effect_bookmark]
 	buttons.append_array(rarity_buttons)
 	return buttons
 

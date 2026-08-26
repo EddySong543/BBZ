@@ -9,20 +9,20 @@ extends Control
 ## wave_* 同名同义）→ 换节点即可，battle_screen 调用侧零改动。
 ##
 ## **一格 = 一滴血**（Eddy 2026-07-18 定 A 案）：6 血英雄就是 6 格，半滴血裁半格。
-## max_cells=10 = 可拓展上限（护盾往外接时才够得着·英雄本身 4~7 血）。
+## max_cells=10 = 可拓展上限（护甲往外接时才够得着·英雄本身 4~7 血）。
 ##
-## **排布**（自原点向外）：血量 [0, hp) → 空槽补到 max；护盾**自格 0（靠头像那头）起
+## **排布**（自原点向外）：血量 [0, hp) → 空槽补到 max；护甲**自格 0（靠头像那头）起
 ## 覆盖式压在血量上**，盖满整条（sh ≥ max）之后多出来的部分才往外接新格，总长封顶 max_cells
 ## （Eddy 2026-07-18 二改：先覆盖后接长·取代"接在血量尖端外"）。
 ##
 ## **绘制层次**（自底向上）：长平行四边形暗底（含内缝）→ 空槽 → 血量（身/顶高光/底压暗
-## 三段材质·同底部按钮派生规则）→ 护盾银灰。
+## 三段材质·同底部按钮派生规则）→ 护甲银灰。
 ##
 ## 颜色取自 design/ui-design-system.md §2.7 功能色（HUD）。
 
 # ── 取值 ──────────────────────────────────────────────
 @export_group("格数与取值")
-## 可拓展的总格数上限（血量+护盾）。英雄自身 4~7 血，余量留给护盾往外接。
+## 可拓展的总格数上限（血量+护甲）。英雄自身 4~7 血，余量留给护甲往外接。
 @export var max_cells: int = 10:
 	set(v):
 		max_cells = maxi(v, 1)
@@ -100,17 +100,17 @@ extends Control
 	set(v):
 		col_backing = v
 		queue_redraw()
-## 护盾覆盖块身（银灰）。
+## 护甲覆盖块身（银灰）。
 @export var col_shield: Color = Color("#dcdfe6"):
 	set(v):
 		col_shield = v
 		queue_redraw()
-## 护盾顶部高光。
+## 护甲顶部高光。
 @export var col_shield_top: Color = Color("#f4f6fa"):
 	set(v):
 		col_shield_top = v
 		queue_redraw()
-## 护盾底部压暗。
+## 护甲底部压暗。
 @export var col_shield_bottom: Color = Color("#9ea4ae"):
 	set(v):
 		col_shield_bottom = v
@@ -242,7 +242,7 @@ func _process_wave(delta: float) -> void:
 		queue_redraw()
 
 
-## 设置显示值（半点制小数）。extra = 护盾/护甲（银灰覆盖层）。
+## 设置显示值（半点制小数）。extra = 护甲/护甲（银灰覆盖层）。
 func set_value(cur: float, max_val: float, extra: float = 0.0) -> void:
 	_cur = maxf(cur, 0.0)
 	_max = maxf(max_val, 0.0)
@@ -274,7 +274,7 @@ func _draw() -> void:
 	# 一格 = 一滴血 → 下面全部用「格」为单位算（cap 之外一律不画）
 	var cap := float(max_cells)
 	var hp := clampf(cur, 0.0, cap)
-	var sh := clampf(extra, 0.0, cap)      # 护盾：自头像侧（格 0）起覆盖，盖满整条才往外加格
+	var sh := clampf(extra, 0.0, cap)      # 护甲：自头像侧（格 0）起覆盖，盖满整条才往外加格
 	var span := minf(maxf(maxv, sh), cap)  # 条身总长：盾多于血量上限时才撑出去
 	var total := maxi(int(ceil(span - 0.0001)), 1)
 	_slot_count = total
@@ -289,13 +289,13 @@ func _draw() -> void:
 	# ① 长平行四边形暗底：格与格之间的缝、外框都由它露出 → "拼贴成一条"的读法
 	draw_colored_polygon(_backing_quad(total), col_backing)
 
-	# ② 空槽打底（已失去的血量·安静不跳动）；上面再依次盖血量与护盾
+	# ② 空槽打底（已失去的血量·安静不跳动）；上面再依次盖血量与护甲
 	_draw_span(0.0, span, col_empty, col_empty, col_empty)
 
 	# ③ 血量：整格 + 末尾半格（半滴血裁半格）·逐格取实时色（低血警示 + 波纹）
 	_draw_span_live(0.0, hp)
 
-	# ④ 护盾：自格 0（靠头像那头）起覆盖式压在血量上；盖满 max 后多出来的部分往外接新格
+	# ④ 护甲：自格 0（靠头像那头）起覆盖式压在血量上；盖满 max 后多出来的部分往外接新格
 	_draw_span(0.0, sh, col_shield, col_shield_top, col_shield_bottom)
 
 

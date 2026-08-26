@@ -8,7 +8,6 @@ signal tier_changed(tier: int)
 ## 三档按书页连续浏览；当前道具的稀有度只在右页图案下方展示。
 
 const SELECTION_MARKER_SCRIPT := preload("res://src/ui/components/hero_gallery_selection_marker.gd")
-const LEGENDARY_BG := ItemFrameStyle.LEGENDARY_TEXTURE
 const ITEM_FRAME_TEX := ItemFrameStyle.FRAME_TEXTURE
 const TIER_LABEL := {1: "普通", 2: "稀有", 3: "传说"}
 const TIER_TAG_COLOR := {
@@ -17,8 +16,6 @@ const TIER_TAG_COLOR := {
 	3: ItemCatalog.RARITY_LEGENDARY,
 }
 const DETAIL_NAME_INK := Color("302820")
-const LEGENDARY_BG_TINT := ItemFrameStyle.LEGENDARY_TINT
-const LEGENDARY_TOP_DARKENING := ItemFrameStyle.LEGENDARY_TOP_DARKENING
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
 
 # 道具格恢复与战斗道具栏完全同源的格底 shader 与三阶配色。
@@ -33,7 +30,7 @@ const SELECTED_NAME_INK := Color("9A6828")
 
 const INK := Color(0.24, 0.19, 0.12)           # 墨（亮页主文字）
 const INK_DIM := Color(0.48, 0.41, 0.28)       # 淡墨（次级/划线/注记）
-# 恢复三阶渐变方案：普通/稀有格底上暗下亮，外框按母版明暗区映射蓝/紫/金。
+# 方案 2：三档高识别上深下亮渐变，外框按母版明暗区映射同色系蓝 / 紫 / 金。
 const CELL_FILL := ItemFrameStyle.CELL_TOP
 const CELL_CENTER := ItemFrameStyle.CELL_BOTTOM
 const FRAME_SHADOW := ItemFrameStyle.FRAME_SHADOW
@@ -94,6 +91,10 @@ var _sel_tweens: Array[Tween] = []  # 选中动效 tween（pop+呼吸·换选先
 @onready var page_indicator: Label = $PoolArea/PageNavigation/PageIndicator
 @onready var next_page_btn: Button = $PoolArea/PageNavigation/NextPage
 @onready var detail_area: Control = $DetailArea
+@onready var detail_navigation: Control = $DetailArea/DetailNavigation
+@onready var previous_detail_btn: Button = $DetailArea/DetailNavigation/PreviousItem
+@onready var detail_indicator: Label = $DetailArea/DetailNavigation/ItemIndicator
+@onready var next_detail_btn: Button = $DetailArea/DetailNavigation/NextItem
 @onready var _book_layer: Control = $BookLayer
 @onready var back_btn: Button = $TopBand/BackButton
 @onready var title_lbl: Label = $TopBand/Title
@@ -105,6 +106,7 @@ func _ready() -> void:
 	_setup_top()
 	_build_detail_panel()
 	_setup_page_navigation()
+	_setup_detail_navigation()
 	_select_tier(1)
 	if not embedded_in_codex:
 		_play_intro()
@@ -164,6 +166,53 @@ func _setup_page_navigation() -> void:
 			juice.name = "ButtonJuice"
 			button.add_child(juice)
 	_refresh_page_visibility()
+
+
+func _setup_detail_navigation() -> void:
+	previous_detail_btn.pressed.connect(_turn_detail.bind(-1))
+	next_detail_btn.pressed.connect(_turn_detail.bind(1))
+	for button: Button in [previous_detail_btn, next_detail_btn]:
+		if button.get_node_or_null("ButtonJuice") == null:
+			var juice := ButtonJuice.new()
+			juice.name = "ButtonJuice"
+			button.add_child(juice)
+	_refresh_detail_navigation()
+
+
+func _catalog_item_count() -> int:
+	var total := 0
+	for tier: int in range(1, 4):
+		total += ItemCatalog.all_for_tier(tier).size()
+	return total
+
+
+func _global_item_index() -> int:
+	var index := maxi(_sel_idx, 0)
+	for tier: int in range(1, _tier):
+		index += ItemCatalog.all_for_tier(tier).size()
+	return index
+
+
+func _refresh_detail_navigation() -> void:
+	var total := _catalog_item_count()
+	detail_navigation.visible = total > 0
+	var current := clampi(_global_item_index(), 0, maxi(total - 1, 0))
+	detail_indicator.text = "%02d / %02d" % [current + 1, total] if total > 0 else "00 / 00"
+	previous_detail_btn.disabled = total == 0 or current <= 0
+	next_detail_btn.disabled = total == 0 or current >= total - 1
+
+
+func _turn_detail(direction: int) -> void:
+	var total := _catalog_item_count()
+	if total == 0:
+		return
+	var target := clampi(_global_item_index() + direction, 0, total - 1)
+	for tier: int in range(1, 4):
+		var tier_items: Array[ItemData] = ItemCatalog.all_for_tier(tier)
+		if target < tier_items.size():
+			_load_tier_item(tier, target)
+			return
+		target -= tier_items.size()
 
 
 func _grid_float(property_name: StringName, fallback: float) -> float:
@@ -370,7 +419,7 @@ func _make_item_card(item: ItemData, idx: int) -> Button:
 	for s in ["normal", "hover", "pressed", "focus", "disabled"]:
 		card.add_theme_stylebox_override(s, StyleBoxEmpty.new())
 	card.add_child(_make_selection_pointer(box))
-	# 格底：深炭中性格（ref15——亮页上的暗格·彩色图标自己跳）；传说铺金云纹美术。
+	# 格底：三档均使用稀有度整格纵向渐变填充。
 	var slot_rect := Rect2(Vector2.ZERO, Vector2(box, box))
 	var frame_position := slot_rect.position + slot_rect.size * FRAME_OFFSET_RATIO
 	var frame_size := slot_rect.size * FRAME_ART_SCALE
@@ -520,8 +569,10 @@ func _select(idx: int) -> void:
 	_d_rarity_mark.set("passive_color", tag_color)
 	_d_rarity_mark.set("active_color", tag_color)
 	_d_rarity_mark.call("set_passive", true)
-	_d_desc.text = tr(it.description)
+	# 与英雄说明一致从固定顶边起笔；垂直居中会让不同换行数的首行高度发生跳动。
+	_d_desc.text = tr(it.description).strip_edges()
 	_d_flavor.text = tr(it.flavor)
+	_refresh_detail_navigation()
 
 
 ## 选中动效：真实框立即转金，英雄图鉴同款粗像素棕色箭头轻推入并静止。

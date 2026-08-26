@@ -30,12 +30,12 @@ const DIM_COLOR := {
 }
 
 ## 道具框形式（2026-06-28 Eddy：战斗道具栏统一为「道具图鉴」同款形式）：
-##   双层 = 暗格底 canvas_ui_item_cell_bg（稀有度暗底 + 中心高亮 + 传说金底图）+ 稀有度像素框 canvas_ui_pixel_frame。
-##   与 item_gallery_screen 完全同源（像素框 + 暗格 + 居中图标 + 全圆角）。jelly 仅保留给右上「升」角标。
+##   双层 = 稀有度完整渐变格底 canvas_ui_item_cell_bg + 同色系像素框。
+##   与 item_gallery_screen 完全同源（像素框 + 渐变格 + 居中图标 + 全圆角）。jelly 仅保留给右上「升」角标。
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")        # 点选金晕外环用（框本体全走回纹贴图）
 const FRAME_PALETTE_SHADER := ItemFrameStyle.FRAME_SHADER
 const ITEM_FRAME_TEX := ItemFrameStyle.FRAME_TEXTURE
-# 格底内外色（2026-07-13 与图鉴同源定版：四角=深饱和阶色·中心=略浅阶色·传说走 gold_bottom）。
+# 格底上下色与图鉴同源：普通 / 稀有 / 传说统一使用明快纵向渐变。
 const CELL_FILL_T := ItemFrameStyle.CELL_TOP
 const CELL_CENTER_T := ItemFrameStyle.CELL_BOTTOM
 const FRAME_SHADOW_T := ItemFrameStyle.FRAME_SHADOW
@@ -43,9 +43,6 @@ const FRAME_MID_T := ItemFrameStyle.FRAME_MID
 const FRAME_HIGHLIGHT_T := ItemFrameStyle.FRAME_HIGHLIGHT
 const CELL_BG_SHADER := ItemFrameStyle.CELL_SHADER
 const JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")          # 仅「升」角标用
-const LEGENDARY_BG := ItemFrameStyle.LEGENDARY_TEXTURE
-const LEGENDARY_BG_TINT := ItemFrameStyle.LEGENDARY_TINT
-const LEGENDARY_TOP_DARKENING := ItemFrameStyle.LEGENDARY_TOP_DARKENING
 const FRAME_EDGE_OUTER := Color(0.16, 0.10, 0.06)   # 框外轮廓=深咖（与图鉴同）
 const FRAME_ART_SIZE := Vector2.ONE * SLOT_W * ItemFrameStyle.FRAME_ART_SCALE
 const FRAME_ART_OFFSET := Vector2(SLOT_W, SLOT_H) * ItemFrameStyle.FRAME_OFFSET_RATIO
@@ -503,7 +500,6 @@ func refresh(battle: BattleCore, player: int, staged: Array = [], concealed: boo
 		var fb := SEAL_FB                   # = 格底四角色（fill_color）
 		var glow := 0.0
 		var cell_inner := Color.WHITE
-		var legend := false
 		var has_item := false
 		var sealed := st == BattleCore.SlotState.SEALED
 		var locked_item := false           # 有道具但冷却锁中
@@ -537,9 +533,8 @@ func refresh(battle: BattleCore, player: int, staged: Array = [], concealed: boo
 			BattleCore.SlotState.CHARGING:
 				var item: ItemData = null if concealed else battle.slot_item(player, i)
 				has_item = item != null
-				legend = has_item and item.tier >= 3        # 传说 → 格底用 gold_bottom 金底图
 				if has_item:
-					glow = 0.0 if legend else 1.0
+					glow = 1.0
 				var tier_key: int = item.tier if item != null else 1
 				cur_tier = tier_key
 				var c_out: Color = CELL_FILL_T.get(tier_key, CELL_FILL_T[1])
@@ -591,7 +586,7 @@ func refresh(battle: BattleCore, player: int, staged: Array = [], concealed: boo
 		# 格底应用
 		var cmat: ShaderMaterial = _cell_mats[i]
 		if has_item:
-			# 统一样式负责阶色、纵向渐变与传说贴图；战斗状态只附加锁定压暗。
+			# 统一样式负责三档阶色与纵向渐变；战斗状态只附加锁定压暗。
 			var state_tint := Color(0.68, 0.68, 0.68, 1.0) if locked_item else Color.WHITE
 			ItemFrameStyle.apply_cell_palette(cmat, cur_tier, state_tint)
 		else:
@@ -707,7 +702,7 @@ func _play_seal_tear(i: int, mini: bool, end_mod: Color, flash: bool = true) -> 
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 
-## 芯片底色（2026-06-26 Eddy：改按【稀有度】而非维度——普通灰/稀有蓝/传说金·与图鉴/抽卡同源）。
+## 芯片底色按【稀有度】而非维度：普通蓝 / 稀有紫 / 传说金，与图鉴 / 抽卡同源。
 func _rarity_color(item: ItemData) -> Color:
 	if item == null:
 		return SEAL_FT

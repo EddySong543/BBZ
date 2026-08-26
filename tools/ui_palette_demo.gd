@@ -30,7 +30,7 @@ const SLOTS := [
 	["可开", Color("57524a"), Color("3a352e"), Color("d8b85a"), false], # SEALED 可开（金边提示）
 	["可抽", Color("57524a"), Color("3a352e"), Color("d8b85a"), false], # OPENED 可抽
 	["飞镖", Color("c05038"), Color("8a2e1f"), Color("ffd86a"), true],  # 进攻就绪（红+金边+升）
-	["护盾", Color("4a7ab8"), Color("2c5288"), Color("ffd86a"), true],  # 防御就绪（蓝+金边+升）
+	["护甲", Color("4a7ab8"), Color("2c5288"), Color("ffd86a"), true],  # 防御就绪（蓝+金边+升）
 	["可补", Color("242329"), Color("17171c"), Color("3a3a42"), false], # EMPTY 空格
 ]
 

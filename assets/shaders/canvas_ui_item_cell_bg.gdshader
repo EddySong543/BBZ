@@ -12,7 +12,7 @@ group_uniforms palette;
 uniform vec4 fill_color : source_color = vec4(0.20, 0.10, 0.08, 1.0); // 稀有度深底（=外框色深调）
 uniform vec4 cloud_color : source_color = vec4(0.97, 0.84, 0.50, 1.0); // 云纹金
 uniform float fill_opaque : hint_range(0.0, 1.0) = 1.0; // 1=实底(图鉴) / 0=仅云纹叠加层(战斗·覆在 jelly 芯片上)
-uniform sampler2D bg_tex : source_color, filter_linear_mipmap; // 传说背景美术图(gold_bottom)·use_tex=1 启用
+uniform sampler2D bg_tex : source_color, filter_linear_mipmap; // 兼容旧背景图；当前三档统一 use_tex=0
 uniform float use_tex = 0.0;                            // 0=程序底色+云纹 / 1=采样 bg_tex 当格底(传说·替代程序云纹)
 uniform vec4 tex_tint : source_color = vec4(1.0, 1.0, 1.0, 1.0); // 纹理压暗去饱和(与暗格协调不出戏)
 uniform float tex_top_darkening : hint_range(0.0, 0.4, 0.01) = 0.0; // 保留原贴图，只从顶部向中部轻压明度
@@ -27,7 +27,7 @@ uniform float corner_radius : hint_range(0.0, 0.4) = 0.18; // 圆角（与外框
 uniform float pixel_grid : hint_range(8.0, 64.0) = 24.0;   // 圆角像素台阶（=格 px/6·与框对齐）
 uniform float center_glow : hint_range(0.0, 1.0) = 0.0;    // 内外渐变强度（0=纯 fill_color / 1=中心全到 inner_color·凸显道具）
 uniform float glow_radius : hint_range(0.1, 0.9) = 0.55;   // (保留·当前内外渐变未用)
-uniform vec4 inner_color : source_color = vec4(1.0, 1.0, 1.0, 1.0); // 中心亮色（=稀有度亮调·参传说 gold_bottom 中心亮/四角深）
+uniform vec4 inner_color : source_color = vec4(1.0, 1.0, 1.0, 1.0); // 纵向渐变底部亮色
 uniform float vertical_gradient : hint_range(0.0, 1.0) = 0.0; // 1=上暗(fill_color)→下亮(inner_color)；默认保留径向模式
 uniform float material_lighting : hint_range(0.0, 1.0) = 0.0; // 1=偏上局部柔光+暗角+弱底部反光，代替整面轴向渐变
 // 与 round_mask / pixel_frame 同一套像素台阶圆角逻辑（多层一起切·不露方角）。
@@ -68,7 +68,7 @@ void fragment() {
 	// 两模式无分支切换：实底(fill_opaque=1·图鉴)=底色+云纹混入·不透明；叠加(=0·战斗)=仅金云·低 alpha 覆在芯片上
 	vec3 fill_col = mix(fill_color.rgb, cloud_color.rgb, cl);
 	// 非传说底色：中心 inner_color(亮) → 四角 fill_color(深) 径向渐变。
-	//   参传说 gold_bottom 实测内外区分（中心 V≈0.98 略浅 / 四角 V≈0.89 更深更饱和）→ 普通/稀有同款"亮而有内外层次"。
+	//   纵向模式由 fill_color 到 inner_color 完整铺满格底，不叠加暗色内填充。
 	float rr = clamp(distance(UV, vec2(0.5)) / 0.71, 0.0, 1.0);     // 0=中心 → 1=四角
 	float rad = (1.0 - smoothstep(0.0, 1.0, rr)) * center_glow;     // 1中心 → 0角（center_glow=渐变强度）
 	vec3 radial_proc = mix(fill_col, inner_color.rgb, rad);

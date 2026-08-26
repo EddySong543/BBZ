@@ -7,7 +7,6 @@
 [ext_resource type="Script" uid="uid://ntdtde68i8h7" path="res://src/ui/components/item_gallery_grid_preview.gd" id="5_grid_preview"]
 [ext_resource type="Shader" uid="uid://etbdxn4sd25v" path="res://assets/shaders/canvas_ui_item_cell_bg.gdshader" id="6_cell_shader"]
 [ext_resource type="Shader" uid="uid://bspwebgdg5hrs" path="res://assets/shaders/canvas_ui_item_frame_palette.gdshader" id="7_frame_shader"]
-[ext_resource type="Texture2D" uid="uid://b8h3484g6v8fj" path="res://assets/ui/gold_bottom.png" id="8_gold_bg"]
 [ext_resource type="Texture2D" uid="uid://84wmbgdlqwp1" path="res://assets/ui/item_frame.png" id="9_item_frame"]
 [ext_resource type="Script" uid="uid://bosrg5fr7rmtv" path="res://src/ui/components/hero_gallery_skill_type_mark.gd" id="10_type_mark"]
 
@@ -15,10 +14,9 @@
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_detail_cell"]
 shader = ExtResource("6_cell_shader")
-shader_parameter/fill_color = Color(0.243137, 0.466667, 0.741176, 1)
+shader_parameter/fill_color = Color(0.247059, 0.494118, 0.815686, 1)
 shader_parameter/cloud_color = Color(0.97, 0.84, 0.5, 1)
 shader_parameter/fill_opaque = 1.0
-shader_parameter/bg_tex = ExtResource("8_gold_bg")
 shader_parameter/use_tex = 0.0
 shader_parameter/tex_tint = Color(1, 1, 1, 1)
 shader_parameter/tex_top_darkening = 0.0
@@ -31,15 +29,15 @@ shader_parameter/corner_radius = 0.0
 shader_parameter/pixel_grid = 42.6667
 shader_parameter/center_glow = 1.0
 shader_parameter/glow_radius = 0.55
-shader_parameter/inner_color = Color(0.356863, 0.545098, 0.780392, 1)
+shader_parameter/inner_color = Color(0.396078, 0.627451, 0.890196, 1)
 shader_parameter/vertical_gradient = 1.0
 shader_parameter/material_lighting = 0.0
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_detail_frame"]
 shader = ExtResource("7_frame_shader")
-shader_parameter/shadow_color = Color(0.109804, 0.211765, 0.333333, 1)
-shader_parameter/mid_color = Color(0.243137, 0.466667, 0.741176, 1)
-shader_parameter/highlight_color = Color(0.607843, 0.721569, 0.866667, 1)
+shader_parameter/shadow_color = Color(0.180392, 0.388235, 0.619608, 1)
+shader_parameter/mid_color = Color(0.207843, 0.427451, 0.698039, 1)
+shader_parameter/highlight_color = Color(0.607843, 0.780392, 0.937255, 1)
 
 [node name="ItemGalleryScreen" type="Control" unique_id=1011365771]
 layout_mode = 3
@@ -167,6 +165,65 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
+[node name="DetailNavigation" type="Control" parent="DetailArea"]
+editor_description = "可视化编辑：右页逐个浏览入口；位置、字号和间距与左页分页行一致，运行时只更新个数与可用状态。"
+layout_mode = 0
+offset_left = 1099.0
+offset_top = 916.0
+offset_right = 1856.0
+offset_bottom = 970.0
+mouse_filter = 2
+
+[node name="PreviousItem" type="Button" parent="DetailArea/DetailNavigation"]
+layout_mode = 0
+offset_left = -38.0
+offset_right = 142.0
+offset_bottom = 54.0
+focus_mode = 0
+theme_override_colors/font_color = Color(0.278431, 0.227451, 0.168627, 0.9)
+theme_override_colors/font_pressed_color = Color(0.419608, 0.290196, 0.196078, 1)
+theme_override_colors/font_hover_color = Color(0.419608, 0.290196, 0.196078, 1)
+theme_override_colors/font_disabled_color = Color(0.439216, 0.4, 0.333333, 0.4)
+theme_override_fonts/font = ExtResource("4_font")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBoxEmpty_page")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_page")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_page")
+theme_override_styles/disabled = SubResource("StyleBoxEmpty_page")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_page")
+text = "上一个"
+
+[node name="ItemIndicator" type="Label" parent="DetailArea/DetailNavigation"]
+layout_mode = 0
+offset_left = 217.0
+offset_right = 397.0
+offset_bottom = 54.0
+theme_override_colors/font_color = Color(0.439216, 0.4, 0.333333, 0.68)
+theme_override_fonts/font = ExtResource("4_font")
+theme_override_font_sizes/font_size = 22
+text = "01 / 01"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="NextItem" type="Button" parent="DetailArea/DetailNavigation"]
+layout_mode = 0
+offset_left = 472.0
+offset_right = 652.0
+offset_bottom = 54.0
+focus_mode = 0
+theme_override_colors/font_color = Color(0.278431, 0.227451, 0.168627, 0.9)
+theme_override_colors/font_pressed_color = Color(0.419608, 0.290196, 0.196078, 1)
+theme_override_colors/font_hover_color = Color(0.419608, 0.290196, 0.196078, 1)
+theme_override_colors/font_disabled_color = Color(0.439216, 0.4, 0.333333, 0.4)
+theme_override_fonts/font = ExtResource("4_font")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBoxEmpty_page")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_page")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_page")
+theme_override_styles/disabled = SubResource("StyleBoxEmpty_page")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_page")
+text = "下一个"
+
 [node name="ItemName" type="Label" parent="DetailArea" unique_id=766983032]
 editor_description = "可视化编辑：右页道具名。运行时只更新文字，始终保持统一书页墨黑色。"
 layout_mode = 0
@@ -256,8 +313,8 @@ offset_right = 80.0
 offset_bottom = 34.0
 mouse_filter = 2
 script = ExtResource("10_type_mark")
-passive_color = Color(0.243137, 0.466667, 0.741176, 1)
-active_color = Color(0.243137, 0.466667, 0.741176, 1)
+passive_color = Color(0.247059, 0.494118, 0.815686, 1)
+active_color = Color(0.247059, 0.494118, 0.815686, 1)
 edge_alpha = 0.55
 
 [node name="BadgeLabel" type="Label" parent="DetailArea/RarityBadge" unique_id=1755782194]
@@ -281,22 +338,22 @@ layout_mode = 0
 offset_left = 1028.0
 offset_top = 690.0
 offset_right = 1794.0
-offset_bottom = 818.0
+offset_bottom = 810.0
 theme_override_colors/font_color = Color(0.24, 0.19, 0.12, 1)
 theme_override_constants/line_spacing = 6
 theme_override_fonts/font = ExtResource("4_font")
 theme_override_font_sizes/font_size = 24
 horizontal_alignment = 1
-vertical_alignment = 1
+vertical_alignment = 0
 autowrap_mode = 3
 
 [node name="Flavor" type="Label" parent="DetailArea" unique_id=639903069]
 editor_description = "可视化编辑：右页风味文字。字号、墨色、行距和区域均可在 Inspector 直接调整。"
 layout_mode = 0
 offset_left = 1068.0
-offset_top = 836.0
+offset_top = 822.0
 offset_right = 1754.0
-offset_bottom = 936.0
+offset_bottom = 900.0
 theme_override_colors/font_color = Color(0.427451, 0.356863, 0.231373, 0.86)
 theme_override_constants/line_spacing = 4
 theme_override_fonts/font = ExtResource("4_font")

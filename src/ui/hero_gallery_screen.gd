@@ -9,6 +9,7 @@ const ITEM_FRAME_TEX := preload("res://assets/ui/item_frame.png")              #
 const CELL_BG_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")
 const FRAME_PALETTE_SHADER := preload("res://assets/shaders/canvas_ui_item_frame_palette.gdshader")
 const SELECTION_MARKER_SCRIPT := preload("res://src/ui/components/hero_gallery_selection_marker.gd")
+const EffectTextFormatterScript := preload("res://src/ui/effect_text_formatter.gd")
 
 const HERO_DATA_DIR := "res://assets/data/heroes/"
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
@@ -25,7 +26,7 @@ const GOLD_SEL := Color("C99032")
 const SELECTED_NAME_INK := Color("9A6828")
 const POINTER_COLOR := Color("7B5E3E")
 const POINTER_SIZE := Vector2(20.0, 36.0)
-const SKILL_SECTION_OFFSET_Y := -24.0
+const SKILL_SECTION_OFFSET_Y := -40.0
 
 # ── 1920×1080 双栏几何 ──
 const PAGE_L := Rect2(50, 158, 886, 836)
@@ -78,6 +79,9 @@ var _d_skill_icon: TextureRect
 var _d_detail: Label
 var _d_detail_rule: ColorRect
 var _d_detail_pin: ColorRect
+var _d_detail_segment_labels: Array[Label] = []
+var _d_keyword_labels: Array[Label] = []
+var _effect_keyword_font: FontVariation
 
 @onready var pool_area: Control = $PoolArea
 @onready var portrait_grid: Control = $PoolArea/PortraitGrid
@@ -90,6 +94,10 @@ var _d_detail_pin: ColorRect
 @onready var previous_page_btn: Button = $PoolArea/PageNavigation/PreviousPage
 @onready var page_indicator: Label = $PoolArea/PageNavigation/PageIndicator
 @onready var next_page_btn: Button = $PoolArea/PageNavigation/NextPage
+@onready var detail_navigation: Control = $DetailArea/DetailNavigation
+@onready var previous_detail_btn: Button = $DetailArea/DetailNavigation/PreviousItem
+@onready var detail_indicator: Label = $DetailArea/DetailNavigation/ItemIndicator
+@onready var next_detail_btn: Button = $DetailArea/DetailNavigation/NextItem
 
 
 func _ready() -> void:
@@ -98,6 +106,7 @@ func _ready() -> void:
 	_setup_top()
 	_build_pool()
 	_setup_page_navigation()
+	_setup_detail_navigation()
 	_build_detail_panel()
 	_select(0)
 	if not embedded_in_codex:
@@ -148,6 +157,31 @@ func _setup_page_navigation() -> void:
 		juice.name = "ButtonJuice"
 		button.add_child(juice)
 	_refresh_page_visibility()
+
+
+func _setup_detail_navigation() -> void:
+	previous_detail_btn.pressed.connect(_turn_detail.bind(-1))
+	next_detail_btn.pressed.connect(_turn_detail.bind(1))
+	for button: Button in [previous_detail_btn, next_detail_btn]:
+		var juice := ButtonJuice.new()
+		juice.name = "ButtonJuice"
+		button.add_child(juice)
+	_refresh_detail_navigation()
+
+
+func _refresh_detail_navigation() -> void:
+	var total := all_heroes.size()
+	detail_navigation.visible = total > 0
+	var current := clampi(_sel_idx, 0, maxi(total - 1, 0))
+	detail_indicator.text = "%02d / %02d" % [current + 1, total] if total > 0 else "00 / 00"
+	previous_detail_btn.disabled = total == 0 or current <= 0
+	next_detail_btn.disabled = total == 0 or current >= total - 1
+
+
+func _turn_detail(direction: int) -> void:
+	if all_heroes.is_empty():
+		return
+	_select(clampi(_sel_idx + direction, 0, all_heroes.size() - 1))
 
 
 func _make_gallery_frame_material() -> ShaderMaterial:
@@ -391,11 +425,14 @@ func _build_detail_panel() -> void:
 	detail_area.add_child(_d_detail_pin)
 	_d_detail = _make_label(
 		Vector2(px + 112, py + 670 + SKILL_SECTION_OFFSET_Y),
-		Vector2(PAGE_R.size.x - 214, 126), 22, INK)
+		Vector2(PAGE_R.size.x - 214, 96), 22, INK)
 	_d_detail.name = "SkillDetail"
 	_d_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_d_detail.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	_d_detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# SkillDetail 只保留可视化布局区域与原文；实际字形由互斥分段 Label 绘制，
+	# 防止“全文 + 粗体词”在同一位置重复绘制造成重影。
+	_d_detail.visible = false
 
 
 ## 选中英雄：真实头像框转金 + 棕色三角指针 + 右页填充。
@@ -454,8 +491,13 @@ func _select(idx: int) -> void:
 		_d_skill_icon.visible = true
 	else:
 		_d_skill_icon.visible = false
-	_d_detail.text = tr(h.skill_detail) if h.skill_detail != "" else tr(h.skill_description)
+	var authored_detail := tr(h.skill_detail) if h.skill_detail != "" \
+			else tr(h.skill_description)
+	var concise_detail := EffectTextFormatterScript.concise(authored_detail)
+	_d_detail.text = concise_detail
+	_rebuild_effect_keyword_emphasis(concise_detail)
 	_layout_skill_row()
+	_refresh_detail_navigation()
 
 
 ## 选中动效：真实框立即转金，粗像素棕色箭头轻推入；落位后完全静止。
@@ -495,6 +537,95 @@ func _layout_skill_row() -> void:
 	var tag_x := x0 + icon_block + name_w + tag_gap
 	# 标签高 34px、技能名行高 32px；上提 1px 后几何中心与新字体基线严格一致。
 	_d_tag_group.position = Vector2(tag_x, y0 - 1.0)
+
+
+## 正文按普通/效果词拆成互斥 Label；效果词使用效果图鉴同款 FontVariation 粗体。
+## 每个字只绘制一次，分段 Label 仍会进入图鉴原生文字层，兼顾无重影与清晰度。
+func _rebuild_effect_keyword_emphasis(text: String) -> void:
+	for label: Label in _d_detail_segment_labels:
+		if is_instance_valid(label):
+			label.visible = false
+			label.queue_free()
+	_d_detail_segment_labels.clear()
+	_d_keyword_labels.clear()
+	if text.is_empty():
+		return
+	var normal_font := _d_detail.get_theme_font("font")
+	var font_size := _d_detail.get_theme_font_size("font_size")
+	var paragraph := TextParagraph.new()
+	paragraph.width = _d_detail.size.x
+	paragraph.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	paragraph.break_flags = TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND \
+			| TextServer.BREAK_GRAPHEME_BOUND
+	for run: Dictionary in EffectTextFormatterScript.split_runs(text):
+		paragraph.add_string(
+				String(run.text),
+				_get_effect_keyword_font() if bool(run.bold) else normal_font,
+				font_size)
+	var line_top := 0.0
+	for line_index: int in paragraph.get_line_count():
+		var line_range := paragraph.get_line_range(line_index)
+		var line_size := paragraph.get_line_size(line_index)
+		var line_text := text.substr(line_range.x, line_range.y - line_range.x)
+		var runs := EffectTextFormatterScript.split_runs(line_text)
+		var run_widths: Array[float] = []
+		var run_gaps: Array[Vector2] = []
+		var actual_width := 0.0
+		for run: Dictionary in runs:
+			var run_font: Font = _get_effect_keyword_font() if bool(run.bold) else normal_font
+			var run_width := run_font.get_string_size(
+					String(run.text), HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x
+			var side_gap := EffectTextFormatterScript.KEYWORD_SIDE_GAP \
+					if bool(run.bold) else 0.0
+			run_widths.append(run_width)
+			run_gaps.append(Vector2(side_gap, side_gap))
+			actual_width += run_width + side_gap * 2.0
+		var cursor_x := _d_detail.position.x + (_d_detail.size.x - actual_width) * 0.5
+		for run_index: int in runs.size():
+			var run: Dictionary = runs[run_index]
+			var gaps: Vector2 = run_gaps[run_index]
+			_add_effect_text_segment(
+					String(run.text), bool(run.bold),
+					Vector2(cursor_x + gaps.x, _d_detail.position.y + line_top),
+					run_widths[run_index], line_size.y, font_size, normal_font,
+					"%d:%d" % [get_instance_id(), line_index], line_index, run_index,
+					gaps.x, gaps.y)
+			cursor_x += gaps.x + run_widths[run_index] + gaps.y
+		line_top += line_size.y + float(_d_detail.get_theme_constant("line_spacing"))
+
+
+func _add_effect_text_segment(text: String, bold: bool, segment_position: Vector2,
+		segment_width: float, line_height: float, font_size: int, normal_font: Font,
+		line_id: String, _line_index: int, run_order: int,
+		gap_before: float, gap_after: float) -> void:
+	var label := Label.new()
+	label.name = "SkillKeyword_%s" % text if bold else "SkillTextSegment"
+	label.text = text
+	label.position = segment_position
+	label.size = Vector2(ceilf(segment_width) + 2.0, line_height)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	FontManager.apply(label, font_size)
+	label.add_theme_font_override("font", _get_effect_keyword_font() if bold else normal_font)
+	label.add_theme_color_override("font_color", INK)
+	label.set_meta(EffectTextFormatterScript.META_LINE_ID, line_id)
+	label.set_meta(EffectTextFormatterScript.META_LINE_CENTER_X,
+			_d_detail.position.x + _d_detail.size.x * 0.5)
+	label.set_meta(EffectTextFormatterScript.META_RUN_ORDER, run_order)
+	label.set_meta(EffectTextFormatterScript.META_GAP_BEFORE, gap_before)
+	label.set_meta(EffectTextFormatterScript.META_GAP_AFTER, gap_after)
+	detail_area.add_child(label)
+	_d_detail_segment_labels.append(label)
+	if bold:
+		_d_keyword_labels.append(label)
+
+
+func _get_effect_keyword_font() -> FontVariation:
+	if _effect_keyword_font != null:
+		return _effect_keyword_font
+	_effect_keyword_font = EffectTextFormatterScript.make_bold_font(
+			load(FontManager.UI_FONT_PATH) as Font)
+	return _effect_keyword_font
 
 
 # ============================================================

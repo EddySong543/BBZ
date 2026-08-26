@@ -29,9 +29,7 @@ const FRAME_HIGHLIGHT := ItemFrameStyle.FRAME_HIGHLIGHT
 const FRAME_ART_SCALE := ItemFrameStyle.FRAME_ART_SCALE
 const FRAME_OFFSET_RATIO := ItemFrameStyle.FRAME_OFFSET_RATIO
 const CELL_INSET_RATIO := ItemFrameStyle.CELL_INSET_RATIO
-const TIER_INK := {   # 卡名墨色三阶（=item_gallery_screen.TIER_INK 同源·稀有度不染卡面）
-	1: Color("3769A6"), 2: Color("543F8F"), 3: Color("BB812C"),
-}
+const TIER_INK := ItemFrameStyle.FRAME_MID  # 卡名与对应稀有度框主体色同源，卡面本身不染色。
 const INK := Color(0.24, 0.19, 0.12)  # 墨字（亮纸主文字·与战斗悬停提示同源）
 
 var _can_cancel := true
@@ -190,7 +188,7 @@ func _build_card(item: ItemData, pos: Vector2, idx: int) -> Control:
 	card.add_child(name_lbl)
 
 	if tex != null:
-		# 格底（图鉴格同配方：四角深阶色+中心略浅·传说=gold_bottom）——铺在阶框下。
+		# 格底（图鉴格同配方：三档完整上深下亮渐变）——铺在阶框下。
 		var slot_rect := Rect2(Vector2(CARD_W * 0.5 - 64.0, 92.0), Vector2(128.0, 128.0))
 		var frame_position := slot_rect.position + slot_rect.size * FRAME_OFFSET_RATIO
 		var frame_size := slot_rect.size * FRAME_ART_SCALE
