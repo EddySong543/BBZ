@@ -1,0 +1,11 @@
+{
+  "_comment_purpose": "供 tools/run_godot.ps1 -Mode Test -Target 使用；目标由 CLI 单独传入。",
+  "dirs": [],
+  "include_subdirs": false,
+  "prefix": "test_",
+  "suffix": ".gd",
+  "log_level": 1,
+  "should_exit": false,
+  "should_exit_on_success": false,
+  "should_maximize": false
+}

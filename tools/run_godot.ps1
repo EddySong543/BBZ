@@ -63,7 +63,19 @@ switch ($Mode) {
     'Test' {
         $GodotArguments.Add('-s')
         $GodotArguments.Add('res://addons/gut/gut_cmdln.gd')
-        $GodotArguments.Add('-gconfig=res://tests/.gutconfig.json')
+        if (-not [string]::IsNullOrWhiteSpace($Target)) {
+            $GodotArguments.Add('-gconfig=res://tests/.gutconfig.scoped.json')
+            if ($Target.EndsWith('.gd', [StringComparison]::OrdinalIgnoreCase)) {
+                $GodotArguments.Add('-gtest=' + $Target)
+            }
+            else {
+                $GodotArguments.Add('-gdir=' + $Target)
+                $GodotArguments.Add('-ginclude_subdirs')
+            }
+        }
+        else {
+            $GodotArguments.Add('-gconfig=res://tests/.gutconfig.json')
+        }
         $GodotArguments.Add('-gexit')
     }
     'Tool' {
