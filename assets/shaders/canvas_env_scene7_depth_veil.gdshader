@@ -1,9 +1,9 @@
 shader_type canvas_item;
 render_mode unshaded, blend_mix;
 
-uniform vec4 mist_color : source_color = vec4(0.33, 0.52, 0.49, 1.0);
-uniform vec4 dust_color : source_color = vec4(0.78, 0.67, 0.43, 1.0);
-uniform float opacity : hint_range(0.0, 0.2) = 0.09;
+uniform vec4 mist_color : source_color = vec4(0.48, 0.72, 0.64, 1.0);
+uniform vec4 dust_color : source_color = vec4(0.86, 0.62, 0.58, 1.0);
+uniform float opacity : hint_range(0.0, 0.2) = 0.018;
 uniform float top_fade : hint_range(0.02, 0.4) = 0.18;
 uniform float bottom_fade : hint_range(0.02, 0.4) = 0.24;
 uniform vec2 pixel_grid = vec2(480.0, 96.0);

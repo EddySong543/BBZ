@@ -269,7 +269,7 @@ func _ready() -> void:
 	var mid_left_rect := _displayed_used_rect(stage.get_node("MidgroundLeft") as TextureRect)
 	var mid_center_rect := _displayed_used_rect(stage.get_node("MidgroundCenter") as TextureRect)
 	var mid_right_rect := _displayed_used_rect(stage.get_node("MidgroundRight") as TextureRect)
-	var platform_visible_rect := _displayed_used_rect(platform)
+	var platform_visible_rect := _scene7_platform_visible_rect(platform)
 	var platform_authored_position := platform.position
 	var platform_authored_size := platform.size
 	var midground_coverage_ready := (
@@ -337,6 +337,7 @@ func _ready() -> void:
 		"MidgroundLeft": 0.55,
 		"MidgroundCenter": 0.55,
 		"MidgroundRight": 0.55,
+		"OasisMotesMid": 0.82,
 		"FrontWater": 1.0,
 		"BattlePlatform": 1.0,
 		"OasisMotesNear": 1.12,
@@ -377,7 +378,9 @@ func _ready() -> void:
 				< stage.get_node("MidgroundLeft").get_index()
 		and stage.get_node("MidgroundLeft").get_index()
 				< stage.get_node("MidgroundRight").get_index()
-		and stage.get_node("MidgroundRight").get_index()
+		and stage.get_node("RearWaterReflection").get_index()
+				< stage.get_node("OasisMotesMid").get_index()
+		and stage.get_node("OasisMotesMid").get_index()
 				< stage.get_node("FrontWater").get_index()
 		and stage.get_node("FrontWater").get_index() < platform.get_index()
 		and platform.get_index() < stage.get_node("OasisMotesNear").get_index()
@@ -451,12 +454,14 @@ func _ready() -> void:
 				0.68 if node_name.begins_with("Foreground") else 0.46)
 			and float(material.get_shader_parameter("glow_pulse_strength")) >= (
 				0.16 if node_name.begins_with("Foreground") else 0.13))
-	for mote_name: String in ["OasisMotesFar", "OasisMotesNear"]:
+	for mote_name: String in ["OasisMotesFar", "OasisMotesMid", "OasisMotesNear"]:
 		var material := (stage.get_node(mote_name) as ColorRect).material as ShaderMaterial
 		environment_motion_ready = (
 			environment_motion_ready
 			and material.shader.resource_path == MOTES_SHADER_PATH
-			and float(material.get_shader_parameter("rise_px_per_sec")) >= 2.0
+			and float(material.get_shader_parameter("rise_px_per_sec")) >= 1.4
+			and float(material.get_shader_parameter("secondary_density")) >= 0.12
+			and float(material.get_shader_parameter("horizontal_sway_px")) >= 1.0
 			and float(material.get_shader_parameter("alpha")) <= 0.42)
 	var rear_water_material := rear_water.material as ShaderMaterial
 	var front_water_material := front_water.material as ShaderMaterial
@@ -477,7 +482,7 @@ func _ready() -> void:
 		and rear_water.uv[23] == Vector2(0.0, 29.0)
 		and front_water.position.x <= -24.0
 		and front_water.position.x + front_water.size.x >= 1944.0
-		and platform_visible_rect.end.y - front_water.position.y >= 6.0
+		and platform_visible_rect.end.y - front_water.position.y >= 4.0
 		and platform_visible_rect.end.y - front_water.position.y <= 10.0
 		and front_water.position.y + front_water.size.y >= 1080.0
 		and is_equal_approx(float(rear_water.get_meta("parallax_factor")), 0.55)
@@ -575,7 +580,7 @@ func _ready() -> void:
 		and platform_visible_rect.position.x < 0.0
 		and platform_visible_rect.end.x > 1920.0
 		and is_equal_approx(platform_visible_rect.position.y, 738.0)
-		and is_equal_approx(platform_visible_rect.size.y, 126.0)
+		and is_equal_approx(platform_visible_rect.size.y, 96.0)
 		and platform_visible_rect.position.y <= 748.0
 		and platform_visible_rect.end.y > 748.0)
 	var source_geometry_ready: bool = (
@@ -609,8 +614,8 @@ func _ready() -> void:
 	var far_cleanup_ready := (
 		far_material != null
 		and far_material.shader.resource_path == FAR_CLEANUP_SHADER_PATH
-		and far_background.size.is_equal_approx(Vector2(289.0, 171.0))
-		and far_background.scale.is_equal_approx(Vector2(6.7, 6.7))
+		and far_background.size.is_equal_approx(Vector2(332.0, 188.0))
+		and far_background.scale.is_equal_approx(Vector2(6.0, 6.0))
 		and far_background.texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST
 		and far_cleanup_stats.x > 0.0
 		and far_cleanup_stats.y <= far_cleanup_stats.x
@@ -639,8 +644,8 @@ func _ready() -> void:
 		and p2.visible
 		and is_zero_approx(p1.rim_strength)
 		and is_zero_approx(p2.rim_strength)
-		and is_equal_approx(p1.backlight, 0.012)
-		and is_equal_approx(p2.backlight, 0.012)
+		and is_zero_approx(p1.backlight)
+		and is_zero_approx(p2.backlight)
 		and is_zero_approx(p1.warmth_amount)
 		and is_zero_approx(p2.warmth_amount)
 		and is_zero_approx(p1.fill_amount)
@@ -674,9 +679,9 @@ func _ready() -> void:
 	var aggressive_grade_frame := get_viewport().get_texture().get_image()
 	var aggressive_high_saturation_fraction := _fraction_above_saturation(
 		aggressive_grade_frame, 0.65, 4)
-	post_material.set_shader_parameter("brightness", 1.01)
+	post_material.set_shader_parameter("brightness", 1.0)
 	post_material.set_shader_parameter("contrast", 1.0)
-	post_material.set_shader_parameter("saturation", 0.95)
+	post_material.set_shader_parameter("saturation", 1.0)
 	post_material.set_shader_parameter("tint_strength", 0.0)
 	post_material.set_shader_parameter("shadow_tint", Color(0.92, 1.0, 0.98, 1.0))
 	post_material.set_shader_parameter("highlight_tint", Color(1.0, 0.99, 0.95, 1.0))
@@ -685,11 +690,11 @@ func _ready() -> void:
 	var daylight_postfx: bool = (
 		post_material != null
 		and is_equal_approx(
-			float(post_material.get_shader_parameter("brightness")), 1.01)
+			float(post_material.get_shader_parameter("brightness")), 1.0)
 		and is_equal_approx(
 			float(post_material.get_shader_parameter("contrast")), 1.0)
 		and is_equal_approx(
-			float(post_material.get_shader_parameter("saturation")), 0.95)
+			float(post_material.get_shader_parameter("saturation")), 1.0)
 		and is_equal_approx(
 			float(post_material.get_shader_parameter("tint_strength")), 0.0)
 		and is_equal_approx(
@@ -699,13 +704,18 @@ func _ready() -> void:
 		and is_zero_approx(
 			float(post_material.get_shader_parameter("heat_haze_strength"))))
 	var readability_veil := screen.get_node_or_null("UiReadabilityVeil") as ColorRect
-	var ui_readability_ready := readability_veil != null
+	var post_readability_grab := screen.get_node_or_null(
+			"UiReadabilityPostGrab") as BackBufferCopy
+	var ui_readability_ready := readability_veil != null and post_readability_grab != null
 	if ui_readability_ready:
 		var veil_material := readability_veil.material as ShaderMaterial
 		ui_readability_ready = (
 			veil_material != null
 			and veil_material.shader.resource_path == UI_READABILITY_SHADER_PATH
-			and screen.get_node("PostFX").get_index() < readability_veil.get_index()
+			and screen.get_node("WorldGrab").get_index() < readability_veil.get_index()
+			and readability_veil.get_index() < post_readability_grab.get_index()
+			and post_readability_grab.get_index() < screen.get_node("PostFX").get_index()
+			and post_readability_grab.copy_mode == BackBufferCopy.COPY_MODE_VIEWPORT
 			and readability_veil.get_index() < screen.get_node("P1Hud").get_index()
 			and readability_veil.get_index() < screen.get_node("P2Hud").get_index()
 			and readability_veil.get_index() < screen.get_node("TimerLabel").get_index()
@@ -1308,6 +1318,25 @@ func _displayed_used_rect(layer: TextureRect) -> Rect2:
 	return Rect2(
 		layer.position + Vector2(used_rect.position) * stretch_ratio * layer.scale,
 		Vector2(used_rect.size) * stretch_ratio * layer.scale)
+
+
+func _scene7_platform_visible_rect(layer: TextureRect) -> Rect2:
+	var source_rect := _alpha_used_rect(layer.texture.get_image(), 0.5)
+	var material := layer.material as ShaderMaterial
+	var surface_bottom_row: float = material.get_shader_parameter("surface_bottom_row")
+	var shallow_wall_rows: float = material.get_shader_parameter("shallow_wall_rows")
+	var edge_variation_rows: float = material.get_shader_parameter("edge_variation_rows")
+	var visible_source_bottom := minf(
+			float(source_rect.end.y),
+			surface_bottom_row + shallow_wall_rows + edge_variation_rows)
+	var visible_source_rect := Rect2(
+			Vector2(source_rect.position),
+			Vector2(source_rect.size.x,
+					visible_source_bottom - float(source_rect.position.y)))
+	var stretch_ratio := layer.size / Vector2(layer.texture.get_size())
+	return Rect2(
+			layer.position + visible_source_rect.position * stretch_ratio * layer.scale,
+			visible_source_rect.size * stretch_ratio * layer.scale)
 
 
 func _water_rect(water: CanvasItem) -> Rect2:

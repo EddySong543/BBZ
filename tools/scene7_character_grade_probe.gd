@@ -46,7 +46,7 @@ func _render_stats(frames: SpriteFrames, material: ShaderMaterial) -> Vector4:
 	var display := (load(CHARACTER_DISPLAY_PATH) as PackedScene).instantiate() \
 			as CharacterDisplay
 	display.rim_strength = 0.0
-	display.backlight = 0.012
+	display.backlight = 0.0
 	display.shadow_tint = Color(0.86, 0.9, 0.88, 1.0)
 	display.warmth_amount = 0.0
 	display.fill_amount = 0.0
@@ -80,17 +80,15 @@ func _character_material() -> ShaderMaterial:
 	material.shader = load(CHARACTER_SHADER_PATH) as Shader
 	material.set_shader_parameter("source_saturation", 1.0)
 	material.set_shader_parameter("source_contrast", 1.0)
-	material.set_shader_parameter("ambient_tint", Color(0.9, 0.96, 0.91, 1.0))
-	material.set_shader_parameter("ambient_tint_amount", 0.08)
-	material.set_shader_parameter("highlight_shoulder_start", 0.68)
-	material.set_shader_parameter("highlight_shoulder_strength", 0.8)
-	material.set_shader_parameter("backlight", 0.012)
+	material.set_shader_parameter("ambient_tint_amount", 0.0)
+	material.set_shader_parameter("highlight_shoulder_strength", 0.0)
+	material.set_shader_parameter("backlight", 0.0)
 	material.set_shader_parameter("shadow_tint", Color(0.86, 0.9, 0.88, 1.0))
 	material.set_shader_parameter("warmth_amount", 0.0)
 	material.set_shader_parameter("rim_strength", 0.0)
 	material.set_shader_parameter("fill_amount", 0.0)
-	material.set_shader_parameter("daylight_key_amount", 0.004)
-	material.set_shader_parameter("water_bounce_amount", 0.006)
+	material.set_shader_parameter("daylight_key_amount", 0.0)
+	material.set_shader_parameter("water_bounce_amount", 0.0)
 	return material
 
 

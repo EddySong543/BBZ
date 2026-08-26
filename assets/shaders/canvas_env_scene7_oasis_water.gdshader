@@ -11,19 +11,22 @@ uniform vec2 size_px = vec2(1984.0, 224.0);
 uniform vec2 screen_px = vec2(1920.0, 1080.0);
 uniform float px_size : hint_range(1.0, 8.0) = 4.0;
 uniform float perspective_y : hint_range(1.0, 6.0) = 2.8;
+uniform float style_source_top_px : hint_range(0.0, 128.0) = 96.0;
 group_uniforms;
 
 group_uniforms reflection;
 uniform float reflection_height_px : hint_range(160.0, 720.0) = 540.0;
 uniform float reflection_strength : hint_range(0.0, 1.0) = 0.54;
 uniform float reflection_levels : hint_range(2.0, 16.0) = 9.0;
-uniform vec4 reflection_tint : source_color = vec4(0.04, 0.96, 0.82, 1.0);
+uniform vec4 reflection_tint : source_color = vec4(0.19, 0.75, 0.68, 1.0);
 uniform float reflection_colorize : hint_range(0.0, 1.0) = 0.68;
 uniform float slice_px_far : hint_range(2.0, 12.0) = 4.0;
 uniform float slice_px_near : hint_range(4.0, 20.0) = 10.0;
 uniform float radial_distortion_px : hint_range(0.0, 20.0) = 4.0;
 uniform float breakup_px : hint_range(16.0, 160.0) = 76.0;
 uniform float breakup_strength : hint_range(0.0, 1.0) = 0.10;
+uniform float reflection_sway_px : hint_range(0.0, 12.0) = 6.0;
+uniform float reflection_sway_period_sec : hint_range(4.0, 16.0) = 9.8;
 group_uniforms;
 
 group_uniforms character_reflection;
@@ -37,16 +40,16 @@ uniform float character_waterline_y = 0.0;
 uniform float character_reflection_strength : hint_range(0.0, 1.0) = 0.30;
 uniform float character_reflection_vertical_scale : hint_range(0.5, 2.0) = 1.08;
 uniform float character_reflection_saturation : hint_range(0.0, 1.0) = 0.64;
-uniform vec4 character_reflection_tint : source_color = vec4(0.35, 0.92, 0.74, 1.0);
+uniform vec4 character_reflection_tint : source_color = vec4(0.28, 0.67, 0.64, 1.0);
 uniform float character_reflection_fade_start : hint_range(0.0, 1.0) = 0.58;
 group_uniforms;
 
 group_uniforms palette;
-uniform vec4 surface_color : source_color = vec4(0.015, 0.62, 0.56, 1.0);
-uniform vec4 shallow_color : source_color = vec4(0.004, 0.43, 0.46, 1.0);
-uniform vec4 deep_color : source_color = vec4(0.0, 0.17, 0.27, 1.0);
-uniform vec4 ripple_color : source_color = vec4(0.18, 0.90, 0.70, 1.0);
-uniform vec4 spring_glow_color : source_color = vec4(0.42, 1.0, 0.78, 1.0);
+uniform vec4 surface_color : source_color = vec4(0.133, 0.667, 0.6, 1.0);
+uniform vec4 shallow_color : source_color = vec4(0.133, 0.533, 0.533, 1.0);
+uniform vec4 deep_color : source_color = vec4(0.067, 0.267, 0.4, 1.0);
+uniform vec4 ripple_color : source_color = vec4(0.333, 0.8, 0.667, 1.0);
+uniform vec4 spring_glow_color : source_color = vec4(0.44, 0.88, 0.72, 1.0);
 uniform float depth_curve : hint_range(0.2, 4.0) = 1.08;
 uniform float row_contrast : hint_range(0.0, 0.3) = 0.026;
 group_uniforms;
@@ -63,22 +66,27 @@ uniform float ring_width : hint_range(0.005, 0.08) = 0.024;
 uniform float main_ring_strength : hint_range(0.0, 1.0) = 0.38;
 uniform float micro_ring_strength : hint_range(0.0, 1.0) = 0.10;
 uniform float caustic_strength : hint_range(0.0, 0.5) = 0.10;
+uniform float glint_period_sec : hint_range(4.0, 16.0) = 9.6;
+uniform float glint_cell_px : hint_range(24.0, 128.0) = 64.0;
+uniform float glint_presence : hint_range(0.0, 1.0) = 0.34;
+uniform float glint_strength : hint_range(0.0, 0.5) = 0.16;
+uniform float diagnostic_time_sec = -1.0;
 group_uniforms;
-
-group_uniforms shore;
-uniform vec4 shore_dark : source_color = vec4(0.002, 0.10, 0.16, 1.0);
-uniform vec4 shore_light : source_color = vec4(0.34, 0.88, 0.67, 1.0);
-uniform float shore_px : hint_range(1.0, 12.0) = 4.0;
-uniform float shore_cluster_spacing_px : hint_range(24.0, 180.0) = 104.0;
-uniform float shore_cluster_density : hint_range(0.0, 0.7) = 0.20;
-uniform float shore_cluster_cycle_sec : hint_range(2.0, 12.0) = 9.0;
-uniform float shore_light_strength : hint_range(0.0, 1.0) = 0.30;
-group_uniforms;
-
 
 float hash21(vec2 p) {
 	p = mod(p, vec2(511.0, 257.0));
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+
+float motion_time() {
+	return diagnostic_time_sec >= 0.0 ? diagnostic_time_sec : TIME;
+}
+
+
+float signed_pixel_snap(float value, float step_size) {
+	float magnitude = floor(abs(value) / step_size + 0.5) * step_size;
+	return sign(value) * magnitude;
 }
 
 
@@ -129,8 +137,7 @@ float reflection_rect_mask(vec2 point_px, vec4 rect_px) {
 }
 
 
-vec3 emerald_reflection(vec3 source_rgb) {
-	float luma = dot(source_rgb, vec3(0.2126, 0.7152, 0.0722));
+vec3 palette_reflection_from_luma(float luma) {
 	vec3 palette_reflection = mix(
 			deep_color.rgb,
 			surface_color.rgb,
@@ -139,14 +146,28 @@ vec3 emerald_reflection(vec3 source_rgb) {
 			palette_reflection,
 			spring_glow_color.rgb,
 			smoothstep(0.62, 0.92, luma) * 0.42);
-	vec3 tinted_source = source_rgb * reflection_tint.rgb;
-	return mix(tinted_source, palette_reflection, reflection_colorize);
+	return palette_reflection;
+}
+
+
+vec3 emerald_reflection(vec3 source_rgb) {
+	float luma = dot(source_rgb, vec3(0.2126, 0.7152, 0.0722));
+	vec3 silhouette_tint = vec3(luma) * reflection_tint.rgb * 1.18;
+	return mix(
+			silhouette_tint,
+			palette_reflection_from_luma(luma),
+			reflection_colorize);
 }
 
 
 void fragment() {
-	float t = floor(TIME * anim_fps) / anim_fps;
-	vec2 px = floor(UV * size_px / px_size) * px_size + px_size * 0.5;
+	float t = floor(motion_time() * anim_fps) / anim_fps;
+	vec2 display_px = floor(UV * size_px / px_size) * px_size
+			+ px_size * 0.5;
+	vec2 display_quv = display_px / size_px;
+	float style_y = mix(style_source_top_px, size_px.y, display_quv.y);
+	style_y = floor(style_y / px_size) * px_size + px_size * 0.5;
+	vec2 px = vec2(display_px.x, min(style_y, size_px.y - px_size * 0.5));
 	vec2 quv = px / size_px;
 	float depth = pow(clamp(quv.y, 0.0, 1.0), depth_curve);
 	float main_time = t / max(main_period_sec, 0.001);
@@ -167,12 +188,18 @@ void fragment() {
 	float block_shift = floor(
 			(hash21(vec2(block_id, band_id + 31.0)) - 0.5)
 			* radial_distortion_px * breakup_strength / px_size) * px_size;
+	float reflection_sway_phase = t * TAU
+			/ max(reflection_sway_period_sec, 0.001)
+			+ band_id * 0.73
+			+ hash21(vec2(block_id + 19.0, band_id + 83.0)) * TAU;
+	float reflection_sway = signed_pixel_snap(
+			sin(reflection_sway_phase) * reflection_sway_px, px_size);
 
-	vec2 suv = SCREEN_UV + (quv - UV) * size_px / screen_px;
-	float waterline = suv.y - quv.y * size_px.y / screen_px.y;
+	vec2 suv = SCREEN_UV + (display_quv - UV) * size_px / screen_px;
+	float waterline = suv.y - display_quv.y * size_px.y / screen_px.y;
 	float reflected_depth_px = band_y / size_px.y * reflection_height_px;
 	vec2 ruv = vec2(
-			suv.x + (band_shift + block_shift) / screen_px.x,
+			suv.x + (band_shift + block_shift + reflection_sway) / screen_px.x,
 			waterline - reflected_depth_px / screen_px.y);
 	ruv.x = clamp(ruv.x, 0.001, 0.999);
 	ruv.y = clamp(ruv.y, 0.001, max(waterline - 0.001, 0.001));
@@ -199,6 +226,21 @@ void fragment() {
 	float trough = ring_mask(main_distance, main_time, 0.12) * ring_envelope;
 	col = mix(col, deep_color.rgb, trough * 0.075);
 	col = mix(col, ripple_color.rgb, crest * main_ring_strength);
+
+	// Two small, independent disturbance points keep the pool alive between
+	// broad spring crests. They expand locally and never acquire a flow axis.
+	float micro_time = t / max(micro_period_sec, 0.001);
+	float secondary_distance_a = spring_distance(quv, secondary_source_a);
+	float secondary_distance_b = spring_distance(quv, secondary_source_b);
+	float secondary_a = ring_mask(
+			secondary_distance_a * 1.75, micro_time, 0.18)
+			* (1.0 - smoothstep(0.06, 0.58, secondary_distance_a));
+	float secondary_b = ring_mask(
+			secondary_distance_b * 1.62, micro_time * 0.87, 0.63)
+			* (1.0 - smoothstep(0.06, 0.54, secondary_distance_b));
+	float secondary_rings = max(secondary_a, secondary_b);
+	col = mix(col, ripple_color.rgb,
+			secondary_rings * micro_ring_strength);
 	float spring_halo = 1.0 - smoothstep(0.12, 0.62, main_distance);
 	col = mix(col, spring_glow_color.rgb, spring_halo * 0.10);
 
@@ -213,12 +255,35 @@ void fragment() {
 			* (1.0 - smoothstep(0.82, 1.0, depth));
 	col = mix(col, spring_glow_color.rgb, caustic * caustic_strength);
 
+	// Sparse horizontal highlights breathe in place. Their authored cells do
+	// not move; only discrete brightness states change, matching pixel water.
+	float glint_cell = floor(px.x / max(glint_cell_px, px_size));
+	float glint_seed = hash21(vec2(glint_cell, band_id + 149.0));
+	float glint_active = step(1.0 - glint_presence, glint_seed);
+	float glint_phase = t * TAU / max(glint_period_sec, 0.001)
+			+ glint_seed * TAU;
+	float glint_pulse = floor(
+			(0.5 + 0.5 * sin(glint_phase)) * 4.0 + 0.5) / 4.0;
+	float glint_local_x = mod(px.x, max(glint_cell_px, px_size));
+	float glint_length = max(glint_cell_px, px_size)
+			* mix(0.24, 0.48, hash21(vec2(glint_cell, 191.0)));
+	float glint_segment = step(glint_local_x, glint_length);
+	float glint_row = step(0.58,
+			hash21(vec2(glint_cell + 37.0, band_id + 227.0)));
+	float glint_depth = smoothstep(0.08, 0.24, depth)
+			* (1.0 - smoothstep(0.76, 0.94, depth));
+	float glint = glint_active * glint_segment * glint_row
+			* glint_pulse * glint_depth;
+	vec3 glint_color = mix(ripple_color.rgb, spring_glow_color.rgb, 0.42);
+	col = mix(col, glint_color, glint * glint_strength);
+
 	// Characters render after Stage, so their SubViewport textures are mirrored
 	// separately to complete the scene reflection.
 	vec2 screen_pos_px = suv * screen_px;
 	float char_depth_px = max(screen_pos_px.y - character_waterline_y, 0.0);
 	float char_depth_norm = clamp(char_depth_px / max(size_px.y, 1.0), 0.0, 1.0);
-	float char_sample_x = screen_pos_px.x + band_shift + block_shift;
+	float char_sample_x = screen_pos_px.x + band_shift + block_shift
+			+ reflection_sway;
 	float char_scale = max(character_reflection_vertical_scale, 0.001);
 	vec2 p1_source_px = vec2(
 			char_sample_x, p1_reflection_foot_y - char_depth_px / char_scale);
@@ -249,24 +314,6 @@ void fragment() {
 	float char_mix = char_sample.a * character_reflection_strength
 			* char_fade * mix(1.0, 0.76, depth);
 	col = mix(col, char_reflection, char_mix);
-
-	float shore_shadow = 1.0 - step(
-			(shore_px + px_size) / size_px.y, quv.y);
-	col = mix(col, shore_dark.rgb, shore_shadow * 0.66);
-	float shore_cluster = floor(px.x / shore_cluster_spacing_px);
-	float shore_local = mod(px.x, shore_cluster_spacing_px);
-	float shore_seed = hash21(vec2(shore_cluster, 181.0));
-	float shore_active = step(1.0 - shore_cluster_density, shore_seed);
-	float shore_length = mix(
-			shore_cluster_spacing_px * 0.18,
-			shore_cluster_spacing_px * 0.48,
-			hash21(vec2(shore_cluster, 223.0)));
-	float shore_phase = fract(
-			t / shore_cluster_cycle_sec + hash21(vec2(shore_cluster, 307.0)));
-	float shore_life = floor((0.5 + 0.5 * sin(shore_phase * TAU)) * 3.0 + 0.5) / 3.0;
-	float shore_segment = shore_active * step(shore_local, shore_length) * shore_life;
-	float shore_row = (1.0 - step(shore_px / size_px.y, quv.y)) * shore_segment;
-	col = mix(col, shore_light.rgb, shore_row * shore_light_strength);
 
 	col = floor(clamp(col, vec3(0.0), vec3(1.0)) * 31.0 + 0.5) / 31.0;
 	COLOR = vec4(col, 1.0);

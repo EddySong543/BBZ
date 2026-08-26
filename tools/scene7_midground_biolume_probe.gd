@@ -31,12 +31,13 @@ func _ready() -> void:
 
 		var layer_passed := (
 			source_stats.x > 0.0
-			and rendered_stats.x >= source_stats.x * 0.72
+			and rendered_stats.x >= source_stats.x * 0.76
 			and rendered_stats.x <= source_stats.x * 1.10
-			and rendered_stats.y <= 0.03
-			and rendered_stats.z >= 0.52
-			and rendered_stats.z <= 0.62
-			and rendered_stats.z / rendered_stats.x <= 2.10
+			and rendered_stats.y >= source_stats.y * 0.45
+			and rendered_stats.y <= source_stats.y * 0.75
+			and rendered_stats.z >= 0.76
+			and rendered_stats.z <= 0.90
+			and rendered_stats.z / rendered_stats.x <= 2.85
 			and rendered_stats.w >= 0.20)
 		passed = passed and layer_passed
 		print(

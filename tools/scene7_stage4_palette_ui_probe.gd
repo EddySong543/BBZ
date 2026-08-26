@@ -85,6 +85,7 @@ func _ready() -> void:
 	var sky_clear_ready := (
 			(stage.get_node("Sky") as TextureRect).material == null
 			and (stage.get_node("OasisMotesFar") as ColorRect).position.y >= 500.0
+			and (stage.get_node("OasisMotesMid") as ColorRect).position.y >= 420.0
 			and (stage.get_node("OasisMotesNear") as ColorRect).position.y >= 600.0)
 	var midground_grade_ready := true
 	for node_name: String in ["MidgroundLeft", "MidgroundCenter", "MidgroundRight"]:
@@ -92,13 +93,20 @@ func _ready() -> void:
 		midground_grade_ready = (
 				midground_grade_ready
 				and float(material.get_shader_parameter("base_brightness")) <= 1.0
-				and float(material.get_shader_parameter("emission_strength")) <= 0.60
-				and float(material.get_shader_parameter("halo_strength")) <= 0.44
+				and float(material.get_shader_parameter("emission_strength")) <= 0.16
+				and float(material.get_shader_parameter("halo_strength")) <= 0.24
+				and float(material.get_shader_parameter("halo_alpha")) <= 0.12
+				and is_equal_approx(float(material.get_shader_parameter("halo_radius")), 1.0)
+				and float(material.get_shader_parameter("core_preservation")) >= 0.76
+				and float(material.get_shader_parameter("core_preservation")) <= 0.86
 				and float(material.get_shader_parameter("source_cyan_compression")) >= 0.20
-				and float(material.get_shader_parameter("source_cyan_value_ceiling")) <= 0.60
-				and float(material.get_shader_parameter("emission_threshold")) >= 0.56
-				and float(material.get_shader_parameter("emission_soft_knee")) >= 0.14
-				and float(material.get_shader_parameter("highlight_shoulder_strength")) >= 6.0)
+				and float(material.get_shader_parameter("source_cyan_compression")) <= 0.28
+				and float(material.get_shader_parameter("source_cyan_value_ceiling")) >= 0.66
+				and float(material.get_shader_parameter("core_value_floor")) >= 0.63
+				and float(material.get_shader_parameter("core_value_ceiling")) <= 0.80
+				and float(material.get_shader_parameter("source_cyan_midtone_lift")) >= 0.08
+				and float(material.get_shader_parameter("highlight_shoulder_strength")) >= 1.2
+				and float(material.get_shader_parameter("highlight_shoulder_strength")) <= 1.5)
 	var platform_material := (
 			stage.get_node("BattlePlatform") as TextureRect).material as ShaderMaterial
 	var platform_elevation_ready := (
@@ -135,8 +143,8 @@ func _ready() -> void:
 			and top_luma <= 0.72
 			and center_luma >= edge_luma * 1.15
 			and center_luma <= edge_luma * 1.5
-			and water_hue >= 180.0
-			and water_hue <= 210.0
+			and water_hue >= 160.0
+			and water_hue <= 190.0
 			and platform_elevation_ready)
 	var passed := (
 			localized_backplates_ready

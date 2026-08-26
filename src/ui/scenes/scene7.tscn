@@ -5,7 +5,7 @@
 [ext_resource type="Texture2D" uid="uid://dtq7wbs1kt1e2" path="res://assets/scenes/scene7/scene7_battle_platform.png" id="3_platform"]
 [ext_resource type="Texture2D" uid="uid://b1347vn8wkvvb" path="res://assets/scenes/scene7/scene7_foreground_left.png" id="4_foreground_left"]
 [ext_resource type="Texture2D" uid="uid://d18j81rnbxrlm" path="res://assets/scenes/scene7/scene7_foreground_right.png" id="5_foreground_right"]
-[ext_resource type="Shader" uid="uid://tdlk1rrdcsav" path="res://assets/shaders/canvas_env_scene7_far_cleanup.gdshader" id="7_far_cleanup_shader"]
+[ext_resource type="Shader" uid="uid://1knyduqi15uf" path="res://assets/shaders/canvas_env_scene7_far_cleanup.gdshader" id="7_far_cleanup_shader"]
 [ext_resource type="Shader" uid="uid://c4g3tfhj88jns" path="res://assets/shaders/canvas_env_scene7_biolume_plant.gdshader" id="8_biolume_shader"]
 [ext_resource type="Texture2D" uid="uid://cc30vcd28nrx4" path="res://assets/scenes/scene7/scene7_sky.png" id="9_sky"]
 [ext_resource type="Texture2D" uid="uid://ch2aand02adk4" path="res://assets/scenes/scene7/scene7_midground_left.png" id="10_mid_left"]
@@ -16,6 +16,32 @@
 [ext_resource type="Shader" uid="uid://e7c7u6amcfvm" path="res://assets/shaders/canvas_env_scene7_oasis_motes.gdshader" id="16_motes_shader"]
 [ext_resource type="Shader" uid="uid://b68cgqt3o75im" path="res://assets/shaders/canvas_env_scene7_oasis_far_water.gdshader" id="17_far_water_shader"]
 [ext_resource type="Shader" uid="uid://d1xicmi7nlwbm" path="res://assets/shaders/canvas_env_scene7_oasis_water.gdshader" id="18_front_water_shader"]
+[ext_resource type="Shader" uid="uid://bsqk7cs2vy404" path="res://assets/shaders/canvas_env_scene7_oasis_far_reflection.gdshader" id="19_far_reflection_shader"]
+[ext_resource type="Texture2D" uid="uid://df0ral85m3e7t" path="res://assets/scenes/scene7/scene7_foreground_center_stone.png" id="20_foreground_center_stone"]
+[ext_resource type="Shader" uid="uid://begtra11r4448" path="res://assets/shaders/canvas_env_scene7_platform_spring_contact.gdshader" id="21_platform_spring_contact_shader"]
+[ext_resource type="Shader" uid="uid://b3ylnsb4mms5u" path="res://assets/shaders/canvas_env_scene7_foreground_stone_grade.gdshader" id="22_foreground_stone_grade_shader"]
+[ext_resource type="Shader" uid="uid://bcutx35t43yo2" path="res://assets/shaders/canvas_env_scene7_sky_grade.gdshader" id="23_sky_grade_shader"]
+[ext_resource type="Script" path="res://src/ui/components/scene7_biolume_glow_overlay.gd" id="25_biolume_glow"]
+[ext_resource type="Texture2D" path="res://assets/scenes/scene7/scene7_branch_mask_midground_center.png" id="26_branch_center"]
+[ext_resource type="Texture2D" path="res://assets/scenes/scene7/scene7_branch_mask_midground_left.png" id="27_branch_left"]
+[ext_resource type="Texture2D" path="res://assets/scenes/scene7/scene7_branch_mask_midground_right.png" id="28_branch_right"]
+[ext_resource type="Texture2D" path="res://assets/scenes/scene7/scene7_branch_mask_foreground_left.png" id="29_branch_front_left"]
+[ext_resource type="Texture2D" path="res://assets/scenes/scene7/scene7_branch_underpaint_midground_center.png" id="30_branch_center_underpaint"]
+[ext_resource type="Texture2D" path="res://assets/scenes/scene7/scene7_branch_underpaint_midground_left.png" id="31_branch_left_underpaint"]
+[ext_resource type="Texture2D" path="res://assets/scenes/scene7/scene7_branch_underpaint_midground_right.png" id="32_branch_right_underpaint"]
+[ext_resource type="Texture2D" path="res://assets/scenes/scene7/scene7_branch_underpaint_foreground_left.png" id="33_branch_front_left_underpaint"]
+[ext_resource type="Script" uid="uid://btqph6dh13ylq" path="res://src/ui/components/scene2_water_interaction.gd" id="34_water_interaction"]
+[ext_resource type="Script" path="res://src/ui/components/scene7_oasis_resonance.gd" id="35_oasis_resonance"]
+
+[sub_resource type="ShaderMaterial" id="Scene7SkyGradeMat"]
+resource_local_to_scene = true
+shader = ExtResource("23_sky_grade_shader")
+shader_parameter/zenith_color = Color(0.58, 0.82, 0.69, 1)
+shader_parameter/horizon_color = Color(0.7, 0.9, 0.72, 1)
+shader_parameter/horizon_haze_color = Color(0.92, 0.95, 0.78, 1)
+shader_parameter/palette_strength = 0.2730000129675
+shader_parameter/source_value_detail = 0.12
+shader_parameter/horizon_haze_strength = 0.05
 
 [sub_resource type="ShaderMaterial" id="Scene7BackgroundGradeMat"]
 resource_local_to_scene = true
@@ -24,26 +50,32 @@ shader_parameter/cleanup_strength = 0.76
 shader_parameter/outlier_threshold = 0.18
 shader_parameter/neighbor_coherence = 0.12
 shader_parameter/edge_protection = 0.2
-shader_parameter/macro_block_px = 2.0
-shader_parameter/detail_reduction = 0.28
-shader_parameter/value_levels = 12.0
-shader_parameter/quantize_strength = 0.18
-shader_parameter/ridge_strength = 0.08
-shader_parameter/shadow_color = Color(0.16, 0.31, 0.31, 1)
-shader_parameter/middle_color = Color(0.4, 0.44, 0.34, 1)
-shader_parameter/sand_color = Color(0.68, 0.57, 0.37, 1)
-shader_parameter/sunlit_color = Color(0.84, 0.7, 0.46, 1)
-shader_parameter/atmosphere_color = Color(0.43, 0.61, 0.59, 1)
-shader_parameter/palette_strength = 0.14
-shader_parameter/atmosphere_strength = 0.09
+shader_parameter/local_radius_px = 2.0
+shader_parameter/far_detail_retention = 0.74
+shader_parameter/near_detail_retention = 0.94
+shader_parameter/far_saturation_retention = 0.94
+shader_parameter/near_saturation_retention = 1.0
+shader_parameter/distance_start = 0.1
+shader_parameter/distance_end = 0.88
+shader_parameter/air_color = Color(0.58, 0.78, 0.69, 1)
+shader_parameter/air_strength = 0.06
+shader_parameter/edge_air_strength = 0.1
+shader_parameter/horizon_color = Color(1, 0.72, 0.55, 1)
+shader_parameter/horizon_warmth = 0.1
 shader_parameter/opacity = 1.0
+shader_parameter/sand_shadow_color = Color(0.58, 0.43, 0.58, 1)
+shader_parameter/sand_mid_color = Color(0.86, 0.58, 0.5, 1)
+shader_parameter/sand_highlight_color = Color(1, 0.78, 0.59, 1)
+shader_parameter/sand_palette_strength = 0.98
+shader_parameter/sand_saturation = 1.15999997779715
+shader_parameter/source_value_detail = 0.3150000149625
 
 [sub_resource type="ShaderMaterial" id="Scene7DepthVeilMat"]
 resource_local_to_scene = true
 shader = ExtResource("15_depth_veil_shader")
-shader_parameter/mist_color = Color(0.3, 0.5, 0.47, 1)
-shader_parameter/dust_color = Color(0.78, 0.67, 0.43, 1)
-shader_parameter/opacity = 0.065
+shader_parameter/mist_color = Color(0.48, 0.72, 0.64, 1)
+shader_parameter/dust_color = Color(0.86, 0.62, 0.58, 1)
+shader_parameter/opacity = 0.018
 shader_parameter/top_fade = 0.18
 shader_parameter/bottom_fade = 0.24
 shader_parameter/pixel_grid = Vector2(480, 96)
@@ -58,12 +90,14 @@ shader_parameter/px_size = 1.0
 shader_parameter/perspective_y = 3.2
 shader_parameter/local_origin = Vector2(-32, 674)
 shader_parameter/local_extent = Vector2(1984, 86)
-shader_parameter/surface_color = Color(0.086, 0.49, 0.56, 1)
-shader_parameter/mid_color = Color(0.027, 0.34, 0.416, 1)
-shader_parameter/deep_color = Color(0.024, 0.173, 0.267, 1)
-shader_parameter/ripple_color = Color(0.31, 0.75, 0.76, 1)
-shader_parameter/spring_glow_color = Color(0.45, 0.88, 0.75, 1)
-shader_parameter/bank_shadow_color = Color(0.018, 0.12, 0.17, 1)
+shader_parameter/surface_color = Color(0.133, 0.667, 0.6, 1)
+shader_parameter/mid_color = Color(0.133, 0.533, 0.533, 1)
+shader_parameter/deep_color = Color(0.067, 0.267, 0.4, 1)
+shader_parameter/ripple_color = Color(0.333, 0.8, 0.667, 1)
+shader_parameter/spring_glow_color = Color(0.44, 0.88, 0.72, 1)
+shader_parameter/shore_contact_color = Color(0.08, 0.31, 0.39, 1)
+shader_parameter/distance_atmosphere_color = Color(0.25, 0.48, 0.52, 1)
+shader_parameter/distance_atmosphere = 0.1
 shader_parameter/anim_fps = 8.0
 shader_parameter/main_source = Vector2(0.52, 0.06)
 shader_parameter/secondary_source_a = Vector2(0.2, 0.58)
@@ -75,6 +109,10 @@ shader_parameter/ring_width = 0.032
 shader_parameter/main_ring_strength = 0.44
 shader_parameter/micro_ring_strength = 0.1
 shader_parameter/caustic_strength = 0.11
+shader_parameter/glint_period_sec = 10.2
+shader_parameter/glint_cell_px = 36.0
+shader_parameter/glint_presence = 0.3
+shader_parameter/glint_strength = 0.15
 shader_parameter/shore_shadow_px = 1.0
 shader_parameter/shore_glow_density = 0.24
 shader_parameter/shore_glow_strength = 0.26
@@ -82,173 +120,287 @@ shader_parameter/shore_glow_strength = 0.26
 [sub_resource type="ShaderMaterial" id="Scene7FarMotesMat"]
 resource_local_to_scene = true
 shader = ExtResource("16_motes_shader")
-shader_parameter/jade_color = Color(0.35, 0.86, 0.67, 1)
-shader_parameter/gold_color = Color(0.95, 0.76, 0.4, 1)
-shader_parameter/pixel_grid = Vector2(960, 180)
-shader_parameter/macro_cell = Vector2(128, 92)
-shader_parameter/density = 0.62
-shader_parameter/alpha = 0.3
-shader_parameter/rise_px_per_sec = 2.8
-shader_parameter/horizontal_px_per_sec = 0.75
-shader_parameter/motion_fps = 12.0
-shader_parameter/twinkle_speed = 0.48
+shader_parameter/jade_color = Color(0.35, 0.86, 0.72, 1)
+shader_parameter/gold_color = Color(0.84, 0.48, 0.76, 1)
+shader_parameter/accent_ratio = 0.08
+shader_parameter/alpha = 0.24
+shader_parameter/pixel_grid = Vector2(992, 180)
+shader_parameter/macro_cell = Vector2(124, 60)
+shader_parameter/density = 0.72
+shader_parameter/secondary_density = 0.18
+shader_parameter/spark_length_px = 0.0
+shader_parameter/spark_chance = 0.0
+shader_parameter/rise_px_per_sec = 1.6
+shader_parameter/horizontal_sway_px = 1.0
+shader_parameter/cycle_sec = 14.8
+shader_parameter/motion_fps = 8.0
+shader_parameter/twinkle_speed = 0.32
 shader_parameter/phase = 0.9
+shader_parameter/diagnostic_time_sec = -1.0
+
+[sub_resource type="ShaderMaterial" id="Scene7MidMotesMat"]
+resource_local_to_scene = true
+shader = ExtResource("16_motes_shader")
+shader_parameter/jade_color = Color(0.36, 0.88, 0.73, 1)
+shader_parameter/gold_color = Color(0.86, 0.5, 0.77, 1)
+shader_parameter/accent_ratio = 0.13
+shader_parameter/alpha = 0.29
+shader_parameter/pixel_grid = Vector2(992, 200)
+shader_parameter/macro_cell = Vector2(88, 64)
+shader_parameter/density = 0.58
+shader_parameter/secondary_density = 0.24
+shader_parameter/spark_length_px = 1.0
+shader_parameter/spark_chance = 0.16
+shader_parameter/rise_px_per_sec = 2.4
+shader_parameter/horizontal_sway_px = 2.0
+shader_parameter/cycle_sec = 11.6
+shader_parameter/motion_fps = 10.0
+shader_parameter/twinkle_speed = 0.46
+shader_parameter/phase = 2.2
+shader_parameter/diagnostic_time_sec = -1.0
 
 [sub_resource type="ShaderMaterial" id="Scene7MidCenterBiolumeMat"]
 resource_local_to_scene = true
 shader = ExtResource("8_biolume_shader")
-shader_parameter/ambient_tint = Color(0.73, 0.81, 0.8, 1)
-shader_parameter/glow_color = Color(0.28, 0.95, 0.75, 1)
-shader_parameter/base_brightness = 0.94
-shader_parameter/emission_threshold = 0.58
-shader_parameter/emission_strength = 0.14
-shader_parameter/halo_strength = 0.18
-shader_parameter/halo_alpha = 0.18
-shader_parameter/halo_radius = 1.5
-shader_parameter/source_cyan_compression = 0.25
-shader_parameter/source_cyan_value_start = 0.3
-shader_parameter/source_cyan_value_ceiling = 0.58
-shader_parameter/source_cyan_tint = Color(0.08, 0.56, 0.43, 1)
-shader_parameter/emission_core_end = 0.94
-shader_parameter/emission_soft_knee = 0.14
-shader_parameter/source_cyan_midtone_lift = 0.15
-shader_parameter/highlight_shoulder_start = 0.46
-shader_parameter/highlight_shoulder_strength = 7.5
+shader_parameter/ambient_tint = Color(0.58, 0.67, 0.78, 1)
+shader_parameter/glow_color = Color(0.35, 0.86, 0.72, 1)
+shader_parameter/base_brightness = 0.9
+shader_parameter/emission_threshold = 0.66
+shader_parameter/emission_strength = 0.08
+shader_parameter/halo_strength = 0.16
+shader_parameter/halo_alpha = 0.08
+shader_parameter/halo_radius = 1.0
+shader_parameter/source_cyan_compression = 0.18
+shader_parameter/source_cyan_value_start = 0.28
+shader_parameter/source_cyan_value_ceiling = 0.69
+shader_parameter/source_cyan_tint = Color(0.1, 0.62, 0.57, 1)
+shader_parameter/core_preservation = 0.84
+shader_parameter/core_start = 0.66
+shader_parameter/core_full = 0.9
+shader_parameter/core_value_floor = 0.66
+shader_parameter/core_value_ceiling = 0.79
+shader_parameter/core_tint_mix = 0.3
+shader_parameter/emission_core_end = 0.9
+shader_parameter/emission_soft_knee = 0.1
+shader_parameter/source_cyan_midtone_lift = 0.08
+shader_parameter/highlight_shoulder_start = 0.67
+shader_parameter/highlight_shoulder_strength = 1.35
 shader_parameter/cool_output_gain = 0.96
-shader_parameter/shadow_palette = Color(0.04, 0.17, 0.21, 1)
-shader_parameter/sunlit_palette = Color(0.46, 0.53, 0.35, 1)
-shader_parameter/palette_strength = 0.24
-shader_parameter/atmosphere_color = Color(0.35, 0.52, 0.54, 1)
-shader_parameter/atmosphere_strength = 0.065
+shader_parameter/shadow_palette = Color(0.04, 0.14, 0.27, 1)
+shader_parameter/sunlit_palette = Color(0.1, 0.42, 0.48, 1)
+shader_parameter/palette_strength = 0.38
+shader_parameter/atmosphere_color = Color(0.19, 0.27, 0.4, 1)
+shader_parameter/atmosphere_strength = 0.06
 shader_parameter/edge_integration_strength = 0.09
-shader_parameter/contact_color = Color(0.03, 0.19, 0.18, 1)
-shader_parameter/sediment_color = Color(0.5, 0.44, 0.27, 1)
-shader_parameter/reflection_color = Color(0.21, 0.59, 0.63, 1)
-shader_parameter/contact_start = 0.62
+shader_parameter/contact_color = Color(0.08, 0.31, 0.39, 1)
+shader_parameter/sediment_color = Color(0.4, 0.31, 0.4, 1)
+shader_parameter/reflection_color = Color(0.2, 0.66, 0.6, 1)
+shader_parameter/contact_start = 0.72
 shader_parameter/contact_strength = 0.52
 shader_parameter/sediment_strength = 0.26
 shader_parameter/reflection_strength = 0.2
 shader_parameter/root_merge_strength = 0.88
-shader_parameter/sway_strength_px = 0.48
 shader_parameter/sway_speed = 0.31
 shader_parameter/sway_phase = 2.1
-shader_parameter/sway_anchor_y = 0.66
-shader_parameter/secondary_sway_ratio = 0.34
-shader_parameter/vertical_sway_ratio = 0.08
-shader_parameter/edge_motion_strength = 0.055
-shader_parameter/glow_pulse_strength = 0.17
+shader_parameter/branch_mask = ExtResource("26_branch_center")
+shader_parameter/branch_source_texture = ExtResource("11_mid_center")
+shader_parameter/branch_underpaint_texture = ExtResource("30_branch_center_underpaint")
+shader_parameter/branch_underpaint_enabled = 1.0
+shader_parameter/branch_motion_enabled = 1.0
+shader_parameter/branch_group_count = 3
+shader_parameter/branch_motion_fps = 5.0
+shader_parameter/branch_cycle_sec = Vector3(10.5, 11.75, 9.75)
+shader_parameter/branch_angle_deg = Vector3(0.95, 0.72, 0.84)
+shader_parameter/branch_phase = Vector3(0.35, 1.85, 3.65)
+shader_parameter/branch_pivot_a = Vector2(0.36, 0.45)
+shader_parameter/branch_pivot_b = Vector2(0.39, 0.44)
+shader_parameter/branch_pivot_c = Vector2(0.41, 0.46)
+shader_parameter/edge_motion_strength = 0.0
+shader_parameter/glow_pulse_strength = 0.0
 shader_parameter/glow_pulse_speed = 0.51
 shader_parameter/glow_pulse_phase = 2.6
+shader_parameter/point_twinkle_strength = 0.0
+shader_parameter/point_twinkle_speed = 1.16
+shader_parameter/point_twinkle_density = 0.3
+shader_parameter/point_twinkle_phase = 2.4
+shader_parameter/cluster_breathe_strength = 0.0
+shader_parameter/cluster_breathe_speed = 0.34
+shader_parameter/cluster_breathe_phase = 1.8
 
 [sub_resource type="ShaderMaterial" id="Scene7MidLeftBiolumeMat"]
 resource_local_to_scene = true
 shader = ExtResource("8_biolume_shader")
-shader_parameter/ambient_tint = Color(0.72, 0.8, 0.79, 1)
-shader_parameter/glow_color = Color(0.27, 0.93, 0.72, 1)
-shader_parameter/base_brightness = 0.98
-shader_parameter/emission_threshold = 0.58
-shader_parameter/emission_strength = 0.13
-shader_parameter/halo_strength = 0.17
-shader_parameter/halo_alpha = 0.17
-shader_parameter/halo_radius = 1.5
-shader_parameter/source_cyan_compression = 0.22
-shader_parameter/source_cyan_value_start = 0.3
-shader_parameter/source_cyan_value_ceiling = 0.58
-shader_parameter/source_cyan_tint = Color(0.08, 0.54, 0.42, 1)
-shader_parameter/emission_core_end = 0.94
-shader_parameter/emission_soft_knee = 0.14
-shader_parameter/source_cyan_midtone_lift = 0.15
-shader_parameter/highlight_shoulder_start = 0.46
-shader_parameter/highlight_shoulder_strength = 7.5
+shader_parameter/ambient_tint = Color(0.57, 0.66, 0.77, 1)
+shader_parameter/glow_color = Color(0.34, 0.85, 0.71, 1)
+shader_parameter/base_brightness = 0.91
+shader_parameter/emission_threshold = 0.64
+shader_parameter/emission_strength = 0.075
+shader_parameter/halo_strength = 0.15
+shader_parameter/halo_alpha = 0.075
+shader_parameter/halo_radius = 1.0
+shader_parameter/source_cyan_compression = 0.18
+shader_parameter/source_cyan_value_start = 0.28
+shader_parameter/source_cyan_value_ceiling = 0.68
+shader_parameter/source_cyan_tint = Color(0.095, 0.61, 0.56, 1)
+shader_parameter/core_preservation = 0.83
+shader_parameter/core_start = 0.64
+shader_parameter/core_full = 0.84
+shader_parameter/core_value_floor = 0.65
+shader_parameter/core_value_ceiling = 0.78
+shader_parameter/core_tint_mix = 0.28
+shader_parameter/emission_core_end = 0.84
+shader_parameter/emission_soft_knee = 0.09
+shader_parameter/source_cyan_midtone_lift = 0.075
+shader_parameter/highlight_shoulder_start = 0.67
+shader_parameter/highlight_shoulder_strength = 1.4
 shader_parameter/cool_output_gain = 0.96
-shader_parameter/shadow_palette = Color(0.035, 0.15, 0.18, 1)
-shader_parameter/sunlit_palette = Color(0.44, 0.5, 0.34, 1)
-shader_parameter/palette_strength = 0.22
-shader_parameter/atmosphere_color = Color(0.34, 0.51, 0.52, 1)
+shader_parameter/shadow_palette = Color(0.035, 0.13, 0.26, 1)
+shader_parameter/sunlit_palette = Color(0.09, 0.4, 0.47, 1)
+shader_parameter/palette_strength = 0.36
+shader_parameter/atmosphere_color = Color(0.18, 0.26, 0.39, 1)
 shader_parameter/atmosphere_strength = 0.06
 shader_parameter/edge_integration_strength = 0.08
-shader_parameter/contact_color = Color(0.035, 0.18, 0.17, 1)
-shader_parameter/sediment_color = Color(0.49, 0.43, 0.27, 1)
-shader_parameter/reflection_color = Color(0.2, 0.57, 0.61, 1)
-shader_parameter/contact_start = 0.58
+shader_parameter/contact_color = Color(0.08, 0.31, 0.39, 1)
+shader_parameter/sediment_color = Color(0.39, 0.3, 0.39, 1)
+shader_parameter/reflection_color = Color(0.19, 0.64, 0.59, 1)
+shader_parameter/contact_start = 0.72
 shader_parameter/contact_strength = 0.4
 shader_parameter/sediment_strength = 0.18
 shader_parameter/reflection_strength = 0.14
 shader_parameter/root_merge_strength = 0.82
-shader_parameter/sway_strength_px = 0.82
 shader_parameter/sway_speed = 0.38
 shader_parameter/sway_phase = 0.3
-shader_parameter/sway_anchor_y = 0.68
-shader_parameter/secondary_sway_ratio = 0.46
-shader_parameter/vertical_sway_ratio = 0.08
-shader_parameter/edge_motion_strength = 0.1
-shader_parameter/glow_pulse_strength = 0.15
+shader_parameter/branch_mask = ExtResource("27_branch_left")
+shader_parameter/branch_source_texture = ExtResource("10_mid_left")
+shader_parameter/branch_underpaint_texture = ExtResource("31_branch_left_underpaint")
+shader_parameter/branch_underpaint_enabled = 1.0
+shader_parameter/branch_motion_enabled = 1.0
+shader_parameter/branch_group_count = 1
+shader_parameter/branch_motion_fps = 4.0
+shader_parameter/branch_cycle_sec = Vector3(11.5, 11.5, 11.5)
+shader_parameter/branch_angle_deg = Vector3(1.55, 0, 0)
+shader_parameter/branch_phase = Vector3(0.9, 0, 0)
+shader_parameter/branch_pivot_a = Vector2(0.48, 0.9)
+shader_parameter/edge_motion_strength = 0.0
+shader_parameter/glow_pulse_strength = 0.0
 shader_parameter/glow_pulse_speed = 0.42
 shader_parameter/glow_pulse_phase = 0.4
+shader_parameter/point_twinkle_strength = 0.0
+shader_parameter/point_twinkle_speed = 0.94
+shader_parameter/point_twinkle_density = 0.26
+shader_parameter/point_twinkle_phase = 0.6
+shader_parameter/cluster_breathe_strength = 0.0
+shader_parameter/cluster_breathe_speed = 0.29
+shader_parameter/cluster_breathe_phase = 3.4
 
 [sub_resource type="ShaderMaterial" id="Scene7MidRightBiolumeMat"]
 resource_local_to_scene = true
 shader = ExtResource("8_biolume_shader")
-shader_parameter/ambient_tint = Color(0.7, 0.79, 0.78, 1)
-shader_parameter/glow_color = Color(0.26, 0.9, 0.7, 1)
-shader_parameter/base_brightness = 0.96
-shader_parameter/emission_threshold = 0.6
-shader_parameter/emission_strength = 0.13
-shader_parameter/halo_strength = 0.17
-shader_parameter/halo_alpha = 0.17
-shader_parameter/halo_radius = 1.5
-shader_parameter/source_cyan_compression = 0.22
-shader_parameter/source_cyan_value_start = 0.3
-shader_parameter/source_cyan_value_ceiling = 0.58
-shader_parameter/source_cyan_tint = Color(0.075, 0.52, 0.4, 1)
-shader_parameter/emission_core_end = 0.98
-shader_parameter/emission_soft_knee = 0.14
-shader_parameter/source_cyan_midtone_lift = 0.15
-shader_parameter/highlight_shoulder_start = 0.46
-shader_parameter/highlight_shoulder_strength = 7.5
+shader_parameter/ambient_tint = Color(0.56, 0.65, 0.76, 1)
+shader_parameter/glow_color = Color(0.33, 0.84, 0.7, 1)
+shader_parameter/base_brightness = 0.9
+shader_parameter/emission_threshold = 0.64
+shader_parameter/emission_strength = 0.075
+shader_parameter/halo_strength = 0.15
+shader_parameter/halo_alpha = 0.075
+shader_parameter/halo_radius = 1.0
+shader_parameter/source_cyan_compression = 0.18
+shader_parameter/source_cyan_value_start = 0.29
+shader_parameter/source_cyan_value_ceiling = 0.68
+shader_parameter/source_cyan_tint = Color(0.09, 0.6, 0.55, 1)
+shader_parameter/core_preservation = 0.83
+shader_parameter/core_start = 0.64
+shader_parameter/core_full = 0.84
+shader_parameter/core_value_floor = 0.65
+shader_parameter/core_value_ceiling = 0.78
+shader_parameter/core_tint_mix = 0.27
+shader_parameter/emission_core_end = 0.84
+shader_parameter/emission_soft_knee = 0.09
+shader_parameter/source_cyan_midtone_lift = 0.075
+shader_parameter/highlight_shoulder_start = 0.67
+shader_parameter/highlight_shoulder_strength = 1.4
 shader_parameter/cool_output_gain = 0.96
-shader_parameter/shadow_palette = Color(0.03, 0.14, 0.16, 1)
-shader_parameter/sunlit_palette = Color(0.42, 0.48, 0.32, 1)
-shader_parameter/palette_strength = 0.21
-shader_parameter/atmosphere_color = Color(0.33, 0.49, 0.5, 1)
+shader_parameter/shadow_palette = Color(0.03, 0.12, 0.25, 1)
+shader_parameter/sunlit_palette = Color(0.085, 0.39, 0.46, 1)
+shader_parameter/palette_strength = 0.36
+shader_parameter/atmosphere_color = Color(0.18, 0.25, 0.38, 1)
 shader_parameter/atmosphere_strength = 0.065
 shader_parameter/edge_integration_strength = 0.1
-shader_parameter/contact_color = Color(0.032, 0.17, 0.16, 1)
-shader_parameter/sediment_color = Color(0.46, 0.4, 0.24, 1)
-shader_parameter/reflection_color = Color(0.19, 0.55, 0.59, 1)
-shader_parameter/contact_start = 0.6
+shader_parameter/contact_color = Color(0.08, 0.31, 0.39, 1)
+shader_parameter/sediment_color = Color(0.38, 0.29, 0.38, 1)
+shader_parameter/reflection_color = Color(0.18, 0.63, 0.58, 1)
+shader_parameter/contact_start = 0.72
 shader_parameter/contact_strength = 0.44
 shader_parameter/sediment_strength = 0.16
 shader_parameter/reflection_strength = 0.12
 shader_parameter/root_merge_strength = 0.84
-shader_parameter/sway_strength_px = 0.54
 shader_parameter/sway_speed = 0.46
 shader_parameter/sway_phase = 4.0
-shader_parameter/sway_anchor_y = 0.7
-shader_parameter/secondary_sway_ratio = 0.34
-shader_parameter/vertical_sway_ratio = 0.08
-shader_parameter/edge_motion_strength = 0.06
-shader_parameter/glow_pulse_strength = 0.14
+shader_parameter/branch_mask = ExtResource("28_branch_right")
+shader_parameter/branch_source_texture = ExtResource("12_mid_right")
+shader_parameter/branch_underpaint_texture = ExtResource("32_branch_right_underpaint")
+shader_parameter/branch_underpaint_enabled = 1.0
+shader_parameter/branch_motion_enabled = 1.0
+shader_parameter/branch_group_count = 1
+shader_parameter/branch_motion_fps = 4.0
+shader_parameter/branch_cycle_sec = Vector3(12, 12, 12)
+shader_parameter/branch_angle_deg = Vector3(1.5, 0, 0)
+shader_parameter/branch_phase = Vector3(2.45, 0, 0)
+shader_parameter/branch_pivot_a = Vector2(0.56, 0.89)
+shader_parameter/edge_motion_strength = 0.0
+shader_parameter/glow_pulse_strength = 0.0
 shader_parameter/glow_pulse_speed = 0.37
 shader_parameter/glow_pulse_phase = 4.7
+shader_parameter/point_twinkle_strength = 0.0
+shader_parameter/point_twinkle_speed = 1.04
+shader_parameter/point_twinkle_density = 0.22
+shader_parameter/point_twinkle_phase = 4.8
+shader_parameter/cluster_breathe_strength = 0.0
+shader_parameter/cluster_breathe_speed = 0.38
+shader_parameter/cluster_breathe_phase = 0.9
+
+[sub_resource type="ShaderMaterial" id="Scene7RearReflectionMat"]
+resource_local_to_scene = true
+shader = ExtResource("19_far_reflection_shader")
+shader_parameter/screen_px = Vector2(1920, 1080)
+shader_parameter/water_depth_px = 80.0
+shader_parameter/reflection_height_px = 96.0
+shader_parameter/sample_gap_px = 2.0
+shader_parameter/slice_px = 3.0
+shader_parameter/breakup_width_px = 52.0
+shader_parameter/breakup_offset_px = 4.0
+shader_parameter/surface_color = Color(0.133, 0.667, 0.6, 1)
+shader_parameter/mid_color = Color(0.133, 0.533, 0.533, 1)
+shader_parameter/deep_color = Color(0.067, 0.267, 0.4, 1)
+shader_parameter/spring_glow_color = Color(0.44, 0.88, 0.72, 1)
+shader_parameter/reflection_strength = 0.34
+shader_parameter/reflection_colorize = 0.9
+shader_parameter/vegetation_floor = 0.18
+shader_parameter/anim_fps = 8.0
+shader_parameter/reflection_period_sec = 9.8
+shader_parameter/reflection_sway_px = 3.0
+shader_parameter/reflection_breathe_strength = 0.16
 
 [sub_resource type="ShaderMaterial" id="Scene7FrontWaterMat"]
 resource_local_to_scene = true
 shader = ExtResource("18_front_water_shader")
-shader_parameter/size_px = Vector2(1984, 224)
+shader_parameter/size_px = Vector2(1984, 256)
 shader_parameter/screen_px = Vector2(1920, 1080)
 shader_parameter/px_size = 4.0
 shader_parameter/perspective_y = 2.8
+shader_parameter/style_source_top_px = 112.0
 shader_parameter/reflection_height_px = 540.0
 shader_parameter/reflection_strength = 0.54
 shader_parameter/reflection_levels = 9.0
-shader_parameter/reflection_tint = Color(0.16, 0.68, 0.7, 1)
-shader_parameter/reflection_colorize = 0.6
+shader_parameter/reflection_tint = Color(0.19, 0.75, 0.68, 1)
+shader_parameter/reflection_colorize = 0.84
 shader_parameter/slice_px_far = 4.0
 shader_parameter/slice_px_near = 10.0
 shader_parameter/radial_distortion_px = 4.0
 shader_parameter/breakup_px = 76.0
 shader_parameter/breakup_strength = 0.1
+shader_parameter/reflection_sway_px = 6.0
+shader_parameter/reflection_sway_period_sec = 9.8
 shader_parameter/p1_reflection_rect = Vector4(0, 0, 0, 0)
 shader_parameter/p2_reflection_rect = Vector4(0, 0, 0, 0)
 shader_parameter/p1_reflection_foot_y = 0.0
@@ -257,13 +409,13 @@ shader_parameter/character_waterline_y = 0.0
 shader_parameter/character_reflection_strength = 0.3
 shader_parameter/character_reflection_vertical_scale = 1.08
 shader_parameter/character_reflection_saturation = 0.64
-shader_parameter/character_reflection_tint = Color(0.3, 0.67, 0.68, 1)
+shader_parameter/character_reflection_tint = Color(0.28, 0.67, 0.64, 1)
 shader_parameter/character_reflection_fade_start = 0.58
-shader_parameter/surface_color = Color(0.09, 0.46, 0.54, 1)
-shader_parameter/shallow_color = Color(0.04, 0.34, 0.42, 1)
-shader_parameter/deep_color = Color(0.02, 0.145, 0.23, 1)
-shader_parameter/ripple_color = Color(0.27, 0.7, 0.73, 1)
-shader_parameter/spring_glow_color = Color(0.42, 0.9, 0.72, 1)
+shader_parameter/surface_color = Color(0.133, 0.667, 0.6, 1)
+shader_parameter/shallow_color = Color(0.133, 0.533, 0.533, 1)
+shader_parameter/deep_color = Color(0.067, 0.267, 0.4, 1)
+shader_parameter/ripple_color = Color(0.333, 0.8, 0.667, 1)
+shader_parameter/spring_glow_color = Color(0.44, 0.88, 0.72, 1)
 shader_parameter/depth_curve = 1.08
 shader_parameter/row_contrast = 0.026
 shader_parameter/anim_fps = 8.0
@@ -277,80 +429,130 @@ shader_parameter/ring_width = 0.024
 shader_parameter/main_ring_strength = 0.38
 shader_parameter/micro_ring_strength = 0.1
 shader_parameter/caustic_strength = 0.1
-shader_parameter/shore_dark = Color(0.018, 0.11, 0.16, 1)
-shader_parameter/shore_light = Color(0.36, 0.73, 0.7, 1)
-shader_parameter/shore_px = 4.0
-shader_parameter/shore_cluster_spacing_px = 104.0
-shader_parameter/shore_cluster_density = 0.2
-shader_parameter/shore_cluster_cycle_sec = 9.0
-shader_parameter/shore_light_strength = 0.3
+shader_parameter/glint_period_sec = 9.6
+shader_parameter/glint_cell_px = 64.0
+shader_parameter/glint_presence = 0.34
+shader_parameter/glint_strength = 0.16
+
+[sub_resource type="ShaderMaterial" id="Scene7PlatformSpringContactMat"]
+resource_local_to_scene = true
+shader = ExtResource("21_platform_spring_contact_shader")
+shader_parameter/platform_texture = ExtResource("3_platform")
+shader_parameter/size_px = Vector2(1984, 18)
+shader_parameter/contact_origin_px = Vector2(-32, 824)
+shader_parameter/platform_origin_px = Vector2(-133.165, 234)
+shader_parameter/platform_rect_size_px = Vector2(364.83337, 188)
+shader_parameter/platform_node_scale = Vector2(6, 6)
+shader_parameter/surface_bottom_row = 95.0
+shader_parameter/shallow_wall_rows = 4.0
+shader_parameter/edge_variation_rows = 1.0
+shader_parameter/stone_block_width = 7.0
+shader_parameter/line_cell_width_px = 78.0
+shader_parameter/line_presence = 0.86
+shader_parameter/line_margin_px = 8.0
+shader_parameter/contact_thickness_px = 5.0
+shader_parameter/minimum_thickness_px = 3.0
+shader_parameter/anim_fps = 8.0
+shader_parameter/spring_period_sec = 7.6
+shader_parameter/active_line_ratio = 0.64
+shader_parameter/surface_color = Color(0.133, 0.667, 0.6, 1)
+shader_parameter/ripple_color = Color(0.333, 0.8, 0.667, 1)
+shader_parameter/spring_glow_color = Color(0.44, 0.88, 0.72, 1)
+shader_parameter/ripple_palette_mix = 0.58
+shader_parameter/glow_palette_mix = 0.42
+shader_parameter/contact_alpha = 0.66
 
 [sub_resource type="ShaderMaterial" id="Scene7PlatformGradeMat"]
 resource_local_to_scene = true
 shader = ExtResource("14_platform_elevation_shader")
-shader_parameter/shadow_tint = Color(0.2, 0.3, 0.29, 1)
-shader_parameter/highlight_tint = Color(0.82, 0.72, 0.51, 1)
-shader_parameter/dry_edge_color = Color(0.92, 0.82, 0.62, 1)
-shader_parameter/wet_edge_color = Color(0.04, 0.24, 0.3, 1)
-shader_parameter/waterline_color = Color(0.2, 0.58, 0.62, 1)
-shader_parameter/grade_strength = 0.18
-shader_parameter/brightness = 1.06
-shader_parameter/contrast = 1.03
-shader_parameter/saturation = 0.8
-shader_parameter/dry_edge_strength = 0.36
-shader_parameter/wet_edge_strength = 0.24
-shader_parameter/contact_shadow_strength = 0.3
-shader_parameter/waterline_strength = 0.14
-shader_parameter/contact_band_px = 5.0
-shader_parameter/screen_px_per_texel = 6.0
+shader_parameter/shadow_tint = Color(0.42, 0.3, 0.4, 1)
+shader_parameter/highlight_tint = Color(0.93, 0.65, 0.58, 1)
+shader_parameter/grade_strength = 0.72
+shader_parameter/brightness = 1.0
+shader_parameter/contrast = 1.04
+shader_parameter/saturation = 1.05
+shader_parameter/underside_tint = Color(0.4, 0.267, 0.4, 1)
+shader_parameter/underside_strength = 0.82
+shader_parameter/surface_bottom_row = 95.0
+shader_parameter/shallow_wall_rows = 4.0
+shader_parameter/edge_variation_rows = 1.0
 
 [sub_resource type="ShaderMaterial" id="Scene7NearMotesMat"]
 resource_local_to_scene = true
 shader = ExtResource("16_motes_shader")
-shader_parameter/jade_color = Color(0.29, 1, 0.72, 1)
-shader_parameter/gold_color = Color(1, 0.8, 0.42, 1)
-shader_parameter/pixel_grid = Vector2(960, 180)
-shader_parameter/macro_cell = Vector2(96, 72)
-shader_parameter/density = 0.36
-shader_parameter/alpha = 0.4
-shader_parameter/rise_px_per_sec = 4.6
-shader_parameter/horizontal_px_per_sec = -1.25
-shader_parameter/motion_fps = 12.0
-shader_parameter/twinkle_speed = 0.76
+shader_parameter/jade_color = Color(0.38, 0.9, 0.74, 1)
+shader_parameter/gold_color = Color(0.88, 0.5, 0.79, 1)
+shader_parameter/accent_ratio = 0.18
+shader_parameter/alpha = 0.34
+shader_parameter/pixel_grid = Vector2(672, 180)
+shader_parameter/macro_cell = Vector2(84, 60)
+shader_parameter/density = 0.46
+shader_parameter/secondary_density = 0.14
+shader_parameter/spark_length_px = 1.0
+shader_parameter/spark_chance = 0.28
+shader_parameter/rise_px_per_sec = 3.2
+shader_parameter/horizontal_sway_px = 3.0
+shader_parameter/cycle_sec = 9.6
+shader_parameter/motion_fps = 10.0
+shader_parameter/twinkle_speed = 0.55
 shader_parameter/phase = 3.4
+shader_parameter/diagnostic_time_sec = -1.0
 
 [sub_resource type="ShaderMaterial" id="Scene7ForegroundLeftGradeMat"]
 resource_local_to_scene = true
 shader = ExtResource("8_biolume_shader")
-shader_parameter/ambient_tint = Color(0.68, 0.8, 0.69, 1)
-shader_parameter/glow_color = Color(0.22, 1, 0.74, 1)
-shader_parameter/base_brightness = 0.88
+shader_parameter/ambient_tint = Color(0.5, 0.62, 0.76, 1)
+shader_parameter/glow_color = Color(0.35, 0.9, 0.72, 1)
+shader_parameter/base_brightness = 0.82
 shader_parameter/emission_threshold = 0.2
-shader_parameter/emission_strength = 0.64
-shader_parameter/halo_strength = 0.48
-shader_parameter/halo_alpha = 0.36
+shader_parameter/emission_strength = 0.56
+shader_parameter/halo_strength = 0.4
+shader_parameter/halo_alpha = 0.3
 shader_parameter/halo_radius = 1.5
 shader_parameter/source_cyan_compression = 0.0
-shader_parameter/shadow_palette = Color(0.04, 0.16, 0.13, 1)
-shader_parameter/sunlit_palette = Color(0.52, 0.56, 0.32, 1)
-shader_parameter/palette_strength = 0.22
-shader_parameter/atmosphere_color = Color(0.14, 0.3, 0.28, 1)
-shader_parameter/atmosphere_strength = 0.03
+shader_parameter/source_cyan_value_start = 0.32
+shader_parameter/source_cyan_value_ceiling = 0.5
+shader_parameter/source_cyan_tint = Color(0.1, 0.64, 0.59, 1)
+shader_parameter/core_preservation = 0.0
+shader_parameter/core_start = 0.54
+shader_parameter/core_full = 0.72
+shader_parameter/core_value_floor = 0.68
+shader_parameter/core_value_ceiling = 0.84
+shader_parameter/core_tint_mix = 0.34
+shader_parameter/emission_core_end = 0.86
+shader_parameter/emission_soft_knee = 0.0
+shader_parameter/source_cyan_midtone_lift = 0.0
+shader_parameter/highlight_shoulder_start = 0.58
+shader_parameter/highlight_shoulder_strength = 0.0
+shader_parameter/cool_output_gain = 1.0
+shader_parameter/shadow_palette = Color(0.015, 0.06, 0.14, 1)
+shader_parameter/sunlit_palette = Color(0.08, 0.32, 0.38, 1)
+shader_parameter/palette_strength = 0.42
+shader_parameter/atmosphere_color = Color(0.04, 0.12, 0.24, 1)
+shader_parameter/atmosphere_strength = 0.04
 shader_parameter/edge_integration_strength = 0.055
-shader_parameter/contact_color = Color(0.035, 0.18, 0.17, 1)
-shader_parameter/sediment_color = Color(0.48, 0.42, 0.26, 1)
-shader_parameter/reflection_color = Color(0.18, 0.62, 0.48, 1)
+shader_parameter/contact_color = Color(0.08, 0.31, 0.39, 1)
+shader_parameter/sediment_color = Color(0.4, 0.3, 0.4, 1)
+shader_parameter/reflection_color = Color(0.2, 0.7, 0.62, 1)
 shader_parameter/contact_start = 0.62
 shader_parameter/contact_strength = 0.0
 shader_parameter/sediment_strength = 0.0
 shader_parameter/reflection_strength = 0.0
 shader_parameter/root_merge_strength = 0.0
-shader_parameter/sway_strength_px = 0.72
 shader_parameter/sway_speed = 0.62
 shader_parameter/sway_phase = 1.4
-shader_parameter/sway_anchor_y = 0.72
-shader_parameter/secondary_sway_ratio = 0.42
-shader_parameter/vertical_sway_ratio = 0.08
+shader_parameter/branch_mask = ExtResource("29_branch_front_left")
+shader_parameter/branch_source_texture = ExtResource("4_foreground_left")
+shader_parameter/branch_underpaint_texture = ExtResource("33_branch_front_left_underpaint")
+shader_parameter/branch_underpaint_enabled = 1.0
+shader_parameter/branch_motion_enabled = 1.0
+shader_parameter/branch_group_count = 2
+shader_parameter/branch_motion_fps = 5.0
+shader_parameter/branch_cycle_sec = Vector3(9.75, 11.25, 11.25)
+shader_parameter/branch_angle_deg = Vector3(2.05, 1.8, 0)
+shader_parameter/branch_phase = Vector3(1.35, 4.1, 0)
+shader_parameter/branch_pivot_a = Vector2(0.57, 0.93)
+shader_parameter/branch_pivot_b = Vector2(0.69, 0.94)
 shader_parameter/edge_motion_strength = 0.065
 shader_parameter/glow_pulse_strength = 0.18
 shader_parameter/glow_pulse_speed = 0.72
@@ -359,39 +561,62 @@ shader_parameter/glow_pulse_phase = 1.2
 [sub_resource type="ShaderMaterial" id="Scene7ForegroundRightGradeMat"]
 resource_local_to_scene = true
 shader = ExtResource("8_biolume_shader")
-shader_parameter/ambient_tint = Color(0.68, 0.8, 0.69, 1)
-shader_parameter/glow_color = Color(0.22, 1, 0.74, 1)
-shader_parameter/base_brightness = 0.88
+shader_parameter/ambient_tint = Color(0.5, 0.62, 0.76, 1)
+shader_parameter/glow_color = Color(0.35, 0.9, 0.72, 1)
+shader_parameter/base_brightness = 0.82
 shader_parameter/emission_threshold = 0.2
-shader_parameter/emission_strength = 0.64
-shader_parameter/halo_strength = 0.48
-shader_parameter/halo_alpha = 0.36
+shader_parameter/emission_strength = 0.56
+shader_parameter/halo_strength = 0.4
+shader_parameter/halo_alpha = 0.3
 shader_parameter/halo_radius = 1.5
 shader_parameter/source_cyan_compression = 0.0
-shader_parameter/shadow_palette = Color(0.038, 0.15, 0.12, 1)
-shader_parameter/sunlit_palette = Color(0.5, 0.54, 0.31, 1)
-shader_parameter/palette_strength = 0.23
-shader_parameter/atmosphere_color = Color(0.14, 0.3, 0.28, 1)
-shader_parameter/atmosphere_strength = 0.032
+shader_parameter/source_cyan_value_start = 0.32
+shader_parameter/source_cyan_value_ceiling = 0.5
+shader_parameter/source_cyan_tint = Color(0.1, 0.64, 0.59, 1)
+shader_parameter/core_preservation = 0.0
+shader_parameter/core_start = 0.54
+shader_parameter/core_full = 0.72
+shader_parameter/core_value_floor = 0.68
+shader_parameter/core_value_ceiling = 0.84
+shader_parameter/core_tint_mix = 0.34
+shader_parameter/emission_core_end = 0.86
+shader_parameter/emission_soft_knee = 0.0
+shader_parameter/source_cyan_midtone_lift = 0.0
+shader_parameter/highlight_shoulder_start = 0.58
+shader_parameter/highlight_shoulder_strength = 0.0
+shader_parameter/cool_output_gain = 1.0
+shader_parameter/shadow_palette = Color(0.015, 0.055, 0.135, 1)
+shader_parameter/sunlit_palette = Color(0.075, 0.31, 0.37, 1)
+shader_parameter/palette_strength = 0.42
+shader_parameter/atmosphere_color = Color(0.04, 0.115, 0.23, 1)
+shader_parameter/atmosphere_strength = 0.04
 shader_parameter/edge_integration_strength = 0.06
-shader_parameter/contact_color = Color(0.035, 0.18, 0.17, 1)
-shader_parameter/sediment_color = Color(0.48, 0.42, 0.26, 1)
-shader_parameter/reflection_color = Color(0.18, 0.62, 0.48, 1)
+shader_parameter/contact_color = Color(0.08, 0.31, 0.39, 1)
+shader_parameter/sediment_color = Color(0.4, 0.3, 0.4, 1)
+shader_parameter/reflection_color = Color(0.2, 0.7, 0.62, 1)
 shader_parameter/contact_start = 0.62
 shader_parameter/contact_strength = 0.0
 shader_parameter/sediment_strength = 0.0
 shader_parameter/reflection_strength = 0.0
 shader_parameter/root_merge_strength = 0.0
-shader_parameter/sway_strength_px = 0.76
 shader_parameter/sway_speed = 0.54
 shader_parameter/sway_phase = 3.3
-shader_parameter/sway_anchor_y = 0.74
-shader_parameter/secondary_sway_ratio = 0.34
-shader_parameter/vertical_sway_ratio = 0.08
 shader_parameter/edge_motion_strength = 0.06
 shader_parameter/glow_pulse_strength = 0.17
 shader_parameter/glow_pulse_speed = 0.63
 shader_parameter/glow_pulse_phase = 3.8
+
+[sub_resource type="ShaderMaterial" id="Scene7ForegroundCenterStoneGradeMat"]
+resource_local_to_scene = true
+shader = ExtResource("22_foreground_stone_grade_shader")
+shader_parameter/ambient_tint = Color(0.52, 0.58, 0.72, 1)
+shader_parameter/cool_body_tint = Color(0.08, 0.33, 0.42, 1)
+shader_parameter/shadow_palette = Color(0.02, 0.06, 0.14, 1)
+shader_parameter/sunlit_palette = Color(0.19, 0.27, 0.39, 1)
+shader_parameter/cool_body_tint_mix = 0.15
+shader_parameter/palette_strength = 0.45
+shader_parameter/base_brightness = 0.74
+shader_parameter/highlight_ceiling = 0.36
 
 [node name="Scene7" type="Control" unique_id=1976670911]
 layout_mode = 3
@@ -404,10 +629,11 @@ mouse_filter = 2
 script = ExtResource("1_stage")
 idle_amplitude = 5.0
 metadata/framework_only = false
-metadata/theme_name = "白昼碧月泉"
+metadata/theme_name = "珊瑚霞金碧月泉"
 
 [node name="Sky" type="TextureRect" parent="." unique_id=981190719]
 texture_filter = 1
+material = SubResource("Scene7SkyGradeMat")
 layout_mode = 0
 offset_right = 1672.0
 offset_bottom = 941.0
@@ -422,15 +648,16 @@ metadata/_edit_lock_ = true
 texture_filter = 1
 material = SubResource("Scene7BackgroundGradeMat")
 layout_mode = 0
-offset_left = -1.9999962
-offset_top = -336.0
-offset_right = 287.0
-offset_bottom = -165.0
-scale = Vector2(6.7, 6.7)
+offset_left = -36.0
+offset_top = -274.0
+offset_right = 296.0
+offset_bottom = -86.0
+scale = Vector2(6, 6)
 mouse_filter = 2
 texture = ExtResource("2_background")
 expand_mode = 1
 metadata/parallax_factor = 0.18
+metadata/_edit_lock_ = true
 
 [node name="OasisDepthVeil" type="ColorRect" parent="." unique_id=2015391512]
 texture_filter = 1
@@ -449,7 +676,30 @@ texture_filter = 1
 material = SubResource("Scene7RearWaterMat")
 polygon = PackedVector2Array(-32, 680, 96, 680, 192, 680, 288, 678, 384, 676, 480, 674, 576, 678, 672, 680, 768, 680, 864, 680, 960, 680, 1056, 680, 1152, 688, 1248, 688, 1344, 683, 1440, 683, 1536, 684, 1632, 684, 1728, 684, 1824, 684, 1920, 680, 1952, 680, 1952, 760, -32, 760)
 uv = PackedVector2Array(0, 0, 30.967743, 0, 54.193546, 0, 77.41936, 0, 100.645164, 0, 123.87097, 0, 147.09677, 0, 170.32259, 0, 193.54839, 0, 216.7742, 0, 240, 0, 263.2258, 0, 286.4516, 0, 309.67743, 0, 332.90323, 0, 356.12903, 0, 379.35483, 0, 402.58066, 0, 425.80646, 0, 449.03226, 0, 472.25806, 0, 480, 0, 480, 29, 0, 29)
+vertex_colors = PackedColorArray(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1)
 metadata/parallax_factor = 0.55
+metadata/_edit_lock_ = true
+
+[node name="RearSpringClickRipple" type="Control" parent="."]
+texture_filter = 1
+layout_mode = 0
+offset_left = -32.0
+offset_top = 688.0
+offset_right = 1952.0
+offset_bottom = 738.0
+mouse_filter = 1
+script = ExtResource("34_water_interaction")
+effect_kind = 1
+water_target_path = NodePath(".")
+max_effects = 4
+effect_lifetime = 1.15
+click_cooldown = 0.12
+pixel_size = 2.0
+bright_color = Color(0.333, 0.8, 0.667, 0.72)
+foam_color = Color(0.44, 0.88, 0.72, 0.66)
+shadow_color = Color(0.067, 0.267, 0.4, 0.42)
+metadata/parallax_factor = 0.55
+metadata/composition_role = "rear_spring_click_ripple"
 metadata/_edit_lock_ = true
 
 [node name="OasisMotesFar" type="ColorRect" parent="." unique_id=57716243]
@@ -462,6 +712,7 @@ offset_right = 1952.0
 offset_bottom = 860.0
 mouse_filter = 2
 metadata/parallax_factor = 0.64
+metadata/composition_role = "far_air_behind_vegetation"
 metadata/_edit_lock_ = true
 
 [node name="MidgroundCenter" type="TextureRect" parent="." unique_id=1052543904]
@@ -479,6 +730,40 @@ expand_mode = 1
 metadata/parallax_factor = 0.55
 metadata/composition_role = "rear_center_island"
 metadata/shoreline_anchor_y = 683.0
+metadata/_edit_lock_ = true
+
+[node name="MidgroundCenterGlowFX" type="MeshInstance2D" parent="."]
+texture_filter = 1
+script = ExtResource("25_biolume_glow")
+source_layer_path = NodePath("../MidgroundCenter")
+glow_color = Color(0.28, 0.92, 0.75, 1)
+maximum_point_components = 10
+point_exclusion_zones = Array[Vector4]([Vector4(0.72, 0.7, 0.21, 0.27)])
+point_cycle_sec = 7.2
+point_time_phase = 0.18
+metadata/parallax_factor = 0.55
+metadata/composition_role = "rear_center_biolume_points"
+metadata/_edit_lock_ = true
+
+[node name="MidgroundCenterGrassGlowFX" type="MeshInstance2D" parent="."]
+texture_filter = 1
+script = ExtResource("25_biolume_glow")
+source_layer_path = NodePath("../MidgroundCenter")
+glow_color = Color(0.28, 0.92, 0.75, 1)
+include_point_components = false
+collective_relight = true
+cluster_component_seeds = Array[Vector2]([Vector2(0.8, 0.68)])
+cluster_value_threshold = 0.42
+cluster_cyan_threshold = 0.045
+cluster_cycle_sec = 9.6
+cluster_time_phase = 0.58
+cluster_core_base = 0.05
+cluster_core_peak = 0.115
+cluster_halo_base = 0.015
+cluster_halo_peak = 0.065
+metadata/parallax_factor = 0.55
+metadata/composition_role = "rear_center_right_grass_collective_biolume"
+metadata/_edit_lock_ = true
 
 [node name="MidgroundLeft" type="TextureRect" parent="." unique_id=699713726]
 texture_filter = 1
@@ -495,6 +780,19 @@ expand_mode = 1
 metadata/parallax_factor = 0.55
 metadata/composition_role = "rear_left_bank"
 metadata/shoreline_anchor_y = 679.0
+metadata/_edit_lock_ = true
+
+[node name="MidgroundLeftGlowFX" type="MeshInstance2D" parent="."]
+texture_filter = 1
+script = ExtResource("25_biolume_glow")
+source_layer_path = NodePath("../MidgroundLeft")
+glow_color = Color(0.27, 0.9, 0.74, 1)
+maximum_point_components = 8
+point_cycle_sec = 7.8
+point_time_phase = 0.47
+metadata/parallax_factor = 0.55
+metadata/composition_role = "rear_left_biolume_points"
+metadata/_edit_lock_ = true
 
 [node name="MidgroundRight" type="TextureRect" parent="." unique_id=1005986852]
 texture_filter = 1
@@ -511,21 +809,115 @@ expand_mode = 1
 metadata/parallax_factor = 0.55
 metadata/composition_role = "rear_right_bank"
 metadata/shoreline_anchor_y = 679.0
+metadata/_edit_lock_ = true
+
+[node name="MidgroundRightGlowFX" type="MeshInstance2D" parent="."]
+texture_filter = 1
+script = ExtResource("25_biolume_glow")
+source_layer_path = NodePath("../MidgroundRight")
+glow_color = Color(0.29, 0.94, 0.76, 1)
+maximum_point_components = 7
+point_exclusion_zones = Array[Vector4]([Vector4(0.49, 0.65, 0.25, 0.24)])
+point_cycle_sec = 7.5
+point_time_phase = 0.74
+metadata/parallax_factor = 0.55
+metadata/composition_role = "rear_right_biolume_points_outside_grass"
+metadata/_edit_lock_ = true
+
+[node name="MidgroundRightGrassGlowFX" type="MeshInstance2D" parent="."]
+texture_filter = 1
+script = ExtResource("25_biolume_glow")
+source_layer_path = NodePath("../MidgroundRight")
+glow_color = Color(0.29, 0.94, 0.76, 1)
+include_point_components = false
+collective_relight = true
+cluster_zones = Array[Vector4]([Vector4(0.49, 0.65, 0.25, 0.24)])
+cluster_value_threshold = 0.42
+cluster_cyan_threshold = 0.045
+cluster_cycle_sec = 9.4
+cluster_time_phase = 0.41
+cluster_core_base = 0.055
+cluster_core_peak = 0.13
+cluster_halo_base = 0.02
+cluster_halo_peak = 0.075
+metadata/parallax_factor = 0.55
+metadata/composition_role = "rear_right_full_grass_collective_biolume"
+metadata/_edit_lock_ = true
 
 [node name="OasisReflectionGrab" type="BackBufferCopy" parent="." unique_id=2144203825]
 copy_mode = 2
+metadata/_edit_lock_ = true
+
+[node name="RearWaterReflection" type="Polygon2D" parent="." unique_id=1294090401]
+texture_filter = 1
+material = SubResource("Scene7RearReflectionMat")
+polygon = PackedVector2Array(-32, 680, 96, 680, 192, 680, 288, 678, 384, 676, 480, 674, 576, 678, 672, 680, 768, 680, 864, 680, 960, 680, 1056, 680, 1152, 688, 1248, 688, 1344, 683, 1440, 683, 1536, 684, 1632, 684, 1728, 684, 1824, 684, 1920, 680, 1952, 680, 1952, 760, -32, 760)
+uv = PackedVector2Array(0, 0, 30.967743, 0, 54.193546, 0, 77.41936, 0, 100.645164, 0, 123.87097, 0, 147.09677, 0, 170.32259, 0, 193.54839, 0, 216.7742, 0, 240, 0, 263.2258, 0, 286.4516, 0, 309.67743, 0, 332.90323, 0, 356.12903, 0, 379.35483, 0, 402.58066, 0, 425.80646, 0, 449.03226, 0, 472.25806, 0, 480, 0, 480, 29, 0, 29)
+vertex_colors = PackedColorArray(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+metadata/parallax_factor = 0.55
+metadata/composition_role = "rear_bank_reflection"
+metadata/_edit_lock_ = true
+
+[node name="OasisMotesMid" type="ColorRect" parent="."]
+texture_filter = 1
+material = SubResource("Scene7MidMotesMat")
+layout_mode = 0
+offset_left = -32.0
+offset_top = 430.0
+offset_right = 1952.0
+offset_bottom = 830.0
+mouse_filter = 2
+metadata/parallax_factor = 0.82
+metadata/composition_role = "mid_air_depth_bridge"
+metadata/_edit_lock_ = true
 
 [node name="FrontWater" type="ColorRect" parent="." unique_id=883411495]
 texture_filter = 1
 material = SubResource("Scene7FrontWaterMat")
 layout_mode = 0
 offset_left = -32.0
-offset_top = 856.0
+offset_top = 824.0
 offset_right = 1952.0
 offset_bottom = 1080.0
 mouse_filter = 2
 color = Color(0, 0, 0, 0)
 metadata/parallax_factor = 1.0
+metadata/_edit_lock_ = true
+
+[node name="FrontSpringClickRipple" type="Control" parent="."]
+texture_filter = 1
+layout_mode = 0
+offset_left = -32.0
+offset_top = 842.0
+offset_right = 1952.0
+offset_bottom = 1080.0
+mouse_filter = 1
+script = ExtResource("34_water_interaction")
+effect_kind = 1
+water_target_path = NodePath(".")
+max_effects = 6
+effect_lifetime = 1.3
+click_cooldown = 0.12
+pixel_size = 4.0
+bright_color = Color(0.333, 0.8, 0.667, 0.78)
+foam_color = Color(0.44, 0.88, 0.72, 0.72)
+shadow_color = Color(0.067, 0.267, 0.4, 0.5)
+metadata/parallax_factor = 1.0
+metadata/composition_role = "front_spring_click_ripple"
+metadata/_edit_lock_ = true
+
+[node name="PlatformSpringContact" type="ColorRect" parent="." unique_id=1689552616]
+texture_filter = 1
+material = SubResource("Scene7PlatformSpringContactMat")
+layout_mode = 0
+offset_left = -32.0
+offset_top = 824.0
+offset_right = 1952.0
+offset_bottom = 842.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+metadata/parallax_factor = 1.0
+metadata/composition_role = "platform_spring_contact"
 metadata/_edit_lock_ = true
 
 [node name="BattlePlatform" type="TextureRect" parent="." unique_id=1128410403]
@@ -535,14 +927,14 @@ layout_mode = 0
 offset_left = -133.165
 offset_top = 234.0
 offset_right = 231.66838
-offset_bottom = 422.0
+offset_bottom = 422.00003
 scale = Vector2(6, 6)
 mouse_filter = 2
 texture = ExtResource("3_platform")
 expand_mode = 1
 metadata/parallax_factor = 1.0
 metadata/composition_role = "raised_oasis_causeway"
-metadata/shoreline_anchor_y = 864.0
+metadata/shoreline_anchor_y = 824.0
 
 [node name="OasisMotesNear" type="ColorRect" parent="." unique_id=767137805]
 texture_filter = 1
@@ -554,6 +946,7 @@ offset_right = 1968.0
 offset_bottom = 960.0
 mouse_filter = 2
 metadata/parallax_factor = 1.12
+metadata/composition_role = "near_air_behind_foreground"
 metadata/_edit_lock_ = true
 
 [node name="ForegroundLeft" type="TextureRect" parent="." unique_id=672367325]
@@ -573,6 +966,24 @@ metadata/composition_role = "front_left_bank_frame"
 metadata/shoreline_anchor_y = 864.0
 metadata/_edit_lock_ = true
 
+[node name="ForegroundLeftGlowFX" type="MeshInstance2D" parent="."]
+texture_filter = 1
+script = ExtResource("25_biolume_glow")
+source_layer_path = NodePath("../ForegroundLeft")
+glow_color = Color(0.32, 0.91, 0.73, 1)
+maximum_point_components = 6
+maximum_point_area = 44
+minimum_point_spacing = 0.025
+point_cycle_sec = 7.9
+point_time_phase = 0.33
+point_core_base = 0.05
+point_core_peak = 0.22
+point_halo_base = 0.015
+point_halo_peak = 0.11
+metadata/parallax_factor = 1.25
+metadata/composition_role = "front_left_biolume_grass_points"
+metadata/_edit_lock_ = true
+
 [node name="ForegroundRight" type="TextureRect" parent="." unique_id=136199281]
 texture_filter = 1
 material = SubResource("Scene7ForegroundRightGradeMat")
@@ -588,6 +999,64 @@ expand_mode = 1
 metadata/parallax_factor = 1.25
 metadata/composition_role = "front_right_bank_frame"
 metadata/shoreline_anchor_y = 864.0
+metadata/_edit_lock_ = true
+
+[node name="ForegroundCenterStone" type="TextureRect" parent="." unique_id=1413811787]
+texture_filter = 1
+material = SubResource("Scene7ForegroundCenterStoneGradeMat")
+layout_mode = 0
+offset_left = 74.0
+offset_top = 655.89087
+offset_right = 464.94336
+offset_bottom = 968.72107
+scale = Vector2(2.65, 2.65)
+mouse_filter = 2
+texture = ExtResource("20_foreground_center_stone")
+expand_mode = 1
+metadata/parallax_factor = 1.25
+metadata/composition_role = "front_center_stone_frame"
+metadata/shoreline_anchor_y = 1072.0
+metadata/_edit_lock_ = true
+
+[node name="ForegroundCenterStone2" type="TextureRect" parent="." unique_id=526297843]
+texture_filter = 1
+material = SubResource("Scene7ForegroundCenterStoneGradeMat")
+layout_mode = 0
+offset_left = 319.0
+offset_top = 662.89087
+offset_right = 709.94336
+offset_bottom = 975.721
+scale = Vector2(2.65, 2.65)
+mouse_filter = 2
+texture = ExtResource("20_foreground_center_stone")
+expand_mode = 1
+metadata/parallax_factor = 1.25
+metadata/composition_role = "front_center_stone_frame"
+metadata/shoreline_anchor_y = 1072.0
+metadata/_edit_lock_ = true
+
+[node name="ForegroundCenterStone3" type="TextureRect" parent="." unique_id=1770447528]
+texture_filter = 1
+material = SubResource("Scene7ForegroundCenterStoneGradeMat")
+layout_mode = 0
+offset_left = 349.99994
+offset_top = 891.8908
+offset_right = 740.9433
+offset_bottom = 1204.721
+rotation = -0.3630285
+scale = Vector2(2.65, 2.65)
+mouse_filter = 2
+texture = ExtResource("20_foreground_center_stone")
+expand_mode = 1
+metadata/parallax_factor = 1.25
+metadata/composition_role = "front_center_stone_frame"
+metadata/shoreline_anchor_y = 1072.0
+metadata/_edit_lock_ = true
+
+[node name="OasisResonance" type="Node2D" parent="."]
+script = ExtResource("35_oasis_resonance")
+metadata/parallax_factor = 1.0
+metadata/composition_role = "three_zone_biolume_resonance_easter_egg"
 metadata/_edit_lock_ = true
 
 [node name="CompositionGuides" type="Node2D" parent="." unique_id=1578501147]

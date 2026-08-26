@@ -1,19 +1,18 @@
 shader_type canvas_item;
 render_mode unshaded;
 
-// Scene7 keeps the new sky visible and lets each HUD cluster carry its own
-// contrast support. The three top fields never touch, and their long vertical
-// falloff reads as blue oasis atmosphere instead of a painted black strip.
+// Scene7 keeps the top HUD fully transparent to the bright authored sky.
+// Bottom-control highlight compression remains isolated below.
 uniform sampler2D screen_texture : hint_screen_texture, filter_nearest, repeat_disable;
 uniform vec4 support_tint : source_color = vec4(0.13, 0.29, 0.35, 1.0);
-uniform float hud_support_strength : hint_range(0.0, 0.4) = 0.18;
-uniform float timer_support_strength : hint_range(0.0, 0.4) = 0.22;
+uniform float hud_support_strength : hint_range(0.0, 0.4) = 0.0;
+uniform float timer_support_strength : hint_range(0.0, 0.4) = 0.0;
 uniform float horizontal_feather : hint_range(0.002, 0.04) = 0.018;
 uniform float top_fade_start : hint_range(0.0, 0.15) = 0.055;
 uniform float top_fade_end : hint_range(0.12, 0.35) = 0.225;
 uniform float support_highlight_start : hint_range(0.0, 1.0) = 0.46;
 uniform float support_highlight_end : hint_range(0.0, 1.0) = 0.82;
-uniform float support_desaturation : hint_range(0.0, 0.2) = 0.045;
+uniform float support_desaturation : hint_range(0.0, 0.2) = 0.0;
 
 uniform float bottom_strength : hint_range(0.0, 1.0) = 0.42;
 uniform float bottom_feather : hint_range(0.002, 0.08) = 0.028;
