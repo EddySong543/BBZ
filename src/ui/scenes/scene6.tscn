@@ -434,12 +434,11 @@ texture_filter = 1
 material = SubResource("Scene6MagmaLakeMat")
 layout_mode = 0
 offset_left = -32.0
-offset_top = 834.0
+offset_top = 808.0
 offset_right = 1952.0
 offset_bottom = 1080.0
 mouse_filter = 2
 metadata/parallax_factor = 1.0
-metadata/_edit_lock_ = true
 
 [node name="MagmaClickFX" type="Control" parent="." unique_id=971764001]
 layout_mode = 1
@@ -466,9 +465,6 @@ sword_hilt_texture = ExtResource("16_secret_hilt")
 sword_tip_texture = ExtResource("17_secret_tip")
 legendary_blade_texture = ExtResource("19_legendary_blade")
 legendary_scale = 2.5
-front_props_layer_path = NodePath("../MagmaSecretFrontProps")
-platform_path = NodePath("../BattlePlatform")
-front_depth_ratio = 0.62
 metadata/parallax_factor = 1.0
 
 [node name="BattlePlatform" type="TextureRect" parent="." unique_id=1261622324]
@@ -476,16 +472,17 @@ texture_filter = 1
 material = SubResource("Scene6PlatformGradeMat")
 layout_mode = 0
 offset_left = -72.0
-offset_top = 670.0
+offset_top = 656.0
 offset_right = 444.0
-offset_bottom = 771.75
+offset_bottom = 757.75
 scale = Vector2(4, 4)
 mouse_filter = 2
 texture = ExtResource("4_platform")
 expand_mode = 1
 metadata/parallax_factor = 1.0
+metadata/_edit_lock_ = true
 
-[node name="MagmaSecretFrontProps" type="Control" parent="."]
+[node name="MagmaSecretFrontProps" type="Control" parent="." unique_id=1154015931]
 texture_filter = 1
 layout_mode = 1
 anchors_preset = 15
@@ -495,6 +492,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 metadata/parallax_factor = 1.0
+metadata/_edit_lock_ = true
 
 [node name="ForegroundLeft" type="TextureRect" parent="." unique_id=39270639]
 texture_filter = 1

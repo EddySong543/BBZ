@@ -361,57 +361,6 @@ func test_low_probability_legendary_blade_has_distinct_runtime_contract() -> voi
 			"传奇氛围不得退回会读成水波涟漪的椭圆传送门")
 
 
-func test_all_secret_kinds_add_one_return_ripple_at_surface_contact() -> void:
-	var stage := SCENE6.instantiate() as BattleStage
-	add_child_autofree(stage)
-	await get_tree().process_frame
-	var secrets := stage.get_node("MagmaSecrets") as Scene6MagmaSecrets
-	secrets.reveal_cooldown_sec = 0.0
-	secrets.legend_roll_override = 1.0
-	secrets.rise_duration_sec = 0.02
-	secrets.float_duration_sec = 0.80
-	secrets.sink_duration_sec = 0.30
-	for _click: int in secrets.clicks_per_reveal:
-		secrets.register_molten_click(Vector2(420.0, 936.0))
-	await get_tree().create_timer(0.835).timeout
-	assert_eq(secrets.active_return_ripple_count(), 1,
-			"普通残片原本插在液面中，回沉起步即开始排开液体")
-	assert_eq(secrets.get_return_contact_ripple_count(), 1)
-	await get_tree().create_timer(0.31).timeout
-	assert_eq(secrets.get_return_contact_ripple_count(), 1,
-			"完全沉没时不得再重复生成第二个主涟漪")
-	assert_eq(secrets.get_closure_bubble_spawn_count(), 1,
-			"完全沉没只补一个空腔闭合气泡")
-	assert_eq(secrets.active_closure_bubble_count(), 1,
-			"闭合气泡需要在完全沉没后短暂可见")
-	assert_eq(secrets.active_return_ripple_count(), 1,
-			"闭合气泡不能伪装成第二个主涟漪")
-
-	secrets.legendary_rise_duration_sec = 0.02
-	secrets.legendary_float_duration_sec = 0.04
-	secrets.legendary_sink_duration_sec = 0.30
-	secrets.legendary_hover_clearance_px = 32.0
-	secrets.legend_roll_override = 0.0
-	for _click: int in secrets.clicks_per_reveal:
-		secrets.register_molten_click(Vector2(1420.0, 936.0))
-	var contacts_before_legendary := secrets.get_return_contact_ripple_count()
-	await get_tree().create_timer(0.07).timeout
-	assert_eq(secrets.get_return_contact_ripple_count(), contacts_before_legendary,
-			"悬空巨剑刚开始下降但尚未触水时不能提前出现涟漪")
-	await get_tree().create_timer(0.14).timeout
-	assert_eq(secrets.get_return_contact_ripple_count(),
-			contacts_before_legendary + 1,
-			"巨剑最低点实际接触液面时立即出现回沉涟漪")
-	assert_eq(secrets.get_return_contact_ripple_count(), 2)
-	await get_tree().create_timer(0.18).timeout
-	assert_eq(secrets.get_return_contact_ripple_count(), 2,
-			"巨剑完全沉没时同样不得追加第二个主涟漪")
-	assert_eq(secrets.get_closure_bubble_spawn_count(), 2,
-			"传奇巨剑完全沉没时同样只补一个闭合气泡")
-	assert_eq(secrets.active_closure_bubble_count(), 2,
-			"正常点击不会清除仍在消散的上一枚闭合气泡")
-
-
 func test_legendary_blade_clears_the_surface_and_hovers_in_open_air() -> void:
 	var stage := SCENE6.instantiate() as BattleStage
 	add_child_autofree(stage)

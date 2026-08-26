@@ -118,14 +118,20 @@ func _process(delta: float) -> void:
 
 func trigger_achievement_swarm() -> bool:
 	_ambient_timer.stop()
-	_clear_active_spirits()
+	var free_spirit_indices := _get_free_spirit_indices()
 	var count := _rng.randi_range(
 			mini(spirit_count_min, spirit_count_max),
 			maxi(spirit_count_min, spirit_count_max))
-	count = mini(count, _pool.size())
-	for spirit_index: int in count:
-		var direction := 1 if spirit_index % 2 == 0 else -1
-		_activate_spirit(spirit_index, count, direction)
+	count = mini(count, free_spirit_indices.size())
+	if count <= 0:
+		return false
+	for formation_index: int in count:
+		var direction := 1 if formation_index % 2 == 0 else -1
+		_activate_spirit(
+				free_spirit_indices[formation_index],
+				formation_index,
+				count,
+				direction)
 	_active_swarm_kind = &"achievement"
 	set_process(true)
 	swarm_started.emit(count)
@@ -139,10 +145,16 @@ func trigger_ambient_swarm() -> bool:
 	var count := _rng.randi_range(
 			mini(ambient_spirit_count_min, ambient_spirit_count_max),
 			maxi(ambient_spirit_count_min, ambient_spirit_count_max))
-	count = mini(count, _pool.size())
+	var free_spirit_indices := _get_free_spirit_indices()
+	count = mini(count, free_spirit_indices.size())
 	var direction := 1 if _rng.randf() < 0.5 else -1
-	for spirit_index: int in count:
-		_activate_spirit(spirit_index, count, direction, true)
+	for formation_index: int in count:
+		_activate_spirit(
+				free_spirit_indices[formation_index],
+				formation_index,
+				count,
+				direction,
+				true)
 	_active_swarm_kind = &"ambient"
 	set_process(true)
 	swarm_started.emit(count)
@@ -151,6 +163,14 @@ func trigger_ambient_swarm() -> bool:
 
 func get_active_spirit_count() -> int:
 	return _active_spirits.size()
+
+
+func get_active_spirit_count_by_kind(kind: StringName) -> int:
+	var count := 0
+	for state: Dictionary in _active_spirits:
+		if state.get("kind", &"") == kind:
+			count += 1
+	return count
 
 
 func get_visible_spirit_count() -> int:
@@ -201,17 +221,18 @@ func _create_pool() -> void:
 
 
 func _activate_spirit(
-		spirit_index: int,
+		pool_index: int,
+		formation_index: int,
 		spirit_count: int,
 		direction: int,
 		ambient := false
 ) -> void:
-	var sprite := _pool[spirit_index]
+	var sprite := _pool[pool_index]
 	if ambient:
 		_activate_ambient_spirit(
-				sprite, spirit_index, spirit_count, direction)
+				sprite, formation_index, spirit_count, direction)
 		return
-	var lane := spirit_index % 6
+	var lane := formation_index % 6
 	var start_x := _rng.randf_range(70.0, 390.0)
 	var end_x := _rng.randf_range(1240.0, 1850.0)
 	if direction < 0:
@@ -234,7 +255,7 @@ func _activate_spirit(
 			maxf(spirit_scale_min, spirit_scale_max))
 	sprite.scale = Vector2.ONE * spirit_scale
 	sprite.position = start.round()
-	sprite.frame = spirit_index % FRAME_COUNT
+	sprite.frame = formation_index % FRAME_COUNT
 	sprite.visible = false
 
 	var color := spirit_tint
@@ -244,8 +265,9 @@ func _activate_spirit(
 	color.b *= value_variation
 	_active_spirits.append({
 		"sprite": sprite,
+		"kind": &"achievement",
 		"elapsed": 0.0,
-		"delay": float(spirit_index) * _rng.randf_range(0.055, 0.095),
+		"delay": float(formation_index) * _rng.randf_range(0.055, 0.095),
 		"duration": _rng.randf_range(
 				minf(flight_duration_min, flight_duration_max),
 				maxf(flight_duration_min, flight_duration_max)),
@@ -300,6 +322,7 @@ func _activate_ambient_spirit(
 	color.b *= value_variation
 	_active_spirits.append({
 		"sprite": sprite,
+		"kind": &"ambient",
 		"elapsed": 0.0,
 		"delay": float(spirit_index) * _rng.randf_range(0.18, 0.27),
 		"duration": _rng.randf_range(
@@ -314,6 +337,17 @@ func _activate_ambient_spirit(
 		"frame_phase": _rng.randf_range(0.0, float(FRAME_COUNT)),
 		"color": color,
 	})
+
+
+func _get_free_spirit_indices() -> Array[int]:
+	var active_sprites: Dictionary = {}
+	for state: Dictionary in _active_spirits:
+		active_sprites[state["sprite"]] = true
+	var free_indices: Array[int] = []
+	for pool_index: int in _pool.size():
+		if not active_sprites.has(_pool[pool_index]):
+			free_indices.append(pool_index)
+	return free_indices
 
 
 func _release_spirit(active_index: int) -> void:

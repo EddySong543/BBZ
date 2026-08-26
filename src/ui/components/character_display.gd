@@ -168,6 +168,7 @@ var _sprite: AnimatedSprite2D
 var _return_to_idle: bool = false
 var _base_output_material: Material = null
 var _death_dissolve_material: ShaderMaterial = null
+var _switch_blocks_material: ShaderMaterial = null
 
 static var _sprite_cache: Dictionary = {}
 
@@ -177,6 +178,10 @@ func _ready() -> void:
 	# 死亡侵蚀开始时才临时挂载，替补入场/重置后立即恢复。
 	_base_output_material = material
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Control 的 offset_transform_* 默认不参与实际绘制；踏尘换位需要显式开启，
+	# 且只移动视觉结果，不改变容器布局与命中区域。
+	offset_transform_enabled = true
+	offset_transform_visual_only = true
 	if get_child_count() > 0 and get_child(0) is SubViewport:
 		var vp: SubViewport = get_child(0) as SubViewport
 		for c in vp.get_children():
@@ -374,6 +379,39 @@ func _ensure_death_dissolve_material() -> ShaderMaterial:
 	_death_dissolve_material.set_shader_parameter("dissolve_from_right", 1.0)
 	_death_dissolve_material.set_shader_parameter("dissolve_steps", 12.0)
 	return _death_dissolve_material
+
+
+## 换人像素收束：0=完整角色，1=规则横向像素带已全部收向己方边缘。
+## 进场直接从 1 tween 回 0，因此出/入场使用同一套确定性像素规则。
+func set_switch_blocks(progress: float, exits_right: bool, steps: int = 8) -> void:
+	var normalized_progress := clampf(progress, 0.0, 1.0)
+	if normalized_progress <= 0.0:
+		if _switch_blocks_material != null:
+			_switch_blocks_material.set_shader_parameter("switch_progress", 0.0)
+			if material == _switch_blocks_material:
+				material = _base_output_material
+		return
+	var switch_material := _ensure_switch_blocks_material()
+	material = switch_material
+	switch_material.set_shader_parameter("switch_progress", normalized_progress)
+	switch_material.set_shader_parameter("outward_right", 1.0 if exits_right else 0.0)
+	switch_material.set_shader_parameter("switch_steps", float(maxi(1, steps)))
+
+
+func reset_switch_blocks() -> void:
+	set_switch_blocks(0.0, false)
+
+
+func _ensure_switch_blocks_material() -> ShaderMaterial:
+	if _switch_blocks_material != null:
+		return _switch_blocks_material
+	_switch_blocks_material = ShaderMaterial.new()
+	_switch_blocks_material.shader = preload(
+			"res://assets/shaders/canvas_ui_character_switch_blocks.gdshader")
+	_switch_blocks_material.set_shader_parameter("switch_progress", 0.0)
+	_switch_blocks_material.set_shader_parameter("outward_right", 0.0)
+	_switch_blocks_material.set_shader_parameter("switch_steps", 8.0)
+	return _switch_blocks_material
 
 
 func set_hit_flash(on: bool) -> void:

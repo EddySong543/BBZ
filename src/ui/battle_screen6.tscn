@@ -120,21 +120,21 @@ shader_parameter/impact_px = 3.0
 [node name="Stage" parent="StageSlot" parent_id_path=PackedInt32Array(924300025) index="0" unique_id=1182508117 instance=ExtResource("2_scene6")]
 layout_mode = 1
 pointer_parallax = true
-demo_click_shake = false
 
 [node name="P1Shadow" parent="." index="3" unique_id=329774492]
+self_modulate = Color(0.34, 0.08, 0.12, 0.58)
 offset_top = 719.0
 offset_bottom = 811.0
-self_modulate = Color(0.34, 0.08, 0.12, 0.58)
 
 [node name="P2Shadow" parent="." index="4" unique_id=1318395873]
+self_modulate = Color(0.34, 0.08, 0.12, 0.58)
 offset_top = 721.0
 offset_bottom = 813.0
-self_modulate = Color(0.34, 0.08, 0.12, 0.58)
 
 [node name="P1CharDisplay" parent="." index="5" unique_id=1642938575]
 offset_top = 262.0
 offset_bottom = 1030.0
+offset_transform_enabled = true
 rim_color = Color(0.62, 0.34, 0.12, 1)
 rim_strength = 0.018
 rim_width = 1.0
@@ -149,11 +149,12 @@ fill_amount = 0.012
 [node name="AnimatedSprite2D" parent="P1CharDisplay/SubViewport" parent_id_path=PackedInt32Array(1642938575, 1325957388) index="1" unique_id=1622338484]
 material = SubResource("ShaderMaterial_qrrme")
 scale = Vector2(2, 2)
-frame_progress = 0.9830427
+frame_progress = 0.54845077
 
 [node name="P2CharDisplay" parent="." index="6" unique_id=915119977]
-offset_top = 265.0
-offset_bottom = 1033.0
+offset_top = 262.0
+offset_bottom = 1030.0
+offset_transform_enabled = true
 flip_h = true
 rim_color = Color(0.62, 0.34, 0.12, 1)
 rim_strength = 0.018
@@ -169,7 +170,7 @@ fill_amount = 0.011
 [node name="AnimatedSprite2D" parent="P2CharDisplay/SubViewport" parent_id_path=PackedInt32Array(915119977, 1325957388) index="1" unique_id=1622338484]
 material = SubResource("ShaderMaterial_k7b3w")
 scale = Vector2(2, 2)
-frame_progress = 0.9830427
+frame_progress = 0.54845077
 flip_h = true
 
 [node name="ForeDust" parent="." index="7" unique_id=844619574]
@@ -183,40 +184,34 @@ emitting = false
 [node name="PostFX" parent="." index="10" unique_id=516553634]
 material = SubResource("ShaderMaterial_dw032")
 
-[node name="P1EnergyCapLabel" parent="P1Hud" parent_id_path=PackedInt32Array(1074064709) index="2"]
-layout_mode = 0
+[node name="P1EnergyCapLabel" parent="P1Hud" parent_id_path=PackedInt32Array(1074064709) index="2" unique_id=472764230]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 192.0
+offset_bottom = 24.0
 
 [node name="P1Frame0" parent="P1Hud" parent_id_path=PackedInt32Array(1074064709) index="3" unique_id=2129820687]
-offset_right = 98.0
-offset_bottom = 76.0
 theme_override_styles/panel = SubResource("StyleBoxEmpty_ba0gr")
 
 [node name="P1Frame1" parent="P1Hud" parent_id_path=PackedInt32Array(1074064709) index="4" unique_id=1566007647]
-offset_right = 744.0
-offset_bottom = 74.0
 theme_override_styles/panel = SubResource("StyleBoxEmpty_gmbvd")
 
 [node name="P1Frame2" parent="P1Hud" parent_id_path=PackedInt32Array(1074064709) index="6" unique_id=1208252427]
-offset_right = 664.0
-offset_bottom = 74.0
 theme_override_styles/panel = SubResource("StyleBoxEmpty_d0c7y")
 
-[node name="P2EnergyCapLabel" parent="P2Hud" parent_id_path=PackedInt32Array(1758094651) index="2"]
-layout_mode = 0
+[node name="P2EnergyCapLabel" parent="P2Hud" parent_id_path=PackedInt32Array(1758094651) index="2" unique_id=463665812]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 192.0
+offset_bottom = 24.0
 
 [node name="P2Frame0" parent="P2Hud" parent_id_path=PackedInt32Array(1758094651) index="3" unique_id=1770616061]
-offset_right = 1886.0
-offset_bottom = 76.0
 theme_override_styles/panel = SubResource("StyleBoxEmpty_ldm43")
 
 [node name="P2Frame1" parent="P2Hud" parent_id_path=PackedInt32Array(1758094651) index="4" unique_id=1621653890]
-offset_right = 1258.0
-offset_bottom = 74.0
 theme_override_styles/panel = SubResource("StyleBoxEmpty_2e6wl")
 
 [node name="P2Frame2" parent="P2Hud" parent_id_path=PackedInt32Array(1758094651) index="6" unique_id=1695379356]
-offset_right = 1338.0
-offset_bottom = 74.0
 theme_override_styles/panel = SubResource("StyleBoxEmpty_ah7aj")
 
 [editable path="P1CharDisplay"]

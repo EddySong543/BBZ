@@ -216,8 +216,9 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_battle_gd")
-tip_size_s = Vector2(144, 66)
-tip_size_l = Vector2(222, 122)
+tip_size_s = Vector2(156, 76)
+tip_size_m = Vector2(222, 144)
+tip_size_l = Vector2(340, 128)
 tip_glyph_spacing = 1
 
 [node name="StageSlot" type="Control" parent="." unique_id=924300025]

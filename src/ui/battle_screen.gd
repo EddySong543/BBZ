@@ -5,7 +5,7 @@ extends Control
 ## v4 引擎（BattleCore）+ 同时盲选 vs AI（决策 B1）。
 ## 你 = P0（下），对手 = P1（上，AI）。玩家选动作 → 确认 → AI 后台选 → 同时结算。
 ##
-## 半点制：HP/护盾内部为半点，显示用 battle.hp_display()。
+## 半点制：HP/护甲内部为半点，显示用 battle.hp_display()。
 
 const A := ActionDef.Action
 const ACTIVE := ActionDef.ACTIVE
@@ -20,6 +20,7 @@ const HEART_COST_SHEET := preload("res://assets/ui/icons/heart_idle.png")
 const LONGYUJI_SKILL_ICON := preload("res://assets/sprites/heroes/h05/h05_skill.png")
 const ANCHAO_SKILL_ICON := preload("res://assets/sprites/heroes/h13/h13_skill.png")
 const H24_SKILL_ICON := preload("res://assets/sprites/heroes/h24/h24_skill.png")
+const EffectTextFormatterScript := preload("res://src/ui/effect_text_formatter.gd")
 const HERO_FRAME_SCENE := preload("res://src/ui/components/hero_frame.tscn")
 const BACKPACK_OVERLAY_SCENE := preload("res://src/ui/backpack_screen.tscn")
 const BACKPACK_ICON := preload("res://assets/ui/icons/backpack.png")
@@ -36,8 +37,6 @@ const LOW_HP_RATIO := 0.5
 ## 顶部 UI 整体下移量(px)：原布局太贴屏幕顶端 → 下沉一点留呼吸。改这一个数即可整组调整。
 ## 注：当前为运行时代码统一微调(编辑器里仍是基准位)；下移量定稿后可烘焙进 .tscn 使"所见=所得"。
 const TOP_UI_DROP := 26.0   # 顶部 UI 整体下移量（2026-06-28 Eddy：44太多→回调到26）；0=复原原位
-const BUBBLE_HEAD_RISE := 102.0  # 出招气泡锚点：角色显示容器「中心」上移此值（越大气泡越高·够高才不压角色·随立绘 2.0x 同步 2026-07-11）
-const BUBBLE_SIDE_X := 91.0      # 出招气泡水平偏移：己方(P0)放头「右上」/ 敌方(P1)镜像「左上」（越大越往外侧·够大才不和角色重合·随立绘 2.0x 同步）
 
 ## 顶部头像框尺寸。出战 / 替补。**摆位一律在 battle_screen_base.tscn 里定**（offset_* 已按本尺寸摆好），
 ## 代码只负责把尺寸喂给 HeroFrame —— 旧 _enlarge_frames「按基准差量偏移」的代偿已退役。
@@ -120,6 +119,24 @@ const HpSlantBarScript := preload("res://src/ui/components/hp_slant_bar.gd")
 ## 各动画相位等待（秒），可在 Inspector 调。
 @export var anim_phase_duration: float = 1.0
 @export var action_phase_duration: float = 0.6
+@export_group("结算气泡")
+## 气泡不再绑定角色容器的固定像素偏移，而是按当前立绘帧的实际显示矩形取头部与侧向锚点。
+@export_range(72.0, 120.0, 1.0) var action_bubble_size: float = 92.0
+@export_range(0.05, 0.35, 0.01) var action_bubble_head_ratio: float = 0.21
+@export_range(0.10, 0.45, 0.01) var action_bubble_side_ratio: float = 0.23
+@export_range(0.0, 48.0, 1.0) var action_bubble_safe_margin: float = 18.0
+@export_range(0.6, 1.6, 0.05) var action_bubble_hold_duration: float = 1.0
+@export_range(0.08, 0.30, 0.01) var action_bubble_enter_duration: float = 0.18
+@export_range(0.08, 0.30, 0.01) var action_bubble_exit_duration: float = 0.14
+@export_group("")
+@export_group("结算换人")
+@export_range(0.08, 0.30, 0.01) var switch_exit_duration: float = 0.16
+@export_range(0.0, 0.16, 0.01) var switch_handoff_pause: float = 0.05
+@export_range(0.10, 0.36, 0.01) var switch_enter_duration: float = 0.22
+@export_range(12.0, 72.0, 1.0) var switch_travel_distance: float = 34.0
+@export_range(0.0, 24.0, 1.0) var switch_vertical_drop: float = 8.0
+@export_range(4, 16, 1) var switch_pixel_steps: int = 8
+@export_group("")
 ## 独立场景变体可把现有角色 SubViewport 送入指定水面；默认关闭，Scene1 不改变。
 @export var character_reflections_enabled: bool = false
 @export var character_reflection_receiver_path: NodePath = ^"River"
@@ -320,6 +337,7 @@ var _blood_payment_armed: bool = false    # 本回合是否由出战蚩尤以等
 var _energy_cap_discount_armed: bool = false # 本回合是否降低 1 点能量上限，换取行动费用 -1
 var _free_switch_sequence: Array[int] = [] # 联机提交时重放本回合千里自在风的逻辑预览序列
 var _blood_payment_activation_step: int = -1 # 在第几次免费切换前由蚩尤发动（-1=未发动）
+var _switch_handoff_running: bool = false # 免费切换即时交接期间锁住重复选择
 
 # ---- 主动换人（任务5）：点替补框→框内显「切换」(armed)→再次点=选择(动画)→「结束」提交 ----
 var _armed_switch_frame: int = -1   # 当前 armed 的替补框索引（1 / 2），-1=无
@@ -370,7 +388,7 @@ var _fx: Node = null   # BattleFx 实例（演出原语库·池在组件内）
 # A3b 事件注解飘字配色（伤害数字解释不了的时刻·沿用战斗已有色族不添新色相）
 const COL_TAG_POISON := Color(0.55, 0.88, 0.35)   # 毒爆=酸绿（比治疗绿偏黄·毒感）
 const COL_TAG_AMP := Color(1.0, 0.72, 0.35)       # 印记/脆弱=暖橙（"这下更疼"的加伤注解）
-const COL_TAG_ABSORB := Color(0.62, 0.78, 1.0)    # 护盾/替身=钢蓝（与格挡火花同族·"被垫掉"）
+const COL_TAG_ABSORB := Color(0.62, 0.78, 1.0)    # 护甲/替身=钢蓝（与格挡火花同族·"被垫掉"）
 const COL_TAG_SAVE := Color(1.0, 0.86, 0.42)      # 还魂/免疫=救场金（最该被看见的时刻）
 const COL_TAG_BREAK := Color(1.0, 0.45, 0.35)     # 破甲/能量上限受损=赤红（坏消息）
 const COL_DMG_BURN := Color(1.0, 0.58, 0.22)      # 延迟伤害到期（妖火/藤蔓）=余烬橙（动作前结算的旧账）
@@ -955,8 +973,19 @@ func _setup_character_reflections() -> void:
 	_update_character_reflections()
 
 
-func _control_screen_rect(control: Control) -> Rect2:
+## visual_only 的 offset transform 不进入 get_global_transform_with_canvas()，但会进入
+## RenderingServer 的最终绘制变换；倒影等伴随层必须显式合成它才能和画面中的角色重合。
+func _control_visual_screen_transform(control: Control) -> Transform2D:
 	var xform := control.get_global_transform_with_canvas()
+	if control.offset_transform_enabled and control.offset_transform_visual_only:
+		# Godot 4.7 暂未把 Control::get_offset_transform() 绑定给 GDScript；本项目角色
+		# 只使用绝对 position 分量，因此按引擎的 base * offset 顺序合成屏幕位移。
+		xform.origin += xform.basis_xform(control.offset_transform_position)
+	return xform
+
+
+func _control_screen_rect(control: Control) -> Rect2:
+	var xform := _control_visual_screen_transform(control)
 	var corners: Array[Vector2] = [
 		xform * Vector2.ZERO,
 		xform * Vector2(control.size.x, 0.0),
@@ -977,10 +1006,12 @@ func _update_character_reflections() -> void:
 	if _character_reflection_material == null or _character_reflection_receiver == null:
 		return
 
-	var p1_rect := _control_screen_rect(p1_char_display)
-	var p2_rect := _control_screen_rect(p2_char_display)
-	var p1_xform := p1_char_display.get_global_transform_with_canvas()
-	var p2_xform := p2_char_display.get_global_transform_with_canvas()
+	var p1_visible := p1_char_display.is_visible_in_tree()
+	var p2_visible := p2_char_display.is_visible_in_tree()
+	var p1_rect := _control_screen_rect(p1_char_display) if p1_visible else Rect2()
+	var p2_rect := _control_screen_rect(p2_char_display) if p2_visible else Rect2()
+	var p1_xform := _control_visual_screen_transform(p1_char_display)
+	var p2_xform := _control_visual_screen_transform(p2_char_display)
 	var p1_foot := p1_xform * Vector2(
 		p1_char_display.size.x * 0.5,
 		p1_char_display.size.y * character_reflection_foot_ratio)
@@ -995,8 +1026,10 @@ func _update_character_reflections() -> void:
 		"p1_reflection_rect", Vector4(p1_rect.position.x, p1_rect.position.y, p1_rect.size.x, p1_rect.size.y))
 	_character_reflection_material.set_shader_parameter(
 		"p2_reflection_rect", Vector4(p2_rect.position.x, p2_rect.position.y, p2_rect.size.x, p2_rect.size.y))
-	_character_reflection_material.set_shader_parameter("p1_reflection_foot_y", p1_foot.y)
-	_character_reflection_material.set_shader_parameter("p2_reflection_foot_y", p2_foot.y)
+	_character_reflection_material.set_shader_parameter(
+		"p1_reflection_foot_y", p1_foot.y if p1_visible else 0.0)
+	_character_reflection_material.set_shader_parameter(
+		"p2_reflection_foot_y", p2_foot.y if p2_visible else 0.0)
 	_character_reflection_material.set_shader_parameter("character_waterline_y", minf(river_left.y, river_right.y))
 
 
@@ -1016,7 +1049,7 @@ func _connect_frame_signals() -> void:
 
 
 ## 左下切换模块：主按钮占用原图鉴位置，两个替补头像从按钮右侧展开。
-## 候选只呈现头像与可用性，不复制生命/护盾信息；完整状态仍由顶部 HUD 承担。
+## 候选只呈现头像与可用性，不复制生命/护甲信息；完整状态仍由顶部 HUD 承担。
 func _build_switch_module() -> void:
 	btn_switch = Button.new()
 	btn_switch.name = "BtnSwitch"
@@ -1094,7 +1127,7 @@ func _build_switch_module() -> void:
 
 
 func _on_switch_main_pressed() -> void:
-	if state != State.PLAYER_SELECT or not _has_switchable_reserve():
+	if _switch_handoff_running or state != State.PLAYER_SELECT or not _has_switchable_reserve():
 		return
 	_set_switch_tray_open(not _switch_tray_open)
 
@@ -1108,7 +1141,8 @@ func _on_switch_candidate_input(event: InputEvent, frame_idx: int) -> void:
 
 
 func _on_switch_candidate_pressed(frame_idx: int) -> void:
-	if state != State.PLAYER_SELECT or not _is_switchable_reserve(frame_idx):
+	if _switch_handoff_running or state != State.PLAYER_SELECT \
+			or not _is_switchable_reserve(frame_idx):
 		return
 	if _switch_selected and _armed_switch_frame == frame_idx:
 		_deselect_switch()
@@ -2054,7 +2088,7 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 					tags[p].append({text = tr("脆弱"), col = COL_TAG_AMP})
 			"shield_absorb":
 				if on_display:
-					tags[p].append({text = tr("护盾-%s") % _fmt_hp(float(ev.get("amount", 0)) / 2.0), col = COL_TAG_ABSORB})
+					tags[p].append({text = tr("护甲-%s") % _fmt_hp(float(ev.get("amount", 0)) / 2.0), col = COL_TAG_ABSORB})
 			"decoy_absorb":
 				if on_display:
 					tags[p].append({text = tr("替身-%s") % _fmt_hp(float(ev.get("amount", 0)) / 2.0), col = COL_TAG_ABSORB})
@@ -2125,7 +2159,8 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 	await _play_battle_anims(anim_actions[0], anim_actions[1], dmg, dead,
 		{pen = pen_max, blocked = blocked, block_big = block_big_atk, egain = egain, healed = healed,
 			tags = tags, pre_tags = pre_tags, reserve_hits = reserve_hits, reserve_blocks = reserve_blocks,
-			strength_price_executed = strength_price_executed})
+			strength_price_executed = strength_price_executed,
+			active_before = corrected_active_before})
 	_update_all()
 
 
@@ -2396,6 +2431,8 @@ func _disarm_switch() -> void:
 ## 核心只暂存 from/to 并让 active_index 指向预览英雄；出入场、冲撞与夜明珠均等到
 ## 同回合天罗裁定后才原子兑现，故此处可以直接复用成熟角色/按钮刷新而不复制战局。
 func _free_switch_now(frame_idx: int) -> void:
+	if _switch_handoff_running:
+		return
 	var slot: int = p1_frame_slots[frame_idx]
 	if slot < 0:
 		return
@@ -2413,7 +2450,24 @@ func _free_switch_now(frame_idx: int) -> void:
 		_split_big_wave_armed = false
 		_energy_cap_discount_armed = false
 		_reset_button_styles()
+		# 核心 active_index 已切到预览英雄，中央立绘仍是旧英雄；复用结算阶段的
+		# 普通/技能/道具切换交接，避免被动免费切换继续直接换图。
+		# 交接期间冻结而非消耗选择倒计时；否则临界归零会在 RESOLVING 状态停表，
+		# 回到 PLAYER_SELECT 后也不会自动提交或继续计时。
+		var resume_turn_timer := not game_timer.is_stopped()
+		game_timer.stop()
+		_switch_handoff_running = true
+		state = State.RESOLVING
+		_set_buttons_active(false)
+		await _play_switch_handoff([PLAYER])
+		if not is_inside_tree():
+			return
+		state = State.PLAYER_SELECT
+		_switch_handoff_running = false
+		_set_buttons_active(true)
 		_update_all()
+		if resume_turn_timer and timer_seconds > 0 and not battle.game_over:
+			game_timer.start(1.0)
 
 
 ## 清掉底部动作按钮的选中高亮 + 结束呼吸 + 选择状态。
@@ -2967,48 +3021,58 @@ func _build_item_rows() -> void:
 # 悬停提示（2026-07-11 Eddy 点单·外部 UI 件到位前的程序化像素框版）
 # ============================================================
 
-enum TipFormat { S, L }
+enum TipFormat { S, M, L }
 enum TipContentKind { PLAIN, SKILL, ITEM, AVATAR_SKILL }
 
 @export_group("悬停说明框")
-@export var tip_size_s := Vector2(320.0, 96.0)    # 基础动作、技能分支
-@export var tip_size_l := Vector2(480.0, 144.0)   # 主动技能、技能说明、道具说明
-@export var tip_size_item := Vector2(222.0, 128.0)   # 具名道具：紧凑标题行 + 最多三行正文
-@export var tip_size_avatar_skill := Vector2(340.0, 116.0)   # 去掉标题后收短高度：技能图标 + 单段说明
+@export var tip_size_s := Vector2(156.0, 76.0)    # 底部按钮说明
+@export var tip_size_m := Vector2(222.0, 144.0)   # 道具说明：只增加高度，不扩大宽度
+@export var tip_size_l := Vector2(340.0, 128.0)   # 主动技能、头像技能说明
 @export_range(0.5, 2.0, 0.01) var tip_texture_brightness := 1.28
 @export_subgroup("字距")
 @export_range(-4, 8, 1) var tip_glyph_spacing: int = 0
+@export_subgroup("统一文字节奏")
+## S/M/L 共用同一个行距源，禁止分框单独覆盖后再次产生疏密漂移。
+@export_range(-4, 12, 1) var tip_line_spacing: int = 4
 @export_subgroup("S 框文字与留白")
 @export_range(8, 32, 1) var tip_font_size_s: int = 17
-@export_range(-4, 12, 1) var tip_line_spacing_s: int = 1
 @export_range(0.0, 32.0, 1.0) var tip_padding_horizontal_s := 12.0
 @export_range(0.0, 32.0, 1.0) var tip_padding_vertical_s := 8.0
+@export_subgroup("M 框文字与留白")
+@export_range(0.0, 32.0, 1.0) var tip_padding_horizontal_m := 12.0
+@export_range(0.0, 32.0, 1.0) var tip_padding_vertical_m := 8.0
 @export_subgroup("L 框文字与留白")
 @export_range(8, 32, 1) var tip_font_size_l: int = 16
-@export_range(-4, 12, 1) var tip_line_spacing_l: int = 1
 @export_range(0.0, 32.0, 1.0) var tip_padding_horizontal_l := 12.0
 @export_range(0.0, 32.0, 1.0) var tip_padding_vertical_l := 8.0
+@export_subgroup("头像技能说明")
+## 图标与文案作为整组受此边距约束；长文只能向内换行，不能贴到纸框描边。
+@export_range(0.0, 32.0, 1.0) var tip_padding_horizontal_avatar_skill := 18.0
+@export_range(0.0, 32.0, 1.0) var tip_padding_vertical_avatar_skill := 10.0
 @export_subgroup("分框视觉轴")
 ## 正值向右；每类提示独立保存，禁止再用一个全局值同时推动 S/L。
 @export_range(-8.0, 8.0, 1.0) var tip_optical_center_shift_s := 0.0
 @export_range(-8.0, 8.0, 1.0) var tip_optical_center_shift_l := 0.0
-@export_range(-8.0, 8.0, 1.0) var tip_optical_center_shift_item := 3.0
+@export_range(-8.0, 8.0, 1.0) var tip_optical_center_shift_item := 0.0
 @export_range(-8.0, 8.0, 1.0) var tip_optical_center_shift_avatar_skill := 0.0
 @export_subgroup("道具说明排版")
 ## 正值越大，道具名称与正文组成的整块越向上移动；常规布局保持 0。
 @export_range(0.0, 12.0, 1.0) var item_tip_vertical_lift := 0.0
 ## 名称行与正文的真实像素间距；默认只留一个短呼吸位。
 @export_range(1, 64, 1) var item_tip_title_body_gap: int = 8
+@export_range(0, 3, 1) var item_tip_title_size_boost: int = 1
+@export_range(0.0, 0.8, 0.05) var item_tip_title_embolden: float = 0.25
 const ITEM_TIP_ICON_SIZE := 32.0
-const ITEM_TIP_ICON_TITLE_GAP := 6.0
+const ITEM_TIP_ICON_TITLE_GAP := 8.0
 const ITEM_TIP_COLUMN_INSET := 8.0
 const ITEM_TIP_BASE_TOP := 2.0
+const ITEM_TIP_HEADER_RULE_GAP := 5.0
 @export_group("")
 
 const TIP_GAP := 12.0                # 提示框与目标控件的间距(px)
 const AVATAR_SKILL_TIP_EXTRA_DROP := 30.0   # 越过替补头像下方 28px 血量行
 const TIP_ATOMIC_TERMS: Array[String] = [
-	"0.5点", "1点", "2点", "3点", "4点", "大波", "大防", "能量", "生命", "护盾",
+	"0.5点", "1点", "2点", "3点", "4点", "大波", "大防", "能量", "生命", "护甲",
 	"伤害", "回合", "出战", "英雄", "敌方", "我方",
 ]
 
@@ -3020,7 +3084,9 @@ var _tip_skill_icon: TextureRect
 var _tip_item_header: Control
 var _tip_item_icon: TextureRect
 var _tip_item_title: Label
+var _tip_item_rule: ColorRect
 var _tip_stylebox: StyleBoxTexture
+var _tip_effect_bold_font: FontVariation
 
 
 ## 建悬停提示（中性书页像素框 9-slice）+ 挂满底部动作按钮与我方道具槽。
@@ -3056,7 +3122,7 @@ func _build_hover_tips() -> void:
 	_tip_label.name = "Text"
 	_tip_label.add_theme_font_override("font", _make_tip_font(tip_font_size_s))
 	_tip_label.add_theme_font_size_override("font_size", tip_font_size_s)
-	_tip_label.add_theme_constant_override("line_spacing", tip_line_spacing_s)
+	_tip_label.add_theme_constant_override("line_spacing", tip_line_spacing)
 	_tip_label.add_theme_color_override("font_color", Color(0.24, 0.19, 0.12))   # 墨字压纸面（描边退役——亮底不需要）
 	_tip_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_tip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -3083,7 +3149,7 @@ func _build_hover_tips() -> void:
 	_tip_rich.name = "RichText"
 	_tip_rich.add_theme_font_override("normal_font", _make_tip_font(tip_font_size_l))
 	_tip_rich.add_theme_font_size_override("normal_font_size", tip_font_size_l)
-	_tip_rich.add_theme_constant_override("line_separation", tip_line_spacing_l)
+	_tip_rich.add_theme_constant_override("line_separation", tip_line_spacing)
 	_tip_rich.add_theme_color_override("default_color", Color(0.24, 0.19, 0.12))
 	_tip_rich.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
 	_tip_rich.vertical_alignment = VERTICAL_ALIGNMENT_TOP
@@ -3096,12 +3162,17 @@ func _build_hover_tips() -> void:
 	_tip_rich.visible = false
 	_tip_content.add_child(_tip_rich)
 	_tip_rich.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_tip_effect_bold_font = EffectTextFormatterScript.make_bold_font(
+			_tip_rich.get_theme_font("normal_font"))
 	add_child(_tip_panel)
 	_register_tip(btn_charge, _action_tip.bind(A.CHARGE), TipFormat.S, true)
 	_register_tip(btn_attack, _action_tip.bind(A.ATTACK), TipFormat.S, true)
 	_register_tip(btn_big_attack, _action_tip.bind(A.BIG_ATTACK), TipFormat.S, true)
 	_register_tip(btn_defend, _action_tip.bind(A.DEFEND), TipFormat.S, true)
 	_register_tip(btn_big_defend, _action_tip.bind(A.BIG_DEFEND), TipFormat.S, true)
+	_register_tip(btn_switch, _switch_button_tip, TipFormat.S, true)
+	_register_tip(btn_backpack, _backpack_button_tip, TipFormat.S, true)
+	_register_tip(btn_confirm, _end_turn_button_tip, TipFormat.S, true)
 	_register_tip(btn_special, _special_tip, TipFormat.L, false, TipContentKind.SKILL)
 	_register_tip(btn_longyuji_branch, _longyuji_tip, TipFormat.L, false,
 		TipContentKind.SKILL)
@@ -3146,11 +3217,33 @@ func _build_item_tip_header() -> void:
 	_tip_item_title.offset_bottom = ITEM_TIP_ICON_SIZE
 	_tip_item_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_tip_item_title.clip_text = true
-	_tip_item_title.add_theme_font_override("font", _make_tip_font(tip_font_size_l + 1))
-	_tip_item_title.add_theme_font_size_override("font_size", tip_font_size_l + 1)
-	_tip_item_title.add_theme_color_override("font_color", Color(0.22, 0.16, 0.10))
+	var title_font_size := tip_font_size_l + item_tip_title_size_boost
+	var title_font := _make_tip_font(title_font_size)
+	title_font.variation_embolden = item_tip_title_embolden
+	_tip_item_title.add_theme_font_override("font", title_font)
+	_tip_item_title.add_theme_font_size_override("font_size", title_font_size)
+	_tip_item_title.add_theme_color_override("font_color", Color(0.18, 0.12, 0.07))
 	_tip_item_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tip_item_header.add_child(_tip_item_title)
+
+	_tip_item_rule = ColorRect.new()
+	_tip_item_rule.name = "ItemHeaderRule"
+	_tip_item_rule.color = Color(0.26, 0.19, 0.11, 0.28)
+	_tip_item_rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tip_item_rule.visible = false
+	_tip_content.add_child(_tip_item_rule)
+
+
+func _switch_button_tip() -> String:
+	return tr("切换出战英雄")
+
+
+func _backpack_button_tip() -> String:
+	return tr("打开背包")
+
+
+func _end_turn_button_tip() -> String:
+	return tr("结束回合")
 
 
 func _register_tip(c: Control, provider: Callable, format: int, centered: bool = false,
@@ -3190,7 +3283,7 @@ func _on_hero_skill_tip(player: int, frame_idx: int) -> void:
 	var hero: HeroData = battle.heroes[player][slot]
 	if hero == null:
 		return
-	var detail: String = tr(hero.skill_detail)
+	var detail: String = EffectTextFormatterScript.concise(tr(hero.skill_detail))
 	# 头像说明只保留效果正文；旧 skill_description 是技能名，不再占据顶部一行。
 	var text: String = detail
 	if text == "":
@@ -3207,7 +3300,7 @@ func _on_item_slot_hovered(slot: int) -> void:
 	var base: Vector2 = p1_item_row.global_position \
 		+ Vector2(slot * (ItemSlotRow.SLOT_W + ItemSlotRow.GAP) * sc.x, 0.0)
 	_show_tip_at(Rect2(base, Vector2(ItemSlotRow.SLOT_W * sc.x, ItemSlotRow.SLOT_H * sc.y)),
-		_item_slot_tip(slot), TipFormat.L, false, TipContentKind.ITEM, null,
+		_item_slot_tip(slot), TipFormat.M, false, TipContentKind.ITEM, null,
 		_item_slot_tip_data(slot, PLAYER))
 
 
@@ -3217,7 +3310,7 @@ func _on_item_slot_hovered_p2(slot: int) -> void:
 	var base: Vector2 = p2_item_row.global_position \
 		+ Vector2(slot * (ItemSlotRow.SLOT_W + ItemSlotRow.GAP) * sc.x, 0.0)
 	_show_tip_at(Rect2(base, Vector2(ItemSlotRow.SLOT_W * sc.x, ItemSlotRow.SLOT_H * sc.y)),
-		_item_slot_tip(slot, AI), TipFormat.L, false, TipContentKind.ITEM, null,
+		_item_slot_tip(slot, AI), TipFormat.M, false, TipContentKind.ITEM, null,
 		_item_slot_tip_data(slot, AI))
 
 
@@ -3318,28 +3411,31 @@ func _show_tip_at(target: Rect2, text: String, format: int, centered: bool = fal
 	if text == "":
 		_hide_tip()
 		return
-	var is_avatar_skill := content_kind == TipContentKind.AVATAR_SKILL
-	var is_named_item := content_kind == TipContentKind.ITEM and item_data != null
-	var tip_size: Vector2 = tip_size_avatar_skill if is_avatar_skill else (
-		tip_size_item if is_named_item else (tip_size_s if format == TipFormat.S else tip_size_l))
-	_set_tip_content_margins(format, content_kind)
 	var is_short := format == TipFormat.S
+	var is_avatar_skill := content_kind == TipContentKind.AVATAR_SKILL
+	var tip_size: Vector2 = tip_size_s if format == TipFormat.S else (
+		tip_size_m if format == TipFormat.M else tip_size_l)
+	_set_tip_content_margins(format, content_kind)
 	_tip_label.visible = is_short
 	_tip_rich.visible = not is_short
 	_tip_skill_icon.texture = skill_icon
 	_tip_skill_icon.visible = is_avatar_skill and skill_icon != null
 	_tip_item_header.visible = false
+	_tip_item_rule.visible = false
 	_tip_rich.offset_left = 76.0 if _tip_skill_icon.visible else 0.0
 	_tip_rich.offset_top = 0.0
 	_tip_rich.offset_right = 0.0
 	_tip_rich.offset_bottom = 0.0
 	if is_short:
+		_tip_label.add_theme_constant_override("line_spacing", tip_line_spacing)
 		_tip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if centered \
 			else HORIZONTAL_ALIGNMENT_LEFT
 		_tip_label.text = _keep_tip_terms_together(text)
 	elif is_avatar_skill:
+		_tip_rich.add_theme_constant_override("line_separation", tip_line_spacing)
 		_set_avatar_skill_tip_text(text)
 	else:
+		_tip_rich.add_theme_constant_override("line_separation", tip_line_spacing)
 		_set_l_tip_text(text, content_kind, item_data)
 	# PanelContainer 只直接管理零最小尺寸的中间层，文字自身不会再把固定框撑大。
 	_tip_panel.custom_minimum_size = Vector2.ZERO
@@ -3361,10 +3457,22 @@ func _show_tip_at(target: Rect2, text: String, format: int, centered: bool = fal
 func _set_avatar_skill_tip_text(text: String) -> void:
 	_tip_rich.clear()
 	_tip_rich.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_tip_rich.push_paragraph(HORIZONTAL_ALIGNMENT_LEFT)
-	_tip_rich.push_font_size(tip_font_size_l)
-	_tip_rich.push_color(Color(0.27, 0.21, 0.14))
-	_tip_rich.add_text(_keep_tip_terms_together(text.strip_edges()))
+	_append_effect_rich_text(
+			text.strip_edges(), HORIZONTAL_ALIGNMENT_LEFT, Color(0.27, 0.21, 0.14))
+
+
+## 与效果图鉴共用同一效果词表和 0.8 仿粗参数；每段只进入一次 RichTextLabel 字体栈。
+func _append_effect_rich_text(
+		text: String, alignment: int, color: Color) -> void:
+	_tip_rich.push_paragraph(alignment)
+	_tip_rich.push_font(_tip_rich.get_theme_font("normal_font"), tip_font_size_l)
+	_tip_rich.push_color(color)
+	for run: Dictionary in EffectTextFormatterScript.split_runs(text):
+		if bool(run.bold):
+			_tip_rich.push_font(_tip_effect_bold_font, tip_font_size_l)
+		_tip_rich.add_text(_keep_tip_terms_together(String(run.text)))
+		if bool(run.bold):
+			_tip_rich.pop()
 	_tip_rich.pop_all()
 
 
@@ -3387,13 +3495,15 @@ func _tip_optical_center_shift(format: int, content_kind: int) -> float:
 
 func _set_tip_content_margins(format: int,
 		content_kind: int = TipContentKind.PLAIN) -> void:
-	var horizontal := tip_padding_horizontal_s if format == TipFormat.S \
-		else tip_padding_horizontal_l
-	var vertical := tip_padding_vertical_s if format == TipFormat.S \
-		else tip_padding_vertical_l
+	var is_avatar_skill := content_kind == TipContentKind.AVATAR_SKILL
+	var horizontal := tip_padding_horizontal_avatar_skill if is_avatar_skill else (
+		tip_padding_horizontal_s if format == TipFormat.S else (
+			tip_padding_horizontal_m if format == TipFormat.M else tip_padding_horizontal_l))
+	var vertical := tip_padding_vertical_avatar_skill if is_avatar_skill else (
+		tip_padding_vertical_s if format == TipFormat.S else (
+			tip_padding_vertical_m if format == TipFormat.M else tip_padding_vertical_l))
 	var optical_shift := _tip_optical_center_shift(format, content_kind)
-	# 回归记录：第三次对齐复发的根因是把道具 L 的 +3px 补偿错误提升为全局轴，
-	# 导致原本居中的底部 S 与头像技能一起右移。只允许在此按内容类型分流。
+	# 内容轴必须保持几何对称；标题与正文的视觉层级由自身字号/字重处理，禁止再推动整框。
 	_tip_stylebox.content_margin_left = horizontal + optical_shift
 	_tip_stylebox.content_margin_right = horizontal - optical_shift
 	_tip_stylebox.content_margin_top = vertical
@@ -3407,11 +3517,8 @@ func _set_l_tip_text(text: String, content_kind: int, item_data: ItemData = null
 		if content_kind == TipContentKind.SKILL else VERTICAL_ALIGNMENT_TOP
 	if content_kind != TipContentKind.ITEM:
 		if content_kind == TipContentKind.SKILL:
-			_tip_rich.push_paragraph(HORIZONTAL_ALIGNMENT_CENTER)
-		_tip_rich.push_font_size(tip_font_size_l)
-		_tip_rich.push_color(Color(0.24, 0.19, 0.12))
-		_tip_rich.add_text(_keep_tip_terms_together(text))
-		_tip_rich.pop_all()
+			_append_effect_rich_text(
+					text, HORIZONTAL_ALIGNMENT_CENTER, Color(0.24, 0.19, 0.12))
 		return
 
 	var title := ""
@@ -3429,6 +3536,7 @@ func _set_l_tip_text(text: String, content_kind: int, item_data: ItemData = null
 	# 不再模仿说明段落顶端左排，而是在整张提示纸内水平+垂直居中。
 	if title == "":
 		_tip_item_header.visible = false
+		_tip_item_rule.visible = false
 		_tip_rich.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		_tip_rich.push_paragraph(HORIZONTAL_ALIGNMENT_CENTER)
 		_tip_rich.push_font_size(tip_font_size_l)
@@ -3438,44 +3546,62 @@ func _set_l_tip_text(text: String, content_kind: int, item_data: ItemData = null
 		return
 	var body_text := "\n".join(body_lines)
 	var group_top := ITEM_TIP_BASE_TOP - item_tip_vertical_lift
-	var content_width := tip_size_item.x - tip_padding_horizontal_l * 2.0
-	# 固定左右对称内容轴：不再根据每件道具的标题/正文长度改变列宽，彻底消除视觉漂移。
-	var column_left := ITEM_TIP_COLUMN_INSET
-	var column_width := content_width - ITEM_TIP_COLUMN_INSET * 2.0
-	_configure_item_tip_header(title, item_data, group_top, content_width)
-	# 正文维持左右对称内容列；顶部图标+名称则按实际组合宽度独立居中。
+	var content_width := tip_size_m.x - tip_padding_horizontal_m * 2.0
+	var max_body_width := content_width - ITEM_TIP_COLUMN_INSET * 2.0
+	# 换行后各行保持左对齐，但承载列按真实最长行宽居中；固定满宽列会让短说明永远偏左。
+	var body_width := _measure_wrapped_text_width(body_text, max_body_width)
+	var column_left := floorf((content_width - body_width) * 0.5)
+	var column_right := content_width - column_left - body_width
+	var rule_top := _configure_item_tip_header(title, item_data, group_top, content_width)
+	# 正文维持左右对称内容列；标题轨道固定，不再随道具名字数左右漂移。
 	_tip_rich.offset_left = column_left
-	_tip_rich.offset_right = -column_left
-	_tip_rich.offset_top = group_top + ITEM_TIP_ICON_SIZE + item_tip_title_body_gap
+	_tip_rich.offset_right = -column_right
+	_tip_rich.offset_top = rule_top + 1.0 + item_tip_title_body_gap
 	_tip_rich.offset_bottom = 0.0
 	_tip_rich.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	if not body_lines.is_empty():
-		_tip_rich.push_paragraph(HORIZONTAL_ALIGNMENT_LEFT)
-		_tip_rich.push_font_size(tip_font_size_l)
-		_tip_rich.push_color(Color(0.27, 0.21, 0.14))
-		_tip_rich.add_text(_keep_tip_terms_together(body_text))
-		_tip_rich.pop_all()
+		_append_effect_rich_text(
+				body_text, HORIZONTAL_ALIGNMENT_LEFT, Color(0.27, 0.21, 0.14))
+
+
+func _measure_wrapped_text_width(text: String, max_width: float) -> float:
+	if text.is_empty():
+		return max_width
+	var paragraph := TextParagraph.new()
+	paragraph.width = max_width
+	paragraph.break_flags = TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND \
+			| TextServer.BREAK_GRAPHEME_BOUND
+	for run: Dictionary in EffectTextFormatterScript.split_runs(text):
+		paragraph.add_string(
+				_keep_tip_terms_together(String(run.text)),
+				_tip_effect_bold_font if bool(run.bold) \
+						else _tip_rich.get_theme_font("normal_font"),
+				tip_font_size_l)
+	var measured_width := 0.0
+	for line_index: int in paragraph.get_line_count():
+		measured_width = maxf(measured_width, paragraph.get_line_size(line_index).x)
+	return clampf(ceilf(measured_width), 1.0, max_width)
 func _configure_item_tip_header(title: String, item_data: ItemData, top: float,
-		content_width: float) -> void:
+		content_width: float) -> float:
 	var protected_title := _keep_tip_terms_together(title)
 	_tip_item_title.text = protected_title
 	_tip_item_icon.texture = ItemCatalog.load_icon(item_data.item_id) if item_data != null else null
 	_tip_item_icon.visible = _tip_item_icon.texture != null
 	var icon_width := ITEM_TIP_ICON_SIZE if _tip_item_icon.visible else 0.0
 	var icon_gap := ITEM_TIP_ICON_TITLE_GAP if _tip_item_icon.visible else 0.0
-	var title_font := _tip_item_title.get_theme_font("font")
-	var title_font_size := _tip_item_title.get_theme_font_size("font_size")
-	var measured_title_width := ceilf(title_font.get_string_size(
-			protected_title, HORIZONTAL_ALIGNMENT_LEFT, -1.0, title_font_size).x)
-	var title_width := minf(measured_title_width,
-			maxf(content_width - icon_width - icon_gap, 0.0))
-	var group_width := icon_width + icon_gap + title_width
-	var group_left := floorf((content_width - group_width) * 0.5)
-	_tip_item_header.position = Vector2(group_left, top)
-	_tip_item_header.size = Vector2(group_width, ITEM_TIP_ICON_SIZE)
+	var header_left := ITEM_TIP_COLUMN_INSET
+	var header_width := content_width - ITEM_TIP_COLUMN_INSET * 2.0
+	_tip_item_header.position = Vector2(header_left, top)
+	_tip_item_header.size = Vector2(header_width, ITEM_TIP_ICON_SIZE)
 	_tip_item_title.offset_left = icon_width + icon_gap
+	_tip_item_title.offset_right = 0.0
 	_tip_item_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_tip_item_header.visible = true
+	var rule_top := top + ITEM_TIP_ICON_SIZE + ITEM_TIP_HEADER_RULE_GAP
+	_tip_item_rule.position = Vector2(header_left, rule_top)
+	_tip_item_rule.size = Vector2(header_width, 1.0)
+	_tip_item_rule.visible = true
+	return rule_top
 
 
 ## U+2060 只影响断行、不绘制；保护高频规则词，避免“能/量”“大/防”被拆到两行。
@@ -3524,14 +3650,12 @@ func _special_tip() -> String:
 			return tr("将本回合行动的能量消耗改为消耗生命")
 		"h17":
 			return tr("转变为敌方当前出战英雄")
-		"h18":
-			return tr("平均分配我方所有存活英雄的当前生命")
 		"h21":
 			return tr("指定敌方一名未出战英雄登场，替换其当前出战英雄")
 		"h22":
 			return tr("下一回合结束时，双方失去全部能量")
 		_:
-			return tr(h.skill_detail)
+			return EffectTextFormatterScript.concise(tr(h.skill_detail))
 
 
 func _longyuji_tip() -> String:
@@ -3543,7 +3667,7 @@ func _split_big_wave_tip() -> String:
 
 
 func _h24_discount_tip() -> String:
-	return tr("降低1点能量上限，使本回合行动少消耗1点能量（上限最低3点）")
+	return tr("降低1点能量上限，使本回合所有行动少消耗1点能量（最低到3点）")
 
 
 ## 我方道具槽提示（按槽状态）：空槽显示解锁/抽取/补充提示；
@@ -4129,26 +4253,30 @@ func _update_all() -> void:
 
 func _update_character_displays() -> void:
 	for p in [0, 1]:
-		var cd: CharacterDisplay = p1_char_display if p == 0 else p2_char_display
-		# 死亡节拍守卫：
-		# 出战位还是遗体（阵亡未换人 / 终局尸身）时跳过刷新——sprite_frames_path setter
-		# 会重播 idle 把遗体拉起来站好；结算尾的 _update_all 正撞在倒地中段。
-		# 换人后出战位是活人，刷新自然恢复。
-		if battle.hp[p][battle.active_index[p]] <= 0:
-			continue
-		cd.modulate = Color.WHITE  # 复位防御蓝闪 / 攒黄闪等临时染色
-		cd.reset_death_dissolve()
-		cd.offset_transform_position = Vector2.ZERO
-		var h: HeroData = battle.active_hero(p)
-		if h.sprite_frames_path != "":
-			cd.sprite_frames_path = h.sprite_frames_path
-		elif h.spritesheet_path != "":
-			cd.spritesheet_path = h.spritesheet_path
-		# A 方案：v4 数据无 attack/hit/defeat 帧，攻击靠 juice；仍喂（多为空，组件 fallback）。
-		cd.attack_spritesheet_path = h.attack_spritesheet_path
-		cd.hit_spritesheet_path = h.hit_spritesheet_path
-		cd.defend_spritesheet_path = h.defend_spritesheet_path
-		cd.defeat_spritesheet_path = h.defeat_spritesheet_path
+		_update_character_display(p)
+
+
+func _update_character_display(player: int, force_refresh: bool = false) -> void:
+	var cd: CharacterDisplay = _cd(player)
+	# 死亡节拍守卫：出战位还是遗体时跳过，避免 setter 重播 idle 把遗体拉起。
+	# 换装隐藏帧是唯一例外：刚换上的英雄可能已在同一结算快照中阵亡，仍须先把
+	# 正确立绘换入，后续死亡事件才能作用在本人而不是上一位英雄的遗体上。
+	if not force_refresh and battle.hp[player][battle.active_index[player]] <= 0:
+		return
+	cd.modulate = Color.WHITE
+	cd.reset_switch_blocks()
+	cd.reset_death_dissolve()
+	cd.offset_transform_position = Vector2.ZERO
+	var h: HeroData = battle.active_hero(player)
+	if h.sprite_frames_path != "":
+		cd.sprite_frames_path = h.sprite_frames_path
+	elif h.spritesheet_path != "":
+		cd.spritesheet_path = h.spritesheet_path
+	# A 方案：v4 数据无 attack/hit/defeat 帧，攻击靠 juice；仍喂（多为空，组件 fallback）。
+	cd.attack_spritesheet_path = h.attack_spritesheet_path
+	cd.hit_spritesheet_path = h.hit_spritesheet_path
+	cd.defend_spritesheet_path = h.defend_spritesheet_path
+	cd.defeat_spritesheet_path = h.defeat_spritesheet_path
 
 
 func _get_reserve_slots(player: int) -> Array[int]:
@@ -4187,8 +4315,8 @@ func _update_hero_frames() -> void:
 					hp_rows[fi].visible = false
 
 
-## 出战位(is_active)：只画头像，血量/护盾由上方大血条显示 → 替补血量行隐藏。
-## 待选位：头像 + 单个平行四边形血量符号 + 数字；有护盾时追加银灰符号 + 数字。
+## 出战位(is_active)：只画头像，血量/护甲由上方大血条显示 → 替补血量行隐藏。
+## 待选位：头像 + 单个平行四边形血量符号 + 数字；有护甲时追加银灰符号 + 数字。
 ## 内容按真实文本宽度整体居中，整数和半点数都不会偏轴。
 ## hp_row 在 index 0(出战位) 为 null；摆位/大小在 battle_screen_base.tscn 调，代码只填值。
 func _update_single_frame(frame: HeroFrame, hp_row, player: int, slot: int, is_active: bool, pcolor: Color) -> void:
@@ -4222,13 +4350,13 @@ func _update_single_frame(frame: HeroFrame, hp_row, player: int, slot: int, is_a
 	# 放在所有几何参数之后赋值：换贴图时一次性按最终框宽/抬升重新布局。
 	frame.portrait_path = _battle_portrait_path(h)
 
-	# 出战位 / 阵亡位：替补血量行隐藏（出战血量看上方大心条；阵亡不显示 0hp/护盾）。
+	# 出战位 / 阵亡位：替补血量行隐藏（出战血量看上方大心条；阵亡不显示 0hp/护甲）。
 	if is_active or dead:
 		if hp_row != null:
 			hp_row.visible = false
 		return
 
-	# 待选位：一个斜切血量符号 + 数字（护盾同理），而不是按 HP 个数铺满多个血块。
+	# 待选位：一个斜切血量符号 + 数字（护甲同理），而不是按 HP 个数铺满多个血块。
 	if hp_row != null:
 		hp_row.visible = true
 		var hp_now := battle.hp_display(battle.hp[player][slot])
@@ -4266,7 +4394,7 @@ func _update_hp_labels() -> void:
 		var hp_now := battle.hp_display(battle.current_hp(p))
 		var hp_max := battle.hp_display(battle.current_max_hp(p))
 		var sh := battle.hp_display(battle.shield[p][battle.active_index[p]])
-		# 心形血珠：满+半+暗色空心到 max；护盾作青色额外心追加。
+		# 心形血珠：满+半+暗色空心到 max；护甲作青色额外心追加。
 		var row: HpSlantBarScript = p1_heart_row if p == 0 else p2_heart_row
 		row.set_value(hp_now, hp_max, sh)
 		# 数字重量(b)：HP 变化时心条 flinch 脉冲（掉血偏红 / 回血偏绿）。
@@ -4359,6 +4487,15 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 	for p in 2:
 		for hit_data in (reserve_hits[p] as Dictionary).values():
 			reserve_dmg[p] += int((hit_data as Dictionary).get("amount", 0))
+	# 核心已完成换人逻辑，但画面仍是结算前英雄。先完成视觉交接，
+	# 再让新出战英雄承接同拍攻击/受击；定身取消或未真换槽时不播假动画。
+	var active_before: Array = fx.get("active_before", battle.active_index.duplicate())
+	var switched_players: Array[int] = []
+	for p in 2:
+		if p < active_before.size() and int(active_before[p]) != battle.active_index[p]:
+			switched_players.append(p)
+	if not switched_players.is_empty():
+		await _play_switch_handoff(switched_players)
 	# 执行动作 → 镜头聚焦"冲突落点"（Eddy 2026-07-09 镜头规格）：双方都进攻=居中放大对撞（配震屏）；
 	# 仅对方进攻=偏左聚受击的己方；仅己方进攻=偏右聚受击的敌方；双方都未进攻=不推近。
 	var p1_off := _is_offense(a0, int(dmg[1]), bool(dead[1]))
@@ -4428,7 +4565,7 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 	for p in 2:
 		if float(healed[p]) > 0.0:
 			_fx._pop_heal(p, float(healed[p]))
-	# A3b 命中拍注解：毒爆/印记/脆弱/护盾/替身/免疫/破甲/追击/还魂/能量上限——腹位小字逐条弹出。
+	# A3b 命中拍注解：毒爆/印记/脆弱/护甲/替身/免疫/破甲/追击/还魂/能量上限——腹位小字逐条弹出。
 	var tags: Array = fx.get("tags", [[], []])
 	for p in 2:
 		_fx._pop_tags(p, tags[p])
@@ -4461,6 +4598,81 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 
 	await get_tree().create_timer(action_phase_duration).timeout
 	stage.set_focus(false)   # 动作结束 → 镜头回正中
+
+
+## 像素带交接：旧英雄向己方边缘收束 → 隐藏单帧换装 → 新英雄按同一规则反向重组。
+## 主动、免费被动、技能与道具强制换人全部共用；不改 active_index 和事件流。
+func _play_switch_handoff(players: Array[int]) -> void:
+	var shadow_visibility: Dictionary = {}
+	for player: int in players:
+		var shadow: TextureRect = p1_shadow if player == PLAYER else p2_shadow
+		shadow_visibility[player] = shadow.visible
+	var out_tweens: Array[Tween] = []
+	for player: int in players:
+		var cd: CharacterDisplay = _cd(player)
+		out_tweens.append(_animate_switch_out(cd, player))
+	if not out_tweens.is_empty():
+		await out_tweens[0].finished
+	for player: int in players:
+		_cd(player).visible = false
+		var shadow: TextureRect = p1_shadow if player == PLAYER else p2_shadow
+		shadow.visible = false
+	if switch_handoff_pause > 0.0:
+		await get_tree().create_timer(switch_handoff_pause).timeout
+	for player: int in players:
+		_update_character_display(player, true)
+	_update_hero_frames()
+	var in_tweens: Array[Tween] = []
+	for player: int in players:
+		var cd: CharacterDisplay = _cd(player)
+		cd.visible = true
+		var shadow: TextureRect = p1_shadow if player == PLAYER else p2_shadow
+		shadow.visible = bool(shadow_visibility.get(player, true))
+		in_tweens.append(_animate_switch_in(cd, player))
+	if not in_tweens.is_empty():
+		await in_tweens[0].finished
+	for player: int in players:
+		var cd: CharacterDisplay = _cd(player)
+		cd.reset_switch_blocks()
+		cd.offset_transform_position = Vector2.ZERO
+		if _fx != null:
+			_fx._spawn_dust(player)
+
+
+func _animate_switch_out(cd: CharacterDisplay, player: int) -> Tween:
+	var outward := -1.0 if player == PLAYER else 1.0
+	var tw := cd.create_tween().set_parallel(true)
+	tw.tween_method(_set_switch_block_progress.bind(cd, outward > 0.0),
+		0.0, 1.0, switch_exit_duration).set_trans(Tween.TRANS_LINEAR)
+	tw.tween_method(_set_switch_pixel_offset.bind(cd, Vector2.ZERO,
+		Vector2(outward * switch_travel_distance, switch_vertical_drop)),
+		0.0, 1.0, switch_exit_duration).set_trans(Tween.TRANS_LINEAR)
+	return tw
+
+
+func _animate_switch_in(cd: CharacterDisplay, player: int) -> Tween:
+	var outward := -1.0 if player == PLAYER else 1.0
+	cd.offset_transform_position = Vector2(outward * switch_travel_distance, switch_vertical_drop)
+	cd.modulate.a = 1.0
+	cd.set_switch_blocks(1.0, outward > 0.0, switch_pixel_steps)
+	var tw := cd.create_tween().set_parallel(true)
+	tw.tween_method(_set_switch_block_progress.bind(cd, outward > 0.0),
+		1.0, 0.0, switch_enter_duration).set_trans(Tween.TRANS_LINEAR)
+	tw.tween_method(_set_switch_pixel_offset.bind(cd,
+		Vector2(outward * switch_travel_distance, switch_vertical_drop), Vector2.ZERO),
+		0.0, 1.0, switch_enter_duration).set_trans(Tween.TRANS_LINEAR)
+	return tw
+
+
+func _set_switch_block_progress(progress: float, cd: CharacterDisplay, exits_right: bool) -> void:
+	cd.set_switch_blocks(progress, exits_right, switch_pixel_steps)
+
+
+func _set_switch_pixel_offset(progress: float, cd: CharacterDisplay, from: Vector2,
+		to: Vector2) -> void:
+	var steps := float(maxi(1, switch_pixel_steps))
+	var stepped := floorf(clampf(progress, 0.0, 1.0) * steps + 0.0001) / steps
+	cd.offset_transform_position = from.lerp(to, stepped).round()
 
 
 ## P3：大波命中"前推顿帧"。上升时长 = 命中前的 await（0.45×phase）→ 峰值正好落在命中瞬间，
@@ -4891,8 +5103,13 @@ func _update_shadow(p: int) -> void:
 	var cd: CharacterDisplay = p1_char_display if p == 0 else p2_char_display
 	var sh: TextureRect = p1_shadow if p == 0 else p2_shadow
 	var home: Vector2 = _cd_home[p]
-	var dx: float = cd.position.x - home.x
-	var lift: float = maxf(home.y - cd.position.y, 0.0)          # 上抬量（离地）
+	var visual_offset: Vector2 = cd.offset_transform_position \
+			if cd.offset_transform_enabled else Vector2.ZERO
+	var visual_position: Vector2 = cd.position + visual_offset
+	var dx: float = visual_position.x - home.x
+	var lift: float = maxf(home.y - visual_position.y, 0.0)      # 上抬量（离地）
+	if not cd.visible:
+		sh.visible = false
 	sh.position.x = _shadow_home[p].x + dx
 	var k: float = clampf(1.0 - lift / 140.0, 0.5, 1.0)          # 离地越多越小
 	var stretch: float = 1.0 + clampf(absf(dx) / 190.0, 0.0, 1.0) * 0.4
@@ -4901,26 +5118,27 @@ func _update_shadow(p: int) -> void:
 
 
 # ============================================================
-# 头顶招式圆圈（揭示盲选出招，占位待美术）/ 动作名
+# 头顶结算气泡（揭示盲选出招）/ 动作图标
 # ============================================================
 
-## 双方各在角色头顶弹出一个气泡（揭示盲选出招）：有美术图标用图标、否则用文字。
-## 进场带 pop 动画（缩放回弹 + 淡入），显示 1.2s 后收起淡出，告别"直接冒出来"的僵硬。
+## 双方各在角色头部侧上方揭示盲选出招：有美术图标用图标，否则才用文字回退。
+## 轻推入场 → 稳定阅读 → 朝战场中心收束，退场完成后再进入角色动作。
 func _show_action_indicators(a0: int, a1: int) -> void:
 	status_label.visible = false
 	event_label.visible = false
 	var c0 := _spawn_action_circle(0, a0)
 	var c1 := _spawn_action_circle(1, a1)
-	await get_tree().create_timer(1.2).timeout
-	for c in [c0, c1]:
+	await get_tree().create_timer(action_bubble_hold_duration).timeout
+	var exit_tweens: Array[Tween] = []
+	for player: int in 2:
+		var c: Control = c0 if player == 0 else c1
 		if is_instance_valid(c):
-			var tw := create_tween()
-			tw.tween_property(c, "scale", Vector2(0.5, 0.5), 0.14).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-			tw.parallel().tween_property(c, "modulate:a", 0.0, 0.14)
-			tw.tween_callback(c.queue_free)
+			exit_tweens.append(_animate_bubble_exit(c, player))
+	if not exit_tweens.is_empty():
+		await exit_tweens[0].finished
 
 
-## 找动作对应的动作按钮（攒/波/大波/防/大防 有；技能/切换 无 → null）。
+## 找动作对应的动作按钮（技能无普通按钮，其余复用现有视觉源）。
 func _btn_for_action(action: int) -> Button:
 	match action:
 		A.CHARGE: return btn_charge
@@ -4928,12 +5146,15 @@ func _btn_for_action(action: int) -> Button:
 		A.BIG_ATTACK: return btn_big_attack
 		A.DEFEND: return btn_defend
 		A.BIG_DEFEND: return btn_big_defend
+		A.SWITCH: return btn_switch
 		ACTIVE: return btn_special
 	return null
 
 
 ## 取动作按钮上的 HoverIcon（图标/帧/缩放的单一来源，在 .tscn 配置）；无则 null。
 func _hover_icon_for(action: int) -> HoverIcon:
+	if action == A.SWITCH:
+		return _switch_button_icon
 	var btn := _btn_for_action(action)
 	if btn == null:
 		return null
@@ -4942,17 +5163,13 @@ func _hover_icon_for(action: int) -> HoverIcon:
 
 ## 在 player 角色头顶生成揭示气泡（圆底 + 美术图标 / 文字回退）。
 func _spawn_action_circle(player: int, action: int) -> Control:
-	var cd := _cd(player)
-	var sz := 92.0
+	var sz := action_bubble_size
 	var circ := Control.new()
+	circ.name = "ActionBubbleP%d" % (player + 1)
 	circ.size = Vector2(sz, sz)
-	# 气泡位置：己方(P0)=人物头「右上方」/ 敌方(P1)=镜像「左上方」+ pop 小动画（_animate_bubble_pop）。
-	# 锚用容器「中心」(不随 viewport 放大飞走)：中心上移 BUBBLE_HEAD_RISE 到头顶、再按阵营左右偏 BUBBLE_SIDE_X。
-	var cd_center := cd.position + cd.size * 0.5
-	var side := 1.0 if player == PLAYER else -1.0   # 己方右 / 敌方左·镜像
-	circ.position = Vector2(
-		cd_center.x + side * BUBBLE_SIDE_X - sz * 0.5,
-		cd_center.y - BUBBLE_HEAD_RISE - sz)
+	# 跟随当前立绘的 frame/scale/offset 计算头部锚点，再做安全边界约束。
+	# 换英雄、调立绘大小或移动 CharacterDisplay 后，气泡会自动跟随，不再伪固定。
+	circ.position = _action_bubble_target_position(player, sz)
 	circ.pivot_offset = Vector2(sz, sz) * 0.5   # 从中心 pop
 	circ.z_index = 80
 	circ.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -4982,11 +5199,15 @@ func _spawn_action_circle(player: int, action: int) -> Control:
 		anim.vframes = hi.vframes
 		anim.frame_count = hi.frame_count
 		anim.fps = hi.fps
+		anim.playback_frames = hi.playback_frames
+		anim.loop_on_hover = hi.loop_on_hover
+		anim.rest_frame = hi.rest_frame
 		# 比例与按钮一致：取按钮里图标的「显示占比」直接当 content_scale + inset 归零 →
 		# 气泡内图标占气泡的比例 = 图标占按钮的比例（修复气泡图标偏大/比例不一致）。
 		anim.inset_ratio = 0.0
 		anim.content_scale = hi.display_ratio()
 		anim.auto_play = true
+		anim.name = "ActionIcon"
 		anim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		anim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		circ.add_child(anim)
@@ -5004,19 +5225,71 @@ func _spawn_action_circle(player: int, action: int) -> Control:
 		circ.add_child(lbl)
 
 	add_child(circ)
-	_animate_bubble_pop(circ)
+	_animate_bubble_enter(circ, player)
 	return circ
 
 
-## 气泡 pop 进场：从小放大（回弹）+ 淡入。
-func _animate_bubble_pop(node: Control) -> void:
-	node.scale = Vector2(0.2, 0.2)
+## 当前立绘在战斗画布上的名义显示矩形。不扫描图像像素，但完整跟随 frame/scale/offset。
+func _character_sprite_rect(cd: CharacterDisplay) -> Rect2:
+	var viewport_size := Vector2(cd.frame_size, cd.frame_size)
+	for child in cd.get_children():
+		if child is SubViewport:
+			viewport_size = Vector2((child as SubViewport).size)
+			break
+	viewport_size.x = maxf(viewport_size.x, 1.0)
+	viewport_size.y = maxf(viewport_size.y, 1.0)
+	var map_scale := cd.size / viewport_size
+	var sprite_size := Vector2(cd.frame_size, cd.frame_size) * cd.sprite_scale.abs() * map_scale
+	var sprite_center := cd.position + cd.sprite_offset * map_scale
+	return Rect2(sprite_center - sprite_size * 0.5, sprite_size)
+
+
+func _action_bubble_target_position(player: int, bubble_size: float) -> Vector2:
+	var sprite_rect := _character_sprite_rect(_cd(player))
+	var side := 1.0 if player == PLAYER else -1.0
+	var anchor := Vector2(
+		sprite_rect.get_center().x + side * sprite_rect.size.x * action_bubble_side_ratio,
+		sprite_rect.position.y + sprite_rect.size.y * action_bubble_head_ratio)
+	var target := anchor - Vector2.ONE * bubble_size * 0.5
+	# 战斗 UI 以 1920×1080 逻辑画布排版；GUT/headless 父视口可能只有 64×64，
+	# 不能让探针尺寸反向把正常气泡夹到左上角。实际超宽视口仍可使用更大边界。
+	var canvas_size := Vector2(maxf(size.x, SCREEN_W), maxf(size.y, SCREEN_H))
+	target.x = clampf(target.x, action_bubble_safe_margin,
+		maxf(action_bubble_safe_margin, canvas_size.x - bubble_size - action_bubble_safe_margin))
+	target.y = clampf(target.y, action_bubble_safe_margin,
+		maxf(action_bubble_safe_margin, canvas_size.y - bubble_size - action_bubble_safe_margin))
+	return target.round()
+
+
+## 结算揭示进场：从角色一侧轻推出来，无回弹、无超调，落定后恢复严格 1:1。
+func _animate_bubble_enter(node: Control, player: int) -> Tween:
+	var target := node.position
+	var toward_center := 1.0 if player == PLAYER else -1.0
+	node.position = target + Vector2(-toward_center * 10.0, 10.0)
+	node.scale = Vector2(0.84, 0.84)
 	node.modulate.a = 0.0
-	var tw := create_tween()
-	tw.tween_property(node, "scale", Vector2(1.14, 1.14), 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(node, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_SINE)
-	var tw2 := create_tween()
-	tw2.tween_property(node, "modulate:a", 1.0, 0.14).set_ease(Tween.EASE_OUT)
+	var tw := node.create_tween().set_parallel(true)
+	tw.tween_property(node, "position", target, action_bubble_enter_duration) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_property(node, "scale", Vector2.ONE, action_bubble_enter_duration) \
+		.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
+	tw.tween_property(node, "modulate:a", 1.0, action_bubble_enter_duration * 0.72) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	return tw
+
+
+## 退场朝战场中心轻收，把视觉动势交给随后的角色出招。
+func _animate_bubble_exit(node: Control, player: int) -> Tween:
+	var toward_center := 1.0 if player == PLAYER else -1.0
+	var tw := node.create_tween().set_parallel(true)
+	tw.tween_property(node, "position", node.position + Vector2(toward_center * 12.0, -4.0),
+		action_bubble_exit_duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(node, "scale", Vector2(0.92, 0.92), action_bubble_exit_duration) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_property(node, "modulate:a", 0.0, action_bubble_exit_duration * 0.88) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.chain().tween_callback(node.queue_free)
+	return tw
 
 
 func _action_name(act: int) -> String:

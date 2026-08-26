@@ -14,7 +14,7 @@
 [ext_resource type="Script" uid="uid://cum6ef8jkdxxg" path="res://src/ui/components/scene5_wheat_mesh.gd" id="15_wheat_mesh"]
 [ext_resource type="Shader" uid="uid://bqm6bapmhmg0k" path="res://assets/shaders/canvas_env_dark_smoke.gdshader" id="16_pixel_cloud"]
 [ext_resource type="Shader" uid="uid://0tjgiqy11mjf" path="res://assets/shaders/scene5_distant_wheat_light.gdshader" id="17_distant_light"]
-[ext_resource type="Script" path="res://src/ui/components/scene5_crop_circle.gd" id="18_crop_circle"]
+[ext_resource type="Script" uid="uid://c60sgu74jnnxp" path="res://src/ui/components/scene5_crop_circle.gd" id="18_crop_circle"]
 
 [sub_resource type="ShaderMaterial" id="Scene5SunRayMat"]
 shader = ExtResource("14_sun_rays")
@@ -384,6 +384,11 @@ shader_parameter/shape_wave_feather = 0.06
 shader_parameter/gust_strength = 0.0
 shader_parameter/gust_direction = 1.0
 shader_parameter/gust_px = 9.6
+shader_parameter/crop_circle_strength = 0.0
+shader_parameter/crop_circle_reveal = 0.0
+shader_parameter/crop_circle_center = Vector2(0.5, 0.55)
+shader_parameter/crop_circle_depth_scale = 1.0
+shader_parameter/crop_circle_half_size = Vector2(0.36, 0.085)
 
 [node name="Scene5" type="Control" unique_id=1837926955]
 layout_mode = 3
@@ -411,7 +416,6 @@ offset_right = 1.0
 offset_bottom = -194.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 1
 texture = ExtResource("4_sky")
 expand_mode = 1
 metadata/parallax_factor = 0.1
@@ -545,7 +549,7 @@ metadata/asset_slot = "scene5_far_wheat.png:derived_mid_depth"
 metadata/placeholder = false
 metadata/_edit_lock_ = true
 
-[node name="ClickLeavesMidFar" type="CPUParticles2D" parent="."]
+[node name="ClickLeavesMidFar" type="CPUParticles2D" parent="." unique_id=737657769]
 texture_filter = 1
 position = Vector2(960, 590)
 emitting = false
@@ -555,8 +559,6 @@ one_shot = true
 explosiveness = 0.62
 randomness = 0.82
 local_coords = true
-fixed_fps = 0
-fract_delta = true
 emission_shape = 3
 emission_rect_extents = Vector2(40, 5)
 direction = Vector2(-0.18, -1)
@@ -571,12 +573,11 @@ damping_max = 1.5
 scale_amount_min = 0.78
 scale_amount_max = 1.05
 color = Color(0.72, 0.58, 0.26, 0.36)
-color_ramp = SubResource("GradientTexture_chaff_life")
 metadata/parallax_factor = 0.34
 metadata/asset_slot = "scene5_far_disturbance:mid_far_streaks"
 metadata/placeholder = false
 
-[node name="ClickLeavesMidFarPool2" type="CPUParticles2D" parent="."]
+[node name="ClickLeavesMidFarPool2" type="CPUParticles2D" parent="." unique_id=521659226]
 texture_filter = 1
 position = Vector2(960, 590)
 emitting = false
@@ -586,8 +587,6 @@ one_shot = true
 explosiveness = 0.62
 randomness = 0.82
 local_coords = true
-fixed_fps = 0
-fract_delta = true
 emission_shape = 3
 emission_rect_extents = Vector2(40, 5)
 direction = Vector2(-0.18, -1)
@@ -602,12 +601,11 @@ damping_max = 1.5
 scale_amount_min = 0.78
 scale_amount_max = 1.05
 color = Color(0.72, 0.58, 0.26, 0.36)
-color_ramp = SubResource("GradientTexture_chaff_life")
 metadata/parallax_factor = 0.34
 metadata/asset_slot = "scene5_far_disturbance:mid_far_streaks_pool2"
 metadata/placeholder = false
 
-[node name="ClickLeavesMidFarPool3" type="CPUParticles2D" parent="."]
+[node name="ClickLeavesMidFarPool3" type="CPUParticles2D" parent="." unique_id=1968708417]
 texture_filter = 1
 position = Vector2(960, 590)
 emitting = false
@@ -617,8 +615,6 @@ one_shot = true
 explosiveness = 0.62
 randomness = 0.82
 local_coords = true
-fixed_fps = 0
-fract_delta = true
 emission_shape = 3
 emission_rect_extents = Vector2(40, 5)
 direction = Vector2(-0.18, -1)
@@ -633,7 +629,6 @@ damping_max = 1.5
 scale_amount_min = 0.78
 scale_amount_max = 1.05
 color = Color(0.72, 0.58, 0.26, 0.36)
-color_ramp = SubResource("GradientTexture_chaff_life")
 metadata/parallax_factor = 0.34
 metadata/asset_slot = "scene5_far_disturbance:mid_far_streaks_pool3"
 metadata/placeholder = false
@@ -658,18 +653,15 @@ metadata/asset_slot = "scene5_far_wheat.png:complete_mesh"
 metadata/placeholder = false
 metadata/_edit_lock_ = true
 
-[node name="ClickLeavesFar" type="CPUParticles2D" parent="."]
+[node name="ClickLeavesFar" type="CPUParticles2D" parent="." unique_id=1636480780]
 texture_filter = 1
 position = Vector2(960, 590)
 emitting = false
-amount = 8
 lifetime = 1.55
 one_shot = true
 explosiveness = 0.66
 randomness = 0.78
 local_coords = true
-fixed_fps = 0
-fract_delta = true
 emission_shape = 3
 emission_rect_extents = Vector2(58, 6)
 direction = Vector2(0.12, -1)
@@ -684,23 +676,19 @@ damping_max = 1.35
 scale_amount_min = 0.9
 scale_amount_max = 1.25
 color = Color(0.82, 0.65, 0.26, 0.48)
-color_ramp = SubResource("GradientTexture_chaff_life")
 metadata/parallax_factor = 0.42
 metadata/asset_slot = "scene5_far_disturbance:far_streaks"
 metadata/placeholder = false
 
-[node name="ClickLeavesFarPool2" type="CPUParticles2D" parent="."]
+[node name="ClickLeavesFarPool2" type="CPUParticles2D" parent="." unique_id=1666534402]
 texture_filter = 1
 position = Vector2(960, 590)
 emitting = false
-amount = 8
 lifetime = 1.55
 one_shot = true
 explosiveness = 0.66
 randomness = 0.78
 local_coords = true
-fixed_fps = 0
-fract_delta = true
 emission_shape = 3
 emission_rect_extents = Vector2(58, 6)
 direction = Vector2(0.12, -1)
@@ -715,23 +703,19 @@ damping_max = 1.35
 scale_amount_min = 0.9
 scale_amount_max = 1.25
 color = Color(0.82, 0.65, 0.26, 0.48)
-color_ramp = SubResource("GradientTexture_chaff_life")
 metadata/parallax_factor = 0.42
 metadata/asset_slot = "scene5_far_disturbance:far_streaks_pool2"
 metadata/placeholder = false
 
-[node name="ClickLeavesFarPool3" type="CPUParticles2D" parent="."]
+[node name="ClickLeavesFarPool3" type="CPUParticles2D" parent="." unique_id=473729975]
 texture_filter = 1
 position = Vector2(960, 590)
 emitting = false
-amount = 8
 lifetime = 1.55
 one_shot = true
 explosiveness = 0.66
 randomness = 0.78
 local_coords = true
-fixed_fps = 0
-fract_delta = true
 emission_shape = 3
 emission_rect_extents = Vector2(58, 6)
 direction = Vector2(0.12, -1)
@@ -746,7 +730,6 @@ damping_max = 1.35
 scale_amount_min = 0.9
 scale_amount_max = 1.25
 color = Color(0.82, 0.65, 0.26, 0.48)
-color_ramp = SubResource("GradientTexture_chaff_life")
 metadata/parallax_factor = 0.42
 metadata/asset_slot = "scene5_far_disturbance:far_streaks_pool3"
 metadata/placeholder = false
@@ -771,7 +754,7 @@ metadata/asset_slot = "scene5_far_wheat.png:derived_cover_back"
 metadata/placeholder = false
 metadata/_edit_lock_ = true
 
-[node name="ClickLeavesCover" type="CPUParticles2D" parent="."]
+[node name="ClickLeavesCover" type="CPUParticles2D" parent="." unique_id=724585870]
 texture_filter = 1
 position = Vector2(960, 590)
 emitting = false
@@ -781,8 +764,6 @@ one_shot = true
 explosiveness = 0.7
 randomness = 0.74
 local_coords = true
-fixed_fps = 0
-fract_delta = true
 emission_shape = 3
 emission_rect_extents = Vector2(76, 7)
 direction = Vector2(-0.08, -1)
@@ -794,15 +775,13 @@ angular_velocity_min = -18.0
 angular_velocity_max = 18.0
 damping_min = 0.6
 damping_max = 1.2
-scale_amount_min = 1.0
 scale_amount_max = 1.45
 color = Color(0.92, 0.71, 0.27, 0.58)
-color_ramp = SubResource("GradientTexture_chaff_life")
 metadata/parallax_factor = 0.48
 metadata/asset_slot = "scene5_far_disturbance:cover_streaks"
 metadata/placeholder = false
 
-[node name="ClickLeavesCoverPool2" type="CPUParticles2D" parent="."]
+[node name="ClickLeavesCoverPool2" type="CPUParticles2D" parent="." unique_id=1653940865]
 texture_filter = 1
 position = Vector2(960, 590)
 emitting = false
@@ -812,8 +791,6 @@ one_shot = true
 explosiveness = 0.7
 randomness = 0.74
 local_coords = true
-fixed_fps = 0
-fract_delta = true
 emission_shape = 3
 emission_rect_extents = Vector2(76, 7)
 direction = Vector2(-0.08, -1)
@@ -825,15 +802,13 @@ angular_velocity_min = -18.0
 angular_velocity_max = 18.0
 damping_min = 0.6
 damping_max = 1.2
-scale_amount_min = 1.0
 scale_amount_max = 1.45
 color = Color(0.92, 0.71, 0.27, 0.58)
-color_ramp = SubResource("GradientTexture_chaff_life")
 metadata/parallax_factor = 0.48
 metadata/asset_slot = "scene5_far_disturbance:cover_streaks_pool2"
 metadata/placeholder = false
 
-[node name="ClickLeavesCoverPool3" type="CPUParticles2D" parent="."]
+[node name="ClickLeavesCoverPool3" type="CPUParticles2D" parent="." unique_id=741746357]
 texture_filter = 1
 position = Vector2(960, 590)
 emitting = false
@@ -843,8 +818,6 @@ one_shot = true
 explosiveness = 0.7
 randomness = 0.74
 local_coords = true
-fixed_fps = 0
-fract_delta = true
 emission_shape = 3
 emission_rect_extents = Vector2(76, 7)
 direction = Vector2(-0.08, -1)
@@ -856,10 +829,8 @@ angular_velocity_min = -18.0
 angular_velocity_max = 18.0
 damping_min = 0.6
 damping_max = 1.2
-scale_amount_min = 1.0
 scale_amount_max = 1.45
 color = Color(0.92, 0.71, 0.27, 0.58)
-color_ramp = SubResource("GradientTexture_chaff_life")
 metadata/parallax_factor = 0.48
 metadata/asset_slot = "scene5_far_disturbance:cover_streaks_pool3"
 metadata/placeholder = false
@@ -921,11 +892,10 @@ self_modulate = Color(0.72, 0.76, 0.58, 1)
 texture_filter = 1
 layout_mode = 0
 offset_left = -16.0
-offset_top = 600.0
+offset_top = 595.0
 offset_right = 976.0
-offset_bottom = 761.0
+offset_bottom = 756.0
 scale = Vector2(2, 2)
-mouse_filter = 2
 texture = ExtResource("3_ground")
 patch_margin_left = 8
 patch_margin_right = 8
@@ -933,7 +903,6 @@ axis_stretch_horizontal = 2
 metadata/parallax_factor = 1.0
 metadata/asset_slot = "scene5_ground.png"
 metadata/placeholder = false
-metadata/_edit_lock_ = true
 
 [node name="GustChaff" type="GPUParticles2D" parent="." unique_id=1204599927]
 texture_filter = 1
@@ -983,7 +952,7 @@ near_layer_path = NodePath("../NearWheatLeft")
 far_hit_layer_paths = Array[NodePath]([NodePath("../FarWheatCoverBack"), NodePath("../FarWheat"), NodePath("../MidFarWheat")])
 click_leaf_paths = Array[NodePath]([NodePath("../ClickLeavesMidFar"), NodePath("../ClickLeavesFar"), NodePath("../ClickLeavesCover"), NodePath("../ClickLeavesMidFarPool2"), NodePath("../ClickLeavesFarPool2"), NodePath("../ClickLeavesCoverPool2"), NodePath("../ClickLeavesMidFarPool3"), NodePath("../ClickLeavesFarPool3"), NodePath("../ClickLeavesCoverPool3")])
 
-[node name="CropCircle" type="Node" parent="."]
+[node name="CropCircle" type="Node" parent="." unique_id=621198623]
 script = ExtResource("18_crop_circle")
 wheat_layer_paths = Array[NodePath]([NodePath("../MidFarWheat"), NodePath("../FarWheat"), NodePath("../FarWheatCoverBack")])
 

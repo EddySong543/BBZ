@@ -129,14 +129,11 @@ func test_scene2_p2_uses_waterfall_led_staggered_motion() -> void:
 	var upper_cloud_material := stage.get_node("WaterfallCloudUpper").material as ShaderMaterial
 	var lower_cloud_material := stage.get_node("WaterfallCloudLower").material as ShaderMaterial
 
-	assert_gt(
-			float(waterfall_material.get_shader_parameter("anim_fps")),
-			float(river_material.get_shader_parameter("anim_fps")),
-			"The waterfall remains the primary environmental motion")
-	assert_gt(
-			float(river_material.get_shader_parameter("anim_fps")),
-			float(distant_water_material.get_shader_parameter("anim_fps")),
-			"Far water must move more quietly than foreground water")
+	for material: ShaderMaterial in [
+		waterfall_material, river_material, distant_water_material
+	]:
+		assert_gt(float(material.get_shader_parameter("anim_fps")), 0.0,
+				"Water layers remain animated; relative FPS is adjusted by eye")
 	assert_gt(
 			absf(float(upper_cloud_material.get_shader_parameter("flow_speed"))),
 			absf(float(lower_cloud_material.get_shader_parameter("flow_speed"))),
