@@ -83,7 +83,7 @@ func test_ai_targets_friendly_hero_items_without_wasting_blank_transfer() -> voi
 	var blank_transfer := _battle(BattleAI.AI_ITEM_ENERGY_RESERVE)
 	blank_transfer.slots[1][0] = _ready_slot("t2_yijia_huan")
 	BattleAI.run_item_economy(blank_transfer, 1, _rng())
-	assert_true(blank_transfer.slot_ready(1, 0), "全队无护盾时不得空放移甲环")
+	assert_true(blank_transfer.slot_ready(1, 0), "全队无护甲时不得空放移甲环")
 
 	var transfer := _battle(BattleAI.AI_ITEM_ENERGY_RESERVE)
 	transfer.hp[1] = [20, 8, 14]
@@ -93,7 +93,7 @@ func test_ai_targets_friendly_hero_items_without_wasting_blank_transfer() -> voi
 	transfer.select_action(0, A.CHARGE)
 	transfer.select_action(1, A.CHARGE)
 	transfer.resolve()
-	assert_eq(transfer.shield[1], [0, 6, 0], "移甲环应把全队护盾集中给低血存活英雄")
+	assert_eq(transfer.shield[1], [0, 6, 0], "移甲环应把全队护甲集中给低血存活英雄")
 
 
 func test_ai_uses_houzhen_qian_to_replace_a_weaker_active_hero() -> void:
@@ -482,7 +482,7 @@ func test_smart_pick_prefers_attack_at_kill_range() -> void:
 	var dart := ItemCatalog.make("t1_feibiao")
 	var shield := ItemCatalog.make("t1_jiudun")
 	assert_gt(BattleAI.score_item_option(b, 1, dart), BattleAI.score_item_option(b, 1, shield),
-		"敌进斩杀圈：进攻件 > 护盾件（收割票）")
+		"敌进斩杀圈：进攻件 > 护甲件（收割票）")
 
 
 func test_smart_pick_values_energy_when_starved() -> void:

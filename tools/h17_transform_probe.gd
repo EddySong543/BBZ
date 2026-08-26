@@ -55,7 +55,7 @@ func _ready() -> void:
 	if int(screen.battle.max_hp[screen.PLAYER][0]) != 14:
 		failures.append("生命上限未复制为穷奇的7点")
 	if int(screen.battle.shield[screen.PLAYER][0]) != 3:
-		failures.append("护盾未随英雄本体状态复制")
+		failures.append("护甲未随英雄本体状态复制")
 	if int(screen.battle.get_status(screen.PLAYER, 0, "vuln", 0)) != 1:
 		failures.append("英雄局部状态未复制")
 	if int(screen.battle.energy[screen.PLAYER]) != 2:

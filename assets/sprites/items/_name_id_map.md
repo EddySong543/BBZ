@@ -26,7 +26,7 @@
 | 急救铃 | `t1_jijiu_ling` | 导出 |
 | 劣质法力药水 | `t1_lzhi_fali` | 能量 |
 | 劣质生命药水 | `t1_lzhi_shengming` | 防御 |
-| 破旧的护盾 | `t1_jiudun` | 防御 |
+| 破旧的护甲 | `t1_jiudun` | 防御 |
 | 圣贤书 | `t1_hushenfu` | 防御 |
 | 生锈的暗器 | `t1_feibiao` | 进攻 |
 | 算命铜钱 | `t1_tongqian` | 博弈 |
@@ -72,7 +72,7 @@
 | 回流珠 | `t2_huiliu_zhu` | 能量 |
 | 回照镜 | `t2_huizhao_jing` | 防御 |
 | 护阵钉 | `t2_huzhen_ding` | 防御 |
-| 坚固的护盾 | `t2_jiandun` | 防御 |
+| 坚固的护甲 | `t2_jiandun` | 防御 |
 | 借印佩 | `t2_jieyin_pei` | 进攻 |
 | 净纹帚 | `t2_jingwen_zhou` | 状态 |
 | 连心锁 | `t2_lianxin_suo` | 中立 |

@@ -7,6 +7,10 @@ const A := ActionDef.Action
 const SEED := 777
 
 
+func _display_desc(raw: String) -> String:
+	return raw.trim_suffix("。").replace("。", "；")
+
+
 func _hero(id: String, hp_value: int = 10) -> HeroData:
 	var h := HeroData.new()
 	h.hero_id = id
@@ -61,7 +65,7 @@ func test_t1_player_copy_matches_approved_text() -> void:
 		"t1_xianshou": "本回合内，我方下一次攻击造成的伤害增加1点。",
 		"t1_dutu_yingbi": "本回合内，我方下一次攻击造成的伤害增加2点，或使敌方下一次攻击造成的伤害增加2点。",
 		"t1_podun_zhou": "本回合内，若敌方使用「防」，我方「波」的伤害增加1点并穿防。",
-		"t1_houshou": "本回合内，若敌方攻击，我方出战英雄存活获得1.5点护盾。",
+		"t1_houshou": "本回合内，若敌方攻击，我方出战英雄存活获得1.5点护甲。",
 		"t1_yaohuo": "点燃敌方出战英雄，下回合结束前，若该英雄仍在场上则失去1.5点生命。",
 		"t1_xiangjiaopi": "本回合内，若敌方攻击，该攻击的总伤害减少1点。",
 		"t1_xixie_yaya": "本回合的下次攻击命中时，我方出战英雄回复等同于伤害的生命。",
@@ -72,14 +76,14 @@ func test_t1_player_copy_matches_approved_text() -> void:
 		"t1_fengzhixue": "本回合内，我方若「切换」，下回合第一次攻击的总伤害增加1.5点。",
 		"t1_weihouzhen": "本回合内，我方出战英雄若死亡，对当时的敌方出战英雄造成2点伤害。",
 		"t1_ronglu": "选择并烧掉另一件可使用的道具，立即获得2点能量。",
-		"t1_deneng_hufu": "本回合内，我方第一次获得非回合被动能量时，出战英雄获得1点护盾。",
+		"t1_deneng_hufu": "本回合内，我方第一次获得非回合被动能量时，出战英雄获得1点护甲。",
 		"t1_fentong_mupai": "本回合内，我方出战英雄受到的下一次伤害中，1点改由生命最高的另一名存活队友承受。",
-		"t1_huanfang_kou": "本回合内，我方切换后，登场英雄获得1点护盾。",
+		"t1_huanfang_kou": "本回合内，我方切换后，登场英雄获得1点护甲。",
 		"t1_houzhen_qian": "选择我方一名未出战英雄，本回合结束时令其登场。",
 		"t1_jijiu_ling": "本回合内，我方下一次攻击命中时，生命最低的存活英雄回复1点生命。",
 		"t1_yazhen_zhui": "本回合内，我方用「大防」挡下「波」时，敌方失去1点能量。",
-		"t1_huifeng_qiao": "本回合内，我方下一次「波」被成功防御时，出战英雄获得1.5点护盾。",
-		"t1_xuzhen_qi": "本回合内，我方出战英雄若死亡，下一名登场英雄获得2点护盾。",
+		"t1_huifeng_qiao": "本回合内，我方下一次「波」被成功防御时，出战英雄获得1.5点护甲。",
+		"t1_xuzhen_qi": "本回合内，我方出战英雄若死亡，下一名登场英雄获得2点护甲。",
 		"t1_xuedu_jie": "我方出战英雄失去1点生命，生命最低的另一名存活英雄回复2点生命。",
 		"t1_tengman_xianjing": "本回合内，敌方切换后，换下的英雄受到1点伤害。",
 		"t1_jiedu_yaoshui": "清除我方出战英雄的毒素；若没有毒素则清除脆弱。成功清除后，其回复1点生命。",
@@ -89,7 +93,7 @@ func test_t1_player_copy_matches_approved_text() -> void:
 		"t1_gufeng_zhui": "仅当我方没有其他可使用的道具时使用；本回合内，我方下一次攻击的总伤害增加2点。",
 	}
 	for id in expected:
-		assert_eq(ItemCatalog.make(id).description, expected[id], id)
+		assert_eq(ItemCatalog.make(id).description, _display_desc(expected[id]), id)
 	assert_eq(ItemCatalog.make("t1_feibiao").flavor,
 		"虚日【鼠】再三强调，这可不是M9刺刀（★） | 外表生锈")
 
@@ -108,7 +112,7 @@ func test_t2_player_copy_and_value_match_approved_rebase() -> void:
 		"t2_huanhundan": "直到本局结束，使用该道具的英雄免疫1次致命伤害。每名英雄限用1次。",
 		"t2_jieyin_pei": "选择我方一名未出战英雄；本回合我方下一次攻击命中时，也结算该英雄的「印记」。",
 		"t2_huizhao_jing": "本回合内，反制敌方对我方使用的第一件道具。",
-		"t2_jiandun": "我方出战英雄获得2点护盾。",
+		"t2_jiandun": "我方出战英雄获得2点护甲。",
 		"t2_daijia": "本回合内，我方「波」和「大波」的伤害增加2点，本回合结束我方出战英雄死亡。",
 		"t2_lieyin": "敌方出战英雄获得3层脆弱。",
 		"t2_huoshou": "本回合内，我方下一次攻击命中时，获得1.5点能量。",
@@ -125,14 +129,14 @@ func test_t2_player_copy_and_value_match_approved_rebase() -> void:
 		"t2_caoren": "本回合内，我方切换后，敌方本回合攻击落空。",
 		"t2_xingjun_yaonang": "选择我方一名未出战英雄，使其回复2点生命。",
 		"t2_qiubite": "本回合内，我方下一次攻击改为造成真实伤害。",
-		"t2_difeng_kou": "移除我方出战英雄至多2点护盾；本回合内，我方下一次攻击的总伤害增加等量。",
+		"t2_difeng_kou": "移除我方出战英雄至多2点护甲；本回合内，我方下一次攻击的总伤害增加等量。",
 		"t2_fuying_suo": "锁定敌方出战英雄；本回合内，我方下一次攻击仍以该英雄为目标，即使其切换下场。",
-		"t2_ningxue_gao": "本回合内，我方所有生命回复改为获得等量护盾。",
+		"t2_ningxue_gao": "本回合内，我方所有生命回复改为获得等量护甲。",
 		"t2_zhenwen_zhen": "本回合内，敌方由「波」或「大波」命中触发的英雄技能无效。",
 		"t2_lianxin_suo": "本回合内，我方出战英雄受到的下一次攻击伤害由我方所有存活英雄平均承受。",
 		"t2_fencun_chi": "本回合内，双方每次攻击的总伤害最多为1点。",
-		"t2_yijia_huan": "选择我方一名存活英雄，将我方全队的护盾转移给该英雄。",
-		"t2_huzhen_ding": "选择我方一名未出战英雄，使其获得2点护盾。",
+		"t2_yijia_huan": "选择我方一名存活英雄，将我方全队的护甲转移给该英雄。",
+		"t2_huzhen_ding": "选择我方一名未出战英雄，使其获得2点护甲。",
 		"t2_fengmai_zhen": "本回合内，双方无法回复生命。",
 		"t2_suoquan_sai": "下回合，敌方无法获得能量。",
 		"t2_yawu_piao": "押注敌方一件可使用的道具；本回合其若被使用，我方获得2点能量。",
@@ -155,25 +159,25 @@ func test_t2_player_copy_and_value_match_approved_rebase() -> void:
 		assert_false(ItemCatalog.ids().has(deleted_id), "%s 已移出正式目录" % deleted_id)
 	for id in expected:
 		var item := ItemCatalog.make(id)
-		assert_eq(item.description, expected[id], id)
+		assert_eq(item.description, _display_desc(expected[id]), id)
 		assert_eq(item.ev_half, 4, "%s 应按稀有道具新基准估值" % id)
 
 
 func test_t3_player_copy_value_and_params_match_approved_rebase() -> void:
 	var expected_copy := {
-		"t3_budongmingwang": "我方接下来3次成功防御时，出战英雄获得等同于该攻击总伤害的护盾。",
+		"t3_budongmingwang": "我方接下来3次成功防御时，出战英雄获得等同于该攻击总伤害的护甲。",
 		"t3_yujin": "本回合内，我方下一次攻击时，若出战英雄生命不超过1点，该攻击的总伤害增加3点并穿大防。",
 		"t3_hedinghong": "我方接下来引爆毒素时，每层毒素伤害额外增加1点。",
 		"t3_judingsanhua": "我方接下来3次攻击若命中，由命中触发的英雄技能各额外触发1次。",
 		"t3_longxi": "本回合内，我方「大波」的基础伤害翻倍；若该「大波」被「大防」挡下，我方下回合无法行动。",
 		"t3_mengdie": "将我方与敌方的能量，道具栏整体对调。",
-		"t3_morihuozhong": "若我方仅剩1名英雄存活，则其所有攻击额外造成1点伤害，所有防御额外获得1点护盾，直到对局结束。",
+		"t3_morihuozhong": "若我方仅剩1名英雄存活，则其所有攻击额外造成1点伤害，所有防御额外获得1点护甲，直到对局结束。",
 		"t3_sanqi_zhong": "结束双方所有已生效的道具效果。",
 		"t3_zhaohun_fan": "选择我方一名已死亡英雄，使其以1点生命复活并成为未出战英雄。",
 		"t3_lianhuan_gu": "本回合内，我方依次执行两个不同的行动（不含切换和英雄技能）。",
 		"t3_jubao_pen": "直到对局结束，每回合结束时，若我方道具栏有空位，随机补入1件普通道具。",
 		"t3_sheming_quan": "立即获得6点能量；下回合我方无法行动。",
-		"t3_huanming_qi": "选择我方一名未出战英雄，交换其与出战英雄的当前生命和护盾。",
+		"t3_huanming_qi": "选择我方一名未出战英雄，交换其与出战英雄的当前生命和护甲。",
 		"t3_jieming_deng": "我方能量补满，然后出战英雄的生命降至1点。",
 		"t3_qingnang_huopen": "本回合结束时，双方烧掉所有仍可使用的道具；每烧掉1件，所属玩家获得1点能量。",
 		"t3_junneng_dou": "合并双方当前能量，再平均分配。",
@@ -184,7 +188,7 @@ func test_t3_player_copy_value_and_params_match_approved_rebase() -> void:
 		"t3_tianluodiwang": "本回合内，敌方的首件道具和「切换」无效",
 		"t3_tinglong": "耗尽我方全部能量，每1点能量对敌方出战英雄造成0.5点伤害并穿大防。",
 		"t3_xumingxiang": "本回合起的3回合内，我方出战英雄每回合回复1.5点生命",
-		"t3_yemingzhu": "我方接下来3次切换时，对敌方出战英雄造成1点伤害，切换登场的英雄获得1点护盾。",
+		"t3_yemingzhu": "我方接下来3次切换时，对敌方出战英雄造成1点伤害，切换登场的英雄获得1点护甲。",
 		"t3_jianyi": "本回合内，我方「波」若命中，下回合第一次「大波」不消耗能量。",
 		"t3_yiqi": "本回合无敌。",
 		"t3_xiling_ling": "本回合内，双方所有英雄技能无效。",
@@ -223,7 +227,7 @@ func test_t3_player_copy_value_and_params_match_approved_rebase() -> void:
 	assert_eq(ItemCatalog.all_tier3().size(), 28)
 	for id in expected_copy:
 		var item := ItemCatalog.make(id)
-		assert_eq(item.description, expected_copy[id], id)
+		assert_eq(item.description, _display_desc(expected_copy[id]), id)
 		assert_eq(item.ev_half, 6, "%s 应按传说道具新基准估值" % id)
 		assert_eq(item.params, expected_params[id], "%s 参数应与结算契约一致" % id)
 
@@ -410,7 +414,7 @@ func test_egg_reduces_enemy_attack_total_to_zero_floor() -> void:
 func test_houshou_grants_shield_only_after_surviving_enemy_attack() -> void:
 	var survived := _battle()
 	_use_and_resolve(survived, "t1_houshou", A.CHARGE, A.ATTACK)
-	assert_eq(survived.hp[0][0], 18, "护盾不能倒过来吸收触发它的攻击")
+	assert_eq(survived.hp[0][0], 18, "护甲不能倒过来吸收触发它的攻击")
 	assert_eq(survived.shield[0][0], 3)
 
 	var defeated := _battle()
@@ -438,7 +442,7 @@ func test_fang_heals_actual_damage_dealt_by_the_next_attack() -> void:
 	_use_and_resolve(shielded, "t1_xixie_yaya", A.BIG_ATTACK, A.CHARGE)
 	assert_eq(shielded.shield[1][0], 0)
 	assert_eq(shielded.hp[1][0], 18)
-	assert_eq(shielded.hp[0][0], 14, "护盾与生命实际减少合计2点，回复2点")
+	assert_eq(shielded.hp[0][0], 14, "护甲与生命实际减少合计2点，回复2点")
 
 	var doubled := _battle()
 	doubled.hp[0][0] = 6
@@ -623,7 +627,7 @@ func test_tail_needle_is_one_turn_death_retaliation_and_uses_normal_damage() -> 
 	_use_and_resolve(b, "t1_weihouzhen", A.CHARGE, A.BIG_ATTACK)
 	assert_lte(b.hp[0][0], 0)
 	assert_eq(b.shield[1][0], 0)
-	assert_eq(b.hp[1][0], 18, "2点普通伤害先被1点护盾吸收")
+	assert_eq(b.hp[1][0], 18, "2点普通伤害先被1点护甲吸收")
 
 	var expired := _battle()
 	_use_and_resolve(expired, "t1_weihouzhen", A.CHARGE, A.CHARGE)
@@ -664,7 +668,7 @@ func test_furnace_burns_chosen_item_and_grants_energy_immediately() -> void:
 	assert_eq(b.energy[0], 6, "立即获得2点能量")
 	assert_true(bool(b.slots[0][0]["used"]))
 	assert_false(bool(b.slots[0][1]["used"]), "未选择的飞镖保留")
-	assert_true(bool(b.slots[0][2]["used"]), "明确选择护盾作为燃料")
+	assert_true(bool(b.slots[0][2]["used"]), "明确选择护甲作为燃料")
 	assert_true(b.select_action(0, A.BIG_ATTACK), "熔炉产能可支付同回合大波")
 
 

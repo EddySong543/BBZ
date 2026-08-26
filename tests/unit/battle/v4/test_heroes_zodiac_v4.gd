@@ -350,7 +350,7 @@ func test_h03_shield_prevents_kill_so_enemy_attack_resolves() -> void:
 	b.shield[1][0] = 2
 	var tiger_hp: int = b.hp[0][0]
 	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.ATTACK)
-	assert_eq(b.hp[1][0], 1, "护盾吸收后敌方攻击英雄仍存活")
+	assert_eq(b.hp[1][0], 1, "护甲吸收后敌方攻击英雄仍存活")
 	assert_eq(b.hp[0][0], tiger_hp - 2, "未实际击杀时敌方攻击照常结算")
 
 

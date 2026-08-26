@@ -115,7 +115,7 @@ func test_lianhuan_second_attack_connects_to_turn_items_and_dragon_breath() -> v
 	afterhand.resolve()
 	assert_eq(afterhand.hp[0][0], 18)
 	assert_eq(afterhand.shield[0][0], 3,
-		"敌方只在第二行动攻击时，后手仍应在攻击完成后获得1.5点护盾")
+		"敌方只在第二行动攻击时，后手仍应在攻击完成后获得1.5点护甲")
 
 	var breath := _battle()
 	assert_true(_use(breath, 0, "t3_lianhuan_gu"))

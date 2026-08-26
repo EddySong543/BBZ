@@ -73,7 +73,7 @@ func test_budongmingwang_merges_charges_and_converts_one_whole_defense() -> void
 	assert_true(battle.select_action(0, A.BIG_ATTACK, -1, false, true))
 	assert_true(battle.select_action(1, A.BIG_DEFEND))
 	battle.resolve()
-	assert_eq(battle.shield[1][0], 4, "h13双段大波按整次防御前总伤害只转一次护盾")
+	assert_eq(battle.shield[1][0], 4, "h13双段大波按整次防御前总伤害只转一次护甲")
 	assert_eq(int(battle.relics[1][0]["state"].get("charges", 0)), 5)
 
 
@@ -84,7 +84,7 @@ func test_budongmingwang_has_three_successful_defense_charges() -> void:
 		_resolve(battle, A.DEFEND, A.ATTACK)
 		if expected_charge > 0:
 			assert_eq(int(battle.relics[0][0]["state"].get("charges", -1)), expected_charge)
-	assert_eq(battle.shield[0][0], 6, "三次波各转化2个半点护盾")
+	assert_eq(battle.shield[0][0], 6, "三次波各转化2个半点护甲")
 	assert_eq(battle.relics[0].size(), 0)
 
 
@@ -417,7 +417,7 @@ func test_tianluo_cancels_h07_free_switch_before_any_switch_side_effect() -> voi
 	var result := _resolve(battle, A.DEFEND, A.DEFEND)
 	assert_eq(battle.active_index[1], 0, "天罗令选择期免费切换的位置变化无效")
 	assert_eq(battle.hp[0][0], 20, "h07 入场冲撞不得先发生再回滚")
-	assert_eq(battle.shield[1][1], 0, "夜明珠护盾不得先发生再回滚")
+	assert_eq(battle.shield[1][1], 0, "夜明珠护甲不得先发生再回滚")
 	assert_eq(int(battle.relics[1][0]["state"].get("charges", 0)), 3,
 		"夜明珠次数不得消耗")
 	assert_eq(int(battle.get_status(1, 0, "vuln", 0)), 3,

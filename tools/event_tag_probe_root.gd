@@ -4,7 +4,7 @@ extends Node
 ## 带窗口跑（主场景模式·autoload 正常注册）：
 ##   godot --path . res://tools/event_tag_probe.tscn
 ## 回合① 敌带毒 2 层+印记 → 我波命中 → 「毒爆」「印记」注解（0.14s 错时逐条弹）
-## 回合② 我带 2.0 护盾 → 敌波被全吸 → 「护盾-1」注解（无伤害字·血没少但有交代）
+## 回合② 我带 2.0 护甲 → 敌波被全吸 → 「护甲-1」注解（无伤害字·血没少但有交代）
 ## 回合③ 我背 1.0 到期延迟伤害 → 出招拍余烬橙「-1」（引擎直写 HP 的旧账·原先完全隐形）
 ## 输出：D:/Game/BoBoZan/_probe_output/event_tags_poison.png / _shield.png / _burn.png（仓库外）
 
@@ -34,7 +34,7 @@ func _ready() -> void:
 		fails.append("①「印记」注解未出现")
 	await _rt(2.4)   # 等回合过场结束
 
-	# —— 回合②：我方出战垫 2.0 护盾 → 敌「波」被全吸 → 护盾注解（无 -N 伤害字）——
+	# —— 回合②：我方出战垫 2.0 护甲 → 敌「波」被全吸 → 护甲注解（无 -N 伤害字）——
 	await _wait_select(s)
 	s.battle.shield[0][s.battle.active_index[0]] += 4
 	s.battle.select_action(0, A.Action.CHARGE)
@@ -43,8 +43,8 @@ func _ready() -> void:
 	await _rt(2.15)
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png(OUT_DIR + "event_tags_shield.png")
-	if _find_float_prefix(s, "护盾-") == null:
-		fails.append("②「护盾-N」注解未出现")
+	if _find_float_prefix(s, "护甲-") == null:
+		fails.append("②「护甲-N」注解未出现")
 	await _rt(2.4)
 
 	# —— 回合③：我方出战背 1.0 到期延迟伤害 → 出招拍余烬橙 -1（不走 damage_taken 的直写掉血）——

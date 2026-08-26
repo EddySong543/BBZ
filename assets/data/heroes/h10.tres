@@ -5,13 +5,13 @@
 [resource]
 script = ExtResource("1_3ccig")
 hero_id = "h10"
-team_role = "进攻"
-dimension = "状态"
 hero_name = "昴日【鸡】"
 max_hp = 5
+dimension = "状态"
+team_role = "进攻"
 skill_type = 1
 skill_description = "太初万法剑"
-skill_detail = "我方每次攻击命中，积累 1 点剑气（最多 4 点）；昴日【鸡】可消耗全部剑气发动强力一击（2 点剑气击穿「防」，4 点剑气击穿「大防」）。"
+skill_detail = "我方每次攻击命中，积累1点剑气，昴日【鸡】可消耗全部剑气发动强力一击。"
 portrait_path = "res://assets/sprites/heroes/h10/h10_portrait.png"
 skill_icon_path = "res://assets/sprites/heroes/h10/h10_skill.png"
 sprite_frames_path = "res://assets/sprites/heroes/h10/h10_idle.tres"

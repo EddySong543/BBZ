@@ -15,7 +15,7 @@
 - Normalize only Wave and Big Wave base damage; modifiers remain later in the pipeline.
 - Do not affect active attacks, pursuits, counters, or independent damage.
 - Keep simultaneous resolution and all defense penetration rules unchanged.
-- Use “待命名” as the temporary display name until Eddy approves a candidate.
+- Use【游丝引】as the finalized display name; retain only the name, not the retired redistribution mechanic.
 - Do not touch unrelated dirty Scene 7, UI, item, expedition, runner, or test files.
 
 ---
@@ -30,7 +30,7 @@
 - Consumes: `BattleCore.select_action()`, `BattleCore.select_active()`, `BattleCore.resolve()`, `BattleCore.set_status()`.
 - Produces: behavioral contracts for symmetric normalization, active-only presence, modifier ordering, independent active damage, and published hero data.
 
-- [ ] **Step 1: Replace the retired redistribution tests**
+- [x] **Step 1: Replace the retired redistribution tests**
 
 ```gdscript
 func test_h18_field_normalizes_both_sides_big_wave_base_damage() -> void:
@@ -42,7 +42,7 @@ func test_h18_field_normalizes_both_sides_big_wave_base_damage() -> void:
     assert_eq(b.hp[1][0], 8)
 ```
 
-- [ ] **Step 2: Add boundary tests**
+- [x] **Step 2: Add boundary tests**
 
 ```gdscript
 func test_h18_field_requires_active_unsilenced_h18() -> void:
@@ -78,17 +78,17 @@ func test_h18_field_does_not_modify_attack_active_damage() -> void:
     assert_eq(b.hp[0][0], 4)
 ```
 
-- [ ] **Step 3: Update the data contract test**
+- [x] **Step 3: Update the data contract test**
 
 ```gdscript
 assert_eq(h.max_hp, 5)
-assert_eq(h.team_role, "防守")
+assert_eq(h.team_role, "经济")
 assert_eq(h.skill_type, HeroData.SkillType.PASSIVE)
-assert_eq(h.skill_description, "待命名")
+assert_eq(h.skill_description, "游丝引")
 assert_eq(h.skill_detail, "相柳【蛇】出战时，双方「波」与「大波」的基础伤害均视为1点。")
 ```
 
-- [ ] **Step 4: Run the two scoped test files and verify RED**
+- [x] **Step 4: Run the two scoped test files and verify RED**
 
 Run:
 
@@ -113,7 +113,7 @@ Expected: failures reference the missing battlefield normalization and old h18 d
 - Produces: `HeroSkill.modify_battlefield_base_attack_damage(dmg: int, action: int, battle: BattleCore, attacker_player: int, attacker_slot: int, self_player: int, self_slot: int) -> int`.
 - Consumes: `ActionDef.HP_UNIT`, `BattleCore.active_index`, and the existing silence-time nulling of `_skills`.
 
-- [ ] **Step 1: Add the default no-op hook**
+- [x] **Step 1: Add the default no-op hook**
 
 ```gdscript
 func modify_battlefield_base_attack_damage(dmg: int, _action: int, _battle: BattleCore,
@@ -121,7 +121,7 @@ func modify_battlefield_base_attack_damage(dmg: int, _action: int, _battle: Batt
     return dmg
 ```
 
-- [ ] **Step 2: Apply active battlefield hooks before outgoing modifiers**
+- [x] **Step 2: Apply active battlefield hooks before outgoing modifiers**
 
 ```gdscript
 func _apply_battlefield_base_attack_damage(dmg: int, action: int,
@@ -135,7 +135,7 @@ func _apply_battlefield_base_attack_damage(dmg: int, action: int,
     return dmg
 ```
 
-- [ ] **Step 3: Implement H18 and update its preload**
+- [x] **Step 3: Implement H18 and update its preload**
 
 ```gdscript
 extends HeroSkill
@@ -145,7 +145,7 @@ func modify_battlefield_base_attack_damage(_dmg: int, _action: int, _battle: Bat
     return ActionDef.HP_UNIT
 ```
 
-- [ ] **Step 4: Run the scoped hero behavior test and verify GREEN**
+- [x] **Step 4: Run the scoped hero behavior test and verify GREEN**
 
 Run:
 
@@ -159,28 +159,34 @@ Expected: all tests in the file pass.
 
 **Files:**
 - Modify: `assets/data/heroes/h18.tres`
+- Modify: `assets/i18n/strings_zh.csv`
+- Modify: `src/ui/battle_screen.gd`
 - Modify: `design/heroes.md`
 - Modify: `design/heroes-redesign.md`
 - Modify: `design/heroes-schools.md`
 
 **Interfaces:**
-- Produces: HP5 passive data, defensive legacy role, pending display name, exact player copy, and updated design history.
+- Produces: HP5 passive data, unchanged legacy economy role, pending display name, exact player copy, and updated design history.
 
-- [ ] **Step 1: Update h18 resource data**
+- [x] **Step 1: Update h18 resource data**
 
 ```text
-team_role = "防守"
+team_role = "经济"
 max_hp = 5
 skill_type = 0
-skill_description = "待命名"
+skill_description = "游丝引"
 skill_detail = "相柳【蛇】出战时，双方「波」与「大波」的基础伤害均视为1点。"
 ```
 
-- [ ] **Step 2: Replace the retired h18 canonical documentation**
+- [x] **Step 2: Replace the retired h18 canonical documentation**
 
 Record the passive field rule, modifier ordering, independent-damage exclusion, HP5, control main role, and pending name. Move h18 from Defense to Control in the five-role roster table.
 
-- [ ] **Step 3: Run the scoped data test**
+- [x] **Step 3: Remove the retired H18 active-button fallback copy**
+
+Delete the `h18` branch from `BattleScreen._special_tip()` because the redesigned hero is passive and no longer owns a special-action button. Remove the retired redistribution copy from `strings_zh.csv`, retain【游丝引】for the redesigned passive, and add the new passive copy without regenerating unrelated dirty-source entries.
+
+- [x] **Step 4: Run the scoped data test**
 
 Run:
 
@@ -199,20 +205,20 @@ Expected: all published-data contracts pass.
 - Consumes: the complete feature and test suite.
 - Produces: fresh evidence for delivery.
 
-- [ ] **Step 1: Run focused hero tests**
+- [x] **Step 1: Run focused hero tests**
 
 ```powershell
 & .\tools\run_godot.ps1 -Mode Test -Target 'res://tests/unit/battle/v4/test_heroes_dark_v4.gd'
 & .\tools\run_godot.ps1 -Mode Test -Target 'res://tests/unit/battle/v4/test_hero_team_role.gd'
 ```
 
-- [ ] **Step 2: Run the full GUT suite**
+- [x] **Step 2: Run the full GUT suite**
 
 ```powershell
 & .\tools\run_godot.ps1 -Mode Test
 ```
 
-- [ ] **Step 3: Inspect scope and whitespace**
+- [x] **Step 3: Inspect scope and whitespace**
 
 ```powershell
 git -c safe.directory=$Repo -C $Repo diff --check

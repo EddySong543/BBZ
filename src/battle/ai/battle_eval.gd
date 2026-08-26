@@ -5,13 +5,13 @@ extends RefCounted
 ##
 ## v1 权重（2026-05-30 锁定）。单位 = 半点（1 HP = 2 半点）。
 ## 设计依据：杀一人 = 去一具身体 + 一套 kit，故 W_ALIVE 远超其残血价值；
-##   能量按"2 能 ≈ 一记大波(4 半点伤)"折现 tempo；护盾约半个 HP 价值。
+##   能量按"2 能 ≈ 一记大波(4 半点伤)"折现 tempo；护甲约半个 HP 价值。
 ## 仅 1-ply 评估（看一回合后局面），后续按 batch 平衡数据调权重。
 
 const W_WIN := 1000000.0     # 终局胜/负（绝对优先）
 const W_ALIVE := 600.0       # 每多存活 1 英雄
 const W_HP := 10.0           # 每半点 HP 差（1 HP = 2 半点 = 20 分）
-const W_SHIELD := 6.0        # 每半点护盾差
+const W_SHIELD := 6.0        # 每半点护甲差
 const W_ACTIVE_HP := 4.0     # 出战位 HP 差额外加权（前线存活更重要）
 
 ## 能量边际递减：前 ENERGY_FULL_CAP 能（够一记大波）满价 W_ENERGY，
@@ -31,10 +31,10 @@ const W_FATAL_IMMUNITY_ACTIVE := 10.0 # 保护当前出战者更容易改变下�
 const W_FATAL_IMMUNITY_LOW_HP := 16.0 # 低血保护更接近实际兑现
 const W_FATAL_IMMUNITY_LAST_ALIVE := 18.0 # 最后一名存活英雄的保命价值更高
 const FATAL_IMMUNITY_LOW_HP_LINE := 4 # 半点制：2 HP 及以下
-const W_RELIC_BUDONG_CHARGE := 16.0   # 一次成功防御把整次攻击转为同量护盾，需对手配合
+const W_RELIC_BUDONG_CHARGE := 16.0   # 一次成功防御把整次攻击转为同量护甲，需对手配合
 const W_RELIC_HEDING_LAYER := 16.0    # 下次毒爆每层额外1点伤害，按敌方当前毒层折现
 const W_RELIC_JUDING_CHARGE := 12.0   # 一次额外附加效果机会，不把它误算成第二次攻击伤害
-const W_RELIC_YEMING_CHARGE := 20.0   # 一次主动切换同时提供伤害与新英雄护盾，需支付切换机会
+const W_RELIC_YEMING_CHARGE := 20.0   # 一次主动切换同时提供伤害与新英雄护甲，需支付切换机会
 const W_RELIC_QING_TURN := 18.0       # 每剩余回合 1.5 能，按延迟资源折价
 const W_RELIC_XUMING_HALF_HEAL := 10.0 # 只按当前出战实际缺血估值，避免满血时虚高
 const W_RELIC_MORIHUO_DORMANT := 8.0

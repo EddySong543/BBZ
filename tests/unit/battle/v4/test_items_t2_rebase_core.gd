@@ -209,7 +209,7 @@ func test_huanhundan_persists_and_nullifies_the_whole_fatal_hit() -> void:
 		"未触发的致命免疫应保留到本局结束")
 	_resolve(battle, A.CHARGE, A.BIG_ATTACK)
 	assert_eq(battle.hp[0][0], 2, "致命整次伤害应归零")
-	assert_eq(battle.shield[0][0], 2, "致命免疫不得消耗护盾")
+	assert_eq(battle.shield[0][0], 2, "致命免疫不得消耗护甲")
 	assert_eq(int(battle.get_status(0, 0, "fatal_damage_immunity", 0)), 0)
 	assert_eq(int(battle.get_status(1, 0, "jianqi", 0)), 1, "免疫伤害仍然算命中")
 
@@ -302,7 +302,7 @@ func test_nuanyu_requires_a_base_attack_to_be_fully_blocked() -> void:
 	shield_only.shield[0][0] = 4
 	_give_and_use(shield_only, 0, "t2_nuanyu")
 	_resolve(shield_only, A.CHARGE, A.ATTACK)
-	assert_eq(shield_only.hp[0][0], 10, "仅由护盾吸收也不算成功防御")
+	assert_eq(shield_only.hp[0][0], 10, "仅由护甲吸收也不算成功防御")
 
 	var blocked := _battle()
 	blocked.hp[0] = [10, 12, 14]
@@ -389,7 +389,7 @@ func test_qiubite_changes_the_next_base_attack_to_true_damage() -> void:
 	battle.shield[1][0] = 4
 	_give_and_use(battle, 0, "t2_qiubite")
 	_resolve(battle, A.ATTACK, A.BIG_DEFEND)
-	assert_eq(battle.hp[1][0], 18, "真实伤害应穿过大防并无视护盾")
+	assert_eq(battle.hp[1][0], 18, "真实伤害应穿过大防并无视护甲")
 	assert_eq(battle.shield[1][0], 4)
 
 

@@ -8,7 +8,7 @@
 assets/sprites/items/
 ├── README.md            ← 本文件
 ├── 臭鸡蛋.png           ← 正式图标，文件名 = 道具中文显示名
-├── 坚固的护盾.png
+├── 坚固的护甲.png
 └── ...
 ```
 

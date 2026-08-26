@@ -8,7 +8,7 @@ extends GutTest
 ## h15【七杀战鬼】= 进攻：出战时无法用防/大防（can_afford gate·下场即解）+ 波穿防（attack_penetration）。
 ## h16【白虹】= 调度/进攻：队友基础攻击命中时，替补广寒登场并对同一目标追击 1 点伤害。
 ## h17【待重命名】= 主动技：占动作+费2能，转变为敌方当前出战英雄；复制英雄本体状态，不复制团队能量。
-## h18【游丝引】= 防守·主动技：费1能且占行动，平均分配我方所有存活英雄的当前生命；总生命守恒、不复活、不超过上限。
+## h18【游丝引】= 控制·被动：出战时，双方「波 / 大波」的基础伤害均视为 1 点；后续强化与独立伤害照常。
 ## h19【奔雷】= 进攻：攻击命中时，目标至多承受 1.0HP，超过部分转移给当前生命最高的另一名敌人。
 ## h20【罪已昭】= 状态·被动：命中敌方出战使其获得脆弱（vuln），受伤 +0.5，直到下场（下场清）。
 ## h21【调虎离山】= 干扰·主动技：占动作+费1能（批④降费·原2能）+每局2次+须出战，强制对手换人、揪其指定（未指定→随机）存活替补上场。
@@ -106,7 +106,7 @@ func test_h13_split_big_wave_is_fully_blocked_by_big_defend() -> void:
 		if event.get("id", "") == "big_defend_block" and int(event.get("player", -1)) == 1:
 			block_events += 1
 	assert_eq(b.hp[1][0], 10, "大防应完整挡住两次波")
-	assert_eq(block_events, 2, "大防不是次数护盾，两次波都应分别被挡")
+	assert_eq(block_events, 2, "大防不是次数护甲，两次波都应分别被挡")
 
 
 func test_h13_normal_big_wave_remains_available_and_pierces_defend() -> void:
@@ -170,7 +170,7 @@ func test_h14_blood_payment_uses_hp_not_shield_and_can_pay_exactly() -> void:
 	b.resolve()
 
 	assert_eq(b.hp[0][0], 0, "支付费用直接扣生命，可将蚩尤扣至阵亡")
-	assert_eq(b.shield[0][0], 8, "生命支付不是伤害，不应消耗护盾")
+	assert_eq(b.shield[0][0], 8, "生命支付不是伤害，不应消耗护甲")
 	assert_eq(b.hp[1][0], 8, "即使支付后阵亡，本轮已经提交的波仍应完成结算")
 
 
@@ -391,7 +391,7 @@ func test_h17_transforms_into_enemy_active_and_copies_runtime_state() -> void:
 	assert_eq((b.heroes[0][0] as HeroData).hero_id, "h15", "烛阴槽位应变成敌方当前出战英雄")
 	assert_eq(b.hp[0][0], 7, "复制敌方当前生命，而不是按比例换算或回满")
 	assert_eq(b.max_hp[0][0], 12, "复制敌方生命上限")
-	assert_eq(b.shield[0][0], 3, "护盾属于英雄本体状态，应随转变复制")
+	assert_eq(b.shield[0][0], 3, "护甲属于英雄本体状态，应随转变复制")
 	assert_eq(int(b.get_status(0, 0, "vuln", 0)), 2, "局部状态应随英雄复制")
 	assert_eq(int(b.get_status(0, 0, "active_uses", 0)), 1, "技能使用进度不应被转变刷新")
 	assert_eq(b.energy[0], 6, "消耗2点能量后只获得正常的回合被动能量；不复制敌方能量")
@@ -458,56 +458,68 @@ func test_silence_status_disables_unique_and_decrements() -> void:
 	assert_eq(b.energy[1] - before, 5, "到期恢复：攒(2+步虚无有乡1) + 被动 2 = +5")
 
 
-# ---- h18 相柳（主动技·平均分配全队存活英雄当前生命）----
+# ---- h18 相柳（被动·出战时双方攻击基础伤害归一）----
 
-func test_h18_active_costs_one_energy_and_evenly_redistributes_hp() -> void:
-	var b := _battle("h18", 5, 2)
-	b.hp[0] = [10, 4, 1]
-	assert_true(b.select_active(0), "有1点能量时，相柳应能发动主动技")
-	b.select_action(1, ActionDef.Action.CHARGE)
+func test_h18_field_normalizes_both_sides_big_wave_base_damage() -> void:
+	var b := _battle("h18", 5, 20)
+	b.select_action(0, ActionDef.Action.BIG_ATTACK)
+	b.select_action(1, ActionDef.Action.BIG_ATTACK)
 	b.resolve()
 
-	assert_eq(b.hp[0], [5, 5, 5], "15个半点生命应平均分为5/5/5")
-	assert_eq(b.energy[0], 2, "发动消耗1点能量，回合被动再回复1点能量")
+	assert_eq(b.hp[0][0], 8, "敌方大波在相柳场内应只造成1点基础伤害")
+	assert_eq(b.hp[1][0], 8, "相柳自己的大波也应受对称战场规则约束")
 
 
-func test_h18_active_requires_one_energy() -> void:
-	var b := _battle("h18", 5, 0)
-	assert_false(b.can_use_active(0), "0能量时不能发动")
-	assert_false(b.select_active(0), "主动技提交入口也必须拒绝")
+func test_h18_field_keeps_big_wave_penetration_against_defend() -> void:
+	var b := _battle("h18", 5, 20)
+	b.select_action(0, ActionDef.Action.DEFEND)
+	b.select_action(1, ActionDef.Action.BIG_ATTACK)
+	var result: Dictionary = b.resolve()
+
+	assert_eq(b.hp[0][0], 8, "大波基础伤害归一后仍应穿过普通防御")
+	assert_false(_has_event(result, "defend_block"), "相柳战场不得改写大波的穿透类型")
 
 
-func test_h18_redistribution_respects_max_hp_and_half_point_remainder() -> void:
-	var p1: Array = [_hero("h18", 3), _hero("test_p0_1", 7), _hero("test_p0_2", 7)]
-	var p2: Array = [_hero("test_p1_0"), _hero("test_p1_1"), _hero("test_p1_2")]
-	var b := BattleCore.new()
-	b.setup(p1, p2, 555)
-	b.energy = [2, 2]
-	b.hp[0] = [6, 14, 1]
-	b.select_active(0)
-	b.select_action(1, ActionDef.Action.CHARGE)
+func test_h18_field_requires_active_unsilenced_h18() -> void:
+	var reserve := _battle_team(["test_p0_0", "h18", "test_p0_2"], 5, 20)
+	_resolve(reserve, ActionDef.Action.BIG_ATTACK, ActionDef.Action.CHARGE)
+	assert_eq(reserve.hp[1][0], 6, "替补席相柳不得修改大波的2点基础伤害")
+
+	var silenced := _battle("h18", 5, 20)
+	silenced.set_status(0, 0, "silenced", 1)
+	_resolve(silenced, ActionDef.Action.CHARGE, ActionDef.Action.BIG_ATTACK)
+	assert_eq(silenced.hp[0][0], 6, "被沉默的相柳不得维持战场规则")
+
+
+func test_h18_field_preserves_empowered_wave_and_vulnerability_after_base_value() -> void:
+	var empowered := _battle_team(["h18", "h05", "test_p0_2"], 5, 20)
+	assert_true(empowered.select_action(0, ActionDef.Action.ATTACK, -1, true))
+	empowered.select_action(1, ActionDef.Action.CHARGE)
+	empowered.resolve()
+	assert_eq(empowered.hp[1][0], 6, "强化波应在1点基础伤害后继续增加1点伤害")
+
+	var vulnerable := _battle("h18", 5, 20)
+	vulnerable.set_status(1, 0, "vuln", 1)
+	_resolve(vulnerable, ActionDef.Action.BIG_ATTACK, ActionDef.Action.CHARGE)
+	assert_eq(vulnerable.hp[1][0], 7, "脆弱应在归一后的1点大波上继续增加0.5点伤害")
+
+
+func test_h18_field_does_not_modify_attack_active_damage() -> void:
+	var b := _battle_vs(
+		["h18", "test_p0_1", "test_p0_2"],
+		["h10", "test_p1_1", "test_p1_2"], 5, 20)
+	b.set_status(1, 0, "jianqi", 4)
+	b.select_action(0, ActionDef.Action.CHARGE)
+	assert_true(b.select_active(1))
 	b.resolve()
 
-	assert_eq(b.hp[0], [6, 8, 7], "低上限英雄封顶后，余下15个半点应在另外两人间尽量均分")
-	assert_eq(b.hp[0][0] + b.hp[0][1] + b.hp[0][2], 21, "均分不得创造或销毁生命")
+	assert_eq(b.hp[0][0], 4, "昴日满层主动技仍应造成3点独立伤害")
 
 
-func test_h18_redistribution_excludes_dead_heroes_without_reviving_them() -> void:
-	var b := _battle("h18", 5, 2)
-	b.hp[0] = [10, 0, 2]
-	b.select_active(0)
-	b.select_action(1, ActionDef.Action.CHARGE)
-	b.resolve()
-
-	assert_eq(b.hp[0], [6, 0, 6], "阵亡英雄不参与均分，也不会被复活")
-
-
-func test_h18_old_defend_tax_and_switch_lock_are_removed() -> void:
-	var b := _battle("h18", 6, 2)
-	b.energy[1] = 0
-	assert_true(b.can_afford(1, ActionDef.Action.DEFEND), "相柳不再提高敌方防御费用")
-	assert_true(b.can_afford(1, ActionDef.Action.SWITCH), "相柳不再封锁敌方主动切换")
-	assert_true(b.select_switch(1, 1), "敌方切换提交入口应恢复正常")
+func test_h18_no_longer_has_an_active_skill() -> void:
+	var b := _battle("h18", 5, 20)
+	assert_false(b.can_use_active(0), "新相柳是被动英雄，不再提供主动技按钮")
+	assert_false(b.select_active(0), "主动技提交入口必须拒绝新相柳")
 
 
 # ---- h19 乌骓 奔雷（目标承受至多 1.0HP，其余伤害转移给最高生命的另一名敌人）----
@@ -564,7 +576,7 @@ func test_h19_jianta_primary_and_transfer_each_respect_their_own_shield() -> voi
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
 
-	assert_eq(b.hp[1], [10, 6, 7], "两段伤害应分别经过各自目标的护盾")
+	assert_eq(b.hp[1], [10, 6, 7], "两段伤害应分别经过各自目标的护甲")
 	assert_eq(b.shield[1], [0, 0, 0], "原目标吸收1点，转移目标吸收0.5点")
 
 
@@ -736,7 +748,7 @@ func test_h23_uses_hp_damage_after_shield_and_vulnerability() -> void:
 	b.set_status(1, 0, "vuln", 1)
 	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.CHARGE)
 
-	assert_eq(b.hp[1][0], 8, "波受脆弱增加 0.5，再由 0.5 护盾吸收，实际落血仍为 1 点")
+	assert_eq(b.hp[1][0], 8, "波受脆弱增加 0.5，再由 0.5 护甲吸收，实际落血仍为 1 点")
 	assert_eq(b.energy_max[1], 18, "只能按实际落血量降低上限，不能按管线中的原始伤害计算")
 
 
@@ -965,8 +977,8 @@ func test_h22_cast_schedules_next_round_without_immediate_burn_or_shield() -> vo
 
 	assert_eq(b.energy[0], 10, "施放回合只结算被动能量，不立即清空")
 	assert_eq(b.energy[1], 8, "敌方波的费用被回合被动抵消，不立即清空")
-	assert_eq(b.hp[0][0], 8, "新版不再附带护盾，毕方正常承受波的 1 点伤害")
-	assert_eq(b.shield[0][0], 0, "新版不再获得护盾")
+	assert_eq(b.hp[0][0], 8, "新版不再附带护甲，毕方正常承受波的 1 点伤害")
+	assert_eq(b.shield[0][0], 0, "新版不再获得护甲")
 	assert_eq(b.energy_burn_turn, b.turn_number, "火兆瞄准当前选择阶段对应的回合末")
 	assert_false(_has_event(result, "h22_energy_burn"), "施放回合不触发能量归零")
 

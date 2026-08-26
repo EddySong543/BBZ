@@ -45,7 +45,7 @@ func test_difeng_kou_converts_up_to_two_shield_into_whole_attack_damage() -> voi
 	assert_true(_use(battle, 0, "t2_difeng_kou"))
 	_resolve(battle, A.ATTACK, A.CHARGE)
 	assert_eq(battle.shield[0][0], 2)
-	assert_eq(battle.hp[1][0], 14, "波1点加转化护盾2点，总计造成3点伤害")
+	assert_eq(battle.hp[1][0], 14, "波1点加转化护甲2点，总计造成3点伤害")
 
 
 func test_fuying_suo_keeps_the_original_enemy_as_attack_target_after_switch() -> void:
@@ -65,7 +65,7 @@ func test_ningxue_gao_converts_all_healing_to_full_printed_shield_regardless_of_
 	assert_true(_use(battle, 0, "t2_ningxue_gao"))
 	_resolve(battle, A.CHARGE, A.CHARGE)
 	assert_eq(battle.hp[0][0], 20)
-	assert_eq(battle.shield[0][0], 4, "满血时2点治疗也应改为2点护盾")
+	assert_eq(battle.shield[0][0], 4, "满血时2点治疗也应改为2点护甲")
 
 
 func test_zhenwen_zhen_suppresses_enemy_hit_triggered_hero_skills_only() -> void:
@@ -156,7 +156,7 @@ func test_fengmai_zhen_blocks_both_teams_healing_but_ningxue_conversion_still_wo
 	_resolve(converted, A.CHARGE, A.CHARGE)
 	assert_eq(converted.hp[0][0], 10)
 	assert_eq(converted.shield[0][0], 4,
-		"治疗先被凝血膏改为护盾，因此不受无法回复生命影响")
+		"治疗先被凝血膏改为护甲，因此不受无法回复生命影响")
 
 
 func test_suoquan_sai_blocks_only_the_enemy_next_turn_energy_gains() -> void:

@@ -1,6 +1,6 @@
 extends ItemEffect
 
-## 血魔的獠牙：下一次基础攻击命中后，按整次攻击实际造成的伤害回复（含护盾损失）。
+## 血魔的獠牙：下一次基础攻击命中后，按整次攻击实际造成的伤害回复（含护甲损失）。
 func apply_pre(battle: BattleCore, player: int, _target: int, data: ItemData) -> void:
 	battle.add_base_attack_aftereffect(player, data)
 

@@ -124,7 +124,7 @@ func test_t2_qiubite_control_armor_absorbs() -> void:
 	b.select_action(1, A.CHARGE)
 	b.resolve()
 	assert_eq(b.hp[1][0], 20)
-	assert_eq(b.shield[1][0], 0)   # 2.0 飞镖被 2.0 护盾完整吸收
+	assert_eq(b.shield[1][0], 0)   # 2.0 飞镖被 2.0 护甲完整吸收
 
 
 # === T2 状态 / 易伤 ===
@@ -146,7 +146,7 @@ func test_t2_duyao_poison_detonates_when_shield_absorbs_the_attack() -> void:
 	b.select_action(0, A.ATTACK)
 	b.select_action(1, A.CHARGE)
 	b.resolve()
-	assert_eq(b.hp[1][0], 17, "护盾吸收波的伤害后仍算命中，毒素照常引爆")
+	assert_eq(b.hp[1][0], 17, "护甲吸收波的伤害后仍算命中，毒素照常引爆")
 	assert_eq(b.shield[1][0], 0)
 	assert_eq(int(b.get_status(1, 0, "poison", 0)), 0)
 
@@ -451,11 +451,11 @@ func test_t3_morihuozhong_boosts_last_survivor() -> void:
 	b.select_action(1, A.CHARGE)
 	b.resolve()
 	assert_eq(b.hp[1][0], 16)      # 波 2 + 火种 2 = 4 落地
-	assert_eq(b.shield[0][0], 0, "火种只强化防御行动，不因攻击凭空获得护盾")
+	assert_eq(b.shield[0][0], 0, "火种只强化防御行动，不因攻击凭空获得护甲")
 	b.select_action(0, A.DEFEND)
 	b.select_action(1, A.CHARGE)
 	b.resolve()
-	assert_eq(b.shield[0][0], 2, "仅剩一名英雄时，防御额外获得 1 点护盾")
+	assert_eq(b.shield[0][0], 2, "仅剩一名英雄时，防御额外获得 1 点护甲")
 
 
 func test_t3_morihuozhong_inert_with_full_team() -> void:

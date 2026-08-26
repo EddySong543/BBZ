@@ -36,9 +36,17 @@ func modify_outgoing_damage(dmg: int, _action: int, _battle: BattleCore, _player
 	return dmg
 
 
+## 战场层基础攻击伤害修正：只在「波 / 大波」取得 ActionDef 基础值后调用，早于出手英雄、
+## 团队与其他攻击总修正。引擎只扫描双方当前出战、存活且技能有效的英雄；用于相柳这类
+## 同时改写双方基础攻击的对称场规则，不作用攻击型主动技、追击、反击或独立伤害。
+func modify_battlefield_base_attack_damage(dmg: int, _action: int, _battle: BattleCore,
+		_attacker_player: int, _attacker_slot: int, _self_player: int, _self_slot: int) -> int:
+	return dmg
+
+
 ## 基础攻击完成状态与减伤计算后，是否把超过阈值的最终伤害转移给主目标之外
 ## 当前生命最高的另一名存活敌方英雄。返回半点制阈值；<= 0 表示不启用。
-## 无合法转移目标时，超过阈值的部分丢失。转移段不重复计算增伤/减伤，但单独经过其目标护盾。
+## 无合法转移目标时，超过阈值的部分丢失。转移段不重复计算增伤/减伤，但单独经过其目标护甲。
 func base_attack_excess_transfer_threshold(_action: int, _battle: BattleCore,
 		_player: int, _slot: int) -> int:
 	return 0

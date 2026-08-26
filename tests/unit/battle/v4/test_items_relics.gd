@@ -105,13 +105,13 @@ func test_control_skilless_defend_blocks_attack() -> void:
 	assert_eq(b.hp[0][0], 20)   # 对照：正常防挡下波
 
 
-# === 不动明王甲：接下来 3 次成功防御转化整次攻击总伤害为护盾 ===
+# === 不动明王甲：接下来 3 次成功防御转化整次攻击总伤害为护甲 ===
 
 func test_relic_budongmingwang_block_grants_shield() -> void:
 	var b := _battle()
 	b.use_item(0, _give(b, 0, "t3_budongmingwang"))
 	_aa(b, A.DEFEND, A.ATTACK)
-	assert_eq(b.shield[0][0], 2, "成功防住波后获得等同攻击总伤害的护盾")
+	assert_eq(b.shield[0][0], 2, "成功防住波后获得等同攻击总伤害的护甲")
 	assert_eq(int(b.relics[0][0]["state"].get("charges", 0)), 2)
 
 
@@ -181,17 +181,17 @@ func test_all_relics_run_many_turns() -> void:
 		assert_true(true, "%s 跑 5 回合不崩" % id)
 
 
-# === 夜明珠：接下来 3 次正常切换，伤敌 1 点并给新出战英雄 1 点护盾 ===
+# === 夜明珠：接下来 3 次正常切换，伤敌 1 点并给新出战英雄 1 点护甲 ===
 
 func test_relic_yemingzhu_switch_in_charges_enemy() -> void:
-	# 持夜明珠 + P0 正常切换登场 → 敌方出战受 1 点伤害，新出战英雄得 1 点护盾。
+	# 持夜明珠 + P0 正常切换登场 → 敌方出战受 1 点伤害，新出战英雄得 1 点护甲。
 	var b := _battle()
 	b.use_item(0, _give(b, 0, "t3_yemingzhu"))
 	b.select_switch(0, 1)
 	b.select_action(1, A.CHARGE)
 	b.resolve()
 	assert_eq(b.hp[1][0], 18, "夜明珠切换：敌方出战 20→18（-1）")
-	assert_eq(b.shield[0][1], 2, "夜明珠切换：新出战英雄获得 1 点护盾")
+	assert_eq(b.shield[0][1], 2, "夜明珠切换：新出战英雄获得 1 点护甲")
 	# 对照：无夜明珠切换不冲撞
 	var base := _battle()
 	base.select_switch(0, 1)

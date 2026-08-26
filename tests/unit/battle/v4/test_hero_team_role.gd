@@ -139,12 +139,12 @@ func test_h14_published_data_matches_approved_redesign() -> void:
 func test_h18_published_data_matches_approved_redesign() -> void:
 	var h := load("res://assets/data/heroes/h18.tres") as HeroData
 	assert_not_null(h, "h18 数据资源必须可加载")
-	assert_eq(h.max_hp, 6, "相柳生命保持 6")
-	assert_eq(h.team_role, "经济", "旧 UI 分类按兼容规则暂不逐只迁移")
-	assert_eq(h.skill_type, HeroData.SkillType.EXTRA_ACTION, "相柳的新技能应标记为主动技")
-	assert_eq(h.skill_description, "游丝引", "相柳技能名应为定稿名称")
+	assert_eq(h.max_hp, 5, "对称战场规则较强，相柳生命应收紧为 5")
+	assert_eq(h.team_role, "经济", "旧 UI 三分类按全池兼容规则暂不逐只迁移")
+	assert_eq(h.skill_type, HeroData.SkillType.PASSIVE, "相柳的新技能应标记为被动")
+	assert_eq(h.skill_description, "游丝引", "h18 应沿用 Eddy 定稿的技能名")
 	assert_eq(h.skill_detail,
-		"平均分配我方所有存活英雄的当前生命。",
+		"相柳【蛇】出战时，双方「波」与「大波」的基础伤害均视为1点。",
 		"相柳短文案应与定稿措辞完全一致")
 
 
@@ -153,7 +153,7 @@ func test_h19_published_data_matches_damage_transfer_rule() -> void:
 	assert_not_null(h, "h19 数据资源必须可加载")
 	assert_eq(h.skill_description, "奔雷", "乌骓技能名保持奔雷")
 	assert_eq(h.skill_detail,
-		"乌骓【马】攻击命中时，目标至多承受1点伤害，超过1点的部分转移给当前生命最高的另一名存活敌方英雄。",
+		"乌骓【马】攻击命中时，目标最多受到1点伤害；溢出伤害转移给生命最高的另一名存活敌方英雄。",
 		"乌骓短文案应准确说明伤害守恒与确定性转移目标")
 
 
@@ -162,8 +162,16 @@ func test_h23_published_data_matches_approved_redesign() -> void:
 	assert_not_null(h, "h23 数据资源必须可加载")
 	assert_eq(h.max_hp, 6, "天狗生命保持 6")
 	assert_eq(h.skill_detail,
-		"天狗【狗】的「波」和「大波」造成的伤害会等量降低目标的能量上限（最低3点）",
+		"天狗【狗】的「波」或「大波」造成伤害时，等量降低敌方能量上限（最低到3点）。",
 		"天狗短文案应与本轮定稿措辞完全一致")
+
+
+func test_h24_published_data_states_full_turn_discount_and_floor() -> void:
+	var h := load("res://assets/data/heroes/h24.tres") as HeroData
+	assert_not_null(h, "h24 数据资源必须可加载")
+	assert_eq(h.skill_detail,
+		"并封【猪】在队时，我方可以降低1点能量上限，使本回合所有行动少消耗1点能量（最低到3点）。",
+		"并封文案必须明确减费覆盖本回合所有行动，且上限只能降到3点")
 
 
 func test_hero_data_launch_pool_all_have_valid_team_role() -> void:

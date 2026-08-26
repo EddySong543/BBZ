@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://12dxulv22152"
-path="res://.godot/imported/破旧的护盾.png-f55580b5de311114da5a540cc85f863e.ctex"
+path="res://.godot/imported/破旧的护甲.png-481a687d8187b2c08814a02196fdd5fe.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/items/破旧的护盾.png"
-dest_files=["res://.godot/imported/破旧的护盾.png-f55580b5de311114da5a540cc85f863e.ctex"]
+source_file="res://assets/sprites/items/破旧的护甲.png"
+dest_files=["res://.godot/imported/破旧的护甲.png-481a687d8187b2c08814a02196fdd5fe.ctex"]
 
 [params]
 

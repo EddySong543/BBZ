@@ -368,7 +368,7 @@ static func score_item_option(b: BattleCore, side: int, data: ItemData) -> float
 				if b.max_hp[side][aslot] - my_hp >= 2:
 					s += 6.0   # 已掉血 → 治疗增值；满血不倒扣（用的时候多半已掉血）
 			elif my_hp <= 2 * BattleCore.HP_UNIT:
-				s += 6.0    # 自己进斩杀圈：护盾/挡件保命（轻推）
+				s += 6.0    # 自己进斩杀圈：护甲/挡件保命（轻推）
 		"能量":
 			if b.energy[side] <= 2:
 				s += 4.0    # 缺能（≤1.0 能）：能量件回血线（轻推）
@@ -935,7 +935,7 @@ static func _has_empty_item_slot(b: BattleCore, side: int) -> bool:
 	return false
 
 
-## 散契钟只比较公开、仍在持续生效的道具状态，不把生命/能量/护盾等已结算数值算进去。
+## 散契钟只比较公开、仍在持续生效的道具状态，不把生命/能量/护甲等已结算数值算进去。
 static func _active_item_effect_count(b: BattleCore, side: int) -> int:
 	var count: int = b.relics[side].size() + b.timed_item_effects[side].size()
 	const TEAM_KEYS: Array[String] = [
@@ -999,7 +999,7 @@ static func _has_active_energy_gain_route(b: BattleCore, side: int) -> bool:
 ## 寻星坠与其他进攻道具一样，只在 AI 最终选招为「波」时才真正提交；
 ## 但“能打谁”又必须在选招时进入搜索。因此用克隆预提交就绪寻星坠，只取其
 ## 「波」合法目标补入决策集；真局仍在 commit_attack_items 中按最终 action 决定是否消耗。
-## 所有存活目标都保留，让完整搜索自行评估后排残血、护盾和命中状态价值。
+## 所有存活目标都保留，让完整搜索自行评估后排残血、护甲和命中状态价值。
 static func _legal_actions_for_decision(b: BattleCore, side: int) -> Array:
 	var legal: Array = b.legal_actions(side)
 	if _should_spend_xunxing(b, side):

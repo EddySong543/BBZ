@@ -12,7 +12,7 @@ extends RefCounted
 ##   ⏳ 待补：高级管线相位（月相/减免/穿透；脆弱已实装[h20 触邪·罪已昭]，「伤害转移/延迟」原属已弃用的旧塔罗英雄 h27/h30、随塔罗架构弃用作废）、
 ##           overkill 连锁(§D8)、英雄组件注册表(_build_skills)。
 ##
-## 半点制 (§D3)：HP / 伤害 / 护盾 / pending 内部以"半点"整数存储，
+## 半点制 (§D3)：HP / 伤害 / 护甲 / pending 内部以"半点"整数存储，
 ##    1 HP = HP_UNIT(2) 半点，最小伤害 0.5 = 1 半点。能量是独立整数资源。
 ##
 ## 组件无状态 (§D2)：所有 per-hero 状态都在本引擎的容器里；HeroSkill 只读写传入的 self。
@@ -122,7 +122,7 @@ const _HERO_SKILL_SCRIPTS := {
 	"h15": preload("res://src/battle/skills/h15_qishazhangui.gd"),
 	"h16": preload("res://src/battle/skills/h16_baihong.gd"),
 	"h17": preload("res://src/battle/skills/h17_zhenya.gd"),
-	"h18": preload("res://src/battle/skills/h18_chanrao.gd"),
+	"h18": preload("res://src/battle/skills/h18_base_damage_field.gd"),
 	"h19": preload("res://src/battle/skills/h19_jianta.gd"),
 	"h20": preload("res://src/battle/skills/h20_duanzui.gd"),
 	"h21": preload("res://src/battle/skills/h21_diaohu.gd"),
@@ -713,7 +713,7 @@ func _heal(player: int, slot: int, amount: int,
 		allow_overflow_conversion: bool = true) -> int:
 	if slot < 0 or slot >= hp[player].size() or hp[player][slot] <= 0 or amount <= 0:
 		return 0
-	# 凝血膏先把“生命回复”改写为护盾，因此可以在封脉针的禁疗规则下正常产甲。
+	# 凝血膏先把“生命回复”改写为护甲，因此可以在封脉针的禁疗规则下正常产甲。
 	if bool(item_mod(player, "healing_to_shield", false)):
 		shield[player][slot] += amount
 		return 0
@@ -1681,7 +1681,7 @@ func request_mengdie(player: int) -> void:
 	add_item_mod(player, "mengdie_requests", 1)
 
 
-## 散契钟：只结束仍可继续影响未来结算的“道具状态”。已经到账的伤害、治疗、护盾、
+## 散契钟：只结束仍可继续影响未来结算的“道具状态”。已经到账的伤害、治疗、护甲、
 ## 能量与槽位变更不回滚；毒素/脆弱等英雄战斗状态因来源可能不是道具，也不在这里误删。
 func end_all_active_item_effects() -> int:
 	var ended: int = 0
@@ -2495,7 +2495,7 @@ func add_death_retaliation(player: int, slot: int, amount: int) -> void:
 	_imod[player]["death_retaliations"] = by_slot
 
 
-## 失去生命：绕过防御/护盾/受伤 hook，不属于敌方击败来源。
+## 失去生命：绕过防御/护甲/受伤 hook，不属于敌方击败来源。
 func lose_life(player: int, slot: int, amount: int, events: Array, source: String) -> int:
 	if slot < 0 or slot >= hp[player].size() or hp[player][slot] <= 0 or amount <= 0:
 		return 0
@@ -3930,7 +3930,7 @@ func resolve() -> Dictionary:
 				sk.execute_active(self, p, active_index[p])
 
 	# Phase 2.65: 烛阴转变。先完整拍下双方目标，再同时落地，避免双方烛阴同拍时后手读到前手改写后的英雄。
-	# 复制英雄身份 + 当前/上限 HP + 护盾 + 延迟效果 + 局部状态（含主动技使用进度）；
+	# 复制英雄身份 + 当前/上限 HP + 护甲 + 延迟效果 + 局部状态（含主动技使用进度）；
 	# 团队能量、道具、遗物与团队 buff 不属于英雄本体，不复制。
 	var transform_snapshots: Array = [null, null]
 	for p in [0, 1]:
@@ -4163,7 +4163,7 @@ func resolve() -> Dictionary:
 	# Phase 4.6: 广寒替补追击。双方主攻击已全部完成，故登场不会改写本回合既定攻击目标。
 	_resolve_reserve_pursuits(events)
 
-	# Phase 4.7: 整次基础攻击的结算后道具与后手护盾。
+	# Phase 4.7: 整次基础攻击的结算后道具与后手护甲。
 	# 双方主攻击均已落地后再回调，避免玩家0因先回治疗产生不对称。
 	for p in [0, 1]:
 		var context: Dictionary = base_attack_contexts[p]
@@ -4326,7 +4326,7 @@ func resolve() -> Dictionary:
 		events.append({id = "overtime_sudden_death", drain = drain})
 		# 标准事件补发（2026-07-17 审计修复）：直写 HP 原本不发 damage_taken/hero_died——
 		# UI 演出全靠这两个事件驱动（A3a），缺了=血条突跳、无掉血/死亡演出（"零特判"注释不实）。
-		# 不走 _apply_damage（骤死=无视防御/护盾/on-hit·语义就是直扣），只补事件落账。
+		# 不走 _apply_damage（骤死=无视防御/护甲/on-hit·语义就是直扣），只补事件落账。
 		if drain > 0:
 			events.append({id = "damage_taken", player = 0, slot = oa, amount = drain, src = "overtime", pen = ActionDef.Pen.TRUE_DMG})
 			events.append({id = "damage_taken", player = 1, slot = ob, amount = drain, src = "overtime", pen = ActionDef.Pen.TRUE_DMG})
@@ -4454,7 +4454,7 @@ func _apply_hero_runtime_snapshot(player: int, slot: int, snapshot: Dictionary) 
 	_skills[player][slot] = _make_skill(copied_hero.hero_id)
 
 
-## 英雄费用唯一结算口。血量支付是费用而非伤害：不吃护盾、不触发 damage/on-hit，
+## 英雄费用唯一结算口。血量支付是费用而非伤害：不吃护甲、不触发 damage/on-hit，
 ## 即使前置延迟伤害令生命不足，也最多扣至 0；已提交的本轮行动继续完成。
 func _pay_action_cost(player: int, amount: int, events: Array) -> void:
 	if amount <= 0:
@@ -4614,7 +4614,7 @@ func free_switch(player: int, target: int) -> bool:
 	return true
 
 
-## 星日登场冲撞：对敌方出战造成 0.5 独立伤害；走护盾/受伤管线，但不算命中。
+## 星日登场冲撞：对敌方出战造成 0.5 独立伤害；走护甲/受伤管线，但不算命中。
 ## 用 PIERCE_BIGDEF 让冲撞无视防御直接连接（登场突袭）；事件用本地数组（不并入 resolve 事件流）。
 func chongzhuang(attacker_player: int) -> void:
 	var opp: int = 1 - attacker_player
@@ -4639,7 +4639,7 @@ func _highest_hp_living_other(player: int, excluded_slot: int) -> int:
 
 
 ## 施加一段已经完成增伤/减伤计算的转移伤害。它不再进入伤害修正管线，避免凭空增伤；
-## 但仍单独经过目标护盾、致死免疫与受伤回调。
+## 但仍单独经过目标护甲、致死免疫与受伤回调。
 func _apply_exact_transferred_damage(target_player: int, target_slot: int, amount: int,
 		attacker_player: int, events: Array, src: String) -> int:
 	if amount <= 0 or target_slot < 0 or target_slot >= hp[target_player].size() \
@@ -4735,14 +4735,29 @@ func _apply_resolve_hit(attacker_player: int, hit: Dictionary, actions: Array[in
 
 
 ## 计算 player 本次攻击的造成伤害（半点）。
-## 出伤 = 基础 → 出战英雄 modify_outgoing_damage → 全队 modify_team_outgoing_damage（团队层 buff）。
+## 出伤 = 基础 → 双方出战英雄的战场修正 → 出手英雄 modify_outgoing_damage
+##   → 全队 modify_team_outgoing_damage（团队层 buff）。
 func _calc_outgoing(player: int, action: int) -> int:
 	var slot: int = active_index[player]
-	var dmg := ActionDef.get_base_damage(action)
+	var dmg: int = _apply_battlefield_base_attack_damage(
+		ActionDef.get_base_damage(action), action, player, slot)
 	var skill: HeroSkill = _skills[player][slot]
 	if skill != null:
 		dmg = skill.modify_outgoing_damage(dmg, action, self, player, slot)
 	return _apply_team_outgoing(dmg, action, player, slot)
+
+
+## 对称战场规则只读取当前出战位。resolve 的沉默阶段会把失效技能临时置 null；切换、
+## 强制换位与转变均早于 hit-list 构建，因此这里自然读取最终出战快照，不新增局内状态。
+func _apply_battlefield_base_attack_damage(dmg: int, action: int,
+		attacker_player: int, attacker_slot: int) -> int:
+	for field_player: int in [0, 1]:
+		var field_slot: int = active_index[field_player]
+		var field_skill: HeroSkill = _skills[field_player][field_slot]
+		if field_skill != null and hp[field_player][field_slot] > 0:
+			dmg = field_skill.modify_battlefield_base_attack_damage(
+				dmg, action, self, attacker_player, attacker_slot, field_player, field_slot)
+	return dmg
 
 
 ## 团队层出伤修正：扫攻击方全队（含替补），让团队 buff 源生效（modify_team_outgoing_damage hook）。
@@ -4756,16 +4771,16 @@ func _apply_team_outgoing(dmg: int, action: int, player: int, attacker_slot: int
 
 
 ## 技能/反击类「管线打击」公共入口：走完整 _apply_damage，但不算「波／大波」命中。
-## def_action=CHARGE 视作不可挡；仍经过护盾与受伤链，不引爆毒素、不触发命中技能。
+## def_action=CHARGE 视作不可挡；仍经过护甲与受伤链，不引爆毒素、不触发命中技能。
 func strike(target_player: int, raw: int, attacker_player: int, pen: int, events: Array = []) -> int:
 	return _apply_damage(target_player, raw, attacker_player, ActionDef.Action.ATTACK, pen, ActionDef.Action.CHARGE, events)
 
 
-## 伤害管线 (§D4)：防御门 → 攻击命中时引爆毒素 → 受伤 hook(平减) → 护盾 → 落 HP → on-hit 触发。
+## 伤害管线 (§D4)：防御门 → 攻击命中时引爆毒素 → 受伤 hook(平减) → 护甲 → 落 HP → on-hit 触发。
 ## 返回实际落在 HP 上的伤害（半点），供攻击型主动技回调使用。
 ## src = 本次伤害的来源标签（"action"=动作攻击/技能·"item"=独立道具伤害）。
 ## 只有 is_base_attack=true 的「波／大波」穿过防御门后才算命中并结算命中效果；
-## 护盾吸收仍算命中，主动技、追击、反击和独立道具伤害均不算。
+## 护甲吸收仍算命中，主动技、追击、反击和独立道具伤害均不算。
 ## attacker_slot = 出手英雄槽（hit 生成时的快照值·-1=用实时出战位）。结算期间 active_index
 ## 可能变化，on-hit 归因必须钉在出招英雄身上，否则先后手不对称（2026-07-17 审计修复）。
 ## 周天罡气（t3_yiqi·2026-07-04 重做）：该方本回合是否"无敌"——免疫一切【敌源】伤害
@@ -4813,7 +4828,7 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		return 0
 
 	# 分痛木牌：只分流敌源伤害；生命支付、失去生命与规则处决不经过本入口。
-	# 分流发生在防御与护盾前，原目标仍按本次波/大波是否穿过防御来判定命中。
+	# 分流发生在防御与护甲前，原目标仍按本次波/大波是否穿过防御来判定命中。
 	var redirected_damage: int = 0
 	var redirect_target: int = -1
 	var redirect_pool: int = int(item_mod(target_player, "next_damage_redirect", 0))
@@ -4968,7 +4983,7 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 			dmg = transfer_threshold
 			excess_transfer_target = _highest_hp_living_other(target_player, slot)
 
-	# Stage B6: 护盾。还魂丹在实际扣盾前按“本次会否致命”判定，触发时整次伤害归零。
+	# Stage B6: 护甲。还魂丹在实际扣盾前按“本次会否致命”判定，触发时整次伤害归零。
 	var shield_damage := 0
 	var dealt: int = 0
 	var was_alive: bool = hp[target_player][slot] > 0
@@ -5109,7 +5124,7 @@ func _apply_shared_attack_damage(target_player: int, total: int, attacker_player
 
 
 ## 结算到期的团队级定时道具效果。妖火只检查截止时是否仍为出战英雄；
-## 失去生命不经过伤害/护盾管线，但保留敌方来源供“被敌方击败”判定。
+## 失去生命不经过伤害/护甲管线，但保留敌方来源供“被敌方击败”判定。
 func _resolve_timed_item_effects(events: Array) -> void:
 	for target_player in [0, 1]:
 		var kept: Array = []

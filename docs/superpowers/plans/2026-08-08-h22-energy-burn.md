@@ -111,7 +111,7 @@
 
 - [ ] **Step 4: Scan for retired references**
 
-  Run: `rg -n "pierce_next_attack|蓄力并获得 1 点护盾|我方下一次攻击穿大防|火兆共享" assets src tests design`
+  Run: `rg -n "pierce_next_attack|蓄力并获得 1 点护甲|我方下一次攻击穿大防|火兆共享" assets src tests design`
 
   Expected: no code, test, or current-mechanic claim remains; historical mentions are explicitly labeled retired.
 

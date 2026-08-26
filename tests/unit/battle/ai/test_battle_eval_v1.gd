@@ -2,7 +2,7 @@ extends GutTest
 
 ## ============================================================================
 ## BattleEval —— v1 基础评估（AI 现役默认·battle_screen profile 0）权重项锁定测试。
-##   对称态 == 0 ｜ 存活/HP/护盾/出战位 各权重 ｜ 能量边际递减 ｜ 终局胜负 ｜ 反对称 ｜ 溢杀保护 ｜ 权重覆盖
+##   对称态 == 0 ｜ 存活/HP/护甲/出战位 各权重 ｜ 能量边际递减 ｜ 终局胜负 ｜ 反对称 ｜ 溢杀保护 ｜ 权重覆盖
 ##   半点制：1 HP = 2 半点。setup 后 max_hp 翻倍（5HP → 10 半点）。
 ## ============================================================================
 
@@ -57,11 +57,11 @@ func test_v1_active_hp_diff_double_weighted() -> void:
 		"出战位 HP 差 = 基础 W_HP + 前线额外 W_ACTIVE_HP")
 
 
-# ---- 护盾差 ----
+# ---- 护甲差 ----
 
 func test_v1_shield_diff_weighted_by_w_shield() -> void:
 	var b := _neutral()
-	b.shield[0][1] = 3   # 我方 +3 半点护盾
+	b.shield[0][1] = 3   # 我方 +3 半点护甲
 	assert_almost_eq(BattleEval.score(b, 0), BattleEval.W_SHIELD * 3.0, 0.001)
 
 

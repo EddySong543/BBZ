@@ -254,21 +254,14 @@ func test_slot_row_new_frame_palette_and_inner_mask_fit() -> void:
 				"第%d阶外框高光色" % tier)
 		assert_eq(cell_mat.get_shader_parameter("material_lighting"), 0.0,
 				"道具格底关闭额外材质光照，与图鉴一致")
-		if tier < 3:
-			assert_eq(cell_mat.get_shader_parameter("fill_color"), ItemSlotRow.CELL_FILL_T[tier],
-					"普通/稀有格底顶部色与图鉴一致")
-			assert_eq(cell_mat.get_shader_parameter("inner_color"), ItemSlotRow.CELL_CENTER_T[tier],
-					"普通/稀有格底底部色与图鉴一致")
-			assert_eq(cell_mat.get_shader_parameter("vertical_gradient"), 1.0,
-					"普通/稀有格底使用图鉴的上暗下亮纵向渐变")
-			assert_eq(cell_mat.get_shader_parameter("use_tex"), 0.0,
-					"普通/稀有格底不误用传说贴图")
-		else:
-			assert_eq(cell_mat.get_shader_parameter("use_tex"), 1.0,
-					"传说格底沿用金色背景贴图")
-			assert_eq(cell_mat.get_shader_parameter("tex_top_darkening"),
-					ItemSlotRow.LEGENDARY_TOP_DARKENING,
-					"传说格底顶部压暗量与图鉴一致")
+		assert_eq(cell_mat.get_shader_parameter("fill_color"), ItemSlotRow.CELL_FILL_T[tier],
+				"第%d阶格底顶部色与图鉴一致" % tier)
+		assert_eq(cell_mat.get_shader_parameter("inner_color"), ItemSlotRow.CELL_CENTER_T[tier],
+				"第%d阶格底底部色与图鉴一致" % tier)
+		assert_eq(cell_mat.get_shader_parameter("vertical_gradient"), 1.0,
+				"第%d阶格底统一使用上深下亮纵向渐变" % tier)
+		assert_eq(cell_mat.get_shader_parameter("use_tex"), 0.0,
+				"第%d阶格底不叠加旧纹理" % tier)
 
 
 func test_draft_popup_resolves_choice_once() -> void:
@@ -341,14 +334,27 @@ func test_item_frame_style_is_the_single_palette_source() -> void:
 	assert_eq(ItemCatalog.rarity_color(1), ItemCatalog.RARITY_NORMAL)
 	assert_eq(ItemCatalog.rarity_color(2), ItemCatalog.RARITY_RARE)
 	assert_eq(ItemCatalog.rarity_color(3), ItemCatalog.RARITY_LEGENDARY)
+	assert_eq(ItemCatalog.RARITY_NORMAL, Color("3F7ED0"), "普通使用方案 2 高识别蓝")
+	assert_eq(ItemCatalog.RARITY_RARE, Color("7249BC"), "稀有使用方案 2 高识别紫")
+	assert_eq(ItemCatalog.RARITY_LEGENDARY, Color("CB8B24"), "传说使用方案 2 高识别金")
 	assert_eq(ItemFrameStyle.CELL_TOP[1], ItemCatalog.RARITY_NORMAL,
-			"普通填充同源 C 方案宝石蓝")
+			"普通填充同源方案 2 高识别蓝")
 	assert_eq(ItemFrameStyle.CELL_TOP[2], ItemCatalog.RARITY_RARE,
-			"稀有填充同源 C 方案深紫晶")
-	assert_eq(ItemFrameStyle.FRAME_MID[3], ItemCatalog.RARITY_LEGENDARY,
-			"传说外框主色同源 C 方案明金")
-	assert_eq(ItemFrameStyle.LEGENDARY_TINT, Color("F0CA82"),
-			"传说纹理同步 C 宝石方案的明金色调")
+			"稀有填充同源方案 2 高识别紫")
+	assert_eq(ItemFrameStyle.CELL_TOP[3], ItemCatalog.RARITY_LEGENDARY,
+			"传说填充同源方案 2 高识别金")
+	assert_eq(ItemFrameStyle.CELL_BOTTOM,
+			{1: Color("65A0E3"), 2: Color("9870D1"), 3: Color("E5B349")},
+			"三档底色采用方案 2 的高识别亮阶渐变")
+	assert_eq(ItemFrameStyle.FRAME_SHADOW,
+			{1: Color("2E639E"), 2: Color("56358A"), 3: Color("9F6818")},
+			"框体暗阶保持同色相且不落入近黑暗底")
+	assert_eq(ItemFrameStyle.FRAME_MID,
+			{1: Color("356DB2"), 2: Color("623DA1"), 3: Color("AD741B")},
+			"框体主体色同步方案 2")
+	assert_eq(ItemFrameStyle.FRAME_HIGHLIGHT,
+			{1: Color("9BC7EF"), 2: Color("C3A5E4"), 3: Color("F3D077")},
+			"框体高光色同步方案 2")
 
 
 func test_battle_screen_script_compiles_with_m3_wiring() -> void:
@@ -362,7 +368,7 @@ func test_battle_screen_script_compiles_with_m3_wiring() -> void:
 # === C：升级线 1→2→3（ADR D5）===
 
 func test_catalog_upgrade_chain_links() -> void:
-	# 4 条升级线（设计：T2 升级线4 + T3 顶2）：飞镖/护盾 T1→T2；生命/法力药水 T1→T2→T3。
+	# 4 条升级线（设计：T2 升级线4 + T3 顶2）：飞镖/护甲 T1→T2；生命/法力药水 T1→T2→T3。
 	assert_eq(ItemCatalog.make("t1_feibiao").upgrade_to, "t2_feibiao")
 	assert_eq(ItemCatalog.make("t1_jiudun").upgrade_to, "t2_jiandun")
 	assert_eq(ItemCatalog.make("t1_lzhi_shengming").upgrade_to, "t2_shengming")
