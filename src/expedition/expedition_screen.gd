@@ -90,7 +90,7 @@ const COL_TEXT_DIM := Color(0.72, 0.68, 0.58)
 const COL_FLOOR := Color("2e2417")         # 地表/迷雾全色板已入 terrain shader uniform 默认值
 const COL_MONSTER := Color("d24a44")       # 阵营红系（角宝石红）
 const COL_EVENT := Color("9b86d8")         # 干扰紫提亮档
-const COL_CHEST := ItemCatalog.RARITY_LEGENDARY  # 传说金（道具稀有度 C 方案）
+const COL_CHEST := ItemCatalog.RARITY_LEGENDARY  # 传说金（道具稀有度方案 2）
 const COL_EXT_OPEN := Color("5cb863")      # 确认绿
 const COL_EXT_CLOSED := Color("8a8f98")    # 随机灰
 const COL_PLAYER := Color("f2e08a")        # 亮金
@@ -197,7 +197,7 @@ var object_art: Control            # 物体：田界、搜索容器
 var atmosphere_layer: ColorRect    # 已清雾地图内的斜向日照与缓慢云影
 var atmosphere_mat: ShaderMaterial
 var marker_art: Control            # 标识：搜索目标等运行时状态
-var route_preview_art: Control     # 鼠标悬停目标格与弯曲虚线路径
+var route_preview_art: Control     # 鼠标悬停目标格与连续交替脚印流
 var route_target_outline: ColorRect
 var route_target_material: ShaderMaterial
 var canvas: Control                # 世界空间地图图签画布
@@ -395,6 +395,8 @@ func _build_map_view() -> void:
 	route_target_material.set_shader_parameter("corner_radius_px", GROUND_CORNER_RADIUS_PX)
 	route_target_material.set_shader_parameter("pixel_step_px", GROUND_PIXEL_STEP_PX)
 	route_target_material.set_shader_parameter("outline_px", 4.0)
+	route_target_material.set_shader_parameter("outline_alpha", 1.0)
+	route_target_material.set_shader_parameter("fill_alpha", 0.10)
 	route_target_outline.material = route_target_material
 	map_world.add_child(route_target_outline)
 	player_backdrop = Control.new()
@@ -1944,16 +1946,8 @@ func _draw_map_route_preview() -> void:
 		return
 	var route_cells: Array[Vector2i] = [map.player]
 	route_cells.append_array(_hovered_map_path)
-	var curve: PackedVector2Array = GridRoutePreviewScript.build_curve(
-			route_cells, float(MAP_CELL), 12.0, 4)
-	var phase: float = fposmod(_anim_time * 42.0, 24.0)
-	for marker: PackedVector2Array in GridRoutePreviewScript.build_markers(
-			curve, 24.0, phase, 10.0):
-		var start: Vector2 = marker[0].round()
-		var finish: Vector2 = marker[1].round()
-		route_preview_art.draw_line(start, finish, Color("FFE0A0E6"), 6.0, false)
-		route_preview_art.draw_circle(start, 3.0, Color("FFE0A0E6"), true, -1.0, false)
-		route_preview_art.draw_circle(finish, 3.0, Color("FFE0A0E6"), true, -1.0, false)
+	GridRoutePreviewScript.draw_preview(
+			route_preview_art, route_cells, float(MAP_CELL), _anim_time)
 
 
 func _cell_from_map_view_position(view_position: Vector2) -> Vector2i:

@@ -174,20 +174,111 @@ func test_connected_stones_keep_flickering_and_beam_reaches_screen_top_from_nine
 	var base_rect := Rect2(contract["portal_beam_base_rect"])
 	assert_almost_eq(beam_rect.position.y, 0.0, 0.001,
 			"光柱必须一直延伸到屏幕上边界")
+	assert_eq(beam_rect, Rect2(Vector2.ZERO, MainMenuWorld.VIEW_SIZE),
+			"低分辨率光柱画布必须覆盖完整设计画面")
 	assert_eq(base_rect.size, MainMenuWorld.RENDERED_CELL_SIZE * 3.0,
 			"光柱底部必须覆盖中心3×3九格")
 	assert_almost_eq(base_rect.get_center().x, MainMenuWorld.VIEW_SIZE.x * 0.5, 0.001)
 	assert_almost_eq(base_rect.get_center().y, MainMenuWorld.VIEW_SIZE.y * 0.5, 0.001)
 	assert_true(beam_rect.encloses(base_rect), "九格阵面必须位于贯穿屏幕顶部的光柱内部")
 	assert_almost_eq(MainMenuWorld.PORTAL_BEAM_DURATION, 1.8, 0.001)
+	assert_gte(MainMenuWorld.PORTAL_BEAM_PEAK_HOLD_RATIO, 0.08,
+			"光柱冲顶后必须保留可读的峰值停留，不能立刻切场景")
 	assert_false(world.portal_beam.visible)
+	var procedural_contract: Dictionary = world.portal_beam.get_visual_contract()
+	assert_eq(procedural_contract["implementation"],
+			"ref44_contoured_pixel_portal_beam")
+	assert_eq(procedural_contract["reference_profile"], "ref44")
+	assert_true(bool(procedural_contract["uses_ref44_contour"]))
+	assert_true(bool(procedural_contract["uses_single_connected_column"]))
+	assert_true(bool(procedural_contract["uses_colored_outline"]))
+	assert_true(bool(procedural_contract["uses_ivory_core"]))
+	assert_false(bool(procedural_contract["uses_internal_cutouts"]))
+	assert_true(bool(procedural_contract["uses_subviewport"]))
+	assert_true(bool(procedural_contract["uses_runtime_viewport_texture"]))
+	assert_false(bool(procedural_contract["uses_external_texture"]))
+	assert_false(bool(procedural_contract["uses_shader"]))
+	assert_false(bool(procedural_contract["uses_sprite_sheet"]))
+	assert_false(bool(procedural_contract["uses_antialiasing"]))
+	assert_false(bool(procedural_contract["uses_continuous_gradients"]))
+	assert_false(bool(procedural_contract["uses_tapered_staircase_edges"]))
+	assert_false(bool(procedural_contract["uses_full_frame_additive_blend"]))
+	assert_true(bool(procedural_contract["uses_controlled_value_layers"]))
+	assert_true(bool(procedural_contract["uses_connected_profile"]))
+	assert_false(bool(procedural_contract["uses_full_body_rect"]))
+	assert_false(bool(procedural_contract["uses_flat_top_cap"]))
+	assert_true(bool(procedural_contract["uses_coherent_upward_streams"]))
+	assert_false(bool(procedural_contract["uses_hash_mosaic"]))
+	assert_false(bool(procedural_contract["uses_isolated_noise_chunks"]))
+	assert_true(bool(procedural_contract["core_rises_before_body"]))
+	assert_eq(procedural_contract["color_mode"], "ref44_purple_ivory")
+	assert_eq(procedural_contract["outline_color"], Color("822B85"))
+	assert_eq(procedural_contract["core_color"], Color("FDFCF7"))
+	assert_between(float(procedural_contract["top_width_ratio"]), 0.52, 0.66)
+	assert_eq(Vector2i(procedural_contract["logical_canvas_size"]),
+			Vector2i(240, 135))
+	assert_eq(int(procedural_contract["integer_scale"]), 8)
+	assert_eq(int(procedural_contract["pixel_block_size_px"]), 8)
+	assert_true(bool(procedural_contract["texture_filter_nearest"]))
+	assert_eq(int(procedural_contract["animation_fps"]), 12)
+	assert_eq(int(procedural_contract["palette_level_count"]), 5)
+	assert_eq(int(procedural_contract["leading_prong_count"]), 1)
+	assert_eq(int(procedural_contract["silhouette_state_count"]), 6)
+	assert_eq(int(procedural_contract["beam_stage_count"]), 5)
+	assert_gte(int(procedural_contract["column_layer_count"]), 4)
+	assert_gte(int(procedural_contract["upward_stream_count"]), 5)
+	assert_eq(int(procedural_contract["edge_tongue_count"]), 0)
+	assert_gte(int(procedural_contract["base_pulse_ring_count"]), 3)
+	assert_true(bool(procedural_contract["profile_spans_portal_width"]),
+			"轮廓的活动边界必须覆盖中央三列，不能缩成中心一格")
+	assert_true(bool(procedural_contract["base_spans_nine_cells"]),
+			"底部爆发的活动边界必须横跨中央完整3×3阵面")
+	assert_gte(float(procedural_contract["main_body_width_px"]), base_rect.size.x)
 	world.complete_portal_connection(MainMenuWorld.PORTAL_ENERGY_GOLD)
 	await world.play_portal_beam(MainMenuWorld.PORTAL_ENERGY_GOLD, 0.12)
 	assert_true(world.portal_beam.visible)
-	assert_almost_eq(float(world.portal_beam_material.get_shader_parameter("beam_phase")),
-			1.0, 0.001)
-	assert_eq(world.portal_beam_material.get_shader_parameter("beam_color"),
-			MainMenuWorld.PORTAL_ENERGY_GOLD)
+	assert_almost_eq(float(world.portal_beam.beam_progress), 1.0, 0.001)
+	assert_eq(world.portal_beam.beam_color, Color("C65FBF"),
+			"石头继续使用模式色，光柱本体采用ref44的紫色轮廓")
+	procedural_contract = world.portal_beam.get_visual_contract()
+	assert_true(bool(procedural_contract["reaches_screen_top"]))
+	var logical_base := Rect2i(procedural_contract["logical_base_rect"])
+	var logical_body := Rect2i(procedural_contract["main_body_rect_logical"])
+	assert_lte(logical_body.position.x, logical_base.position.x)
+	assert_gte(logical_body.end.x, logical_base.end.x)
+	assert_eq(logical_body.position.y, 0)
+	assert_gt(int(procedural_contract["visible_upward_stream_count"]), 0,
+			"柱体内部必须存在沿亮核上升的像素光痕")
+	assert_eq(int(procedural_contract["visible_edge_tongue_count"]), 0,
+			"ref44轮廓必须保持干净，不再挂接分散的边缘能量舌")
+	world.set_process(false)
+	world.portal_beam.set_anim_time(3.0)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var frame_a: Dictionary = world.portal_beam.get_runtime_pixel_metrics()
+	world.portal_beam.set_anim_time(3.25)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var frame_b: Dictionary = world.portal_beam.get_runtime_pixel_metrics()
+	world.set_process(true)
+	assert_true(bool(frame_a["image_ready"]), "低分辨率运行画布必须产生实际像素数据")
+	assert_true(bool(frame_a["base_spans_full_rect"]),
+			"九格底部爆发的活动边界必须覆盖完整阵面")
+	assert_between(float(frame_a["base_coverage_ratio"]), 0.90, 1.0,
+			"ref44式光柱底座必须完整覆盖九格阵面，不能退回零散白块")
+	assert_eq(int(frame_a["covered_column_rows"]), logical_body.size.y,
+			"实际渲染的光柱每一行都必须贯穿到屏幕顶端")
+	assert_between(float(frame_a["column_fill_ratio"]), 0.85, 0.99,
+			"连续柱体必须覆盖九格宽度，同时通过边缘起伏避免等宽长方形")
+	assert_gte(int(frame_a["distinct_row_width_count"]), 4,
+			"主体至少需要四种横截面宽度，不能仍是等宽长方形")
+	assert_gt(int(frame_a["bright_pixel_count"]), 0,
+			"紫色主体、浅紫内层和象牙白亮核必须形成可测量的亮度层次")
+	assert_ne(int(frame_a["frame_signature"]), int(frame_b["frame_signature"]),
+			"维持阶段的上行能流必须持续变化，不能冲顶后成为静态白块")
+	assert_false(ResourceLoader.exists(
+			"res://assets/shaders/canvas_ui_portal_beam.gdshader"),
+			"程序化色带接管后不得继续保留旧光柱shader运行链")
 
 
 func test_mode_entry_source_no_longer_calls_wave_curtain_transition() -> void:
@@ -227,7 +318,7 @@ func test_main_menu_disables_wasd_and_keeps_mouse_as_only_movement_input() -> vo
 	assert_eq(Vector2i(world.get("_current_cell")), start)
 
 
-func test_main_menu_hover_draws_exact_rounded_target_and_regular_route_markers() -> void:
+func test_main_menu_hover_draws_exact_target_and_full_route_footprint_stream() -> void:
 	var menu: Control = _make_menu()
 	var world: MainMenuWorld = menu.get_node("MenuWorld") as MainMenuWorld
 	var target: Vector2i = Vector2i(world.get("_current_cell")) + Vector2i.LEFT * 3
@@ -251,6 +342,37 @@ func test_main_menu_hover_draws_exact_rounded_target_and_regular_route_markers()
 			"corner_radius_px")), 16.0, 0.001)
 	assert_almost_eq(float(world.route_target_material.get_shader_parameter(
 			"pixel_step_px")), 4.0, 0.001)
+	assert_almost_eq(float(world.route_target_material.get_shader_parameter(
+			"outline_alpha")), 1.0, 0.001,
+			"目标描边必须完全盖住底层格边，不能透出底部边线颜色")
+	var route_contract: Dictionary = GridRoutePreview.get_style_contract()
+	assert_eq(route_contract["implementation"],
+			"full_route_alternating_footprint_stream")
+	assert_true(bool(route_contract["uses_footprints"]))
+	assert_true(bool(route_contract["alternates_left_right"]))
+	assert_true(bool(route_contract["covers_full_route"]))
+	assert_true(bool(route_contract["count_scales_with_route_length"]))
+	assert_false(bool(route_contract["uses_fixed_visible_count"]))
+	assert_false(bool(route_contract["uses_footprint_count_cap"]))
+	assert_true(bool(route_contract["moves_continuously_forward"]))
+	assert_true(bool(route_contract["uses_distance_sampling"]))
+	assert_true(bool(route_contract["uses_smoothed_turn_tangents"]))
+	assert_false(bool(route_contract["uses_loop_gap"]))
+	assert_false(bool(route_contract["fills_every_path_cell"]))
+	assert_false(bool(route_contract["lights_individual_footprints"]))
+	assert_lt(float(route_contract["stream_speed_cells_per_second"]), 0.55)
+	assert_false(bool(route_contract["uses_inset_edge_bars"]))
+	assert_false(bool(route_contract["uses_arrows"]))
+	assert_false(bool(route_contract["uses_continuous_ribbon"]))
+	assert_false(bool(route_contract["uses_chevrons"]))
+	assert_false(bool(route_contract["uses_dashes"]))
+	assert_false(bool(route_contract["uses_nodes"]))
+	assert_false(bool(route_contract["uses_toe_details"]))
+	assert_false(bool(route_contract["uses_ground_shadow"]))
+	assert_false(bool(route_contract["uses_inner_core"]))
+	assert_false(bool(route_contract["uses_glow"]))
+	assert_false(bool(route_contract["uses_external_texture"]))
+	assert_false(bool(route_contract["uses_sprite_sheet"]))
 
 
 func test_global_wave_curtain_is_removed_from_all_regular_scene_changes() -> void:
@@ -279,32 +401,95 @@ func test_main_menu_reset_home_returns_to_this_loads_chosen_spawn() -> void:
 			"同一次主界面加载期间不得重新随机出生点")
 
 
-func test_main_menu_modes_are_direct_bottom_dock_buttons() -> void:
+func test_main_menu_uses_single_banner_and_pre_anchor_bottom_dock() -> void:
 	var menu: Control = _make_menu()
 	await get_tree().create_timer(1.1).timeout
-	for path: String in ["UI/ModeMatch", "UI/ModeTower"]:
-		var entry := menu.get_node(path) as Button
-		assert_not_null(entry)
-		assert_null(entry.get_script(), "匹配与远征不再使用世界卡片脚本")
-		assert_eq(entry.focus_mode, Control.FOCUS_ALL)
-		assert_false(entry.disabled)
-		assert_true(entry.size.is_equal_approx(Vector2(108, 108)))
-		assert_almost_eq(entry.position.y, 916.0, 0.01)
-		assert_eq(entry.text, "")
-		assert_null(entry.get_node_or_null("Caption"), "底部按钮不得保留文字标题")
-		assert_null(entry.get_node_or_null("Status"), "底部按钮不得保留计时文字")
-		var icon_size := (entry.get_node("Icon") as TextureRect).size
-		assert_almost_eq(icon_size.x, 64.0, 0.001)
-		assert_almost_eq(icon_size.y, 64.0, 0.001)
-	assert_eq((menu.get_node("UI/ModeTower") as Button).position.x
-			- ((menu.get_node("UI/ModeMatch") as Button).position.x + 108.0), 24.0)
+	var expected_banner_rect := Rect2(Vector2(788.0, 916.0), Vector2(344.0, 108.0))
+	var expected_switch_rect := Rect2(Vector2(1156.0, 934.0), Vector2(72.0, 72.0))
+	assert_null(menu.get_node_or_null("UI/ModeMatch"))
+	assert_null(menu.get_node_or_null("UI/ModeTower"))
+	var banner_button := menu.get_node("UI/ModeBanner") as Button
+	var switch_button := menu.get_node("UI/ModeSwitch") as Button
+	assert_true(Rect2(banner_button.position, banner_button.size).is_equal_approx(
+			expected_banner_rect), "中央Banner恢复到格子锚定式实施前的位置")
+	assert_true(Rect2(switch_button.position, switch_button.size).is_equal_approx(
+			expected_switch_rect), "模式切换钮恢复到Banner右侧的独立位置")
+	assert_eq(banner_button.text, "")
+	assert_eq(switch_button.text, "")
+	var banner_art := banner_button.get_node("Banner") as TextureRect
+	assert_eq(banner_art.texture.resource_path,
+			"res://assets/ui/main_menu/battle_banner.png")
+	assert_eq(banner_art.stretch_mode, TextureRect.STRETCH_KEEP_ASPECT_COVERED)
+	assert_eq(banner_art.offset_left, 0.0)
+	assert_eq(banner_art.offset_top, 0.0)
+	assert_eq(banner_art.offset_right, 0.0)
+	assert_eq(banner_art.offset_bottom, 0.0)
+	assert_not_null(banner_art.material,
+			"像素外框必须直接作用于Banner图片，不得只放在图片背后")
+	if banner_art.material != null:
+		assert_eq((banner_art.material as ShaderMaterial).shader.resource_path,
+				"res://assets/shaders/canvas_mode_banner_frame.gdshader")
+	var banner_bg := banner_button.get_node("Bg") as ColorRect
+	var banner_material := banner_bg.material as ShaderMaterial
+	assert_eq(banner_material.shader.resource_path,
+			"res://assets/shaders/canvas_button_jelly.gdshader")
+	assert_almost_eq(float(banner_material.get_shader_parameter("aspect")),
+			expected_banner_rect.size.aspect(), 0.001,
+			"Banner像素框必须按长方形比例计算，不得拉伸方钮边框")
+	assert_eq(banner_material.get_shader_parameter("fill_top"),
+			Color(0.92, 0.87, 0.70), "主界面必须恢复战斗UI的奶油纸面色系")
+	assert_not_null(banner_button.get_node_or_null("BottomShadow"),
+			"Banner复用图鉴、背包的同形底部投影")
+	assert_false(banner_bg.visible,
+			"Banner画面填满内部时，不得让奶油底板透过画面形成第二层底色")
+	var frame_overlay := banner_button.get_node("FrameOverlay") as ColorRect
+	var frame_material := frame_overlay.material as ShaderMaterial
+	assert_eq(frame_material.shader.resource_path,
+			"res://assets/shaders/canvas_button_jelly.gdshader")
+	assert_almost_eq(float(frame_material.get_shader_parameter("fill_alpha")),
+			0.0, 0.001, "外框中心必须透明，让Banner填满内部")
+	assert_almost_eq(float(frame_material.get_shader_parameter("aspect")),
+			expected_banner_rect.size.aspect(), 0.001)
+	assert_eq(banner_button.get_child(banner_button.get_child_count() - 1),
+			frame_overlay, "像素外框必须覆盖在Banner画面之上")
+	assert_null(banner_button.get_node_or_null("BannerShadow"),
+			"不再复制Banner图片模拟投影")
+	assert_null(switch_button.get_node_or_null("Icon"),
+			"模式切换不得继续使用语义含混的通用switch图标")
+	var carousel_glyph := switch_button.get_node("CarouselGlyph") as Control
+	assert_eq(int(carousel_glyph.get("selected_index")), 0)
+	var switch_bg := switch_button.get_node("Bg") as ColorRect
+	assert_eq((switch_bg.material as ShaderMaterial).shader.resource_path,
+			"res://assets/shaders/canvas_button_jelly.gdshader")
+	assert_almost_eq(float((switch_bg.material as ShaderMaterial).get_shader_parameter(
+			"aspect")), 1.0, 0.001)
+	assert_null(banner_button.get_node_or_null("GridAnchor"),
+			"屏幕层UI不得继续描亮地面格子")
+	var layout_contract: Dictionary = menu.call("get_bottom_ui_layout_contract")
+	assert_eq(layout_contract["implementation"], "single_banner_bottom_dock")
+	assert_false(bool(layout_contract["uses_continuous_bottom_bar"]))
+	assert_true(bool(layout_contract["uses_separate_ui_islands"]))
+	assert_false(bool(layout_contract["secondary_tabs_partially_offscreen"]))
+	assert_true(bool(layout_contract["reuses_battle_ui_palette"]))
+	assert_false(bool(layout_contract["switch_overlaps_banner_edge"]))
+	assert_eq(banner_button.find_children("Banner", "TextureRect", true, false).size(), 1,
+			"两个模式只能交换同一张Banner，不得同时挂两张图")
+	switch_button.pressed.emit()
+	assert_eq(banner_art.texture.resource_path,
+			"res://assets/ui/main_menu/expedition_banner.png")
+	assert_eq(int(carousel_glyph.get("selected_index")), 1,
+			"轮播箭头与页码必须跟随当前模式反向")
+	assert_eq((menu.get_node("UI/NavHeroes") as Button).position, Vector2(48.0, 916.0))
+	assert_eq((menu.get_node("UI/NavBackpack") as Button).position, Vector2(1640.0, 916.0))
+	assert_eq((menu.get_node("UI/NavWarehouse") as Button).position, Vector2(1772.0, 916.0))
+	assert_eq((menu.get_node("UI/NetLobbyButton") as Button).position, Vector2(1652.0, 108.0))
 
 
 func test_main_menu_merges_hero_and_item_codex_entry() -> void:
 	var menu: Control = _make_menu()
 	for path: String in [
 		"UI/IdentityButton", "UI/SettingsButton", "UI/QuitButton",
-		"UI/NavHeroes", "UI/NavBackpack",
+		"UI/NavHeroes", "UI/NavBackpack", "UI/NavWarehouse",
 	]:
 		var button := menu.get_node(path) as Button
 		assert_not_null(button, "%s 必须保留直接点击入口" % path)
@@ -312,19 +497,21 @@ func test_main_menu_merges_hero_and_item_codex_entry() -> void:
 	var codex := menu.get_node("UI/NavHeroes") as Button
 	assert_eq(codex.text, "", "主菜单图鉴入口与战斗 UI 一致，不再保留文字")
 	assert_true(codex.size.is_equal_approx(Vector2(108.0, 108.0)),
-			"主菜单图鉴入口复用战斗 UI 的 108x108 尺寸")
+			"次要入口恢复为格子锚定式之前的完整方形按钮")
 	assert_null(codex.get_node_or_null("Plate"), "图鉴入口不再使用主菜单长条羊皮板")
 	var book := codex.get_node("BookIcon") as TextureRect
 	assert_eq(book.texture.resource_path, "res://assets/ui/icons/codex_book.png",
 			"合并入口使用战斗 UI 的书本图标")
-	assert_eq(book.size, Vector2(64.0, 64.0), "书本图标保持战斗 UI 的 64x64 真像素尺寸")
+	assert_true(book.size.is_equal_approx(Vector2(64.0, 64.0)),
+			"完整方钮恢复原有图标占比")
 	var bg := codex.get_node("Bg") as ColorRect
 	assert_eq((bg.material as ShaderMaterial).shader.resource_path,
 			"res://assets/shaders/canvas_button_jelly.gdshader")
 	assert_eq((bg.material as ShaderMaterial).get_shader_parameter("fill_top"),
-			Color(0.92, 0.87, 0.70), "图鉴方钮复用战斗 UI 奶油纸上色")
+			Color(0.92, 0.87, 0.70), "底部按钮复用战斗UI奶油纸面上色")
 	assert_not_null(codex.get_node_or_null("ButtonJuice"), "图鉴方钮复用战斗 UI 按压反馈")
 	assert_not_null(codex.get_node_or_null("BottomShadow"), "图鉴方钮复用战斗 UI 下投影")
+	assert_null(codex.get_node_or_null("GridAnchor"), "回退状态不得包含格子锚定描边")
 	assert_null(menu.get_node_or_null("UI/NavItems"), "旧道具独立入口彻底退出场景")
 	assert_null(menu.get_node_or_null("UI/NavShop"), "商店占位 UI 彻底退出场景")
 	var backpack := menu.get_node("UI/NavBackpack") as Button
@@ -332,7 +519,26 @@ func test_main_menu_merges_hero_and_item_codex_entry() -> void:
 			"res://assets/ui/icons/backpack.png")
 	assert_null(backpack.get_node_or_null("Caption"))
 	assert_eq(backpack.tooltip_text, "背包")
+	var warehouse := menu.get_node("UI/NavWarehouse") as Button
+	assert_eq(warehouse.text, "")
+	assert_eq(warehouse.tooltip_text, "仓库（占位）")
+	assert_not_null(warehouse.get_node_or_null("Icon"))
 	assert_not_null(menu.get_node_or_null("UI/IdentityButton/AvatarFrame"))
+
+
+func test_pre_anchor_shortcut_stays_fully_visible_on_hover() -> void:
+	var menu: Control = _make_menu()
+	await get_tree().create_timer(1.1).timeout
+	var codex := menu.get_node("UI/NavHeroes") as Button
+	var home_position: Vector2 = codex.position
+	assert_lte(codex.position.y + codex.size.y, MainMenuWorld.VIEW_SIZE.y,
+			"前锚定版本的方钮必须完整处于屏幕内")
+	codex.mouse_entered.emit()
+	await get_tree().create_timer(0.14).timeout
+	assert_true(codex.position.is_equal_approx(home_position),
+			"前锚定版本没有边缘标签升降行为")
+	codex.mouse_exited.emit()
+	assert_true(codex.position.is_equal_approx(home_position))
 
 
 func test_world_focus_only_changes_presentation_state() -> void:
@@ -348,14 +554,15 @@ func test_world_focus_only_changes_presentation_state() -> void:
 
 func test_match_state_uses_icon_and_blue_portal_energy_then_restores_on_cancel() -> void:
 	var menu: Control = _make_menu()
-	var match_entry := menu.get_node("UI/ModeMatch") as Button
+	var match_entry := menu.get_node("UI/ModeBanner") as Button
 	var world := menu.get_node("MenuWorld") as MainMenuWorld
 	menu.call("_start_search")
 	await get_tree().create_timer(1.15).timeout
 	assert_null(match_entry.get_node_or_null("Caption"))
 	assert_null(match_entry.get_node_or_null("Status"))
 	assert_eq(match_entry.tooltip_text, "匹配中 0:01")
-	assert_eq((match_entry.get_node("Bg") as ColorRect).self_modulate, Color("FFD4B8"))
+	assert_eq((match_entry.get_node("Banner") as TextureRect).self_modulate,
+			Color("FFD4B8"))
 	for stone: TextureRect in world.portal_stones:
 		assert_eq((stone.material as ShaderMaterial).get_shader_parameter("energy_color"),
 				MainMenuWorld.PORTAL_ENERGY_BLUE)
@@ -369,6 +576,7 @@ func test_match_state_uses_icon_and_blue_portal_energy_then_restores_on_cancel()
 	assert_true(bool(world.get_visual_contract()["portal_connection_complete"]))
 	menu.call("_cancel_search")
 	assert_eq(match_entry.tooltip_text, "匹配")
-	assert_eq((match_entry.get_node("Bg") as ColorRect).self_modulate, Color.WHITE)
+	assert_eq((match_entry.get_node("Banner") as TextureRect).self_modulate,
+			Color.WHITE)
 	await get_tree().create_timer(0.35).timeout
 	assert_almost_eq(float(world.get_visual_contract()["portal_energy_mix"]), 0.0, 0.001)

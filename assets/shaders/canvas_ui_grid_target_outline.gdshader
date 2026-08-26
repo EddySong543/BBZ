@@ -6,6 +6,8 @@ uniform float cell_inset_px = 1.0;
 uniform float corner_radius_px = 16.0;
 uniform float pixel_step_px = 4.0;
 uniform float outline_px = 4.0;
+uniform float outline_alpha : hint_range(0.0, 1.0) = 1.0;
+uniform float fill_alpha : hint_range(0.0, 1.0) = 0.10;
 uniform vec4 target_color : source_color = vec4(1.0, 0.88, 0.63, 1.0);
 
 varying vec2 local_position;
@@ -41,7 +43,7 @@ void fragment() {
 			cell_inset_px + outline_px,
 			max(corner_radius_px - outline_px, pixel_step_px));
 	float outline = outer * (1.0 - inner);
-	float fill = inner * 0.08;
+	float fill = inner * fill_alpha;
 	COLOR = vec4(target_color.rgb,
-			target_color.a * clamp(outline * 0.96 + fill, 0.0, 1.0));
+			target_color.a * clamp(outline * outline_alpha + fill, 0.0, 1.0));
 }

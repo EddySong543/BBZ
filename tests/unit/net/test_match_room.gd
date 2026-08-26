@@ -535,7 +535,7 @@ func test_match_room_tianluo_cancels_h07_preview_for_both_players_and_arrival_or
 			assert_eq(room.battle.hp[tianluo_player][0], enemy_hp_before,
 				"被取消的星日登场不能先造成冲撞")
 			assert_eq(room.battle.shield[h07_player][1], 0,
-				"被取消的夜明珠不能给预览目标护盾")
+				"被取消的夜明珠不能给预览目标护甲")
 			assert_eq(int(room.battle.relics[h07_player][0]["state"].get("charges", 0)), 3,
 				"被取消的夜明珠不能消耗次数")
 			assert_eq(int(room.battle.get_status(h07_player, 0, "vuln", 0)), 3,

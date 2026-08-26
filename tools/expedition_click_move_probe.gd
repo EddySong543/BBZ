@@ -36,6 +36,71 @@ func _run() -> void:
 	if screen._cell_from_map_view_position(click.position) != target:
 		_fail("view-to-cell conversion mismatch")
 		return
+	var hover := InputEventMouseMotion.new()
+	hover.position = click.position
+	screen._on_map_view_gui_input(hover)
+	await process_frame
+	var route_contract: Dictionary = GridRoutePreview.get_style_contract()
+	if String(route_contract.get("implementation", "")) \
+			!= "full_route_alternating_footprint_stream":
+		_fail("route preview is not using the full-route footprint stream")
+		return
+	if not bool(route_contract.get("uses_footprints", false)) \
+			or not bool(route_contract.get("alternates_left_right", false)) \
+			or not bool(route_contract.get("covers_full_route", false)) \
+			or not bool(route_contract.get("count_scales_with_route_length", false)) \
+			or bool(route_contract.get("uses_fixed_visible_count", true)) \
+			or bool(route_contract.get("uses_footprint_count_cap", true)) \
+			or not bool(route_contract.get("moves_continuously_forward", false)) \
+			or float(route_contract.get("stream_speed_cells_per_second", 1.0)) >= 0.55 \
+			or not bool(route_contract.get("uses_distance_sampling", false)) \
+			or bool(route_contract.get("uses_loop_gap", true)) \
+			or bool(route_contract.get("fills_every_path_cell", true)) \
+			or bool(route_contract.get("lights_individual_footprints", true)) \
+			or bool(route_contract.get("uses_ground_shadow", true)) \
+			or bool(route_contract.get("uses_inner_core", true)) \
+			or bool(route_contract.get("uses_glow", true)) \
+			or bool(route_contract.get("uses_inset_edge_bars", true)) \
+			or bool(route_contract.get("uses_arrows", true)) \
+			or bool(route_contract.get("uses_continuous_ribbon", true)) \
+			or bool(route_contract.get("uses_chevrons", true)) \
+			or bool(route_contract.get("uses_toe_details", true)):
+		_fail("route preview still uses a rejected route family")
+		return
+	if screen._hovered_map_cell != target or screen._hovered_map_path.is_empty():
+		_fail("continuous footprint stream did not receive the hover route")
+		return
+	var runtime_route_cells: Array[Vector2i] = [start]
+	runtime_route_cells.append_array(screen._hovered_map_path)
+	var runtime_footprints_a: Array[Dictionary] = \
+			GridRoutePreview.build_stream_footprints(runtime_route_cells, 120.0, 0.0)
+	var runtime_footprints_b: Array[Dictionary] = \
+			GridRoutePreview.build_stream_footprints(runtime_route_cells, 120.0, 0.25)
+	if runtime_footprints_a.is_empty():
+		_fail("expedition full-route footprint stream is empty")
+		return
+	if runtime_footprints_a.size() != runtime_footprints_b.size():
+		_fail("expedition footprint stream changes count during ordinary motion")
+		return
+	var long_route_cells: Array[Vector2i] = []
+	for route_index: int in 10:
+		long_route_cells.append(Vector2i(route_index, 0))
+	if GridRoutePreview.build_stream_footprints(
+			long_route_cells, 120.0, 0.0).size() <= runtime_footprints_a.size():
+		_fail("expedition footprint count does not scale with route length")
+		return
+	for index: int in runtime_footprints_a.size():
+		var footprint_a: Dictionary = runtime_footprints_a[index]
+		var footprint_b: Dictionary = runtime_footprints_b[index]
+		var parts: Array[PackedVector2Array] = footprint_a["parts"]
+		if parts.size() != 2 or parts[0].size() != 6 or parts[1].size() != 4:
+			_fail("expedition footprint does not use the forefoot and heel sole")
+			return
+		if int(footprint_a["stream_index"]) != int(footprint_b["stream_index"]) \
+				or float(footprint_b["path_distance"]) \
+				<= float(footprint_a["path_distance"]):
+			_fail("expedition footprint train does not move continuously forward")
+			return
 	screen._on_map_view_gui_input(click)
 	var movement_deadline: int = Time.get_ticks_msec() + 3000
 	while (screen.map.player != target or screen._click_route_active) \

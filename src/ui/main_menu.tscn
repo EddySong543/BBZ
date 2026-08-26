@@ -81,37 +81,44 @@ text = "退出"
 [node name="VersionLabel" type="Label" parent="UI"]
 layout_mode = 0
 offset_left = 1700.0
-offset_top = 1044.0
+offset_top = 168.0
 offset_right = 1872.0
-offset_bottom = 1068.0
+offset_bottom = 192.0
 text = "v0.6"
 horizontal_alignment = 2
 mouse_filter = 2
 
-[node name="ModeMatch" type="Button" parent="UI"]
+[node name="ModeBanner" type="Button" parent="UI"]
 layout_mode = 0
-offset_left = 708.0
+offset_left = 788.0
 offset_top = 916.0
-offset_right = 816.0
+offset_right = 1132.0
 offset_bottom = 1024.0
 
-[node name="ModeTower" type="Button" parent="UI"]
+[node name="ModeSwitch" type="Button" parent="UI"]
 layout_mode = 0
-offset_left = 840.0
-offset_top = 916.0
-offset_right = 948.0
-offset_bottom = 1024.0
+offset_left = 1156.0
+offset_top = 934.0
+offset_right = 1228.0
+offset_bottom = 1006.0
 
 [node name="NavHeroes" type="Button" parent="UI"]
 layout_mode = 0
-offset_left = 972.0
+offset_left = 48.0
 offset_top = 916.0
-offset_right = 1080.0
+offset_right = 156.0
 offset_bottom = 1024.0
 
 [node name="NavBackpack" type="Button" parent="UI"]
 layout_mode = 0
-offset_left = 1104.0
+offset_left = 1640.0
 offset_top = 916.0
-offset_right = 1212.0
+offset_right = 1748.0
+offset_bottom = 1024.0
+
+[node name="NavWarehouse" type="Button" parent="UI"]
+layout_mode = 0
+offset_left = 1772.0
+offset_top = 916.0
+offset_right = 1880.0
 offset_bottom = 1024.0

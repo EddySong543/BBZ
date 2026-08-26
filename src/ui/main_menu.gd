@@ -1,7 +1,7 @@
 extends Control
 
 ## 主菜单 = 晴风驿站功能大厅。远征地表与英雄只承担世界呈现；所有入口仍可直接点击。
-## WASD 或左键点格可让角色在纯展示地图中逐格行走；入口按钮仍是主操作，不创建远征背包或结算状态。
+## 左键点格可让角色在纯展示地图中逐格行走；入口按钮仍是主操作，不创建远征背包或结算状态。
 
 const BP_SCENE := "res://src/ui/bp_screen.tscn"
 const EXPEDITION_SCENE := "res://src/expedition/expedition_screen.tscn"
@@ -13,6 +13,7 @@ const ProfileStore := preload("res://src/core/player_profile.gd")   # 个人资�
 # ---- 匹配状态机：IDLE 点入口=开始；SEARCHING 再点/ESC/取消钮=取消；FOUND 锁输入。----
 # 本地用 mock_match_seconds 定时模拟匹配成功；联机时把定时器换成真匹配回调，状态机原样复用。
 enum MatchState { IDLE, SEARCHING, FOUND }
+enum PrimaryMode { MATCH, EXPEDITION }
 
 ## 本地测试模拟匹配时长（秒）。联机接入后弃用。
 @export var mock_match_seconds: float = 3.0
@@ -28,20 +29,75 @@ var _cancel_btn: Button   # 匹配中才出现的「✕ 取消匹配」（_setup
 const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")   # 235×55·v14 净面版（2026-07-16 Eddy 定内饰多余·img_inner_clear 去回纹钩+内线·只留深咖外框+净纸面）
 const CODEX_ICON_TEX := preload("res://assets/ui/icons/codex_book.png")
 const BACKPACK_ICON_TEX := preload("res://assets/ui/icons/backpack.png")
+const BATTLE_BANNER_TEX := preload("res://assets/ui/main_menu/battle_banner.png")
+const EXPEDITION_BANNER_TEX := preload("res://assets/ui/main_menu/expedition_banner.png")
 const CODEX_JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")
+const MODE_BANNER_FRAME_SHADER := preload(
+		"res://assets/shaders/canvas_mode_banner_frame.gdshader")
 const UI_BOTTOM_SHADOW_OFFSET := Vector2(3.0, 6.0)
 const UI_BOTTOM_SHADOW_COLOR := Color(0.02, 0.012, 0.008, 0.52)
+const BATTLE_UI_FILL_TOP := Color(0.92, 0.87, 0.70)
+const BATTLE_UI_FILL_BOTTOM := Color(0.76, 0.68, 0.50)
+const BATTLE_UI_EDGE_INNER := Color(1.0, 0.95, 0.80)
+const BATTLE_UI_EDGE_OUTER := Color(0.1, 0.09, 0.11)
+const DOCK_BUTTON_SIZE := Vector2(108.0, 108.0)
+const MODE_SWITCH_SIZE := Vector2(72.0, 72.0)
 const PIXEL_FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")   # 身份带悬停金晕外环
 const NAV_PLATE_MARGIN_X := 22.0   # 9-slice 边距（v14 净面后内里全纸·任意≥框厚均可·沿用实钩期数值）
 const NAV_PLATE_MARGIN_Y := 20.0
 const INK := Color(0.20, 0.14, 0.08)        # 墨（羊皮上的字/图标）
 const CREAM := Color(0.95, 0.91, 0.80)      # 暖米白（直接压在暗波上的字·非羊皮上）
 
-@onready var _match_entry: Button = $UI/ModeMatch
+
+## 单Banner模式选择采用轮播语义：大块箭头指向下一个模式，双页码显示当前位置。
+## 箭头由整数坐标块组成，不依赖外部switch图标，也不会引入平滑矢量观感。
+class ModeCarouselGlyph extends Control:
+	const GLYPH_INK := Color(0.20, 0.14, 0.08)
+	const GLYPH_ACTIVE := Color(0.78, 0.53, 0.18)
+	const GLYPH_MUTED := Color(0.20, 0.14, 0.08, 0.28)
+
+	var selected_index: int = 0
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		resized.connect(queue_redraw)
+
+	func set_selected_index(value: int) -> void:
+		selected_index = clampi(value, 0, 1)
+		queue_redraw()
+
+	func _draw() -> void:
+		if size.x <= 0.0 or size.y <= 0.0:
+			return
+		var glyph_offset := (size - Vector2(56.0, 56.0)) * 0.5
+		var arrow := PackedVector2Array([
+			Vector2(9.0, 20.0), Vector2(27.0, 20.0),
+			Vector2(27.0, 15.0), Vector2(34.0, 15.0),
+			Vector2(34.0, 18.0), Vector2(41.0, 18.0),
+			Vector2(41.0, 21.0), Vector2(49.0, 21.0),
+			Vector2(49.0, 33.0), Vector2(41.0, 33.0),
+			Vector2(41.0, 36.0), Vector2(34.0, 36.0),
+			Vector2(34.0, 39.0), Vector2(27.0, 39.0),
+			Vector2(27.0, 34.0), Vector2(9.0, 34.0),
+		])
+		for index: int in arrow.size():
+			arrow[index] += glyph_offset
+		if selected_index == 1:
+			for index: int in arrow.size():
+				arrow[index].x = size.x - arrow[index].x
+		draw_colored_polygon(arrow, GLYPH_INK)
+		for index: int in 2:
+			var pip_color := GLYPH_ACTIVE if index == selected_index else GLYPH_MUTED
+			draw_rect(Rect2(glyph_offset + Vector2(18.0 + index * 15.0, 46.0),
+					Vector2(8.0, 5.0)), pip_color)
+
+@onready var _match_entry: Button = $UI/ModeBanner
+@onready var _mode_switch: Button = $UI/ModeSwitch
 @onready var _menu_world: MainMenuWorld = $MenuWorld
 
 var _backpack_overlay: BackpackScreen
 var _codex_overlay: Control
+var _primary_mode: int = PrimaryMode.MATCH
 
 
 func _ready() -> void:
@@ -194,31 +250,173 @@ func _open_settings() -> void:
 	add_child(panel)
 
 
-## 匹配与远征改为底部直接入口，不再与展示地图的目标格绑定。
+## 匹配与远征共用一个Banner主入口；右侧小钮只切换当前模式，不直接启动。
 func _setup_modes() -> void:
-	($UI/ModeMatch as Button).pressed.connect(_on_match_pressed)
-	($UI/ModeTower as Button).pressed.connect(_on_expedition_pressed)
+	_setup_mode_banner_button()
+	_setup_mode_carousel_button()
+	_match_entry.pressed.connect(_on_mode_banner_pressed)
+	_mode_switch.pressed.connect(_on_mode_switch_pressed)
+	_refresh_mode_banner()
 	_build_cancel_button()
 	_build_net_button()
 	_match_entry.grab_focus()
 
 
-## M1：局域网对战入口（右下低调工具钮，不与三个世界入口抢层级）。
+func _setup_mode_banner_button() -> void:
+	_match_entry.text = ""
+	_match_entry.clip_contents = false
+	for state: String in ["normal", "hover", "pressed", "focus", "disabled"]:
+		_match_entry.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+
+	var bg := ColorRect.new()
+	bg.name = "Bg"
+	bg.color = Color.WHITE
+	var material := ShaderMaterial.new()
+	material.shader = CODEX_JELLY_SHADER
+	material.set_shader_parameter("fill_top", BATTLE_UI_FILL_TOP)
+	material.set_shader_parameter("fill_bottom", BATTLE_UI_FILL_BOTTOM)
+	material.set_shader_parameter("edge_inner", BATTLE_UI_EDGE_INNER)
+	material.set_shader_parameter("edge_outer", BATTLE_UI_EDGE_OUTER)
+	material.set_shader_parameter("fill_alpha", 1.0)
+	material.set_shader_parameter("pixel_grid", 38.0)
+	material.set_shader_parameter("corner", 0.08)
+	material.set_shader_parameter("edge_px", 2.0)
+	material.set_shader_parameter("aspect", _match_entry.size.x / _match_entry.size.y)
+	material.set_shader_parameter("noise_amt", 0.08)
+	material.set_shader_parameter("wear", 0.24)
+	material.set_shader_parameter("solid_rim", true)
+	material.set_shader_parameter("rim_px", 1.5)
+	bg.material = material
+	bg.show_behind_parent = true
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_match_entry.add_child(bg)
+	_attach_bottom_shadow(_match_entry)
+	bg.visible = false
+
+	var banner := TextureRect.new()
+	banner.name = "Banner"
+	banner.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	banner.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	banner.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	banner.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var image_material := ShaderMaterial.new()
+	image_material.shader = MODE_BANNER_FRAME_SHADER
+	image_material.set_shader_parameter("pixel_grid", 38.0)
+	image_material.set_shader_parameter("corner", 0.08)
+	image_material.set_shader_parameter("aspect", _match_entry.size.x / _match_entry.size.y)
+	banner.material = image_material
+	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_match_entry.add_child(banner)
+	_attach_juice(_match_entry)
+
+	var frame_overlay := ColorRect.new()
+	frame_overlay.name = "FrameOverlay"
+	frame_overlay.color = Color.WHITE
+	var overlay_material := ShaderMaterial.new()
+	overlay_material.shader = CODEX_JELLY_SHADER
+	overlay_material.set_shader_parameter("fill_top", BATTLE_UI_FILL_TOP)
+	overlay_material.set_shader_parameter("fill_bottom", BATTLE_UI_FILL_BOTTOM)
+	overlay_material.set_shader_parameter("edge_inner", BATTLE_UI_EDGE_INNER)
+	overlay_material.set_shader_parameter("edge_outer", BATTLE_UI_EDGE_OUTER)
+	overlay_material.set_shader_parameter("fill_alpha", 0.0)
+	overlay_material.set_shader_parameter("pixel_grid", 38.0)
+	overlay_material.set_shader_parameter("corner", 0.08)
+	overlay_material.set_shader_parameter("edge_px", 2.0)
+	overlay_material.set_shader_parameter("aspect", _match_entry.size.x / _match_entry.size.y)
+	overlay_material.set_shader_parameter("noise_amt", 0.0)
+	overlay_material.set_shader_parameter("wear", 0.0)
+	overlay_material.set_shader_parameter("solid_rim", true)
+	overlay_material.set_shader_parameter("rim_px", 1.5)
+	frame_overlay.material = overlay_material
+	frame_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	frame_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_match_entry.add_child(frame_overlay)
+
+
+func _setup_mode_carousel_button() -> void:
+	_mode_switch.text = ""
+	_mode_switch.clip_contents = false
+	for state: String in ["normal", "hover", "pressed", "focus", "disabled"]:
+		_mode_switch.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+
+	var bg := ColorRect.new()
+	bg.name = "Bg"
+	bg.color = Color.WHITE
+	var material := ShaderMaterial.new()
+	material.shader = CODEX_JELLY_SHADER
+	material.set_shader_parameter("fill_top", BATTLE_UI_FILL_TOP)
+	material.set_shader_parameter("fill_bottom", BATTLE_UI_FILL_BOTTOM)
+	material.set_shader_parameter("edge_inner", BATTLE_UI_EDGE_INNER)
+	material.set_shader_parameter("edge_outer", BATTLE_UI_EDGE_OUTER)
+	material.set_shader_parameter("fill_alpha", 1.0)
+	material.set_shader_parameter("pixel_grid", 38.0)
+	material.set_shader_parameter("corner", 0.16)
+	material.set_shader_parameter("edge_px", 2.0)
+	material.set_shader_parameter("aspect", _mode_switch.size.x / _mode_switch.size.y)
+	material.set_shader_parameter("noise_amt", 0.08)
+	material.set_shader_parameter("wear", 0.24)
+	material.set_shader_parameter("solid_rim", true)
+	material.set_shader_parameter("rim_px", 1.5)
+	bg.material = material
+	bg.show_behind_parent = true
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_mode_switch.add_child(bg)
+
+	var glyph := ModeCarouselGlyph.new()
+	glyph.name = "CarouselGlyph"
+	glyph.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_mode_switch.add_child(glyph)
+	_attach_juice(_mode_switch)
+	_attach_bottom_shadow(_mode_switch)
+
+
+func _refresh_mode_banner() -> void:
+	var is_match: bool = _primary_mode == PrimaryMode.MATCH
+	var texture: Texture2D = BATTLE_BANNER_TEX if is_match else EXPEDITION_BANNER_TEX
+	(_match_entry.get_node("Banner") as TextureRect).texture = texture
+	(_mode_switch.get_node("CarouselGlyph") as ModeCarouselGlyph).set_selected_index(
+			0 if is_match else 1)
+	_match_entry.tooltip_text = tr("匹配") if is_match else tr("远征")
+	_mode_switch.tooltip_text = tr("切换至远征") if is_match else tr("切换至匹配")
+
+
+func _on_mode_banner_pressed() -> void:
+	if _primary_mode == PrimaryMode.MATCH:
+		_on_match_pressed()
+	else:
+		_on_expedition_pressed()
+
+
+func _on_mode_switch_pressed() -> void:
+	if _match_state != MatchState.IDLE:
+		return
+	_primary_mode = PrimaryMode.EXPEDITION \
+			if _primary_mode == PrimaryMode.MATCH else PrimaryMode.MATCH
+	_refresh_mode_banner()
+
+
+## M1：局域网对战入口移至右上设置下方，不与中央模式Banner抢层级。
 func _build_net_button() -> void:
 	var b := Button.new()
 	b.name = "NetLobbyButton"
 	b.text = tr("联机对战·局域网")
-	b.position = Vector2(1660, 980)
+	b.position = Vector2(1652, 108)
 	b.size = Vector2(220, 52)
-	b.modulate = Color(1, 1, 1, 0.75)
 	FontManager.apply_btn(b, 16)
+	b.add_theme_color_override("font_color", INK)
+	_apply_plate(b)
+	_set_btn_left_margin(b, 38.0)
+	_add_icon(b, Rect2(12, 12, 28, 28), "duel")
+	_attach_juice(b)
 	b.pressed.connect(func() -> void:
 		if _match_state == MatchState.IDLE:
 			TransitionManager.transition_to("res://src/ui/net_lobby_screen.tscn"))
 	$UI.add_child(b)
 
 
-## 远征模式入口：四石充能完成后由中心九格光柱直接传送。匹配中不离队。
+## 远征模式入口：四石充能完成后由中央白色光柱直接传送。匹配中不离队。
 func _on_expedition_pressed() -> void:
 	if _match_state != MatchState.IDLE:
 		return
@@ -235,7 +433,7 @@ func _on_expedition_pressed() -> void:
 ## 「✕ 取消匹配」独立小钮（匹配中才出现·匹配入口正下方居中）。
 ## 不再挤在副标小字里（2026-06-12 Eddy："取消匹配感觉不明显"根修）。
 func _build_cancel_button() -> void:
-	var card := $UI/ModeMatch as Control
+	var card := $UI/ModeBanner as Control
 	_cancel_btn = Button.new()
 	_cancel_btn.name = "CancelMatchButton"
 	_cancel_btn.text = tr("✕ 取消匹配")
@@ -279,7 +477,7 @@ func _on_cancel_btn_pressed() -> void:
 
 ## 取消钮显隐：出现=淡入上浮；收起=即时隐藏（取消瞬间不该有残影挡点击）。
 func _show_cancel_button(on: bool) -> void:
-	var home_y: float = ($UI/ModeMatch as Control).position.y - 68.0
+	var home_y: float = ($UI/ModeBanner as Control).position.y - 68.0
 	if not on:
 		_cancel_btn.visible = false
 		_cancel_btn.position.y = home_y
@@ -293,18 +491,47 @@ func _show_cancel_button(on: bool) -> void:
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 
-## 底部四入口：匹配、远征、图鉴、背包共用战斗图鉴方钮语言，点击即执行。
+## 图鉴、背包与仓库保持为屏幕底部的独立直接入口。
 func _setup_dock() -> void:
-	_setup_square_dock_button(
-		$UI/ModeMatch as Button, PixelGlyphs.icon_texture("duel"), "匹配", true)
-	_setup_square_dock_button(
-		$UI/ModeTower as Button, PixelGlyphs.icon_texture("flag"), "远征", true)
 	_setup_square_dock_button(
 		$UI/NavHeroes as Button, CODEX_ICON_TEX, "图鉴", false)
 	_setup_square_dock_button(
 		$UI/NavBackpack as Button, BACKPACK_ICON_TEX, "背包", false)
+	_setup_square_dock_button(
+		$UI/NavWarehouse as Button, PixelGlyphs.icon_texture("potion"),
+		"仓库（占位）", true)
 	($UI/NavHeroes as Button).pressed.connect(_on_codex_pressed)
 	($UI/NavBackpack as Button).pressed.connect(_on_backpack_pressed)
+	($UI/NavWarehouse as Button).pressed.connect(_on_warehouse_placeholder_pressed)
+
+
+func get_bottom_ui_layout_contract() -> Dictionary:
+	return {
+		"implementation": "single_banner_bottom_dock",
+		"uses_continuous_bottom_bar": false,
+		"uses_separate_ui_islands": true,
+		"secondary_tabs_partially_offscreen": false,
+		"reuses_battle_ui_palette": true,
+		"uses_grid_anchor_outline": false,
+		"banner_rect": Rect2(_match_entry.position, _match_entry.size),
+		"switch_rect": Rect2(_mode_switch.position, _mode_switch.size),
+		"switch_overlaps_banner_edge": _mode_switch.position.x \
+				< _match_entry.position.x + _match_entry.size.x,
+		"shortcut_size": DOCK_BUTTON_SIZE,
+		"switch_size": MODE_SWITCH_SIZE,
+		"frame_fill_top": BATTLE_UI_FILL_TOP,
+		"frame_fill_bottom": BATTLE_UI_FILL_BOTTOM,
+		"frame_edge_inner": BATTLE_UI_EDGE_INNER,
+		"secondary_tab_positions": PackedVector2Array([
+			($UI/NavHeroes as Button).position,
+			($UI/NavBackpack as Button).position,
+			($UI/NavWarehouse as Button).position,
+		]),
+	}
+
+
+func _on_warehouse_placeholder_pressed() -> void:
+	_flash_dock_button($UI/NavWarehouse as Button)
 
 
 func _setup_backpack_overlay() -> void:
@@ -321,7 +548,7 @@ func _setup_codex_overlay() -> void:
 	_codex_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 
-## 与战斗 UI 的 BtnCodex 同尺寸、同材质；底部入口只显示居中图标。
+## 次要入口复用战斗UI材质，只显示居中图标。
 func _setup_square_dock_button(
 		btn: Button, icon_texture: Texture2D, tooltip: String, tint_icon: bool) -> void:
 	btn.text = ""
@@ -335,10 +562,10 @@ func _setup_square_dock_button(
 	bg.color = Color.WHITE
 	var material := ShaderMaterial.new()
 	material.shader = CODEX_JELLY_SHADER
-	material.set_shader_parameter("fill_top", Color(0.92, 0.87, 0.70))
-	material.set_shader_parameter("fill_bottom", Color(0.76, 0.68, 0.50))
-	material.set_shader_parameter("edge_inner", Color(1.0, 0.95, 0.80))
-	material.set_shader_parameter("edge_outer", Color(0.1, 0.09, 0.11))
+	material.set_shader_parameter("fill_top", BATTLE_UI_FILL_TOP)
+	material.set_shader_parameter("fill_bottom", BATTLE_UI_FILL_BOTTOM)
+	material.set_shader_parameter("edge_inner", BATTLE_UI_EDGE_INNER)
+	material.set_shader_parameter("edge_outer", BATTLE_UI_EDGE_OUTER)
 	material.set_shader_parameter("fill_alpha", 1.0)
 	material.set_shader_parameter("pixel_grid", 38.0)
 	material.set_shader_parameter("corner", 0.22)
@@ -438,9 +665,9 @@ func _play_intro() -> void:
 ## 入口入场：远征主入口先出现，其余入口与边缘件跟进。
 func _animate_in() -> void:
 	var order: Array = [
-		$UI/ModeTower, $UI/ModeMatch,
+		$UI/ModeBanner, $UI/ModeSwitch,
 		$UI/IdentityButton, $UI/QuitButton, $UI/SettingsButton,
-		$UI/NavHeroes, $UI/NavBackpack,
+		$UI/NavHeroes, $UI/NavBackpack, $UI/NavWarehouse,
 	]
 	var step := 0.0
 	for n in order:
@@ -481,7 +708,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 # ============================================================
-# 匹配状态机：正计时 → 四石连接完成 → 中心九格光柱传送
+# 匹配状态机：正计时 → 四石连接完成 → 中央白色光柱传送
 # ============================================================
 
 func _start_search() -> void:
@@ -520,7 +747,7 @@ func _process(delta: float) -> void:
 		_on_match_found()
 
 
-## 匹配成功：四石汇聚后由中心九格光柱直接传送进备战，不再调用波幕。
+## 匹配成功：四石连接后由中央白色光柱直接传送进备战，不再调用波幕。
 func _on_match_found() -> void:
 	_match_state = MatchState.FOUND
 	_menu_world.complete_portal_connection(MainMenuWorld.PORTAL_ENERGY_BLUE)
@@ -534,19 +761,17 @@ func _on_match_found() -> void:
 
 ## 匹配中远征入口压暗禁点；底栏与设置保持可用。
 func _set_side_cards_enabled(on: bool) -> void:
-	for n in [$UI/ModeTower]:
-		var card := n as Button
-		card.disabled = not on
-		var tw := create_tween()
-		tw.tween_property(card, "modulate",
-			Color.WHITE if on else Color(0.55, 0.55, 0.55), 0.25)\
-			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_mode_switch.disabled = not on
+	var tw := create_tween()
+	tw.tween_property(_mode_switch, "modulate",
+		Color.WHITE if on else Color(0.55, 0.55, 0.55), 0.25)\
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 
 
 func _set_mode_entries_enabled(on: bool) -> void:
 	for entry: Button in [
-		$UI/ModeMatch as Button,
-		$UI/ModeTower as Button,
+		$UI/ModeBanner as Button,
+		$UI/ModeSwitch as Button,
 	]:
 		entry.disabled = not on
 
@@ -557,9 +782,9 @@ func _set_match_button_status(title: String, timer_text: String) -> void:
 
 
 func _set_match_button_emphasized(on: bool) -> void:
-	var bg := _match_entry.get_node_or_null("Bg") as ColorRect
-	if bg != null:
-		bg.self_modulate = Color("FFD4B8") if on else Color.WHITE
+	var banner := _match_entry.get_node_or_null("Banner") as TextureRect
+	if banner != null:
+		banner.self_modulate = Color("FFD4B8") if on else Color.WHITE
 
 
 func _flash_dock_button(button: Button) -> void:

@@ -18,7 +18,7 @@ const GRID_TARGET_OUTLINE_SHADER := preload(
 		"res://assets/shaders/canvas_ui_grid_target_outline.gdshader")
 const ATMOSPHERE_SHADER := preload("res://assets/shaders/canvas_ui_qingfeng_atmosphere.gdshader")
 const PORTAL_STONE_SHADER := preload("res://assets/shaders/canvas_ui_portal_stone_energy.gdshader")
-const PORTAL_BEAM_SHADER := preload("res://assets/shaders/canvas_ui_portal_beam.gdshader")
+const PortalPixelBeamScript := preload("res://src/ui/components/portal_pixel_beam.gd")
 const PORTAL_STONE_TEXTURES: Array[Texture2D] = [
 	preload("res://assets/ui/main_menu/stone1.png"),
 	preload("res://assets/ui/main_menu/stone2.png"),
@@ -58,6 +58,7 @@ const PORTAL_IGNITE_DURATION: float = 0.38
 const PORTAL_BLOCK_LEAN_DISTANCE: float = 8.0
 const PORTAL_BLOCK_RECOIL_DISTANCE: float = 5.0
 const PORTAL_BEAM_DURATION: float = 1.80
+const PORTAL_BEAM_PEAK_HOLD_RATIO: float = 0.10
 const PORTAL_ENERGY_GOLD := Color("FFC44F")
 const PORTAL_ENERGY_BLUE := Color("48A8FF")
 const TOKEN_SIZE := Vector2(208.0, 208.0)
@@ -90,8 +91,7 @@ var player_shadow: Control
 var player_token: TextureRect
 var portal_stones: Array[TextureRect] = []
 var portal_stone_shadows: Array[Control] = []
-var portal_beam: ColorRect
-var portal_beam_material: ShaderMaterial
+var portal_beam: PortalPixelBeam
 
 var _hero_frames: SpriteFrames
 var _hero_textures: Array[Texture2D] = []
@@ -226,6 +226,8 @@ func _build_world() -> void:
 	route_target_material.set_shader_parameter("corner_radius_px", 16.0)
 	route_target_material.set_shader_parameter("pixel_step_px", 4.0)
 	route_target_material.set_shader_parameter("outline_px", 4.0)
+	route_target_material.set_shader_parameter("outline_alpha", 1.0)
+	route_target_material.set_shader_parameter("fill_alpha", 0.10)
 	route_target_outline.material = route_target_material
 	map_world.add_child(route_target_outline)
 
@@ -253,24 +255,18 @@ func _build_world() -> void:
 
 
 func _build_portal_beam() -> void:
-	portal_beam = ColorRect.new()
+	portal_beam = PortalPixelBeamScript.new() as PortalPixelBeam
 	portal_beam.name = "PortalBeamToScreenTop"
 	var base_size: Vector2 = RENDERED_CELL_SIZE * 3.0
-	var base_top: float = VIEW_SIZE.y * 0.5 - base_size.y * 0.5
-	portal_beam.position = Vector2(VIEW_SIZE.x * 0.5 - base_size.x * 0.5, 0.0)
-	portal_beam.size = Vector2(base_size.x, base_top + base_size.y)
-	portal_beam.color = Color.WHITE
+	var base_rect := Rect2(VIEW_SIZE * 0.5 - base_size * 0.5, base_size)
+	portal_beam.position = Vector2.ZERO
+	portal_beam.size = VIEW_SIZE
 	portal_beam.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	portal_beam.z_index = 4096
 	portal_beam.visible = false
-	portal_beam_material = ShaderMaterial.new()
-	portal_beam_material.shader = PORTAL_BEAM_SHADER
-	portal_beam_material.set_shader_parameter("beam_color", Color.WHITE)
-	portal_beam_material.set_shader_parameter("beam_phase", 0.0)
-	portal_beam_material.set_shader_parameter("base_top_uv", base_top / portal_beam.size.y)
-	portal_beam_material.set_shader_parameter(
-			"beam_aspect", portal_beam.size.x / portal_beam.size.y)
-	portal_beam.material = portal_beam_material
+	portal_beam.set_portal_base_rect(base_rect)
+	portal_beam.set_beam_color(Color.WHITE)
+	portal_beam.set_beam_progress(0.0)
 	map_view.add_child(portal_beam)
 
 
@@ -384,30 +380,34 @@ func complete_portal_connection(color: Color) -> void:
 	_portal_energy_tweens.append(surge)
 
 
-## 四石已连接后，中心九格形成阵面；柱体从阵面一路喷涌到屏幕上边界。
-func play_portal_beam(color: Color, duration: float = PORTAL_BEAM_DURATION) -> void:
+## 四石已连接后，中央3×3阵面升起ref44式紫边象牙亮核粗像素光柱。
+func play_portal_beam(_color: Color, duration: float = PORTAL_BEAM_DURATION) -> void:
 	if not _portal_connection_complete or portal_beam == null:
 		return
 	if _portal_beam_tween != null and _portal_beam_tween.is_valid():
 		_portal_beam_tween.kill()
 	var safe_duration: float = maxf(duration, 0.08)
 	portal_beam.visible = true
-	portal_beam_material.set_shader_parameter("beam_color", color)
+	portal_beam.set_beam_color(PortalPixelBeam.REF44_BODY)
 	_set_portal_beam_progress(0.0)
 	_portal_beam_tween = create_tween().bind_node(self)
-	# 预热、突破、持续流动、过曝峰值；阶段分离避免短促的一次性淡入。
+	# 九格阵面预热、象牙亮核先行、紫色连续轮廓追上、内部光痕上行、峰值停留。
 	_portal_beam_tween.tween_method(
-			_set_portal_beam_progress, 0.0, 0.22, safe_duration * 0.24
+			_set_portal_beam_progress, 0.0, 0.22, safe_duration * 0.20
 	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_portal_beam_tween.tween_method(
-			_set_portal_beam_progress, 0.22, 0.64, safe_duration * 0.34
+			_set_portal_beam_progress, 0.22, 0.50, safe_duration * 0.18
 	).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
 	_portal_beam_tween.tween_method(
-			_set_portal_beam_progress, 0.64, 0.90, safe_duration * 0.28
+			_set_portal_beam_progress, 0.50, 0.72, safe_duration * 0.22
+	).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	_portal_beam_tween.tween_method(
+			_set_portal_beam_progress, 0.72, 0.90, safe_duration * 0.18
 	).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_portal_beam_tween.tween_method(
-			_set_portal_beam_progress, 0.90, 1.0, safe_duration * 0.14
+			_set_portal_beam_progress, 0.90, 1.0, safe_duration * 0.12
 	).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
+	_portal_beam_tween.tween_interval(safe_duration * PORTAL_BEAM_PEAK_HOLD_RATIO)
 	await _portal_beam_tween.finished
 	if is_instance_valid(self):
 		_set_portal_beam_progress(1.0)
@@ -415,8 +415,8 @@ func play_portal_beam(color: Color, duration: float = PORTAL_BEAM_DURATION) -> v
 
 func _set_portal_beam_progress(value: float) -> void:
 	_portal_beam_progress = clampf(value, 0.0, 1.0)
-	if portal_beam_material != null:
-		portal_beam_material.set_shader_parameter("beam_phase", _portal_beam_progress)
+	if portal_beam != null:
+		portal_beam.set_beam_progress(_portal_beam_progress)
 
 
 func reset_portal_energy() -> void:
@@ -871,16 +871,8 @@ func _draw_route_preview() -> void:
 		return
 	var route_cells: Array[Vector2i] = [_current_cell]
 	route_cells.append_array(_hovered_path)
-	var curve: PackedVector2Array = GridRoutePreviewScript.build_curve(
-			route_cells, MAP_CELL, 12.0, 4)
-	var phase: float = fposmod(_anim_time * 42.0, 24.0)
-	for marker: PackedVector2Array in GridRoutePreviewScript.build_markers(
-			curve, 24.0, phase, 10.0):
-		var start: Vector2 = marker[0].round()
-		var finish: Vector2 = marker[1].round()
-		route_preview_art.draw_line(start, finish, Color("FFE0A0E6"), 6.0, false)
-		route_preview_art.draw_circle(start, 3.0, Color("FFE0A0E6"), true, -1.0, false)
-		route_preview_art.draw_circle(finish, 3.0, Color("FFE0A0E6"), true, -1.0, false)
+	GridRoutePreviewScript.draw_preview(
+			route_preview_art, route_cells, MAP_CELL, _anim_time)
 
 
 func _cell_from_view_position(view_position: Vector2) -> Vector2i:
@@ -950,6 +942,8 @@ func get_visual_contract() -> Dictionary:
 				RENDERED_CELL_SIZE * 3.0),
 		"portal_beam_visible": portal_beam != null and portal_beam.visible,
 		"portal_beam_progress": _portal_beam_progress,
+		"portal_beam_contract": portal_beam.get_visual_contract() \
+				if portal_beam != null else {},
 		"portal_blocked_feedback_strength": _blocked_feedback_strength,
 		"current_cell": _current_cell,
 		"click_to_move": map_view != null and map_view.gui_input.is_connected(
@@ -1001,8 +995,8 @@ func _update_portal_stones() -> void:
 				+ Vector2(0.0, lift) + _portal_stone_impact_offsets[index]
 		_portal_stone_materials[index].set_shader_parameter("anim_time", _anim_time)
 		portal_stone_shadows[index].queue_redraw()
-	if portal_beam_material != null:
-		portal_beam_material.set_shader_parameter("anim_time", _anim_time)
+	if portal_beam != null:
+		portal_beam.set_anim_time(_anim_time)
 
 
 func _apply_shared_movement_visual() -> void:

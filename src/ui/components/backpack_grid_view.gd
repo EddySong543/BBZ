@@ -92,8 +92,8 @@ func _draw() -> void:
 		for offset: Vector2i in shape:
 			var cell := anchor + offset
 			var occupied_rect := cell_rect(cell.y * columns + cell.x).grow(-2.0)
-			draw_rect(occupied_rect, Color(rarity.darkened(0.34), 0.92), true)
-			draw_rect(occupied_rect, Color(rarity.lightened(0.12), 0.78), false, 2.0)
+			draw_rect(occupied_rect, Color(rarity, 0.90), true)
+			draw_rect(occupied_rect, Color(rarity.lightened(0.18), 0.88), false, 2.0)
 		var item_id := String(item.get("combat_id", item.get("id", "")))
 		var texture := ItemCatalogScript.load_icon(item_id)
 		if texture == null or shape.is_empty():
