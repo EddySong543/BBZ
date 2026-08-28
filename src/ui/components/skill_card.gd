@@ -23,6 +23,7 @@ const ENEMY_TINT := Color(1.0, 0.91, 0.80)   # 对方·暖调羊皮·小提亮
 ## 敌我区分（与顶部头像框同语言·2026-07-17）：插画窗框贴图换色变体（我方暖骨/敌方阵营红）。
 const FRAME_TEX := preload("res://assets/ui/hero_avatar_frame.png")
 const FRAME_TEX_ENEMY := preload("res://assets/ui/hero_avatar_frame_enemy.png")
+const EffectTextFormatterScript := preload("res://src/ui/effect_text_formatter.gd")
 
 const INK := Color(0.14, 0.09, 0.04)              # 深褐墨字（描述正文）·加深提升可读性·同色描边做仿粗体
 
@@ -180,11 +181,14 @@ func _refresh_text() -> void:
 		return
 	# 正文 = 【技能名】：技能描述（【技能名】加粗：同墨色 BBCode 描边 → 笔画变粗；描述普通墨字）。
 	# 英雄名已在上方 TypeLabel 自成一行，与本正文之间天然换行。
-	var body := tr(skill_detail.strip_edges()) if skill_detail.strip_edges() != "" else ""
+	var body := EffectTextFormatterScript.protect_cjk_line_breaks(
+			tr(skill_detail.strip_edges())) if skill_detail.strip_edges() != "" else ""
 	var ink_hex := INK.to_html(false)
-	var bold_name := "[outline_size=1][outline_color=#%s]【%s】[/outline_color][/outline_size]" % [ink_hex, tr(skill_name)]
+	var bold_name := "[outline_size=1][outline_color=#%s]【%s】[/outline_color][/outline_size]" % [
+			ink_hex, tr(skill_name)]
 	if skill_name != "" and body != "":
-		_desc_label.text = tr("%s：%s") % [bold_name, body]
+		_desc_label.text = "%s%s：%s" % [
+				bold_name, EffectTextFormatterScript.WORD_JOINER, body]
 	elif skill_name != "":
 		_desc_label.text = bold_name
 	else:

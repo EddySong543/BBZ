@@ -8,6 +8,7 @@ signal tier_changed(tier: int)
 ## 三档按书页连续浏览；当前道具的稀有度只在右页图案下方展示。
 
 const SELECTION_MARKER_SCRIPT := preload("res://src/ui/components/hero_gallery_selection_marker.gd")
+const EffectTextFormatterScript := preload("res://src/ui/effect_text_formatter.gd")
 const ITEM_FRAME_TEX := ItemFrameStyle.FRAME_TEXTURE
 const TIER_LABEL := {1: "普通", 2: "稀有", 3: "传说"}
 const TIER_TAG_COLOR := {
@@ -570,8 +571,9 @@ func _select(idx: int) -> void:
 	_d_rarity_mark.set("active_color", tag_color)
 	_d_rarity_mark.call("set_passive", true)
 	# 与英雄说明一致从固定顶边起笔；垂直居中会让不同换行数的首行高度发生跳动。
-	_d_desc.text = tr(it.description).strip_edges()
-	_d_flavor.text = tr(it.flavor)
+	_d_desc.text = EffectTextFormatterScript.protect_cjk_line_breaks(
+			tr(it.description).strip_edges())
+	_d_flavor.text = EffectTextFormatterScript.protect_cjk_line_breaks(tr(it.flavor))
 	_refresh_detail_navigation()
 
 

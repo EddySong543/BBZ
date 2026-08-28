@@ -1,58 +1,92 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="FontVariation" path="res://assets/font/zlabs_pixel_ui.tres" id="1_font"]
+[ext_resource type="Texture2D" path="res://assets/ui/item_frame.png" id="2_frame"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_ui_item_cell_bg.gdshader" id="3_cell_shader"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_ui_item_frame_palette.gdshader" id="4_frame_shader"]
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_effect"]
 
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_cell"]
+resource_local_to_scene = true
+shader = ExtResource("3_cell_shader")
+shader_parameter/fill_color = Color(0.443137, 0.407843, 0.364706, 1)
+shader_parameter/inner_color = Color(0.54902, 0.486275, 0.407843, 1)
+shader_parameter/center_glow = 1.0
+shader_parameter/corner_radius = 0.0
+shader_parameter/pixel_grid = 17.3333
+shader_parameter/cloud_on = 0.0
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_frame"]
+resource_local_to_scene = true
+shader = ExtResource("4_frame_shader")
+shader_parameter/shadow_color = Color(0.286275, 0.215686, 0.168627, 1)
+shader_parameter/mid_color = Color(0.545098, 0.462745, 0.364706, 1)
+shader_parameter/highlight_color = Color(0.843137, 0.741176, 0.568627, 1)
+
 [node name="EffectEntry" type="Button"]
-offset_right = 310.0
-offset_bottom = 72.0
-focus_mode = 1
+offset_right = 104.0
+offset_bottom = 140.0
+focus_mode = 0
 toggle_mode = true
 theme_override_styles/normal = SubResource("StyleBoxEmpty_effect")
 theme_override_styles/hover = SubResource("StyleBoxEmpty_effect")
 theme_override_styles/pressed = SubResource("StyleBoxEmpty_effect")
 theme_override_styles/focus = SubResource("StyleBoxEmpty_effect")
 
-[node name="SelectionPaper" type="ColorRect" parent="."]
-visible = false
-show_behind_parent = true
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 2.0
-offset_top = 4.0
-offset_right = -4.0
-offset_bottom = -4.0
-grow_horizontal = 2
-grow_vertical = 2
+[node name="EffectFrame" type="Control" parent="."]
+layout_mode = 0
+offset_right = 104.0
+offset_bottom = 104.0
 mouse_filter = 2
-color = Color(0.91, 0.831, 0.678, 0.28)
 
-[node name="Icon" type="TextureRect" parent="."]
-custom_minimum_size = Vector2(48, 48)
+[node name="EffectCell" type="ColorRect" parent="EffectFrame"]
+layout_mode = 0
+offset_left = 8.41176
+offset_top = 8.41176
+offset_right = 95.5882
+offset_bottom = 95.5882
+mouse_filter = 2
+material = SubResource("ShaderMaterial_cell")
+color = Color(1, 1, 1, 1)
+
+[node name="Icon" type="TextureRect" parent="EffectFrame"]
+custom_minimum_size = Vector2(64, 64)
 texture_filter = 1
 layout_mode = 0
-offset_left = 16.0
-offset_top = 12.0
-offset_right = 64.0
-offset_bottom = 60.0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 84.0
+offset_bottom = 84.0
 mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
 
+[node name="GalleryItemFrame" type="TextureRect" parent="EffectFrame"]
+texture_filter = 1
+material = SubResource("ShaderMaterial_frame")
+layout_mode = 0
+offset_left = -14.6824
+offset_top = -15.2941
+offset_right = 118.759
+offset_bottom = 118.147
+mouse_filter = 2
+texture = ExtResource("2_frame")
+expand_mode = 1
+stretch_mode = 0
+
 [node name="NameLabel" type="Label" parent="."]
 texture_filter = 1
 layout_mode = 0
-offset_left = 84.0
-offset_right = 300.0
-offset_bottom = 72.0
+offset_left = -16.0
+offset_top = 111.0
+offset_right = 120.0
+offset_bottom = 147.0
 mouse_filter = 2
-theme_override_colors/font_color = Color(0.239216, 0.188235, 0.121569, 1)
+theme_override_colors/font_color = Color(0.180392, 0.160784, 0.133333, 1)
 theme_override_fonts/font = ExtResource("1_font")
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 17
 text = "效果"
-horizontal_alignment = 0
-vertical_alignment = 1
+horizontal_alignment = 1
+vertical_alignment = 0
 text_overrun_behavior = 3

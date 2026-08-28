@@ -216,9 +216,8 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_battle_gd")
-tip_size_s = Vector2(156, 76)
-tip_size_m = Vector2(222, 144)
-tip_size_l = Vector2(340, 128)
+tip_size_m = Vector2(222, 188)
+tip_size_l = Vector2(388, 144)
 tip_glyph_spacing = 1
 
 [node name="StageSlot" type="Control" parent="." unique_id=924300025]
@@ -277,6 +276,7 @@ offset_left = 96.0
 offset_top = 258.0
 offset_right = 864.0
 offset_bottom = 1026.0
+offset_transform_enabled = true
 mouse_filter = 2
 sprite_scale = Vector2(2, 2)
 anim_fps = 12.0
@@ -293,6 +293,7 @@ offset_left = 1056.0
 offset_top = 258.0
 offset_right = 1824.0
 offset_bottom = 1026.0
+offset_transform_enabled = true
 mouse_filter = 2
 sprite_scale = Vector2(2, 2)
 anim_fps = 12.0
@@ -460,6 +461,14 @@ theme_override_font_sizes/font_size = 16
 text = "玩家1"
 vertical_alignment = 1
 
+[node name="P1StatusAnchor" type="Control" parent="P1Hud"]
+layout_mode = 0
+offset_left = 246.0
+offset_top = 113.0
+offset_right = 246.0
+offset_bottom = 113.0
+mouse_filter = 2
+
 [node name="P2Hud" type="Control" parent="." unique_id=1758094651]
 layout_mode = 1
 anchors_preset = 15
@@ -598,6 +607,14 @@ theme_override_font_sizes/font_size = 16
 text = "玩家2"
 horizontal_alignment = 2
 vertical_alignment = 1
+
+[node name="P2StatusAnchor" type="Control" parent="P2Hud"]
+layout_mode = 0
+offset_left = 1674.0
+offset_top = 113.0
+offset_right = 1674.0
+offset_bottom = 113.0
+mouse_filter = 2
 
 [node name="TimerLabel" type="Label" parent="." unique_id=2111037196]
 layout_mode = 0

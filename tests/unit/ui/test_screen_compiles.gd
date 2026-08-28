@@ -540,6 +540,15 @@ func test_death_switch_uses_battle_diamond_frame_and_slant_hp() -> void:
 	assert_not_null(avatar, "被迫换人头像复用战斗 UI 的 HeroFrame")
 	assert_true(avatar.diamond_mode, "被迫换人头像使用战斗 UI 菱形模式")
 	assert_not_null(avatar.get_node_or_null("DiamondFrame"), "菱形框已真实建立")
+	assert_almost_eq(avatar.diamond_stroke_px / DeathSwitchOverlay.FRAME_SIZE,
+			6.0 / 80.0, 0.0001,
+			"死亡换人主亮边必须与顶部出战框保持相同粗度比例")
+	assert_almost_eq(avatar.diamond_rim_px / DeathSwitchOverlay.FRAME_SIZE,
+			2.0 / 80.0, 0.0001,
+			"死亡换人外暗边必须与顶部出战框等比放大")
+	assert_almost_eq(avatar.diamond_inner_rim_px / DeathSwitchOverlay.FRAME_SIZE,
+			1.5 / 80.0, 0.0001,
+			"死亡换人内暗边必须与顶部出战框等比放大")
 	assert_not_null(hp_row, "被迫换人使用平行四边形+数字血量")
 	assert_true(hp_row is ReserveHpRow, "血量展示复用现役 ReserveHpRow")
 	assert_eq(hp_row.size, DeathSwitchOverlay.HP_ROW_SIZE,
@@ -706,6 +715,17 @@ func test_hero_gallery_selection_uses_book_pointer_and_gold_outer_frame() -> voi
 	assert_false(first_pointer.visible, "切换英雄后旧侧签立即隐藏")
 	assert_true(screen.card_cards[1].get_node("SelectionPointer").visible,
 			"切换英雄后侧签移动到新头像")
+	var first_cell := screen.card_frames[0].get_node("HeroThumbCell") as ColorRect
+	var cell_material := first_cell.material as ShaderMaterial
+	assert_true((cell_material.get_shader_parameter("fill_color") as Color).is_equal_approx(
+			Color("71685D")),
+			"英雄图鉴格底回退为既有暖褐暗阶")
+	assert_true((cell_material.get_shader_parameter("inner_color") as Color).is_equal_approx(
+			Color("8C7C68")),
+			"英雄图鉴格底回退为既有暖褐亮阶")
+	assert_eq(HeroGalleryScreen.FRAME_SHADOW, Color("49372B"))
+	assert_eq(HeroGalleryScreen.FRAME_MID, Color("8B765D"))
+	assert_eq(HeroGalleryScreen.FRAME_HIGHLIGHT, Color("D7BD91"))
 
 
 func test_hero_gallery_detail_uses_authored_skill_type_and_page_rule() -> void:

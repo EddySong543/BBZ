@@ -7,10 +7,18 @@ class_name EffectGalleryScreen
 const EffectCatalogScript := preload("res://src/battle/effect_catalog.gd")
 const EffectTextFormatterScript := preload("res://src/ui/effect_text_formatter.gd")
 const SELECTION_MARKER_SCRIPT := preload("res://src/ui/components/hero_gallery_selection_marker.gd")
-const INK := Color("3D301F")
+const INK := Color("2E2922")
+const SELECTED_INK := Color("9A6828")
 const ICON_ALPHA_THRESHOLD := 0.06
 const POINTER_COLOR := Color("7B5E3E")
 const POINTER_SIZE := Vector2(20.0, 36.0)
+const DETAIL_TWEEN_DURATION := 0.14
+const FRAME_SHADOW := Color("49372B")
+const FRAME_MID := Color("8B765D")
+const FRAME_HIGHLIGHT := Color("D7BD91")
+const FRAME_SELECTED_SHADOW := Color("704A1E")
+const FRAME_SELECTED_MID := Color("C99032")
+const FRAME_SELECTED_HIGHLIGHT := Color("F2D28B")
 const DISPLAY_ORDER: Array[StringName] = [
 	&"bonus_effect",
 	&"armor",
@@ -28,8 +36,8 @@ var _selected_id: StringName = &"bonus_effect"
 var _buttons: Array[Button] = []
 var _entries: Array[Dictionary] = []
 var _normalized_icons: Dictionary = {}
-var _bold_font: FontVariation
 var _selection_tweens: Array[Tween] = []
+var _detail_tween: Tween
 
 @onready var _book_layer: Control = $BookLayer
 @onready var effect_list: Control = $EffectList
@@ -59,15 +67,19 @@ func _ready() -> void:
 		_clear_button_chrome(button)
 		var name_label := button.get_node("NameLabel") as Label
 		name_label.text = entry.name
-		_apply_bold_label(name_label, 24)
+		FontManager.apply(name_label, 17)
 		name_label.add_theme_color_override("font_color", INK)
-		var icon := button.get_node("Icon") as TextureRect
+		var icon := button.get_node("EffectFrame/Icon") as TextureRect
 		icon.texture = _load_effect_icon(entry)
 		icon.visible = icon.texture != null
-		button.add_child(_make_selection_pointer(button.size.y))
+		button.add_child(_make_selection_pointer(104.0))
+		var juice := ButtonJuice.new()
+		juice.name = "ButtonJuice"
+		button.add_child(juice)
 		button.pressed.connect(select_effect.bind(entry.id))
-	_apply_bold_label(detail_name, 32)
-	_apply_bold_label(detail_description, 24)
+	FontManager.apply(detail_name, 32)
+	FontManager.apply(detail_description, 24)
+	detail_icon.set_meta(&"home_position", detail_icon.position)
 	_setup_detail_navigation()
 	_setup_back_button()
 	select_effect(_selected_id)
@@ -84,13 +96,27 @@ func select_effect(effect_id: StringName) -> void:
 	_selection_tweens.clear()
 	for button: Button in _buttons:
 		var selected: bool = button.get_meta(&"effect_id") == effect_id
-		(button.get_node("SelectionPaper") as ColorRect).visible = selected
 		(button.get_node("SelectionPointer") as Control).visible = false
 		button.button_pressed = selected
+		_set_effect_frame_selected(button, selected)
+		(button.get_node("NameLabel") as Label).add_theme_color_override(
+				"font_color", SELECTED_INK if selected else INK)
 		if selected:
 			_play_select_fx(button)
 	_refresh_detail(entry)
+	_play_detail_switch_fx()
 	_refresh_detail_navigation()
+
+
+func _set_effect_frame_selected(button: Button, selected: bool) -> void:
+	var frame_art := button.get_node("EffectFrame/GalleryItemFrame") as TextureRect
+	var material := frame_art.material as ShaderMaterial
+	material.set_shader_parameter(
+			"shadow_color", FRAME_SELECTED_SHADOW if selected else FRAME_SHADOW)
+	material.set_shader_parameter(
+			"mid_color", FRAME_SELECTED_MID if selected else FRAME_MID)
+	material.set_shader_parameter(
+			"highlight_color", FRAME_SELECTED_HIGHLIGHT if selected else FRAME_HIGHLIGHT)
 
 
 func _make_selection_pointer(row_height: float) -> Control:
@@ -105,7 +131,7 @@ func _make_selection_pointer(row_height: float) -> Control:
 	return pointer
 
 
-## 与英雄、道具图鉴共用：书页棕像素指针轻推入，落位后完全静止。
+## 与英雄图鉴共用：真实框转金，书页棕像素指针轻推入后完全静止。
 func _play_select_fx(button: Button) -> void:
 	var pointer := button.get_node("SelectionPointer") as Control
 	var pointer_home: Vector2 = pointer.get_meta(&"home_position")
@@ -120,16 +146,32 @@ func _play_select_fx(button: Button) -> void:
 	_selection_tweens.append(pop)
 
 
+func _play_detail_switch_fx() -> void:
+	if _detail_tween != null and _detail_tween.is_valid():
+		_detail_tween.kill()
+	var home: Vector2 = detail_icon.get_meta(&"home_position")
+	detail_icon.pivot_offset = detail_icon.size * 0.5
+	detail_icon.position = home + Vector2(0.0, 4.0)
+	detail_icon.scale = Vector2.ONE * 1.06
+	detail_icon.modulate.a = 0.72
+	_detail_tween = create_tween()
+	_detail_tween.set_parallel(true)
+	_detail_tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_detail_tween.tween_property(detail_icon, "position", home, DETAIL_TWEEN_DURATION)
+	_detail_tween.tween_property(detail_icon, "scale", Vector2.ONE, DETAIL_TWEEN_DURATION)
+	_detail_tween.tween_property(detail_icon, "modulate:a", 1.0, DETAIL_TWEEN_DURATION)
+
+
 func _setup_detail_navigation() -> void:
 	previous_detail_button.pressed.connect(_turn_detail.bind(-1))
 	next_detail_button.pressed.connect(_turn_detail.bind(1))
 	for button: Button in [previous_detail_button, next_detail_button]:
 		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		_apply_bold_button(button, 24)
+		FontManager.apply_btn(button, 24)
 		var juice := ButtonJuice.new()
 		juice.name = "ButtonJuice"
 		button.add_child(juice)
-	_apply_bold_label(detail_indicator, 22)
+	FontManager.apply(detail_indicator, 22)
 	_refresh_detail_navigation()
 
 
@@ -162,7 +204,8 @@ func _refresh_detail(entry: Dictionary) -> void:
 	detail_name.add_theme_color_override("font_color", INK)
 	detail_icon.texture = _load_effect_icon(entry)
 	detail_icon.visible = detail_icon.texture != null
-	detail_description.text = entry.description
+	detail_description.text = EffectTextFormatterScript.protect_cjk_line_breaks(
+			String(entry.description))
 
 
 func _load_effect_icon(entry: Dictionary) -> Texture2D:
@@ -213,30 +256,12 @@ func _clear_button_chrome(button: Button) -> void:
 		button.add_theme_stylebox_override(state, StyleBoxEmpty.new())
 
 
-func _effect_bold_font() -> FontVariation:
-	if _bold_font != null:
-		return _bold_font
-	_bold_font = EffectTextFormatterScript.make_bold_font(
-			load(FontManager.UI_FONT_PATH) as Font)
-	return _bold_font
-
-
-func _apply_bold_label(label: Label, px_size: int) -> void:
-	FontManager.apply(label, px_size)
-	label.add_theme_font_override("font", _effect_bold_font())
-
-
-func _apply_bold_button(button: Button, px_size: int) -> void:
-	FontManager.apply_btn(button, px_size)
-	button.add_theme_font_override("font", _effect_bold_font())
-
-
 func _setup_back_button() -> void:
 	if embedded_in_codex:
 		back_button.visible = false
 		back_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		return
-	_apply_bold_button(back_button, 24)
+	FontManager.apply_btn(back_button, 24)
 	back_button.pressed.connect(_back_to_menu)
 
 

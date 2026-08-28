@@ -1,5 +1,7 @@
 # Codex Preview Fidelity Correction Implementation Plan
 
+> **历史计划提示（2026-08-27）**：本计划用于追溯返工过程，不再代表当前几何和资产架构。当前权威合同见 `docs/reports/2026-08-27-codex-production-retrospective.md`。
+
 > **For agentic workers:** Execute inline in the current BBZ workspace; preserve unrelated dirty-worktree changes and use `tools/run_godot.ps1` for every Godot run.
 
 **Goal:** Make the unified codex reproduce the approved side-tab states and book/background proportions, while adding restrained motion only to the smoky-brown backdrop.

@@ -13,6 +13,7 @@ signal resolved(choice: int)
 const CARD_W := 263.0                 # =贴图实寸（源 1052×1420 ÷4 整数倍降采样·2026-07-14）
 const CARD_H := 355.0
 const CARD_GAP := 28.0
+const EffectTextFormatterScript := preload("res://src/ui/effect_text_formatter.gd")
 const PAGE_SIZE := 3
 const SCREEN_W := 1920.0
 const SCREEN_H := 1080.0
@@ -264,19 +265,7 @@ func _build_card(item: ItemData, pos: Vector2, idx: int) -> Control:
 
 ## 手动定宽换行：每行固定 chars 个字符（CJK 等宽·统一每行字数·保留已有换行）。
 func _wrap_fixed(text: String, chars: int) -> String:
-	var out := ""
-	var count := 0
-	for ch in text:
-		if ch == "\n":
-			out += ch
-			count = 0
-			continue
-		out += ch
-		count += 1
-		if count >= chars:
-			out += "\n"
-			count = 0
-	return out.trim_suffix("\n")
+	return EffectTextFormatterScript.wrap_fixed_cjk(text, chars)
 
 
 func _input(event: InputEvent) -> void:

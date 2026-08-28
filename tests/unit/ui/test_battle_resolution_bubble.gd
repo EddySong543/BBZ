@@ -225,6 +225,26 @@ func test_switch_handoff_replaces_character_only_during_hidden_gap() -> void:
 	assert_almost_eq(cd.modulate.a, 1.0, 0.001)
 
 
+func test_death_switch_reuses_active_switch_pixel_entry() -> void:
+	var screen = await _make_screen()
+	var cd: CharacterDisplay = screen.p1_char_display
+	cd.process_mode = Node.PROCESS_MODE_ALWAYS
+	screen.switch_enter_duration = 0.02
+	var base_material: Material = cd.material
+	var target_slot: int = screen._get_reserve_slots(0)[0]
+	var old_path: String = cd.sprite_frames_path
+	screen.battle.active_index[0] = target_slot
+	await screen._death_switch_transition(0)
+	assert_ne(cd.sprite_frames_path, old_path,
+			"死亡补位在不可见交接期换成新英雄")
+	assert_eq(cd.sprite_frames_path, screen.battle.active_hero(0).sprite_frames_path)
+	assert_eq(cd.offset_transform_position, Vector2.ZERO)
+	assert_almost_eq(cd.modulate.a, 1.0, 0.001,
+			"死亡补位不再使用旧版透明淡入")
+	assert_eq(cd.material, base_material,
+			"像素带重组结束后与主动换人一样卸载临时材质")
+
+
 func test_switch_handoff_force_refreshes_a_new_hero_already_lethal_in_snapshot() -> void:
 	var screen = await _make_screen()
 	var cd: CharacterDisplay = screen.p1_char_display

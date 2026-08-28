@@ -1,5 +1,34 @@
 extends GutTest
 
+
+func _justified_tip_caret_x(
+		screen: Control, line_range: Vector2i, caret_index: int) -> float:
+	var parsed_text: String = screen._tip_rich.get_parsed_text()
+	var text_line := TextLine.new()
+	text_line.direction = TextServer.DIRECTION_AUTO
+	text_line.alignment = HORIZONTAL_ALIGNMENT_FILL
+	text_line.flags = TextServer.JUSTIFICATION_KASHIDA | TextServer.JUSTIFICATION_WORD_BOUND
+	text_line.width = screen._tip_rich.size.x
+	var line_end := line_range.y
+	var cursor := line_range.x
+	while cursor < line_end:
+		var is_keyword: bool = screen._tip_character_is_keyword(cursor)
+		var run_end := cursor + 1
+		while run_end < line_end \
+				and screen._tip_character_is_keyword(run_end) == is_keyword:
+			run_end += 1
+		var run_font: Font = screen._tip_effect_bold_font if is_keyword \
+				else screen._tip_rich.get_theme_font("normal_font")
+		text_line.add_string(
+				parsed_text.substr(cursor, run_end - cursor),
+				run_font, screen.tip_font_size_l, "zh_CN")
+		cursor = run_end
+	var caret_info: Dictionary = TextServerManager.get_primary_interface().shaped_text_get_carets(
+			text_line.get_rid(), caret_index - line_range.x)
+	var leading_caret: Rect2 = caret_info.get("leading_rect", Rect2())
+	var trailing_caret: Rect2 = caret_info.get("trailing_rect", Rect2())
+	return maxf(leading_caret.position.x, trailing_caret.position.x)
+
 const BATTLE1_PATH := "res://src/ui/battle_screen1.tscn"
 const BATTLE2_PATH := "res://src/ui/battle_screen2.tscn"
 const RoundLabelOrnamentsScript := preload("res://src/ui/components/round_label_ornaments.gd")
@@ -217,8 +246,8 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 		assert_false(parsed_skill_text.contains(tr(active_hero.skill_description)),
 				"头像技能说明不再重复顶部技能名")
 	assert_almost_eq(screen._tip_effect_bold_font.variation_embolden,
-			EffectTextFormatter.EMBOLDEN, 0.001,
-			"战斗技能与道具说明沿用效果图鉴同款粗体参数")
+			0.32, 0.001,
+			"战斗说明关键词同步采用克制的小幅加粗")
 	var h06_frame_index := -1
 	for frame_index: int in screen.p1_frame_slots.size():
 		var slot: int = screen.p1_frame_slots[frame_index]
@@ -228,10 +257,21 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 	assert_gte(h06_frame_index, 0)
 	if h06_frame_index >= 0:
 		screen._on_hero_skill_tip(screen.PLAYER, h06_frame_index)
+		await get_tree().process_frame
 		var concise_h06: String = screen._tip_rich.get_parsed_text().replace("\u2060", "")
 		assert_true(concise_h06.contains("1层毒素"))
 		assert_false(concise_h06.contains("毒素："),
 				"战斗技能说明与英雄图鉴一致，不重复效果百科释义")
+		assert_gt((screen._tip_keyword_sparks as Array).size(), 0,
+				"战斗说明中的效果词同步显示右上角星芒")
+		assert_true(concise_h06.contains(EffectTextFormatter.KEYWORD_TRAILING_SPACER_GLYPH),
+				"战斗悬停说明必须为覆盖绘制的星芒保留同行占位")
+		var spacer_width: float = screen._tip_rich.get_theme_font("normal_font").get_string_size(
+				EffectTextFormatter.KEYWORD_TRAILING_SPACER,
+				HORIZONTAL_ALIGNMENT_LEFT, -1.0, screen.tip_font_size_l).x
+		assert_gte(spacer_width,
+				EffectKeywordSpark.MARK_SIZE.x + EffectTextFormatter.KEYWORD_SPARK_OFFSET.x,
+				"战斗悬停的星芒占位必须覆盖完整角标宽度")
 	var item_tip: String = screen._item_slot_tip(0)
 	assert_false(item_tip.begins_with("【") or item_tip.contains("】\n"),
 			"已有道具名称不再显示书名括号")
@@ -301,18 +341,34 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 			"顶部只保留整像素尺寸的道具图标，避免缩放边框破损")
 	assert_eq(screen._tip_item_icon.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST,
 			"道具图标使用点采样保持像素边缘")
+	var icon_visual_gap_rect: Rect2 = screen._item_tip_icon_visual_rect(
+			screen._tip_item_icon.texture)
 	assert_almost_eq(screen._tip_item_title.position.x
-			- screen._tip_item_icon.get_rect().end.x, 8.0, 0.01,
-			"道具名紧跟图标并保留最小可读间距")
+			- (screen._tip_item_icon.position.x + icon_visual_gap_rect.end.x), 8.0, 0.51,
+			"道具名紧跟图标真实 alpha 边界并保留最小可读间距")
 	var item_content_width: float = screen.tip_size_m.x - screen.tip_padding_horizontal_m * 2.0
 	assert_almost_eq(screen._tip_item_header.position.x + screen._tip_item_header.size.x * 0.5,
 			item_content_width * 0.5, 0.51,
 			"顶部图标与名称使用固定且居中的标题轨道")
-	assert_gte(screen._tip_rich.offset_left, 8.0,
-			"下方正文至少保留基础内缩，不得触碰纸框")
-	assert_almost_eq(screen._tip_rich.position.x + screen._tip_rich.size.x * 0.5,
-			screen._tip_content.size.x * 0.5, 0.51,
-			"正文列按真实最长换行宽度在内容区内整体居中")
+	var icon_visual: Rect2 = screen._item_tip_icon_visual_rect(screen._tip_item_icon.texture)
+	var visible_left: float = screen._tip_item_icon.position.x + icon_visual.position.x
+	var title_font: Font = screen._tip_item_title.get_theme_font("font")
+	var title_width: float = title_font.get_string_size(
+			screen._tip_item_title.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0,
+			screen._tip_item_title.get_theme_font_size("font_size")).x
+	var visible_right: float = screen._tip_item_title.position.x + title_width
+	assert_almost_eq((visible_left + visible_right) * 0.5,
+			screen._tip_item_header.size.x * 0.5, 0.75,
+			"按图标真实 alpha 边界与标题字宽居中，不再只把空容器数学居中")
+	assert_eq(screen._tip_rich.offset_left, 8.0,
+			"正文恢复上轮前的 8px 左起笔位，不能继续贴向纸框左侧")
+	assert_eq(screen._tip_rich.offset_right, -8.0,
+			"右侧使用同等 8px 安全位，保持标题与正文同轴")
+	assert_almost_eq(screen._tip_rich.size.x,
+			item_content_width - 16.0, 0.51,
+			"正文使用左右各8px的固定对称列")
+	assert_true(screen._item_slot_tip(0).ends_with("。"),
+			"战斗道具说明恢复完整句号")
 	assert_eq(screen._tip_item_title.get_theme_font_size("font_size"), 17,
 			"道具名只保留一级字号差，避免重新退化为粗重标题方案")
 	var item_title_font := screen._tip_item_title.get_theme_font("font") as FontVariation
@@ -323,10 +379,72 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 			"标题行贴近内容区顶部，不再造成整体下坠")
 	assert_true(screen._tip_item_rule.visible,
 			"具名道具显示克制分隔线，稳定区分标题与正文")
+	assert_eq(screen._tip_item_rule.size.y, screen.ITEM_TIP_RULE_HEIGHT,
+			"分隔线使用稳定的像素刻线高度")
+	assert_eq(screen._tip_item_rule.get_script().resource_path,
+			"res://src/ui/components/item_tip_pixel_divider.gd",
+			"分隔线使用水平主线和两端短竖线，形成横向工字结构")
+	assert_eq(screen._tip_item_rule.get_child_count(), 0,
+			"像素刻线由单一绘制组件生成，不堆叠零散 ColorRect")
+	var divider_geometry: Dictionary = screen._tip_item_rule.debug_geometry()
+	var divider_line := divider_geometry["line"] as Rect2
+	var divider_highlight := divider_geometry["highlight"] as Rect2
+	var divider_left_cap := divider_geometry["left_cap"] as Rect2
+	var divider_right_cap := divider_geometry["right_cap"] as Rect2
+	assert_eq(divider_line.size.y, 1.0,
+			"终版主线收为一行像素阴刻，不再形成第二层粗边框")
+	assert_eq(divider_highlight.size.y, 1.0,
+			"阴线下只跟一行纸色亮边，形成压痕而不是墨条")
+	assert_eq(divider_highlight.position.y, divider_line.end.y,
+			"亮边必须紧邻阴线，不能拆成装饰性双横线")
+	assert_eq(divider_left_cap.size.x, 1.0,
+			"端帽同步收为一像素笔画")
+	assert_lte(divider_left_cap.size.y, 4.0,
+			"左端竖线只作简短收口，不能形成沉重边框")
+	assert_eq(divider_left_cap.size, divider_right_cap.size,
+			"两端短竖线严格对称")
+	var divider_shadow := Color("8B765D")
+	var divider_paper_light := Color("E3CAA2")
+	assert_true(screen._tip_item_rule.shadow_color.is_equal_approx(divider_shadow),
+			"压痕阴线沿用书页暖褐中阶")
+	assert_true(screen._tip_item_rule.highlight_color.is_equal_approx(divider_paper_light),
+			"压痕亮边使用接近纸面的暖亮色，不再以深色抢标题")
+	var tooltip_frame_image: Image = preload(
+			"res://assets/ui/ui_tooltip_book_pixel.png").get_image()
+	for corner_sample: Vector2i in [
+			Vector2i(6, 1), Vector2i(172, 1), Vector2i(1, 37), Vector2i(186, 37)]:
+		assert_eq(tooltip_frame_image.get_pixelv(corner_sample), Color.BLACK,
+				"四角角套仍保留源素材纯黑，不因分割线降深而改色")
+	assert_gt(screen._tip_item_rule.shadow_color.get_luminance(), Color.BLACK.get_luminance(),
+			"分割线必须明显浅于四角角套的纯黑")
+	assert_gt(screen._tip_item_rule.shadow_color.get_luminance(),
+			Color(0.27, 0.21, 0.14).get_luminance(),
+			"分割线必须浅于正文墨色，把视觉主导权还给道具名和正文")
+	assert_lt(screen._tip_item_rule.shadow_color.get_luminance(),
+			Color("D7BD99").get_luminance(),
+			"分割线仍须深于纸张底色，不能淡到失去分区作用")
+	assert_gt(screen._tip_item_rule.highlight_color.get_luminance(),
+			Color("D7BD99").get_luminance(),
+			"亮边必须比纸面略亮，才能读成浅压痕")
+	assert_almost_eq(divider_left_cap.get_center().y,
+			(divider_line.position.y + divider_highlight.end.y) * 0.5, 0.01,
+			"端帽只包住两像素压痕，不引入上下起伏")
+	assert_gte(divider_line.size.x, float(screen._tip_rich.get_line_width(0)),
+			"分割线宽度至少覆盖下方正文任意一行的实际宽度")
+	assert_almost_eq(divider_line.size.x, screen._tip_item_rule.size.x, 0.01,
+			"横向工字线占满正文最大排版轨道，建立稳定的标题分区比例")
+	assert_eq(screen.item_tip_rule_vertical_offset, -2.0,
+			"分割线默认独立上移 2px")
+	var unshifted_rule_top: float = (
+			screen._tip_item_header.position.y + screen.ITEM_TIP_ICON_SIZE
+			+ screen.ITEM_TIP_HEADER_RULE_GAP)
+	assert_almost_eq(screen._tip_item_rule.position.y,
+			unshifted_rule_top + screen.item_tip_rule_vertical_offset, 0.01,
+			"负偏移只将分割线向上移动")
 	assert_almost_eq(screen._tip_rich.offset_top,
-			screen._tip_item_rule.position.y + screen._tip_item_rule.size.y
+			unshifted_rule_top + screen.ITEM_TIP_RULE_HEIGHT
 					+ screen.item_tip_title_body_gap, 0.01,
-			"正文从分隔线下方按统一间隔开始")
+			"独立移动分割线不挤压正文排版")
 	assert_eq(screen._tip_panel.size, screen.tip_size_m,
 			"具名道具使用 222x144 加高 M 框，宽度保持不变")
 	assert_eq(screen.item_tip_vertical_lift, 0.0,
@@ -344,17 +462,94 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 	assert_almost_eq(screen._tip_item_header.position.x,
 			screen.ITEM_TIP_COLUMN_INSET, 0.01,
 			"短道具名继续使用固定标题轨道")
-	assert_almost_eq(screen._tip_rich.position.x + screen._tip_rich.size.x * 0.5,
-			screen._tip_content.size.x * 0.5, 0.51,
-			"短说明的左对齐正文列作为整体居中")
+	assert_almost_eq(screen._tip_rich.offset_left,
+			8.0, 0.01,
+			"短说明也沿用固定左对齐列，不再按文字长度缩成窄栏")
+	assert_almost_eq(screen._tip_rich.get_rect().end.x,
+			screen._tip_content.size.x - 8.0, 0.51,
+			"短说明的右缘保留与左侧一致的 8px 安全位")
 	screen._set_l_tip_text("很长的道具名称\n这是一段会自动换行的较长道具说明文字",
 			screen.TipContentKind.ITEM)
 	assert_almost_eq(screen._tip_item_header.position.x,
 			screen.ITEM_TIP_COLUMN_INSET, 0.01,
 			"长道具名不会推动标题轨道")
-	assert_almost_eq(screen._tip_rich.position.x + screen._tip_rich.size.x * 0.5,
-			screen._tip_content.size.x * 0.5, 0.51,
-			"长说明换行后仍以真实最长行宽整体居中")
+	assert_almost_eq(screen._tip_rich.get_rect().end.x,
+			screen._tip_content.size.x - 8.0, 0.51,
+			"长说明换行后仍使用到右侧安全边界")
+	screen._set_l_tip_text(
+			"排版测试\n本回合内，我方下一次攻击造成的伤害增加2点，或使敌方下一次攻击造成的伤害增加2点。",
+			screen.TipContentKind.ITEM)
+	await get_tree().process_frame
+	assert_eq(screen._tip_keyword_alignment, HORIZONTAL_ALIGNMENT_FILL,
+			"中文书页正文使用两端对齐，不再靠反复试边距掩盖行尾空字格")
+	var protected_item_text: String = screen._tip_rich.get_parsed_text()
+	assert_lte(protected_item_text.count(EffectTextFormatter.WORD_JOINER), 8,
+			"道具正文只保护禁则标点，不得重新把大量普通词锁成不可断片段")
+	for line_index: int in maxi(screen._tip_rich.get_line_count() - 1, 0):
+		var unused_width: float = (
+				screen._tip_rich.size.x - screen._tip_rich.get_line_width(line_index))
+		assert_lt(absf(unused_width), 1.1,
+				"两端对齐后的非末行必须真正抵达右侧正文边界")
+	var sample_last_line: int = screen._tip_rich.get_line_count() - 1
+	assert_lt(screen._tip_rich.get_line_width(sample_last_line),
+			screen._tip_rich.size.x - 1.0,
+			"两端对齐只作用于非末行，末行仍保持自然左齐")
+	# 用全部正式道具文案守住这条排版契约，避免只修一条示例后再次复发。
+	for item: ItemData in ItemCatalog.all():
+		screen._clear_tip_keyword_sparks(true)
+		screen._set_l_tip_text(
+				"%s\n%s" % [item.item_name, item.description],
+				screen.TipContentKind.ITEM, item)
+		await get_tree().process_frame
+		for keyword_range: Vector2i in screen._tip_keyword_ranges:
+			assert_eq(screen._tip_rich.get_character_line(keyword_range.x),
+					screen._tip_rich.get_character_line(
+							keyword_range.x + keyword_range.y - 1),
+					"正式道具 %s 的效果关键词不可拆到两行" % item.item_id)
+		var parsed_item_text: String = screen._tip_rich.get_parsed_text()
+		for line_index: int in screen._tip_rich.get_line_count():
+			var line_range: Vector2i = screen._tip_rich.get_line_range(line_index)
+			var line_text := parsed_item_text.substr(
+					line_range.x, line_range.y - line_range.x)
+			assert_false(EffectTextFormatter.line_starts_with_forbidden(line_text),
+					"正式道具 %s 的正文行首不得出现闭合符号" % item.item_id)
+			assert_false(EffectTextFormatter.line_ends_with_forbidden(line_text),
+					"正式道具 %s 的正文行尾不得留下开放符号" % item.item_id)
+		for line_index: int in maxi(screen._tip_rich.get_line_count() - 1, 0):
+			var unused_width: float = (
+					screen._tip_rich.size.x - screen._tip_rich.get_line_width(line_index))
+			assert_lt(absf(unused_width), 1.1,
+					"正式道具 %s 的非末行没有填满右侧" % item.item_id)
+	var keyword_item := ItemCatalog.make("t1_jiedu_yaoshui")
+	screen._clear_tip_keyword_sparks(true)
+	screen._set_l_tip_text(
+			"%s\n%s" % [keyword_item.item_name, keyword_item.description],
+			screen.TipContentKind.ITEM, keyword_item)
+	await get_tree().process_frame
+	var filled_keyword_count := 0
+	for range_index: int in screen._tip_keyword_ranges.size():
+		var keyword_range: Vector2i = screen._tip_keyword_ranges[range_index]
+		var line_index: int = screen._tip_rich.get_character_line(keyword_range.x)
+		if screen._tip_rich.get_line_width(line_index) < screen._tip_rich.size.x - 1.0:
+			continue
+		filled_keyword_count += 1
+		var expected_caret_x := _justified_tip_caret_x(
+				screen, screen._tip_rich.get_line_range(line_index),
+				keyword_range.x + keyword_range.y)
+		assert_gt(expected_caret_x, 12.0,
+				"TextServer 必须返回真实字符光标，不能因字典键错误回退到零点")
+		assert_lte(expected_caret_x, screen._tip_rich.size.x,
+				"关键词末端光标必须落在正文列内")
+		var spark: Control = screen._tip_keyword_sparks[range_index]
+		assert_almost_eq(spark.position.x,
+				roundf(expected_caret_x + EffectTextFormatter.KEYWORD_SPARK_OFFSET.x),
+				0.51,
+				"两端对齐分摊字距后，星芒仍必须贴住关键词末字")
+	assert_gt(filled_keyword_count, 0,
+			"回归文案必须覆盖至少一个处于两端对齐行的效果关键词")
+	screen._set_l_tip_text("我方获得1点能量", screen.TipContentKind.SKILL)
+	assert_true(screen._tip_rich.get_parsed_text().contains("\u2060"),
+			"技能说明仍保留原有的高频规则词保护，这次只修正道具正文")
 	screen._set_l_tip_text("点击抽取道具", screen.TipContentKind.ITEM)
 	assert_false(screen._tip_item_header.visible,
 			"空槽状态不显示无意义的道具框顶部行")

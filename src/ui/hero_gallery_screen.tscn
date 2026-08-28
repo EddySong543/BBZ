@@ -142,16 +142,16 @@ grow_vertical = 2
 mouse_filter = 2
 metadata/_edit_lock_ = true
 
-[node name="DetailNavigation" type="Control" parent="DetailArea"]
+[node name="DetailNavigation" type="Control" parent="DetailArea" unique_id=2027454628]
 editor_description = "可视化编辑：右页逐个浏览入口；位置、字号和间距与左页分页行一致，运行时只更新个数与可用状态。"
-layout_mode = 0
+anchors_preset = 0
 offset_left = 1099.0
 offset_top = 916.0
 offset_right = 1856.0
 offset_bottom = 970.0
 mouse_filter = 2
 
-[node name="PreviousItem" type="Button" parent="DetailArea/DetailNavigation"]
+[node name="PreviousItem" type="Button" parent="DetailArea/DetailNavigation" unique_id=1839692352]
 layout_mode = 0
 offset_left = -38.0
 offset_right = 142.0
@@ -170,7 +170,7 @@ theme_override_styles/disabled = SubResource("StyleBoxEmpty_back")
 theme_override_styles/focus = SubResource("StyleBoxEmpty_back")
 text = "上一个"
 
-[node name="ItemIndicator" type="Label" parent="DetailArea/DetailNavigation"]
+[node name="ItemIndicator" type="Label" parent="DetailArea/DetailNavigation" unique_id=1579999064]
 layout_mode = 0
 offset_left = 217.0
 offset_right = 397.0
@@ -182,7 +182,7 @@ text = "01 / 24"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="NextItem" type="Button" parent="DetailArea/DetailNavigation"]
+[node name="NextItem" type="Button" parent="DetailArea/DetailNavigation" unique_id=198092821]
 layout_mode = 0
 offset_left = 472.0
 offset_right = 652.0

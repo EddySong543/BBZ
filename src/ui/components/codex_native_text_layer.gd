@@ -2,6 +2,7 @@ extends Control
 class_name CodexNativeTextLayer
 
 const EffectTextFormatterScript := preload("res://src/ui/effect_text_formatter.gd")
+const EFFECT_KEYWORD_SPARK_SCRIPT := preload("res://src/ui/components/effect_keyword_spark.gd")
 
 ## 将缩放书页里的文字复制到最终画布坐标中绘制。
 ## 原按钮仍保留点击区；书页纹理/框体继续由 GalleryHost 统一缩放，文字不再经过 0.84 二次采样。
@@ -26,6 +27,7 @@ const BUTTON_COLOR_NAMES: Array[StringName] = [
 
 var _source_root: Control
 var _mirrors: Dictionary = {}
+var _keyword_sparks: Dictionary = {}
 
 
 func _ready() -> void:
@@ -53,6 +55,7 @@ func sync_now() -> void:
 			_mirrors[source] = mirror
 		_sync_mirror(source, mirror)
 	_reflow_effect_text_segments(sources)
+	_sync_keyword_sparks(sources)
 	for source: Variant in _mirrors.keys():
 		if not is_instance_valid(source) or not active_sources.has(source):
 			var stale := _mirrors[source] as Label
@@ -131,6 +134,45 @@ func mirror_count() -> int:
 
 func mirror_for_source(source: Control) -> Label:
 	return _mirrors.get(source) as Label
+
+
+func keyword_spark_for_source(source: Control) -> Control:
+	return _keyword_sparks.get(source) as Control
+
+
+func _sync_keyword_sparks(sources: Array[Control]) -> void:
+	var active_sources: Dictionary = {}
+	for source: Control in sources:
+		if not bool(source.get_meta(EffectTextFormatterScript.META_IS_KEYWORD, false)):
+			continue
+		active_sources[source] = true
+		var mirror := _mirrors.get(source) as Label
+		if mirror == null:
+			continue
+		var spark := _keyword_sparks.get(source) as Control
+		if spark == null or not is_instance_valid(spark):
+			spark = EFFECT_KEYWORD_SPARK_SCRIPT.new() as Control
+			spark.name = "NativeKeywordSpark"
+			add_child(spark)
+			_keyword_sparks[source] = spark
+		var font := mirror.get_theme_font("font")
+		var font_size := mirror.get_theme_font_size("font_size")
+		var keyword_width := font.get_string_size(
+				mirror.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x
+		spark.call("configure", mirror.get_theme_color("font_color"))
+		spark.position = Vector2(
+				roundf(mirror.position.x + keyword_width
+						+ EffectTextFormatterScript.KEYWORD_SPARK_OFFSET.x),
+				roundf(mirror.position.y
+						+ EffectTextFormatterScript.KEYWORD_SPARK_OFFSET.y))
+		spark.visible = mirror.visible
+	for source_variant: Variant in _keyword_sparks.keys():
+		if active_sources.has(source_variant):
+			continue
+		var stale := _keyword_sparks[source_variant] as Control
+		if stale != null and is_instance_valid(stale):
+			stale.queue_free()
+		_keyword_sparks.erase(source_variant)
 
 
 func _collect_text_sources(node: Node, result: Array[Control]) -> void:
@@ -374,3 +416,7 @@ func _clear_mirrors() -> void:
 		if is_instance_valid(mirror):
 			(mirror as Label).queue_free()
 	_mirrors.clear()
+	for spark: Variant in _keyword_sparks.values():
+		if is_instance_valid(spark):
+			(spark as Control).queue_free()
+	_keyword_sparks.clear()

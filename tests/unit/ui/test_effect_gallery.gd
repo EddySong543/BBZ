@@ -54,6 +54,12 @@ func test_effect_catalog_contains_every_current_shared_effect() -> void:
 	assert_eq(names, EXPECTED_EFFECTS)
 	assert_eq(colors.size(), EXPECTED_EFFECTS.size(),
 			"首批效果各自保留可复用的语义色，不把所有状态压成毒素绿")
+	assert_eq(String(entries[0].description),
+			"像毒素，剑气等都属于附加效果。附加效果只会被「波」或「大波」命中触发，道具无法触发。",
+			"附加效果必须直接说明波/大波与道具的触发边界")
+	assert_eq(String(entries[5].description),
+			"可叠加。中毒英雄被「大波」命中时，引爆并清除全部毒素，每层造成 0.5 点伤害。",
+			"毒素效果图鉴必须明确只有大波命中才能引爆")
 
 
 func test_effect_gallery_previews_all_entries_and_selects_poison() -> void:
@@ -76,13 +82,21 @@ func test_effect_gallery_previews_all_entries_and_selects_poison() -> void:
 				"效果索引完整落在左页内容区内")
 	gallery.call("select_effect", &"poison")
 	assert_eq((gallery.get_node("DetailArea/EffectName") as Label).text, "毒素")
-	assert_true((gallery.get_node("DetailArea/Description") as Label).text.contains("每层造成 0.5 点伤害"))
+	var poison_description := (gallery.get_node("DetailArea/Description") as Label).text
+	assert_true(EffectTextFormatter.strip_line_break_controls(poison_description).contains(
+			"每层造成 0.5 点伤害"))
 	assert_true(gallery.get_node("DetailArea/EffectIcon") is TextureRect,
 			"效果详情只保留外部图标素材槽，不再使用程序化绘制组件")
 	assert_false(ResourceLoader.exists("res://src/ui/components/effect_icon.gd"))
 	var selected_entry := entries.get_child(5) as Button
 	assert_true((selected_entry.get_node("SelectionPointer") as Control).visible,
 			"效果页必须与英雄、道具页使用同款像素指针表达选中")
+	assert_null(selected_entry.get_node_or_null("SelectionPaper"),
+			"效果目录不得再用整行淡色矩形制造左右漂移错觉")
+	assert_null(selected_entry.get_node_or_null("CatalogAccent"),
+			"效果页采用英雄同款正式外框后，不再叠加独有的印谱底图")
+	assert_not_null(selected_entry.get_node_or_null("EffectFrame/GalleryItemFrame"),
+			"效果图标必须进入英雄、道具页同款正式外框")
 	assert_null(selected_entry.get_node_or_null("SelectionBar"),
 			"效果页不再保留独有的竖色条选中语言")
 
@@ -105,37 +119,41 @@ func test_effect_detail_changes_only_after_click() -> void:
 			"右页内容只在左键点击后切换")
 
 
-func test_effect_index_uses_requested_two_column_order_without_overlap() -> void:
+func test_effect_index_uses_fixed_hero_style_three_row_tracks_without_overlap() -> void:
 	var packed := load("res://src/ui/effect_gallery_screen.tscn") as PackedScene
 	var gallery := packed.instantiate() as Control
 	add_child_autofree(gallery)
 	await get_tree().process_frame
 	var entries := gallery.get_node("EffectList") as Control
-	var expected_columns: Array[float] = [24.0, 377.0]
-	var expected_rows: Array[float] = [72.0, 208.0, 344.0, 480.0]
-	var first_row_left: float = entries.position.x + expected_columns[0]
-	var first_row_right: float = entries.position.x + expected_columns[1] + 310.0
-	assert_almost_eq((first_row_left + first_row_right) * 0.5, 493.0, 0.5,
-			"两列按钮主体必须以左书页中心为轴，不能被选中底纸制造的错觉掩盖真实偏移")
+	var expected_columns: Array[float] = [0.0, 170.0, 340.0, 510.0]
+	var expected_rows: Array[float] = [0.0, 196.0]
+	assert_eq(entries.position, Vector2(188.0, 255.0),
+			"效果目录必须从英雄、道具页同一条首行轨道开始")
+	assert_eq(entries.size.y, 693.0,
+			"目录保留完整三行高度，后续效果不得触发整体自动居中")
 	for index: int in entries.get_child_count():
 		var button := entries.get_child(index) as Button
-		assert_eq(button.position.x, expected_columns[index % 2],
-				"效果目录必须保持两列固定轨道")
-		assert_eq(button.position.y, expected_rows[floori(index / 2.0)],
-				"效果目录必须按指定顺序逐行排列")
-		assert_eq(button.size, Vector2(310.0, 72.0))
+		assert_eq(button.position.x, expected_columns[index % 4],
+				"效果网格必须与英雄页使用 4 列固定轨道")
+		assert_eq(button.position.y, expected_rows[floori(index / 4.0)],
+				"8 个效果按英雄页行距排成两行")
+		assert_eq(button.size, Vector2(104.0, 140.0))
 		for previous_index: int in index:
 			var previous := entries.get_child(previous_index) as Button
 			assert_false(button.get_rect().intersects(previous.get_rect()),
-					"任意两个效果目录点击行均不得重叠")
-		var icon := button.get_node("Icon") as TextureRect
+					"任意两个效果外框点击区均不得重叠")
+		var icon := button.get_node("EffectFrame/Icon") as TextureRect
 		var name_label := button.get_node("NameLabel") as Label
-		assert_lte(icon.get_rect().end.x + 20.0, name_label.position.x,
-				"效果目录必须严格保持图标在前、名称在后，并留下稳定间距")
-		assert_true(name_label.get_theme_font("font") is FontVariation)
-		assert_gte((name_label.get_theme_font("font") as FontVariation).variation_embolden, 0.5,
-				"效果目录统一使用加粗文字，不再依赖状态换色强调")
-		assert_eq(name_label.get_theme_color("font_color"), Color("3D301F"))
+		assert_lte(icon.get_rect().end.y, name_label.position.y,
+				"效果名必须像英雄名一样位于外框下方")
+		assert_eq(name_label.get_theme_font_size("font_size"), 17)
+		var frame_art := button.get_node("EffectFrame/GalleryItemFrame") as TextureRect
+		assert_eq(frame_art.texture.resource_path, "res://assets/ui/item_frame.png")
+		if index == 0:
+			assert_eq(name_label.get_theme_color("font_color"), Color("9A6828"),
+					"当前选中项仅以更深目录墨色辅助识别")
+		else:
+			assert_eq(name_label.get_theme_color("font_color"), Color("2E2922"))
 
 
 func test_effect_detail_navigation_matches_other_codex_pages() -> void:
@@ -167,38 +185,78 @@ func test_effect_detail_uses_one_centered_vertical_axis() -> void:
 	var name_label := gallery.get_node("DetailArea/EffectName") as Label
 	var wash := gallery.get_node("DetailArea/EffectIconWash") as TextureRect
 	var icon := gallery.get_node("DetailArea/EffectIcon") as TextureRect
-	var rule := gallery.get_node("DetailArea/Rule") as Control
+	var rule := gallery.get_node("DetailArea/DetailRule") as ColorRect
+	var pin := gallery.get_node("DetailArea/DetailPin") as ColorRect
 	var description := gallery.get_node("DetailArea/Description") as Label
 	var navigation := gallery.get_node("DetailArea/DetailNavigation") as Control
 	var axis_x := name_label.get_rect().get_center().x
-	assert_eq(icon.size, Vector2(192.0, 192.0),
-			"效果详情图标必须成为右页主视觉，而不是旧版小图标")
+	assert_almost_eq(icon.size.x, 160.0, 0.01,
+			"效果图标宽度要在英雄同尺寸笔刷内留下稳定承托边界")
+	assert_almost_eq(icon.size.y, 160.0, 0.01,
+			"效果图标要在英雄同尺寸笔刷内留下稳定承托边界")
 	assert_eq(wash.texture.resource_path,
 			"res://assets/ui/hero_codex_portrait_wash.png",
 			"效果图标承托必须直接复用英雄详情已经通过的蓝灰笔刷")
+	assert_eq(wash.position, Vector2(1051.0, 270.0))
+	assert_eq(wash.size, Vector2(720.0, 360.0),
+			"蓝灰笔刷的大小和英雄图鉴完全一致，本轮不得缩放")
 	assert_lt(wash.get_index(), icon.get_index(),
 			"蓝灰笔刷只作背景，不得覆盖效果图标")
 	assert_almost_eq(wash.size.x / wash.size.y, 2.0, 0.001,
 			"同源笔刷保持原始 2:1 轮廓，不得被拉成新形状")
 	assert_almost_eq(wash.get_rect().get_center().x, axis_x, 0.01)
 	assert_almost_eq(icon.get_rect().get_center().x, axis_x, 0.01)
-	assert_almost_eq(rule.get_rect().get_center().x, axis_x, 0.01)
-	assert_almost_eq(description.get_rect().get_center().x, axis_x, 0.01)
+	assert_lt(rule.position.x, description.position.x)
+	assert_lt(pin.position.x, description.position.x)
 	assert_lte(name_label.get_rect().end.y, icon.position.y)
-	assert_lte(icon.get_rect().end.y, rule.position.y)
-	assert_lte(rule.get_rect().end.y, description.position.y)
+	assert_lte(icon.get_rect().end.y, description.position.y)
 	assert_lte(description.get_rect().end.y, navigation.position.y)
 	assert_eq(description.horizontal_alignment, HORIZONTAL_ALIGNMENT_CENTER)
-	assert_eq(rule.get_child_count(), 3,
-			"右页分隔线恢复连续主线，并只保留两个像素端帽")
-	var main_stroke := rule.get_node("MainStroke") as ColorRect
-	var left_cap := rule.get_node("LeftCap") as ColorRect
-	var right_cap := rule.get_node("RightCap") as ColorRect
-	assert_eq(main_stroke.size, Vector2(216.0, 4.0))
-	assert_eq(left_cap.size, Vector2(4.0, 8.0))
-	assert_eq(right_cap.size, Vector2(4.0, 8.0))
-	assert_eq(main_stroke.color, left_cap.color)
-	assert_eq(main_stroke.color, right_cap.color)
+	assert_eq(rule.size, Vector2(2.0, 60.0),
+			"效果说明改用英雄技能正文同款左侧竖线")
+	assert_eq(pin.size, Vector2(6.0, 6.0))
+	assert_null(gallery.get_node_or_null("DetailArea/Rule"),
+			"效果右页不再保留横向中分割线")
+	assert_true(description.get_theme_font("font") is FontVariation)
+	assert_lt((description.get_theme_font("font") as FontVariation).variation_embolden, 0.5,
+			"右页解释保持正常正文重量，不得再与标题一样加粗")
+
+
+func test_effect_selection_reuses_hero_frame_palette_and_detail_motion() -> void:
+	var packed := load("res://src/ui/effect_gallery_screen.tscn") as PackedScene
+	var gallery := packed.instantiate() as Control
+	add_child_autofree(gallery)
+	await get_tree().process_frame
+	var entries := gallery.get_node("EffectList") as Control
+	var armor := entries.get_child(1) as Button
+	armor.pressed.emit()
+	var frame_material := (armor.get_node("EffectFrame/GalleryItemFrame") as TextureRect).material \
+			as ShaderMaterial
+	assert_eq(frame_material.get_shader_parameter("mid_color"), Color("C99032"),
+			"效果选中态与英雄页一样把真实外框转为金色")
+	var detail_icon := gallery.get_node("DetailArea/EffectIcon") as TextureRect
+	assert_gt(detail_icon.scale.x, 1.0,
+			"点击切换后效果图标应从轻微放大状态回落，补齐内部切换反馈")
+	await get_tree().create_timer(0.2).timeout
+	assert_almost_eq(detail_icon.scale.x, 1.0, 0.001)
+	assert_almost_eq(detail_icon.scale.y, 1.0, 0.001)
+	var unselected := entries.get_child(0) as Button
+	var cell_material := (unselected.get_node("EffectFrame/EffectCell") as ColorRect).material \
+			as ShaderMaterial
+	var frame_material_unselected := (unselected.get_node(
+			"EffectFrame/GalleryItemFrame") as TextureRect).material as ShaderMaterial
+	assert_true((cell_material.get_shader_parameter("fill_color") as Color).is_equal_approx(
+			Color("71685D")),
+			"效果图鉴格底回退为既有暖褐暗阶")
+	assert_true((cell_material.get_shader_parameter("inner_color") as Color).is_equal_approx(
+			Color("8C7C68")),
+			"效果图鉴格底回退为既有暖褐亮阶")
+	assert_true((frame_material_unselected.get_shader_parameter("shadow_color") as Color).is_equal_approx(
+			Color("49372B")))
+	assert_true((frame_material_unselected.get_shader_parameter("mid_color") as Color).is_equal_approx(
+			Color("8B765D")))
+	assert_true((frame_material_unselected.get_shader_parameter("highlight_color") as Color).is_equal_approx(
+			Color("D7BD91")))
 
 
 func test_hero_gallery_bolds_effect_keywords_without_repeating_glossaries() -> void:
@@ -223,8 +281,19 @@ func test_hero_gallery_bolds_effect_keywords_without_repeating_glossaries() -> v
 	assert_true(poison_keyword.get_theme_font("font") is FontVariation)
 	assert_almost_eq(
 			(poison_keyword.get_theme_font("font") as FontVariation).variation_embolden,
-			EffectTextFormatter.EMBOLDEN, 0.001,
-			"英雄效果词与效果图鉴使用完全相同的仿粗参数")
+			0.32, 0.001,
+			"关键词只增加克制的小幅字重，不再使用重影式粗体")
+	var spark := poison_keyword.get_node_or_null("KeywordSpark") as Control
+	assert_not_null(spark,
+			"效果词末字右上角必须绘制不占字宽的四向星芒")
+	if spark != null:
+		assert_eq(spark.size, Vector2(7.0, 7.0))
+		assert_gt(spark.position.x, poison_keyword.size.x * 0.5,
+				"星芒应贴近关键词末字，不能回到词首或独占一格")
+		assert_lt(spark.position.y, 0.0,
+				"星芒作为右上角标，不得落回文字基线或下方")
+		assert_gte(spark.position.x, poison_keyword.size.x - 1.0,
+				"星芒不得再向左压进关键词末字")
 	var detail_segments := gallery.get("_d_detail_segment_labels") as Array
 	var reconstructed := ""
 	for segment_variant: Variant in detail_segments:
@@ -242,6 +311,164 @@ func test_hero_gallery_bolds_effect_keywords_without_repeating_glossaries() -> v
 	for keyword_variant: Variant in keyword_labels:
 		assert_eq((keyword_variant as Label).text, "剑气",
 				"昴日正文中的剑气使用同一效果词加粗规则")
+
+
+func test_effect_keyword_emphasis_exclusions_and_spacing_are_global() -> void:
+	for excluded: String in ["附加效果", "护甲", "穿防", "穿大防"]:
+		var runs := EffectTextFormatter.split_runs("获得%s，然后继续" % excluded)
+		assert_false(runs.any(func(run: Dictionary) -> bool:
+			return bool(run.bold) and String(run.text) == excluded),
+			"%s 不得加粗或生成星芒角标" % excluded)
+
+	var h20_runs := EffectTextFormatter.split_runs("直到下回合结束，使其获得脆弱。")
+	var keyword_index := -1
+	for index: int in h20_runs.size():
+		if bool(h20_runs[index].bold):
+			keyword_index = index
+			break
+	assert_gt(keyword_index, 0)
+	assert_eq(String(h20_runs[keyword_index - 1].text), "直到下回合结束，使其获得",
+			"h20 关键词前的正文不得被改写")
+	assert_eq(EffectTextFormatter.KEYWORD_GAP_BEFORE, 0.0,
+			"连续中文短语在关键词前不得插入人工间距")
+	assert_eq(EffectTextFormatter.KEYWORD_SPARK_OFFSET.x, 1.0,
+			"星芒从关键词末字外侧开始，修复 h11/h20 贴字")
+	assert_gte(EffectTextFormatter.KEYWORD_GAP_AFTER,
+			EffectKeywordSpark.MARK_SIZE.x + EffectTextFormatter.KEYWORD_SPARK_OFFSET.x,
+			"h10 后文必须排在完整星芒占位之后")
+
+
+func test_h10_h11_h20_keyword_geometry_uses_one_shared_formula() -> void:
+	var packed := load("res://src/ui/hero_gallery_screen.tscn") as PackedScene
+	var gallery := packed.instantiate()
+	add_child_autofree(gallery)
+	await get_tree().process_frame
+	for hero_index: int in [9, 10, 19]:
+		gallery.call("_select", hero_index)
+		await get_tree().process_frame
+		var segments := gallery.get("_d_detail_segment_labels") as Array
+		for segment_variant: Variant in segments:
+			var keyword := segment_variant as Label
+			if not bool(keyword.get_meta(EffectTextFormatter.META_IS_KEYWORD, false)):
+				continue
+			var spark := keyword.get_node_or_null("KeywordSpark") as Control
+			assert_not_null(spark)
+			if spark == null:
+				continue
+			var keyword_width := keyword.get_theme_font("font").get_string_size(
+					keyword.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0,
+					keyword.get_theme_font_size("font_size")).x
+			assert_gte(spark.position.x, keyword_width + 0.99,
+					"h10/h11/h20 星芒均从关键词末字外侧开始")
+			var line_id := String(keyword.get_meta(EffectTextFormatter.META_LINE_ID))
+			var run_order := int(keyword.get_meta(EffectTextFormatter.META_RUN_ORDER))
+			for neighbor_variant: Variant in segments:
+				var neighbor := neighbor_variant as Label
+				if String(neighbor.get_meta(EffectTextFormatter.META_LINE_ID, "")) != line_id:
+					continue
+				var neighbor_order := int(neighbor.get_meta(
+						EffectTextFormatter.META_RUN_ORDER, -1))
+				if neighbor_order == run_order - 1:
+					var previous_width := neighbor.get_theme_font("font").get_string_size(
+							neighbor.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0,
+							neighbor.get_theme_font_size("font_size")).x
+					assert_lte(keyword.position.x - (neighbor.position.x + previous_width), 0.01,
+							"h20 的“获得/脆弱”等连续中文不得在关键词前插空")
+				elif neighbor_order == run_order + 1:
+					var spark_right := keyword.position.x + spark.position.x \
+							+ EffectKeywordSpark.MARK_SIZE.x
+					assert_lte(spark_right, neighbor.position.x,
+							"h10/h11/h20 星芒不得再侵入后续文字或标点")
+
+
+func test_long_hero_skill_detail_keeps_h01_left_rule_clearance() -> void:
+	var packed := load("res://src/ui/hero_gallery_screen.tscn") as PackedScene
+	var gallery := packed.instantiate()
+	add_child_autofree(gallery)
+	await get_tree().process_frame
+	var rule := gallery.get("_d_detail_rule") as ColorRect
+	var detail := gallery.find_child("SkillDetail", true, false) as Label
+	gallery.call("_select", 0)
+	await get_tree().process_frame
+	var h01_segments := gallery.get("_d_detail_segment_labels") as Array
+	var h01_left := INF
+	for segment_variant: Variant in h01_segments:
+		h01_left = minf(h01_left, (segment_variant as Label).position.x)
+	var h01_clearance := h01_left - rule.get_rect().end.x
+	gallery.call("_select", 9)
+	await get_tree().process_frame
+	var h10_segments := gallery.get("_d_detail_segment_labels") as Array
+	var h10_left := INF
+	for segment_variant: Variant in h10_segments:
+		h10_left = minf(h10_left, (segment_variant as Label).position.x)
+	var h10_clearance := h10_left - rule.get_rect().end.x
+	assert_gte(h01_clearance, 38.0,
+			"h01 在统一安全区内不得低于原有 38px 的舒适竖线净距")
+	assert_gte(h10_clearance, 38.0,
+			"h10 等长文案不得退回统一安全区修复前的贴线状态")
+	assert_eq(detail.size.x, 666.0,
+			"所有英雄共用固定左右安全区，不给 h10 写特例")
+
+
+func test_h11_uses_the_same_safe_track_and_never_orphans_its_full_stop() -> void:
+	var packed := load("res://src/ui/hero_gallery_screen.tscn") as PackedScene
+	var gallery := packed.instantiate()
+	add_child_autofree(gallery)
+	await get_tree().process_frame
+	gallery.call("_select", 9)
+	await get_tree().process_frame
+	var h10_left := INF
+	for segment_variant: Variant in gallery.get("_d_detail_segment_labels") as Array:
+		h10_left = minf(h10_left, (segment_variant as Label).position.x)
+	gallery.call("_select", 10)
+	await get_tree().process_frame
+	var h11_left := INF
+	var h11_lines: Dictionary = {}
+	var h11_line_heights: Dictionary = {}
+	var h11_line_tops: Dictionary = {}
+	for segment_variant: Variant in gallery.get("_d_detail_segment_labels") as Array:
+		var segment := segment_variant as Label
+		h11_left = minf(h11_left, segment.position.x)
+		var line_id := String(segment.get_meta(EffectTextFormatter.META_LINE_ID))
+		h11_lines[line_id] = String(h11_lines.get(line_id, "")) + segment.text
+		h11_line_heights[line_id] = segment.size.y
+		h11_line_tops[line_id] = segment.position.y
+	assert_gte(h11_left, h10_left - 1.0,
+			"h11 不得因关键词数量较少而获得更宽轨道、向竖线方向突出")
+	for line_text: String in h11_lines.values():
+		assert_ne(line_text, "。", "h11 句号必须跟随前一个中文短语，不能独占一行")
+	assert_eq(h11_line_heights.size(), 2, "h11 正文应稳定排成两行")
+	var heights := h11_line_heights.values()
+	assert_almost_eq(float(heights[0]), float(heights[1]), 0.01,
+			"禁则移字后第二行必须按正文真实字体重算高度，不得沿用标点孤行的矮行框")
+	var tops := h11_line_tops.values()
+	tops.sort()
+	assert_gte(float(tops[1]) - float(tops[0]), float(heights[0]) + 4.0,
+			"换行后必须保留完整行高和明确行间距，不得贴住第一行")
+
+
+func test_every_hero_description_obeys_cjk_line_start_and_end_rules() -> void:
+	var packed := load("res://src/ui/hero_gallery_screen.tscn") as PackedScene
+	var gallery := packed.instantiate()
+	add_child_autofree(gallery)
+	await get_tree().process_frame
+	var heroes: Array = gallery.get("all_heroes") as Array
+	for hero_index: int in heroes.size():
+		gallery.call("_select", hero_index)
+		await get_tree().process_frame
+		var lines: Dictionary = {}
+		for segment_variant: Variant in gallery.get("_d_detail_segment_labels") as Array:
+			var segment := segment_variant as Label
+			var line_id := String(segment.get_meta(EffectTextFormatter.META_LINE_ID))
+			lines[line_id] = String(lines.get(line_id, "")) + segment.text
+		for line_text_variant: Variant in lines.values():
+			var line_text := String(line_text_variant)
+			assert_false(EffectTextFormatter.line_starts_with_forbidden(line_text),
+					"%s 的说明行首不得出现闭合符号：%s" % [
+							String(heroes[hero_index].hero_id), line_text])
+			assert_false(EffectTextFormatter.line_ends_with_forbidden(line_text),
+					"%s 的说明行尾不得留下开放符号：%s" % [
+							String(heroes[hero_index].hero_id), line_text])
 
 
 func test_hero_skill_section_moves_as_one_group_toward_hp() -> void:
@@ -293,6 +520,13 @@ func test_unified_codex_reflows_effect_segments_at_final_font_size() -> void:
 				assert_gte(mirror.position.x, float(line_ends[line_id]),
 						"最终19px文字层必须重新排流，后段不得压回前段")
 			line_ends[line_id] = mirror.position.x + advance
+			if String(segment.name).begins_with("SkillKeyword_"):
+				var spark: Control = native_layer.keyword_spark_for_source(segment)
+				assert_not_null(spark)
+				if spark != null:
+					var spark_rect := _canvas_rect(spark)
+					assert_lt(spark_rect.position.y, mirror.get_global_rect().get_center().y,
+							"原生文字层的星芒必须保持右上角标位置")
 
 
 func test_effect_icons_use_visible_content_bounds_for_uniform_scale() -> void:
@@ -303,7 +537,7 @@ func test_effect_icons_use_visible_content_bounds_for_uniform_scale() -> void:
 	var entries := gallery.get_node("EffectList") as Control
 	for button_node: Node in entries.get_children():
 		var button := button_node as Button
-		var icon := button.get_node("Icon") as TextureRect
+		var icon := button.get_node("EffectFrame/Icon") as TextureRect
 		assert_true(icon.texture is AtlasTexture,
 				"每枚外部图标必须先裁掉透明留白，再进入统一尺寸槽")
 		var atlas := icon.texture as AtlasTexture
@@ -312,8 +546,8 @@ func test_effect_icons_use_visible_content_bounds_for_uniform_scale() -> void:
 		var visual_scale := minf(icon.size.x / atlas.region.size.x,
 				icon.size.y / atlas.region.size.y)
 		var visual_size := atlas.region.size * visual_scale
-		assert_almost_eq(maxf(visual_size.x, visual_size.y), 48.0, 0.01,
-				"左页图标的可见内容长边必须统一为 48px")
+		assert_almost_eq(maxf(visual_size.x, visual_size.y), 64.0, 0.01,
+				"进入英雄同款外框后，左页效果图标的可见内容长边统一为 64px")
 
 
 func test_imported_effect_icons_are_available_to_the_gallery() -> void:
@@ -341,12 +575,12 @@ func test_armor_rename_keeps_item_names_and_matching_art_paths() -> void:
 	assert_true(ResourceLoader.exists(ItemCatalog.icon_path("t2_jiandun")))
 
 
-func test_item_descriptions_omit_full_stops_from_runtime_text() -> void:
+func test_item_descriptions_restore_full_stops_in_runtime_text() -> void:
 	for item: ItemData in ItemCatalog.all():
-		assert_false(item.description.contains("。"),
-				"%s 的玩家可见说明不得保留句号" % item.item_name)
-	assert_true(ItemCatalog.make("t1_jiedu_yaoshui").description.contains("；成功清除后"),
-			"多句说明去掉句号后仍须以分号保留语义停顿")
+		assert_true(item.description.ends_with("。"),
+				"%s 的玩家可见说明必须以完整句号收尾" % item.item_name)
+	assert_true(ItemCatalog.make("t1_jiedu_yaoshui").description.contains("。成功清除后"),
+			"多句说明恢复句号，不再改写成分号")
 
 
 func test_unified_codex_exposes_effect_as_third_chapter() -> void:
@@ -377,7 +611,7 @@ func test_unified_codex_exposes_effect_as_third_chapter() -> void:
 	var source_name := effect_gallery.get_node("DetailArea/EffectName") as Label
 	var mirror_name := native_layer.mirror_for_source(source_name)
 	assert_not_null(mirror_name)
-	assert_eq(mirror_name.get_theme_color("font_color"), Color("3D301F"),
+	assert_eq(mirror_name.get_theme_color("font_color"), Color("2E2922"),
 			"效果页进入清晰原生文字层后仍统一使用深墨色")
 	var effect_list := effect_gallery.get_node("EffectList") as Control
 	for button_node: Node in effect_list.get_children():
@@ -387,10 +621,10 @@ func test_unified_codex_exposes_effect_as_third_chapter() -> void:
 		assert_not_null(mirror_label)
 		if mirror_label == null:
 			continue
-		var icon_rect := _canvas_rect(button.get_node("Icon") as Control)
+		var icon_rect := _canvas_rect(button.get_node("EffectFrame/Icon") as Control)
 		var text_rect := _canvas_rect(mirror_label)
-		assert_lte(icon_rect.end.x + 8.0, text_rect.position.x,
-				"最终画布上的原生文字不得与左侧图标重叠")
+		assert_lte(icon_rect.end.y + 4.0, text_rect.position.y,
+				"最终画布上的效果名必须像英雄名一样稳定落在外框下方")
 
 
 func _canvas_rect(control: Control) -> Rect2:

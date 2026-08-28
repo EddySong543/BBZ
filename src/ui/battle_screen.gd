@@ -21,6 +21,9 @@ const LONGYUJI_SKILL_ICON := preload("res://assets/sprites/heroes/h05/h05_skill.
 const ANCHAO_SKILL_ICON := preload("res://assets/sprites/heroes/h13/h13_skill.png")
 const H24_SKILL_ICON := preload("res://assets/sprites/heroes/h24/h24_skill.png")
 const EffectTextFormatterScript := preload("res://src/ui/effect_text_formatter.gd")
+const EFFECT_KEYWORD_SPARK_SCRIPT := preload("res://src/ui/components/effect_keyword_spark.gd")
+const ITEM_TIP_DIVIDER_SCRIPT := preload("res://src/ui/components/item_tip_pixel_divider.gd")
+const BATTLE_STATUS_ROW_SCRIPT := preload("res://src/ui/components/battle_status_row.gd")
 const HERO_FRAME_SCENE := preload("res://src/ui/components/hero_frame.tscn")
 const BACKPACK_OVERLAY_SCENE := preload("res://src/ui/backpack_screen.tscn")
 const BACKPACK_ICON := preload("res://assets/ui/icons/backpack.png")
@@ -30,6 +33,7 @@ const BACKPACK_ICON := preload("res://assets/ui/icons/backpack.png")
 
 const SCREEN_W := 1920.0
 const SCREEN_H := 1080.0
+const BATTLE_STATUS_Z_INDEX := 45
 
 ## 出战血条低血红闪阈值（HP 占比 ≤ 此值）；闪烁在 IconPipRow 内部实现（任务5：红光改到剩余血量爱心上）。
 const LOW_HP_RATIO := 0.5
@@ -150,8 +154,6 @@ const HpSlantBarScript := preload("res://src/ui/components/hp_slant_bar.gd")
 @export var death_final_frame_hold_duration: float = 0.26
 @export var death_dissolve_duration: float = 0.60
 @export_range(4, 24, 1) var death_dissolve_steps: int = 12
-@export var death_entry_duration: float = 0.24
-@export var death_entry_drop: float = 18.0
 const DEATH_DISSOLVE_OPEN_PROGRESS: float = 0.25
 const DEATH_DISSOLVE_MIDDLE_PROGRESS: float = 0.83
 const DEATH_DISSOLVE_OPEN_SHARE: float = 0.30
@@ -199,6 +201,8 @@ var _central_turn_cue
 @onready var p2_active_name: Label = $P2Hud/P2ActiveName
 @onready var p1_player_id: Label = $P1Hud/P1PlayerId
 @onready var p2_player_id: Label = $P2Hud/P2PlayerId
+@onready var p1_status_anchor: Control = $P1Hud/P1StatusAnchor
+@onready var p2_status_anchor: Control = $P2Hud/P2StatusAnchor
 
 @onready var p1_char_display: CharacterDisplay = $P1CharDisplay
 @onready var p2_char_display: CharacterDisplay = $P2CharDisplay
@@ -378,6 +382,7 @@ var _world_foreground_occluder: Control = null
 var _world_foreground_source: Control = null
 var _character_reflection_receiver: Control = null
 var _character_reflection_material: ShaderMaterial = null
+var _battle_status_rows: Array[Control] = []
 
 
 # ---- 演出原语库（2026-07-17 拆分批①）：飘字/斩击/火花/尘/能量粒/冲击帧+对象池 全家
@@ -476,6 +481,7 @@ func _ready() -> void:
 	_fx.name = "BattleFx"
 	add_child(_fx)
 	_fx.setup(self)
+	_build_battle_status_rows()
 
 	# 低血红闪（任务5）：出战血条剩余爱心在 HP 占比低时红色呼吸（IconPipRow 内部实现）。
 	for row in [p1_heart_row, p2_heart_row]:
@@ -1979,6 +1985,7 @@ func _sync_cancelled_free_switch_preview(events: Array) -> void:
 			continue
 		_update_hero_frames()
 		_update_character_displays()
+		_refresh_battle_status_rows()
 		return
 
 
@@ -3060,13 +3067,20 @@ enum TipContentKind { PLAIN, SKILL, ITEM, AVATAR_SKILL }
 @export_range(0.0, 12.0, 1.0) var item_tip_vertical_lift := 0.0
 ## 名称行与正文的真实像素间距；默认只留一个短呼吸位。
 @export_range(1, 64, 1) var item_tip_title_body_gap: int = 8
+## 分割线独立垂直偏移；负数上移，正数下移，0 恢复原位。
+@export_range(-8.0, 8.0, 1.0) var item_tip_rule_vertical_offset := -2.0
 @export_range(0, 3, 1) var item_tip_title_size_boost: int = 1
 @export_range(0.0, 0.8, 0.05) var item_tip_title_embolden: float = 0.25
 const ITEM_TIP_ICON_SIZE := 32.0
 const ITEM_TIP_ICON_TITLE_GAP := 8.0
-const ITEM_TIP_COLUMN_INSET := 8.0
+## 标题轨道与分割线在外层 12px 安全边距内只留 2px，保持几何居中。
+const ITEM_TIP_COLUMN_INSET := 2.0
+## 正文恢复较稳的 8px 左右起笔位；提前换行由道具正文的断词规则修正，不再犀牲对称轴。
+const ITEM_TIP_BODY_LEFT_INSET := 8.0
+const ITEM_TIP_BODY_RIGHT_INSET := 8.0
 const ITEM_TIP_BASE_TOP := 2.0
 const ITEM_TIP_HEADER_RULE_GAP := 5.0
+const ITEM_TIP_RULE_HEIGHT := 5.0
 @export_group("")
 
 const TIP_GAP := 12.0                # 提示框与目标控件的间距(px)
@@ -3084,9 +3098,13 @@ var _tip_skill_icon: TextureRect
 var _tip_item_header: Control
 var _tip_item_icon: TextureRect
 var _tip_item_title: Label
-var _tip_item_rule: ColorRect
+var _tip_item_rule: Control
 var _tip_stylebox: StyleBoxTexture
 var _tip_effect_bold_font: FontVariation
+var _tip_keyword_ranges: Array[Vector2i] = []
+var _tip_keyword_sparks: Array[Control] = []
+var _tip_keyword_alignment: int = HORIZONTAL_ALIGNMENT_LEFT
+var _tip_keyword_ink: Color = Color("453623")
 
 
 ## 建悬停提示（中性书页像素框 9-slice）+ 挂满底部动作按钮与我方道具槽。
@@ -3211,7 +3229,7 @@ func _build_item_tip_header() -> void:
 
 	_tip_item_title = Label.new()
 	_tip_item_title.name = "ItemTitle"
-	_tip_item_title.anchor_right = 1.0
+	_tip_item_title.anchor_right = 0.0
 	_tip_item_title.offset_left = ITEM_TIP_ICON_SIZE + ITEM_TIP_ICON_TITLE_GAP
 	_tip_item_title.offset_right = 0.0
 	_tip_item_title.offset_bottom = ITEM_TIP_ICON_SIZE
@@ -3226,9 +3244,8 @@ func _build_item_tip_header() -> void:
 	_tip_item_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tip_item_header.add_child(_tip_item_title)
 
-	_tip_item_rule = ColorRect.new()
+	_tip_item_rule = ITEM_TIP_DIVIDER_SCRIPT.new() as Control
 	_tip_item_rule.name = "ItemHeaderRule"
-	_tip_item_rule.color = Color(0.26, 0.19, 0.11, 0.28)
 	_tip_item_rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tip_item_rule.visible = false
 	_tip_content.add_child(_tip_item_rule)
@@ -3413,6 +3430,7 @@ func _show_tip_at(target: Rect2, text: String, format: int, centered: bool = fal
 		return
 	var is_short := format == TipFormat.S
 	var is_avatar_skill := content_kind == TipContentKind.AVATAR_SKILL
+	_clear_tip_keyword_sparks(true)
 	var tip_size: Vector2 = tip_size_s if format == TipFormat.S else (
 		tip_size_m if format == TipFormat.M else tip_size_l)
 	_set_tip_content_margins(format, content_kind)
@@ -3461,19 +3479,147 @@ func _set_avatar_skill_tip_text(text: String) -> void:
 			text.strip_edges(), HORIZONTAL_ALIGNMENT_LEFT, Color(0.27, 0.21, 0.14))
 
 
-## 与效果图鉴共用同一效果词表和 0.8 仿粗参数；每段只进入一次 RichTextLabel 字体栈。
+## 与效果图鉴共用同一效果词表；效果词统一使用右上角星芒与小幅加粗。
 func _append_effect_rich_text(
-		text: String, alignment: int, color: Color) -> void:
-	_tip_rich.push_paragraph(alignment)
+		text: String, alignment: int, color: Color,
+		protect_atomic_terms: bool = true) -> void:
+	_tip_keyword_alignment = alignment
+	_tip_keyword_ink = color
+	_tip_rich.push_paragraph(alignment, Control.TEXT_DIRECTION_AUTO, "zh_CN")
 	_tip_rich.push_font(_tip_rich.get_theme_font("normal_font"), tip_font_size_l)
 	_tip_rich.push_color(color)
+	var cursor := _tip_rich.get_total_character_count()
 	for run: Dictionary in EffectTextFormatterScript.split_runs(text):
-		if bool(run.bold):
+		var run_text := String(run.text)
+		var is_keyword := bool(run.bold)
+		# 星芒必须与完整关键词同行；普通道具正文则不再把常用双字词全部锁死。
+		var protected_text := _join_tip_glyphs(
+				EffectTextFormatterScript.protect_cjk_line_breaks(run_text)) \
+				if is_keyword else (
+				_keep_tip_terms_together(run_text) if protect_atomic_terms \
+				else EffectTextFormatterScript.protect_cjk_line_breaks(run_text))
+		if is_keyword:
+			_tip_keyword_ranges.append(Vector2i(cursor, protected_text.length()))
 			_tip_rich.push_font(_tip_effect_bold_font, tip_font_size_l)
-		_tip_rich.add_text(_keep_tip_terms_together(String(run.text)))
-		if bool(run.bold):
+		_tip_rich.add_text(protected_text)
+		if is_keyword:
 			_tip_rich.pop()
+			_tip_rich.add_text(EffectTextFormatterScript.KEYWORD_TRAILING_SPACER)
+		cursor += protected_text.length()
+		if is_keyword:
+			cursor += EffectTextFormatterScript.KEYWORD_TRAILING_SPACER.length()
 	_tip_rich.pop_all()
+	call_deferred("_refresh_tip_keyword_sparks")
+
+
+func _clear_tip_keyword_sparks(clear_ranges: bool) -> void:
+	for spark: Control in _tip_keyword_sparks:
+		if is_instance_valid(spark):
+			if spark.get_parent() != null:
+				spark.get_parent().remove_child(spark)
+			spark.queue_free()
+	_tip_keyword_sparks.clear()
+	if clear_ranges:
+		_tip_keyword_ranges.clear()
+
+
+func _refresh_tip_keyword_sparks() -> void:
+	_clear_tip_keyword_sparks(false)
+	if not _tip_rich.visible or _tip_keyword_ranges.is_empty():
+		return
+	var parsed_text := _tip_rich.get_parsed_text()
+	var font_size := _tip_rich.get_theme_font_size("normal_font_size")
+	var vertical_origin := 0.0
+	if _tip_rich.vertical_alignment == VERTICAL_ALIGNMENT_CENTER:
+		vertical_origin = maxf((_tip_rich.size.y - _tip_rich.get_content_height()) * 0.5, 0.0)
+	for keyword_range: Vector2i in _tip_keyword_ranges:
+		if keyword_range.x < 0 or keyword_range.x >= parsed_text.length():
+			continue
+		var line := _tip_rich.get_character_line(keyword_range.x)
+		var line_range := _tip_rich.get_line_range(line)
+		var prefix_length := maxi(keyword_range.x - line_range.x, 0)
+		var keyword := parsed_text.substr(keyword_range.x, keyword_range.y)
+		var prefix_width := _measure_tip_character_range(
+				parsed_text, line_range.x, line_range.x + prefix_length, font_size)
+		var keyword_width := _tip_effect_bold_font.get_string_size(
+				keyword, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x
+		var keyword_end_x := prefix_width + keyword_width
+		if _tip_keyword_alignment == HORIZONTAL_ALIGNMENT_FILL \
+				and _tip_rich.get_line_width(line) >= _tip_rich.size.x - 1.0:
+			keyword_end_x = _measure_filled_tip_caret(
+					parsed_text, line_range, keyword_range.x + keyword_range.y, font_size)
+		var line_origin_x := 0.0
+		if _tip_keyword_alignment == HORIZONTAL_ALIGNMENT_CENTER:
+			line_origin_x = maxf((_tip_rich.size.x - _tip_rich.get_line_width(line)) * 0.5, 0.0)
+		var spark := EFFECT_KEYWORD_SPARK_SCRIPT.new() as Control
+		spark.name = "KeywordSpark"
+		spark.call("configure", _tip_keyword_ink)
+		spark.position = Vector2(
+				roundf(line_origin_x + keyword_end_x
+						+ EffectTextFormatterScript.KEYWORD_SPARK_OFFSET.x),
+				roundf(vertical_origin + _tip_rich.get_line_offset(line)
+						+ EffectTextFormatterScript.KEYWORD_SPARK_OFFSET.y))
+		_tip_rich.add_child(spark)
+		_tip_keyword_sparks.append(spark)
+
+
+func _measure_tip_character_range(
+		text: String, start: int, end: int, font_size: int) -> float:
+	var normal_font := _tip_rich.get_theme_font("normal_font")
+	var cursor := clampi(start, 0, text.length())
+	var safe_end := clampi(end, cursor, text.length())
+	var measured_width := 0.0
+	while cursor < safe_end:
+		var is_keyword := _tip_character_is_keyword(cursor)
+		var run_end := cursor + 1
+		while run_end < safe_end and _tip_character_is_keyword(run_end) == is_keyword:
+			run_end += 1
+		var run_text := text.substr(cursor, run_end - cursor)
+		var run_font: Font = _tip_effect_bold_font if is_keyword else normal_font
+		measured_width += run_font.get_string_size(
+				run_text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x
+		cursor = run_end
+	return measured_width
+
+
+## RichTextLabel 不公开字符横坐标；用相同字体片段和 TextServer 两端对齐规则
+## 重建当前行，取得关键词末端的真实 caret，避免星芒停留在拉伸前的位置。
+func _measure_filled_tip_caret(
+		parsed_text: String, line_range: Vector2i,
+		caret_index: int, font_size: int) -> float:
+	var text_line := TextLine.new()
+	text_line.direction = TextServer.DIRECTION_AUTO
+	text_line.alignment = HORIZONTAL_ALIGNMENT_FILL
+	text_line.flags = TextServer.JUSTIFICATION_KASHIDA | TextServer.JUSTIFICATION_WORD_BOUND
+	text_line.width = _tip_rich.size.x
+	# RichTextLabel 返回的是 [start, end_exclusive]，不是 [start, length]。
+	var line_end := line_range.y
+	var cursor := line_range.x
+	while cursor < line_end:
+		var is_keyword := _tip_character_is_keyword(cursor)
+		var run_end := cursor + 1
+		while run_end < line_end and _tip_character_is_keyword(run_end) == is_keyword:
+			run_end += 1
+		var run_font: Font = _tip_effect_bold_font if is_keyword \
+				else _tip_rich.get_theme_font("normal_font")
+		text_line.add_string(
+				parsed_text.substr(cursor, run_end - cursor),
+				run_font, font_size, "zh_CN")
+		cursor = run_end
+	var caret_info: Dictionary = TextServerManager.get_primary_interface().shaped_text_get_carets(
+			text_line.get_rid(), clampi(
+					caret_index - line_range.x, 0, line_range.y - line_range.x))
+	var leading_caret: Rect2 = caret_info.get("leading_rect", Rect2())
+	var trailing_caret: Rect2 = caret_info.get("trailing_rect", Rect2())
+	return maxf(leading_caret.position.x, trailing_caret.position.x)
+
+
+func _tip_character_is_keyword(character_index: int) -> bool:
+	for keyword_range: Vector2i in _tip_keyword_ranges:
+		if character_index >= keyword_range.x \
+				and character_index < keyword_range.x + keyword_range.y:
+			return true
+	return false
 
 
 func _make_tip_font(font_size: int) -> FontVariation:
@@ -3547,66 +3693,102 @@ func _set_l_tip_text(text: String, content_kind: int, item_data: ItemData = null
 	var body_text := "\n".join(body_lines)
 	var group_top := ITEM_TIP_BASE_TOP - item_tip_vertical_lift
 	var content_width := tip_size_m.x - tip_padding_horizontal_m * 2.0
-	var max_body_width := content_width - ITEM_TIP_COLUMN_INSET * 2.0
-	# 换行后各行保持左对齐，但承载列按真实最长行宽居中；固定满宽列会让短说明永远偏左。
-	var body_width := _measure_wrapped_text_width(body_text, max_body_width)
-	var column_left := floorf((content_width - body_width) * 0.5)
-	var column_right := content_width - column_left - body_width
+	# 正文恢复原有左起笔位并与标题同轴；通过恢复中文正常断行填满右侧，不用不对称边距代偿。
+	var column_left := ITEM_TIP_BODY_LEFT_INSET
+	var column_right := ITEM_TIP_BODY_RIGHT_INSET
 	var rule_top := _configure_item_tip_header(title, item_data, group_top, content_width)
 	# 正文维持左右对称内容列；标题轨道固定，不再随道具名字数左右漂移。
 	_tip_rich.offset_left = column_left
 	_tip_rich.offset_right = -column_right
-	_tip_rich.offset_top = rule_top + 1.0 + item_tip_title_body_gap
+	_tip_rich.offset_top = rule_top + ITEM_TIP_RULE_HEIGHT + item_tip_title_body_gap
 	_tip_rich.offset_bottom = 0.0
 	_tip_rich.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	if not body_lines.is_empty():
+		# 中文书页正文采用两端对齐：非末行填满固定正文列，末行仍自然左齐。
+		# 这解决的是 16px 字号 + 1px 字距在 182px 列宽中必然产生的尾空，
+		# 不能再用不对称边距或不可断词去代偿。
 		_append_effect_rich_text(
-				body_text, HORIZONTAL_ALIGNMENT_LEFT, Color(0.27, 0.21, 0.14))
+				body_text, HORIZONTAL_ALIGNMENT_FILL, Color(0.27, 0.21, 0.14), false)
 
 
-func _measure_wrapped_text_width(text: String, max_width: float) -> float:
-	if text.is_empty():
-		return max_width
-	var paragraph := TextParagraph.new()
-	paragraph.width = max_width
-	paragraph.break_flags = TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND \
-			| TextServer.BREAK_GRAPHEME_BOUND
-	for run: Dictionary in EffectTextFormatterScript.split_runs(text):
-		paragraph.add_string(
-				_keep_tip_terms_together(String(run.text)),
-				_tip_effect_bold_font if bool(run.bold) \
-						else _tip_rich.get_theme_font("normal_font"),
-				tip_font_size_l)
-	var measured_width := 0.0
-	for line_index: int in paragraph.get_line_count():
-		measured_width = maxf(measured_width, paragraph.get_line_size(line_index).x)
-	return clampf(ceilf(measured_width), 1.0, max_width)
 func _configure_item_tip_header(title: String, item_data: ItemData, top: float,
 		content_width: float) -> float:
 	var protected_title := _keep_tip_terms_together(title)
 	_tip_item_title.text = protected_title
 	_tip_item_icon.texture = ItemCatalog.load_icon(item_data.item_id) if item_data != null else null
 	_tip_item_icon.visible = _tip_item_icon.texture != null
-	var icon_width := ITEM_TIP_ICON_SIZE if _tip_item_icon.visible else 0.0
 	var icon_gap := ITEM_TIP_ICON_TITLE_GAP if _tip_item_icon.visible else 0.0
 	var header_left := ITEM_TIP_COLUMN_INSET
 	var header_width := content_width - ITEM_TIP_COLUMN_INSET * 2.0
 	_tip_item_header.position = Vector2(header_left, top)
 	_tip_item_header.size = Vector2(header_width, ITEM_TIP_ICON_SIZE)
-	_tip_item_title.offset_left = icon_width + icon_gap
-	_tip_item_title.offset_right = 0.0
+	var title_font := _tip_item_title.get_theme_font("font")
+	var title_font_size := _tip_item_title.get_theme_font_size("font_size")
+	var title_width := minf(
+			ceilf(title_font.get_string_size(
+					protected_title, HORIZONTAL_ALIGNMENT_LEFT, -1.0, title_font_size).x),
+			header_width - icon_gap)
+	var icon_visual_rect := Rect2()
+	var icon_box_left := 0.0
+	if _tip_item_icon.visible:
+		icon_visual_rect = _item_tip_icon_visual_rect(_tip_item_icon.texture)
+		var group_width := icon_visual_rect.size.x + icon_gap + title_width
+		var visible_group_left := floorf((header_width - group_width) * 0.5)
+		icon_box_left = roundf(visible_group_left - icon_visual_rect.position.x)
+		_tip_item_icon.position = Vector2(
+				icon_box_left,
+				roundf(ITEM_TIP_ICON_SIZE * 0.5 - icon_visual_rect.get_center().y))
+	else:
+		_tip_item_icon.position = Vector2.ZERO
+	var title_left := roundf(
+			(icon_box_left + icon_visual_rect.end.x + icon_gap)
+			if _tip_item_icon.visible else (header_width - title_width) * 0.5)
+	_tip_item_title.offset_left = title_left
+	_tip_item_title.offset_right = minf(title_left + title_width, header_width)
 	_tip_item_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_tip_item_header.visible = true
 	var rule_top := top + ITEM_TIP_ICON_SIZE + ITEM_TIP_HEADER_RULE_GAP
-	_tip_item_rule.position = Vector2(header_left, rule_top)
-	_tip_item_rule.size = Vector2(header_width, 1.0)
+	_tip_item_rule.position = Vector2(
+			header_left,
+			rule_top + item_tip_rule_vertical_offset)
+	_tip_item_rule.size = Vector2(header_width, ITEM_TIP_RULE_HEIGHT)
 	_tip_item_rule.visible = true
 	return rule_top
 
 
+## 以图标真正有 alpha 的像素边界做光学居中；透明留白不再把“图标+名称”假性推歪。
+func _item_tip_icon_visual_rect(texture: Texture2D) -> Rect2:
+	if texture == null:
+		return Rect2(Vector2.ZERO, Vector2.ONE * ITEM_TIP_ICON_SIZE)
+	var image := texture.get_image()
+	if image == null or image.is_empty():
+		return Rect2(Vector2.ZERO, Vector2.ONE * ITEM_TIP_ICON_SIZE)
+	var min_pixel := Vector2i(image.get_width(), image.get_height())
+	var max_pixel := Vector2i(-1, -1)
+	for y: int in image.get_height():
+		for x: int in image.get_width():
+			if image.get_pixel(x, y).a <= 0.06:
+				continue
+			min_pixel.x = mini(min_pixel.x, x)
+			min_pixel.y = mini(min_pixel.y, y)
+			max_pixel.x = maxi(max_pixel.x, x)
+			max_pixel.y = maxi(max_pixel.y, y)
+	if max_pixel.x < min_pixel.x or max_pixel.y < min_pixel.y:
+		return Rect2(Vector2.ZERO, Vector2.ONE * ITEM_TIP_ICON_SIZE)
+	var source_size := Vector2(image.get_width(), image.get_height())
+	var draw_scale := minf(
+			ITEM_TIP_ICON_SIZE / maxf(source_size.x, 1.0),
+			ITEM_TIP_ICON_SIZE / maxf(source_size.y, 1.0))
+	var full_draw_size := source_size * draw_scale
+	var full_draw_origin := (Vector2.ONE * ITEM_TIP_ICON_SIZE - full_draw_size) * 0.5
+	return Rect2(
+			full_draw_origin + Vector2(min_pixel) * draw_scale,
+			Vector2(max_pixel - min_pixel + Vector2i.ONE) * draw_scale)
+
+
 ## U+2060 只影响断行、不绘制；保护高频规则词，避免“能/量”“大/防”被拆到两行。
 func _keep_tip_terms_together(text: String) -> String:
-	var protected_text := text
+	var protected_text := EffectTextFormatterScript.protect_cjk_line_breaks(text)
 	for term in TIP_ATOMIC_TERMS:
 		var joined_term := ""
 		for glyph in term:
@@ -3615,6 +3797,15 @@ func _keep_tip_terms_together(text: String) -> String:
 			joined_term += glyph
 		protected_text = protected_text.replace(term, joined_term)
 	return protected_text
+
+
+func _join_tip_glyphs(text: String) -> String:
+	var joined := ""
+	for glyph in text:
+		if not joined.is_empty():
+			joined += "\u2060"
+		joined += glyph
+	return joined
 
 
 func _hide_tip() -> void:
@@ -4245,6 +4436,7 @@ func _update_all() -> void:
 		p2_item_row.refresh(battle, 1, [], bool(
 			battle.info_distortion[1].get("hide_item_bar", false)))
 	_update_character_displays()
+	_refresh_battle_status_rows()
 	_update_energy_labels()
 	_update_hp_labels()
 	if state == State.PLAYER_SELECT:
@@ -4254,6 +4446,46 @@ func _update_all() -> void:
 func _update_character_displays() -> void:
 	for p in [0, 1]:
 		_update_character_display(p)
+
+
+## 毒素/脆弱/剑气属于角色常驻信息：固定挂在玩家名后，不进入战场空间。
+func _build_battle_status_rows() -> void:
+	_battle_status_rows.clear()
+	var anchors: Array[Control] = [p1_status_anchor, p2_status_anchor]
+	for player: int in 2:
+		var row := BATTLE_STATUS_ROW_SCRIPT.new() as Control
+		row.name = "BattleStatusRowP%d" % (player + 1)
+		row.z_index = BATTLE_STATUS_Z_INDEX
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		anchors[player].add_child(row)
+		_battle_status_rows.append(row)
+
+
+func _refresh_battle_status_rows() -> void:
+	if battle == null or _battle_status_rows.size() < 2:
+		return
+	for player: int in 2:
+		var row: Control = _battle_status_rows[player]
+		var slot := battle.active_index[player]
+		var entries: Array[Dictionary] = []
+		if slot >= 0 and slot < battle.hp[player].size() \
+				and battle.hp[player][slot] > 0:
+			var status_values: Dictionary = battle.statuses[player][slot]
+			entries = EffectCatalog.battle_status_entries(status_values)
+		row.call("refresh", entries)
+	_position_battle_status_rows()
+
+## P1 从锚点向右、P2 从镜像锚点向左；数字只负责防遮挡宽度，不参与锚定。
+## 锚点是 battle_screen_base.tscn 内可直接用 Inspector 调整的零尺寸 Control。
+func _position_battle_status_rows() -> void:
+	for player: int in mini(_battle_status_rows.size(), 2):
+		var row: Control = _battle_status_rows[player]
+		var icon_rect: Rect2 = row.call("debug_icon_alignment_rect")
+		if icon_rect.size.x <= 0.0 or icon_rect.size.y <= 0.0:
+			row.position = Vector2.ZERO
+			continue
+		var local_x := -icon_rect.position.x if player == PLAYER else -icon_rect.end.x
+		row.position = Vector2(local_x, -icon_rect.get_center().y).round()
 
 
 func _update_character_display(player: int, force_refresh: bool = false) -> void:
@@ -4617,6 +4849,8 @@ func _play_switch_handoff(players: Array[int]) -> void:
 		_cd(player).visible = false
 		var shadow: TextureRect = p1_shadow if player == PLAYER else p2_shadow
 		shadow.visible = false
+		if player < _battle_status_rows.size():
+			_battle_status_rows[player].visible = false
 	if switch_handoff_pause > 0.0:
 		await get_tree().create_timer(switch_handoff_pause).timeout
 	for player: int in players:
@@ -4629,6 +4863,7 @@ func _play_switch_handoff(players: Array[int]) -> void:
 		var shadow: TextureRect = p1_shadow if player == PLAYER else p2_shadow
 		shadow.visible = bool(shadow_visibility.get(player, true))
 		in_tweens.append(_animate_switch_in(cd, player))
+	_refresh_battle_status_rows()
 	if not in_tweens.is_empty():
 		await in_tweens[0].finished
 	for player: int in players:
@@ -4923,24 +5158,23 @@ func _wait_for_active_death_dissolves() -> void:
 			await _wait_for_death_dissolve(player)
 
 
-## 遗体已瓦解后才调用：透明期换装，再用无回弹短落位入场。
+## 遗体已瓦解后才调用：透明期换装，新英雄复用主动换人的规则像素带重组。
 func _death_switch_transition(player: int) -> void:
 	await _wait_for_death_dissolve(player)
 	var cd := _cd(player)
 	var home: Vector2 = _cd_home[player]
 	_update_all()   # 瓦解进度=1 → 换装不可见
 	cd.reset_death_dissolve()
-	cd.modulate = Color(1.0, 1.0, 1.0, 0.0)
 	cd.position = home
-	cd.offset_transform_position = Vector2(0.0, -death_entry_drop)
-	var inw := create_tween().set_parallel(true)
-	inw.tween_property(cd, "modulate:a", 1.0, death_entry_duration * 0.75)
-	inw.tween_property(cd, "offset_transform_position", Vector2.ZERO, death_entry_duration) \
-		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	inw.chain().tween_callback(_fx._spawn_dust.bind(player))
+	cd.modulate = Color.WHITE
+	cd.visible = true
+	var inw := _animate_switch_in(cd, player)
 	await inw.finished
+	cd.reset_switch_blocks()
 	cd.position = home
 	cd.offset_transform_position = Vector2.ZERO
+	if _fx != null:
+		_fx._spawn_dust(player)
 
 
 func _cd(player: int) -> CharacterDisplay:

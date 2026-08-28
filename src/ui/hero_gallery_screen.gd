@@ -10,6 +10,7 @@ const CELL_BG_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gds
 const FRAME_PALETTE_SHADER := preload("res://assets/shaders/canvas_ui_item_frame_palette.gdshader")
 const SELECTION_MARKER_SCRIPT := preload("res://src/ui/components/hero_gallery_selection_marker.gd")
 const EffectTextFormatterScript := preload("res://src/ui/effect_text_formatter.gd")
+const EFFECT_KEYWORD_SPARK_SCRIPT := preload("res://src/ui/components/effect_keyword_spark.gd")
 
 const HERO_DATA_DIR := "res://assets/data/heroes/"
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
@@ -27,6 +28,8 @@ const SELECTED_NAME_INK := Color("9A6828")
 const POINTER_COLOR := Color("7B5E3E")
 const POINTER_SIZE := Vector2(20.0, 36.0)
 const SKILL_SECTION_OFFSET_Y := -40.0
+## 以 h01 当前约 38px 的竖线净距为基准；还要给 9px 星芒排流留余量。
+const SKILL_DETAIL_HORIZONTAL_SAFE_INSET := 19.0
 
 # ── 1920×1080 双栏几何 ──
 const PAGE_L := Rect2(50, 158, 886, 836)
@@ -64,6 +67,10 @@ var _sel_tweens: Array[Tween] = []        # 选中书签落位 tween（换选先
 var _pop_tween: Tween                     # 右页展示落位微弹
 ## 统一图鉴外壳会自行提供返回入口与章节切换；嵌入时不重复播放整本书的入场。
 @export var embedded_in_codex: bool = false
+## 分段正文必须使用重排后的统一字体高度，不能沿用标点孤行在重排前的矮行框。
+@export_group("Skill Detail Typography")
+@export_range(0.0, 8.0, 1.0) var skill_detail_line_height_padding := 3.0
+@export_range(0.0, 12.0, 1.0) var skill_detail_line_gap := 7.0
 
 # 详情板部件（_build_detail_panel 一次建好）
 var _d_anim: AnimatedSprite2D
@@ -424,8 +431,10 @@ func _build_detail_panel() -> void:
 	_d_detail_pin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	detail_area.add_child(_d_detail_pin)
 	_d_detail = _make_label(
-		Vector2(px + 112, py + 670 + SKILL_SECTION_OFFSET_Y),
-		Vector2(PAGE_R.size.x - 214, 96), 22, INK)
+		Vector2(px + 112 + SKILL_DETAIL_HORIZONTAL_SAFE_INSET,
+				py + 670 + SKILL_SECTION_OFFSET_Y),
+		Vector2(PAGE_R.size.x - 214 - SKILL_DETAIL_HORIZONTAL_SAFE_INSET * 2.0,
+				96), 22, INK)
 	_d_detail.name = "SkillDetail"
 	_d_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_d_detail.vertical_alignment = VERTICAL_ALIGNMENT_TOP
@@ -539,7 +548,7 @@ func _layout_skill_row() -> void:
 	_d_tag_group.position = Vector2(tag_x, y0 - 1.0)
 
 
-## 正文按普通/效果词拆成互斥 Label；效果词使用效果图鉴同款 FontVariation 粗体。
+## 正文按普通/效果词拆成互斥 Label；效果词统一使用右上角星芒与小幅加粗。
 ## 每个字只绘制一次，分段 Label 仍会进入图鉴原生文字层，兼顾无重影与清晰度。
 func _rebuild_effect_keyword_emphasis(text: String) -> void:
 	for label: Label in _d_detail_segment_labels:
@@ -552,21 +561,35 @@ func _rebuild_effect_keyword_emphasis(text: String) -> void:
 		return
 	var normal_font := _d_detail.get_theme_font("font")
 	var font_size := _d_detail.get_theme_font_size("font_size")
+	var layout_text := EffectTextFormatterScript.protect_cjk_line_breaks(text)
 	var paragraph := TextParagraph.new()
 	paragraph.width = _d_detail.size.x
 	paragraph.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# 不能再按全文关键词数量扣宽度；那会让 h10/h11 获得不同排版轨道。
+	# 中文正文允许在字素间换行，语言信息负责句末标点禁则。
 	paragraph.break_flags = TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND \
 			| TextServer.BREAK_GRAPHEME_BOUND
-	for run: Dictionary in EffectTextFormatterScript.split_runs(text):
+	for run: Dictionary in EffectTextFormatterScript.split_runs(layout_text):
 		paragraph.add_string(
 				String(run.text),
 				_get_effect_keyword_font() if bool(run.bold) else normal_font,
-				font_size)
-	var line_top := 0.0
+				font_size, "zh_CN")
+	var line_texts: Array[String] = []
 	for line_index: int in paragraph.get_line_count():
 		var line_range := paragraph.get_line_range(line_index)
-		var line_size := paragraph.get_line_size(line_index)
-		var line_text := text.substr(line_range.x, line_range.y - line_range.x)
+		line_texts.append(EffectTextFormatterScript.strip_line_break_controls(
+				layout_text.substr(line_range.x, line_range.y - line_range.x)))
+	_rebalance_forbidden_line_edges(line_texts)
+	# h11 的第二行原本只有句号；禁则重排把词移入该行后，TextParagraph 里保存的
+	# 仍是“标点孤行”旧高度。所有重排后的行统一按真实字体高度布局，避免第二行
+	# 被压扁、基线贴住第一行。留白独立成参数，后续可只调节节奏而不碰换行规则。
+	var stable_line_height := ceilf(maxf(
+			normal_font.get_height(font_size),
+			_get_effect_keyword_font().get_height(font_size))) \
+			+ skill_detail_line_height_padding
+	var line_top := 0.0
+	for line_index: int in line_texts.size():
+		var line_text := line_texts[line_index]
 		var runs := EffectTextFormatterScript.split_runs(line_text)
 		var run_widths: Array[float] = []
 		var run_gaps: Array[Vector2] = []
@@ -575,11 +598,13 @@ func _rebuild_effect_keyword_emphasis(text: String) -> void:
 			var run_font: Font = _get_effect_keyword_font() if bool(run.bold) else normal_font
 			var run_width := run_font.get_string_size(
 					String(run.text), HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x
-			var side_gap := EffectTextFormatterScript.KEYWORD_SIDE_GAP \
+			var gap_before := EffectTextFormatterScript.KEYWORD_GAP_BEFORE \
+					if bool(run.bold) else 0.0
+			var gap_after := EffectTextFormatterScript.KEYWORD_GAP_AFTER \
 					if bool(run.bold) else 0.0
 			run_widths.append(run_width)
-			run_gaps.append(Vector2(side_gap, side_gap))
-			actual_width += run_width + side_gap * 2.0
+			run_gaps.append(Vector2(gap_before, gap_after))
+			actual_width += run_width + gap_before + gap_after
 		var cursor_x := _d_detail.position.x + (_d_detail.size.x - actual_width) * 0.5
 		for run_index: int in runs.size():
 			var run: Dictionary = runs[run_index]
@@ -587,11 +612,35 @@ func _rebuild_effect_keyword_emphasis(text: String) -> void:
 			_add_effect_text_segment(
 					String(run.text), bool(run.bold),
 					Vector2(cursor_x + gaps.x, _d_detail.position.y + line_top),
-					run_widths[run_index], line_size.y, font_size, normal_font,
+					run_widths[run_index], stable_line_height, font_size, normal_font,
 					"%d:%d" % [get_instance_id(), line_index], line_index, run_index,
 					gaps.x, gaps.y)
 			cursor_x += gaps.x + run_widths[run_index] + gaps.y
-		line_top += line_size.y + float(_d_detail.get_theme_constant("line_spacing"))
+		line_top += stable_line_height + skill_detail_line_gap
+
+
+## WORD JOINER 是第一层保护；个别字体/TextServer 组合仍可能违反禁则。
+## 此处对真实分行再兜底，覆盖“闭合符号开头”和“开放符号结尾”，不再只识别纯句号行。
+func _rebalance_forbidden_line_edges(lines: Array[String]) -> void:
+	for line_index: int in range(1, lines.size()):
+		while EffectTextFormatterScript.line_starts_with_forbidden(lines[line_index]):
+			var previous := lines[line_index - 1]
+			if previous.is_empty():
+				break
+			var move_length := 1
+			var previous_runs := EffectTextFormatterScript.split_runs(previous)
+			if not previous_runs.is_empty() and bool(previous_runs[-1].bold):
+				move_length = String(previous_runs[-1].text).length()
+			var move_start := maxi(previous.length() - move_length, 0)
+			lines[line_index] = previous.substr(move_start) + lines[line_index]
+			lines[line_index - 1] = previous.substr(0, move_start)
+		while EffectTextFormatterScript.line_ends_with_forbidden(lines[line_index - 1]):
+			var previous := lines[line_index - 1]
+			if previous.is_empty():
+				break
+			var opening := previous.substr(previous.length() - 1, 1)
+			lines[line_index - 1] = previous.left(previous.length() - 1)
+			lines[line_index] = opening + lines[line_index]
 
 
 func _add_effect_text_segment(text: String, bold: bool, segment_position: Vector2,
@@ -614,9 +663,18 @@ func _add_effect_text_segment(text: String, bold: bool, segment_position: Vector
 	label.set_meta(EffectTextFormatterScript.META_RUN_ORDER, run_order)
 	label.set_meta(EffectTextFormatterScript.META_GAP_BEFORE, gap_before)
 	label.set_meta(EffectTextFormatterScript.META_GAP_AFTER, gap_after)
+	label.set_meta(EffectTextFormatterScript.META_IS_KEYWORD, bold)
 	detail_area.add_child(label)
 	_d_detail_segment_labels.append(label)
 	if bold:
+		# 独立运行时由源书页绘制；统一图鉴会在最终画布建立清晰角标。
+		if not embedded_in_codex:
+			var spark := EFFECT_KEYWORD_SPARK_SCRIPT.new() as Control
+			spark.name = "KeywordSpark"
+			spark.position = Vector2(segment_width, 0.0) \
+					+ EffectTextFormatterScript.KEYWORD_SPARK_OFFSET
+			spark.call("configure", INK)
+			label.add_child(spark)
 		_d_keyword_labels.append(label)
 
 

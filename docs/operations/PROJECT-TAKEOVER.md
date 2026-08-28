@@ -140,7 +140,8 @@ git -c safe.directory=$Repo -C $Repo status -sb
 - `TextureRect.flip_h` 会影响传入 CanvasItem shader 的 UV。非对称摆位头像做敌我镜像时，遮罩必须在 shader 局部坐标中反翻 x；只翻纹理会出现 h04 那类三角错裁。
 - 稀有度框采用单一 `assets/ui/item_frame.png` 明暗母版，由 `canvas_ui_item_frame_palette.gdshader` 映射蓝/紫/金；不得重新复制三张相同位图。
 - 英雄图鉴使用图鉴专用头像节点，不再实例化旧 `HeroFrame` 后叠新框；“替换”必须从场景树中消除旧框层。
-- 视觉完成汇报前至少执行一次真实截图/输入探针；遮罩、透明边和四角填充不能靠源代码推断。
+- 图鉴制作与返工的最终工程合同见 `docs/reports/2026-08-27-codex-production-retrospective.md`：主菜单、战斗及后续入口必须实例化同一个 `codex_screen.tscn`；书本全局居中，侧签通过母版不得重画，固定布局场景化，视觉验收使用无截图运行探针。
+- 视觉完成汇报前至少执行一次无截图运行/输入探针，并用几何断言或像素数据检查遮罩、透明边和四角填充；不能只靠源代码推断。
 
 ### 编辑器预览与运行画面
 
