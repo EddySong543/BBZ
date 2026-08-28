@@ -1,0 +1,447 @@
+[gd_scene format=3 uid="uid://bdx1bpiq0gxga"]
+
+[ext_resource type="Script" uid="uid://di0qh6ki88n6e" path="res://src/ui/components/battle_stage.gd" id="1_stage"]
+[ext_resource type="Shader" uid="uid://c5xjdx10sg3xe" path="res://assets/shaders/canvas_env_night_sky.gdshader" id="2_night_sky"]
+[ext_resource type="Shader" uid="uid://byjlefsgiyyte" path="res://assets/shaders/canvas_env_stars.gdshader" id="3_stars"]
+[ext_resource type="Texture2D" uid="uid://nhcl7dupb3ud" path="res://assets/scenes/scene8/scene8_ref48_aurora.png" id="4_pixel_aurora"]
+[ext_resource type="Texture2D" uid="uid://buk88w0e5jk8k" path="res://assets/scenes/scene8/scene8_far_mountain.png" id="5_far_mountain"]
+[ext_resource type="Texture2D" uid="uid://cynwyvni7f0l5" path="res://assets/scenes/scene8/scene8_battle_platform.png" id="6_platform"]
+[ext_resource type="Texture2D" uid="uid://c1d4f1cu748qf" path="res://assets/scenes/scene8/scene8_foreground_left.png" id="7_foreground_left"]
+[ext_resource type="Texture2D" uid="uid://ca3ugl3cann4h" path="res://assets/scenes/scene8/scene8_foreground_right.png" id="8_foreground_right"]
+[ext_resource type="Shader" uid="uid://dymkesugd75i5" path="res://assets/shaders/canvas_env_scene8_open_lake.gdshader" id="9_open_lake"]
+[ext_resource type="Shader" uid="uid://bmybsbwia0d3n" path="res://assets/shaders/canvas_env_scene8_aurora_reflection.gdshader" id="10_aurora_reflection"]
+[ext_resource type="Script" uid="uid://d0w12gxb0igg6" path="res://src/ui/components/scene8_lake_topology.gd" id="11_lake_topology"]
+[ext_resource type="Shader" uid="uid://lku5l1bl8pvp" path="res://assets/shaders/canvas_env_scene8_platform_float.gdshader" id="12_platform_float"]
+[ext_resource type="Shader" uid="uid://c22d4nj6ho78k" path="res://assets/shaders/canvas_env_scene8_platform_water_contact.gdshader" id="13_platform_contact"]
+[ext_resource type="Shader" uid="uid://cwu2pcebocwoc" path="res://assets/shaders/canvas_env_scene8_ref48_aurora_motion.gdshader" id="14_aurora_motion"]
+[ext_resource type="Texture2D" uid="uid://tuqfdbrxefyn" path="res://assets/scenes/scene8/scene8_foreground_center_snow.png" id="15_foreground_center_snow"]
+
+[sub_resource type="ShaderMaterial" id="Scene8NightSkyMat"]
+resource_local_to_scene = true
+shader = ExtResource("2_night_sky")
+shader_parameter/zenith_color = Color(0.012, 0.02, 0.047, 1)
+shader_parameter/horizon_color = Color(0.07, 0.105, 0.155, 1)
+shader_parameter/gradient_curve = 1.35
+shader_parameter/horizon_pos = 1.0
+shader_parameter/glow_color = Color(0.12, 0.2, 0.28, 1)
+shader_parameter/glow_width = 0.32
+shader_parameter/glow_intensity = 0.22
+shader_parameter/breath_amount = 0.03
+shader_parameter/breath_speed = 0.08
+shader_parameter/breath_scale = 1.4
+shader_parameter/dither_amount = 0.012
+shader_parameter/posterize_steps = 160
+shader_parameter/pixel_grid = Vector2(1920, 1080)
+
+[sub_resource type="ShaderMaterial" id="Scene8StarsMat"]
+resource_local_to_scene = true
+shader = ExtResource("3_stars")
+shader_parameter/grid = Vector2(120, 70)
+shader_parameter/coverage = 0.06
+shader_parameter/band_scale = 2.5
+shader_parameter/gap_threshold = 0.64
+shader_parameter/band_soft = 0.08
+shader_parameter/seed = 161.746007682935
+shader_parameter/star_color = Color(0.86, 0.92, 1, 1)
+shader_parameter/star_color_warm = Color(1, 0.94, 0.84, 1)
+shader_parameter/warm_ratio = 0.18
+shader_parameter/brightness = 1.0
+shader_parameter/faint_floor = 0.2
+shader_parameter/twinkle_speed = 0.7
+shader_parameter/twinkle_depth = 0.3
+shader_parameter/bright_ratio = 0.03
+shader_parameter/spike_strength = 0.0
+shader_parameter/moon_pos = Vector2(0.5, 0.3981)
+shader_parameter/moon_clear = 0.0
+shader_parameter/edge_margin = 0.14
+shader_parameter/sky_bottom = 0.5
+shader_parameter/sky_fade = 0.14
+shader_parameter/top_concentration = 0.5
+shader_parameter/pixel_grid = 800.0
+
+[sub_resource type="ShaderMaterial" id="Scene8PixelAuroraMotionMat"]
+resource_local_to_scene = true
+shader = ExtResource("14_aurora_motion")
+shader_parameter/logical_size = Vector2(256, 144)
+shader_parameter/source_texture = ExtResource("4_pixel_aurora")
+shader_parameter/curtain_height_pixels = 71.0
+shader_parameter/primary_cycle_sec = 26.0
+shader_parameter/secondary_cycle_sec = 38.0
+shader_parameter/energy_cycle_sec = 28.0
+shader_parameter/sway_x_pixels = 1.8
+shader_parameter/sway_y_pixels = 1.1
+shader_parameter/motion_floor = 0.68
+shader_parameter/energy_strength = 0.14
+shader_parameter/alpha_variation = 0.06
+shader_parameter/body_opacity_top = 0.74
+shader_parameter/body_opacity_bottom = 0.89
+shader_parameter/halo_strength = 0.14
+shader_parameter/halo_radius_pixels = 2.0
+shader_parameter/diagnostic_time_sec = -1.0
+
+[sub_resource type="ShaderMaterial" id="Scene8OpenLakeMat"]
+resource_local_to_scene = true
+shader = ExtResource("9_open_lake")
+shader_parameter/pixel_grid = Vector2(320, 180)
+shader_parameter/horizon_y = 0.52
+shader_parameter/use_lake_topology = false
+shader_parameter/topology_base_origin_uv = Vector2(0, 0)
+shader_parameter/topology_base_size_uv = Vector2(1, 1)
+shader_parameter/topology_current_origin_uv = Vector2(0, 0)
+shader_parameter/topology_current_size_uv = Vector2(1, 1)
+shader_parameter/wave_cycle_sec = 18.0
+shader_parameter/wave_travel_cells_per_sec = 0.65
+shader_parameter/wave_max_offset_cells = 2.0
+shader_parameter/far_wave_stride_cells = 1.75
+shader_parameter/near_wave_stride_cells = 5.0
+shader_parameter/far_wave_segment_cells = 11.0
+shader_parameter/near_wave_segment_cells = 34.0
+shader_parameter/wave_presence = 0.52
+shader_parameter/shore_distance_cells = 24.0
+shader_parameter/diagnostic_time_sec = -1.0
+shader_parameter/far_color = Color(0.026, 0.082, 0.18, 1)
+shader_parameter/middle_color = Color(0.025, 0.14, 0.27, 1)
+shader_parameter/near_color = Color(0.035, 0.205, 0.34, 1)
+shader_parameter/trough_color = Color(0.012, 0.045, 0.11, 1)
+shader_parameter/glint_color = Color(0.2, 0.5, 0.67, 1)
+shader_parameter/palette_depth_variation = 0.018
+shader_parameter/bank_shadow_distance = 0.14
+shader_parameter/ripple_strength = 0.3
+shader_parameter/thin_ice_depth = 0.04
+shader_parameter/thin_ice_presence = 0.38
+shader_parameter/shore_ice_reach = 0.135
+shader_parameter/ice_lens_spacing_cells = 42.0
+shader_parameter/ice_color = Color(0.23, 0.41, 0.52, 1)
+shader_parameter/shore_ice_opacity = 0.56
+shader_parameter/shore_ice_front_strength = 0.28
+shader_parameter/near_floe_min_depth = 0.68
+shader_parameter/near_floe_max_depth = 0.92
+shader_parameter/near_floe_min_shore_distance = 0.92
+shader_parameter/near_floe_a = Vector4(88, 154, 6, 2.2)
+shader_parameter/near_floe_b = Vector4(235, 162, 7, 2.5)
+shader_parameter/near_floe_color = Color(0.18, 0.35, 0.46, 1)
+shader_parameter/near_floe_shadow_color = Color(0.01, 0.055, 0.12, 1)
+shader_parameter/near_floe_opacity = 0.5
+
+[sub_resource type="ShaderMaterial" id="Scene8AuroraReflectionMat"]
+resource_local_to_scene = true
+shader = ExtResource("10_aurora_reflection")
+shader_parameter/pixel_grid = Vector2(320, 180)
+shader_parameter/horizon_y = 0.52
+shader_parameter/reflection_coverage_depth = 0.9
+shader_parameter/shore_reflection_clearance = 0.18
+shader_parameter/reflection_start_depth = 0.08
+shader_parameter/reflection_end_depth = 0.86
+shader_parameter/reflection_source_top_y = 0.04
+shader_parameter/reflection_source_bottom_y = 0.35
+shader_parameter/reflection_center_x = 0.5
+shader_parameter/reflection_horizontal_stretch = 1.1
+shader_parameter/reflection_floor = 0.24
+shader_parameter/use_lake_topology = false
+shader_parameter/topology_base_origin_uv = Vector2(0, 0)
+shader_parameter/topology_base_size_uv = Vector2(1, 1)
+shader_parameter/topology_current_origin_uv = Vector2(0, 0)
+shader_parameter/topology_current_size_uv = Vector2(1, 1)
+shader_parameter/wave_cycle_sec = 18.0
+shader_parameter/wave_travel_cells_per_sec = 0.65
+shader_parameter/wave_max_offset_cells = 2.0
+shader_parameter/far_wave_stride_cells = 1.75
+shader_parameter/near_wave_stride_cells = 5.0
+shader_parameter/far_wave_segment_cells = 11.0
+shader_parameter/near_wave_segment_cells = 34.0
+shader_parameter/wave_presence = 0.52
+shader_parameter/shore_distance_cells = 24.0
+shader_parameter/diagnostic_time_sec = -1.0
+shader_parameter/reflection_strength = 0.68
+shader_parameter/reflection_saturation = 1.22
+shader_parameter/reflection_value_ceiling = 0.9
+shader_parameter/chroma_gate_low = 0.025
+shader_parameter/chroma_gate_high = 0.1
+shader_parameter/deep_color_absorption = 0.07
+
+[sub_resource type="ShaderMaterial" id="Scene8PlatformWaterContactMat"]
+resource_local_to_scene = true
+shader = ExtResource("13_platform_contact")
+shader_parameter/platform_texture = ExtResource("6_platform")
+shader_parameter/size_px = Vector2(1984, 24)
+shader_parameter/contact_origin_px = Vector2(-32, 802)
+shader_parameter/platform_origin_px = Vector2(88, 166)
+shader_parameter/platform_rect_size_px = Vector2(288, 188)
+shader_parameter/platform_node_scale = Vector2(6, 6)
+shader_parameter/pixel_grid = Vector2(320, 180)
+shader_parameter/horizon_y = 0.52
+shader_parameter/platform_alpha_threshold = 0.03
+shader_parameter/surface_bottom_row = 103.0
+shader_parameter/shallow_wall_rows = 4.0
+shader_parameter/edge_variation_rows = 1.0
+shader_parameter/ice_block_width = 7.0
+shader_parameter/contact_cell_px = 6.0
+shader_parameter/shadow_rows = 1.0
+shader_parameter/crest_rows = 1.0
+shader_parameter/line_cell_width_px = 78.0
+shader_parameter/shadow_line_coverage = 0.82
+shader_parameter/crest_line_coverage = 0.42
+shader_parameter/pressure_shadow_color = Color(0.008, 0.035, 0.09, 1)
+shader_parameter/contact_crest_color = Color(0.12, 0.37, 0.52, 1)
+shader_parameter/aurora_crest_color = Color(0.22, 0.56, 0.68, 1)
+shader_parameter/pressure_shadow_alpha = 0.74
+shader_parameter/contact_crest_alpha = 0.58
+shader_parameter/use_lake_topology = false
+shader_parameter/topology_base_origin_uv = Vector2(0, 0)
+shader_parameter/topology_base_size_uv = Vector2(1, 1)
+shader_parameter/topology_current_origin_uv = Vector2(0, 0)
+shader_parameter/topology_current_size_uv = Vector2(1, 1)
+shader_parameter/wave_cycle_sec = 18.0
+shader_parameter/wave_travel_cells_per_sec = 0.65
+shader_parameter/wave_max_offset_cells = 2.0
+shader_parameter/far_wave_stride_cells = 1.75
+shader_parameter/near_wave_stride_cells = 5.0
+shader_parameter/far_wave_segment_cells = 11.0
+shader_parameter/near_wave_segment_cells = 34.0
+shader_parameter/wave_presence = 0.52
+shader_parameter/shore_distance_cells = 24.0
+shader_parameter/diagnostic_time_sec = -1.0
+
+[sub_resource type="ShaderMaterial" id="Scene8PlatformFloatMat"]
+resource_local_to_scene = true
+shader = ExtResource("12_platform_float")
+shader_parameter/surface_bottom_row = 103.0
+shader_parameter/shallow_wall_rows = 4.0
+shader_parameter/edge_variation_rows = 1.0
+shader_parameter/ice_block_width = 7.0
+shader_parameter/underside_tint = Color(0.045, 0.14, 0.24, 1)
+shader_parameter/wet_edge_tint = Color(0.08, 0.27, 0.38, 1)
+shader_parameter/underside_strength = 0.3
+shader_parameter/wet_edge_strength = 0.48
+
+[node name="Scene8" type="Control" unique_id=1051971769]
+editor_description = "Scene8 天光镜湖。极光静态像素轮廓与慢速动态保持不变；远山以同源错位、翻转和低对比三层轮廓补出空气纵深，中央 snow 作为近景下沿接入，湖面、冰、水线和既有手调构图保持不变。"
+texture_filter = 1
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_stage")
+
+[node name="Sky" type="ColorRect" parent="." unique_id=599315019]
+editor_description = "复刻 Scene1 的成熟深夜夜空材质与参数。"
+material = SubResource("Scene8NightSkyMat")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -48.0
+offset_top = -48.0
+offset_right = 48.0
+offset_bottom = 48.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 1)
+metadata/parallax_factor = 0.0
+metadata/pointer_parallax_factor = 0.0
+metadata/_edit_lock_ = true
+
+[node name="Stars" type="ColorRect" parent="." unique_id=699244428]
+editor_description = "复刻 Scene1 星空参数；关闭 Scene1 专属月盘避让，其余密度、色温与闪烁保持一致。"
+material = SubResource("Scene8StarsMat")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+metadata/parallax_factor = 0.0
+metadata/pointer_parallax_factor = 0.0
+metadata/_edit_lock_ = true
+
+[node name="PixelAurora" type="TextureRect" parent="." unique_id=344487219]
+editor_description = "ref48 原始 256x144 主体的像素修复版；静态 PNG 与已通过轮廓保持不变。Scene8 专用材质让整幅极光以 26/38 秒错相周期缓慢摆动，并用半透明主体与 2 像素阶梯光晕融入夜空。"
+texture_filter = 1
+material = SubResource("Scene8PixelAuroraMotionMat")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -23.0
+offset_top = -124.0
+offset_right = 258.0
+offset_bottom = -150.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("4_pixel_aurora")
+expand_mode = 1
+metadata/parallax_factor = 0.0
+metadata/pointer_parallax_factor = 0.0
+metadata/_edit_lock_ = true
+
+[node name="AuroraReflectionGrab" type="BackBufferCopy" parent="." unique_id=32628268]
+editor_description = "在远山与地景绘制前锁定天空和整幅动态极光，作为湖面倒影的唯一实时屏幕采样源。"
+copy_mode = 2
+metadata/_edit_lock_ = true
+
+[node name="LakeTopology" type="Node" parent="." unique_id=1597038595]
+process_priority = 100
+editor_description = "启动时从远山 alpha 一次性生成 320x180 湖域/岸距/逐列纵深；运行期只同步远山变换，不重建像素。"
+script = ExtResource("11_lake_topology")
+
+[node name="MirrorLake" type="ColorRect" parent="." unique_id=1790463199]
+editor_description = "开放水面主体；连续冷蓝纵深、拓扑岸影与共享横向碎波；远岸仅有半透薄冰，近景仅留两片不规则碎冰。"
+material = SubResource("Scene8OpenLakeMat")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+metadata/parallax_factor = 0.58
+metadata/_edit_lock_ = true
+
+[node name="AuroraReflection" type="ColorRect" parent="." unique_id=1860457149]
+editor_description = "连续采样融合后的动态 ref48 极光作为湖面碎光；按当前极光位置校准天空高度，保留低强度常驻彩光，再由共享横向水波自然切碎，不使用规则倒影条带。"
+material = SubResource("Scene8AuroraReflectionMat")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+metadata/parallax_factor = 0.28
+metadata/_edit_lock_ = true
+
+[node name="FarMountainDistant" type="Sprite2D" parent="." unique_id=1046136694]
+editor_description = "同源远山的最远轮廓；水平翻转、抬高并压低对比度，只露出峰顶，避免一张山脉贴图直接贴在天空前。"
+self_modulate = Color(0.38, 0.52, 0.7, 0.33)
+texture_filter = 1
+position = Vector2(-70, -78)
+scale = Vector2(6.35, 6.35)
+texture = ExtResource("5_far_mountain")
+centered = false
+flip_h = true
+metadata/parallax_factor = 0.06
+metadata/composition_role = "far_mountain_distant"
+metadata/_edit_lock_ = true
+
+[node name="FarMountainMiddle" type="Sprite2D" parent="." unique_id=1813529988]
+editor_description = "同源远山的中间轮廓；错位抬高并保留较弱冷蓝明度，在最远峰与原始岸线之间建立第二个空气层级。"
+self_modulate = Color(0.58, 0.7, 0.82, 0.48)
+texture_filter = 1
+position = Vector2(-108, -36)
+scale = Vector2(6.12, 6.12)
+texture = ExtResource("5_far_mountain")
+centered = false
+metadata/parallax_factor = 0.1
+metadata/composition_role = "far_mountain_middle"
+metadata/_edit_lock_ = true
+
+[node name="FarSnowfield" type="TextureRect" parent="." unique_id=1843340025]
+editor_description = "Eddy 提供的完整远山源图；保持原有 6x 手调 Transform，作为三层远山中最近且最清晰的岸线，并继续以原 alpha 负责湖岸最终遮挡。"
+texture_filter = 1
+layout_mode = 0
+offset_left = -36.0
+offset_right = 296.0
+offset_bottom = 188.0
+scale = Vector2(6, 6)
+mouse_filter = 2
+texture = ExtResource("5_far_mountain")
+expand_mode = 1
+metadata/parallax_factor = 0.15
+metadata/_edit_lock_ = true
+
+[node name="PlatformWaterContact" type="ColorRect" parent="." unique_id=1919535168]
+editor_description = "平台专属压水接触层；按平台源 alpha 仅在真实接触列绘制 6px 暗边与 6px 破碎共享波纹。"
+texture_filter = 1
+material = SubResource("Scene8PlatformWaterContactMat")
+layout_mode = 0
+offset_left = -32.0
+offset_top = 802.0
+offset_right = 1952.0
+offset_bottom = 826.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+metadata/parallax_factor = 1.0
+metadata/composition_role = "platform_water_contact"
+metadata/_edit_lock_ = true
+
+[node name="BattlePlatform" type="TextureRect" parent="." unique_id=107535611]
+editor_description = "Eddy 提供的完整平台源图；Transform 保持手调值，场景专属材质仅让湖水遮住过深侧壁，留下浅浮冰边。"
+texture_filter = 1
+material = SubResource("Scene8PlatformFloatMat")
+layout_mode = 0
+offset_left = 88.0
+offset_top = 166.0
+offset_right = 376.0
+offset_bottom = 354.0
+scale = Vector2(6, 6)
+mouse_filter = 2
+texture = ExtResource("6_platform")
+expand_mode = 1
+metadata/parallax_factor = 1.0
+metadata/_edit_lock_ = true
+
+[node name="ForegroundCenterSnow" type="TextureRect" parent="." unique_id=26214753]
+editor_description = "Eddy 提供的中央近景 snow；3x 整数缩放，只覆盖屏幕下沿与平台下部，不压角色脚位，并以略强于左右近景的视差补出中央前后关系。"
+texture_filter = 1
+layout_mode = 0
+offset_left = 1890.0
+offset_top = 2198.0
+offset_right = 2539.0686
+offset_bottom = 2660.0483
+rotation = 3.1415927
+scale = Vector2(3, 3)
+mouse_filter = 2
+texture = ExtResource("15_foreground_center_snow")
+expand_mode = 1
+metadata/parallax_factor = 1.22
+metadata/composition_role = "foreground_center_snow"
+
+[node name="ForegroundLeft" type="TextureRect" parent="." unique_id=1428487288]
+editor_description = "Eddy 提供的左侧雪地近景；3x 整数缩放，有效透明边界贴齐左侧与底部。"
+texture_filter = 1
+layout_mode = 0
+offset_left = -99.0
+offset_top = 620.0
+offset_right = 134.33334
+offset_bottom = 798.6667
+scale = Vector2(3, 3)
+mouse_filter = 2
+texture = ExtResource("7_foreground_left")
+expand_mode = 1
+metadata/parallax_factor = 1.18
+metadata/_edit_lock_ = true
+
+[node name="ForegroundRight" type="TextureRect" parent="." unique_id=1212273803]
+editor_description = "Eddy 提供的右侧雪地近景；3x 整数缩放，有效透明边界贴齐右侧与底部。"
+texture_filter = 1
+layout_mode = 0
+offset_left = 1336.0
+offset_top = 616.0
+offset_right = 1576.6666
+offset_bottom = 805.0
+scale = Vector2(3, 3)
+mouse_filter = 2
+texture = ExtResource("8_foreground_right")
+expand_mode = 1
+metadata/parallax_factor = 1.18
+metadata/_edit_lock_ = true
+
+[node name="CompositionGuides" type="Node2D" parent="." unique_id=1177821167]
+editor_description = "不可见构图基线；导入环境素材时围绕基线适配，不移动成熟人物。"
+metadata/_edit_lock_ = true
+
+[node name="P1Baseline" type="Marker2D" parent="CompositionGuides" unique_id=936117688]
+position = Vector2(480, 748)
+
+[node name="P2Baseline" type="Marker2D" parent="CompositionGuides" unique_id=747962515]
+position = Vector2(1440, 748)
+
+[node name="PlatformBaseline" type="Marker2D" parent="CompositionGuides" unique_id=1714577792]
+position = Vector2(960, 748)

@@ -1,0 +1,178 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="PackedScene" path="res://src/ui/battle_screen_base.tscn" id="1_base"]
+[ext_resource type="PackedScene" path="res://src/ui/scenes/scene8.tscn" id="2_scene8"]
+[ext_resource type="Shader" path="res://assets/shaders/post_fx_color_grade.gdshader" id="3_postfx"]
+[ext_resource type="Shader" uid="uid://b4hfmw3oiipkk" path="res://assets/shaders/canvas_env_scene8_character_light.gdshader" id="4_character_light"]
+
+[sub_resource type="ShaderMaterial" id="Scene8P1CharacterMat"]
+resource_local_to_scene = true
+shader = ExtResource("4_character_light")
+shader_parameter/flash_amount = 0.0
+shader_parameter/flash_color = Color(1, 1, 1, 1)
+shader_parameter/source_saturation = 0.98
+shader_parameter/source_contrast = 1.04
+shader_parameter/scene_exposure = 0.9
+shader_parameter/highlight_compression = 0.08
+shader_parameter/light_dir = Vector2(0.42, -1)
+shader_parameter/backlight = 0.2
+shader_parameter/shadow_tint = Color(0.26, 0.36, 0.62, 1)
+shader_parameter/skin_warmth = Color(1.02, 1, 0.97, 1)
+shader_parameter/warmth_amount = 0.015
+shader_parameter/warm_identity_protection = 0.78
+shader_parameter/fill_color = Color(0.28, 0.72, 0.82, 1)
+shader_parameter/fill_amount = 0.025
+shader_parameter/rim_color = Color(0.36, 1, 0.76, 1)
+shader_parameter/rim_strength = 0.22
+shader_parameter/rim_width = 1.0
+shader_parameter/night_shadow_color = Color(0.22, 0.3, 0.52, 1)
+shader_parameter/night_mid_color = Color(0.46, 0.6, 0.76, 1)
+shader_parameter/night_grade_amount = 0.44
+shader_parameter/night_value_scale = 0.9
+shader_parameter/scene_identity_floor = 0.78
+shader_parameter/aurora_green = Color(0.3, 1, 0.64, 1)
+shader_parameter/aurora_cyan = Color(0.28, 0.82, 1, 1)
+shader_parameter/aurora_key_amount = 0.24
+shader_parameter/aurora_key_luma_lift = 0.035
+shader_parameter/aurora_violet = Color(0.72, 0.46, 1, 1)
+shader_parameter/violet_bounce_amount = 0.13
+shader_parameter/violet_bounce_start = 0.56
+shader_parameter/aurora_cycle_sec = 28.0
+shader_parameter/aurora_flow_amount = 0.12
+
+[sub_resource type="ShaderMaterial" id="Scene8P2CharacterMat"]
+resource_local_to_scene = true
+shader = ExtResource("4_character_light")
+shader_parameter/flash_amount = 0.0
+shader_parameter/flash_color = Color(1, 1, 1, 1)
+shader_parameter/source_saturation = 0.98
+shader_parameter/source_contrast = 1.04
+shader_parameter/scene_exposure = 0.9
+shader_parameter/highlight_compression = 0.08
+shader_parameter/light_dir = Vector2(-0.42, -1)
+shader_parameter/backlight = 0.2
+shader_parameter/shadow_tint = Color(0.26, 0.36, 0.62, 1)
+shader_parameter/skin_warmth = Color(1.02, 1, 0.97, 1)
+shader_parameter/warmth_amount = 0.015
+shader_parameter/warm_identity_protection = 0.78
+shader_parameter/fill_color = Color(0.28, 0.72, 0.82, 1)
+shader_parameter/fill_amount = 0.025
+shader_parameter/rim_color = Color(0.36, 1, 0.76, 1)
+shader_parameter/rim_strength = 0.22
+shader_parameter/rim_width = 1.0
+shader_parameter/night_shadow_color = Color(0.22, 0.3, 0.52, 1)
+shader_parameter/night_mid_color = Color(0.46, 0.6, 0.76, 1)
+shader_parameter/night_grade_amount = 0.44
+shader_parameter/night_value_scale = 0.9
+shader_parameter/scene_identity_floor = 0.78
+shader_parameter/aurora_green = Color(0.3, 1, 0.64, 1)
+shader_parameter/aurora_cyan = Color(0.28, 0.82, 1, 1)
+shader_parameter/aurora_key_amount = 0.24
+shader_parameter/aurora_key_luma_lift = 0.035
+shader_parameter/aurora_violet = Color(0.72, 0.46, 1, 1)
+shader_parameter/violet_bounce_amount = 0.13
+shader_parameter/violet_bounce_start = 0.56
+shader_parameter/aurora_cycle_sec = 28.0
+shader_parameter/aurora_flow_amount = 0.12
+
+[sub_resource type="ShaderMaterial" id="Scene8NeutralPostFXMat"]
+resource_local_to_scene = true
+shader = ExtResource("3_postfx")
+shader_parameter/barrel_amount = 0.0
+shader_parameter/barrel_edge_margin = 0.15
+shader_parameter/edge_blur_amount = 0.0
+shader_parameter/edge_blur_start = 0.45
+shader_parameter/brightness = 1.0
+shader_parameter/contrast = 1.0
+shader_parameter/saturation = 1.0
+shader_parameter/tint_color = Color(1, 1, 1, 1)
+shader_parameter/tint_strength = 0.0
+shader_parameter/shadow_tint = Color(1, 1, 1, 1)
+shader_parameter/highlight_tint = Color(1, 1, 1, 1)
+shader_parameter/split_strength = 0.0
+shader_parameter/vignette_color = Color(0, 0, 0, 1)
+shader_parameter/vignette_strength = 0.0
+shader_parameter/vignette_radius = 1.0
+shader_parameter/vignette_softness = 0.55
+shader_parameter/grain_amount = 0.0
+shader_parameter/grain_scale = 1.6
+shader_parameter/heat_haze_strength = 0.0
+shader_parameter/heat_haze_speed = 0.34
+shader_parameter/heat_haze_scale = 8.4
+shader_parameter/heat_haze_top_weight = 0.2
+shader_parameter/heat_haze_lower_focus = 0.1
+shader_parameter/heat_haze_vertical = 0.16
+shader_parameter/heat_haze_character_protection = 0.0
+shader_parameter/heat_haze_p1_center = Vector2(0.25, 0.58)
+shader_parameter/heat_haze_p2_center = Vector2(0.75, 0.58)
+shader_parameter/heat_haze_character_radius = Vector2(0.15, 0.34)
+shader_parameter/impact_strength = 0.0
+shader_parameter/impact_invert = 0.0
+shader_parameter/impact_center = Vector2(0.5, 0.55)
+shader_parameter/impact_burst_radius = 0.26
+shader_parameter/impact_jag = 0.11
+shader_parameter/impact_jag_freq = 7.0
+shader_parameter/impact_th_out = 0.52
+shader_parameter/impact_th_in = 0.13
+shader_parameter/impact_white = 0.86
+shader_parameter/impact_px = 3.0
+
+[node name="BattleScreen8" instance=ExtResource("1_base")]
+character_reflections_enabled = false
+character_reflection_receiver_path = NodePath("")
+
+[node name="Stage" parent="StageSlot" parent_id_path=PackedInt32Array(924300025) index="0" instance=ExtResource("2_scene8")]
+layout_mode = 1
+pointer_parallax = true
+demo_click_shake = false
+
+[node name="P1Shadow" parent="." index="3" parent_id_path=PackedInt32Array(1618077294)]
+self_modulate = Color(0.04, 0.12, 0.22, 0.62)
+
+[node name="P2Shadow" parent="." index="4" parent_id_path=PackedInt32Array(1618077294)]
+self_modulate = Color(0.04, 0.12, 0.22, 0.62)
+
+[node name="P1CharDisplay" parent="." index="5" parent_id_path=PackedInt32Array(1618077294)]
+rim_color = Color(0.36, 1, 0.76, 1)
+rim_strength = 0.22
+rim_width = 1.0
+backlight = 0.2
+shadow_tint = Color(0.26, 0.36, 0.62, 1)
+light_dir = Vector2(0.42, -1)
+skin_warmth = Color(1.02, 1, 0.97, 1)
+warmth_amount = 0.015
+fill_color = Color(0.28, 0.72, 0.82, 1)
+fill_amount = 0.025
+
+[node name="AnimatedSprite2D" parent="P1CharDisplay/SubViewport" parent_id_path=PackedInt32Array(1642938575, 1325957388) index="1" unique_id=1622338484]
+material = SubResource("Scene8P1CharacterMat")
+
+[node name="P2CharDisplay" parent="." index="6" parent_id_path=PackedInt32Array(1618077294)]
+flip_h = true
+rim_color = Color(0.36, 1, 0.76, 1)
+rim_strength = 0.22
+rim_width = 1.0
+backlight = 0.2
+shadow_tint = Color(0.26, 0.36, 0.62, 1)
+light_dir = Vector2(0.42, -1)
+skin_warmth = Color(1.02, 1, 0.97, 1)
+warmth_amount = 0.015
+fill_color = Color(0.28, 0.72, 0.82, 1)
+fill_amount = 0.025
+
+[node name="AnimatedSprite2D" parent="P2CharDisplay/SubViewport" parent_id_path=PackedInt32Array(915119977, 1325957388) index="1" unique_id=1622338484]
+material = SubResource("Scene8P2CharacterMat")
+
+[node name="ForeDust" parent="." index="7" parent_id_path=PackedInt32Array(1618077294)]
+visible = false
+emitting = false
+
+[node name="LowerDust" parent="." index="8" parent_id_path=PackedInt32Array(1618077294)]
+visible = false
+emitting = false
+
+[node name="PostFX" parent="." index="10" parent_id_path=PackedInt32Array(1618077294)]
+material = SubResource("Scene8NeutralPostFXMat")
+
+[editable path="P1CharDisplay"]
+[editable path="P2CharDisplay"]
