@@ -4,7 +4,7 @@ const SCENE7_PATH := "res://src/ui/scenes/scene7.tscn"
 const BATTLE_BASE_PATH := "res://src/ui/battle_screen_base.tscn"
 const BATTLE7_PATH := "res://src/ui/battle_screen7.tscn"
 const SCENE7_CHARACTER_SHADER_PATH := \
-		"res://assets/shaders/character_light.gdshader"
+		"res://assets/shaders/canvas_env_scene7_character_light.gdshader"
 const SCENE7_CONTACT_SHADOW_SHADER_PATH := \
 		"res://assets/shaders/canvas_env_scene7_character_contact_shadow.gdshader"
 const POSTFX_SHADER_PATH := "res://assets/shaders/post_fx_color_grade.gdshader"
@@ -302,20 +302,20 @@ func test_scene7_far_background_uses_continuous_atmospheric_perspective() -> voi
 	assert_gte(float(material.get_shader_parameter("horizon_warmth")), 0.08)
 	assert_lte(float(material.get_shader_parameter("horizon_warmth")), 0.12)
 	assert_between(float(material.get_shader_parameter(
-			"sand_palette_strength")), 0.96, 1.0)
+			"sand_palette_strength")), 0.90, 0.94)
 	assert_between(float(material.get_shader_parameter(
-			"sand_saturation")), 1.12, 1.20)
+			"sand_saturation")), 1.05, 1.11)
 	assert_between(float(material.get_shader_parameter(
-			"source_value_detail")), 0.28, 0.35)
+			"source_value_detail")), 0.20, 0.27)
 	var sand_shadow: Color = material.get_shader_parameter("sand_shadow_color")
 	var sand_mid: Color = material.get_shader_parameter("sand_mid_color")
 	var sand_highlight: Color = material.get_shader_parameter("sand_highlight_color")
-	assert_between(sand_shadow.h * 360.0, 285.0, 315.0)
-	assert_between(sand_shadow.s, 0.22, 0.30)
-	assert_between(sand_mid.h * 360.0, 6.0, 18.0)
-	assert_between(sand_mid.s, 0.36, 0.48)
-	assert_between(sand_highlight.h * 360.0, 20.0, 34.0)
-	assert_between(sand_highlight.s, 0.38, 0.46)
+	assert_between(sand_shadow.h * 360.0, 20.0, 35.0)
+	assert_between(sand_shadow.s, 0.45, 0.56)
+	assert_between(sand_mid.h * 360.0, 28.0, 38.0)
+	assert_between(sand_mid.s, 0.46, 0.56)
+	assert_between(sand_highlight.h * 360.0, 35.0, 45.0)
+	assert_between(sand_highlight.s, 0.38, 0.48)
 	assert_lt(_luma(sand_shadow), _luma(sand_mid))
 	assert_lt(_luma(sand_mid), _luma(sand_highlight))
 	var shader_source := FileAccess.get_file_as_string(FAR_CLEANUP_SHADER_PATH)
@@ -440,19 +440,19 @@ func test_scene7_plant_layers_use_pixel_safe_depth_integration() -> void:
 				or cyan_compression == null or cyan_ceiling == null
 				or core_preservation == null):
 			continue
-		assert_gte(float(air_value), 0.055)
-		assert_lte(float(air_value), 0.07)
+		assert_gte(float(air_value), 0.04)
+		assert_lte(float(air_value), 0.05)
 		assert_gte(float(edge_value), 0.08)
 		assert_lte(float(edge_value), 0.15)
 		assert_gte(float(root_value), 0.72)
 		assert_lte(float(root_value), 0.92)
 		assert_between(float(material.get_shader_parameter("contact_start")), 0.68, 0.78)
 		var sediment_color: Color = material.get_shader_parameter("sediment_color")
-		assert_between(sediment_color.h * 360.0, 285.0, 315.0)
-		assert_lte(_luma(sediment_color), 0.34)
+		assert_between(sediment_color.h * 360.0, 28.0, 40.0)
+		assert_lte(_luma(sediment_color), 0.40)
 		assert_between(float(core_preservation), 0.76, 0.86)
 		assert_between(float(cyan_compression), 0.17, 0.19)
-		assert_between(float(cyan_ceiling), 0.67, 0.70)
+		assert_between(float(cyan_ceiling), 0.69, 0.72)
 		assert_between(float(material.get_shader_parameter("core_start")), 0.58, 0.68)
 		assert_between(float(material.get_shader_parameter("core_full")), 0.78, 0.92)
 		assert_between(float(material.get_shader_parameter("core_value_floor")), 0.63, 0.68)
@@ -461,17 +461,17 @@ func test_scene7_plant_layers_use_pixel_safe_depth_integration() -> void:
 		assert_between(float(material.get_shader_parameter("emission_threshold")), 0.58, 0.68)
 		assert_between(float(material.get_shader_parameter("emission_core_end")), 0.78, 0.92)
 		assert_between(float(material.get_shader_parameter("emission_soft_knee")), 0.08, 0.11)
-		assert_between(float(material.get_shader_parameter("source_cyan_midtone_lift")), 0.07, 0.085)
+		assert_between(float(material.get_shader_parameter("source_cyan_midtone_lift")), 0.05, 0.065)
 		assert_between(float(material.get_shader_parameter("highlight_shoulder_strength")), 1.2, 1.5)
 		assert_between(float(material.get_shader_parameter("cool_output_gain")), 0.95, 0.97)
-		assert_between(float(material.get_shader_parameter("base_brightness")), 0.88, 0.93)
+		assert_between(float(material.get_shader_parameter("base_brightness")), 0.96, 1.03)
 		var ambient_tint: Color = material.get_shader_parameter("ambient_tint")
 		var shadow_palette: Color = material.get_shader_parameter("shadow_palette")
 		var sunlit_palette: Color = material.get_shader_parameter("sunlit_palette")
-		assert_between(_luma(ambient_tint), 0.63, 0.70)
-		assert_between(_luma(shadow_palette), 0.10, 0.15)
-		assert_between(_luma(sunlit_palette), 0.32, 0.38)
-		assert_between(float(material.get_shader_parameter("palette_strength")), 0.35, 0.39)
+		assert_between(_luma(ambient_tint), 0.72, 0.79)
+		assert_between(_luma(shadow_palette), 0.16, 0.21)
+		assert_between(_luma(sunlit_palette), 0.48, 0.56)
+		assert_between(float(material.get_shader_parameter("palette_strength")), 0.38, 0.42)
 		assert_almost_eq(float(material.get_shader_parameter("halo_radius")), 1.0, 0.001)
 		assert_lte(float(material.get_shader_parameter("halo_alpha")), 0.12)
 		mid_air_total += float(air_value)
@@ -516,6 +516,8 @@ func test_scene7_environment_motion_is_local_layered_and_out_of_phase() -> void:
 	assert_true(plant_shader_source.contains("branch_motion_enabled"))
 	assert_true(plant_shader_source.contains("inverse_rotate_pixel_uv"))
 	assert_true(plant_shader_source.contains("branch_motion_fps"))
+	assert_true(plant_shader_source.contains("branch_diagnostic_time_sec"))
+	assert_true(plant_shader_source.contains("branch_sway_value"))
 	assert_true(plant_shader_source.contains("branch_pivot_a"))
 	assert_true(plant_shader_source.contains("branch_cycle_sec"))
 	assert_true(plant_shader_source.contains("branch_angle_deg"))
@@ -527,12 +529,19 @@ func test_scene7_environment_motion_is_local_layered_and_out_of_phase() -> void:
 	assert_true(plant_shader_source.contains("glow_pulse_strength"))
 	assert_true(glow_shader_source.contains("render_mode unshaded, blend_add"))
 	assert_true(glow_shader_source.contains("point_flash"))
+	assert_true(glow_shader_source.contains("animation_seed"))
+	assert_true(glow_shader_source.contains("point_cycle_spread"))
+	assert_true(glow_shader_source.contains("seeded_pulse_shape"))
+	assert_true(glow_shader_source.contains("expanded_point_halo"))
 	assert_true(glow_shader_source.contains("point_mask"))
 	assert_true(glow_shader_source.contains("cluster_mask"))
 	assert_true(glow_shader_source.contains("diagnostic_time_sec"))
 	assert_true(relight_shader_source.contains("render_mode unshaded, blend_mix"))
 	assert_true(relight_shader_source.contains("trough_brightness"))
 	assert_true(relight_shader_source.contains("texture(TEXTURE, UV)"))
+	assert_true(relight_shader_source.contains("expanded_cluster_halo"))
+	assert_true(relight_shader_source.contains("animation_seed"))
+	assert_true(relight_shader_source.contains("seeded_cluster_breathe"))
 	assert_true(veil_shader_source.contains("TIME"))
 	assert_true(veil_shader_source.contains("smooth_block_noise"))
 	assert_true(FileAccess.file_exists(FAR_WATER_SHADER_PATH))
@@ -542,10 +551,10 @@ func test_scene7_environment_motion_is_local_layered_and_out_of_phase() -> void:
 	assert_true(FileAccess.file_exists(MIDGROUND_PALETTE_PRESETS_PATH))
 	assert_true(FileAccess.file_exists(BIOLUME_GLOW_SCRIPT_PATH))
 	var branch_contract := {
-		"MidgroundCenter": ["midground_center", 3, 5.0],
-		"MidgroundLeft": ["midground_left", 1, 4.0],
-		"MidgroundRight": ["midground_right", 1, 4.0],
-		"ForegroundLeft": ["foreground_left", 2, 5.0],
+		"MidgroundCenter": ["midground_center", 3, 6.0, 1.25],
+		"MidgroundLeft": ["midground_left", 1, 6.0, 2.2],
+		"MidgroundRight": ["midground_right", 1, 6.0, 2.1],
+		"ForegroundLeft": ["foreground_left", 3, 6.0, 2.3],
 	}
 	for source_name: String in branch_contract:
 		var contract: Array = branch_contract[source_name]
@@ -565,6 +574,13 @@ func test_scene7_environment_motion_is_local_layered_and_out_of_phase() -> void:
 				"branch_group_count")), int(contract[1]))
 		assert_eq(float(source_material.get_shader_parameter(
 				"branch_motion_fps")), float(contract[2]))
+		var branch_angles: Vector3 = source_material.get_shader_parameter(
+				"branch_angle_deg")
+		assert_gte(maxf(branch_angles.x, maxf(branch_angles.y, branch_angles.z)),
+				float(contract[3]))
+		if source_name == "ForegroundLeft":
+			assert_gte(branch_angles.z, 4.6,
+					"Rightmost forked grass must read without sustained staring")
 		var mask := source_material.get_shader_parameter("branch_mask") as Texture2D
 		assert_not_null(mask)
 		if mask == null:
@@ -625,6 +641,9 @@ func test_scene7_environment_motion_is_local_layered_and_out_of_phase() -> void:
 		"MidgroundRightGrassGlowFX": ["MidgroundRight", false, true, 0.55, true],
 		"ForegroundLeftGlowFX": ["ForegroundLeft", true, false, 1.25, false],
 	}
+	var glow_animation_seeds: Dictionary[float, bool] = {}
+	var point_cycles: Dictionary[float, bool] = {}
+	var cluster_cycles: Dictionary[float, bool] = {}
 	for glow_name: String in glow_contract:
 		var contract: Array = glow_contract[glow_name]
 		var source := stage.get_node(contract[0]) as TextureRect
@@ -652,27 +671,45 @@ func test_scene7_environment_motion_is_local_layered_and_out_of_phase() -> void:
 		if glow_material == null:
 			continue
 		assert_true(glow_material.resource_local_to_scene)
+		var animation_seed := float(glow_material.get_shader_parameter(
+				"animation_seed"))
+		assert_between(animation_seed, 0.01, 0.99)
+		glow_animation_seeds[animation_seed] = true
 		assert_eq(
 				glow_material.shader.resource_path,
 				BIOLUME_RELIGHT_SHADER_PATH if expects_relight
 				else BIOLUME_GLOW_SHADER_PATH)
 		if expects_points:
-			assert_gte(float(glow_material.get_shader_parameter("point_core_peak")), 0.22)
-			assert_gte(float(glow_material.get_shader_parameter("point_halo_peak")), 0.10)
+			assert_gte(float(glow_material.get_shader_parameter("point_core_peak")), 0.30)
+			assert_gte(float(glow_material.get_shader_parameter("point_halo_peak")), 0.14)
 			assert_between(float(glow_material.get_shader_parameter(
 					"point_cycle_sec")), 7.0, 8.0)
+			assert_gte(float(glow_material.get_shader_parameter(
+					"point_cycle_spread")), 0.16)
+			point_cycles[float(glow_material.get_shader_parameter(
+					"point_cycle_sec"))] = true
 		if expects_cluster:
 			assert_gte(int(overlay.get_meta("cluster_core_pixel_count", 0)), 40)
 			assert_gte(int(overlay.get_meta("cluster_halo_pixel_count", 0)), 20)
 			assert_between(float(glow_material.get_shader_parameter(
-					"cluster_cycle_sec")), 9.0, 10.0)
+					"cluster_cycle_sec")), 7.5, 12.0)
+			cluster_cycles[float(glow_material.get_shader_parameter(
+					"cluster_cycle_sec"))] = true
 			if expects_relight:
 				assert_lte(float(glow_material.get_shader_parameter(
 						"trough_brightness")), 0.75)
 				assert_gte(float(glow_material.get_shader_parameter(
-						"peak_brightness")), 1.14)
+						"peak_brightness")), 1.20)
+				assert_gte(float(glow_material.get_shader_parameter(
+						"peak_tint_mix")), 0.22)
 		else:
 			assert_eq(int(overlay.get_meta("cluster_core_pixel_count", 0)), 0)
+	assert_eq(glow_animation_seeds.size(), glow_contract.size(),
+			"Every Scene7 glow family needs an independent deterministic seed")
+	assert_eq(point_cycles.size(), 4,
+			"All four small-point families need distinct base periods")
+	assert_eq(cluster_cycles.size(), 2,
+			"The two collective grass glows must not share a period")
 	var center_point_overlay := stage.get_node("MidgroundCenterGlowFX") \
 			as MeshInstance2D
 	var center_cluster_overlay := stage.get_node("MidgroundCenterGrassGlowFX") \
@@ -744,9 +781,9 @@ func test_scene7_environment_motion_is_local_layered_and_out_of_phase() -> void:
 		assert_ne(pulse_phases[index], pulse_phases[index - 1])
 
 	var mote_contract := {
-		"OasisMotesFar": [0.64, 1.4, 1.8, 0.20, 0.26, 0.0, 1.2],
-		"OasisMotesMid": [0.82, 2.2, 2.6, 0.27, 0.31, 1.5, 2.5],
-		"OasisMotesNear": [1.12, 3.0, 3.4, 0.32, 0.36, 2.5, 3.5],
+		"OasisMotesFar": [0.64, 1.4, 1.8, 0.34, 0.39, 0.0, 1.2],
+		"OasisMotesMid": [0.82, 2.2, 2.6, 0.40, 0.46, 1.5, 2.5],
+		"OasisMotesNear": [1.12, 3.0, 3.4, 0.46, 0.53, 2.5, 3.5],
 	}
 	var layer_alphas: Array[float] = []
 	var layer_rise_speeds: Array[float] = []
@@ -772,6 +809,8 @@ func test_scene7_environment_motion_is_local_layered_and_out_of_phase() -> void:
 				float(contract[5]), float(contract[6]))
 		assert_gte(float(material.get_shader_parameter("density")), 0.44)
 		assert_gte(float(material.get_shader_parameter("secondary_density")), 0.12)
+		assert_gte(float(material.get_shader_parameter("cross_glow_px")), 1.0)
+		assert_gte(float(material.get_shader_parameter("cross_glow_strength")), 0.5)
 		assert_between(float(material.get_shader_parameter("cycle_sec")), 9.0, 15.0)
 		assert_between(float(material.get_shader_parameter("motion_fps")), 8.0, 10.0)
 		assert_not_null(material.get_shader_parameter("diagnostic_time_sec"))
@@ -779,6 +818,26 @@ func test_scene7_environment_motion_is_local_layered_and_out_of_phase() -> void:
 		assert_eq(motes.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST)
 		assert_eq(motes.mouse_filter, Control.MOUSE_FILTER_IGNORE)
 		var pixel_grid: Vector2 = material.get_shader_parameter("pixel_grid")
+		var macro_cell: Vector2 = material.get_shader_parameter("macro_cell")
+		var cell_width := motes.size.x / pixel_grid.x
+		var cell_height := motes.size.y / pixel_grid.y
+		if mote_name == "OasisMotesFar":
+			assert_eq(pixel_grid, Vector2(992.0, 180.0))
+			assert_eq(macro_cell, Vector2(124.0, 60.0))
+			assert_almost_eq(float(material.get_shader_parameter("density")), 0.76, 0.001)
+			assert_almost_eq(float(material.get_shader_parameter("secondary_density")), 0.22, 0.001)
+		elif mote_name == "OasisMotesMid":
+			assert_between(float(material.get_shader_parameter("density")), 0.56, 0.60)
+			assert_between(float(material.get_shader_parameter("secondary_density")), 0.22, 0.25)
+			assert_lte(float(material.get_shader_parameter("spark_chance")), 0.18)
+			assert_gte(cell_width, 2.5)
+			assert_gte(cell_height, 2.5)
+		else:
+			assert_between(float(material.get_shader_parameter("density")), 0.44, 0.48)
+			assert_between(float(material.get_shader_parameter("secondary_density")), 0.12, 0.15)
+			assert_lte(float(material.get_shader_parameter("spark_chance")), 0.30)
+			assert_gte(cell_width, 3.8)
+			assert_gte(cell_height, 2.5)
 		layer_cell_widths.append(motes.size.x / pixel_grid.x)
 		layer_alphas.append(layer_alpha)
 		layer_rise_speeds.append(rise_speed)
@@ -793,7 +852,8 @@ func test_scene7_environment_motion_is_local_layered_and_out_of_phase() -> void:
 	for required_token: String in [
 		"mote_sample", "local_cycle", "seed_speed", "horizontal_sway_px",
 		"wrapped_axis_distance", "secondary_density", "diagnostic_time_sec",
-		"floor(motion_time() * motion_fps)",
+		"floor(motion_time() * motion_fps)", "cross_glow_px",
+		"cross_glow_strength", "mote_halo",
 	]:
 		assert_true(mote_source.contains(required_token),
 				"independent mote motion needs %s" % required_token)
@@ -934,11 +994,11 @@ func test_scene7_adds_a_complete_center_stone_and_only_a_thin_spring_contact() -
 			"active_line_ratio")), 0.64)
 	assert_eq(float(contact_material.get_shader_parameter("contact_alpha")), 0.66)
 	assert_eq(contact_material.get_shader_parameter("surface_color"),
-			Color(0.133, 0.667, 0.6, 1.0))
+			Color(0.12, 0.62, 0.47, 1.0))
 	assert_eq(contact_material.get_shader_parameter("ripple_color"),
-			Color(0.333, 0.8, 0.667, 1.0))
+			Color(0.34, 0.77, 0.57, 1.0))
 	assert_eq(contact_material.get_shader_parameter("spring_glow_color"),
-			Color(0.44, 0.88, 0.72, 1.0))
+			Color(0.43, 0.86, 0.64, 1.0))
 	assert_eq(float(contact_material.get_shader_parameter(
 			"ripple_palette_mix")), 0.58)
 	assert_eq(float(contact_material.get_shader_parameter(
@@ -1107,8 +1167,8 @@ func test_scene7_water_is_scene2_style_code_animation_without_sprite_sheets() ->
 				"rear and front water must share %s/%s palette anchors" % palette_pair)
 	assert_gte(front_surface.s, 0.80)
 	assert_gte(front_deep.s, 0.80)
-	assert_between(front_surface.h * 360.0, 168.0, 190.0)
-	assert_between(front_deep.h * 360.0, 180.0, 215.0)
+	assert_between(front_surface.h * 360.0, 155.0, 170.0)
+	assert_between(front_deep.h * 360.0, 180.0, 200.0)
 	var screen := (load(BATTLE7_PATH) as PackedScene).instantiate()
 	add_child_autofree(screen)
 	assert_true(bool(screen.get("character_reflections_enabled")))
@@ -1187,11 +1247,11 @@ func test_scene7_platform_uses_an_internal_neutral_underside() -> void:
 	assert_eq(_bottom_edge_pixel_count(platform.texture.get_image()), 316)
 	var underside_tint: Color = surface_material.get_shader_parameter(
 			"underside_tint")
-	assert_between(underside_tint.h * 360.0, 285.0, 315.0)
-	assert_between(underside_tint.s, 0.28, 0.38)
-	assert_between(underside_tint.v, 0.36, 0.44)
+	assert_between(underside_tint.h * 360.0, 25.0, 40.0)
+	assert_between(underside_tint.s, 0.30, 0.42)
+	assert_between(underside_tint.v, 0.24, 0.32)
 	assert_between(float(surface_material.get_shader_parameter(
-			"underside_strength")), 0.78, 0.86)
+			"underside_strength")), 0.72, 0.80)
 	assert_eq(float(surface_material.get_shader_parameter(
 			"surface_bottom_row")), 95.0)
 	assert_eq(float(surface_material.get_shader_parameter(
@@ -1305,6 +1365,68 @@ func test_scene7_restores_neutral_daylight_and_shades_only_behind_ui() -> void:
 	assert_eq(float(post_material.get_shader_parameter("tint_strength")), 0.0)
 
 
+func test_scene7_character_material_binding_survives_editor_resave() -> void:
+	var scene_source := FileAccess.get_file_as_string(BATTLE7_PATH)
+	assert_true(scene_source.contains(SCENE7_CHARACTER_SHADER_PATH),
+			"Scene7 battle source must own its character-light shader")
+	assert_true(scene_source.contains("Scene7P1CharacterMat"))
+	assert_true(scene_source.contains("Scene7P2CharacterMat"))
+	assert_true(scene_source.contains("material = SubResource(\"Scene7P1CharacterMat\")"))
+	assert_true(scene_source.contains("material = SubResource(\"Scene7P2CharacterMat\")"))
+	assert_true(scene_source.contains("[editable path=\"P1CharDisplay\"]"),
+			"Without editable ownership Godot drops nested P1 overrides on resave")
+	assert_true(scene_source.contains("[editable path=\"P2CharDisplay\"]"),
+			"Without editable ownership Godot drops nested P2 overrides on resave")
+
+
+func test_scene7_character_light_is_local_subtle_and_keeps_shared_flash_shader() -> void:
+	if not ResourceLoader.exists(BATTLE7_PATH):
+		return
+
+	BattleSetup.reset()
+	var screen := (load(BATTLE7_PATH) as PackedScene).instantiate()
+	add_child_autofree(screen)
+	await get_tree().process_frame
+
+	var world := screen.get_node("WorldGroup") as Control
+	var materials: Array[ShaderMaterial] = []
+	for character_name: String in ["P1CharDisplay", "P2CharDisplay"]:
+		var display := world.get_node(character_name) as CharacterDisplay
+		assert_eq(display.modulate, Color.WHITE)
+		assert_eq(display.self_modulate, Color.WHITE)
+		assert_between(display.rim_strength, 0.09, 0.11)
+		assert_between(display.backlight, 0.05, 0.07)
+		assert_between(display.warmth_amount, 0.01, 0.02)
+		assert_between(display.fill_amount, 0.01, 0.025)
+		var sprite := display.get_node("SubViewport/AnimatedSprite2D") \
+				as AnimatedSprite2D
+		var material := sprite.material as ShaderMaterial
+		assert_not_null(material)
+		if material == null:
+			continue
+		materials.append(material)
+		assert_eq(material.shader.resource_path, SCENE7_CHARACTER_SHADER_PATH)
+		assert_true(material.resource_local_to_scene)
+		assert_almost_eq(float(material.get_shader_parameter("flash_amount")), 0.0, 0.001)
+		assert_almost_eq(float(material.get_shader_parameter("rim_strength")),
+				display.rim_strength, 0.001)
+		assert_almost_eq(float(material.get_shader_parameter("fill_amount")),
+				display.fill_amount, 0.001)
+	assert_eq(materials.size(), 2)
+	if materials.size() == 2:
+		assert_ne(materials[0], materials[1],
+				"Scene7 fighters need independent runtime materials")
+	var shader_source := FileAccess.get_file_as_string(SCENE7_CHARACTER_SHADER_PATH)
+	assert_true(shader_source.contains("varying vec4 node_modulate"))
+	assert_true(shader_source.contains("node_modulate = COLOR"))
+	assert_true(shader_source.contains("* node_modulate"))
+	assert_true(shader_source.contains("luma_preserving_palette"))
+	assert_true(shader_source.contains("sun_key_amount"))
+	assert_true(shader_source.contains("oasis_bounce_amount"))
+	assert_false(shader_source.contains("* COLOR"),
+			"Scene7 must not multiply the sampled sprite texture twice")
+
+
 func test_scene7_final_palette_separates_daylight_sand_oasis_shade_and_biolume() -> void:
 	if not ResourceLoader.exists(SCENE7_PATH) or not ResourceLoader.exists(BATTLE7_PATH):
 		return
@@ -1342,9 +1464,9 @@ func test_scene7_final_palette_separates_daylight_sand_oasis_shade_and_biolume()
 	assert_gte(float(background_material.get_shader_parameter("air_strength")), 0.04)
 	assert_lte(float(background_material.get_shader_parameter("air_strength")), 0.08)
 
-	var expected_surface := Color(0.133, 0.667, 0.6, 1.0)
-	var expected_deep := Color(0.067, 0.267, 0.4, 1.0)
-	var expected_glow := Color(0.44, 0.88, 0.72, 1.0)
+	var expected_surface := Color(0.12, 0.62, 0.47, 1.0)
+	var expected_deep := Color(0.045, 0.24, 0.27, 1.0)
+	var expected_glow := Color(0.43, 0.86, 0.64, 1.0)
 	for node_name: String in ["RearWater", "RearWaterReflection", "FrontWater"]:
 		var water_material := (stage.get_node(node_name) as CanvasItem).material as ShaderMaterial
 		assert_eq(water_material.get_shader_parameter("surface_color"), expected_surface)
@@ -1358,10 +1480,10 @@ func test_scene7_final_palette_separates_daylight_sand_oasis_shade_and_biolume()
 	for node_name: String in ["MidgroundLeft", "MidgroundCenter", "MidgroundRight"]:
 		var plant_material := (stage.get_node(node_name) as TextureRect).material as ShaderMaterial
 		var plant_glow: Color = plant_material.get_shader_parameter("glow_color")
-		assert_between(plant_glow.h * 360.0, 155.0, 175.0)
+		assert_between(plant_glow.h * 360.0, 150.0, 165.0)
 		assert_between(plant_glow.v, 0.82, 0.90)
 		assert_between(float(plant_material.get_shader_parameter(
-				"source_cyan_midtone_lift")), 0.07, 0.085)
+				"source_cyan_midtone_lift")), 0.05, 0.065)
 		assert_between(float(plant_material.get_shader_parameter(
 				"highlight_shoulder_strength")), 1.2, 1.5)
 
@@ -1400,15 +1522,15 @@ func test_scene7_reuses_character_geometry_with_daylight_visual_parameters() -> 
 		assert_eq(scene7_node.position, approved_positions[node_name])
 		assert_eq(scene7_node.size, base_node.size)
 		assert_eq(scene7_node.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST)
-		assert_eq(scene7_node.rim_color, Color(1.0, 0.91, 0.74, 1.0))
-		assert_almost_eq(scene7_node.rim_strength, 0.0, 0.001)
-		assert_almost_eq(scene7_node.backlight, 0.0, 0.001)
-		assert_eq(scene7_node.shadow_tint, Color(0.86, 0.9, 0.88, 1.0))
-		assert_eq(scene7_node.light_dir, Vector2(0.35, -1.0))
-		assert_eq(scene7_node.skin_warmth, Color(1.02, 1.01, 0.99, 1.0))
-		assert_almost_eq(scene7_node.warmth_amount, 0.0, 0.001)
-		assert_eq(scene7_node.fill_color, Color(0.36, 0.6, 0.56, 1.0))
-		assert_almost_eq(scene7_node.fill_amount, 0.0, 0.001)
+		assert_eq(scene7_node.rim_color, Color(0.98, 0.82, 0.55, 1.0))
+		assert_almost_eq(scene7_node.rim_strength, 0.10, 0.001)
+		assert_almost_eq(scene7_node.backlight, 0.06, 0.001)
+		assert_eq(scene7_node.shadow_tint, Color(0.5, 0.64, 0.55, 1.0))
+		assert_eq(scene7_node.light_dir, Vector2(0.28, -1.0))
+		assert_eq(scene7_node.skin_warmth, Color(1.04, 1.015, 0.97, 1.0))
+		assert_almost_eq(scene7_node.warmth_amount, 0.015, 0.001)
+		assert_eq(scene7_node.fill_color, Color(0.4, 0.63, 0.52, 1.0))
+		assert_almost_eq(scene7_node.fill_amount, 0.018, 0.001)
 		assert_not_null(scene7_node.get_render_texture())
 		var sprite := scene7_node.get_node("SubViewport/AnimatedSprite2D") as AnimatedSprite2D
 		assert_not_null(sprite.sprite_frames)
@@ -1417,16 +1539,22 @@ func test_scene7_reuses_character_geometry_with_daylight_visual_parameters() -> 
 		assert_not_null(material)
 		if material != null:
 			assert_eq(material.shader.resource_path, SCENE7_CHARACTER_SHADER_PATH)
-			for neutral_parameter: String in [
-				"backlight",
-				"warmth_amount",
-				"rim_strength",
-				"fill_amount",
-			]:
-				assert_almost_eq(
-						float(material.get_shader_parameter(neutral_parameter)),
-						0.0,
-						0.001)
+			assert_almost_eq(float(material.get_shader_parameter("scene_exposure")),
+					1.01, 0.001)
+			assert_almost_eq(float(material.get_shader_parameter(
+					"highlight_compression")), 0.03, 0.001)
+			assert_almost_eq(float(material.get_shader_parameter("backlight")),
+					0.06, 0.001)
+			assert_almost_eq(float(material.get_shader_parameter("warmth_amount")),
+					0.015, 0.001)
+			assert_almost_eq(float(material.get_shader_parameter("rim_strength")),
+					0.10, 0.001)
+			assert_almost_eq(float(material.get_shader_parameter("fill_amount")),
+					0.018, 0.001)
+			assert_almost_eq(float(material.get_shader_parameter("sun_key_amount")),
+					0.12, 0.001)
+			assert_almost_eq(float(material.get_shader_parameter("oasis_bounce_amount")),
+					0.10, 0.001)
 
 	var shadow_positions: Dictionary[String, Vector2] = {
 		"P1Shadow": Vector2(414.0, 732.0),

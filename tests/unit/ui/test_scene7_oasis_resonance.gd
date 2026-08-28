@@ -10,6 +10,7 @@ func test_three_distinct_water_zones_start_one_visible_resonance() -> void:
 	assert_not_null(resonance)
 	if resonance == null:
 		return
+	resonance.call("set_countdown_idle", true)
 
 	assert_true(bool(resonance.call("register_water_click", Vector2(160.0, 710.0))))
 	assert_false(bool(resonance.call("register_water_click", Vector2(420.0, 710.0))))
@@ -30,6 +31,7 @@ func test_partial_sequence_expires_instead_of_triggering_late() -> void:
 	assert_not_null(resonance)
 	if resonance == null:
 		return
+	resonance.call("set_countdown_idle", true)
 
 	resonance.call("register_water_click", Vector2(160.0, 710.0))
 	resonance.call("_process", float(resonance.get("trigger_window_sec")) + 0.01)
@@ -47,6 +49,7 @@ func test_water_ripple_signals_feed_the_scene7_local_controller() -> void:
 	assert_not_null(resonance)
 	if resonance == null:
 		return
+	resonance.call("set_countdown_idle", true)
 
 	rear.emit_signal("effect_spawned", 1, Vector2(160.0, 710.0))
 	rear.emit_signal("effect_spawned", 1, Vector2(960.0, 710.0))
@@ -78,6 +81,7 @@ func test_relay_has_an_obvious_peak_and_restores_the_authored_palette() -> void:
 	assert_not_null(resonance)
 	if resonance == null:
 		return
+	resonance.call("set_countdown_idle", true)
 	var left_base := left_glow.modulate
 	var center_base := center_glow.modulate
 
@@ -97,3 +101,22 @@ func test_relay_has_an_obvious_peak_and_restores_the_authored_palette() -> void:
 	assert_eq(int(resonance.call("particle_count")), 0)
 	assert_eq(left_glow.modulate, left_base)
 	assert_eq(center_glow.modulate, center_base)
+
+
+func test_resonance_accepts_water_clicks_only_during_countdown_idle() -> void:
+	var stage := (load(SCENE7_PATH) as PackedScene).instantiate() as BattleStage
+	add_child_autofree(stage)
+	var resonance := stage.get_node_or_null("OasisResonance")
+	assert_not_null(resonance)
+	if resonance == null:
+		return
+
+	assert_false(bool(resonance.call(
+			"register_water_click", Vector2(160.0, 710.0))))
+	resonance.call("set_countdown_idle", true)
+	assert_true(bool(resonance.call(
+			"register_water_click", Vector2(160.0, 710.0))))
+	resonance.call("set_countdown_idle", false, false)
+	assert_eq(int(resonance.call("registered_zone_count")), 0)
+	assert_false(bool(resonance.call(
+			"register_water_click", Vector2(960.0, 710.0))))

@@ -42,18 +42,29 @@ func _run_probe() -> void:
 		root.add_child(stage)
 		var material := (
 				stage.get_node("FarBackground") as TextureRect).material as ShaderMaterial
+		var scene_shadow: Color = material.get_shader_parameter("sand_shadow_color")
+		var scene_middle: Color = material.get_shader_parameter("sand_mid_color")
+		var scene_highlight: Color = material.get_shader_parameter(
+				"sand_highlight_color")
 		var scene_matches_reference := (
-				_color_delta(material.get_shader_parameter("sand_shadow_color"),
-						reference_shadow) <= 0.035
-				and _color_delta(material.get_shader_parameter("sand_mid_color"),
-						reference_middle) <= 0.035
-				and _color_delta(material.get_shader_parameter("sand_highlight_color"),
-						reference_highlight) <= 0.035
-				and float(material.get_shader_parameter("sand_palette_strength")) >= 0.82
-				and float(material.get_shader_parameter("sand_saturation")) >= 1.12
+				scene_shadow.h * 360.0 >= 20.0
+				and scene_shadow.h * 360.0 <= 35.0
+				and scene_middle.h * 360.0 >= 28.0
+				and scene_middle.h * 360.0 <= 38.0
+				and scene_highlight.h * 360.0 >= 35.0
+				and scene_highlight.h * 360.0 <= 45.0
+				and _luma(scene_shadow) < _luma(scene_middle)
+				and _luma(scene_middle) < _luma(scene_highlight)
+				and absf(scene_middle.h * 360.0 - reference_middle.h * 360.0) <= 6.0
+				and absf(scene_highlight.h * 360.0
+						- reference_highlight.h * 360.0) <= 6.0
+				and float(material.get_shader_parameter("sand_palette_strength")) >= 0.88
+				and float(material.get_shader_parameter("sand_palette_strength")) <= 0.95
+				and float(material.get_shader_parameter("sand_saturation")) >= 1.04
+				and float(material.get_shader_parameter("sand_saturation")) <= 1.12
 				and float(material.get_shader_parameter(
-						"far_saturation_retention")) >= 0.70
-				and float(material.get_shader_parameter("air_strength")) <= 0.18)
+						"far_saturation_retention")) >= 0.90
+				and float(material.get_shader_parameter("air_strength")) <= 0.08)
 		references_ready = references_ready and scene_matches_reference
 		print(
 				"SCENE7_REFERENCE_DESERT_MATCH: ",

@@ -54,6 +54,8 @@ uniform float branch_underpaint_enabled : hint_range(0.0, 1.0, 1.0) = 0.0;
 uniform float branch_motion_enabled : hint_range(0.0, 1.0, 1.0) = 0.0;
 uniform int branch_group_count : hint_range(0, 3, 1) = 0;
 uniform float branch_motion_fps : hint_range(2.0, 8.0, 1.0) = 5.0;
+// Negative uses runtime TIME. Non-negative is reserved for non-saving motion QA.
+uniform float branch_diagnostic_time_sec = -1.0;
 uniform vec3 branch_cycle_sec = vec3(10.5, 11.5, 9.75);
 uniform vec3 branch_angle_deg = vec3(0.85, 0.65, 0.75);
 uniform vec3 branch_phase = vec3(0.0, 1.7, 3.4);
@@ -124,12 +126,39 @@ vec4 branch_group_sample(
 }
 
 
+float branch_sway_value(
+		float motion_time,
+		float cycle_sec,
+		float phase,
+		float secondary_phase) {
+	float main_phase = motion_time * TAU / max(cycle_sec, 0.001) + phase;
+	float broad_sway = sin(main_phase) * 0.78;
+	float leaf_follow = sin(main_phase * 0.47 + secondary_phase) * 0.22;
+	float gust_phase = fract(
+			motion_time / max(cycle_sec * 1.85, 0.001)
+			+ phase / TAU * 0.13 + secondary_phase * 0.07);
+	float gust = smoothstep(0.06, 0.26, gust_phase)
+			* (1.0 - smoothstep(0.58, 0.90, gust_phase));
+	float gust_push = sin(main_phase * 0.53 + secondary_phase * 0.71) * 0.38;
+	return clamp(broad_sway + leaf_follow + gust_push * gust, -1.0, 1.0);
+}
+
+
 vec4 sample_branch_texture(vec2 destination_uv) {
 	vec4 original = texture(branch_source_texture, destination_uv);
-	float stepped_time = floor(TIME * branch_motion_fps) / branch_motion_fps;
+	float motion_time = branch_diagnostic_time_sec >= 0.0
+			? branch_diagnostic_time_sec : TIME;
+	float stepped_time = floor(motion_time * branch_motion_fps)
+			/ branch_motion_fps;
 	vec3 safe_cycles = max(branch_cycle_sec, vec3(0.001));
-	vec3 angles = sin(stepped_time * TAU / safe_cycles + branch_phase)
-			* radians(branch_angle_deg);
+	vec3 sway = vec3(
+			branch_sway_value(
+					stepped_time, safe_cycles.x, branch_phase.x, 0.25),
+			branch_sway_value(
+					stepped_time, safe_cycles.y, branch_phase.y, 1.85),
+			branch_sway_value(
+					stepped_time, safe_cycles.z, branch_phase.z, 3.45));
+	vec3 angles = sway * radians(branch_angle_deg);
 	vec4 local_mask = texture(branch_mask, destination_uv);
 	float moving_here = local_mask.r;
 	if (branch_group_count >= 2) {

@@ -46,26 +46,26 @@ func _initialize() -> void:
 		var base_brightness := float(material.get_shader_parameter("base_brightness"))
 		var palette_mid_luma := (_luma(shadow) + _luma(sunlit)) * 0.5 \
 				* base_brightness
-		var exact_rollback := true
-		var expected: Dictionary = PRESETS.PRE_BRIGHTEN_ROLLBACK[
+		var exact_scheme_b := true
+		var expected: Dictionary = PRESETS.SCHEME_B_APPROVED[
 				PRESET_KEYS[node_name]]
 		for parameter_name: String in expected:
-			exact_rollback = exact_rollback and _variant_matches(
+			exact_scheme_b = exact_scheme_b and _variant_matches(
 					material.get_shader_parameter(parameter_name),
 					expected[parameter_name])
 		var layer_passed := (
 				material.resource_local_to_scene
-				and exact_rollback
-				and palette_mid_luma < reference_body_luma - 0.08
+				and exact_scheme_b
+				and absf(palette_mid_luma - reference_body_luma) <= 0.055
 				and absf(_luma(glow) - reference_glow_luma) <= 0.075
-				and base_brightness >= 0.88
-				and base_brightness <= 0.93
-				and float(material.get_shader_parameter("palette_strength")) >= 0.35
-				and float(material.get_shader_parameter("palette_strength")) <= 0.39
+				and base_brightness >= 0.96
+				and base_brightness <= 1.03
+				and float(material.get_shader_parameter("palette_strength")) >= 0.38
+				and float(material.get_shader_parameter("palette_strength")) <= 0.42
 				and float(material.get_shader_parameter(
-						"source_cyan_midtone_lift")) >= 0.07
+						"source_cyan_midtone_lift")) >= 0.05
 				and float(material.get_shader_parameter(
-						"source_cyan_midtone_lift")) <= 0.085
+						"source_cyan_midtone_lift")) <= 0.065
 				and float(material.get_shader_parameter(
 						"source_cyan_compression")) >= 0.17
 				and float(material.get_shader_parameter(
@@ -82,7 +82,7 @@ func _initialize() -> void:
 	print(
 		"SCENE7_REFERENCE_MIDGROUND_PALETTE: ",
 		"PASS" if passed else "FAIL",
-		" active_preset=PRE_BRIGHTEN_ROLLBACK",
+		" active_preset=SCHEME_B_APPROVED",
 		" clean_backup_layers=", PRESETS.CLEAN_BRIGHT_BACKUP.size(),
 		" body_samples=", reference_body.size(),
 		" body_luma=", snappedf(reference_body_luma, 0.001),

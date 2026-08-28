@@ -19,6 +19,8 @@ uniform float density : hint_range(0.0, 1.0) = 0.56;
 uniform float secondary_density : hint_range(0.0, 0.5) = 0.20;
 uniform float spark_length_px : hint_range(0.0, 2.0) = 1.0;
 uniform float spark_chance : hint_range(0.0, 0.5) = 0.16;
+uniform float cross_glow_px : hint_range(0.0, 2.0) = 1.0;
+uniform float cross_glow_strength : hint_range(0.0, 1.0) = 0.58;
 group_uniforms;
 
 group_uniforms motion;
@@ -49,7 +51,7 @@ float wrapped_axis_distance(float first, float second, float span) {
 }
 
 
-vec3 mote_sample(
+vec4 mote_sample(
 		vec2 local_cell,
 		vec2 macro,
 		float stepped_time,
@@ -85,16 +87,23 @@ vec3 mote_sample(
 	float horizontal_spark = step(dy, 0.1)
 			* step(dx, spark_length_px) * use_spark;
 	float shape = max(core, horizontal_spark);
+	float horizontal_cross = step(dy, 0.1) * step(dx, cross_glow_px);
+	float vertical_cross = step(dx, 0.1) * step(dy, cross_glow_px);
+	float mote_halo = max(horizontal_cross, vertical_cross) * (1.0 - shape);
 
-	float life_fade = smoothstep(0.0, 0.15, life)
-			* (1.0 - smoothstep(0.82, 1.0, life));
+	float life_fade = smoothstep(0.0, 0.08, life)
+			* (1.0 - smoothstep(0.91, 1.0, life));
 	float twinkle_phase = stepped_time * twinkle_speed
 			+ seed_color * 6.2831853 + phase;
 	float twinkle = floor(
 			(0.5 + 0.5 * sin(twinkle_phase)) * 3.0 + 0.5) / 3.0;
-	float brightness = mix(0.68, 1.0, twinkle) * life_fade;
+	float brightness = mix(0.78, 1.0, twinkle) * life_fade;
 	float accent = step(1.0 - accent_ratio, seed_color);
-	return vec3(shape * active * brightness, accent, life);
+	return vec4(
+			shape * active * brightness,
+			accent,
+			life,
+			mote_halo * active * brightness);
 }
 
 
@@ -105,16 +114,19 @@ void fragment() {
 	float stepped_time = floor(motion_time() * motion_fps)
 			/ max(motion_fps, 1.0);
 
-	vec3 primary = mote_sample(
+	vec4 primary = mote_sample(
 			local_cell, macro, stepped_time, vec2(5.3, 19.7), density);
-	vec3 secondary = mote_sample(
+	vec4 secondary = mote_sample(
 			local_cell, macro, stepped_time, vec2(37.1, 7.9), secondary_density);
 	float selected_secondary = step(primary.x, secondary.x);
 	float mote = max(primary.x, secondary.x);
+	float mote_halo = max(primary.w, secondary.w);
 	float accent = mix(primary.y, secondary.y, selected_secondary);
 
 	float vertical_fade = smoothstep(0.0, 0.10, UV.y)
 			* (1.0 - smoothstep(0.88, 1.0, UV.y));
 	vec3 mote_color = mix(jade_color.rgb, gold_color.rgb, accent);
-	COLOR = vec4(mote_color, mote * vertical_fade * alpha);
+	float visible_mote = clamp(
+			mote + mote_halo * cross_glow_strength, 0.0, 1.0);
+	COLOR = vec4(mote_color, visible_mote * vertical_fade * alpha);
 }

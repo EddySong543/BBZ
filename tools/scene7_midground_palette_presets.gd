@@ -93,3 +93,50 @@ const CLEAN_BRIGHT_BACKUP := {
 		"atmosphere_strength": 0.045,
 	},
 }
+
+## Approved Scheme B: readable daytime foliage without the rejected gray lift.
+## Warm olive light and deep teal-green shade bridge the golden desert and jade pool.
+const SCHEME_B_APPROVED := {
+	"center": {
+		"ambient_tint": Color(0.7, 0.78, 0.68),
+		"glow_color": Color(0.34, 0.86, 0.66),
+		"base_brightness": 0.97,
+		"source_cyan_compression": 0.18,
+		"source_cyan_value_ceiling": 0.71,
+		"source_cyan_midtone_lift": 0.06,
+		"cool_output_gain": 0.96,
+		"shadow_palette": Color(0.04, 0.225, 0.18),
+		"sunlit_palette": Color(0.5, 0.54, 0.28),
+		"palette_strength": 0.4,
+		"atmosphere_color": Color(0.26, 0.38, 0.32),
+		"atmosphere_strength": 0.045,
+	},
+	"left": {
+		"ambient_tint": Color(0.69, 0.77, 0.67),
+		"glow_color": Color(0.33, 0.85, 0.65),
+		"base_brightness": 0.98,
+		"source_cyan_compression": 0.18,
+		"source_cyan_value_ceiling": 0.7,
+		"source_cyan_midtone_lift": 0.055,
+		"cool_output_gain": 0.96,
+		"shadow_palette": Color(0.035, 0.21, 0.17),
+		"sunlit_palette": Color(0.47, 0.52, 0.27),
+		"palette_strength": 0.39,
+		"atmosphere_color": Color(0.25, 0.37, 0.31),
+		"atmosphere_strength": 0.045,
+	},
+	"right": {
+		"ambient_tint": Color(0.72, 0.8, 0.69),
+		"glow_color": Color(0.34, 0.86, 0.66),
+		"base_brightness": 1.02,
+		"source_cyan_compression": 0.18,
+		"source_cyan_value_ceiling": 0.71,
+		"source_cyan_midtone_lift": 0.055,
+		"cool_output_gain": 0.96,
+		"shadow_palette": Color(0.045, 0.24, 0.19),
+		"sunlit_palette": Color(0.53, 0.57, 0.29),
+		"palette_strength": 0.41,
+		"atmosphere_color": Color(0.27, 0.4, 0.33),
+		"atmosphere_strength": 0.045,
+	},
+}

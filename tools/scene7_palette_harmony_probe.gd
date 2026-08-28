@@ -7,9 +7,11 @@ const BIOLUME_GLOW_SHADER := \
 		"res://assets/shaders/canvas_env_scene7_biolume_glow_fx.gdshader"
 const BIOLUME_RELIGHT_SHADER := \
 		"res://assets/shaders/canvas_env_scene7_biolume_cluster_relight.gdshader"
-const SURFACE := Color(0.133, 0.667, 0.6, 1.0)
-const DEEP := Color(0.067, 0.267, 0.4, 1.0)
-const GLOW := Color(0.44, 0.88, 0.72, 1.0)
+const CHARACTER_SHADER := \
+		"res://assets/shaders/canvas_env_scene7_character_light.gdshader"
+const SURFACE := Color(0.12, 0.62, 0.47, 1.0)
+const DEEP := Color(0.045, 0.24, 0.27, 1.0)
+const GLOW := Color(0.43, 0.86, 0.64, 1.0)
 
 
 func _initialize() -> void:
@@ -46,19 +48,19 @@ func _run_probe() -> void:
 		plant_palette_ready = (
 				plant_palette_ready
 				and material.resource_local_to_scene
-				and glow.h * 360.0 >= 155.0
-				and glow.h * 360.0 <= 175.0
+				and glow.h * 360.0 >= 150.0
+				and glow.h * 360.0 <= 165.0
 				and glow.v >= 0.82
 				and glow.v <= 0.90
 				and float(material.get_shader_parameter("source_cyan_compression")) >= 0.17
 				and float(material.get_shader_parameter("source_cyan_compression")) <= 0.19
 				and float(material.get_shader_parameter("core_preservation")) <= 0.86
-				and float(material.get_shader_parameter("source_cyan_midtone_lift")) >= 0.07
-				and float(material.get_shader_parameter("source_cyan_midtone_lift")) <= 0.085
-				and float(material.get_shader_parameter("base_brightness")) >= 0.88
-				and float(material.get_shader_parameter("base_brightness")) <= 0.93
-				and float(material.get_shader_parameter("palette_strength")) >= 0.35
-				and float(material.get_shader_parameter("palette_strength")) <= 0.39
+				and float(material.get_shader_parameter("source_cyan_midtone_lift")) >= 0.05
+				and float(material.get_shader_parameter("source_cyan_midtone_lift")) <= 0.065
+				and float(material.get_shader_parameter("base_brightness")) >= 0.96
+				and float(material.get_shader_parameter("base_brightness")) <= 1.03
+				and float(material.get_shader_parameter("palette_strength")) >= 0.38
+				and float(material.get_shader_parameter("palette_strength")) <= 0.42
 				and is_zero_approx(float(material.get_shader_parameter(
 						"point_twinkle_strength")))
 				and is_zero_approx(float(material.get_shader_parameter(
@@ -138,15 +140,15 @@ func _run_probe() -> void:
 			and float(far_material.get_shader_parameter("near_saturation_retention")) >= 0.98
 			and float(far_material.get_shader_parameter("air_strength")) <= 0.08
 			and float(far_material.get_shader_parameter(
-					"sand_palette_strength")) >= 0.96
+					"sand_palette_strength")) >= 0.90
 			and float(far_material.get_shader_parameter(
-					"sand_saturation")) >= 1.12
+					"sand_saturation")) >= 1.05
 			and float(far_material.get_shader_parameter(
-					"sand_saturation")) <= 1.20
+					"sand_saturation")) <= 1.11
 			and float(far_material.get_shader_parameter(
-					"source_value_detail")) >= 0.28
+					"source_value_detail")) >= 0.20
 			and float(far_material.get_shader_parameter(
-					"source_value_detail")) <= 0.35)
+					"source_value_detail")) <= 0.27)
 
 	var sky_material := (stage.get_node("Sky") as TextureRect).material as ShaderMaterial
 	var sky_palette_ready: bool = (
@@ -154,9 +156,9 @@ func _run_probe() -> void:
 			and sky_material.resource_local_to_scene
 			and sky_material.shader.resource_path == SKY_SHADER
 			and sky_material.get_shader_parameter("zenith_color")
-					== Color(0.58, 0.82, 0.69, 1.0)
+					== Color(0.56, 0.81, 0.7, 1.0)
 			and sky_material.get_shader_parameter("horizon_color")
-					== Color(0.7, 0.9, 0.72, 1.0)
+					== Color(0.76, 0.9, 0.7, 1.0)
 			and float(sky_material.get_shader_parameter("palette_strength")) >= 0.24
 			and float(sky_material.get_shader_parameter("palette_strength")) <= 0.32)
 
@@ -177,28 +179,30 @@ func _run_probe() -> void:
 	var underside: Color = platform_material.get_shader_parameter("underside_tint")
 	var platform_palette_ready: bool = (
 			platform_material.resource_local_to_scene
-			and underside.h * 360.0 >= 285.0
-			and underside.h * 360.0 <= 315.0
-			and float(platform_material.get_shader_parameter("underside_strength")) >= 0.78)
+			and underside.h * 360.0 >= 25.0
+			and underside.h * 360.0 <= 40.0
+			and float(platform_material.get_shader_parameter("underside_strength")) >= 0.72)
 
-	var character_neutral_ready := true
+	var character_scene_light_ready := true
 	for node_name: String in ["P1CharDisplay", "P2CharDisplay"]:
 		var display := screen.get_node("WorldGroup/%s" % node_name) as CharacterDisplay
 		var sprite := display.get_node("SubViewport/AnimatedSprite2D") as AnimatedSprite2D
 		var material := sprite.material as ShaderMaterial
 		if material == null:
-			character_neutral_ready = false
+			character_scene_light_ready = false
 			continue
-		character_neutral_ready = (
-				character_neutral_ready
+		character_scene_light_ready = (
+				character_scene_light_ready
 				and material.resource_local_to_scene
-				and is_equal_approx(float(material.get_shader_parameter("source_saturation")), 1.0)
-				and is_equal_approx(float(material.get_shader_parameter("source_contrast")), 1.0)
-				and is_zero_approx(float(material.get_shader_parameter("ambient_tint_amount")))
-				and is_zero_approx(float(material.get_shader_parameter("rim_strength")))
-				and is_zero_approx(float(material.get_shader_parameter("fill_amount")))
-				and is_zero_approx(float(material.get_shader_parameter("daylight_key_amount")))
-				and is_zero_approx(float(material.get_shader_parameter("water_bounce_amount"))))
+				and material.shader.resource_path == CHARACTER_SHADER
+				and is_zero_approx(float(material.get_shader_parameter("flash_amount")))
+				and is_equal_approx(float(material.get_shader_parameter("backlight")), 0.06)
+				and is_equal_approx(float(material.get_shader_parameter("warmth_amount")), 0.015)
+				and is_equal_approx(float(material.get_shader_parameter("rim_strength")), 0.10)
+				and is_equal_approx(float(material.get_shader_parameter("fill_amount")), 0.018)
+				and is_equal_approx(float(material.get_shader_parameter("sun_key_amount")), 0.12)
+				and is_equal_approx(float(material.get_shader_parameter(
+						"oasis_bounce_amount")), 0.10))
 
 	var post_material := (screen.get_node("PostFX") as ColorRect).material as ShaderMaterial
 	var post_neutral_ready := (
@@ -228,7 +232,7 @@ func _run_probe() -> void:
 			and sky_palette_ready
 			and foreground_palette_ready
 			and platform_palette_ready
-			and character_neutral_ready
+			and character_scene_light_ready
 			and post_neutral_ready
 			and ui_local_ready)
 	print(
@@ -240,7 +244,7 @@ func _run_probe() -> void:
 			" sky=", sky_palette_ready,
 			" foreground=", foreground_palette_ready,
 			" platform=", platform_palette_ready,
-			" characters_neutral=", character_neutral_ready,
+			" characters_scene_light=", character_scene_light_ready,
 			" post_neutral=", post_neutral_ready,
 			" ui_local=", ui_local_ready)
 	screen.queue_free()

@@ -642,14 +642,14 @@ func _ready() -> void:
 		and p2.get_render_texture() != null
 		and p1.visible
 		and p2.visible
-		and is_zero_approx(p1.rim_strength)
-		and is_zero_approx(p2.rim_strength)
-		and is_zero_approx(p1.backlight)
-		and is_zero_approx(p2.backlight)
-		and is_zero_approx(p1.warmth_amount)
-		and is_zero_approx(p2.warmth_amount)
-		and is_zero_approx(p1.fill_amount)
-		and is_zero_approx(p2.fill_amount)
+		and is_equal_approx(p1.rim_strength, 0.10)
+		and is_equal_approx(p2.rim_strength, 0.10)
+		and is_equal_approx(p1.backlight, 0.06)
+		and is_equal_approx(p2.backlight, 0.06)
+		and is_equal_approx(p1.warmth_amount, 0.015)
+		and is_equal_approx(p2.warmth_amount, 0.015)
+		and is_equal_approx(p1.fill_amount, 0.018)
+		and is_equal_approx(p2.fill_amount, 0.018)
 		and (p1_sprite.material as ShaderMaterial).shader.resource_path
 				== SCENE7_CHARACTER_SHADER_PATH
 		and (p2_sprite.material as ShaderMaterial).shader.resource_path

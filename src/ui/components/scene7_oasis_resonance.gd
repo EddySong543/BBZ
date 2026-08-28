@@ -8,6 +8,8 @@ extends Node2D
 signal zone_registered(zone_index: int)
 signal resonance_started()
 signal resonance_finished()
+signal resonance_interrupted(interrupted_by_attack: bool)
+signal countdown_idle_closed(interrupted_by_attack: bool)
 
 class GlowPulse:
 	var age: float = 0.0
@@ -85,6 +87,7 @@ var _next_sequence_stage: int = 0
 var _final_burst_fired: bool = false
 var _resonance_count: int = 0
 var _particle_seed: int = 0
+var _countdown_idle: bool = false
 
 
 func _ready() -> void:
@@ -124,7 +127,8 @@ func _on_water_effect_spawned(_effect_kind: int, canvas_position: Vector2) -> vo
 
 
 func register_water_click(canvas_position: Vector2) -> bool:
-	if _resonating or canvas_position.x < 0.0 or canvas_position.x > scene_width:
+	if not _countdown_idle or _resonating \
+			or canvas_position.x < 0.0 or canvas_position.x > scene_width:
 		return false
 	if _trigger_window_left <= 0.0:
 		_registered_zone_mask = 0
@@ -167,6 +171,29 @@ func active_pulse_count() -> int:
 
 func particle_count() -> int:
 	return _particles.size()
+
+
+func set_countdown_idle(active: bool, interrupted_by_attack: bool = false) -> void:
+	if _countdown_idle == active:
+		return
+	_countdown_idle = active
+	if active:
+		return
+
+	_registered_zone_mask = 0
+	_trigger_window_left = 0.0
+	if _resonating:
+		_resonating = false
+		_sequence_age = 0.0
+		_next_sequence_stage = 0
+		_final_burst_fired = false
+		resonance_interrupted.emit(interrupted_by_attack)
+	countdown_idle_closed.emit(interrupted_by_attack)
+	set_process(not _active_pulses.is_empty() or not _particles.is_empty())
+
+
+func is_countdown_idle() -> bool:
+	return _countdown_idle
 
 
 func _start_resonance() -> void:

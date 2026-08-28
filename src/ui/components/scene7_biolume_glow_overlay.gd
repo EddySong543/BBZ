@@ -40,11 +40,13 @@ const NEIGHBORS_8: Array[Vector2i] = [
 @export_range(0.01, 0.2, 0.01) var cluster_cyan_threshold: float = 0.055
 @export_range(2.5, 8.0, 0.1) var point_cycle_sec: float = 4.8
 @export_range(0.0, 1.0, 0.01) var point_time_phase: float = 0.0
+@export_range(0.0, 1.0, 0.01) var animation_seed: float = 0.5
+@export_range(0.0, 0.35, 0.01) var point_cycle_spread: float = 0.20
 @export_range(0.0, 0.4, 0.01) var point_core_base: float = 0.06
 @export_range(0.0, 0.8, 0.01) var point_core_peak: float = 0.24
 @export_range(0.0, 0.2, 0.005) var point_halo_base: float = 0.015
 @export_range(0.0, 0.5, 0.01) var point_halo_peak: float = 0.12
-@export_range(3.0, 10.0, 0.1) var cluster_cycle_sec: float = 6.2
+@export_range(3.0, 12.0, 0.1) var cluster_cycle_sec: float = 6.2
 @export_range(0.0, 1.0, 0.01) var cluster_time_phase: float = 0.0
 @export_range(0.0, 0.4, 0.01) var cluster_core_base: float = 0.05
 @export_range(0.0, 0.6, 0.01) var cluster_core_peak: float = 0.10
@@ -121,11 +123,13 @@ func _build_masks(source_image: Image) -> Array[ImageTexture]:
 		var point_components := _find_point_components(source_image)
 		selected_components = _select_spaced_components(
 				point_components, source_image.get_size())
-	for component_index: int in range(selected_components.size()):
-		var component: Dictionary = selected_components[component_index]
-		var phase := fposmod(
-				float(component_index) * 0.61803398875
-				+ point_time_phase * 0.37, 1.0)
+	for component: Dictionary in selected_components:
+		var centroid_uv: Vector2 = component["centroid"] \
+				/ Vector2(source_image.get_size())
+		var phase := _hash01(
+				centroid_uv.x * 12.9898
+				+ centroid_uv.y * 78.233
+				+ animation_seed * 37.719)
 		_write_component_with_halo(
 				point_mask, component["pixels"], phase)
 
@@ -327,6 +331,7 @@ func _apply_material(point_texture: ImageTexture, cluster_texture: ImageTexture)
 	glow_material.set_shader_parameter("glow_color", glow_color)
 	glow_material.set_shader_parameter("cluster_cycle_sec", cluster_cycle_sec)
 	glow_material.set_shader_parameter("cluster_time_phase", cluster_time_phase)
+	glow_material.set_shader_parameter("animation_seed", animation_seed)
 	if collective_relight:
 		glow_material.set_shader_parameter(
 				"trough_brightness", relight_trough_brightness)
@@ -338,6 +343,7 @@ func _apply_material(point_texture: ImageTexture, cluster_texture: ImageTexture)
 		glow_material.set_shader_parameter("point_mask", point_texture)
 		glow_material.set_shader_parameter("point_cycle_sec", point_cycle_sec)
 		glow_material.set_shader_parameter("point_time_phase", point_time_phase)
+		glow_material.set_shader_parameter("point_cycle_spread", point_cycle_spread)
 		glow_material.set_shader_parameter("point_core_base", point_core_base)
 		glow_material.set_shader_parameter("point_core_peak", point_core_peak)
 		glow_material.set_shader_parameter("point_halo_base", point_halo_base)
@@ -347,6 +353,10 @@ func _apply_material(point_texture: ImageTexture, cluster_texture: ImageTexture)
 		glow_material.set_shader_parameter("cluster_halo_base", cluster_halo_base)
 		glow_material.set_shader_parameter("cluster_halo_peak", cluster_halo_peak)
 	material = glow_material
+
+
+func _hash01(value: float) -> float:
+	return fposmod(sin(value) * 43758.5453, 1.0)
 
 
 func _is_point_pixel(color: Color) -> bool:

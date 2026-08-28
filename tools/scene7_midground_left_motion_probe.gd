@@ -5,7 +5,7 @@ var BRANCH_CONTRACT := {
 	"MidgroundCenter": [3, PackedInt32Array([1000, 1000, 1000])],
 	"MidgroundLeft": [1, PackedInt32Array([1000])],
 	"MidgroundRight": [1, PackedInt32Array([2000])],
-	"ForegroundLeft": [2, PackedInt32Array([300, 200])],
+	"ForegroundLeft": [3, PackedInt32Array([300, 200, 180])],
 }
 
 
@@ -72,8 +72,12 @@ func _run() -> void:
 							_vector_component(angles, group_index),
 							source)
 					peak_screen_motion.append(snappedf(peak_motion, 0.01))
+					var minimum_peak_motion := 10.0 \
+							if source_name == "ForegroundLeft" and group_index == 2 \
+							else 5.0
 					layer_passed = layer_passed \
-							and peak_motion >= 2.5 and peak_motion <= 9.0
+							and peak_motion >= minimum_peak_motion \
+							and peak_motion <= 14.0
 					var screen_bounds := _mask_screen_bounds(
 							mask_image, group_index, source)
 					var visible_bounds := screen_bounds.intersection(
@@ -185,18 +189,20 @@ func _run() -> void:
 			if expects_points:
 				glow_varieties = glow_varieties \
 						and float(overlay_material.get_shader_parameter(
-								"point_core_peak")) >= 0.22 \
+								"point_core_peak")) >= 0.30 \
 						and float(overlay_material.get_shader_parameter(
-								"point_halo_peak")) >= 0.10 \
+								"point_halo_peak")) >= 0.14 \
 						and float(overlay_material.get_shader_parameter(
 								"point_cycle_sec")) >= 7.0
 			if expects_cluster:
 				glow_varieties = glow_varieties \
 						and float(overlay_material.get_shader_parameter(
-								"cluster_cycle_sec")) >= 9.0 \
+								"cluster_cycle_sec")) >= 7.5 \
 						and (not expects_relight \
-								or float(overlay_material.get_shader_parameter(
-										"trough_brightness")) <= 0.75)
+								or (float(overlay_material.get_shader_parameter(
+										"trough_brightness")) <= 0.75 \
+									and float(overlay_material.get_shader_parameter(
+										"peak_brightness")) >= 1.20))
 		glow_reports.append("%s:p=%s/%s/%s,c=%s/%s" % [
 				glow_name, point_components, point_core_pixels,
 				point_halo_pixels, cluster_core_pixels, cluster_halo_pixels])

@@ -66,6 +66,14 @@ var CONFIGS := {
 				Vector2(0.75, 0.82), Vector2(0.75, 0.89),
 				Vector2(0.69, 0.93), Vector2(0.62, 0.87),
 			]),
+			PackedVector2Array([
+				# The rightmost forked grass crown.  Keep its dense root outside
+				# the moving silhouette so it remains attached to the bank.
+				Vector2(0.75, 0.79), Vector2(0.84, 0.79),
+				Vector2(0.93, 0.84), Vector2(0.98, 0.91),
+				Vector2(0.96, 0.94), Vector2(0.84, 0.95),
+				Vector2(0.75, 0.89),
+			]),
 		],
 	},
 }
