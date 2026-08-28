@@ -10,7 +10,7 @@ extends GutTest
 ## h17【待重命名】= 主动技：占动作+费2能，转变为敌方当前出战英雄；复制英雄本体状态，不复制团队能量。
 ## h18【游丝引】= 控制·被动：出战时，双方「波 / 大波」的基础伤害均视为 1 点；后续强化与独立伤害照常。
 ## h19【奔雷】= 进攻：攻击命中时，目标至多承受 1.0HP，超过部分转移给当前生命最高的另一名敌人。
-## h20【罪已昭】= 状态·被动：命中敌方出战使其获得脆弱（vuln），受伤 +0.5，直到下场（下场清）。
+## h20【罪已昭】= 状态·被动：命中敌方出战使其获得脆弱（vuln），受伤 +0.5，持续到下回合结束。
 ## h21【调虎离山】= 干扰·主动技：占动作+费1能（批④降费·原2能）+每局2次+须出战，强制对手换人、揪其指定（未指定→随机）存活替补上场。
 ## h22【焚天火兆】= 控制·主动技：占动作+免费+每局2次 → 下一回合结束时双方失去全部能量。
 ## h23【天光长蚀】= 干扰：「波 / 大波」实际造成多少伤害，就等量降低敌方团队能量上限；最低 3 点，现有超额能量保留。
@@ -600,7 +600,7 @@ func test_h19_jianta_blocked_no_trample() -> void:
 	assert_eq(b.hp[1][1], 10, "被挡 → 替补不受踏")
 
 
-# ---- h20 触邪 罪已昭（持续脆弱：命中敌方出战施加·受伤 +0.5·下场清）----
+# ---- h20 触邪 罪已昭（限时脆弱：命中施加·受伤 +0.5·下回合末清）----
 
 func test_h20_zuiyizhao_marks_and_amplifies() -> void:
 	# 触邪波命中敌方出战 → 施加脆弱；此后对该目标的攻击 +0.5(1 半点)
@@ -615,6 +615,29 @@ func test_h20_zuiyizhao_marks_and_amplifies() -> void:
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
 	assert_eq(b.hp[1][0], 8 - 3, "被印后受伤 +0.5 → 波打 3 半点")
+	assert_eq(int(b.get_status(1, 0, "vuln", 0)), 1,
+			"第二回合再次命中应刷新脆弱到再下一回合结束")
+
+
+func test_h20_zuiyizhao_expires_after_next_turn_without_refresh() -> void:
+	var b := _battle("h20", 5, 8)
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.CHARGE)
+	assert_eq(int(b.get_status(1, 0, "vuln", 0)), 1)
+
+	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.CHARGE)
+	assert_eq(int(b.get_status(1, 0, "vuln", 0)), 0,
+			"施加后的下一回合结束时，未刷新的罪已昭脆弱必须消失")
+
+
+func test_h20_zuiyizhao_applies_for_next_turn_then_expires() -> void:
+	var b := _battle_team(["h20", "test_p0_1", "test_p0_2"], 5, 8)
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.CHARGE)
+	b._perform_switch(0, 0, 1, [])
+
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.CHARGE)
+	assert_eq(b.hp[1][0], 5, "队友在下一回合攻击时仍应获得脆弱的0.5点增伤")
+	assert_eq(int(b.get_status(1, 0, "vuln", 0)), 0,
+			"下一回合攻击结算后，未由触邪刷新的脆弱必须消失")
 
 
 func test_h20_zuiyizhao_amplifies_any_attacker() -> void:
@@ -634,6 +657,9 @@ func test_h20_zuiyizhao_does_not_downgrade_hunter_mark_vulnerability() -> void:
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
 	assert_eq(int(b.get_status(1, 0, "vuln", 0)), 3, "断罪不得把猎物印记的 3 层脆弱覆盖成 1 层")
+	_resolve(b, ActionDef.Action.CHARGE, ActionDef.Action.CHARGE)
+	assert_eq(int(b.get_status(1, 0, "vuln", 0)), 3,
+			"罪已昭到期不得清除其他来源的更高层脆弱")
 
 
 func test_h20_zuiyizhao_cleared_on_switch_out() -> void:

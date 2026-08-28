@@ -2,7 +2,7 @@
 
 > **状态**：2026-07-30 重写。英雄设计正式采用五种唯一主定位：**进攻 / 防守 / 经济 / 调度 / 控制**；旧「进攻 / 防御 / 能量 / 节奏 / 状态 / 干扰」六维不再承担英雄定位或人数配额。
 > **作用**：所有现有及未来英雄设计的指导框架，也是主定位裁定的单一真相源。
-> **关联**：`design/heroes.md`（玩家可见技能文案快照）、`design/heroes-redesign.md`（逐只设计理据）、`design/gdd/game-concept.md`（核心机制）。
+> **关联**：`design/hero-design-lessons.md`（协作经验与提交前门禁）、`design/heroes.md`（玩家可见技能文案快照）、`design/heroes-redesign.md`（逐只设计理据）、`design/gdd/game-concept.md`（核心机制）。
 > **兼容边界**：`HeroData.dimension` 暂时仍是道具抽取加权使用的旧技术标签，`HeroData.team_role` 暂时仍是 BP 框色使用的旧三分类。两者均不得再指导英雄机制设计；待 24 名英雄重设计稳定后统一迁移，禁止逐只随手改字段造成英雄、道具、UI 与测试错位。
 
 ---

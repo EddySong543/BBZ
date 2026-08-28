@@ -109,8 +109,8 @@ func test_pianfeng_wave_still_connects_but_deals_zero_and_big_wave_gains_two() -
 	assert_true(wave.use_slot(1, 0))
 	_resolve(wave, A.ATTACK, A.CHARGE)
 	assert_eq(wave.hp[1][0], 20)
-	assert_eq(int(wave.get_status(1, 0, "poison", 0)), 0,
-		"偏锋甲不是防御，波仍命中并引爆命中成果")
+	assert_eq(int(wave.get_status(1, 0, "poison", 0)), 2,
+		"偏锋甲不是防御，但普通波不再引爆毒素")
 
 	var big := _battle()
 	big.slots[1][0] = _ready_slot("t2_pianfeng_jia")

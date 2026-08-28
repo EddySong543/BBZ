@@ -102,8 +102,8 @@ func test_hedinghong_consumes_once_and_adds_one_point_per_poison_layer() -> void
 	var battle := _battle()
 	assert_true(_use(battle, 0, "t3_hedinghong"))
 	battle.set_status(1, 0, "poison", 3)
-	_resolve(battle, A.ATTACK, A.CHARGE)
-	assert_eq(battle.hp[1][0], 9, "波2半点+毒3半点+鹤顶红6半点")
+	_resolve(battle, A.BIG_ATTACK, A.CHARGE)
+	assert_eq(battle.hp[1][0], 7, "大波4半点+毒3半点+鹤顶红6半点")
 	assert_eq(battle.relics[0].size(), 0)
 
 

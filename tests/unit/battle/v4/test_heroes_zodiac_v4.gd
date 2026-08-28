@@ -682,20 +682,30 @@ func test_h05_empowered_wave_combines_with_h04_targeting_and_h16_pursuit() -> vo
 	assert_eq(b.active_index[0], 2, "替补广寒应在强化波命中后登场")
 
 
-# ---- h06 翼火 神打（命中叠毒素；再次被命中时引爆）----
+# ---- h06 翼火 神打（命中叠毒素；大波命中时引爆）----
 
 func test_h06_shenda_stacks_poison_on_hit() -> void:
 	var b := _battle("h06", 5, 8)
 	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.CHARGE)
 	assert_eq(int(b.get_status(1, 0, "poison", 0)), 1, "翼火命中 → 叠 1 层毒素")
 
-func test_h06_shenda_detonates_on_second_hit() -> void:
-	# 第 1 击：叠毒素（不引爆）；第 2 击：先引爆 1 层（+1 半点）再叠新毒素。
-	var b := _battle("h06", 5, 8)
-	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.CHARGE)   # 10→8，毒=1
-	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.CHARGE)   # 引爆1(+1) + 波2 = -3 → 8→5
-	assert_eq(b.hp[1][0], 5, "第2击引爆1层(0.5)+波(1.0)=1.5 → 10-2-3=5")
-	assert_eq(int(b.get_status(1, 0, "poison", 0)), 1, "引爆后清空、再叠新 1 层")
+func test_h06_shenda_only_big_attack_detonates_stacked_poison() -> void:
+	var b := _battle_teams(
+			["h06", "test_p0_1", "test_p0_2"],
+			["test_p1_0", "test_p1_1", "test_p1_2"], 10, 8)
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.CHARGE)
+	var second_wave: Dictionary = _resolve(
+			b, ActionDef.Action.ATTACK, ActionDef.Action.CHARGE)
+	assert_eq(b.hp[1][0], 16, "连续两次波各造成1点伤害，不得提前引爆毒素")
+	assert_eq(int(b.get_status(1, 0, "poison", 0)), 2, "两次波命中应累积2层毒素")
+	assert_false(_has_event(second_wave, "poison_detonate"), "波命中不再引爆毒素")
+
+	var big_wave: Dictionary = _resolve(
+			b, ActionDef.Action.BIG_ATTACK, ActionDef.Action.CHARGE)
+	assert_eq(b.hp[1][0], 10, "大波2点加2层毒素1点，共造成3点伤害")
+	assert_true(_has_event(big_wave, "poison_detonate"), "大波命中必须引爆全部毒素")
+	assert_eq(int(b.get_status(1, 0, "poison", 0)), 1,
+			"大波先清除旧毒，再由翼火本次命中重新施加1层")
 
 
 # ---- h07 星日 千里自在风（登场 0.5 冲撞）----

@@ -129,13 +129,13 @@ func test_t2_qiubite_control_armor_absorbs() -> void:
 
 # === T2 状态 / 易伤 ===
 
-func test_t2_duyao_poison_detonates_on_hit() -> void:
+func test_t2_duyao_poison_detonates_on_big_attack_hit() -> void:
 	var b := _battle()
 	b.use_item(0, _give(b, 0, "t2_duyao"))
-	b.select_action(0, A.ATTACK)   # 波命中 → 引爆 3 层毒
+	b.select_action(0, A.BIG_ATTACK)   # 大波命中 → 引爆 3 层毒
 	b.select_action(1, A.CHARGE)
 	b.resolve()
-	assert_eq(b.hp[1][0], 15)   # 波 1点 + 3层毒素 1.5点
+	assert_eq(b.hp[1][0], 13)   # 大波 2点 + 3层毒素 1.5点
 	assert_eq(int(b.get_status(1, 0, "poison", 0)), 0)
 
 
@@ -143,10 +143,10 @@ func test_t2_duyao_poison_detonates_when_shield_absorbs_the_attack() -> void:
 	var b := _battle()
 	b.shield[1][0] = 2
 	b.use_item(0, _give(b, 0, "t2_duyao"))
-	b.select_action(0, A.ATTACK)
+	b.select_action(0, A.BIG_ATTACK)
 	b.select_action(1, A.CHARGE)
 	b.resolve()
-	assert_eq(b.hp[1][0], 17, "护甲吸收波的伤害后仍算命中，毒素照常引爆")
+	assert_eq(b.hp[1][0], 15, "护甲吸收部分大波伤害后仍算命中，毒素照常引爆")
 	assert_eq(b.shield[1][0], 0)
 	assert_eq(int(b.get_status(1, 0, "poison", 0)), 0)
 
@@ -169,7 +169,7 @@ func test_t2_duyao_poison_does_not_detonate_from_independent_item_damage() -> vo
 	_resolve_cc(b)
 	assert_eq(b.hp[1][0], 18, "独立道具只造成自身1点伤害，不引爆毒素")
 	assert_eq(int(b.get_status(1, 0, "poison", 0)), 3,
-		"只有波／大波命中才能引爆毒素")
+		"只有大波命中才能引爆毒素")
 
 
 func test_t2_duyao_poison_does_not_detonate_from_skill_or_retaliation_strike() -> void:
@@ -181,7 +181,7 @@ func test_t2_duyao_poison_does_not_detonate_from_skill_or_retaliation_strike() -
 	assert_eq(dealt, 2, "技能或反击伤害仍正常经过伤害管线")
 	assert_eq(b.hp[1][0], 18)
 	assert_eq(int(b.get_status(1, 0, "poison", 0)), 3,
-		"非波／大波的管线打击不算命中，不引爆毒素")
+		"非大波的管线打击不引爆毒素")
 
 
 func test_t2_lieyin_adds_three_persistent_vulnerable_layers() -> void:

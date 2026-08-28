@@ -342,11 +342,11 @@ const _DEF := {
 		script = preload("res://src/battle/items/t3_budongmingwang.gd")},
 	"t3_xumingxiang": {
 		tier = 3, ev = 6, name = "续命香", dim = "防御", role = "遗物", seq = _S_ANY, target = _T_SELF,
-		desc = "本回合起的3回合内，我方出战英雄每回合回复1.5点生命", params = {relic = true, heal = 3, turns = 3, stack_mode = "extend_turns"},
+		desc = "本回合起的3回合内，我方出战英雄每回合回复1.5点生命。", params = {relic = true, heal = 3, turns = 3, stack_mode = "extend_turns"},
 		script = preload("res://src/battle/items/t3_xumingxiang.gd")},
 	"t3_qingyuanbaolian": {
 		tier = 3, ev = 6, name = "青元宝莲", dim = "能量", role = "遗物", seq = _S_ANY, target = _T_SELF,
-		desc = "本回合起的3回合内，我方每回合额外获得1.5点能量", params = {relic = true, energy = 3, turns = 3, stack_mode = "extend_turns"},
+		desc = "本回合起的3回合内，我方每回合额外获得1.5点能量。", params = {relic = true, energy = 3, turns = 3, stack_mode = "extend_turns"},
 		script = preload("res://src/battle/items/t3_qingyuanbaolian.gd")},
 
 	# ========== Phase 3A 纯逻辑件（切换替身 / 强制切换 / 信息博弈）==========
@@ -390,7 +390,7 @@ const _DEF := {
 		script = preload("res://src/battle/items/t3_hedinghong.gd")},
 	"t3_tianluodiwang": {
 		tier = 3, ev = 6, name = "天罗地网", dim = "干扰", role = "一次性", seq = _S_ANY, target = _T_ENEMY,
-		desc = "本回合内，敌方的首件道具和「切换」无效", params = {},
+		desc = "本回合内，敌方的首件道具和「切换」无效。", params = {},
 		script = preload("res://src/battle/items/t3_tianluodiwang.gd")},
 	"t3_mengdie": {
 		tier = 3, ev = 6, name = "梦蝶", dim = "趣味", role = "一次性", seq = _S_ANY, target = _T_SELF,
@@ -643,9 +643,13 @@ static func make(id: String) -> ItemData:
 	return item
 
 
-## 玩家可见的道具说明统一不使用句号。多句说明以分号保留语义停顿，避免删点后粘成一句。
+## 玩家可见说明保留原始句号；防御性补齐漏写的末尾句号，不改写句内标点。
 static func _display_description(raw: String) -> String:
-	return raw.trim_suffix("。").replace("。", "；")
+	var displayed: String = raw.strip_edges()
+	if displayed.is_empty() or displayed.ends_with("。") \
+			or displayed.ends_with("！") or displayed.ends_with("？"):
+		return displayed
+	return displayed + "。"
 
 
 ## 指定 tier 的全部件（玩家显示顺序）。

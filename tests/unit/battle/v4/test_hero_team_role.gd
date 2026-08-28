@@ -73,8 +73,8 @@ func test_h06_published_data_matches_approved_redesign() -> void:
 	assert_eq(h.team_role, "进攻", "翼火的主定位应为进攻")
 	assert_eq(h.skill_description, "神打", "翼火应使用已定稿技能名")
 	assert_eq(h.skill_detail,
-		"翼火【蛇】命中敌方英雄时，使其获得1层毒素。\n毒素：可叠加。中毒英雄再次被「波」或「大波」命中时，引爆并清除全部毒素，每层造成0.5点伤害。",
-		"翼火文案应使用已定稿的毒素与引爆术语")
+		"翼火【蛇】命中敌方英雄时，使其获得1层毒素。",
+		"翼火英雄文案只说明产毒条件，引爆规则统一交给效果图鉴")
 
 
 func test_h15_published_data_matches_approved_redesign() -> void:
@@ -155,6 +155,15 @@ func test_h19_published_data_matches_damage_transfer_rule() -> void:
 	assert_eq(h.skill_detail,
 		"乌骓【马】攻击命中时，目标最多受到1点伤害；溢出伤害转移给生命最高的另一名存活敌方英雄。",
 		"乌骓短文案应准确说明伤害守恒与确定性转移目标")
+
+
+func test_h20_published_data_matches_next_turn_vulnerability_rule() -> void:
+	var h := load("res://assets/data/heroes/h20.tres") as HeroData
+	assert_not_null(h, "h20 数据资源必须可加载")
+	assert_eq(h.skill_description, "罪已昭")
+	assert_eq(h.skill_detail,
+		"触邪【羊】攻击命中敌方英雄时，直到下回合结束，使其获得脆弱。",
+		"触邪文案必须明确脆弱只维持到紧接的下一回合结束")
 
 
 func test_h23_published_data_matches_approved_redesign() -> void:

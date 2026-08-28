@@ -377,6 +377,46 @@ func get_status(player: int, slot: int, key: String, default: Variant = null) ->
 func set_status(player: int, slot: int, key: String, value: Variant) -> void:
 	statuses[player][slot][key] = value
 
+
+## 罪已昭只记录并回收自己实际补上的脆弱层数，避免到期时误删猎物印记等其他来源。
+func apply_h20_vulnerability(player: int, slot: int, amount: int = 1) -> void:
+	if player < 0 or player >= statuses.size() \
+			or slot < 0 or slot >= statuses[player].size() or amount <= 0:
+		return
+	var current: int = int(get_status(player, slot, "vuln", 0))
+	var contribution: int = int(get_status(player, slot, "h20_vuln_contribution", 0))
+	if current < amount:
+		contribution += amount - current
+		set_status(player, slot, "vuln", amount)
+	set_status(player, slot, "h20_vuln_contribution", contribution)
+	set_status(player, slot, "h20_vuln_until_turn", turn_number + 1)
+
+
+func clear_vulnerability(player: int, slot: int) -> void:
+	(statuses[player][slot] as Dictionary).erase("vuln")
+	(statuses[player][slot] as Dictionary).erase("h20_vuln_contribution")
+	(statuses[player][slot] as Dictionary).erase("h20_vuln_until_turn")
+
+
+func _expire_h20_vulnerabilities(events: Array) -> void:
+	for side in [0, 1]:
+		for slot in range(statuses[side].size()):
+			var until_turn: int = int(get_status(side, slot, "h20_vuln_until_turn", -1))
+			if until_turn < 0 or until_turn > turn_number:
+				continue
+			var contribution: int = maxi(0, int(get_status(
+					side, slot, "h20_vuln_contribution", 0)))
+			var remaining: int = maxi(0, int(get_status(side, slot, "vuln", 0)) - contribution)
+			(statuses[side][slot] as Dictionary).erase("h20_vuln_contribution")
+			(statuses[side][slot] as Dictionary).erase("h20_vuln_until_turn")
+			if remaining > 0:
+				set_status(side, slot, "vuln", remaining)
+			else:
+				(statuses[side][slot] as Dictionary).erase("vuln")
+			if contribution > 0:
+				events.append({id = "h20_vulnerability_expired", player = side, slot = slot})
+
+
 func active_hero(player: int) -> HeroData:
 	return heroes[player][active_index[player]]
 
@@ -1571,7 +1611,10 @@ func clear_pending_hit_skill_effects() -> int:
 		for slot in range(statuses[side].size()):
 			for key in ["poison", "jianqi", "vuln"]:
 				if int(get_status(side, slot, key, 0)) > 0:
-					(statuses[side][slot] as Dictionary).erase(key)
+					if key == "vuln":
+						clear_vulnerability(side, slot)
+					else:
+						(statuses[side][slot] as Dictionary).erase(key)
 					cleared += 1
 	return cleared
 
@@ -2210,8 +2253,7 @@ func _resolve_borrowed_marks(player: int, context: Dictionary, events: Array) ->
 				set_status(player, slot, "jianqi", mini(4, int(
 					get_status(player, slot, "jianqi", 0)) + 1))
 			"h20":
-				set_status(target_player, target_slot, "vuln", maxi(1, int(
-					get_status(target_player, target_slot, "vuln", 0))))
+				apply_h20_vulnerability(target_player, target_slot)
 			_:
 				continue
 		events.append({id = "borrowed_mark", player = player, slot = slot,
@@ -4247,6 +4289,8 @@ func resolve() -> Dictionary:
 				sk.on_resolve_end(self, p, s)
 
 	# Phase 6: cleanup
+	# 罪已昭覆盖施加回合与紧接的下一回合；若下一回合再次命中，会在此之前刷新期限。
+	_expire_h20_vulnerabilities(events)
 	# 遗物·Phase 6：每回合末 tick（产出/计数/充能；读 selected_action 判断本回合是否攻击）。
 	#   返回 false 的遗物移除（碎/耗尽）。在被动能量前结算，故遗物产能也享受不到/不影响被动。
 	for p in [0, 1]:
@@ -4500,7 +4544,7 @@ func _perform_switch(player: int, from_slot: int, to_slot: int, events: Array,
 		opp_active.on_enemy_switch_out(from_slot, self, opp, active_index[opp])
 
 	active_index[player] = to_slot
-	set_status(player, from_slot, "vuln", 0)   # 罪已昭（触邪 h20）：脆弱随出战英雄换下场清除
+	clear_vulnerability(player, from_slot)   # 脆弱随出战英雄换下场清除，并同步清理罪已昭期限
 	events.append({id = "switch", player = player, from_to = [from_slot, to_slot]})
 	var switches: Array = item_buffs[player].get("actual_switches_this_turn", [])
 	switches.append({from = from_slot, to = to_slot})
@@ -4776,7 +4820,7 @@ func strike(target_player: int, raw: int, attacker_player: int, pen: int, events
 	return _apply_damage(target_player, raw, attacker_player, ActionDef.Action.ATTACK, pen, ActionDef.Action.CHARGE, events)
 
 
-## 伤害管线 (§D4)：防御门 → 攻击命中时引爆毒素 → 受伤 hook(平减) → 护甲 → 落 HP → on-hit 触发。
+## 伤害管线 (§D4)：防御门 → 大波命中时引爆毒素 → 受伤 hook(平减) → 护甲 → 落 HP → on-hit 触发。
 ## 返回实际落在 HP 上的伤害（半点），供攻击型主动技回调使用。
 ## src = 本次伤害的来源标签（"action"=动作攻击/技能·"item"=独立道具伤害）。
 ## 只有 is_base_attack=true 的「波／大波」穿过防御门后才算命中并结算命中效果；
@@ -4923,9 +4967,9 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		set_item_mod(target_player, "next_damage_redirect", 0)
 	outcome["connected"] = true
 	var dmg := raw
-	# Stage B3a: 毒素只由「波／大波」穿过防御门时引爆；独立道具、主动技、追击均不引爆。
+	# Stage B3a: 毒素只由「大波」穿过防御门时引爆；波、独立道具、主动技与追击均不引爆。
 	var poison: int = int(get_status(target_player, slot, "poison", 0))
-	if poison > 0 and is_base_attack:
+	if poison > 0 and is_base_attack and atk_action == ActionDef.Action.BIG_ATTACK:
 		dmg += poison
 		# 遗物·毒爆 hook：本方遗物在此追加毒爆伤害（鹤顶红 = +1.0）。A4：由 core 硬编码搬入遗物 effect。
 		for relic in relics[attacker_player]:
@@ -4946,7 +4990,7 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		dmg += marked
 		statuses[target_player][slot].erase("marked")
 		events.append({id = "marked_hit", player = target_player, slot = slot, amount = marked})
-	# 罪已昭（触邪 h20·持续脆弱）：目标受到的伤害 +N（不消耗·换下场清；施加那次由触邪 on_deal_hit 记 proc）
+	# 罪已昭（触邪 h20·限时脆弱）：目标受到的伤害 +N（不消耗；到期或换下场清）。
 	var vuln: int = int(get_status(target_player, slot, "vuln", 0))
 	if vuln > 0:
 		dmg += vuln

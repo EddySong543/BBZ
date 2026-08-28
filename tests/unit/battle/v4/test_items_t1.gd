@@ -8,7 +8,10 @@ const SEED := 777
 
 
 func _display_desc(raw: String) -> String:
-	return raw.trim_suffix("。").replace("。", "；")
+	var displayed := raw.strip_edges()
+	if displayed.ends_with("。") or displayed.ends_with("！") or displayed.ends_with("？"):
+		return displayed
+	return displayed + "。"
 
 
 func _hero(id: String, hp_value: int = 10) -> HeroData:

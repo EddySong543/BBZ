@@ -122,7 +122,7 @@ static func _status_assets(b: BattleCore, p: int) -> float:
 		if b.hp[e][s2] <= 0:
 			continue
 		t += 8.0 * float(b.get_status(e, s2, "poison", 0))             # 毒层（命中引爆）
-		t += 6.0 * float(b.get_status(e, s2, "vuln", 0))               # 罪已昭脆弱（持续·换下场才清）
+		t += 6.0 * float(b.get_status(e, s2, "vuln", 0))               # 脆弱（罪已昭限时；道具来源可持续）
 		t += 8.0 * float(b.get_status(e, s2, "marked", 0))             # 猎物印记（本回合一次性易伤·命中兑现）
 		t += 5.0 * float(b.get_status(e, s2, "broken_armor", 0))       # 破甲（下次防御失效）
 		t += 10.0 * minf(float(b.get_status(e, s2, "silenced", 0)), 2.0)  # 沉默（unique 停摆/回合）

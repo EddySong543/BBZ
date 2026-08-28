@@ -9,7 +9,7 @@ const EFFECTS: Array[Dictionary] = [
 		"id": &"bonus_effect",
 		"name": "附加效果",
 		"icon_path": "res://assets/ui/effects/bonus_effect.png",
-		"description": "一次攻击除了造成伤害，还额外触发的效果。额外触发只重复英雄技能；道具附带效果每次攻击最多结算一次。",
+		"description": "像毒素，剑气等都属于附加效果。附加效果只会被「波」或「大波」命中触发，道具无法触发。",
 		"ink": Color("5D3E1F"),
 		"accent": Color("A8783C"),
 		"edge": Color("3D2714"),
@@ -54,7 +54,8 @@ const EFFECTS: Array[Dictionary] = [
 		"id": &"poison",
 		"name": "毒素",
 		"icon_path": "res://assets/ui/effects/poison.png",
-		"description": "可叠加。中毒英雄再次被「波」或「大波」命中时，引爆并清除全部毒素，每层造成 0.5 点伤害。",
+		"description": "可叠加。中毒英雄被「大波」命中时，引爆并清除全部毒素，每层造成 0.5 点伤害。",
+		"show_stack_count": true,
 		"ink": Color("214B36"),
 		"accent": Color("5A9470"),
 		"edge": Color("163424"),
@@ -64,6 +65,7 @@ const EFFECTS: Array[Dictionary] = [
 		"name": "脆弱",
 		"icon_path": "res://assets/ui/effects/vulnerable.png",
 		"description": "受到的伤害增加 0.5 点。",
+		"show_stack_count": true,
 		"ink": Color("6A3030"),
 		"accent": Color("B15F58"),
 		"edge": Color("451F1F"),
@@ -73,10 +75,18 @@ const EFFECTS: Array[Dictionary] = [
 		"name": "剑气",
 		"icon_path": "res://assets/ui/effects/sword_qi.png",
 		"description": "最多积累4点。昴日【鸡】发动「太初万法剑」时消耗全部剑气，每点增加0.5点伤害；2点穿防，4点穿大防。",
+		"show_stack_count": true,
 		"ink": Color("24464B"),
 		"accent": Color("5F8C8F"),
 		"edge": Color("172D30"),
 	},
+]
+
+## 核心状态键与玩家可见效果 id 的唯一适配层；UI 不再散落 poison/vuln/jianqi 判断。
+const BATTLE_STATUS_EFFECTS: Array[Dictionary] = [
+	{"status_key": "poison", "effect_id": &"poison"},
+	{"status_key": "vuln", "effect_id": &"vulnerable"},
+	{"status_key": "jianqi", "effect_id": &"sword_qi"},
 ]
 
 
@@ -96,3 +106,19 @@ static func index_of(effect_id: StringName) -> int:
 		if EFFECTS[index].id == effect_id:
 			return index
 	return -1
+
+
+static func battle_status_entries(status_values: Dictionary) -> Array[Dictionary]:
+	var entries: Array[Dictionary] = []
+	for mapping: Dictionary in BATTLE_STATUS_EFFECTS:
+		var status_key := String(mapping.status_key)
+		var value := int(status_values.get(status_key, 0))
+		if value <= 0:
+			continue
+		var entry := get_by_id(StringName(mapping.effect_id))
+		if entry.is_empty():
+			continue
+		entry["status_key"] = status_key
+		entry["value"] = value
+		entries.append(entry)
+	return entries

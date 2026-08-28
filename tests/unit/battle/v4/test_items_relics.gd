@@ -203,17 +203,17 @@ func test_relic_yemingzhu_switch_in_charges_enemy() -> void:
 # === 鹤顶红：下次毒爆每层额外 +1 ===
 
 func test_relic_hedinghong_amplifies_poison_detonate() -> void:
-	# 持鹤顶红 + 敌出战带 1 层毒 → P0 波命中引爆：波2 + 毒爆1 + 鹤顶红2 = 5 半点。
+	# 持鹤顶红 + 敌出战带 1 层毒 → P0 大波命中引爆：大波4 + 毒爆1 + 鹤顶红2 = 7 半点。
 	var b := _battle()
 	b.use_item(0, _give(b, 0, "t3_hedinghong"))
 	b.set_status(1, 0, "poison", 1)
-	_aa(b, A.ATTACK, A.CHARGE)
-	assert_eq(b.hp[1][0], 15, "鹤顶红：波2 + 毒爆1 + 鹤顶红2 = 5 半点（20→15）")
-	# 对照：无鹤顶红 → 波2 + 毒爆1 = 3 半点
+	_aa(b, A.BIG_ATTACK, A.CHARGE)
+	assert_eq(b.hp[1][0], 13, "鹤顶红：大波4 + 毒爆1 + 鹤顶红2 = 7 半点（20→13）")
+	# 对照：无鹤顶红 → 大波4 + 毒爆1 = 5 半点
 	var base := _battle()
 	base.set_status(1, 0, "poison", 1)
-	base.select_action(0, A.ATTACK)
+	base.select_action(0, A.BIG_ATTACK)
 	base.select_action(1, A.CHARGE)
 	base.resolve()
-	assert_eq(base.hp[1][0], 17, "无鹤顶红：波2 + 毒爆1 = 3 半点（20→17）")
+	assert_eq(base.hp[1][0], 15, "无鹤顶红：大波4 + 毒爆1 = 5 半点（20→15）")
 	assert_eq(base.hp[1][0] - b.hp[1][0], 2, "鹤顶红使每层毒素多扣 2 半点（+1）")
