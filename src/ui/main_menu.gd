@@ -7,6 +7,7 @@ const BP_SCENE := "res://src/ui/bp_screen.tscn"
 const EXPEDITION_SCENE := "res://src/expedition/expedition_screen.tscn"
 const PROFILE_SCENE := "res://src/ui/profile_screen.tscn"
 const BACKPACK_OVERLAY_SCENE := preload("res://src/ui/backpack_screen.tscn")
+const WAREHOUSE_OVERLAY_SCENE := preload("res://src/ui/warehouse_screen.tscn")
 const CODEX_OVERLAY_SCRIPT := preload("res://src/ui/components/battle_codex_overlay.gd")
 const ProfileStore := preload("res://src/core/player_profile.gd")   # 个人资料存档（headless 安全走 preload）
 
@@ -96,6 +97,7 @@ class ModeCarouselGlyph extends Control:
 @onready var _menu_world: MainMenuWorld = $MenuWorld
 
 var _backpack_overlay: BackpackScreen
+var _warehouse_overlay: WarehouseScreen
 var _codex_overlay: Control
 var _primary_mode: int = PrimaryMode.MATCH
 
@@ -107,6 +109,7 @@ func _ready() -> void:
 	_setup_modes()
 	_setup_dock()
 	_setup_backpack_overlay()
+	_setup_warehouse_overlay()
 	_setup_codex_overlay()
 	# 设置面板仍通过既有广播刷新主界面颜色，世界组件只重绘视觉层。
 	add_to_group("wave_flow_bg")
@@ -416,7 +419,7 @@ func _build_net_button() -> void:
 	$UI.add_child(b)
 
 
-## 远征模式入口：四石充能完成后由中央白色光柱直接传送。匹配中不离队。
+## 远征模式入口：四石依次发光并维持各自光柱，随后底部波幕上涌。匹配中不离队。
 func _on_expedition_pressed() -> void:
 	if _match_state != MatchState.IDLE:
 		return
@@ -425,9 +428,10 @@ func _on_expedition_pressed() -> void:
 			MainMenuWorld.PORTAL_ENERGY_GOLD, MainMenuWorld.PORTAL_ACTIVATION_DURATION)
 	if not is_instance_valid(self):
 		return
-	await _menu_world.play_portal_beam(MainMenuWorld.PORTAL_ENERGY_GOLD)
+	await _menu_world.wait_for_portal_beams()
 	if is_instance_valid(self):
-		get_tree().change_scene_to_file(EXPEDITION_SCENE)
+		await TransitionManager.portal_transition_to(
+				EXPEDITION_SCENE, MainMenuWorld.PORTAL_ENERGY_GOLD)
 
 
 ## 「✕ 取消匹配」独立小钮（匹配中才出现·匹配入口正下方居中）。
@@ -499,10 +503,10 @@ func _setup_dock() -> void:
 		$UI/NavBackpack as Button, BACKPACK_ICON_TEX, "背包", false)
 	_setup_square_dock_button(
 		$UI/NavWarehouse as Button, PixelGlyphs.icon_texture("potion"),
-		"仓库（占位）", true)
+		"仓库", true)
 	($UI/NavHeroes as Button).pressed.connect(_on_codex_pressed)
 	($UI/NavBackpack as Button).pressed.connect(_on_backpack_pressed)
-	($UI/NavWarehouse as Button).pressed.connect(_on_warehouse_placeholder_pressed)
+	($UI/NavWarehouse as Button).pressed.connect(_on_warehouse_pressed)
 
 
 func get_bottom_ui_layout_contract() -> Dictionary:
@@ -530,15 +534,18 @@ func get_bottom_ui_layout_contract() -> Dictionary:
 	}
 
 
-func _on_warehouse_placeholder_pressed() -> void:
-	_flash_dock_button($UI/NavWarehouse as Button)
-
-
 func _setup_backpack_overlay() -> void:
 	_backpack_overlay = BACKPACK_OVERLAY_SCENE.instantiate() as BackpackScreen
 	_backpack_overlay.name = "BackpackOverlay"
 	add_child(_backpack_overlay)
 	_backpack_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+
+func _setup_warehouse_overlay() -> void:
+	_warehouse_overlay = WAREHOUSE_OVERLAY_SCENE.instantiate() as WarehouseScreen
+	_warehouse_overlay.name = "WarehouseOverlay"
+	add_child(_warehouse_overlay)
+	_warehouse_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 
 func _setup_codex_overlay() -> void:
@@ -634,6 +641,8 @@ func _on_codex_pressed() -> void:
 		return
 	if _backpack_overlay.visible:
 		_backpack_overlay.close()
+	if _warehouse_overlay.visible:
+		_warehouse_overlay.close()
 	if _codex_overlay.visible:
 		_codex_overlay.call("close")
 	else:
@@ -645,7 +654,19 @@ func _on_backpack_pressed() -> void:
 		return
 	if _codex_overlay.visible:
 		_codex_overlay.call("close")
+	if _warehouse_overlay.visible:
+		_warehouse_overlay.close()
 	_backpack_overlay.open()
+
+
+func _on_warehouse_pressed() -> void:
+	if _match_state != MatchState.IDLE:
+		return
+	if _codex_overlay.visible:
+		_codex_overlay.call("close")
+	if _backpack_overlay.visible:
+		_backpack_overlay.close()
+	_warehouse_overlay.open()
 
 
 # ============================================================
@@ -708,7 +729,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 # ============================================================
-# 匹配状态机：正计时 → 四石连接完成 → 中央白色光柱传送
+# 匹配状态机：正计时 → 四石连接完成 → 四束光柱 → 底部波幕传送
 # ============================================================
 
 func _start_search() -> void:
@@ -747,16 +768,17 @@ func _process(delta: float) -> void:
 		_on_match_found()
 
 
-## 匹配成功：四石连接后由中央白色光柱直接传送进备战，不再调用波幕。
+## 匹配成功：第四石接入并与前三束共同维持，再由底部波幕传送进备战。
 func _on_match_found() -> void:
 	_match_state = MatchState.FOUND
 	_menu_world.complete_portal_connection(MainMenuWorld.PORTAL_ENERGY_BLUE)
 	_set_match_button_status("已找到", "")
 	_show_cancel_button(false)
 	_flash_dock_button(_match_entry)
-	await _menu_world.play_portal_beam(MainMenuWorld.PORTAL_ENERGY_BLUE)
+	await _menu_world.wait_for_portal_beams()
 	if is_instance_valid(self):
-		get_tree().change_scene_to_file(BP_SCENE)
+		await TransitionManager.portal_transition_to(
+				BP_SCENE, MainMenuWorld.PORTAL_ENERGY_BLUE)
 
 
 ## 匹配中远征入口压暗禁点；底栏与设置保持可用。

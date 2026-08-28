@@ -61,6 +61,28 @@ func test_click_route_chains_straight_steps_before_a_full_stop() -> void:
 		movement.process(1.0 / 60.0)
 	assert_eq(movement.current_cell, Vector2i(5, 2))
 	assert_false(movement.route_active)
+	assert_true(movement.is_motion_settled())
+
+
+func test_motion_settled_rejects_pending_route_before_visual_motion_starts() -> void:
+	_committed_cell = Vector2i(2, 2)
+	var movement: GridMovementController = GridMovementControllerScript.new()
+	movement.configure(
+			_committed_cell, Rect2i(Vector2i.ZERO, Vector2i(8, 8)),
+			120.0, Vector2(-44.0, -66.0), _can_enter, _commit)
+	assert_true(movement.is_motion_settled())
+	assert_true(movement.request_path(Vector2i(3, 2)))
+	assert_false(movement.is_moving(),
+			"路径刚获批但尚未process时，视觉坐标还没有开始变化")
+	assert_false(movement.is_motion_settled(),
+			"待启动路径同样必须拦住缩放，不能漏掉首帧竞态")
+	movement.process(1.0 / 60.0)
+	assert_true(movement.is_moving())
+	assert_false(movement.is_motion_settled())
+	for _frame: int in 360:
+		movement.process(1.0 / 60.0)
+	assert_true(movement.is_motion_settled(),
+			"路径与视觉跟随全部结束后才重新允许缩放")
 
 
 func test_click_route_chains_a_turn_without_waiting_for_full_settle() -> void:

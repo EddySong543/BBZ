@@ -3,7 +3,7 @@ extends Control
 
 ## 参考ref44外形与配色的240×135低分辨率程序化光柱，经8倍最近邻放大。
 ## 淡紫光晕、深紫实体边、粉紫主体与象牙白亮核组成一条连续收束柱体；
-## 九格底部爆发仍独立覆盖传送阵。不使用shader、外部纹理或逐帧动画素材。
+## 底部爆发严格覆盖调用方配置的石头格。不使用shader、外部纹理或逐帧动画素材。
 
 const DESIGN_SIZE := Vector2i(1920, 1080)
 const INTEGER_SCALE: int = 8
@@ -627,7 +627,7 @@ func get_visual_contract() -> Dictionary:
 				_core_progress()))),
 		"profile_spans_portal_width": body_rect.size.x * INTEGER_SCALE \
 				>= portal_base_rect.size.x,
-		"base_spans_nine_cells": covered_base.encloses(portal_base_rect),
+		"base_spans_configured_rect": covered_base.encloses(portal_base_rect),
 		"column_progress": column_progress,
 		"core_progress": _core_progress(),
 		"visible_upward_stream_count": visible_streams,

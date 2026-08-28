@@ -4,6 +4,9 @@ class_name BackpackGridView
 ## ref43 规则的背包格面：背包本体就是容器，物品稀有度底色只填充实际占格。
 
 signal cell_pressed(index: int)
+signal item_drop_requested(
+		source_container: String, source_index: int,
+		target_container: String, target_index: int, grab_offset: Vector2i)
 
 const ItemCatalogScript := preload("res://src/battle/item_catalog.gd")
 const GRID_FILL := Color("211713")
@@ -17,11 +20,15 @@ const ITEM_SHADOW := Color(0.02, 0.01, 0.0, 0.68)
 
 @export_range(1, 12, 1) var rows: int = 6
 @export_range(1, 12, 1) var columns: int = 6
+@export var container_id: String = ""
 
 var item_ids: Array[String] = []
 var placements: Array = []
 var _cell_to_placement: Dictionary = {}
 var _hovered_cell: int = -1
+var _pressed_cell: int = -1
+var _drag_started: bool = false
+var _suppress_click_release: bool = false
 
 
 func _ready() -> void:
@@ -54,6 +61,16 @@ func item_name_at(index: int) -> String:
 	if placement.is_empty():
 		return "空格"
 	return String((placement.get("item", {}) as Dictionary).get("name", "空格"))
+
+
+func placement_at_index(index: int) -> Dictionary:
+	return _placement_at_index(index)
+
+
+func cell_vector(index: int) -> Vector2i:
+	if index < 0 or index >= rows * columns:
+		return Vector2i(-1, -1)
+	return Vector2i(index % columns, index / columns)
 
 
 func occupied_cell_count() -> int:
@@ -122,11 +139,66 @@ func _gui_input(event: InputEvent) -> void:
 			queue_redraw()
 	elif event is InputEventMouseButton:
 		var mouse_event := event as InputEventMouseButton
-		if mouse_event.button_index == MOUSE_BUTTON_LEFT and mouse_event.pressed:
-			var index := _cell_at(mouse_event.position)
-			if index >= 0:
-				cell_pressed.emit(index)
-				accept_event()
+		if mouse_event.button_index != MOUSE_BUTTON_LEFT:
+			return
+		var index := _cell_at(mouse_event.position)
+		if mouse_event.pressed:
+			_pressed_cell = index
+			_drag_started = false
+			_suppress_click_release = false
+		elif index >= 0 and index == _pressed_cell and not _suppress_click_release:
+			cell_pressed.emit(index)
+			accept_event()
+		_pressed_cell = -1
+
+
+func _get_drag_data(local_position: Vector2) -> Variant:
+	var source_index := _cell_at(local_position)
+	var placement := _placement_at_index(source_index)
+	if source_index < 0 or placement.is_empty():
+		return null
+	_drag_started = true
+	_suppress_click_release = true
+	var anchor := Vector2i(placement.get("anchor", Vector2i.ZERO))
+	var source_cell := cell_vector(source_index)
+	var item := placement.get("item", {}) as Dictionary
+	var preview := Label.new()
+	preview.text = String(item.get("name", "道具"))
+	preview.add_theme_color_override("font_color", Color("F2D9A7"))
+	preview.add_theme_color_override("font_outline_color", Color("24150E"))
+	preview.add_theme_constant_override("outline_size", 4)
+	FontManager.apply(preview, 18)
+	set_drag_preview(preview)
+	return {
+		"kind": "inventory_item",
+		"source_container": container_id,
+		"source_index": source_index,
+		"grab_offset": source_cell - anchor,
+	}
+
+
+func _can_drop_data(local_position: Vector2, data: Variant) -> bool:
+	return data is Dictionary \
+			and String((data as Dictionary).get("kind", "")) == "inventory_item" \
+			and _cell_at(local_position) >= 0
+
+
+func _drop_data(local_position: Vector2, data: Variant) -> void:
+	if not _can_drop_data(local_position, data):
+		return
+	var payload := data as Dictionary
+	item_drop_requested.emit(
+			String(payload.get("source_container", "")),
+			int(payload.get("source_index", -1)),
+			container_id,
+			_cell_at(local_position),
+			Vector2i(payload.get("grab_offset", Vector2i.ZERO)))
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_DRAG_END:
+		_drag_started = false
+		_pressed_cell = -1
 
 
 func _cell_at(local_position: Vector2) -> int:

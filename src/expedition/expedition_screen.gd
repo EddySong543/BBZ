@@ -14,6 +14,8 @@ signal movement_finished(cell: Vector2i, completed: bool)
 
 const MapState := preload("res://src/expedition/expedition_map_state.gd")
 const GridMovementControllerScript := preload("res://src/expedition/grid_movement_controller.gd")
+const GridViewZoomControllerScript := preload(
+		"res://src/expedition/grid_view_zoom_controller.gd")
 const GridPathfinderScript := preload("res://src/expedition/grid_pathfinder.gd")
 const GridRoutePreviewScript := preload("res://src/expedition/grid_route_preview.gd")
 const QingfengLayout := preload("res://src/expedition/maps/qingfeng_ricefield_layout.gd")
@@ -29,6 +31,8 @@ const GROUND_CELL_SHADER := preload("res://assets/shaders/canvas_ui_expedition_g
 const GRID_TARGET_OUTLINE_SHADER := preload(
 		"res://assets/shaders/canvas_ui_grid_target_outline.gdshader")
 const ATMOSPHERE_SHADER := preload("res://assets/shaders/canvas_ui_qingfeng_atmosphere.gdshader")
+const VISION_SHADOW_SHADER := preload(
+		"res://assets/shaders/canvas_ui_pve_vision_shadow.gdshader")
 const JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")           # 按钮果冻底（与战斗/道具弹窗同语言）
 const ITEM_CELL_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")    # 道具格底（与 PvP 道具格同源·圆角径向渐变）
 const GOLDEN_WAVE_GROUND_TEXTURE := preload("res://assets/tilesets/qingfeng_ricefield/golden_wave_ground_v1.png")
@@ -36,18 +40,20 @@ const QINGFENG_VISUAL_MAP_SCENE := preload("res://src/expedition/maps/qingfeng_r
 
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
 
-# ── 布局（1920×1080·临时完整19×11视窗 / 32×18 晴风稻田）──
-# 逻辑格仍为120px，屏幕显示为96px；奇数行列让中心3×3严格位于视窗正中。
-# 地图区1824×1056，四周留48/12px边距，不裁半格。
+# ── 布局（1920×1080·31×17 ↔ 15×9 五档视窗 / 32×18 晴风稻田）──
+# 静止档位只显示完整格；短促过渡中对角色做反向比例补偿，避免横纵拉伸。
+# 奇数行列保证中心3×3严格位于视窗正中，四边既不露兜底色也不裁半格。
 const MAP_CELL: int = 120
-const MAP_VIEW_COLS: int = 19
-const MAP_VIEW_ROWS: int = 11
-const MAP_RENDER_SCALE: float = 0.8
+const MAP_VIEW_COLS: int = 31
+const MAP_VIEW_ROWS: int = 17
+const MAP_RENDER_SCALE := Vector2(16.0 / 31.0, 9.0 / 17.0)
 const MAP_VIEW_SIZE := Vector2(
 		MAP_VIEW_COLS * MAP_CELL, MAP_VIEW_ROWS * MAP_CELL) * MAP_RENDER_SCALE
 const MAP_WORLD_SIZE := Vector2(MapState.WIDTH * MAP_CELL, MapState.HEIGHT * MAP_CELL)
 const MAP_VIEW_WORLD_SIZE := MAP_VIEW_SIZE / MAP_RENDER_SCALE
-const MAP_VIEW_ORIGIN := Vector2(48, 12)
+const MAP_VIEW_ORIGIN := Vector2.ZERO
+const ZOOM_TRANSITION_DURATION: float = 0.15
+const ZOOM_INPUT_BURST_WINDOW: float = 0.055
 # h01 原图双脚是全部 idle 资产的公共骨架基准：左脚(116.5,182)、右脚(139.5,182)。
 # 所有英雄使用同一原图缩放和同一坐标变换，不再被武器、披风或透明轮廓改变大小/锚点。
 const H01_SOURCE_LEFT_FOOT := Vector2(116.5, 182.0)
@@ -59,7 +65,8 @@ const TOKEN_FOOT_ANCHOR := Vector2(104, 156)
 # 落脚线从格底上移到格内75%高度，人物站在格子内部而不是贴住下边。
 const TOKEN_CELL_FOOT_POINT := Vector2(60, 90)
 const TOKEN_OFFSET := TOKEN_CELL_FOOT_POINT - TOKEN_FOOT_ANCHOR
-const TOKEN_RENDER_COMPENSATION: float = 1.0
+const TOKEN_RENDER_COMPENSATION := Vector2(
+		MAP_RENDER_SCALE.y / MAP_RENDER_SCALE.x, 1.0)
 const TOKEN_IDLE_BASE_FPS: float = 8.0
 const TOKEN_IDLE_REF_FRAMES: float = 6.0
 const TOKEN_STEP_LOGICAL_PX: float = GridMovementControllerScript.LOGICAL_PIXEL_STEP
@@ -83,7 +90,7 @@ const BP_CELL: int = 52
 const SEL_PANEL := Rect2(440, 140, 1040, 800)
 
 # ── 色板（§2 令牌：暖骨框 / 暖米白字 / 语义色·全暖色系=Eddy 定·⛔夜色衬底）──
-const COL_BG := Color("0b1c18")            # 选人/浮层之外的兜底色；进图后由19×11地图覆盖
+const COL_BG := Color("0b1c18")            # 选人/浮层之外的兜底色；进图后被地图完全覆盖
 const COL_PANEL := Color("241c12")         # 暖色深底面板
 const COL_TEXT := Color(0.95, 0.91, 0.80)  # 暖米白（禁纯白）
 const COL_TEXT_DIM := Color(0.72, 0.68, 0.58)
@@ -143,9 +150,14 @@ const FOG_EXTENSION_SEAM_PX: float = 2.0
 const PLAYER_SHADOW_BASE_WIDTH: float = 62.0
 const PLAYER_SHADOW_MIN_WIDTH: float = 42.0
 const PLAYER_SHADOW_MAIN_COLOR := Color(0.025, 0.070, 0.050, 0.46)
-const FOG_OF_WAR_ENABLED: bool = true
+const FOG_OF_WAR_ENABLED: bool = false
 const FOG_REVEAL_DURATION: float = 0.46
 const FOG_REVEAL_STAGGER_PER_CELL: float = 0.035
+const VISION_INNER_RADIUS_CELLS: float = 2.5
+const VISION_OUTER_RADIUS_CELLS: float = 4.5
+const VISION_HORIZONTAL_RATIO: float = 1.4
+const VISION_OUTER_ALPHA: float = 0.60
+const VISION_SHADOW_COLOR := Color(0.018, 0.064, 0.055, 1.0)
 
 var map: MapState
 var bp: Backpack
@@ -185,7 +197,7 @@ var test_next_hero_button: Button
 var player_backdrop: Control       # 人物脚底粗像素接触影；不参与跳步
 var player_token: TextureRect      # 英雄 idle 帧 token；静止时不叠加代码摇摆
 var teleport_fx: Control           # 传送点占用态前景动效；必须压在角色之上才不会被头像遮住
-var map_view: Control              # 屏幕空间临时19×11完整正方形格裁切窗口
+var map_view: Control              # 屏幕空间五档完整格裁切窗口
 var map_world: Control             # 32×18 世界容器；由镜头在完整格视窗内跟随
 var ground_art: Control            # 地表：草地、泥土
 var visual_map: Node2D             # Godot 2D面板可直接刷格的分层地图；Ground作为运行时美术数据源
@@ -196,6 +208,8 @@ var field_chaff: GPUParticles2D     # 大型金色稻壳/断叶，位于麦穗�
 var object_art: Control            # 物体：田界、搜索容器
 var atmosphere_layer: ColorRect    # 已清雾地图内的斜向日照与缓慢云影
 var atmosphere_mat: ShaderMaterial
+var vision_shadow_layer: ColorRect # 只表达当前视野，不读取或保存探索历史
+var vision_shadow_mat: ShaderMaterial
 var marker_art: Control            # 标识：搜索目标等运行时状态
 var route_preview_art: Control     # 鼠标悬停目标格与连续交替脚印流
 var route_target_outline: ColorRect
@@ -203,7 +217,7 @@ var route_target_material: ShaderMaterial
 var canvas: Control                # 世界空间地图图签画布
 var bp_canvas: Control             # 屏幕空间背包物品/手持幽灵画布
 
-# ── 地形层（数据纹理驱动·地表/迷雾/揭示全在 shader）──
+# ── 兼容地形层（战争迷雾停用；保留数据结构供旧存档与测试读取）──
 var fx_layer: Control              # 地图动效层（飘字/格闪·压 token 之上·G 任务）
 var terrain_mat: ShaderMaterial
 var _terrain_img: Image            # WIDTH×HEIGHT RGBAF（R=遮挡 G=已清雾 B=散开起始时刻 A=保留）
@@ -227,6 +241,7 @@ var _token_turn_active: bool = false
 var _queued_move_direction: Vector2i = Vector2i.ZERO
 var _click_route_active: bool = false
 var _grid_movement: GridMovementController
+var _view_zoom
 var _hovered_map_cell: Vector2i = Vector2i(-1, -1)
 var _hovered_map_path: Array[Vector2i] = []
 var _wheat_wave_pulses: Array[Dictionary] = []
@@ -238,6 +253,8 @@ var _test_hero_index: int = -1
 
 func _ready() -> void:
 	seed_value = randi() % 1000000
+	_view_zoom = GridViewZoomControllerScript.new()
+	_view_zoom.configure(MAP_VIEW_SIZE, float(MAP_CELL))
 	_build_wheat_wave_runtime_frames()
 	_build_ui()
 	if not BattleSetup.expedition_state.is_empty():
@@ -339,7 +356,7 @@ func _build_map_view() -> void:
 	map_world = Control.new()
 	map_world.name = "MapWorld"
 	map_world.size = MAP_WORLD_SIZE
-	map_world.scale = Vector2.ONE * MAP_RENDER_SCALE
+	map_world.scale = _current_render_scale()
 	map_world.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	map_view.add_child(map_world)
 
@@ -365,10 +382,10 @@ func _build_map_view() -> void:
 	object_art = _make_map_art_layer("ObjectArtLayer", _draw_object_art)
 	_take_visual_map_layer("BlockingObjects")
 	_take_visual_map_layer("Containers")
-	# 柔边迷雾位于物体层上方，让边缘格中的麦穗与搜索目标一起渐隐。
-	# 物体只在 map.revealed 的永久清雾区绘制，不会透过地图迷雾泄露远处目标。
+	# 迷雾兼容层保留在原层级，但正式运行时隐藏；所有地图物件直接绘制。
 	_make_terrain_layer()
 	_build_atmosphere_layer()
+	_build_vision_shadow_layer()
 	marker_art = _make_map_art_layer("MarkerArtLayer", _draw_marker_art)
 	var marker_guides := visual_map.get_node_or_null("MarkerGuides") as TileMapLayer
 	if marker_guides != null:
@@ -416,7 +433,7 @@ func _build_map_view() -> void:
 	player_token.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	player_token.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	player_token.pivot_offset = TOKEN_FOOT_ANCHOR
-	player_token.scale = Vector2.ONE * TOKEN_RENDER_COMPENSATION
+	player_token.scale = _current_token_render_compensation()
 	player_token.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	player_token.visible = false   # 进图（_new_run）才现身
 	map_world.add_child(player_token)
@@ -456,11 +473,12 @@ func _make_map_art_layer(layer_name: String, draw_callback: Callable) -> Control
 	return layer
 
 
-## 正式地形资产上方的迷雾遮罩：数据纹理只控制探明与全屏光影，地表始终可辨。
+## 旧迷雾资源的兼容层；正式远征隐藏该层，不再覆盖地图。
 func _make_terrain_layer() -> void:
 	var t := ColorRect.new()
 	t.name = "TerrainLayer"
 	t.size = MAP_WORLD_SIZE
+	t.visible = FOG_OF_WAR_ENABLED
 	t.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_terrain_img = Image.create(MapState.WIDTH, MapState.HEIGHT, false, Image.FORMAT_RGBAF)
@@ -470,9 +488,11 @@ func _make_terrain_layer() -> void:
 	terrain_mat.set_shader_parameter("map_data", _terrain_tex)
 	terrain_mat.set_shader_parameter("grid_size", Vector2(MapState.WIDTH, MapState.HEIGHT))
 	terrain_mat.set_shader_parameter("cell_px", float(MAP_CELL))
-	terrain_mat.set_shader_parameter("fog_low_color", Color("D6C7A2"))
-	terrain_mat.set_shader_parameter("fog_high_color", Color("F5EBD2"))
-	terrain_mat.set_shader_parameter("unseen_alpha", 0.93)
+	terrain_mat.set_shader_parameter("paper_low_color", Color("D0B47C"))
+	terrain_mat.set_shader_parameter("paper_high_color", Color("E5D39E"))
+	terrain_mat.set_shader_parameter("paper_ink_color", Color("5A422F"))
+	terrain_mat.set_shader_parameter("paper_edge_color", Color("3B2B24"))
+	terrain_mat.set_shader_parameter("unseen_alpha", 1.0)
 	terrain_mat.set_shader_parameter("reveal_duration", FOG_REVEAL_DURATION)
 	t.material = terrain_mat
 	map_world.add_child(t)
@@ -491,7 +511,8 @@ func _build_field_chaff() -> void:
 	field_chaff.local_coords = true
 	field_chaff.fixed_fps = 24
 	field_chaff.texture = null
-	field_chaff.visibility_rect = Rect2(-MAP_VIEW_SIZE * 0.68, MAP_VIEW_SIZE * 1.36)
+	var world_view_size: Vector2 = _current_view_world_size()
+	field_chaff.visibility_rect = Rect2(-world_view_size * 0.68, world_view_size * 1.36)
 	field_chaff.emitting = false
 
 	var atlas_material := CanvasItemMaterial.new()
@@ -505,7 +526,8 @@ func _build_field_chaff() -> void:
 
 	var process_material := ParticleProcessMaterial.new()
 	process_material.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
-	process_material.emission_box_extents = Vector3(MAP_VIEW_SIZE.x * 0.58, MAP_VIEW_SIZE.y * 0.58, 1.0)
+	process_material.emission_box_extents = Vector3(
+			world_view_size.x * 0.58, world_view_size.y * 0.58, 1.0)
 	process_material.direction = Vector3(1.0, -0.16, 0.0)
 	process_material.spread = 16.0
 	process_material.initial_velocity_min = 30.0
@@ -540,7 +562,7 @@ func _build_field_chaff() -> void:
 func _build_atmosphere_layer() -> void:
 	atmosphere_layer = ColorRect.new()
 	atmosphere_layer.name = "AtmosphereLayer"
-	atmosphere_layer.size = MAP_VIEW_WORLD_SIZE
+	atmosphere_layer.size = _current_view_world_size()
 	atmosphere_layer.color = Color.WHITE
 	atmosphere_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	atmosphere_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -549,10 +571,34 @@ func _build_atmosphere_layer() -> void:
 	atmosphere_mat.shader = ATMOSPHERE_SHADER
 	atmosphere_mat.set_shader_parameter("map_data", _terrain_tex)
 	atmosphere_mat.set_shader_parameter("grid_size", Vector2(MapState.WIDTH, MapState.HEIGHT))
-	atmosphere_mat.set_shader_parameter("view_size_px", MAP_VIEW_WORLD_SIZE)
+	atmosphere_mat.set_shader_parameter("view_size_px", _current_view_world_size())
 	atmosphere_mat.set_shader_parameter("cell_px", float(MAP_CELL))
 	atmosphere_layer.material = atmosphere_mat
 	map_world.add_child(atmosphere_layer)
+
+
+func _build_vision_shadow_layer() -> void:
+	vision_shadow_layer = ColorRect.new()
+	vision_shadow_layer.name = "VisionShadowLayer"
+	vision_shadow_layer.size = MAP_WORLD_SIZE
+	vision_shadow_layer.color = Color.WHITE
+	vision_shadow_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vision_shadow_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	vision_shadow_layer.visible = false
+	vision_shadow_mat = ShaderMaterial.new()
+	vision_shadow_mat.shader = VISION_SHADOW_SHADER
+	vision_shadow_mat.set_shader_parameter("world_size_px", MAP_WORLD_SIZE)
+	vision_shadow_mat.set_shader_parameter("cell_px", float(MAP_CELL))
+	vision_shadow_mat.set_shader_parameter(
+			"inner_radius_cells", VISION_INNER_RADIUS_CELLS)
+	vision_shadow_mat.set_shader_parameter(
+			"outer_radius_cells", VISION_OUTER_RADIUS_CELLS)
+	vision_shadow_mat.set_shader_parameter(
+			"horizontal_ratio", VISION_HORIZONTAL_RATIO)
+	vision_shadow_mat.set_shader_parameter("outer_alpha", VISION_OUTER_ALPHA)
+	vision_shadow_mat.set_shader_parameter("shadow_color", VISION_SHADOW_COLOR)
+	vision_shadow_layer.material = vision_shadow_mat
+	map_world.add_child(vision_shadow_layer)
 
 
 func _set_atmosphere_active(active: bool) -> void:
@@ -561,18 +607,36 @@ func _set_atmosphere_active(active: bool) -> void:
 		field_chaff.visible = active
 	if atmosphere_layer != null:
 		atmosphere_layer.visible = active
+	if vision_shadow_layer != null:
+		vision_shadow_layer.visible = active
+	if active and vision_shadow_mat != null:
+		vision_shadow_mat.set_shader_parameter("seed_f", float(seed_value % 977))
+		_sync_vision_shadow_to_player()
 
 
 func _sync_atmosphere_to_camera() -> void:
 	if map_world == null:
 		return
-	var camera_world_origin: Vector2 = -map_world.position / MAP_RENDER_SCALE
+	var render_scale: Vector2 = _current_render_scale()
+	var world_view_size: Vector2 = _current_view_world_size()
+	var camera_world_origin: Vector2 = -map_world.position / render_scale
 	if field_chaff != null:
-		field_chaff.position = camera_world_origin + MAP_VIEW_WORLD_SIZE * 0.5
+		field_chaff.position = camera_world_origin + world_view_size * 0.5
 	if atmosphere_layer != null:
 		atmosphere_layer.position = camera_world_origin
 	if atmosphere_mat != null:
 		atmosphere_mat.set_shader_parameter("camera_world_origin_px", camera_world_origin)
+
+
+func _sync_vision_shadow_to_player() -> void:
+	if vision_shadow_mat == null:
+		return
+	var visual_origin: Vector2 = _camera_visual_token_origin
+	if not _camera_initialized and map != null:
+		visual_origin = _token_origin_for_cell(map.player)
+	var player_center: Vector2 = visual_origin - TOKEN_OFFSET \
+			+ Vector2.ONE * float(MAP_CELL) * 0.5
+	vision_shadow_mat.set_shader_parameter("player_world_px", player_center)
 
 
 ## 背包整理浮层（B 唤出）：背包格 + 拾取区 + 装备栏 + 保险槽/扩容 同屏整理。默认隐藏。
@@ -830,8 +894,8 @@ func _flash_cell(cell: Vector2i, color: Color) -> void:
 
 ## token 惊跳（遇敌"!"）：脚底为轴快速弹一下（scale punch·卡通感）。
 func _token_bump() -> void:
-	var base_scale := Vector2(
-			TOKEN_RENDER_COMPENSATION * _player_facing_sign, TOKEN_RENDER_COMPENSATION)
+	var base_scale := _current_token_render_compensation() \
+			* Vector2(_player_facing_sign, 1.0)
 	var tw := create_tween()
 	tw.tween_property(player_token, "scale", base_scale * 1.14, 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tw.tween_property(player_token, "scale", base_scale, 0.14).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -1102,9 +1166,9 @@ func _is_cell_explored(cell: Vector2i) -> bool:
 	return map != null and map.revealed.has(cell)
 
 
-## 把地图状态写进数据纹理：R=遮挡，G=已清雾，B=本格散开起始时刻，A=保留。
+## 仅在战争迷雾启用时更新旧数据纹理；探索记录本身仍由 MapState 维护。
 func _update_terrain_data() -> void:
-	if map == null or _terrain_img == null:
+	if not FOG_OF_WAR_ENABLED or map == null or _terrain_img == null:
 		return
 	for y: int in MapState.HEIGHT:
 		for x: int in MapState.WIDTH:
@@ -1147,19 +1211,20 @@ func _token_origin_for_cell(player_cell: Vector2i) -> Vector2:
 
 func _camera_world_offset_for_visual(visual_token_origin: Vector2) -> Vector2:
 	var rendered_origin: Vector2 = _quantize_world_pixel(visual_token_origin)
+	var render_scale: Vector2 = _current_render_scale()
 	var rendered_cell_center: Vector2 = (
 			rendered_origin - TOKEN_OFFSET + Vector2.ONE * MAP_CELL * 0.5)
 	var desired_offset: Vector2 = (
 			MAP_VIEW_SIZE * 0.5
-			- rendered_cell_center * MAP_RENDER_SCALE)
+			- rendered_cell_center * render_scale)
 	var extension_rect: Rect2 = _camera_extension_world_rect()
 	return Vector2(
 			_camera_axis_offset(desired_offset.x, MAP_VIEW_SIZE.x,
-					extension_rect.position.x * MAP_RENDER_SCALE,
-					extension_rect.end.x * MAP_RENDER_SCALE),
+					extension_rect.position.x * render_scale.x,
+					extension_rect.end.x * render_scale.x),
 			_camera_axis_offset(desired_offset.y, MAP_VIEW_SIZE.y,
-					extension_rect.position.y * MAP_RENDER_SCALE,
-					extension_rect.end.y * MAP_RENDER_SCALE)
+					extension_rect.position.y * render_scale.y,
+					extension_rect.end.y * render_scale.y)
 	).round()
 
 
@@ -1205,6 +1270,7 @@ func _apply_camera_visual_position() -> void:
 	_set_player_visual_origin(rendered_origin)
 	map_world.position = _camera_world_offset_for_visual(rendered_origin)
 	_sync_atmosphere_to_camera()
+	_sync_vision_shadow_to_player()
 
 
 func _set_player_visual_origin(origin: Vector2) -> void:
@@ -1290,9 +1356,7 @@ func _token_scale_at_step_progress(progress: float) -> Vector2:
 		lift = 1.0 + sin(progress * PI) * 0.05
 		squeeze = round(squeeze / TOKEN_TURN_SCALE_STEP) * TOKEN_TURN_SCALE_STEP
 		lift = round(lift / TOKEN_TURN_SCALE_STEP) * TOKEN_TURN_SCALE_STEP
-	return Vector2(
-			TOKEN_RENDER_COMPENSATION * squeeze * facing_sign,
-			TOKEN_RENDER_COMPENSATION * lift)
+	return _current_token_render_compensation() * Vector2(squeeze * facing_sign, lift)
 
 
 func _finish_token_step_visuals() -> void:
@@ -1302,9 +1366,8 @@ func _finish_token_step_visuals() -> void:
 	_token_step_active = false
 	if player_token != null:
 		player_token.rotation = 0.0
-		player_token.scale = Vector2(
-				TOKEN_RENDER_COMPENSATION * _player_facing_sign,
-				TOKEN_RENDER_COMPENSATION)
+		player_token.scale = _current_token_render_compensation() * Vector2(
+				_player_facing_sign, 1.0)
 
 
 func _token_step_rotation_at(progress: float) -> float:
@@ -1339,8 +1402,9 @@ func _camera_is_moving() -> bool:
 func _process(delta: float) -> void:
 	_anim_time += delta
 	_prune_wheat_wave_pulses()
+	_advance_view_zoom(delta)
 	_step_camera_follow(delta)
-	if terrain_mat != null:
+	if FOG_OF_WAR_ENABLED and terrain_mat != null:
 		terrain_mat.set_shader_parameter("anim_time", _anim_time)
 	if atmosphere_mat != null:
 		atmosphere_mat.set_shader_parameter("anim_time", _anim_time)
@@ -1349,7 +1413,8 @@ func _process(delta: float) -> void:
 		if _token_step_active:
 			if _legacy_state_tracks_shared_controller():
 				player_token.rotation = _grid_movement.token_rotation()
-				player_token.scale = _grid_movement.token_scale(TOKEN_RENDER_COMPENSATION)
+				player_token.scale = _grid_movement.token_scale() \
+						* _current_token_render_compensation()
 			else:
 				var step_progress: float = _token_step_progress_at(
 						_camera_visual_token_origin)
@@ -1695,7 +1760,8 @@ func _draw_marker_art() -> void:
 ## 单层椭圆脚影；跳步抬起时只收窄、变淡，不改变基础轮廓类型。
 func _draw_player_backdrop() -> void:
 	var lift: float = _player_shadow_lift()
-	var width: float = _player_shadow_width_at_lift(lift)
+	var width: float = _player_shadow_width_at_lift(lift) \
+			* _current_token_render_compensation().x
 	var height: float = round(lerpf(12.0, 8.0, lift))
 	var opacity: float = lerpf(1.0, 0.52, lift)
 	var center := TOKEN_CELL_FOOT_POINT + Vector2(
@@ -1719,7 +1785,7 @@ func _player_shadow_width_at_lift(lift: float) -> float:
 	return round(width * 0.5) * 2.0
 
 
-## 世界画布绘制（地表/迷雾=TerrainLayer shader；本层只画地图图签与落脚反馈）。
+## 世界画布绘制；地表由资产层负责，本层只保留地图图签与落脚反馈入口。
 func _draw_canvas() -> void:
 	pass
 
@@ -1868,6 +1934,14 @@ func _on_map_view_gui_input(event: InputEvent) -> void:
 	if not (event is InputEventMouseButton):
 		return
 	var mouse_button := event as InputEventMouseButton
+	if mouse_button.pressed and mouse_button.button_index in [
+			MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+		if _can_change_view_zoom() and _view_zoom.request_zoom(
+				mouse_button.button_index == MOUSE_BUTTON_WHEEL_UP):
+			_apply_view_zoom_projection()
+			_clear_map_route_preview()
+		map_view.accept_event()
+		return
 	if not mouse_button.pressed or mouse_button.button_index != MOUSE_BUTTON_LEFT:
 		return
 	if map == null or map.over or select_overlay.visible or bp_overlay.visible or dialog.visible:
@@ -1958,7 +2032,8 @@ func _cell_from_map_view_position(view_position: Vector2) -> Vector2i:
 func _raw_cell_from_map_view_position(view_position: Vector2) -> Vector2i:
 	if map_world == null:
 		return Vector2i(-1, -1)
-	var world_position: Vector2 = (view_position - map_world.position) / MAP_RENDER_SCALE
+	var world_position: Vector2 = (
+			view_position - map_world.position) / _current_render_scale()
 	var cell := Vector2i(floori(world_position.x / MAP_CELL), floori(world_position.y / MAP_CELL))
 	return cell if Rect2i(Vector2i.ZERO,
 			Vector2i(MapState.WIDTH, MapState.HEIGHT)).has_point(cell) else Vector2i(-1, -1)
@@ -1966,7 +2041,88 @@ func _raw_cell_from_map_view_position(view_position: Vector2) -> Vector2i:
 
 func _map_view_position_for_cell(cell: Vector2i) -> Vector2:
 	return map_world.position + (Vector2(cell) + Vector2.ONE * 0.5) \
-			* float(MAP_CELL) * MAP_RENDER_SCALE
+			* float(MAP_CELL) * _current_render_scale()
+
+
+func get_zoom_contract() -> Dictionary:
+	if _view_zoom == null:
+		return {
+			"grid_presets": [Vector2i(MAP_VIEW_COLS, MAP_VIEW_ROWS)],
+			"current_grid": Vector2i(MAP_VIEW_COLS, MAP_VIEW_ROWS),
+			"closest_grid": Vector2i(MAP_VIEW_COLS, MAP_VIEW_ROWS),
+			"transition_duration": ZOOM_TRANSITION_DURATION,
+			"transition_active": false,
+			"instant_switch": false,
+			"input_burst_window": ZOOM_INPUT_BURST_WINDOW,
+		}
+	return _view_zoom.get_contract()
+
+
+func _current_render_scale() -> Vector2:
+	return _view_zoom.current_scale if _view_zoom != null else MAP_RENDER_SCALE
+
+
+func _current_view_world_size() -> Vector2:
+	return MAP_VIEW_SIZE / _current_render_scale()
+
+
+func _current_token_render_compensation() -> Vector2:
+	var render_scale: Vector2 = _current_render_scale()
+	return Vector2(render_scale.y / render_scale.x, 1.0)
+
+
+func _advance_view_zoom(delta: float) -> void:
+	if _view_zoom != null and _view_zoom.advance(delta):
+		_apply_view_zoom_projection()
+
+
+func _can_change_view_zoom() -> bool:
+	return map != null and not map.over and not select_overlay.visible \
+			and not bp_overlay.visible and not dialog.visible \
+			and _view_zoom != null
+
+
+func _apply_view_zoom_projection() -> void:
+	if map_world == null:
+		return
+	map_world.scale = _current_render_scale()
+	var world_view_size: Vector2 = _current_view_world_size()
+	if atmosphere_layer != null:
+		atmosphere_layer.size = world_view_size
+	if atmosphere_mat != null:
+		atmosphere_mat.set_shader_parameter("view_size_px", world_view_size)
+	if field_chaff != null:
+		field_chaff.visibility_rect = Rect2(
+				-world_view_size * 0.68, world_view_size * 1.36)
+		var process_material := field_chaff.process_material as ParticleProcessMaterial
+		if process_material != null:
+			process_material.emission_box_extents = Vector3(
+					world_view_size.x * 0.58, world_view_size.y * 0.58, 1.0)
+	_sync_player_token_scale_for_zoom()
+	if player_backdrop != null:
+		player_backdrop.queue_redraw()
+	if map != null:
+		if _grid_movement == null:
+			_update_map_camera()
+		else:
+			_apply_camera_visual_position()
+	else:
+		_sync_atmosphere_to_camera()
+
+
+func _sync_player_token_scale_for_zoom() -> void:
+	if player_token == null:
+		return
+	if _token_step_active:
+		if _legacy_state_tracks_shared_controller():
+			player_token.scale = _grid_movement.token_scale() \
+					* _current_token_render_compensation()
+		else:
+			player_token.scale = _token_scale_at_step_progress(
+					_token_step_progress_at(_camera_visual_token_origin))
+	else:
+		player_token.scale = _current_token_render_compensation() \
+				* Vector2(_player_facing_sign, 1.0)
 
 
 func _unhandled_input(event: InputEvent) -> void:

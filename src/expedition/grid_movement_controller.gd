@@ -173,6 +173,13 @@ func is_moving() -> bool:
 			> SNAP_DISTANCE * SNAP_DISTANCE
 
 
+## True only when no committed, queued, or visually settling movement remains.
+func is_motion_settled() -> bool:
+	return initialized and not route_active and not step_active and not is_moving() \
+			and _keyboard_buffered_direction == Vector2i.ZERO \
+			and not _keyboard_finish_pending
+
+
 func token_origin_for_cell(cell: Vector2i) -> Vector2:
 	return Vector2(cell) * cell_size + token_offset
 

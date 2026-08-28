@@ -27,6 +27,8 @@ func test_ref44_beam_uses_connected_purple_outline_and_ivory_core() -> void:
 	assert_eq(contract["core_color"], Color("FDFCF7"))
 	assert_between(float(contract["top_width_ratio"]), 0.52, 0.66)
 	assert_true(bool(contract["uses_connected_profile"]))
+	assert_true(bool(contract["base_spans_configured_rect"]))
+	assert_false(contract.has("base_spans_nine_cells"))
 	assert_false(bool(contract["uses_full_body_rect"]))
 	assert_false(bool(contract["uses_flat_top_cap"]))
 	assert_false(bool(contract["uses_full_frame_additive_blend"]))

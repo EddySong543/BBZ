@@ -4,6 +4,7 @@ const EXPEDITION_SCENE_PATH := "res://src/expedition/expedition_screen.tscn"
 const TERRAIN_SHADER_PATH := "res://assets/shaders/canvas_ui_expedition_terrain.gdshader"
 const GROUND_CELL_SHADER_PATH := "res://assets/shaders/canvas_ui_expedition_ground_cell.gdshader"
 const ATMOSPHERE_SHADER_PATH := "res://assets/shaders/canvas_ui_qingfeng_atmosphere.gdshader"
+const VISION_SHADOW_SHADER_PATH := "res://assets/shaders/canvas_ui_pve_vision_shadow.gdshader"
 const VISUAL_MAP_PATH := "res://src/expedition/maps/qingfeng_ricefield_visual_map.tscn"
 const CHAFF_ATLAS_PATH := "res://assets/tilesets/qingfeng_ricefield/wind_chaff_01.png"
 const HeroDataScript := preload("res://src/battle/hero_data.gd")
@@ -264,7 +265,7 @@ func test_authored_terrain_tiles_keep_transparent_pixel_cut_edges() -> void:
 		assert_lt(ratio, 0.90, "Object layer must retain a readable cut edge: %s" % path)
 
 
-func test_expedition_terrain_material_exposes_asset_overlay_contract() -> void:
+func test_expedition_runtime_keeps_fog_overlay_disabled() -> void:
 	BattleSetup.reset()
 	var screen := (load(EXPEDITION_SCENE_PATH) as PackedScene).instantiate()
 	add_child_autofree(screen)
@@ -289,38 +290,13 @@ func test_expedition_terrain_material_exposes_asset_overlay_contract() -> void:
 	assert_eq(terrain.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST)
 	assert_lt(ground_art.get_index(), foliage_art.get_index())
 	assert_lt(foliage_art.get_index(), object_art.get_index())
-	assert_lt(object_art.get_index(), terrain.get_index(),
-			"柔边迷雾必须覆盖地表叠加物，边缘才能整体渐隐")
+	assert_lt(object_art.get_index(), terrain.get_index())
 	assert_lt(object_art.get_index(), marker_art.get_index())
 	assert_eq(material.shader.resource_path, TERRAIN_SHADER_PATH)
-	assert_eq(Vector2(material.get_shader_parameter("grid_size")),
-			Vector2(QingfengLayoutScript.WIDTH, QingfengLayoutScript.HEIGHT))
-	assert_eq(float(material.get_shader_parameter("cell_px")), 120.0)
-	assert_true(screen.FOG_OF_WAR_ENABLED,
-			"正式远征必须启用战争迷雾")
-	var unseen_alpha: Variant = material.get_shader_parameter("unseen_alpha")
-	var reveal_duration: Variant = material.get_shader_parameter("reveal_duration")
-	var fog_low_color: Color = material.get_shader_parameter("fog_low_color")
-	var fog_high_color: Color = material.get_shader_parameter("fog_high_color")
-	assert_gte(float(unseen_alpha), 0.90, "未知区必须真正遮住地表信息")
-	assert_between(float(reveal_duration), 0.36, 0.60,
-			"清雾应有短促散开过程，不能瞬间硬切或拖成随身光圈")
-	var shader_source := FileAccess.get_file_as_string(TERRAIN_SHADER_PATH)
-	assert_true(shader_source.contains("texture(map_data"),
-			"清雾结果必须读取MapState写入的数据纹理")
-	assert_true(shader_source.contains("reveal_started_at"),
-			"新清除格必须携带散开起始时间")
-	assert_false(shader_source.contains("vision_center_cell"),
-			"地图迷雾不能继续绑定角色的随身视觉中心")
-	for fog_color: Color in [fog_low_color, fog_high_color]:
-		assert_gt(fog_color.r, 0.68, "迷雾必须是明亮暖色，不能退回阴影色")
-		assert_gt(fog_color.g, 0.62)
-		assert_gt(fog_color.b, 0.48)
-		assert_gt(fog_color.r, fog_color.b, "米白雾应保留轻微暖色倾向")
-	assert_true(shader_source.contains("fog_drift"),
-			"地图雾必须持续流动，不能只是静态米色覆盖")
-	assert_true(shader_source.contains("anim_time *"),
-			"动态雾必须由统一动画时间驱动")
+	assert_false(screen.FOG_OF_WAR_ENABLED,
+			"正式远征不再启用战争迷雾")
+	assert_false(terrain.visible,
+			"保留的兼容层不得再覆盖地图画面")
 	BattleSetup.reset()
 
 
@@ -721,7 +697,7 @@ func test_search_container_reveals_one_item_before_transferring_to_pickup_area()
 	BattleSetup.reset()
 
 
-func test_expedition_run_writes_a_permanent_reveal_trail_into_map_data() -> void:
+func test_expedition_run_keeps_exploration_history_without_rendering_fog() -> void:
 	BattleSetup.reset()
 	var screen := (load(EXPEDITION_SCENE_PATH) as PackedScene).instantiate()
 	add_child_autofree(screen)
@@ -733,6 +709,7 @@ func test_expedition_run_writes_a_permanent_reveal_trail_into_map_data() -> void
 	var terrain := screen.get_node("MapView/MapWorld/TerrainLayer") as ColorRect
 	var material := terrain.material as ShaderMaterial
 	assert_not_null(material.get_shader_parameter("map_data"))
+	assert_false(terrain.visible)
 	assert_not_null(screen.map)
 	assert_gt(screen.map.revealed.size(), 0)
 	assert_true(screen.player_token.visible)
@@ -742,16 +719,13 @@ func test_expedition_run_writes_a_permanent_reveal_trail_into_map_data() -> void
 	assert_eq(screen.canvas.mouse_filter, Control.MOUSE_FILTER_IGNORE)
 	var start_cell: Vector2i = screen.map.player
 	var revealed_before: Dictionary = screen.map.revealed.duplicate()
-	assert_almost_eq(screen._terrain_img.get_pixelv(start_cell).g, 1.0, 0.001)
 	var move_result: Dictionary = screen.map.try_move(Vector2i.UP)
 	assert_true(bool(move_result.get("moved", false)))
 	screen._refresh()
 	assert_gt(screen.map.revealed.size(), revealed_before.size())
-	assert_true(screen.map.revealed.has(start_cell), "离开后，旧路径必须保持清雾")
-	assert_almost_eq(screen._terrain_img.get_pixelv(start_cell).g, 1.0, 0.001)
-	assert_almost_eq(screen._terrain_img.get_pixelv(screen.map.player).g, 1.0, 0.001)
-	for old_cell: Vector2i in revealed_before:
-		assert_almost_eq(screen._terrain_img.get_pixelv(old_cell).g, 1.0, 0.001)
+	assert_true(screen.map.revealed.has(start_cell), "离开后仍须保留探索历史")
+	assert_true(screen._is_cell_visible(start_cell))
+	assert_true(screen._is_cell_visible(screen.map.player))
 	BattleSetup.reset()
 
 
@@ -780,7 +754,7 @@ func test_expedition_run_has_no_legacy_corner_hud() -> void:
 	BattleSetup.reset()
 
 
-func test_expedition_world_temporarily_uses_complete_nineteen_by_eleven_grid() -> void:
+func test_expedition_world_defaults_to_complete_twenty_three_by_thirteen_grid() -> void:
 	BattleSetup.reset()
 	var screen := (load(EXPEDITION_SCENE_PATH) as PackedScene).instantiate()
 	add_child_autofree(screen)
@@ -792,13 +766,16 @@ func test_expedition_world_temporarily_uses_complete_nineteen_by_eleven_grid() -
 	var map_view := screen.get_node("MapView") as Control
 	var map_world := screen.get_node("MapView/MapWorld") as Control
 	assert_true(map_view.clip_contents)
-	assert_eq(map_view.position, Vector2(48, 12),
-			"地图视窗必须整体居中，外侧只留边框而不能裁出半格")
-	assert_lte(map_view.size.distance_to(Vector2(1824, 1056)), 0.001)
+	assert_eq(map_view.position, Vector2.ZERO,
+			"PVE地图必须从屏幕左上角开始，不得露出绿色或黑色外框")
+	assert_lte(map_view.size.distance_to(Vector2(1920, 1080)), 0.001,
+			"PVE地图必须完整铺满设计分辨率")
 	assert_eq(map_world.size, Vector2(3840, 2160))
-	assert_lte(map_world.scale.distance_to(Vector2.ONE * 0.8), 0.0001)
-	assert_lte((screen.MAP_VIEW_SIZE / (screen.MAP_CELL * screen.MAP_RENDER_SCALE))
-			.distance_to(Vector2(19, 11)), 0.001,
+	assert_lte(map_world.scale.distance_to(Vector2(16.0 / 23.0, 9.0 / 13.0)), 0.0001)
+	var rendered_cell_size: Vector2 = Vector2.ONE * float(screen.MAP_CELL) \
+			* map_world.scale
+	assert_lte((screen.MAP_VIEW_SIZE / rendered_cell_size)
+			.distance_to(Vector2(23, 13)), 0.001,
 			"上下左右必须都严格结束在完整方格边界")
 	assert_eq(screen.MAP_VIEW_COLS, MainMenuWorld.VISIBLE_COLS,
 			"主界面与远征界面必须显示相同列数")
@@ -810,12 +787,84 @@ func test_expedition_world_temporarily_uses_complete_nineteen_by_eleven_grid() -
 	assert_almost_eq(screen.player_token.size.x, 208.0, 0.01)
 	assert_almost_eq(screen.player_token.size.y, 208.0, 0.01)
 	var token_screen_size: Vector2 = (
-			screen.player_token.size * screen.TOKEN_RENDER_COMPENSATION * screen.MAP_RENDER_SCALE)
-	assert_lte(token_screen_size.distance_to(Vector2(166.4, 166.4)), 0.01)
-	assert_gt(token_screen_size.x, screen.MAP_CELL * screen.MAP_RENDER_SCALE,
-			"人物画布必须允许武器、头发等越出96px格体")
+			screen.player_token.size * screen.player_token.scale * map_world.scale)
+	assert_lte(token_screen_size.distance_to(
+			Vector2.ONE * 208.0 * 9.0 / 13.0), 0.01)
+	assert_almost_eq(token_screen_size.x, token_screen_size.y, 0.001,
+			"横纵独立地图缩放不得压扁人物")
+	assert_gt(token_screen_size.x, rendered_cell_size.x,
+			"人物画布必须允许武器、头发等越出格体")
+	assert_gt(token_screen_size.y, rendered_cell_size.y)
 	assert_eq(screen.canvas.get_parent(), map_world)
 	assert_eq(screen.player_token.get_parent(), map_world)
+	BattleSetup.reset()
+
+
+func test_expedition_mouse_wheel_zooms_without_borders_or_oversized_player() -> void:
+	BattleSetup.reset()
+	var screen := (load(EXPEDITION_SCENE_PATH) as PackedScene).instantiate()
+	add_child_autofree(screen)
+	await get_tree().process_frame
+	assert_null(screen.get_node_or_null("MapView/ZoomFocusPulse"),
+			"缩放只保留尺度转场，不得再叠加暗化或扩散脉冲")
+	var wheel_up := InputEventMouseButton.new()
+	wheel_up.button_index = MOUSE_BUTTON_WHEEL_UP
+	wheel_up.pressed = true
+	screen._on_map_view_gui_input(wheel_up)
+	assert_eq(Vector2i(screen.get_zoom_contract()["current_grid"]), Vector2i(23, 13),
+			"选角或浮层阶段不得在背后误缩放地图")
+
+	screen._on_hero_selected(HeroDataScript.create_launch_pool()[2])
+	await get_tree().process_frame
+	screen.map.player = Vector2i(16, 9)
+	screen._camera_initialized = false
+	screen._update_map_camera()
+	screen._on_map_view_gui_input(wheel_up)
+
+	var contract: Dictionary = screen.get_zoom_contract()
+	assert_eq(contract["grid_presets"], [
+		Vector2i(31, 17), Vector2i(27, 15), Vector2i(23, 13),
+		Vector2i(19, 11), Vector2i(15, 9),
+	])
+	assert_eq(Vector2i(contract["current_grid"]), Vector2i(19, 11))
+	assert_eq(Vector2i(contract["default_grid"]), Vector2i(23, 13))
+	assert_true(bool(contract["transition_active"]))
+	assert_almost_eq(float(contract["transition_duration"]), 0.15, 0.001)
+	assert_eq(screen.map_view.position, Vector2.ZERO)
+	assert_eq(screen.map_view.size, Vector2(1920, 1080),
+			"缩放只改变地图投影，PVE视窗始终必须满屏")
+	var middle_scale := Vector2(16.0 / 23.0, 9.0 / 13.0)
+	assert_lte(screen.map_world.scale.distance_to(middle_scale), 0.001,
+			"滚轮触发帧不得瞬间跳到下一档")
+	screen._advance_view_zoom(screen.ZOOM_TRANSITION_DURATION * 0.5)
+	assert_gt(screen.map_world.scale.x, middle_scale.x)
+	assert_lt(screen.map_world.scale.x, 16.0 / 19.0)
+	var transition_token_scale: Vector2 = screen.player_token.scale * screen.map_world.scale
+	assert_almost_eq(absf(transition_token_scale.x), absf(transition_token_scale.y), 0.001,
+			"PVE缩放动效中也不得压扁角色")
+	screen._advance_view_zoom(screen.ZOOM_TRANSITION_DURATION * 0.5)
+	screen._on_map_view_gui_input(wheel_up)
+	screen._advance_view_zoom(screen.ZOOM_TRANSITION_DURATION)
+	assert_eq(Vector2i(screen.get_zoom_contract()["current_grid"]), Vector2i(15, 9))
+	assert_false(bool(screen.get_zoom_contract()["transition_active"]))
+	assert_lte(screen.map_world.scale.distance_to(Vector2(16.0 / 15.0, 1.0)), 0.001)
+	var rendered_cell_size: Vector2 = Vector2.ONE * float(screen.MAP_CELL) \
+			* screen.map_world.scale
+	assert_lte((screen.MAP_VIEW_SIZE / rendered_cell_size)
+			.distance_to(Vector2(15, 9)), 0.001,
+			"最近档四边也必须停在完整格边界")
+	var backdrop_center: Vector2 = (
+			screen.player_backdrop.position + screen.player_backdrop.size * 0.5)
+	assert_lte((screen.map_world.position + backdrop_center * screen.map_world.scale)
+			.distance_to(screen.MAP_VIEW_SIZE * 0.5), 0.71,
+			"PVE缩放中心必须保持在角色格，而不是鼠标位置")
+	var token_screen_scale: Vector2 = screen.player_token.scale * screen.map_world.scale
+	assert_almost_eq(absf(token_screen_scale.x), absf(token_screen_scale.y), 0.001)
+	assert_lte(screen.player_token.size.y * absf(token_screen_scale.y), 208.01,
+			"最近档角色不得超过208px")
+	assert_eq(screen._raw_cell_from_map_view_position(
+			screen._map_view_position_for_cell(Vector2i(16, 9))), Vector2i(16, 9),
+			"缩放后屏幕坐标与逻辑格换算必须互逆")
 	BattleSetup.reset()
 
 
@@ -832,9 +881,12 @@ func test_authored_terrain_tiles_keep_complete_grid_nearest_neighbor_scale() -> 
 			assert_eq(texture.get_size(), Vector2(60, 60),
 					"正式格继续保留60px原资产：%s" % path)
 	assert_eq(screen.MAP_CELL, 120)
-	assert_almost_eq(screen.MAP_RENDER_SCALE, 0.8, 0.0001)
-	assert_almost_eq(60.0 * 2.0 * screen.MAP_RENDER_SCALE, 96.0, 0.001,
-			"60px正式格经运行画布与视图缩放后必须显示为96px单格")
+	assert_lte(screen._current_render_scale().distance_to(
+			Vector2(16.0 / 23.0, 9.0 / 13.0)), 0.0001)
+	var rendered_cell_size: Vector2 = Vector2.ONE * 60.0 * 2.0 \
+			* screen._current_render_scale()
+	assert_lte(rendered_cell_size.distance_to(Vector2(1920.0 / 23.0, 1080.0 / 13.0)),
+			0.001, "60px正式格必须以默认23×13个完整格精确铺满画面")
 	BattleSetup.reset()
 
 
@@ -864,12 +916,57 @@ func test_qingfeng_atmosphere_adds_large_chaff_below_objects_and_screen_space_li
 	assert_eq(atmosphere.mouse_filter, Control.MOUSE_FILTER_IGNORE)
 	assert_eq((atmosphere.material as ShaderMaterial).shader.resource_path, ATMOSPHERE_SHADER_PATH)
 	screen._sync_atmosphere_to_camera()
-	assert_eq(atmosphere.position * screen.MAP_RENDER_SCALE + world.position, Vector2.ZERO,
+	assert_eq(atmosphere.position * screen._current_render_scale() + world.position, Vector2.ZERO,
 			"屏幕空间光影必须抵消地图镜头位移")
 	BattleSetup.reset()
 
 
-func test_world_fog_clearance_is_permanent_instead_of_following_the_player() -> void:
+func test_pve_uses_continuous_three_band_vision_shadow_without_restoring_fog() -> void:
+	BattleSetup.reset()
+	var screen := (load(EXPEDITION_SCENE_PATH) as PackedScene).instantiate()
+	add_child_autofree(screen)
+	await get_tree().process_frame
+	var shadow := screen.get_node_or_null(
+			"MapView/MapWorld/VisionShadowLayer") as ColorRect
+	assert_not_null(shadow, "PVE必须有独立的当前视野阴影层")
+	if shadow == null:
+		BattleSetup.reset()
+		return
+	assert_false(shadow.visible, "选角阶段不得在背景地图上提前显示视野阴影")
+	screen._on_hero_selected(HeroDataScript.create_launch_pool()[2])
+	await get_tree().process_frame
+	assert_true(shadow.visible)
+	assert_eq(shadow.size, screen.MAP_WORLD_SIZE)
+	var atmosphere := screen.get_node("MapView/MapWorld/AtmosphereLayer") as ColorRect
+	var markers := screen.get_node("MapView/MapWorld/MarkerArtLayer") as Control
+	assert_gt(shadow.get_index(), atmosphere.get_index(),
+			"视野阴影必须压住地表与环境光影")
+	assert_lt(shadow.get_index(), markers.get_index(),
+			"路线、目标与角色不得被外围阴影压暗")
+	var material := shadow.material as ShaderMaterial
+	assert_not_null(material)
+	assert_eq(material.shader.resource_path, VISION_SHADOW_SHADER_PATH)
+	assert_almost_eq(float(material.get_shader_parameter("inner_radius_cells")), 2.5, 0.001)
+	assert_almost_eq(float(material.get_shader_parameter("outer_radius_cells")), 4.5, 0.001)
+	assert_almost_eq(float(material.get_shader_parameter("horizontal_ratio")), 1.4, 0.001)
+	assert_almost_eq(float(material.get_shader_parameter("outer_alpha")), 0.60, 0.001)
+	screen._sync_vision_shadow_to_player()
+	var expected_center: Vector2 = screen._camera_visual_token_origin \
+			- screen.TOKEN_OFFSET + Vector2.ONE * float(screen.MAP_CELL) * 0.5
+	assert_lte(Vector2(material.get_shader_parameter("player_world_px"))
+			.distance_to(expected_center), 0.001,
+			"视野中心必须跟随角色的连续视觉坐标，不能逐格跳变")
+	assert_false(screen.FOG_OF_WAR_ENABLED)
+	assert_false((screen.get_node("MapView/MapWorld/TerrainLayer") as CanvasItem).visible)
+	var shader_source := FileAccess.get_file_as_string(VISION_SHADOW_SHADER_PATH)
+	assert_true(shader_source.contains("player_world_px"))
+	assert_true(shader_source.contains("inner_radius_cells"))
+	assert_false(shader_source.contains("map_data"),
+			"当前视野阴影不得读取或保存探索历史")
+	BattleSetup.reset()
+
+
+func test_disabled_world_fog_keeps_unexplored_cells_visible() -> void:
 	BattleSetup.reset()
 	var screen := (load(EXPEDITION_SCENE_PATH) as PackedScene).instantiate()
 	add_child_autofree(screen)
@@ -881,16 +978,16 @@ func test_world_fog_clearance_is_permanent_instead_of_following_the_player() -> 
 	screen.map.player = Vector2i(9, 5)
 	screen.map._reveal_around(screen.map.player)
 	screen._refresh()
-	assert_true(screen.map.revealed.has(start), "旧格必须保持在永久清雾记录")
-	assert_true(screen.FOG_OF_WAR_ENABLED)
-	assert_true(screen._is_cell_visible(start), "角色走远后，旧路径不能重新被迷雾覆盖")
+	assert_true(screen.map.revealed.has(start), "旧格必须保持在探索记录")
+	assert_false(screen.FOG_OF_WAR_ENABLED)
+	assert_false((screen.get_node("MapView/MapWorld/TerrainLayer") as CanvasItem).visible)
+	assert_true(screen._is_cell_visible(start))
 	assert_true(screen._is_cell_explored(start))
-	assert_almost_eq(screen._terrain_img.get_pixelv(start).g, 1.0, 0.001)
 	assert_true(screen._is_cell_visible(screen.map.player))
-	assert_almost_eq(screen._terrain_img.get_pixelv(screen.map.player).g, 1.0, 0.001)
 	var unknown := Vector2i(0, 0)
 	assert_false(screen._is_cell_explored(unknown))
-	assert_almost_eq(screen._terrain_img.get_pixelv(unknown).g, 0.0, 0.001)
+	assert_true(screen._is_cell_visible(unknown),
+			"未探索格也必须直接显示，探索记录不再控制画面")
 	BattleSetup.reset()
 
 
@@ -906,8 +1003,8 @@ func test_token_and_complete_grid_camera_share_one_monotonic_visual_coordinate()
 	screen.map.player = Vector2i(16, 9)
 	screen._camera_initialized = false
 	screen._update_map_camera()
-	screen._queued_move_direction = Vector2i.DOWN
-	screen.map.player = Vector2i(16, 10)
+	screen._queued_move_direction = Vector2i.UP
+	screen.map.player = Vector2i(16, 8)
 	screen._update_map_camera()
 	var target: Vector2 = screen._camera_target_token_origin
 	var previous_distance: float = screen._camera_visual_token_origin.distance_to(target)
@@ -919,7 +1016,7 @@ func test_token_and_complete_grid_camera_share_one_monotonic_visual_coordinate()
 		var backdrop_center: Vector2 = (
 				screen.player_backdrop.position + screen.player_backdrop.size * 0.5)
 		var screen_center: Vector2 = (
-				screen.map_world.position + backdrop_center * screen.MAP_RENDER_SCALE)
+				screen.map_world.position + backdrop_center * screen._current_render_scale())
 		assert_lte(screen_center.distance_to(screen.MAP_VIEW_SIZE * 0.5), 0.71,
 				"地图与角色必须共用同一视觉坐标；横纵各半像素取整误差不得累积成抖动")
 	assert_almost_eq(screen._camera_visual_token_origin.x, target.x, 0.05)
@@ -944,9 +1041,9 @@ func test_complete_grid_camera_clamps_at_real_map_edges() -> void:
 	screen.map.player = Vector2i(31, 17)
 	screen._camera_initialized = false
 	screen._update_map_camera()
-	assert_eq(screen.map_world.position, Vector2(-1248, -672))
-	assert_gt(screen.map_world.size.x * screen.MAP_RENDER_SCALE, screen.MAP_VIEW_SIZE.x)
-	assert_gt(screen.map_world.size.y * screen.MAP_RENDER_SCALE, screen.MAP_VIEW_SIZE.y)
+	assert_eq(screen.map_world.position, Vector2(-751, -415))
+	assert_gt(screen.map_world.size.x * screen._current_render_scale().x, screen.MAP_VIEW_SIZE.x)
+	assert_gt(screen.map_world.size.y * screen._current_render_scale().y, screen.MAP_VIEW_SIZE.y)
 	BattleSetup.reset()
 
 
@@ -1014,7 +1111,7 @@ func test_horizontal_steps_use_a_foot_pivoted_squeeze_turn_and_vertical_steps_ke
 	assert_true(screen._token_turn_active)
 	var compressed: Vector2 = screen._token_scale_at_step_progress(0.25)
 	assert_gt(compressed.x, 0.0, "转身前半段仍保持旧朝向")
-	assert_lt(absf(compressed.x), screen.TOKEN_RENDER_COMPENSATION,
+	assert_lt(absf(compressed.x), screen.TOKEN_RENDER_COMPENSATION.x,
 			"转身必须先横向压缩，不能瞬间镜像")
 	var flipped: Vector2 = screen._token_scale_at_step_progress(0.5)
 	assert_lt(flipped.x, 0.0, "最窄帧后才切换到左朝向")
@@ -1052,7 +1149,8 @@ func test_complete_grid_camera_uses_real_map_bounds_without_fake_fog_padding() -
 	await get_tree().process_frame
 
 	assert_eq(screen.map_world.size, Vector2(3840, 2160), "逻辑地图必须为32×18")
-	assert_lte(screen.map_world.scale.distance_to(Vector2.ONE * 0.8), 0.0001)
+	assert_lte(screen.map_world.scale.distance_to(
+			Vector2(16.0 / 23.0, 9.0 / 13.0)), 0.0001)
 	assert_true(screen._is_fog_extension_cell(Vector2i(-1, 0)))
 	assert_true(screen._is_fog_extension_cell(Vector2i(32, 17)))
 	assert_false(screen._is_fog_extension_cell(Vector2i(0, 0)))
@@ -1060,9 +1158,9 @@ func test_complete_grid_camera_uses_real_map_bounds_without_fake_fog_padding() -
 	assert_eq(screen._camera_extension_world_rect(), Rect2(Vector2.ZERO, screen.MAP_WORLD_SIZE))
 	var expected_offsets := [
 		Vector2.ZERO,
-		Vector2(-1248, 0),
-		Vector2(0, -672),
-		Vector2(-1248, -672),
+		Vector2(-751, 0),
+		Vector2(0, -415),
+		Vector2(-751, -415),
 	]
 	var corners := [Vector2i.ZERO, Vector2i(31, 0), Vector2i(0, 17), Vector2i(31, 17)]
 	for index: int in corners.size():

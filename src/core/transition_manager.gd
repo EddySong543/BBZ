@@ -1,7 +1,10 @@
 extends CanvasLayer
 
-## 全局场景切换协调器。通用波幕已经停用；transition_to 只负责防重复切场。
-## Boot 保留自身独立的曝光环离场，它不属于旧波幕系统。
+## 全局场景切换协调器。通用切场保持无幕布；只有主界面传送会调用
+## 从旧横向波幕改造的底部上涌波幕。Boot 继续使用独立曝光环。
+
+const PORTAL_WAVE_SHADER := preload(
+		"res://assets/shaders/canvas_portal_vertical_wave.gdshader")
 
 const BOOT_EXIT_SHADER := preload(
 	"res://assets/shaders/canvas_boot_exit_pixels.gdshader")
@@ -21,6 +24,8 @@ const BOOT_PRE_COVER_TIME := 0.16
 const BOOT_COVER_TIME := 0.74
 const BOOT_HOLD_TIME := 0.03
 const BOOT_REVEAL_TIME := 0.50
+const PORTAL_WAVE_COVER_TIME := 0.38
+const PORTAL_WAVE_REVEAL_TIME := 0.45
 
 # 自定义鼠标指针（G 件·程序生成 tools/gen_ui_cursor.gd v8）：
 # ①GPT 出图理解不好→程序实现转正 ②尾腿怎么做都怪→纯箭镞 ③悬停深色金身看不出还误导⛔
@@ -35,11 +40,23 @@ const CURSOR_HOTSPOT := Vector2(4, 2)
 
 var _boot_rect: ColorRect
 var _boot_mat: ShaderMaterial
+var _portal_wave_rect: ColorRect
+var _portal_wave_mat: ShaderMaterial
+var _portal_wave_time: float = 0.0
 var _busy: bool = false
 
 
 func _ready() -> void:
 	layer = 100
+	_portal_wave_mat = ShaderMaterial.new()
+	_portal_wave_mat.shader = PORTAL_WAVE_SHADER
+	_portal_wave_rect = ColorRect.new()
+	_portal_wave_rect.name = "PortalWaveVeil"
+	_portal_wave_rect.material = _portal_wave_mat
+	_portal_wave_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_portal_wave_rect.mouse_filter = Control.MOUSE_FILTER_STOP
+	_portal_wave_rect.visible = false
+	add_child(_portal_wave_rect)
 	_boot_mat = ShaderMaterial.new()
 	_boot_mat.shader = BOOT_EXIT_SHADER
 	_boot_mat.set_shader_parameter(
@@ -73,7 +90,14 @@ func _ready() -> void:
 func _update_aspect() -> void:
 	var s := get_viewport().get_visible_rect().size
 	if s.y > 0.0:
+		_portal_wave_mat.set_shader_parameter("aspect", s.x / s.y)
 		_boot_mat.set_shader_parameter("aspect", s.x / s.y)
+
+
+func _process(delta: float) -> void:
+	if _portal_wave_rect.visible:
+		_portal_wave_time += delta
+		_portal_wave_mat.set_shader_parameter("wave_time", _portal_wave_time)
 
 
 ## 是否正在转场中（期间 transition_to 会被忽略）。
@@ -93,6 +117,37 @@ func transition_to(scene_path: String) -> void:
 	get_tree().change_scene_to_file(scene_path)
 	await get_tree().process_frame
 	_busy = false
+
+
+## 主界面传送专用：底部像素波盖屏，切场后继续向顶部排走。
+func portal_transition_to(scene_path: String, energy_color: Color) -> void:
+	if _busy:
+		return
+	_busy = true
+	_portal_wave_mat.set_shader_parameter("crest_color", energy_color)
+	_portal_wave_mat.set_shader_parameter("deep_color", energy_color.darkened(0.62))
+	_portal_wave_mat.set_shader_parameter("progress", 0.0)
+	_portal_wave_time = 0.0
+	_portal_wave_rect.visible = true
+	var cover_tween := create_tween()
+	cover_tween.tween_method(
+			_set_portal_wave_progress, 0.0, 1.0, PORTAL_WAVE_COVER_TIME
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	await cover_tween.finished
+	get_tree().change_scene_to_file(scene_path)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var reveal_tween := create_tween()
+	reveal_tween.tween_method(
+			_set_portal_wave_progress, 1.0, 2.0, PORTAL_WAVE_REVEAL_TIME
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	await reveal_tween.finished
+	_portal_wave_rect.visible = false
+	_busy = false
+
+
+func _set_portal_wave_progress(value: float) -> void:
+	_portal_wave_mat.set_shader_parameter("progress", value)
 
 
 ## Boot 专用离场：手掌能量沿右上—左下贯穿成像素切面，切面扩宽盖屏，
