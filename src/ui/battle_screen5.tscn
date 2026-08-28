@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=17 format=3]
 
 [ext_resource type="PackedScene" path="res://src/ui/battle_screen_base.tscn" id="1_base"]
 [ext_resource type="PackedScene" path="res://src/ui/scenes/scene5.tscn" id="2_scene5"]
@@ -6,6 +6,7 @@
 [ext_resource type="Texture2D" path="res://assets/scenes/scene5/scene5_near_wheat.png" id="4_near_wheat"]
 [ext_resource type="Shader" path="res://assets/shaders/scene5_wheat_wind.gdshader" id="5_occluder"]
 [ext_resource type="Script" path="res://src/ui/components/scene5_wheat_mesh.gd" id="6_wheat_mesh"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_env_scene5_character_light.gdshader" id="7_character_light"]
 
 [sub_resource type="ShaderMaterial" id="Scene5OccluderMat"]
 resource_local_to_scene = true
@@ -69,6 +70,68 @@ shader_parameter/impact_th_in = 0.13
 shader_parameter/impact_white = 0.86
 shader_parameter/impact_px = 3.0
 
+[sub_resource type="ShaderMaterial" id="Scene5P1CharacterMat"]
+resource_local_to_scene = true
+shader = ExtResource("7_character_light")
+shader_parameter/flash_amount = 0.0
+shader_parameter/flash_color = Color(1, 1, 1, 1)
+shader_parameter/source_saturation = 1.02
+shader_parameter/source_contrast = 1.02
+shader_parameter/scene_exposure = 0.96
+shader_parameter/highlight_compression = 0.08
+shader_parameter/light_dir = Vector2(0.55, -1)
+shader_parameter/backlight = 0.18
+shader_parameter/shadow_tint = Color(0.56, 0.46, 0.44, 1)
+shader_parameter/skin_warmth = Color(1.02, 1.01, 0.98, 1)
+shader_parameter/warmth_amount = 0.015
+shader_parameter/rim_color = Color(1, 0.82, 0.58, 1)
+shader_parameter/rim_strength = 0.18
+shader_parameter/rim_width = 1.0
+shader_parameter/fill_color = Color(0.68, 0.62, 0.58, 1)
+shader_parameter/fill_amount = 0.008
+shader_parameter/sun_key_color = Color(1, 0.78, 0.52, 1)
+shader_parameter/sun_key_amount = 0.18
+shader_parameter/sun_warm_shift = Vector3(1.04, 1.01, 0.96)
+shader_parameter/sky_ambient_color = Color(0.62, 0.56, 0.58, 1)
+shader_parameter/sky_ambient_amount = 0.015
+shader_parameter/field_bounce_color = Color(0.82, 0.68, 0.45, 1)
+shader_parameter/field_bounce_amount = 0.025
+shader_parameter/field_bounce_start = 0.62
+shader_parameter/idle_light_cycle_sec = 0.75
+shader_parameter/idle_light_amount = 0.03
+shader_parameter/idle_light_phase = 0.0
+
+[sub_resource type="ShaderMaterial" id="Scene5P2CharacterMat"]
+resource_local_to_scene = true
+shader = ExtResource("7_character_light")
+shader_parameter/flash_amount = 0.0
+shader_parameter/flash_color = Color(1, 1, 1, 1)
+shader_parameter/source_saturation = 1.02
+shader_parameter/source_contrast = 1.02
+shader_parameter/scene_exposure = 0.96
+shader_parameter/highlight_compression = 0.08
+shader_parameter/light_dir = Vector2(-0.55, -1)
+shader_parameter/backlight = 0.16
+shader_parameter/shadow_tint = Color(0.56, 0.46, 0.44, 1)
+shader_parameter/skin_warmth = Color(1.02, 1.01, 0.98, 1)
+shader_parameter/warmth_amount = 0.015
+shader_parameter/rim_color = Color(1, 0.82, 0.58, 1)
+shader_parameter/rim_strength = 0.18
+shader_parameter/rim_width = 1.0
+shader_parameter/fill_color = Color(0.68, 0.62, 0.58, 1)
+shader_parameter/fill_amount = 0.008
+shader_parameter/sun_key_color = Color(1, 0.78, 0.52, 1)
+shader_parameter/sun_key_amount = 0.18
+shader_parameter/sun_warm_shift = Vector3(1.04, 1.01, 0.96)
+shader_parameter/sky_ambient_color = Color(0.62, 0.56, 0.58, 1)
+shader_parameter/sky_ambient_amount = 0.015
+shader_parameter/field_bounce_color = Color(0.82, 0.68, 0.45, 1)
+shader_parameter/field_bounce_amount = 0.025
+shader_parameter/field_bounce_start = 0.62
+shader_parameter/idle_light_cycle_sec = 0.75
+shader_parameter/idle_light_amount = 0.03
+shader_parameter/idle_light_phase = 0.0
+
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_p1_0"]
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_p1_1"]
@@ -98,28 +161,35 @@ self_modulate = Color(0.24, 0.2, 0.17, 0.46)
 self_modulate = Color(0.24, 0.2, 0.17, 0.46)
 
 [node name="P1CharDisplay" parent="." index="5" unique_id=1642938575]
-rim_color = Color(1, 0.89, 0.62, 1)
-rim_strength = 0.1
-rim_width = 1.5
-backlight = 0.12
-shadow_tint = Color(0.56, 0.55, 0.6, 1)
+rim_color = Color(1, 0.82, 0.58, 1)
+rim_strength = 0.18
+rim_width = 1.0
+backlight = 0.18
+shadow_tint = Color(0.56, 0.46, 0.44, 1)
 light_dir = Vector2(0.55, -1)
-skin_warmth = Color(1.04, 1.02, 0.96, 1)
-warmth_amount = 0.12
-fill_color = Color(1, 0.78, 0.5, 1)
-fill_amount = 0.09
+skin_warmth = Color(1.02, 1.01, 0.98, 1)
+warmth_amount = 0.015
+fill_color = Color(0.68, 0.62, 0.58, 1)
+fill_amount = 0.008
+
+[node name="AnimatedSprite2D" parent="P1CharDisplay/SubViewport" index="1"]
+material = SubResource("Scene5P1CharacterMat")
 
 [node name="P2CharDisplay" parent="." index="6" unique_id=915119977]
-rim_color = Color(1, 0.89, 0.62, 1)
-rim_strength = 0.1
-rim_width = 1.5
-backlight = 0.12
-shadow_tint = Color(0.56, 0.55, 0.6, 1)
+flip_h = true
+rim_color = Color(1, 0.82, 0.58, 1)
+rim_strength = 0.18
+rim_width = 1.0
+backlight = 0.16
+shadow_tint = Color(0.56, 0.46, 0.44, 1)
 light_dir = Vector2(0.55, -1)
-skin_warmth = Color(1.04, 1.02, 0.96, 1)
-warmth_amount = 0.12
-fill_color = Color(1, 0.78, 0.5, 1)
-fill_amount = 0.09
+skin_warmth = Color(1.02, 1.01, 0.98, 1)
+warmth_amount = 0.015
+fill_color = Color(0.68, 0.62, 0.58, 1)
+fill_amount = 0.008
+
+[node name="AnimatedSprite2D" parent="P2CharDisplay/SubViewport" index="1"]
+material = SubResource("Scene5P2CharacterMat")
 
 [node name="WorldForegroundOccluder" type="Control" parent="."]
 self_modulate = Color(0.58, 0.52, 0.34, 0.92)

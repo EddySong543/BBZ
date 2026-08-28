@@ -21,6 +21,8 @@ const WIND_SCRIPT_PATH := (
 		"res://src/ui/components/scene5_wind_field.gd")
 const CROP_CIRCLE_SCRIPT_PATH := (
 		"res://src/ui/components/scene5_crop_circle.gd")
+const CHARACTER_SHADER_PATH := (
+		"res://assets/shaders/canvas_env_scene5_character_light.gdshader")
 const WHEAT_MESH_SCRIPT_PATH := (
 		"res://src/ui/components/scene5_wheat_mesh.gd")
 const PIXEL_CLOUD_SHADER_PATH := (
@@ -374,7 +376,12 @@ func _initialize() -> void:
 		if stage == null or stage.scene_file_path != SCENE5_PATH:
 			failures.append("BattleScreen5 does not statically mount Scene5")
 		for node_name: String in ["P1CharDisplay", "P2CharDisplay", "P1Hud", "P2Hud", "Buttons"]:
-			if screen.get_node_or_null(node_name) == null:
+			var inherited_node := screen.get_node_or_null(node_name)
+			if inherited_node == null \
+					and node_name.ends_with("CharDisplay"):
+				inherited_node = screen.get_node_or_null(
+						"WorldGroup/%s" % node_name)
+			if inherited_node == null:
 				failures.append("missing inherited battle node %s" % node_name)
 		var occluder := screen.get_node_or_null(
 				"WorldForegroundOccluder") as Control
@@ -390,9 +397,32 @@ func _initialize() -> void:
 				failures.append("Scene5 foreground occluder shader is not connected")
 		for node_name: String in ["P1CharDisplay", "P2CharDisplay"]:
 			var character := screen.get_node_or_null(node_name) as CharacterDisplay
+			if character == null:
+				character = screen.get_node_or_null(
+						"WorldGroup/%s" % node_name) as CharacterDisplay
+			var sprite := character.get_node_or_null(
+					"SubViewport/AnimatedSprite2D") as AnimatedSprite2D \
+					if character != null else null
+			var material := sprite.material as ShaderMaterial \
+					if sprite != null else null
 			if character == null or character.rim_strength <= 0.0 \
-					or character.rim_strength > 0.2 \
-					or character.warmth_amount <= 0.1:
+					or character.rim_strength > 1.0 \
+					or character.rim_width > 1.0 \
+					or character.warmth_amount > 0.04 \
+					or character.fill_amount > 0.04 \
+					or material == null or material.shader == null \
+					or material.shader.resource_path != CHARACTER_SHADER_PATH \
+					or not material.shader.code.contains("luma_preserving_palette") \
+					or not material.shader.code.contains("sun_band") \
+					or not material.shader.code.contains("shadow_band") \
+					or not material.shader.code.contains("idle_envelope") \
+					or material.shader.code.contains("stepped_sun_band") \
+					or material.shader.code.contains("stepped_shadow_band") \
+					or not material.shader.code.contains("rim_palette_target") \
+					or not material.shader.code.contains("sky_ambient") \
+					or not material.shader.code.contains("field_bounce") \
+					or float(material.get_shader_parameter("sun_key_amount")) > 0.2 \
+					or float(material.get_shader_parameter("idle_light_amount")) > 0.04:
 				failures.append("Scene5 %s lighting is not scene-specific" % node_name)
 		if screen.has_method("_base_attack_response_direction"):
 			if float(screen.call(

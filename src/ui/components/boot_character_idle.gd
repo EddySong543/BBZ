@@ -305,7 +305,16 @@ func _update_rear_hand_energy_anchor(
 ) -> void:
 	if _rear_hand_energy_anchor == null:
 		return
-	var source_uv := REAR_HAND_ANCHOR_HOME / CHARACTER_TEXTURE_SIZE
+	_rear_hand_energy_anchor.position = _perspective_display_position(
+			REAR_HAND_ANCHOR_HOME, yaw_strength, pitch_strength)
+
+
+func _perspective_display_position(
+		source_position: Vector2,
+		yaw_strength: float,
+		pitch_strength: float,
+) -> Vector2:
+	var source_uv := source_position / CHARACTER_TEXTURE_SIZE
 	var display_uv := source_uv
 	for iteration: int in 4:
 		var local_uv := display_uv - PERSPECTIVE_PIVOT
@@ -329,7 +338,7 @@ func _update_rear_hand_energy_anchor(
 		display_uv = (
 			PERSPECTIVE_PIVOT
 			+ (source_uv - PERSPECTIVE_PIVOT) * pointer_scale)
-	_rear_hand_energy_anchor.position = display_uv * CHARACTER_TEXTURE_SIZE
+	return display_uv * CHARACTER_TEXTURE_SIZE
 
 
 func preview_idle_at_time(seconds: float) -> void:

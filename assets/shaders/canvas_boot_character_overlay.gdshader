@@ -7,8 +7,27 @@ uniform float pointer_yaw_strength : hint_range(0.0, 0.12, 0.001) = 0.052;
 uniform float pointer_pitch_strength : hint_range(0.0, 0.08, 0.001) = 0.021;
 uniform float front_hand_start : hint_range(0.5, 0.9, 0.01) = 0.62;
 uniform float front_hand_depth_boost : hint_range(1.0, 1.6, 0.01) = 1.25;
+uniform float blue_replacement_strength : hint_range(0.0, 1.0, 0.01) = 0.92;
+uniform vec4 blue_shadow_target : source_color = vec4(0.188235, 0.196078, 0.207843, 1.0);
+uniform vec4 blue_highlight_target : source_color = vec4(0.466667, 0.450980, 0.419608, 1.0);
 
 varying vec4 vertex_color;
+
+
+vec3 replace_blue_cloth_family(vec3 sampled_color) {
+	float luminance = dot(sampled_color, vec3(0.299, 0.587, 0.114));
+	float blue_dominance = sampled_color.b - max(sampled_color.r, sampled_color.g);
+	float blue_mask = smoothstep(0.025, 0.085, blue_dominance);
+	float value_position = smoothstep(0.10, 0.62, luminance);
+	vec3 graphite = mix(
+			blue_shadow_target.rgb,
+			blue_highlight_target.rgb,
+			value_position);
+	return mix(
+			sampled_color,
+			graphite,
+			blue_mask * clamp(blue_replacement_strength, 0.0, 1.0));
+}
 
 
 void vertex() {
@@ -49,6 +68,8 @@ void fragment() {
 	if (!inside_bounds) {
 		COLOR = vec4(0.0);
 	} else {
-		COLOR = texture(TEXTURE, source_uv) * vertex_color;
+		vec4 source = texture(TEXTURE, source_uv);
+		source.rgb = replace_blue_cloth_family(source.rgb);
+		COLOR = source * vertex_color;
 	}
 }

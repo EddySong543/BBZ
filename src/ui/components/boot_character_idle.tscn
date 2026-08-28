@@ -65,6 +65,9 @@ shader_parameter/hand_radius = Vector2(0.27, 0.34)
 shader_parameter/blur_texels = 1.0
 shader_parameter/blur_mix = 0.58
 shader_parameter/desaturation = 0.06
+shader_parameter/blue_replacement_strength = 0.92
+shader_parameter/blue_shadow_target = Color(0.188235, 0.196078, 0.207843, 1)
+shader_parameter/blue_highlight_target = Color(0.466667, 0.45098, 0.419608, 1)
 shader_parameter/rear_energy_center = Vector2(0.3532, 0.2756)
 shader_parameter/rear_light_radius = Vector2(0.22, 0.3)
 shader_parameter/rear_light_color = Color(0.909804, 0.784314, 0.439216, 1)
@@ -92,6 +95,9 @@ shader_parameter/pointer_yaw_strength = 0.052
 shader_parameter/pointer_pitch_strength = 0.021
 shader_parameter/front_hand_start = 0.62
 shader_parameter/front_hand_depth_boost = 1.25
+shader_parameter/blue_replacement_strength = 0.92
+shader_parameter/blue_shadow_target = Color(0.188235, 0.196078, 0.207843, 1)
+shader_parameter/blue_highlight_target = Color(0.466667, 0.45098, 0.419608, 1)
 
 [node name="BootCharacterIdle" type="Control" unique_id=1424163463]
 layout_mode = 3

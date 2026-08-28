@@ -101,3 +101,40 @@ func test_boot_character_base_uses_selective_foreground_hand_depth() -> void:
 		float(material.get_shader_parameter(&"desaturation")),
 		0.06,
 		0.001)
+	assert_almost_eq(
+		float(material.get_shader_parameter(&"blue_replacement_strength")),
+		0.92,
+		0.001)
+	assert_true(material.shader.code.contains(
+			"sampled_color.b - max(sampled_color.r, sampled_color.g)"),
+			"只允许蓝色占优的衣物像素进入替色遮罩")
+	assert_false(material.shader.code.contains("float warm_mask"),
+			"不得再次使用未区分材质的宽泛暖色遮罩")
+	assert_true((material.get_shader_parameter(&"blue_shadow_target") as Color).is_equal_approx(
+			Color("303235")),
+			"推荐方案使用暖石墨暗阶替换蓝色衣物")
+	assert_true((material.get_shader_parameter(&"blue_highlight_target") as Color).is_equal_approx(
+			Color("77736B")),
+			"推荐方案保留衣物明度结构但不保留蓝色色相")
+	assert_false(material.shader.code.contains("replace_muted_brown_family"),
+			"暖棕替换完整回退，原画棕色与肤色不得再被宽泛遮罩污染")
+	var hair := character.get_node("Rig/HairLeftTips") as Sprite2D
+	var hair_material := hair.material as ShaderMaterial
+	assert_almost_eq(
+		float(hair_material.get_shader_parameter(&"blue_replacement_strength")),
+		0.92,
+			0.001,
+			"拆分出的头发、毛领和腰饰必须与主体共用同一蓝衣替色强度，避免接缝")
+	assert_false(hair_material.shader.code.contains("replace_muted_brown_family"),
+			"拆分层同样回退暖棕替换，避免主体与头发使用不同色链")
+
+
+func test_abandoned_far_eye_glint_is_fully_removed() -> void:
+	var packed := load(CHARACTER_SCENE_PATH) as PackedScene
+	var character := packed.instantiate() as BootCharacterIdle
+	add_child_autofree(character)
+	await get_tree().process_frame
+	assert_null(character.get_node_or_null("Rig/FarEyeGlintAnchor"),
+			"废弃流光不保留隐藏节点或运行时代码")
+	assert_false(ResourceLoader.exists("res://src/ui/components/boot_eye_glint.gd"),
+			"废弃流光脚本应从项目中完整移除")

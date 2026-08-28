@@ -12,6 +12,9 @@ uniform vec2 hand_radius = vec2(0.27, 0.34);
 uniform float blur_texels : hint_range(0.0, 2.0, 0.1) = 1.0;
 uniform float blur_mix : hint_range(0.0, 1.0, 0.01) = 0.58;
 uniform float desaturation : hint_range(0.0, 0.25, 0.01) = 0.06;
+uniform float blue_replacement_strength : hint_range(0.0, 1.0, 0.01) = 0.92;
+uniform vec4 blue_shadow_target : source_color = vec4(0.188235, 0.196078, 0.207843, 1.0);
+uniform vec4 blue_highlight_target : source_color = vec4(0.466667, 0.450980, 0.419608, 1.0);
 uniform vec2 rear_energy_center = vec2(0.3532, 0.2756);
 uniform vec2 rear_light_radius = vec2(0.22, 0.30);
 uniform vec4 rear_light_color : source_color = vec4(
@@ -29,6 +32,24 @@ uniform vec4 intro_impact_color : source_color = vec4(
 uniform float intro_impact_strength : hint_range(0.0, 0.3, 0.005) = 0.14;
 
 varying vec4 vertex_color;
+
+
+vec3 replace_blue_cloth_family(vec3 sampled_color) {
+	float luminance = dot(sampled_color, vec3(0.299, 0.587, 0.114));
+	// Only the authored blue cloth family can enter this mask. Warm skin and brown
+	// materials have B <= max(R, G), so they remain byte-for-byte untouched here.
+	float blue_dominance = sampled_color.b - max(sampled_color.r, sampled_color.g);
+	float blue_mask = smoothstep(0.025, 0.085, blue_dominance);
+	float value_position = smoothstep(0.10, 0.62, luminance);
+	vec3 graphite = mix(
+			blue_shadow_target.rgb,
+			blue_highlight_target.rgb,
+			value_position);
+	return mix(
+			sampled_color,
+			graphite,
+			blue_mask * clamp(blue_replacement_strength, 0.0, 1.0));
+}
 
 
 void vertex() {
@@ -90,6 +111,7 @@ void fragment() {
 			source,
 			blurred,
 			depth_mask * clamp(blur_mix, 0.0, 1.0));
+	result.rgb = replace_blue_cloth_family(result.rgb);
 	float gray = dot(result.rgb, vec3(0.299, 0.587, 0.114));
 	result.rgb = mix(
 			result.rgb,
