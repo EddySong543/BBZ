@@ -1,6 +1,6 @@
 extends VBoxContainer
 
-## 战斗调试面板（DEBUG 专用·左侧竖排测试按钮）：满能量 / 满血 / 敌我造伤 / 加盾 / 换英雄。
+## 战斗调试面板（DEBUG 专用·左侧竖排测试按钮）：数值、换英雄、Buff 与加时巡检。
 ## ⚠ 全项目【唯一】直接改写 BattleCore 状态的 UI —— 有意隔离于此，让 battle_screen 保持「只读引擎状态」
 ##   （联机防作弊边界·可 grep 断言 battle_screen 不写 hp/energy/shield）。
 ## ⚠ 不走正常结算管线：debug 致死不触发强制换人浮窗（要测死亡流程请打真实战斗）。
@@ -16,6 +16,17 @@ const AI := 1
 
 var _battle: BattleCore
 var _art_pool: Array[HeroData] = []   # 美术巡检池：全英雄池中有 idle 资产的（首次点击构建）
+var _buff_picker: VBoxContainer
+var _buff_target := AI
+var _buff_target_button: Button
+
+const DEBUG_BUFFS: Array[Dictionary] = [
+	{"id": &"poison", "name": "毒素"},
+	{"id": &"vulnerable", "name": "脆弱"},
+	{"id": &"sword_qi", "name": "剑气"},
+	{"id": &"h02_wave_upgrade", "name": "玄金不动相"},
+	{"id": &"h08_retained_big_defend", "name": "不坠神言"},
+]
 
 
 ## 由 battle_screen 在创建后调用：注入 battle 引用 + 建按钮。
@@ -34,14 +45,87 @@ func setup(battle_ref: BattleCore) -> void:
 		["进加时赛", _dbg_enter_overtime],
 	]
 	for d in defs:
-		var b := Button.new()
-		b.text = d[0] as String
-		b.custom_minimum_size = Vector2(92.0, 30.0)
-		b.focus_mode = Control.FOCUS_NONE
-		b.modulate = Color(1, 1, 1, 0.82)
-		FontManager.apply_btn(b, 14)
+		var b := _make_debug_button(d[0] as String)
 		b.pressed.connect(d[1] as Callable)
 		add_child(b)
+	var add_buff_button := _make_debug_button("添加 Buff", Vector2(132.0, 40.0), 17)
+	add_buff_button.name = "AddBuffButton"
+	add_buff_button.modulate = Color(1.0, 0.92, 0.68, 0.94)
+	add_buff_button.pressed.connect(_toggle_buff_picker)
+	add_child(add_buff_button)
+	_build_buff_picker()
+
+
+func _make_debug_button(text: String, minimum_size := Vector2(92.0, 30.0),
+		font_size := 14) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.custom_minimum_size = minimum_size
+	button.focus_mode = Control.FOCUS_NONE
+	button.modulate = Color(1.0, 1.0, 1.0, 0.82)
+	FontManager.apply_btn(button, font_size)
+	return button
+
+
+func _build_buff_picker() -> void:
+	_buff_picker = VBoxContainer.new()
+	_buff_picker.name = "BuffPicker"
+	_buff_picker.visible = false
+	_buff_picker.add_theme_constant_override("separation", 3)
+	add_child(_buff_picker)
+	for definition: Dictionary in DEBUG_BUFFS:
+		var button := _make_debug_button(String(definition.name), Vector2(132.0, 28.0), 13)
+		button.name = "Buff_%s" % String(definition.id)
+		button.pressed.connect(_dbg_add_buff.bind(StringName(definition.id)))
+		_buff_picker.add_child(button)
+	_buff_target_button = _make_debug_button("添加至我方", Vector2(132.0, 32.0), 14)
+	_buff_target_button.name = "BuffTargetToggle"
+	_buff_target_button.modulate = Color(0.76, 0.88, 1.0, 0.94)
+	_buff_target_button.pressed.connect(_toggle_buff_target)
+	_buff_picker.add_child(_buff_target_button)
+
+
+func _toggle_buff_picker() -> void:
+	_buff_picker.visible = not _buff_picker.visible
+	if _buff_picker.visible:
+		_buff_target = AI
+		_refresh_buff_target_button()
+
+
+func _toggle_buff_target() -> void:
+	_buff_target = PLAYER if _buff_target == AI else AI
+	_refresh_buff_target_button()
+
+
+func _refresh_buff_target_button() -> void:
+	# 文案表示下一次点击会切换到的目标；首次打开默认敌方，因此底部显示“添加至我方”。
+	_buff_target_button.text = "添加至我方" if _buff_target == AI else "添加至敌方"
+
+
+func _dbg_add_buff(effect_id: StringName) -> void:
+	if _battle == null:
+		return
+	var player := _buff_target
+	var slot: int = _battle.active_index[player]
+	match effect_id:
+		&"poison":
+			_battle.set_status(player, slot, "poison",
+					int(_battle.get_status(player, slot, "poison", 0)) + 1)
+		&"vulnerable":
+			_battle.set_status(player, slot, "vuln",
+					int(_battle.get_status(player, slot, "vuln", 0)) + 1)
+		&"sword_qi":
+			_battle.set_team_status(player, "jianqi", mini(
+					int(_battle.get_team_status(player, "jianqi", 0)) + 1, 4))
+		&"h02_wave_upgrade":
+			_battle.upgrade_next_wave[player] = true
+		&"h08_retained_big_defend":
+			_battle.retained_big_defend[player] = true
+			_battle.retained_big_defend_until_turn[player] = _battle.turn_number + 1
+		_:
+			push_warning("debug: 未知 Buff %s" % effect_id)
+			return
+	state_changed.emit()
 
 
 ## 一键进加时赛（测加时规则+日食演出用）：跳过平局判定与选人浮窗，

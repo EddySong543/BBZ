@@ -65,6 +65,9 @@ const ROW_H := 196.0
 
 var _tier: int = 1
 var _items: Array[ItemData] = []
+var _item_catalog: Array[ItemData] = []
+var _search_query := ""
+var _search_active := false
 var _cards: Array[Button] = []
 var _sel_idx: int = -1
 var _current_page: int = 0
@@ -103,6 +106,8 @@ var _sel_tweens: Array[Tween] = []  # 选中动效 tween（pop+呼吸·换选先
 
 
 func _ready() -> void:
+	for tier: int in range(1, 4):
+		_item_catalog.append_array(ItemCatalog.all_for_tier(tier))
 	_build_book()
 	_setup_top()
 	_build_detail_panel()
@@ -181,6 +186,8 @@ func _setup_detail_navigation() -> void:
 
 
 func _catalog_item_count() -> int:
+	if _search_active:
+		return _items.size()
 	var total := 0
 	for tier: int in range(1, 4):
 		total += ItemCatalog.all_for_tier(tier).size()
@@ -188,6 +195,8 @@ func _catalog_item_count() -> int:
 
 
 func _global_item_index() -> int:
+	if _search_active:
+		return maxi(_sel_idx, 0)
 	var index := maxi(_sel_idx, 0)
 	for tier: int in range(1, _tier):
 		index += ItemCatalog.all_for_tier(tier).size()
@@ -207,6 +216,9 @@ func _turn_detail(direction: int) -> void:
 	var total := _catalog_item_count()
 	if total == 0:
 		return
+	if _search_active:
+		_select(clampi(_sel_idx + direction, 0, _items.size() - 1))
+		return
 	var target := clampi(_global_item_index() + direction, 0, total - 1)
 	for tier: int in range(1, 4):
 		var tier_items: Array[ItemData] = ItemCatalog.all_for_tier(tier)
@@ -214,6 +226,60 @@ func _turn_detail(direction: int) -> void:
 			_load_tier_item(tier, target)
 			return
 		target -= tier_items.size()
+
+
+## 搜索覆盖三档道具，但数据边界仍严格限制在道具章节内。
+func get_search_entries() -> Array[Dictionary]:
+	var entries: Array[Dictionary] = []
+	for item: ItemData in _item_catalog:
+		entries.append({
+			"id": StringName(item.item_id),
+			"label": tr(item.item_name),
+			"search_text": tr(item.item_name),
+		})
+	return entries
+
+
+func set_search_query(query: String) -> void:
+	var normalized := query.strip_edges().to_lower()
+	if normalized == _search_query and (_search_active or normalized.is_empty()):
+		return
+	_search_query = normalized
+	if normalized.is_empty():
+		_search_active = false
+		_load_tier_item(_tier, 0)
+		detail_area.visible = not _items.is_empty()
+		return
+	_search_active = true
+	_items.clear()
+	for item: ItemData in _item_catalog:
+		var searchable := tr(item.item_name)
+		if searchable.to_lower().contains(normalized):
+			_items.append(item)
+	_sel_idx = -1
+	_current_page = 0
+	if not _items.is_empty():
+		_tier = _items[0].tier
+	_build_pool()
+	_refresh_page_visibility()
+	detail_area.visible = not _items.is_empty()
+	if not _items.is_empty():
+		_select(0)
+	else:
+		_refresh_detail_navigation()
+
+
+func search_result_count() -> int:
+	return _items.size()
+
+
+func select_search_result(entry_id: StringName) -> void:
+	for tier: int in range(1, 4):
+		var tier_items: Array[ItemData] = ItemCatalog.all_for_tier(tier)
+		for index: int in tier_items.size():
+			if StringName(tier_items[index].item_id) == entry_id:
+				_load_tier_item(tier, index)
+				return
 
 
 func _grid_float(property_name: StringName, fallback: float) -> float:
@@ -250,10 +316,14 @@ func _catalog_pages() -> Array[Vector2i]:
 
 
 func _catalog_page_count() -> int:
+	if _search_active:
+		return _page_count()
 	return _catalog_pages().size()
 
 
 func _global_page_index() -> int:
+	if _search_active:
+		return _current_page
 	var index := _catalog_pages().find(Vector2i(_tier, _current_page))
 	return maxi(index, 0)
 
@@ -277,6 +347,13 @@ func _refresh_page_visibility() -> void:
 
 
 func _turn_page(direction: int) -> void:
+	if _search_active:
+		var target_page := clampi(_current_page + direction, 0, _page_count() - 1)
+		if target_page == _current_page:
+			return
+		var local_slot := _sel_idx % _grid_page_size() if _sel_idx >= 0 else 0
+		_select(mini(target_page * _grid_page_size() + local_slot, _items.size() - 1))
+		return
 	var pages := _catalog_pages()
 	if pages.is_empty():
 		return
@@ -369,8 +446,9 @@ func _step_catalog_selection(step: int) -> void:
 
 
 func _build_pool() -> void:
-	for c in item_grid.get_children():
-		c.queue_free()
+	for c: Node in item_grid.get_children():
+		item_grid.remove_child(c)
+		c.free()
 	_cards.clear()
 	var cols := _grid_columns()
 	var page_size := _grid_page_size()

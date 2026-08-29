@@ -25,6 +25,8 @@ const NORMAL_TEXT_COLOR := Color("#F2E8CC")
 const MUTED_TEXT_COLOR := Color("#D7E1EA")
 const ORNAMENT_UNDERLAY := Color(0.07, 0.04, 0.02, 0.88)
 const HOVER_MODULATE := Color(1.12, 1.12, 1.12, 1.0)
+## 必须高于战斗状态行与悬停说明框；暗幕因此统一压暗全部既有 HUD，不留亮着的 Buff。
+const OVERLAY_Z_INDEX := 120
 
 signal selection_made(slot: int)
 
@@ -38,6 +40,7 @@ var _hover_tweens: Dictionary = {}
 
 
 func _ready() -> void:
+	z_index = OVERLAY_Z_INDEX
 	FontManager.apply(_prompt, 32)
 	_prompt.add_theme_color_override("font_color", NORMAL_TEXT_COLOR)
 	_prompt.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.05, 0.92))

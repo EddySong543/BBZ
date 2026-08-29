@@ -25,6 +25,8 @@ const DISPLAY_ORDER: Array[StringName] = [
 	&"pierce_defense",
 	&"pierce_guard",
 	&"true_damage",
+	&"h02_wave_upgrade",
+	&"h08_retained_big_defend",
 	&"poison",
 	&"vulnerable",
 	&"sword_qi",
@@ -35,12 +37,16 @@ var embedded_close: Callable = Callable()
 var _selected_id: StringName = &"bonus_effect"
 var _buttons: Array[Button] = []
 var _entries: Array[Dictionary] = []
+var _button_home_positions: Array[Vector2] = []
+var _filtered_entry_indices: Array[int] = []
+var _search_query := ""
 var _normalized_icons: Dictionary = {}
 var _selection_tweens: Array[Tween] = []
 var _detail_tween: Tween
 
 @onready var _book_layer: Control = $BookLayer
 @onready var effect_list: Control = $EffectList
+@onready var detail_area: Control = $DetailArea
 @onready var detail_name: Label = $DetailArea/EffectName
 @onready var detail_icon: TextureRect = $DetailArea/EffectIcon
 @onready var detail_description: Label = $DetailArea/Description
@@ -54,9 +60,13 @@ var _detail_tween: Tween
 func _ready() -> void:
 	_book_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_buttons.assign(effect_list.get_children())
+	for button: Button in _buttons:
+		_button_home_positions.append(button.position)
 	_entries.clear()
 	for effect_id: StringName in DISPLAY_ORDER:
 		_entries.append(EffectCatalogScript.get_by_id(effect_id))
+	for index: int in _entries.size():
+		_filtered_entry_indices.append(index)
 	assert(_buttons.size() == _entries.size())
 	for index: int in _buttons.size():
 		var button := _buttons[index]
@@ -176,17 +186,21 @@ func _setup_detail_navigation() -> void:
 
 
 func _turn_detail(step: int) -> void:
-	var current := _entry_index(_selected_id)
-	var target := clampi(current + step, 0, _entries.size() - 1)
+	if _filtered_entry_indices.is_empty():
+		return
+	var current_catalog_index := _entry_index(_selected_id)
+	var current := maxi(_filtered_entry_indices.find(current_catalog_index), 0)
+	var target := clampi(current + step, 0, _filtered_entry_indices.size() - 1)
 	if target == current:
 		return
-	select_effect(_entries[target].id)
+	select_effect(_entries[_filtered_entry_indices[target]].id)
 
 
 func _refresh_detail_navigation() -> void:
-	var total := _entries.size()
+	var total := _filtered_entry_indices.size()
 	detail_navigation.visible = total > 0
-	var current := clampi(_entry_index(_selected_id), 0, maxi(total - 1, 0))
+	var current := clampi(
+			_filtered_entry_indices.find(_entry_index(_selected_id)), 0, maxi(total - 1, 0))
 	detail_indicator.text = "%02d / %02d" % [current + 1, total] if total > 0 else "00 / 00"
 	previous_detail_button.disabled = total == 0 or current <= 0
 	next_detail_button.disabled = total == 0 or current >= total - 1
@@ -197,6 +211,50 @@ func _entry_index(effect_id: StringName) -> int:
 		if _entries[index].id == effect_id:
 			return index
 	return -1
+
+
+func get_search_entries() -> Array[Dictionary]:
+	var entries: Array[Dictionary] = []
+	for entry: Dictionary in _entries:
+		entries.append({
+			"id": entry.id,
+			"label": String(entry.name),
+			"search_text": String(entry.name),
+		})
+	return entries
+
+
+func set_search_query(query: String) -> void:
+	var normalized := query.strip_edges().to_lower()
+	if normalized == _search_query and not _filtered_entry_indices.is_empty():
+		return
+	_search_query = normalized
+	_filtered_entry_indices.clear()
+	for index: int in _entries.size():
+		var entry := _entries[index]
+		var searchable := String(entry.name)
+		if normalized.is_empty() or searchable.to_lower().contains(normalized):
+			_filtered_entry_indices.append(index)
+	for button: Button in _buttons:
+		button.visible = false
+	for slot_index: int in _filtered_entry_indices.size():
+		var catalog_index := _filtered_entry_indices[slot_index]
+		var button := _buttons[catalog_index]
+		button.position = _button_home_positions[slot_index]
+		button.visible = true
+	detail_area.visible = not _filtered_entry_indices.is_empty()
+	if not _filtered_entry_indices.is_empty():
+		select_effect(_entries[_filtered_entry_indices[0]].id)
+	else:
+		_refresh_detail_navigation()
+
+
+func search_result_count() -> int:
+	return _filtered_entry_indices.size()
+
+
+func select_search_result(entry_id: StringName) -> void:
+	select_effect(entry_id)
 
 
 func _refresh_detail(entry: Dictionary) -> void:

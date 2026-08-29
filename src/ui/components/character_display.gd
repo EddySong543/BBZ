@@ -169,6 +169,7 @@ var _return_to_idle: bool = false
 var _base_output_material: Material = null
 var _death_dissolve_material: ShaderMaterial = null
 var _switch_blocks_material: ShaderMaterial = null
+var _transform_blocks_material: ShaderMaterial = null
 
 static var _sprite_cache: Dictionary = {}
 
@@ -412,6 +413,35 @@ func _ensure_switch_blocks_material() -> ShaderMaterial:
 	_switch_blocks_material.set_shader_parameter("outward_right", 0.0)
 	_switch_blocks_material.set_shader_parameter("switch_steps", 8.0)
 	return _switch_blocks_material
+
+
+## 烛阴专用转变覆盖：0=旧形完整，0.5=黑色像素完全覆盖，1=新形完整。
+func set_transform_blocks(progress: float) -> void:
+	var normalized_progress := clampf(progress, 0.0, 1.0)
+	if normalized_progress <= 0.0 or normalized_progress >= 1.0:
+		if _transform_blocks_material != null:
+			_transform_blocks_material.set_shader_parameter(
+				"transform_progress", normalized_progress)
+			if material == _transform_blocks_material:
+				material = _base_output_material
+		return
+	var transform_material := _ensure_transform_blocks_material()
+	material = transform_material
+	transform_material.set_shader_parameter("transform_progress", normalized_progress)
+
+
+func reset_transform_blocks() -> void:
+	set_transform_blocks(0.0)
+
+
+func _ensure_transform_blocks_material() -> ShaderMaterial:
+	if _transform_blocks_material != null:
+		return _transform_blocks_material
+	_transform_blocks_material = ShaderMaterial.new()
+	_transform_blocks_material.shader = preload(
+		"res://assets/shaders/canvas_ui_character_transform_blocks.gdshader")
+	_transform_blocks_material.set_shader_parameter("transform_progress", 0.0)
+	return _transform_blocks_material
 
 
 func set_hit_flash(on: bool) -> void:

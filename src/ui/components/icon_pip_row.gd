@@ -2,6 +2,8 @@
 class_name IconPipRow
 extends Control
 
+const DISABLED_CAPACITY_COLOR := Color(0.055, 0.055, 0.06, 1.0)
+
 ## 横排"图标点"组件：用一张逐帧精灵图(spritesheet)画一排图标点。
 ## 战斗 HUD 的血量(心形)与能量(金币)用它显示，替换旧 ArcHealthBar / EnergyBar。
 ##
@@ -108,6 +110,11 @@ extends Control
 	set(v):
 		extra_modulate = v
 		queue_redraw()
+## 动态能量上限被封锁的点位颜色。复用原图 alpha，不改变尺寸或像素轮廓。
+@export var disabled_capacity_modulate: Color = DISABLED_CAPACITY_COLOR:
+	set(v):
+		disabled_capacity_modulate = v
+		queue_redraw()
 
 @export_group("Battle HUD 定向阴影")
 @export var bottom_shadow_enabled := false:
@@ -153,6 +160,9 @@ extends Control
 var _cur: float = 0.0
 var _max: float = 0.0
 var _extra: float = 0.0
+var _energy_capacity_mode := false
+var _energy_base_capacity := 0.0
+var _energy_available_capacity := 0.0
 var _gray_tex: Texture2D = null   # 去色版心形(护甲银灰覆盖用；× extra_modulate = 真银灰)
 
 # 每个图标点独立的 idle 状态（错峰、偶发播放）。索引 = 槽位。
@@ -259,10 +269,44 @@ func _process_random(delta: float, total: int) -> void:
 
 ## 设置显示值（半点制小数）。能量用 set_value(e, e)；纯图标用 set_value(1, 1)。
 func set_value(cur: float, max_val: float, extra: float = 0.0) -> void:
+	_energy_capacity_mode = false
 	_cur = maxf(cur, 0.0)
 	_max = maxf(max_val, 0.0)
 	_extra = maxf(extra, 0.0)
 	queue_redraw()
+
+
+## 能量专用：当前能量与动态上限分开表达。普通点从起点累计，失效点始终固定在
+## 基础上限末端，因此降低上限不会挤动、重排或截断已有能量位置。
+func set_energy_capacity_value(cur: float, base_capacity: float,
+		available_capacity: float) -> void:
+	_energy_capacity_mode = true
+	_cur = maxf(cur, 0.0)
+	_energy_base_capacity = maxf(base_capacity, 0.0)
+	_energy_available_capacity = clampf(
+		available_capacity, 0.0, _energy_base_capacity)
+	_max = _energy_base_capacity
+	_extra = 0.0
+	queue_redraw()
+
+
+## 测试/调试契约：返回从最高序号向前变黑的槽位索引。
+func capacity_disabled_indices() -> Array[int]:
+	var result: Array[int] = []
+	if not _energy_capacity_mode:
+		return result
+	var total_slots := int(ceil(_energy_base_capacity - 0.0001))
+	var disabled_count := clampi(
+		int(ceil(_energy_base_capacity - _energy_available_capacity - 0.0001)),
+		0, total_slots)
+	for index in range(total_slots - disabled_count, total_slots):
+		result.append(index)
+	return result
+
+
+## 所有状态统一从这一个几何入口取目标矩形，保证黑点与普通点像素边界一致。
+func pip_rect_for_index(index: int) -> Rect2:
+	return Rect2(_pip_origin(index), Vector2.ONE * pip_size)
 
 
 func _rand_dwell() -> float:
@@ -288,6 +332,9 @@ func _draw() -> void:
 		maxv = preview_max
 		extra = preview_extra
 	if sheet == null:
+		return
+	if _energy_capacity_mode:
+		_draw_energy_capacity(cur)
 		return
 
 	var full_n := int(floor(cur + 0.0001))
@@ -348,22 +395,39 @@ func _draw() -> void:
 		sslot += 1
 
 
+func _draw_energy_capacity(cur: float) -> void:
+	var total_slots := int(ceil(_energy_base_capacity - 0.0001))
+	var disabled_indices := capacity_disabled_indices()
+	var disabled_start := total_slots - disabled_indices.size()
+	var full_n := mini(int(floor(cur + 0.0001)), total_slots)
+	var has_half := allow_half and full_n < total_slots \
+		and (cur - float(full_n)) >= 0.49
+	var filled_slots := full_n + (1 if has_half else 0)
+	_slot_count = total_slots
+	_ensure_slots(_slot_count)
+
+	if bottom_shadow_enabled:
+		for index in total_slots:
+			if index < filled_slots or index >= disabled_start:
+				_draw_pip_shadow(index)
+
+	for index in full_n:
+		if index < disabled_start:
+			_draw_pip(index, 1.0, full_modulate, true)
+	if has_half and full_n < disabled_start:
+		_draw_pip(full_n, 0.5, full_modulate, true)
+
+	# 失效点使用同一帧、同一目标 Rect 与同一采样方式；只换为中性近黑色。
+	var neutral_tex: Texture2D = _gray_tex if _gray_tex != null else sheet
+	for index in disabled_indices:
+		_draw_pip(index, 1.0, disabled_capacity_modulate, false, neutral_tex)
+
+
 ## 画第 index 个图标点。fill<1 = 半颗（裁靠内一侧）；animate=false 强制第 0 帧（空心用）。
 func _draw_pip(index: int, fill: float, mod: Color, animate: bool, tex: Texture2D = null) -> void:
 	var t: Texture2D = tex if tex != null else sheet
 	if t == null:
 		return
-	var step := pip_size + spacing
-	var col := index
-	var row := 0
-	if per_row_cap > 0:
-		col = index % per_row_cap
-		row = index / per_row_cap
-	var x := col * step
-	if right_to_left:
-		x = -step * float(col + 1) + spacing   # 从右锚点往左排
-	var y := row * (pip_size + row_spacing)
-
 	var frame := 0
 	if animate and index < _pip_frame.size():
 		frame = _pip_frame[index]
@@ -372,7 +436,7 @@ func _draw_pip(index: int, fill: float, mod: Color, animate: bool, tex: Texture2
 	var fcol := frame % hframes
 	var frow := frame / hframes
 	var src := Rect2(fcol * fw, frow * fh, fw, fh)
-	var dst := Rect2(x, y, pip_size, pip_size)
+	var dst := pip_rect_for_index(index)
 	if fill < 0.999:
 		# 半颗：裁靠"内侧/满侧"的半边（LTR 留左半，RTL 留右半）
 		if right_to_left:
@@ -389,6 +453,16 @@ func _draw_pip(index: int, fill: float, mod: Color, animate: bool, tex: Texture2
 func _draw_pip_shadow(index: int) -> void:
 	if sheet == null:
 		return
+	var frame_w := sheet.get_width() / hframes
+	var frame_h := sheet.get_height() / vframes
+	var source := Rect2(0.0, 0.0, frame_w, frame_h)
+	var destination := Rect2(
+			pip_rect_for_index(index).position + bottom_shadow_offset,
+			Vector2(pip_size, pip_size))
+	draw_texture_rect_region(sheet, destination, source, bottom_shadow_color)
+
+
+func _pip_origin(index: int) -> Vector2:
 	var step := pip_size + spacing
 	var col := index
 	var row := 0
@@ -399,13 +473,7 @@ func _draw_pip_shadow(index: int) -> void:
 	if right_to_left:
 		x = -step * float(col + 1) + spacing
 	var y := row * (pip_size + row_spacing)
-	var frame_w := sheet.get_width() / hframes
-	var frame_h := sheet.get_height() / vframes
-	var source := Rect2(0.0, 0.0, frame_w, frame_h)
-	var destination := Rect2(
-			Vector2(x, y) + bottom_shadow_offset,
-			Vector2(pip_size, pip_size))
-	draw_texture_rect_region(sheet, destination, source, bottom_shadow_color)
+	return Vector2(x, y)
 
 
 ## 生成去色版心形纹理：护甲用它 × 银灰 extra_modulate 得到真银灰

@@ -24,6 +24,10 @@ const EffectTextFormatterScript := preload("res://src/ui/effect_text_formatter.g
 const EFFECT_KEYWORD_SPARK_SCRIPT := preload("res://src/ui/components/effect_keyword_spark.gd")
 const ITEM_TIP_DIVIDER_SCRIPT := preload("res://src/ui/components/item_tip_pixel_divider.gd")
 const BATTLE_STATUS_ROW_SCRIPT := preload("res://src/ui/components/battle_status_row.gd")
+const ACTION_ICON_SWITCH_SHADER := preload(
+	"res://assets/shaders/canvas_ui_action_icon_switch_blocks.gdshader")
+const ACTION_BUBBLE_DIAGONAL_TIDE_SCRIPT := preload(
+	"res://src/ui/components/action_bubble_diagonal_tide.gd")
 const HERO_FRAME_SCENE := preload("res://src/ui/components/hero_frame.tscn")
 const BACKPACK_OVERLAY_SCENE := preload("res://src/ui/backpack_screen.tscn")
 const BACKPACK_ICON := preload("res://assets/ui/icons/backpack.png")
@@ -132,6 +136,8 @@ const HpSlantBarScript := preload("res://src/ui/components/hp_slant_bar.gd")
 @export_range(0.6, 1.6, 0.05) var action_bubble_hold_duration: float = 1.0
 @export_range(0.08, 0.30, 0.01) var action_bubble_enter_duration: float = 0.18
 @export_range(0.08, 0.30, 0.01) var action_bubble_exit_duration: float = 0.14
+@export_range(0.24, 1.30, 0.01) var action_bubble_transform_duration: float = 0.60
+@export_range(0.0, 0.60, 0.01) var action_bubble_transform_extra_hold: float = 0.16
 @export_group("")
 @export_group("结算换人")
 @export_range(0.08, 0.30, 0.01) var switch_exit_duration: float = 0.16
@@ -140,6 +146,9 @@ const HpSlantBarScript := preload("res://src/ui/components/hp_slant_bar.gd")
 @export_range(12.0, 72.0, 1.0) var switch_travel_distance: float = 34.0
 @export_range(0.0, 24.0, 1.0) var switch_vertical_drop: float = 8.0
 @export_range(4, 16, 1) var switch_pixel_steps: int = 8
+@export_group("")
+@export_group("烛阴转变")
+@export_range(0.30, 1.20, 0.01) var h17_transform_duration: float = 0.64
 @export_group("")
 ## 独立场景变体可把现有角色 SubViewport 送入指定水面；默认关闭，Scene1 不改变。
 @export var character_reflections_enabled: bool = false
@@ -261,12 +270,17 @@ var _backpack_overlay: Control = null # 战斗内背包浮层（懒创建·关�
 @onready var p1_energy_cap_label: Label = $P1Hud/P1EnergyCapLabel
 @onready var p2_energy_cap_label: Label = $P2Hud/P2EnergyCapLabel
 
-# 道具栏（M2·占位）：程序化挂在各 HUD 下。P1=贴左(对齐左侧框组·28px 内边距)；
-# P2=镜像右贴(右内边距=P1 左内边距)，由 _build_item_rows 随槽宽自动算，修「敌方框偏左」错位。
-const ITEM_ROW_POS_P1 := Vector2(28.0, 150.0)   # 2026-06-28 Eddy：道具栏上移一些(168→150)
-const ITEM_ROW_SCALE := 0.92   # 小于 76px 替补头像一个层级，仍比旧 0.85 档清楚。
+# 道具栏改为左右屏幕边缘的三格纵向轨；原顶部横排位置交给 Buff。
+# 修改战斗道具框成品尺寸只需改 ITEM_FRAME_SIZE；缩放与居中位置由公式同步推导。
+# 道具轨纵向仍以中间槽对齐画面中线；横向中心分别与切换 / 结束按钮对齐。
+const ITEM_FRAME_SIZE := 74.0
+const ITEM_ROW_SCALE := ITEM_FRAME_SIZE / ItemSlotRow.SLOT_W
+const ITEM_MIDDLE_CENTER_LOCAL := ItemSlotRow.SLOT_H + ItemSlotRow.GAP \
+	+ ItemSlotRow.SLOT_H * 0.5
 var p1_item_row: ItemSlotRow
 var p2_item_row: ItemSlotRow
+var _debug_panel: Control
+var _debug_buttons_toggle: Button
 ## M3：本回合已点选「使用」的道具槽（仅 P1）；确认时统一 use_slot 提交，进新回合清空。
 var selected_item_slots: Array[int] = []
 ## 需要另选槽位的道具参数：使用槽 -> 目标道具槽。熔炉消耗目标，点金石变换目标。
@@ -383,6 +397,11 @@ var _world_foreground_source: Control = null
 var _character_reflection_receiver: Control = null
 var _character_reflection_material: ShaderMaterial = null
 var _battle_status_rows: Array[Control] = []
+## 无截图时序契约探针；只记录阶段名，不参与玩法或绘制。
+var _resolution_phase_trace: Array[String] = []
+## 结算演出中的临时显示快照：避免 UI 在 h16 独立攻击落下前读取 BattleCore 最终 HP/护甲。
+## key = "player:slot"，value = {hp, shield}（均为半点内部值）。
+var _resolution_frame_value_overrides: Dictionary = {}
 
 
 # ---- 演出原语库（2026-07-17 拆分批①）：飘字/斩击/火花/尘/能量粒/冲击帧+对象池 全家
@@ -866,13 +885,19 @@ func _make_h24_discount_button() -> Button:
 	cap_badge.name = "CapCost"
 	cap_badge.position = Vector2(-22.0, -24.0)
 	cap_badge.size = Vector2(70.0, 70.0)
-	cap_badge.set_icon(ENERGY_COST_SHEET, 4, 4, 0)
-	cap_badge.set_number(-1)
+	_configure_h24_cap_badge(cap_badge)
 	cap_badge.font_size = 16
 	cap_badge.embolden = 0.7
 	choice.add_child(cap_badge)
 	_attach_button_juice(choice)
 	return choice
+
+
+func _configure_h24_cap_badge(cap_badge: IconBadge) -> void:
+	cap_badge.set_icon(ENERGY_COST_SHEET, 4, 4, 0)
+	cap_badge.icon_modulate = IconPipRow.DISABLED_CAPACITY_COLOR
+	cap_badge.set_number(1)
+	cap_badge.z_index = 20
 
 
 ## 结算"进攻方"判定（镜头冲突落点用·Eddy 2026-07-09 镜头规格）：
@@ -1364,6 +1389,12 @@ func _on_circle_pressed(action: int, btn: Button) -> void:
 		return
 	var preview: BattleCore = _battle_after_selected_items()
 	if action == ACTIVE:
+		# 并封的统一技能键只切换“当前行动减费”变体，本身永远不占行动槽。
+		# 只有并封当前出战时才使用底部统一入口；并封在替补时继续走所选动作上方的分支，
+		# 避免与当前英雄自己的主动技争用同一个按钮。
+		if _current_hero_uses_h24_primary():
+			_on_h24_discount_pressed()
+			return
 		if battle.has_blood_payment(PLAYER):
 			var next_blood_payment := not _blood_payment_armed
 			# 已选行动若只能靠蚩尤付款，必须先取消行动，不能把界面留在
@@ -1427,6 +1458,8 @@ func _on_circle_pressed(action: int, btn: Button) -> void:
 		_update_button_states()
 		return
 
+	var requested_h24_primary := _energy_cap_discount_armed \
+		and _current_hero_uses_h24_primary()
 	selected_action = action
 	selected_second_action = -1
 	_second_enemy_target_pick = -1
@@ -1437,7 +1470,10 @@ func _on_circle_pressed(action: int, btn: Button) -> void:
 	_energy_cap_discount_armed = false
 	_reset_button_styles()
 	selected_btn = btn
-	if not _current_action_can_pay_without_h24() and preview.can_use_energy_cap_discount(
+	if requested_h24_primary and preview.can_use_energy_cap_discount(
+			PLAYER, selected_action, _empowered_wave_armed, _blood_payment_armed):
+		_energy_cap_discount_armed = true
+	elif not _current_action_can_pay_without_h24() and preview.can_use_energy_cap_discount(
 			PLAYER, selected_action, _empowered_wave_armed, _blood_payment_armed):
 		_energy_cap_discount_armed = true
 	_set_btn_selected(btn, true)
@@ -2022,7 +2058,13 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 		resolution_events, active_before, hp_before)
 	var corrected_active_before: Array[int] = corrected_baselines["active"]
 	var corrected_hp_before: Array[float] = corrected_baselines["hp"]
+	var h16_pursuits: Array[Dictionary] = _h16_pursuit_specs(resolution_events)
 	var display_slots: Array[int] = [battle.active_index[0], battle.active_index[1]]
+	# BattleCore 已经是最终快照；h16 的最终 active_index 不能倒灌到主行动段。
+	for pursuit: Dictionary in h16_pursuits:
+		var pursuit_player := int(pursuit.get("player", -1))
+		if pursuit_player >= PLAYER and pursuit_player <= AI:
+			display_slots[pursuit_player] = int(corrected_active_before[pursuit_player])
 	var dmg: Array[int] = [0, 0]
 	var reserve_hits: Array[Dictionary] = [{}, {}]   # slot → {amount, pen}，防替补受击误打中央角色
 	var reserve_blocks: Array[Dictionary] = [{}, {}] # slot → 是否挡下大波，防替补格挡误播到中央角色
@@ -2037,10 +2079,13 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 	var tags: Array = [[], []]
 	var pre_tags: Array = [[], []]
 	var cancelled_attacks: Array[bool] = [false, false]
+	var transform_players: Array[int] = []
 	# 力量的代价属于回合末自我处决，而非对方动作击杀。保留死亡演出，
 	# 但不能误触发对方终结技或“大波命中”的镜头判断。
 	var strength_price_executed: Array[bool] = [false, false]
 	for ev in resolution_events:
+		if _is_h16_pursuit_detail_event(ev):
+			continue
 		var p: int = int(ev.get("player", 0))
 		var event_slot: int = int(ev.get("slot", display_slots[p]))
 		var on_display: bool = event_slot == display_slots[p]
@@ -2072,7 +2117,8 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 					reserve_loss["amount"] = int(reserve_loss["amount"]) + loss_amount
 					reserve_hits[p][event_slot] = reserve_loss
 			"hero_died":
-				if event_slot == display_slots[p]:
+				if event_slot == display_slots[p] \
+						and not _death_belongs_to_h16_pursuit(p, event_slot, h16_pursuits):
 					dead[p] = true
 			"defend_block", "big_defend_block":
 				var blocked_big: bool = int(ev.get("kind", -1)) == A.BIG_ATTACK
@@ -2105,10 +2151,6 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 			"armor_broken":
 				if on_display:
 					tags[p].append({text = tr("破甲"), col = COL_TAG_BREAK})
-			"longyuji_empowered":
-				tags[p].append({text = tr("龙御极"), col = COL_TAG_AMP})
-			"h13_split_big_wave":
-				tags[p].append({text = tr("双波"), col = COL_TAG_AMP})
 			"h14_blood_payment":
 				tags[p].append({
 					text = tr("生命-%s") % _fmt_hp(float(ev.get("amount", 0)) / 2.0),
@@ -2117,9 +2159,10 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 			"h24_energy_cap_discount":
 				tags[p].append({text = tr("上限-1 / 费用-1"), col = COL_TAG_AMP})
 			"h16_reserve_pursuit":
-				tags[p].append({text = tr("追击"), col = COL_TAG_AMP})
+				pass
 			"h17_transform":
-				pre_tags[p].append({text = tr("转变"), col = COL_TAG_AMP})
+				if not transform_players.has(p):
+					transform_players.append(p)
 			"h22_energy_burn":
 				tags[0].append({text = tr("能量归零"), col = COL_TAG_BREAK})
 				tags[1].append({text = tr("能量归零"), col = COL_TAG_BREAK})
@@ -2156,9 +2199,20 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 			var hp_now := battle.hp_display(battle.hp[p][corrected_active_before[p]])
 			if hp_now > corrected_hp_before[p]:
 				healed[p] = hp_now - corrected_hp_before[p]
+	var resolved_actions: Array[int] = [
+		int(r.get("p1_action", -1)), int(r.get("p2_action", -1))]
+	var h10_active_players: Array[int] = []
+	for p in 2:
+		# H17 可能在最终快照里变成 h10，不能因此误播飞洒天星的攻击帧。
+		var source_slot: int = int(corrected_active_before[p])
+		if resolved_actions[p] == ACTIVE and not transform_players.has(p) \
+				and source_slot >= 0 and source_slot < battle.heroes[p].size() \
+				and (battle.heroes[p][source_slot] as HeroData).hero_id == "h10":
+			h10_active_players.append(p)
 
 	# 头顶招式圆圈（揭示双方盲选出招）→ 消失 → 再播打斗动画
-	await _show_action_indicators(r.get("p1_action", -1), r.get("p2_action", -1))
+	await _show_action_indicators(
+		r.get("p1_action", -1), r.get("p2_action", -1), resolution_events)
 	var anim_actions: Array[int] = [int(r.get("p1_action", -1)), int(r.get("p2_action", -1))]
 	for p in 2:
 		if cancelled_attacks[p]:
@@ -2167,8 +2221,65 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 		{pen = pen_max, blocked = blocked, block_big = block_big_atk, egain = egain, healed = healed,
 			tags = tags, pre_tags = pre_tags, reserve_hits = reserve_hits, reserve_blocks = reserve_blocks,
 			strength_price_executed = strength_price_executed,
+			transform_players = transform_players,
+			h10_active_players = h10_active_players,
+			h16_pursuits = h16_pursuits,
 			active_before = corrected_active_before})
+	_resolution_frame_value_overrides.clear()
 	_update_all()
+
+
+func _is_h16_pursuit_detail_event(event: Dictionary) -> bool:
+	return String(event.get("resolution_phase", "")) == "h16_pursuit"
+
+
+func _death_belongs_to_h16_pursuit(
+		player: int, slot: int, pursuits: Array[Dictionary]) -> bool:
+	for pursuit: Dictionary in pursuits:
+		if 1 - int(pursuit.get("player", -1)) == player \
+				and int(pursuit.get("target", -1)) == slot \
+				and bool(pursuit.get("target_defeated", false)):
+			return true
+	return false
+
+
+func _h16_pursuit_specs(events: Array) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var index_by_player: Dictionary = {}
+	for event_variant: Variant in events:
+		var event: Dictionary = event_variant
+		if String(event.get("id", "")) == "h16_reserve_pursuit":
+			var spec: Dictionary = event.duplicate(true)
+			spec["target_tags"] = []
+			index_by_player[int(spec.get("player", -1))] = result.size()
+			result.append(spec)
+	for event_variant: Variant in events:
+		var event: Dictionary = event_variant
+		if not _is_h16_pursuit_detail_event(event):
+			continue
+		var pursuit_player := int(event.get("pursuit_player", -1))
+		if not index_by_player.has(pursuit_player):
+			continue
+		var spec_index: int = int(index_by_player[pursuit_player])
+		var target_tags: Array = result[spec_index].get("target_tags", [])
+		match String(event.get("id", "")):
+			"shield_absorb":
+				target_tags.append({
+					text = tr("护甲-%s") % _fmt_hp(float(event.get("amount", 0)) / 2.0),
+					col = COL_TAG_ABSORB,
+				})
+			"damage_immune":
+				target_tags.append({text = tr("免疫"), col = COL_TAG_SAVE, pr = 0})
+			"marked_hit":
+				target_tags.append({text = tr("印记"), col = COL_TAG_AMP})
+			"vuln_hit":
+				target_tags.append({text = tr("脆弱"), col = COL_TAG_AMP})
+			"huanhun_revive", "huanhun_fatal_immunity":
+				target_tags.append({text = tr("还魂"), col = COL_TAG_SAVE, pr = 0})
+			_:
+				pass
+		result[spec_index]["target_tags"] = target_tags
+	return result
 
 
 ## 结算后续（本地流程尾）：终局/加时/AI 换人/玩家换人/下一回合。联机不走此路（服务器驱动相位）。
@@ -2526,12 +2637,20 @@ func _maybe_arm_enemy_targets(action: int) -> void:
 	_enemy_targeting = true
 	_enemy_target_action = action
 	_enemy_target_pick = battle.active_index[AI] if include_active else -1
+	var prompt_icon: Texture2D = _hero_skill_icon(battle.active_hero(PLAYER))
 	for fi in [0, 1, 2]:
 		var slot: int = p2_frame_slots[fi]
 		if slot >= 0 and battle.hp[AI][slot] > 0 \
 				and (include_active or slot != battle.active_index[AI]):
-			p2_frames[fi].set_switch_prompt(true, prompt)
+			p2_frames[fi].set_switch_prompt(true, prompt, prompt_icon)
 			p2_frames[fi].is_selected = slot == _enemy_target_pick
+
+
+func _hero_skill_icon(hero: HeroData) -> Texture2D:
+	if hero == null or hero.skill_icon_path.is_empty() \
+			or not ResourceLoader.exists(hero.skill_icon_path):
+		return null
+	return load(hero.skill_icon_path) as Texture2D
 
 
 ## 道具点选可以在选招前或选招后发生；每次变更都从已选道具预览重算临时选敌权。
@@ -2644,7 +2763,21 @@ func _layout_circles() -> void:
 ## 出战英雄是否有占行动主动技，或不占行动的主动强化。
 func _player_has_active() -> bool:
 	var sk: HeroSkill = battle.get_skill(PLAYER, battle.active_index[PLAYER])
-	return sk != null and (sk.has_active() or sk.enables_blood_payment())
+	return sk != null and (
+		sk.has_active() or sk.enables_blood_payment() or sk.enables_energy_cap_discount())
+
+
+func _current_hero_uses_h24_primary() -> bool:
+	var slot := battle.active_index[PLAYER]
+	var sk: HeroSkill = battle.get_skill(PLAYER, slot)
+	return sk != null and sk.enables_energy_cap_discount() \
+		and not sk.has_active() and not sk.enables_blood_payment()
+
+
+func _can_arm_h24_primary(preview: BattleCore) -> bool:
+	return preview.has_energy_cap_discount(PLAYER) \
+		and preview.energy_max[PLAYER] - BattleCore.ENERGY_CAP_DISCOUNT_COST \
+			>= BattleCore.ENERGY_CAP_DISCOUNT_FLOOR
 
 
 ## 技能钮图标 = 出战英雄专属技能图标（h*_skill.png·2026-07-17 Eddy 点单）；无图回退「技能」二字。
@@ -2662,6 +2795,11 @@ func _refresh_special_icon() -> void:
 		_special_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		_special_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		btn_special.add_child(_special_icon)
+	# SkillIcon 是运行期后加节点；创建后立刻重新声明 CostPips 在其上方，
+	# 避免 h21 等主动技能首次进入画面时由树序把左上费用球盖住。
+	var special_cost_badge := btn_special.get_node_or_null("CostPips") as IconBadge
+	if special_cost_badge != null:
+		special_cost_badge.z_index = 20
 	var h: HeroData = battle.heroes[PLAYER][battle.active_index[PLAYER]]
 	var icon_path: String = h.skill_icon_path
 	if String(_special_icon.get_meta("icon_path", "")) == icon_path:
@@ -2675,6 +2813,15 @@ func _refresh_special_icon() -> void:
 		_special_icon.texture = null
 		_special_icon.visible = false
 		btn_special.text = tr("技能")
+	_sync_special_disabled_visual()
+
+
+func _sync_special_disabled_visual() -> void:
+	if _special_icon == null:
+		return
+	# 与公共动作 HoverIcon 的 disabled_alpha=0.35 使用同一灰暗语义。
+	_special_icon.self_modulate = Color(0.42, 0.42, 0.42, 0.35) \
+		if btn_special.disabled else Color.WHITE
 
 
 func _reset_button_styles() -> void:
@@ -2793,9 +2940,12 @@ func _refresh_action_affordance() -> void:
 		if not btn.visible:
 			continue
 		if btn == btn_special:
-			btn.disabled = not preview.has_blood_payment(PLAYER) \
-				and not preview.can_use_active(PLAYER, _blood_payment_armed) \
-				and not preview.can_use_active(PLAYER, _blood_payment_armed, true)
+			if _current_hero_uses_h24_primary():
+				btn.disabled = not _can_arm_h24_primary(preview)
+			else:
+				btn.disabled = not preview.has_blood_payment(PLAYER) \
+					and not preview.can_use_active(PLAYER, _blood_payment_armed) \
+					and not preview.can_use_active(PLAYER, _blood_payment_armed, true)
 		else:
 			var act: int = _btn_action(btn)
 			var normally_available: bool = preview.can_pay_action_with_blood(PLAYER, act) \
@@ -2803,6 +2953,7 @@ func _refresh_action_affordance() -> void:
 			btn.disabled = not normally_available and not preview.can_use_energy_cap_discount(
 				PLAYER, act, false, _blood_payment_armed)
 	# 技能键能量消耗随出战英雄主动技动态变化（0 不显示）。
+	_sync_special_disabled_visual()
 	_refresh_action_modifiers()
 	_refresh_action_cost_badges()
 	btn_confirm.disabled = false
@@ -2861,11 +3012,20 @@ func _current_action_can_pay_without_h24() -> bool:
 
 
 func _on_h24_discount_pressed() -> void:
-	if state != State.PLAYER_SELECT or selected_action < 0:
+	if state != State.PLAYER_SELECT:
+		return
+	var primary_entry := _current_hero_uses_h24_primary()
+	if selected_action < 0:
+		if primary_entry and _can_arm_h24_primary(_battle_after_selected_items()):
+			_energy_cap_discount_armed = not _energy_cap_discount_armed
+			_refresh_action_affordance()
 		return
 	if _energy_cap_discount_armed:
-		# 若当前行动只有借助并封才付得起，则不能留下一个必定回退为「攒」的无效提交。
+		# 若当前行动只有借助并封才付得起，取消技能时同步撤销该行动；
+		# 这样既不会留下无效提交，也不会把技能键锁在无法取消的异常选中态。
 		if not _current_action_can_pay_without_h24():
+			_clear_action_selection_full()
+			_update_button_states()
 			return
 		_energy_cap_discount_armed = false
 	elif _battle_after_selected_items().can_use_energy_cap_discount(
@@ -2877,7 +3037,12 @@ func _on_h24_discount_pressed() -> void:
 func _refresh_action_modifiers() -> void:
 	_refresh_longyuji()
 	_refresh_h24_discount()
-	_set_btn_selected(btn_special, _blood_payment_armed and battle.has_blood_payment(PLAYER))
+	var special_selected := selected_btn == btn_special and selected_action == ACTIVE
+	if battle.has_blood_payment(PLAYER):
+		special_selected = _blood_payment_armed
+	elif _current_hero_uses_h24_primary():
+		special_selected = _energy_cap_discount_armed
+	_set_btn_selected(btn_special, special_selected)
 
 
 ## 刷新攻击变体：龙御极位于「波」上方，暗潮位于「大波」上方。
@@ -2927,6 +3092,13 @@ func _refresh_h24_discount() -> void:
 	if h24_discount_picker == null or btn_h24_discount == null:
 		return
 	var preview: BattleCore = _battle_after_selected_items()
+	if _current_hero_uses_h24_primary():
+		h24_discount_picker.visible = false
+		if _energy_cap_discount_armed and selected_action >= 0 \
+				and not preview.can_use_energy_cap_discount(
+					PLAYER, selected_action, _empowered_wave_armed, _blood_payment_armed):
+			_energy_cap_discount_armed = false
+		return
 	var can_discount: bool = selected_action >= 0 and preview.can_use_energy_cap_discount(
 		PLAYER, selected_action, _empowered_wave_armed, _blood_payment_armed)
 	if not can_discount:
@@ -2963,7 +3135,12 @@ func _set_cost_pips(btn: Button, cost: int, show_zero: bool = false) -> void:
 	if badge == null:
 		return
 	badge.visible = cost > 0 or show_zero
+	# 主动技能图标是运行期后加的兄弟节点；费用角标必须显式置顶，不能依赖树序。
+	badge.z_index = 20
 	if badge.visible:
+		# CostPips 会被 h24 的黑色上限徽记复用；回到任何普通行动/主动技时，
+		# 必须先恢复正常颜色，不能让并封的不可用语义泄漏给下一位英雄。
+		badge.icon_modulate = Color.WHITE
 		var pay_with_hp: bool = _blood_payment_armed and cost > 0
 		if pay_with_hp:
 			badge.set_icon(HEART_COST_SHEET, 4, 1, 0)
@@ -2995,31 +3172,45 @@ func _refresh_action_cost_badges() -> void:
 	_set_cost_pips(btn_big_attack, big_attack_cost)
 	_set_cost_pips(btn_big_defend, big_defend_cost)
 	_set_cost_pips(btn_defend, ActionDef.BASE_ACTION_DEF[A.DEFEND]["cost"], true)
-	_set_cost_pips(btn_special, active_cost,
-		_energy_cap_discount_armed and selected_action == ACTIVE)
+	if _current_hero_uses_h24_primary():
+		var cap_badge := btn_special.get_node_or_null("CostPips") as IconBadge
+		if cap_badge != null:
+			cap_badge.visible = true
+			_configure_h24_cap_badge(cap_badge)
+	else:
+		_set_cost_pips(btn_special, active_cost,
+			_energy_cap_discount_armed and selected_action == ACTIVE)
 
 
 # ============================================================
 # 刷新显示
 # ============================================================
 
-## M2：在各玩家 HUD 下挂道具栏（程序化占位·位置由 ITEM_ROW_POS_* 控制）。
+## 在各玩家 HUD 下挂左右镜像的纵向道具轨：Y 居中，X 与各自底部主按钮同轴。
 func _build_item_rows() -> void:
 	p1_item_row = ItemSlotRow.new()
-	p1_item_row.position = ITEM_ROW_POS_P1
 	p1_item_row.scale = Vector2.ONE * ITEM_ROW_SCALE
+	p1_item_row.vertical_layout = true
 	p1_item_row.bottom_shadow_enabled = true
+	p1_item_row.position = Vector2(
+		btn_switch.get_global_rect().get_center().x - p1_hud.get_global_rect().position.x
+				- ITEM_FRAME_SIZE * 0.5,
+		SCREEN_H * 0.5 - p1_hud.get_global_rect().position.y
+				- ITEM_MIDDLE_CENTER_LOCAL * ITEM_ROW_SCALE)
 	p1_item_row.interactive = true   # M3：本地玩家行可点击
 	p1_item_row.slot_clicked.connect(_on_p1_slot_clicked)
 	p1_item_row.slot_upgrade_clicked.connect(_on_p1_slot_upgrade)   # C：升级角标
 	p1_hud.add_child(p1_item_row)
 	p2_item_row = ItemSlotRow.new()   # P2 = AI·道具-blind（ADR D9）→ 仅显示
 	p2_item_row.scale = Vector2.ONE * ITEM_ROW_SCALE
+	p2_item_row.vertical_layout = true
 	p2_item_row.bottom_shadow_enabled = true
-	# 右贴镜像 P1：P2 右内边距 = P1 左内边距(28) → 与右侧 P2 框组对齐(修敌方道具行偏左)。
-	# 镜像宽度按缩放后的实显宽算（否则 P2 行会向内缩进一截）。
-	var row_w := (ItemSlotRow.SLOT_W * 3.0 + ItemSlotRow.GAP * 2.0) * ITEM_ROW_SCALE
-	p2_item_row.position = Vector2(SCREEN_W - ITEM_ROW_POS_P1.x - row_w, ITEM_ROW_POS_P1.y)
+	p2_item_row.mirror_seals = true
+	p2_item_row.position = Vector2(
+		btn_confirm.get_global_rect().get_center().x - p2_hud.get_global_rect().position.x
+				- ITEM_FRAME_SIZE * 0.5,
+		SCREEN_H * 0.5 - p2_hud.get_global_rect().position.y
+				- ITEM_MIDDLE_CENTER_LOCAL * ITEM_ROW_SCALE)
 	p2_item_row.slot_clicked.connect(_on_p2_item_target_clicked)
 	p2_hud.add_child(p2_item_row)
 
@@ -3028,13 +3219,14 @@ func _build_item_rows() -> void:
 # 悬停提示（2026-07-11 Eddy 点单·外部 UI 件到位前的程序化像素框版）
 # ============================================================
 
-enum TipFormat { S, M, L }
-enum TipContentKind { PLAIN, SKILL, ITEM, AVATAR_SKILL }
+enum TipFormat { S, M, ACTIVE, L }
+enum TipContentKind { PLAIN, SKILL, ITEM, AVATAR_SKILL, BUFF }
 
 @export_group("悬停说明框")
 @export var tip_size_s := Vector2(156.0, 76.0)    # 底部按钮说明
 @export var tip_size_m := Vector2(222.0, 144.0)   # 道具说明：只增加高度，不扩大宽度
-@export var tip_size_l := Vector2(340.0, 128.0)   # 主动技能、头像技能说明
+@export var tip_size_active := Vector2(300.0, 108.0) # 主动技能短说明专用紧凑框
+@export var tip_size_l := Vector2(340.0, 128.0)   # 头像技能、Buff 说明
 @export_range(0.5, 2.0, 0.01) var tip_texture_brightness := 1.28
 @export_subgroup("字距")
 @export_range(-4, 8, 1) var tip_glyph_spacing: int = 0
@@ -3085,16 +3277,33 @@ const ITEM_TIP_RULE_HEIGHT := 5.0
 
 const TIP_GAP := 12.0                # 提示框与目标控件的间距(px)
 const AVATAR_SKILL_TIP_EXTRA_DROP := 30.0   # 越过替补头像下方 28px 血量行
+## 战斗说明框的星芒必须与关键词末字留出可见间隔；尾随空白同时容纳完整 7px 星芒。
+const TIP_KEYWORD_SPARK_CLEARANCE := 3.0
+const TIP_KEYWORD_TRAILING_SPACER := "\u2060\u2002\u2009\u2060"
+## 单行或最后一行保持自然字距；仅真正需要填充的中间行做两端对齐。
+const TIP_JUSTIFICATION_FLAGS := TextServer.JUSTIFICATION_KASHIDA \
+		| TextServer.JUSTIFICATION_WORD_BOUND \
+		| TextServer.JUSTIFICATION_TRIM_EDGE_SPACES \
+		| TextServer.JUSTIFICATION_SKIP_LAST_LINE_WITH_VISIBLE_CHARS
 const TIP_ATOMIC_TERMS: Array[String] = [
 	"0.5点", "1点", "2点", "3点", "4点", "大波", "大防", "能量", "生命", "护甲",
 	"伤害", "回合", "出战", "英雄", "敌方", "我方",
 ]
+## 17px 标题字形放进 31px 奇数轨道，避免 30-17 的半像素居中让不同汉字看似忽上忽下。
+const BUFF_TITLE_TRACK_HEIGHT := 31.0
+const BUFF_TITLE_FIXED_Y := 3.0
+const BUFF_TITLE_SPARK_GAP := 3.0
+const BUFF_TITLE_COUNT_GAP := 5.0
 
 var _tip_panel: PanelContainer
 var _tip_content: Control
 var _tip_label: Label
 var _tip_rich: RichTextLabel
 var _tip_skill_icon: TextureRect
+var _tip_buff_title: Control
+var _tip_buff_name: Label
+var _tip_buff_count: Label
+var _tip_buff_spark: Control
 var _tip_item_header: Control
 var _tip_item_icon: TextureRect
 var _tip_item_title: Label
@@ -3105,6 +3314,7 @@ var _tip_keyword_ranges: Array[Vector2i] = []
 var _tip_keyword_sparks: Array[Control] = []
 var _tip_keyword_alignment: int = HORIZONTAL_ALIGNMENT_LEFT
 var _tip_keyword_ink: Color = Color("453623")
+var _tip_revision := 0
 
 
 ## 建悬停提示（中性书页像素框 9-slice）+ 挂满底部动作按钮与我方道具槽。
@@ -3182,6 +3392,7 @@ func _build_hover_tips() -> void:
 	_tip_rich.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_tip_effect_bold_font = EffectTextFormatterScript.make_bold_font(
 			_tip_rich.get_theme_font("normal_font"))
+	_build_buff_tip_title()
 	add_child(_tip_panel)
 	_register_tip(btn_charge, _action_tip.bind(A.CHARGE), TipFormat.S, true)
 	_register_tip(btn_attack, _action_tip.bind(A.ATTACK), TipFormat.S, true)
@@ -3191,12 +3402,12 @@ func _build_hover_tips() -> void:
 	_register_tip(btn_switch, _switch_button_tip, TipFormat.S, true)
 	_register_tip(btn_backpack, _backpack_button_tip, TipFormat.S, true)
 	_register_tip(btn_confirm, _end_turn_button_tip, TipFormat.S, true)
-	_register_tip(btn_special, _special_tip, TipFormat.L, false, TipContentKind.SKILL)
-	_register_tip(btn_longyuji_branch, _longyuji_tip, TipFormat.L, false,
+	_register_tip(btn_special, _special_tip, TipFormat.ACTIVE, false, TipContentKind.SKILL)
+	_register_tip(btn_longyuji_branch, _longyuji_tip, TipFormat.ACTIVE, false,
 		TipContentKind.SKILL)
-	_register_tip(btn_split_big_wave, _split_big_wave_tip, TipFormat.L, false,
+	_register_tip(btn_split_big_wave, _split_big_wave_tip, TipFormat.ACTIVE, false,
 		TipContentKind.SKILL)
-	_register_tip(btn_h24_discount, _h24_discount_tip, TipFormat.L, false,
+	_register_tip(btn_h24_discount, _h24_discount_tip, TipFormat.ACTIVE, false,
 		TipContentKind.SKILL)
 	p1_item_row.slot_hovered.connect(_on_item_slot_hovered)
 	p1_item_row.slot_unhovered.connect(_hide_tip)
@@ -3204,6 +3415,72 @@ func _build_hover_tips() -> void:
 	p2_item_row.hoverable = true
 	p2_item_row.slot_hovered.connect(_on_item_slot_hovered_p2)
 	p2_item_row.slot_unhovered.connect(_hide_tip)
+
+
+func _build_buff_tip_title() -> void:
+	_tip_buff_title = Control.new()
+	_tip_buff_title.name = "BuffTitle"
+	_tip_buff_title.anchor_left = 0.5
+	_tip_buff_title.anchor_right = 0.5
+	_set_buff_title_vertical_offset(BUFF_TITLE_FIXED_Y)
+	_tip_buff_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tip_buff_title.visible = false
+	_tip_content.add_child(_tip_buff_title)
+
+	_tip_buff_name = Label.new()
+	_tip_buff_name.name = "BuffName"
+	_tip_buff_name.add_theme_font_override("font", _tip_effect_bold_font)
+	_tip_buff_name.add_theme_font_size_override("font_size", tip_font_size_l)
+	_tip_buff_name.add_theme_color_override("font_color", Color(0.24, 0.19, 0.12))
+	_tip_buff_name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_tip_buff_name.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tip_buff_title.add_child(_tip_buff_name)
+
+	_tip_buff_spark = EFFECT_KEYWORD_SPARK_SCRIPT.new() as Control
+	_tip_buff_spark.name = "BuffNameSpark"
+	_tip_buff_spark.call("configure", Color(0.24, 0.19, 0.12))
+	_tip_buff_title.add_child(_tip_buff_spark)
+
+	_tip_buff_count = Label.new()
+	_tip_buff_count.name = "BuffCount"
+	_tip_buff_count.add_theme_font_override("font", _tip_rich.get_theme_font("normal_font"))
+	_tip_buff_count.add_theme_font_size_override("font_size", tip_font_size_l)
+	_tip_buff_count.add_theme_color_override("font_color", Color(0.24, 0.19, 0.12))
+	_tip_buff_count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_tip_buff_count.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tip_buff_title.add_child(_tip_buff_count)
+
+
+func _configure_buff_tip_title(title: String, count: int) -> void:
+	var protected_title := _join_tip_glyphs(title)
+	_tip_buff_name.text = protected_title
+	_tip_buff_count.text = "x%d" % count if count >= 0 else ""
+	_tip_buff_count.visible = count >= 0
+	var name_width := ceilf(_tip_effect_bold_font.get_string_size(
+			protected_title, HORIZONTAL_ALIGNMENT_LEFT, -1.0, tip_font_size_l).x)
+	var count_width := ceilf(_tip_rich.get_theme_font("normal_font").get_string_size(
+			_tip_buff_count.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, tip_font_size_l).x) \
+			if count >= 0 else 0.0
+	var total_width := name_width + BUFF_TITLE_SPARK_GAP \
+			+ EffectKeywordSpark.MARK_SIZE.x
+	if count >= 0:
+		total_width += BUFF_TITLE_COUNT_GAP + count_width
+	_tip_buff_title.offset_left = -total_width * 0.5
+	_tip_buff_title.offset_right = total_width * 0.5
+	_tip_buff_name.position = Vector2.ZERO
+	_tip_buff_name.size = Vector2(name_width, BUFF_TITLE_TRACK_HEIGHT)
+	_tip_buff_spark.position = Vector2(
+			name_width + BUFF_TITLE_SPARK_GAP, 3.0)
+	_tip_buff_count.position = Vector2(
+			name_width + BUFF_TITLE_SPARK_GAP + EffectKeywordSpark.MARK_SIZE.x
+					+ BUFF_TITLE_COUNT_GAP,
+			0.0)
+	_tip_buff_count.size = Vector2(count_width, BUFF_TITLE_TRACK_HEIGHT)
+
+
+func _set_buff_title_vertical_offset(vertical_offset: float) -> void:
+	_tip_buff_title.offset_top = vertical_offset
+	_tip_buff_title.offset_bottom = vertical_offset + BUFF_TITLE_TRACK_HEIGHT
 
 
 ## 具名道具说明的独立顶部行：原尺寸像素图标 + 名称，不再缩放正式道具框。
@@ -3313,20 +3590,14 @@ func _on_hero_skill_tip(player: int, frame_idx: int) -> void:
 
 
 func _on_item_slot_hovered(slot: int) -> void:
-	var sc: Vector2 = p1_item_row.scale
-	var base: Vector2 = p1_item_row.global_position \
-		+ Vector2(slot * (ItemSlotRow.SLOT_W + ItemSlotRow.GAP) * sc.x, 0.0)
-	_show_tip_at(Rect2(base, Vector2(ItemSlotRow.SLOT_W * sc.x, ItemSlotRow.SLOT_H * sc.y)),
+	_show_tip_at(p1_item_row.slot_global_rect(slot),
 		_item_slot_tip(slot), TipFormat.M, false, TipContentKind.ITEM, null,
 		_item_slot_tip_data(slot, PLAYER))
 
 
 ## 敌方道具悬停：槽矩形始终按道具行的实际缩放计算。
 func _on_item_slot_hovered_p2(slot: int) -> void:
-	var sc: Vector2 = p2_item_row.scale
-	var base: Vector2 = p2_item_row.global_position \
-		+ Vector2(slot * (ItemSlotRow.SLOT_W + ItemSlotRow.GAP) * sc.x, 0.0)
-	_show_tip_at(Rect2(base, Vector2(ItemSlotRow.SLOT_W * sc.x, ItemSlotRow.SLOT_H * sc.y)),
+	_show_tip_at(p2_item_row.slot_global_rect(slot),
 		_item_slot_tip(slot, AI), TipFormat.M, false, TipContentKind.ITEM, null,
 		_item_slot_tip_data(slot, AI))
 
@@ -3424,32 +3695,54 @@ func _append_relic_status_lines(player: int, lines: Array[String]) -> void:
 ## 目标矩形上方居中放提示；上方放不下（道具行在屏幕上部）→ 落到下方。
 func _show_tip_at(target: Rect2, text: String, format: int, centered: bool = false,
 		content_kind: int = TipContentKind.PLAIN, skill_icon: Texture2D = null,
-		item_data: ItemData = null) -> void:
+		item_data: ItemData = null, buff_title: String = "", buff_count: int = -1) -> void:
 	if text == "":
 		_hide_tip()
 		return
+	_tip_revision += 1
+	var tip_revision := _tip_revision
 	var is_short := format == TipFormat.S
 	var is_avatar_skill := content_kind == TipContentKind.AVATAR_SKILL
+	var is_buff := content_kind == TipContentKind.BUFF
+	var uses_skill_layout := is_avatar_skill or is_buff
 	_clear_tip_keyword_sparks(true)
-	var tip_size: Vector2 = tip_size_s if format == TipFormat.S else (
-		tip_size_m if format == TipFormat.M else tip_size_l)
+	# Buff 与头像技能严格共用 L 框尺寸；标题只是覆盖层，不参与正文版心计算。
+	var tip_size: Vector2
+	match format:
+		TipFormat.S:
+			tip_size = tip_size_s
+		TipFormat.M:
+			tip_size = tip_size_m
+		TipFormat.ACTIVE:
+			tip_size = tip_size_active
+		_:
+			tip_size = tip_size_l
 	_set_tip_content_margins(format, content_kind)
 	_tip_label.visible = is_short
 	_tip_rich.visible = not is_short
 	_tip_skill_icon.texture = skill_icon
-	_tip_skill_icon.visible = is_avatar_skill and skill_icon != null
+	_tip_skill_icon.visible = uses_skill_layout and skill_icon != null
+	_tip_buff_title.visible = is_buff
+	if is_buff:
+		# 连续查看不同 Buff 时，名称、星芒与计数始终锁在同一条固定基线。
+		_set_buff_title_vertical_offset(BUFF_TITLE_FIXED_Y)
+		_configure_buff_tip_title(buff_title, buff_count)
 	_tip_item_header.visible = false
 	_tip_item_rule.visible = false
 	_tip_rich.offset_left = 76.0 if _tip_skill_icon.visible else 0.0
 	_tip_rich.offset_top = 0.0
 	_tip_rich.offset_right = 0.0
 	_tip_rich.offset_bottom = 0.0
+	_tip_skill_icon.anchor_top = 0.5
+	_tip_skill_icon.anchor_bottom = 0.5
+	_tip_skill_icon.offset_top = -32.0
+	_tip_skill_icon.offset_bottom = 32.0
 	if is_short:
 		_tip_label.add_theme_constant_override("line_spacing", tip_line_spacing)
 		_tip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if centered \
 			else HORIZONTAL_ALIGNMENT_LEFT
 		_tip_label.text = _keep_tip_terms_together(text)
-	elif is_avatar_skill:
+	elif uses_skill_layout:
 		_tip_rich.add_theme_constant_override("line_separation", tip_line_spacing)
 		_set_avatar_skill_tip_text(text)
 	else:
@@ -3459,16 +3752,40 @@ func _show_tip_at(target: Rect2, text: String, format: int, centered: bool = fal
 	_tip_panel.custom_minimum_size = Vector2.ZERO
 	_tip_panel.size = tip_size
 	var sz: Vector2 = tip_size
-	var x: float = clampf(target.position.x + target.size.x * 0.5 - sz.x * 0.5, 8.0, SCREEN_W - sz.x - 8.0)
-	# 目标在上半屏（道具行）→ 提示放下方（防压顶部头像/血行）；下半屏（底部按钮）→ 放上方。
-	var y: float = target.end.y + TIP_GAP if target.get_center().y < SCREEN_H * 0.4 \
-		else target.position.y - sz.y - TIP_GAP
-	if is_avatar_skill and target.get_center().y < SCREEN_H * 0.4:
-		y += AVATAR_SKILL_TIP_EXTRA_DROP
+	var x: float
+	var y: float
+	if content_kind == TipContentKind.ITEM:
+		# 侧边纵向道具轨：左侧向右展开，右侧向左展开；说明框与槽位垂直居中。
+		x = target.end.x + TIP_GAP if target.get_center().x < SCREEN_W * 0.5 \
+			else target.position.x - sz.x - TIP_GAP
+		y = target.get_center().y - sz.y * 0.5
+	else:
+		x = target.position.x + target.size.x * 0.5 - sz.x * 0.5
+		# 目标在上半屏→提示放下方；下半屏→放上方。
+		y = target.end.y + TIP_GAP if target.get_center().y < SCREEN_H * 0.4 \
+			else target.position.y - sz.y - TIP_GAP
+		if is_avatar_skill and target.get_center().y < SCREEN_H * 0.4:
+			y += AVATAR_SKILL_TIP_EXTRA_DROP
+	x = clampf(x, 8.0, SCREEN_W - sz.x - 8.0)
 	if y < 8.0 or y + sz.y > SCREEN_H - 8.0:
 		y = clampf(y, 8.0, SCREEN_H - sz.y - 8.0)
 	_tip_panel.global_position = Vector2(x, y)
 	_tip_panel.visible = true
+	if uses_skill_layout:
+		call_deferred("_align_skill_tip_text_to_pixel_grid", tip_revision)
+
+
+## RichTextLabel 的垂直居中会在“偶数高轨道 + 奇数高文字块”时落到半像素。
+## 只收窄 1px 正文轨道，把实际文字顶边锁到整数像素；图标与整体版心不移动。
+func _align_skill_tip_text_to_pixel_grid(revision: int) -> void:
+	if revision != _tip_revision or _tip_panel == null or not _tip_panel.visible:
+		return
+	var track_height := int(roundf(_tip_content.size.y))
+	var content_height := int(ceilf(_tip_rich.get_content_height()))
+	var needs_one_pixel_inset := posmod(track_height - content_height, 2) != 0
+	_tip_rich.offset_top = 1.0 if needs_one_pixel_inset else 0.0
+	_tip_rich.offset_bottom = 0.0
+	_refresh_tip_keyword_sparks()
 
 
 ## 头像技能说明使用独立的「图标 + 文案」布局，不与道具文本解析共用状态。
@@ -3485,7 +3802,12 @@ func _append_effect_rich_text(
 		protect_atomic_terms: bool = true) -> void:
 	_tip_keyword_alignment = alignment
 	_tip_keyword_ink = color
-	_tip_rich.push_paragraph(alignment, Control.TEXT_DIRECTION_AUTO, "zh_CN")
+	_tip_rich.push_paragraph(
+			alignment,
+			Control.TEXT_DIRECTION_AUTO,
+			"zh_CN",
+			TextServer.STRUCTURED_TEXT_DEFAULT,
+			TIP_JUSTIFICATION_FLAGS)
 	_tip_rich.push_font(_tip_rich.get_theme_font("normal_font"), tip_font_size_l)
 	_tip_rich.push_color(color)
 	var cursor := _tip_rich.get_total_character_count()
@@ -3504,10 +3826,10 @@ func _append_effect_rich_text(
 		_tip_rich.add_text(protected_text)
 		if is_keyword:
 			_tip_rich.pop()
-			_tip_rich.add_text(EffectTextFormatterScript.KEYWORD_TRAILING_SPACER)
+			_tip_rich.add_text(TIP_KEYWORD_TRAILING_SPACER)
 		cursor += protected_text.length()
 		if is_keyword:
-			cursor += EffectTextFormatterScript.KEYWORD_TRAILING_SPACER.length()
+			cursor += TIP_KEYWORD_TRAILING_SPACER.length()
 	_tip_rich.pop_all()
 	call_deferred("_refresh_tip_keyword_sparks")
 
@@ -3556,7 +3878,7 @@ func _refresh_tip_keyword_sparks() -> void:
 		spark.call("configure", _tip_keyword_ink)
 		spark.position = Vector2(
 				roundf(line_origin_x + keyword_end_x
-						+ EffectTextFormatterScript.KEYWORD_SPARK_OFFSET.x),
+						+ TIP_KEYWORD_SPARK_CLEARANCE),
 				roundf(vertical_origin + _tip_rich.get_line_offset(line)
 						+ EffectTextFormatterScript.KEYWORD_SPARK_OFFSET.y))
 		_tip_rich.add_child(spark)
@@ -3633,7 +3955,7 @@ func _tip_optical_center_shift(format: int, content_kind: int) -> float:
 	match content_kind:
 		TipContentKind.ITEM:
 			return tip_optical_center_shift_item
-		TipContentKind.AVATAR_SKILL:
+		TipContentKind.AVATAR_SKILL, TipContentKind.BUFF:
 			return tip_optical_center_shift_avatar_skill
 	return tip_optical_center_shift_s if format == TipFormat.S \
 		else tip_optical_center_shift_l
@@ -3641,7 +3963,8 @@ func _tip_optical_center_shift(format: int, content_kind: int) -> float:
 
 func _set_tip_content_margins(format: int,
 		content_kind: int = TipContentKind.PLAIN) -> void:
-	var is_avatar_skill := content_kind == TipContentKind.AVATAR_SKILL
+	var is_avatar_skill := content_kind == TipContentKind.AVATAR_SKILL \
+			or content_kind == TipContentKind.BUFF
 	var horizontal := tip_padding_horizontal_avatar_skill if is_avatar_skill else (
 		tip_padding_horizontal_s if format == TipFormat.S else (
 			tip_padding_horizontal_m if format == TipFormat.M else tip_padding_horizontal_l))
@@ -3809,6 +4132,7 @@ func _join_tip_glyphs(text: String) -> String:
 
 
 func _hide_tip() -> void:
+	_tip_revision += 1
 	if _tip_panel != null:
 		_tip_panel.visible = false
 
@@ -3845,6 +4169,8 @@ func _special_tip() -> String:
 			return tr("指定敌方一名未出战英雄登场，替换其当前出战英雄")
 		"h22":
 			return tr("下一回合结束时，双方失去全部能量")
+		"h24":
+			return _h24_discount_tip()
 		_:
 			return EffectTextFormatterScript.concise(tr(h.skill_detail))
 
@@ -4448,15 +4774,19 @@ func _update_character_displays() -> void:
 		_update_character_display(p)
 
 
-## 毒素/脆弱/剑气属于角色常驻信息：固定挂在玩家名后，不进入战场空间。
+## 英雄状态（毒素/脆弱）与队伍状态（剑气/玄金不动相/不坠神言）
+## 共用玩家名后队列，但换人时遵循各自的生命周期。
 func _build_battle_status_rows() -> void:
 	_battle_status_rows.clear()
 	var anchors: Array[Control] = [p1_status_anchor, p2_status_anchor]
 	for player: int in 2:
-		var row := BATTLE_STATUS_ROW_SCRIPT.new() as Control
+		var row := BATTLE_STATUS_ROW_SCRIPT.new() as BattleStatusRow
 		row.name = "BattleStatusRowP%d" % (player + 1)
 		row.z_index = BATTLE_STATUS_Z_INDEX
 		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.right_to_left = player == AI
+		row.status_hovered.connect(_on_battle_status_hovered)
+		row.status_unhovered.connect(_hide_tip)
 		anchors[player].add_child(row)
 		_battle_status_rows.append(row)
 
@@ -4465,17 +4795,46 @@ func _refresh_battle_status_rows() -> void:
 	if battle == null or _battle_status_rows.size() < 2:
 		return
 	for player: int in 2:
-		var row: Control = _battle_status_rows[player]
+		var row: BattleStatusRow = _battle_status_rows[player] as BattleStatusRow
 		var slot := battle.active_index[player]
-		var entries: Array[Dictionary] = []
+		# 行本身属于玩家；英雄槽身份由每个条目的 instance_key 区分。
+		# 因而切换会重播新英雄自己的状态，但队伍 Buff 不会被整行清空。
+		row.set_owner_key(StringName("player:%d" % player))
+		var hero_status_values: Dictionary = {}
+		var hero_slot := -1
 		if slot >= 0 and slot < battle.hp[player].size() \
 				and battle.hp[player][slot] > 0:
-			var status_values: Dictionary = battle.statuses[player][slot]
-			entries = EffectCatalog.battle_status_entries(status_values)
+			hero_status_values = battle.statuses[player][slot]
+			hero_slot = slot
+		# 队伍状态不依附出战槽：死亡待换与换人演出期间也持续存在。
+		var team_status_values: Dictionary = {
+			"jianqi": battle.get_team_status(player, "jianqi", 0),
+			"upgrade_next_wave": battle.upgrade_next_wave[player],
+			"retained_big_defend": battle.has_retained_big_defend(player),
+		}
+		var entries := EffectCatalog.battle_status_entries(
+				hero_status_values, team_status_values, hero_slot)
 		row.call("refresh", entries)
 	_position_battle_status_rows()
 
-## P1 从锚点向右、P2 从镜像锚点向左；数字只负责防遮挡宽度，不参与锚定。
+
+func _on_battle_status_hovered(
+		effect_id: StringName, value: int, target_rect: Rect2) -> void:
+	var entry: Dictionary = EffectCatalog.get_by_id(effect_id)
+	if entry.is_empty():
+		_hide_tip()
+		return
+	var title := tr(String(entry.get("name", "")))
+	var description := tr(String(entry.get("description", "")))
+	var icon: Texture2D = null
+	var icon_path := String(entry.get("icon_path", ""))
+	if icon_path != "" and ResourceLoader.exists(icon_path):
+		icon = load(icon_path) as Texture2D
+	var count := value if bool(entry.get("show_stack_count", false)) else -1
+	_show_tip_at(target_rect, description, TipFormat.L, false,
+			TipContentKind.BUFF, icon, null, title, count)
+
+## P1 从锚点向右、P2 从镜像锚点向左；每个状态使用固定图标槽，数字锁在槽内。
 ## 锚点是 battle_screen_base.tscn 内可直接用 Inspector 调整的零尺寸 Control。
 func _position_battle_status_rows() -> void:
 	for player: int in mini(_battle_status_rows.size(), 2):
@@ -4498,6 +4857,7 @@ func _update_character_display(player: int, force_refresh: bool = false) -> void
 	cd.modulate = Color.WHITE
 	cd.reset_switch_blocks()
 	cd.reset_death_dissolve()
+	cd.reset_transform_blocks()
 	cd.offset_transform_position = Vector2.ZERO
 	var h: HeroData = battle.active_hero(player)
 	if h.sprite_frames_path != "":
@@ -4520,7 +4880,14 @@ func _get_reserve_slots(player: int) -> Array[int]:
 
 
 func _update_hero_frames() -> void:
-	for p in [0, 1]:
+	_update_hero_frames_for_players([PLAYER, AI])
+
+
+func _update_hero_frames_for_players(players: Array) -> void:
+	for player_variant: Variant in players:
+		var p := int(player_variant)
+		if p < PLAYER or p > AI:
+			continue
 		var frames := p1_frames if p == 0 else p2_frames
 		var hp_rows: Array = p1_frame_hp_rows if p == 0 else p2_frame_hp_rows
 		var frame_slots: Array[int] = p1_frame_slots if p == 0 else p2_frame_slots
@@ -4561,7 +4928,13 @@ func _update_single_frame(frame: HeroFrame, hp_row, player: int, slot: int, is_a
 	frame.visible = true
 
 	var h: HeroData = battle.heroes[player][slot]
-	var dead: bool = battle.hp[player][slot] <= 0
+	var override_key := _resolution_frame_override_key(player, slot)
+	var value_override: Dictionary = _resolution_frame_value_overrides.get(
+		override_key, {})
+	var displayed_hp_half := int(value_override.get("hp", battle.hp[player][slot]))
+	var displayed_shield_half := int(
+		value_override.get("shield", battle.shield[player][slot]))
+	var dead: bool = displayed_hp_half <= 0
 
 	frame.hero_name = h.hero_name
 	frame.is_active = is_active
@@ -4591,8 +4964,8 @@ func _update_single_frame(frame: HeroFrame, hp_row, player: int, slot: int, is_a
 	# 待选位：一个斜切血量符号 + 数字（护甲同理），而不是按 HP 个数铺满多个血块。
 	if hp_row != null:
 		hp_row.visible = true
-		var hp_now := battle.hp_display(battle.hp[player][slot])
-		var sh := battle.hp_display(battle.shield[player][slot])
+		var hp_now := battle.hp_display(displayed_hp_half)
+		var sh := battle.hp_display(displayed_shield_half)
 		hp_row.set_values(hp_now, sh)
 
 
@@ -4604,17 +4977,15 @@ func _update_energy_labels() -> void:
 	# 金币能量点：energy 内部为半能(×2)，显示除以 ENERGY_UNIT → 整能（0.5 能可显半枚·allow_half）。
 	var e0 := battle.energy[0] / float(ActionDef.ENERGY_UNIT)
 	var e1 := battle.energy[1] / float(ActionDef.ENERGY_UNIT)
-	p1_coin_row.set_value(e0, e0)
-	p2_coin_row.set_value(e1, e1)
 	var caps: Array[int] = battle.energy_max
-	for p in 2:
-		var label: Label = p1_energy_cap_label if p == 0 else p2_energy_cap_label
-		var reduced: bool = caps[p] < ActionDef.MAX_ENERGY
-		label.visible = reduced
-		if reduced:
-			label.text = tr("能量上限 %s") % _fmt_hp(float(caps[p]) / float(ActionDef.ENERGY_UNIT))
+	var base_cap := float(ActionDef.MAX_ENERGY) / float(ActionDef.ENERGY_UNIT)
 	var cap0 := float(caps[0]) / float(ActionDef.ENERGY_UNIT)
 	var cap1 := float(caps[1]) / float(ActionDef.ENERGY_UNIT)
+	p1_coin_row.set_energy_capacity_value(e0, base_cap, cap0)
+	p2_coin_row.set_energy_capacity_value(e1, base_cap, cap1)
+	# 动态上限已由固定点位的黑色能量点完整表达，不再重复占用一行文字。
+	p1_energy_cap_label.visible = false
+	p2_energy_cap_label.visible = false
 	p1_coin_row.tooltip_text = tr("当前能量 %s / 上限 %s") % [_fmt_hp(e0), _fmt_hp(cap0)]
 	p2_coin_row.tooltip_text = tr("当前能量 %s / 上限 %s") % [_fmt_hp(e1), _fmt_hp(cap1)]
 
@@ -4673,13 +5044,33 @@ func _build_debug_buttons() -> void:
 	# 发布构建剥离（导出模板 release 下 is_debug_build()=false·开发期照常）。
 	if _net or not OS.is_debug_build():
 		return
-	var panel: Node = load("res://src/ui/debug/battle_debug_panel.gd").new()
-	panel.name = "DebugButtons"
-	add_child(panel)
-	panel.setup(battle)
-	panel.state_changed.connect(_on_debug_state_changed)
-	panel.hit_fx.connect(_on_debug_hit_fx)
-	panel.overtime_requested.connect(_on_debug_overtime)
+	_debug_panel = load("res://src/ui/debug/battle_debug_panel.gd").new() as Control
+	_debug_panel.name = "DebugButtons"
+	add_child(_debug_panel)
+	_debug_panel.call("setup", battle)
+	_debug_panel.connect(&"state_changed", _on_debug_state_changed)
+	_debug_panel.connect(&"hit_fx", _on_debug_hit_fx)
+	_debug_panel.connect(&"overtime_requested", _on_debug_overtime)
+	# 默认收起，避免左侧纵向测试面板压住新的道具轨；左下角只保留总开关。
+	_debug_panel.visible = false
+	_debug_buttons_toggle = Button.new()
+	_debug_buttons_toggle.name = "DebugButtonsToggle"
+	_debug_buttons_toggle.text = "测试"
+	_debug_buttons_toggle.position = Vector2(8.0, SCREEN_H - 42.0)
+	_debug_buttons_toggle.size = Vector2(72.0, 34.0)
+	_debug_buttons_toggle.toggle_mode = true
+	_debug_buttons_toggle.focus_mode = Control.FOCUS_NONE
+	_debug_buttons_toggle.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	_debug_buttons_toggle.z_index = 120
+	_debug_buttons_toggle.tooltip_text = "显示或隐藏测试按钮"
+	FontManager.apply_btn(_debug_buttons_toggle, 14)
+	_debug_buttons_toggle.toggled.connect(_on_debug_buttons_toggled)
+	add_child(_debug_buttons_toggle)
+
+
+func _on_debug_buttons_toggled(opened: bool) -> void:
+	if is_instance_valid(_debug_panel):
+		_debug_panel.visible = opened
 
 
 ## debug 面板改了 battle 状态 → 刷新全套显示。
@@ -4710,8 +5101,14 @@ func _on_debug_hit_fx(player: int, dmg_half: int) -> void:
 ## A 方案 juice：出招（攻击前冲 / 防御蓝闪沉身 / 攒上浮黄闪）→ 命中（白闪 + 斩击光
 ## + 伤害数字 + 震屏）。dmg/dead 为 [p0, p1]。无逐帧 attack/hit 动画，全靠代码表现。
 func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionary = {}) -> void:
+	_resolution_phase_trace.clear()
+	_resolution_phase_trace.append("primary_action")
 	var reserve_hits: Array = fx.get("reserve_hits", [{}, {}])
 	var reserve_blocks: Array = fx.get("reserve_blocks", [{}, {}])
+	var h16_pursuits: Array[Dictionary] = []
+	for pursuit_variant: Variant in fx.get("h16_pursuits", []):
+		h16_pursuits.append((pursuit_variant as Dictionary).duplicate(true))
+	_prepare_h16_frame_value_overrides(h16_pursuits)
 	var reserve_hit: Array[bool] = [
 		not (reserve_hits[0] as Dictionary).is_empty(),
 		not (reserve_hits[1] as Dictionary).is_empty()]
@@ -4724,10 +5121,14 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 	var active_before: Array = fx.get("active_before", battle.active_index.duplicate())
 	var switched_players: Array[int] = []
 	for p in 2:
-		if p < active_before.size() and int(active_before[p]) != battle.active_index[p]:
+		if p < active_before.size() and int(active_before[p]) != battle.active_index[p] \
+				and not _h16_pursuit_has_player(h16_pursuits, p):
 			switched_players.append(p)
 	if not switched_players.is_empty():
-		await _play_switch_handoff(switched_players)
+		await _play_switch_handoff(switched_players, false)
+	var transform_players: Array = fx.get("transform_players", [])
+	if not transform_players.is_empty():
+		await _play_h17_transformations(transform_players)
 	# 执行动作 → 镜头聚焦"冲突落点"（Eddy 2026-07-09 镜头规格）：双方都进攻=居中放大对撞（配震屏）；
 	# 仅对方进攻=偏左聚受击的己方；仅己方进攻=偏右聚受击的敌方；双方都未进攻=不推近。
 	var p1_off := _is_offense(a0, int(dmg[1]), bool(dead[1]))
@@ -4740,13 +5141,17 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 	var fin_kill_p1 := bool(dead[0]) and not bool(strength_price_executed[0]) and p2_off
 	if fin_kill_p1 or fin_kill_p2:
 		await _play_finisher(dmg, fin_kill_p2, fin_kill_p1, fx)
+		if not h16_pursuits.is_empty():
+			await _play_h16_pursuits(h16_pursuits)
 		return
 	var fdir := 0.0
 	if p1_off != p2_off:
 		fdir = 1.0 if p1_off else -1.0
 	stage.set_focus(p1_off or p2_off, fdir)
-	_act_juice(0, a0)
-	_act_juice(1, a1)
+	# 飞洒天星本质是一次攻击：直接走公共“波”出招流程，统一获得攻击帧、前冲、
+	# 蹬地尘与回位；不能只孤立地补播 attack 帧。
+	_act_juice(0, _action_for_battle_juice(0, a0, fx))
+	_act_juice(1, _action_for_battle_juice(1, a1, fx))
 	# A3b 出招拍注解：力竭/定身（解释"预期动作为何没发生"）+ 到期延迟伤害（结算在动作前·此刻掉的血）。
 	var pre_tags: Array = fx.get("pre_tags", [[], []])
 	for p in 2:
@@ -4765,6 +5170,7 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 	if big_lands:
 		_big_attack_punch()
 	await get_tree().create_timer(action_phase_duration * 0.45).timeout
+	_resolution_phase_trace.append("primary_impact")
 
 	var pen: Array = fx.get("pen", [0, 0])
 	var any := false
@@ -4830,11 +5236,131 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 
 	await get_tree().create_timer(action_phase_duration).timeout
 	stage.set_focus(false)   # 动作结束 → 镜头回正中
+	if not h16_pursuits.is_empty():
+		await _play_h16_pursuits(h16_pursuits)
+
+
+func _h16_pursuit_has_player(pursuits: Array[Dictionary], player: int) -> bool:
+	for pursuit: Dictionary in pursuits:
+		if int(pursuit.get("player", -1)) == player:
+			return true
+	return false
+
+
+func _resolution_frame_override_key(player: int, slot: int) -> String:
+	return "%d:%d" % [player, slot]
+
+
+func _prepare_h16_frame_value_overrides(pursuits: Array[Dictionary]) -> void:
+	_resolution_frame_value_overrides.clear()
+	for pursuit: Dictionary in pursuits:
+		var target_player := 1 - int(pursuit.get("player", -1))
+		var target_slot := int(pursuit.get("target", -1))
+		if target_player < PLAYER or target_player > AI \
+				or target_slot < 0 or target_slot >= battle.hp[target_player].size():
+			continue
+		_resolution_frame_value_overrides[
+			_resolution_frame_override_key(target_player, target_slot)] = {
+				hp = battle.hp[target_player][target_slot]
+					+ int(pursuit.get("hp_damage", 0)),
+				shield = battle.shield[target_player][target_slot]
+					+ int(pursuit.get("shield_damage", 0)),
+			}
+
+
+func _play_h16_pursuits(pursuits: Array[Dictionary]) -> void:
+	# 每条追击独占一段时间轴：换人完成后才出招，命中后才允许下一条追击进入。
+	for pursuit: Dictionary in pursuits:
+		var player := int(pursuit.get("player", -1))
+		var target_player := 1 - player
+		var target_slot := int(pursuit.get("target", -1))
+		if player < PLAYER or player > AI or target_slot < 0:
+			continue
+		_resolution_phase_trace.append("h16_switch:%d" % player)
+		await _play_switch_handoff([player], false)
+		_resolution_phase_trace.append("h16_attack:%d" % player)
+		stage.set_focus(true, 1.0 if player == PLAYER else -1.0)
+		_act_juice(player, A.ATTACK)
+		_fx._pop_tags(player, [{text = tr("追击"), col = COL_TAG_AMP}], 0.0)
+		await get_tree().create_timer(action_phase_duration * 0.45).timeout
+		_resolution_phase_trace.append("h16_impact:%d" % player)
+
+		var hp_damage := int(pursuit.get("hp_damage", 0))
+		var total_damage := int(pursuit.get("damage_total", 0))
+		var connected := bool(pursuit.get("connected", false))
+		var target_is_active := target_slot == battle.active_index[target_player]
+		if connected or total_damage > 0:
+			if target_is_active:
+				_impact(target_player, hp_damage, ActionDef.Pen.NORMAL)
+			else:
+				_impact_reserve_slot(
+					target_player, target_slot, hp_damage, ActionDef.Pen.NORMAL)
+			stage.shake(SHAKE_HIT, 1.0 if target_player == AI else -1.0)
+		var target_tags: Array = pursuit.get("target_tags", [])
+		if target_is_active and not target_tags.is_empty():
+			_fx._pop_tags(target_player, target_tags)
+		_resolution_frame_value_overrides.erase(
+			_resolution_frame_override_key(target_player, target_slot))
+
+		if bool(pursuit.get("target_defeated", false)) and target_is_active:
+			_hitstop(kill_hitstop_duration)
+			await get_tree().create_timer(
+				kill_hitstop_duration + 0.02, true, false, true).timeout
+			_play_defeat(target_player)
+		await get_tree().create_timer(action_phase_duration).timeout
+		stage.set_focus(false)
+
+
+func _action_for_battle_juice(player: int, resolved_action: int, fx: Dictionary) -> int:
+	if resolved_action == ACTIVE and fx.get("h10_active_players", []).has(player):
+		return A.ATTACK
+	return resolved_action
+
+
+## 烛阴转变：旧形由下至上被黑色像素吞没，中点才换资源，再由下至上显露新形。
+## 双方同拍转变并行播放，避免玩家编号改变演出先后。
+func _play_h17_transformations(players: Array) -> void:
+	var valid_players: Array[int] = []
+	for player_variant in players:
+		var player := int(player_variant)
+		if player >= PLAYER and player <= AI and not valid_players.has(player):
+			valid_players.append(player)
+	if valid_players.is_empty():
+		return
+	for player in valid_players:
+		_cd(player).set_transform_blocks(0.001)
+	# 单一连续相位跨过 0.5：中点换装不再由两个 Tween + await 拼接，消除一帧停顿。
+	var state := {swapped = false}
+	var driver := create_tween()
+	driver.tween_method(
+		_set_h17_transform_phase.bind(valid_players, state),
+		0.001, 0.999, h17_transform_duration
+	).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	await driver.finished
+	for player in valid_players:
+		_cd(player).reset_transform_blocks()
+
+
+func _set_h17_transform_phase(
+		progress: float, players: Array[int], state: Dictionary) -> void:
+	if progress >= 0.5 and not bool(state.get("swapped", false)):
+		state["swapped"] = true
+		for player in players:
+			_update_character_display(player, true)
+		_update_hero_frames()
+	for player in players:
+		_cd(player).set_transform_blocks(progress)
 
 
 ## 像素带交接：旧英雄向己方边缘收束 → 隐藏单帧换装 → 新英雄按同一规则反向重组。
 ## 主动、免费被动、技能与道具强制换人全部共用；不改 active_index 和事件流。
-func _play_switch_handoff(players: Array[int]) -> void:
+func _play_switch_handoff(players: Array[int], refresh_status_rows: bool = true) -> void:
+	# 最终 BattleCore 快照可能已经包含新出战英雄刚获得的毒素/脆弱。
+	# 换人开始只撤下旧英雄状态，队伍状态沿用同一实例持续显示；新英雄状态仍等动作结算后刷新。
+	for player: int in players:
+		if player >= 0 and player < _battle_status_rows.size():
+			(_battle_status_rows[player] as BattleStatusRow).retain_team_entries()
+	_position_battle_status_rows()
 	var shadow_visibility: Dictionary = {}
 	for player: int in players:
 		var shadow: TextureRect = p1_shadow if player == PLAYER else p2_shadow
@@ -4849,13 +5375,11 @@ func _play_switch_handoff(players: Array[int]) -> void:
 		_cd(player).visible = false
 		var shadow: TextureRect = p1_shadow if player == PLAYER else p2_shadow
 		shadow.visible = false
-		if player < _battle_status_rows.size():
-			_battle_status_rows[player].visible = false
 	if switch_handoff_pause > 0.0:
 		await get_tree().create_timer(switch_handoff_pause).timeout
 	for player: int in players:
 		_update_character_display(player, true)
-	_update_hero_frames()
+	_update_hero_frames_for_players(players)
 	var in_tweens: Array[Tween] = []
 	for player: int in players:
 		var cd: CharacterDisplay = _cd(player)
@@ -4863,7 +5387,10 @@ func _play_switch_handoff(players: Array[int]) -> void:
 		var shadow: TextureRect = p1_shadow if player == PLAYER else p2_shadow
 		shadow.visible = bool(shadow_visibility.get(player, true))
 		in_tweens.append(_animate_switch_in(cd, player))
-	_refresh_battle_status_rows()
+	# 结算演出开始时 battle 已是最终快照。若这里刷新，新状态会抢在施加它的
+	# 攻击动画之前出现；结算流程交给动作结束后的 _update_all() 统一显示。
+	if refresh_status_rows:
+		_refresh_battle_status_rows()
 	if not in_tweens.is_empty():
 		await in_tweens[0].finished
 	for player: int in players:
@@ -5253,16 +5780,22 @@ func _impact_reserve_slot(target_player: int, target_slot: int, dmg_half: int, p
 
 	var base_modulate: Color = frame.modulate
 	var base_scale: Vector2 = frame.scale
+	var base_position: Vector2 = frame.position
 	frame.pivot_offset = frame.size * 0.5
 	var pulse := create_tween()
 	pulse.set_parallel(true)
 	var pulse_color := Color(0.62, 0.86, 1.45) if blocked else Color(1.55, 0.58, 0.50)
 	var pulse_scale := 1.10 if blocked_big else 1.08
+	var recoil_x := -3.0 if target_player == PLAYER else 3.0
 	pulse.tween_property(frame, "modulate", pulse_color, 0.08)
 	pulse.tween_property(frame, "scale", base_scale * pulse_scale, 0.08).set_trans(Tween.TRANS_BACK)
+	pulse.tween_property(frame, "position", base_position + Vector2(recoil_x, 0.0), 0.08) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	pulse.chain().set_parallel(true)
 	pulse.tween_property(frame, "modulate", base_modulate, 0.20)
 	pulse.tween_property(frame, "scale", base_scale, 0.20).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	pulse.tween_property(frame, "position", base_position, 0.20) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 	if dmg_half <= 0 and not blocked:
 		return
@@ -5357,12 +5890,30 @@ func _update_shadow(p: int) -> void:
 
 ## 双方各在角色头部侧上方揭示盲选出招：有美术图标用图标，否则才用文字回退。
 ## 轻推入场 → 稳定阅读 → 朝战场中心收束，退场完成后再进入角色动作。
-func _show_action_indicators(a0: int, a1: int) -> void:
+func _show_action_indicators(a0: int, a1: int, events: Array = []) -> void:
 	status_label.visible = false
 	event_label.visible = false
-	var c0 := _spawn_action_circle(0, a0)
-	var c1 := _spawn_action_circle(1, a1)
-	await get_tree().create_timer(action_bubble_hold_duration).timeout
+	var c0 := _spawn_action_circle(0, a0, _active_skill_icon_path(0, a0, events))
+	var c1 := _spawn_action_circle(1, a1, _active_skill_icon_path(1, a1, events))
+	await get_tree().create_timer(action_bubble_enter_duration).timeout
+	var transform_tweens: Array[Tween] = []
+	for player: int in 2:
+		var bubble: Control = c0 if player == PLAYER else c1
+		var transform_spec := _action_bubble_transform_spec(player, events)
+		if not transform_spec.is_empty():
+			var icon_path := String(transform_spec.get("icon_path", ""))
+			if ResourceLoader.exists(icon_path):
+				var ink: Color = transform_spec.get("color", Color.WHITE)
+				var exit_direction: Vector2 = transform_spec.get(
+					"exit_direction", Vector2.ONE)
+				transform_tweens.append(_animate_action_bubble_transform(
+					bubble, load(icon_path) as Texture2D, ink, exit_direction))
+	if not transform_tweens.is_empty():
+		await transform_tweens[0].finished
+	await get_tree().create_timer(
+		maxf(0.0, action_bubble_hold_duration - action_bubble_enter_duration)
+				+ (action_bubble_transform_extra_hold if not transform_tweens.is_empty() else 0.0)
+	).timeout
 	var exit_tweens: Array[Tween] = []
 	for player: int in 2:
 		var c: Control = c0 if player == 0 else c1
@@ -5396,10 +5947,11 @@ func _hover_icon_for(action: int) -> HoverIcon:
 
 
 ## 在 player 角色头顶生成揭示气泡（圆底 + 美术图标 / 文字回退）。
-func _spawn_action_circle(player: int, action: int) -> Control:
+func _spawn_action_circle(player: int, action: int, active_skill_icon_path: String = "") -> Control:
 	var sz := action_bubble_size
 	var circ := Control.new()
 	circ.name = "ActionBubbleP%d" % (player + 1)
+	circ.set_meta("player", player)
 	circ.size = Vector2(sz, sz)
 	# 跟随当前立绘的 frame/scale/offset 计算头部锚点，再做安全边界约束。
 	# 换英雄、调立绘大小或移动 CharacterDisplay 后，气泡会自动跟随，不再伪固定。
@@ -5424,7 +5976,22 @@ func _spawn_action_circle(player: int, action: int) -> Control:
 	circ.add_child(bg)
 
 	var hi := _hover_icon_for(action)
-	if hi != null and hi.sheet != null:
+	if action == ACTIVE and not active_skill_icon_path.is_empty() \
+			and ResourceLoader.exists(active_skill_icon_path):
+		var skill_icon := TextureRect.new()
+		skill_icon.name = "ActionIcon"
+		skill_icon.texture = load(active_skill_icon_path) as Texture2D
+		skill_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		skill_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		skill_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		skill_icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		skill_icon.offset_left = 15.0
+		skill_icon.offset_top = 15.0
+		skill_icon.offset_right = -15.0
+		skill_icon.offset_bottom = -15.0
+		skill_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		circ.add_child(skill_icon)
+	elif hi != null and hi.sheet != null:
 		# 气泡内放一个自动循环播放的 HoverIcon → 复用按钮图标的 sheet/帧/缩放，观感与按钮一致，
 		# 且持续播放 idle 动画（动态，不再是静止帧0）。填满气泡，inset/content_scale 同按钮。
 		var anim := HoverIcon.new()
@@ -5461,6 +6028,109 @@ func _spawn_action_circle(player: int, action: int) -> Control:
 	add_child(circ)
 	_animate_bubble_enter(circ, player)
 	return circ
+
+
+func _active_skill_icon_path(player: int, action: int, events: Array) -> String:
+	if action != ACTIVE:
+		return ""
+	# H17 在核心结算时已替换 HeroData；Bubble 必须从事件里的旧身份取图标。
+	for event_variant in events:
+		var event: Dictionary = event_variant
+		if String(event.get("id", "")) == "h17_transform" \
+				and int(event.get("player", -1)) == player:
+			var from_id := String(event.get("from_hero_id", ""))
+			var data_path := HERO_DATA_DIR + from_id + ".tres"
+			if ResourceLoader.exists(data_path):
+				var original := load(data_path) as HeroData
+				return original.skill_icon_path if original != null else ""
+	var hero := battle.active_hero(player)
+	return hero.skill_icon_path if hero != null else ""
+
+
+func _action_bubble_transform_spec(player: int, events: Array) -> Dictionary:
+	for event_variant in events:
+		var event: Dictionary = event_variant
+		if int(event.get("player", -1)) != player:
+			continue
+		match String(event.get("id", "")):
+			"longyuji_empowered":
+				return {icon_path = LONGYUJI_SKILL_ICON.resource_path,
+					color = Color("d7a43d"), exit_direction = Vector2.ONE}
+			"h13_split_big_wave":
+				return {icon_path = ANCHAO_SKILL_ICON.resource_path,
+					color = Color("17131d"), exit_direction = -Vector2.ONE}
+	return {}
+
+
+func _animate_action_bubble_transform(
+		bubble: Control, replacement_texture: Texture2D, ink: Color,
+		exit_direction: Vector2) -> Tween:
+	var old_icon := bubble.get_node_or_null("ActionIcon") as CanvasItem
+	var replacement := TextureRect.new()
+	replacement.name = "TransformedActionIcon"
+	replacement.texture = replacement_texture
+	replacement.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	replacement.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	replacement.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	replacement.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	replacement.offset_left = 14.0
+	replacement.offset_top = 14.0
+	replacement.offset_right = -14.0
+	replacement.offset_bottom = -14.0
+	replacement.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# 新旧图标从第一帧起同时存在，由互补 shader 分区显示；像素潮经过哪里，
+	# 哪里就从旧图换成新图，因此不会出现“旧图先没、新图还没来”的留白。
+	replacement.visible = true
+	bubble.add_child(replacement)
+	var normalized_direction := Vector2(
+		1.0 if exit_direction.x >= 0.0 else -1.0,
+		1.0 if exit_direction.y >= 0.0 else -1.0)
+	var old_material := _make_action_icon_switch_material(
+		ink, normalized_direction, 0.0, false)
+	var new_material := _make_action_icon_switch_material(
+		ink, normalized_direction, 0.0, true)
+	if old_icon != null:
+		old_icon.material = old_material
+		replacement.material = new_material
+	# 独立像素潮画在图标安全区：它不依赖原图 alpha，因此透明收束时仍能清楚看到
+	# 金色/近黑色方块；14px 外圈的按钮底色、描边与投影完全不受影响。
+	var pixel_tide := ACTION_BUBBLE_DIAGONAL_TIDE_SCRIPT.new() as ActionBubbleDiagonalTide
+	pixel_tide.name = "PixelTide"
+	pixel_tide.position = Vector2.ONE * 14.0
+	pixel_tide.size = bubble.size - Vector2.ONE * 28.0
+	pixel_tide.ink_color = ink
+	pixel_tide.exit_direction = normalized_direction
+	pixel_tide.z_index = 5
+	pixel_tide.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bubble.add_child(pixel_tide)
+	# 单一潮线同时裁切旧图与揭示新图；两张图的遮罩严格互补，中间没有透明断层。
+	var tween := bubble.create_tween()
+	tween.tween_method(
+		func(progress: float) -> void:
+			if old_icon != null:
+				old_material.set_shader_parameter("switch_progress", progress)
+			new_material.set_shader_parameter("switch_progress", progress)
+			pixel_tide.progress = progress,
+		0.0, 1.0, action_bubble_transform_duration).set_trans(Tween.TRANS_LINEAR)
+	tween.tween_callback(func() -> void:
+		if old_icon != null:
+			old_icon.visible = false
+			old_icon.material = null
+		replacement.material = null
+		pixel_tide.queue_free())
+	return tween
+
+
+func _make_action_icon_switch_material(
+		ink: Color, exit_direction: Vector2, progress: float,
+		reveal_behind: bool = false) -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = ACTION_ICON_SWITCH_SHADER
+	material.set_shader_parameter("switch_progress", progress)
+	material.set_shader_parameter("exit_direction", exit_direction)
+	material.set_shader_parameter("handoff_color", ink)
+	material.set_shader_parameter("reveal_behind", reveal_behind)
+	return material
 
 
 ## 当前立绘在战斗画布上的名义显示矩形。不扫描图像像素，但完整跟随 frame/scale/offset。

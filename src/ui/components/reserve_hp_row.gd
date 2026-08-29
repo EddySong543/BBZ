@@ -4,7 +4,7 @@ extends Control
 
 ## 顶部替补英雄的紧凑生命显示：单个平行四边形血量符号 + 数字。
 ## 版式沿用英雄图鉴的「图标 + 数字」，只把心形换成战斗主血条同语汇的斜切血块。
-## 护甲存在时追加一组银灰斜切块 + 数字。两组都按实际文本宽度整体居中。
+## 护甲存在时在血量正下方显示银灰斜切块 + 数字；两行各自按实际文本宽度居中。
 
 @export_group("斜切血量符号")
 @export var icon_w: float = 26.0:
@@ -32,6 +32,15 @@ extends Control
 @export_group("排版")
 @export var gap_icon_num: float = 7.0
 @export var gap_segments: float = 9.0
+## 第一行保持旧版 28px 组件中的中心位置；扩高组件只为容纳下方护盾，不移动血量。
+@export var hp_row_center_y: float = 14.0:
+	set(v):
+		hp_row_center_y = v
+		queue_redraw()
+@export var shield_row_gap: float = 8.0:
+	set(v):
+		shield_row_gap = maxf(v, 0.0)
+		queue_redraw()
 @export var font_size: int = 18
 @export var embolden: float = 0.7
 @export var outline_size: int = 4
@@ -117,6 +126,14 @@ func _seg_width(text: String) -> float:
 		text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 
 
+func debug_hp_center_y() -> float:
+	return hp_row_center_y
+
+
+func debug_shield_center_y() -> float:
+	return hp_row_center_y + icon_h + shield_row_gap
+
+
 func _draw() -> void:
 	if _font == null:
 		_font = _resolve_font()
@@ -129,16 +146,13 @@ func _draw() -> void:
 	var hp_txt := _fmt(hp)
 	var sh_txt := _fmt(shield)
 	var has_shield := shield > 0.0
-	var total := _seg_width(hp_txt)
+	var hp_x := (size.x - _seg_width(hp_txt)) * 0.5
+	_draw_segment(hp_x, debug_hp_center_y(), hp_txt,
+		hp_fill, hp_top, hp_bottom, hp_number_color)
 	if has_shield:
-		total += gap_segments + _seg_width(sh_txt)
-	var x := (size.x - total) * 0.5
-	var cy := size.y * 0.5
-
-	x = _draw_segment(x, cy, hp_txt, hp_fill, hp_top, hp_bottom, hp_number_color)
-	if has_shield:
-		x += gap_segments
-		_draw_segment(x, cy, sh_txt, shield_fill, shield_top, shield_bottom, shield_number_color)
+		var shield_x := (size.x - _seg_width(sh_txt)) * 0.5
+		_draw_segment(shield_x, debug_shield_center_y(), sh_txt,
+			shield_fill, shield_top, shield_bottom, shield_number_color)
 
 
 func _draw_segment(x: float, cy: float, text: String, fill: Color, top: Color,

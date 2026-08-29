@@ -210,12 +210,84 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 	assert_true(backpack_overlay.visible, "战斗背包入口会呼出背包")
 	assert_eq(screen.btn_switch.position, Vector2(30.0, 46.0),
 			"切换模块占据左下安全边距")
-	assert_eq(screen.p1_item_row.scale, Vector2.ONE * 0.92,
-			"道具行比替补头像低一个视觉层级")
-	assert_eq(screen.p2_item_row.scale, Vector2.ONE * 0.92,
-			"敌方道具行与己方保持同档尺寸")
+	assert_eq(screen.ITEM_FRAME_SIZE, 74.0,
+			"战斗道具框由单一成品尺寸常量控制，便于继续手调")
+	assert_almost_eq(screen.p1_item_row.scale.x, 74.0 / 68.0, 0.0001,
+			"侧边道具框成品宽度调整为 74px")
+	assert_almost_eq(screen.p1_item_row.scale.y, 74.0 / 68.0, 0.0001)
+	assert_eq(screen.p2_item_row.scale, screen.p1_item_row.scale,
+			"敌方道具轨与己方保持同档尺寸")
+	assert_true(screen.p1_item_row.vertical_layout)
+	assert_true(screen.p2_item_row.vertical_layout)
+	var first_item_rect: Rect2 = screen.p1_item_row.slot_global_rect(0)
+	var second_item_rect: Rect2 = screen.p1_item_row.slot_global_rect(1)
+	var enemy_middle_item_rect: Rect2 = screen.p2_item_row.slot_global_rect(1)
+	assert_almost_eq(first_item_rect.size.x, 74.0, 0.01)
+	assert_almost_eq(first_item_rect.size.y, 74.0, 0.01)
+	assert_almost_eq(first_item_rect.position.x, second_item_rect.position.x, 0.01)
+	assert_almost_eq(second_item_rect.get_center().x,
+			screen.btn_switch.get_global_rect().get_center().x, 0.01,
+			"己方道具轨横坐标与切换按钮中心轴一致")
+	assert_almost_eq(enemy_middle_item_rect.get_center().x,
+			screen.btn_confirm.get_global_rect().get_center().x, 0.01,
+			"敌方道具轨横坐标与结束按钮中心轴一致")
+	assert_almost_eq(second_item_rect.get_center().y, screen.SCREEN_H * 0.5, 0.01,
+			"己方道具轨以中间槽保持画面纵向居中")
+	assert_almost_eq(enemy_middle_item_rect.get_center().y, screen.SCREEN_H * 0.5, 0.01,
+			"敌方道具轨以中间槽保持画面纵向居中")
+	assert_almost_eq(second_item_rect.get_center().y,
+			enemy_middle_item_rect.get_center().y, 0.01,
+			"双方纵向道具轨使用同一纵向基线")
+	assert_almost_eq(second_item_rect.position.y - first_item_rect.end.y,
+			ItemSlotRowScript.GAP * screen.ITEM_ROW_SCALE, 0.01,
+			"三个道具槽纵向排列并保留原有组内间距")
 	assert_eq(ItemSlotRowScript.GAP, 12.0,
-			"道具槽间距在缩放后仍保留清晰分组")
+			"道具槽间距保持清晰分组")
+	# 纵向布局回归：点选图标、锦囊待机都必须保留各自槽位的局部 Y 基准。
+	screen.p1_item_row.refresh(screen.battle, screen.PLAYER, [0, 1, 2])
+	for slot_index: int in 3:
+		var slot_base: Vector2 = screen.p1_item_row._slot_base(slot_index)
+		assert_almost_eq(
+				(screen.p1_item_row._icons[slot_index] as Control).position.y,
+				slot_base.y + ItemSlotRowScript.ICON_INSET + 3.0, 0.01,
+				"第%d格点选下沉不能跳回第1格" % (slot_index + 1))
+		screen.p1_item_row._set_ambient(slot_index, "cta", Color.WHITE)
+		assert_almost_eq(
+				(screen.p1_item_row._pouches[slot_index] as Control).position.y,
+				slot_base.y + (ItemSlotRowScript.SLOT_H - ItemSlotRowScript.POUCH_H) * 0.5,
+				0.01, "第%d格锦囊待机动画保留槽位基准" % (slot_index + 1))
+		screen.p1_item_row._set_ambient(slot_index, "", Color.WHITE)
+	assert_true(screen.p2_item_row.mirror_seals)
+	assert_gt((screen.p2_item_row._seals[0] as Control).rotation, 0.0,
+			"右侧大封条朝右倾斜")
+	assert_gt((screen.p2_item_row._mini_seals[0] as Control).position.x,
+			ItemSlotRowScript.SLOT_W * 0.5,
+			"右侧小封条固定在右上角")
+	assert_lt((screen.p1_item_row._pouches[0] as Control).get_index(),
+			(screen.p1_item_row._seals[0] as Control).get_index(),
+			"封印态锦囊绘制在底，封条绘制在上")
+	assert_true((screen.p1_item_row._pouches[1] as Control).visible,
+			"未解锁槽同时保留底部锦囊")
+	screen.battle.slots[screen.AI][0]["state"] = BattleCore.SlotState.OPENED
+	screen.battle.slots[screen.AI][0]["since"] = -1
+	screen.p2_item_row.refresh(screen.battle, screen.AI)
+	assert_true((screen.p2_item_row._pouches[0] as Control).visible,
+			"敌方槽解锁后显示锦囊")
+	assert_eq(screen.p2_item_row._anim_keys[0], "cta",
+			"敌方可抽锦囊不因栏位只读而丢失待机跳动")
+	var debug_panel := screen.get_node_or_null("DebugButtons") as Control
+	var debug_toggle := screen.get_node_or_null("DebugButtonsToggle") as Button
+	assert_not_null(debug_panel)
+	assert_not_null(debug_toggle, "左下角提供测试按钮总开关")
+	assert_false(debug_panel.visible, "测试按钮默认收起，不能遮挡侧边道具轨")
+	assert_eq(debug_toggle.position, Vector2(8.0, 1038.0))
+	assert_true(debug_toggle.toggle_mode)
+	debug_toggle.button_pressed = true
+	debug_toggle.toggled.emit(true)
+	assert_true(debug_panel.visible)
+	debug_toggle.button_pressed = false
+	debug_toggle.toggled.emit(false)
+	assert_false(debug_panel.visible)
 	assert_null(screen.get_node_or_null("SettingsButton"),
 			"战斗界面不再显示设置按钮")
 	var esc := InputEventAction.new()
@@ -267,10 +339,11 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 		assert_true(concise_h06.contains(EffectTextFormatter.KEYWORD_TRAILING_SPACER_GLYPH),
 				"战斗悬停说明必须为覆盖绘制的星芒保留同行占位")
 		var spacer_width: float = screen._tip_rich.get_theme_font("normal_font").get_string_size(
-				EffectTextFormatter.KEYWORD_TRAILING_SPACER,
+				screen.TIP_KEYWORD_TRAILING_SPACER,
 				HORIZONTAL_ALIGNMENT_LEFT, -1.0, screen.tip_font_size_l).x
 		assert_gte(spacer_width,
-				EffectKeywordSpark.MARK_SIZE.x + EffectTextFormatter.KEYWORD_SPARK_OFFSET.x,
+				EffectKeywordSpark.MARK_SIZE.x
+						+ screen.TIP_KEYWORD_SPARK_CLEARANCE + 1.0,
 				"战斗悬停的星芒占位必须覆盖完整角标宽度")
 	var item_tip: String = screen._item_slot_tip(0)
 	assert_false(item_tip.begins_with("【") or item_tip.contains("】\n"),
@@ -279,6 +352,16 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 	await get_tree().process_frame
 	assert_true(screen._tip_item_header.visible,
 			"具名道具说明显示图标与名称顶部行")
+	assert_gte(screen._tip_panel.global_position.x,
+			screen.p1_item_row.slot_global_rect(0).end.x + screen.TIP_GAP - 0.01,
+			"左侧道具说明框改为向右展开")
+	screen._on_item_slot_hovered_p2(0)
+	await get_tree().process_frame
+	assert_lte(screen._tip_panel.get_global_rect().end.x,
+			screen.p2_item_row.slot_global_rect(0).position.x - screen.TIP_GAP + 0.01,
+			"右侧道具说明框改为向左展开")
+	screen._on_item_slot_hovered(0)
+	await get_tree().process_frame
 	assert_eq(screen.tip_font_size_s, 17,
 			"五个基础动作短说明字号回退到 17px")
 	assert_eq(screen._tip_label.get_theme_font_size("font_size"), 17,
@@ -445,7 +528,9 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 			unshifted_rule_top + screen.ITEM_TIP_RULE_HEIGHT
 					+ screen.item_tip_title_body_gap, 0.01,
 			"独立移动分割线不挤压正文排版")
-	assert_eq(screen._tip_panel.size, screen.tip_size_m,
+	assert_almost_eq(screen._tip_panel.size.x, screen.tip_size_m.x, 0.01,
+			"具名道具说明框宽度保持不变")
+	assert_almost_eq(screen._tip_panel.size.y, screen.tip_size_m.y, 0.01,
 			"具名道具使用 222x144 加高 M 框，宽度保持不变")
 	assert_eq(screen.item_tip_vertical_lift, 0.0,
 			"固定轴线默认不再叠加历史上移补偿")
@@ -459,6 +544,7 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 	assert_true(String(gap_property.get("hint_string", "")).contains("64"),
 			"道具名称与正文间距的 Inspector 上限扩展到 64")
 	screen._set_l_tip_text("短名\n短说明", screen.TipContentKind.ITEM)
+	await get_tree().process_frame
 	assert_almost_eq(screen._tip_item_header.position.x,
 			screen.ITEM_TIP_COLUMN_INSET, 0.01,
 			"短道具名继续使用固定标题轨道")
@@ -468,6 +554,12 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 	assert_almost_eq(screen._tip_rich.get_rect().end.x,
 			screen._tip_content.size.x - 8.0, 0.51,
 			"短说明的右缘保留与左侧一致的 8px 安全位")
+	assert_lt(screen._tip_rich.get_line_width(0),
+			screen._tip_rich.size.x * 0.65,
+			"单行短说明必须自然左齐，禁止把少数字符强制拉满形成巨大字距")
+	assert_false(bool(screen.TIP_JUSTIFICATION_FLAGS
+			& TextServer.JUSTIFICATION_DO_NOT_SKIP_SINGLE_LINE),
+			"道具正文不得启用强制单行两端对齐")
 	screen._set_l_tip_text("很长的道具名称\n这是一段会自动换行的较长道具说明文字",
 			screen.TipContentKind.ITEM)
 	assert_almost_eq(screen._tip_item_header.position.x,
@@ -506,6 +598,24 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 					screen._tip_rich.get_character_line(
 							keyword_range.x + keyword_range.y - 1),
 					"正式道具 %s 的效果关键词不可拆到两行" % item.item_id)
+		for range_index: int in screen._tip_keyword_ranges.size():
+			var keyword_range: Vector2i = screen._tip_keyword_ranges[range_index]
+			var keyword_line: int = screen._tip_rich.get_character_line(keyword_range.x)
+			var keyword_line_range: Vector2i = screen._tip_rich.get_line_range(keyword_line)
+			var keyword_end_x: float
+			if screen._tip_rich.get_line_width(keyword_line) \
+					>= screen._tip_rich.size.x - 1.0:
+				keyword_end_x = _justified_tip_caret_x(
+						screen, keyword_line_range,
+						keyword_range.x + keyword_range.y)
+			else:
+				keyword_end_x = screen._measure_tip_character_range(
+						screen._tip_rich.get_parsed_text(), keyword_line_range.x,
+						keyword_range.x + keyword_range.y,
+						screen.tip_font_size_l)
+			var keyword_spark: Control = screen._tip_keyword_sparks[range_index]
+			assert_gte(keyword_spark.position.x, keyword_end_x + 1.5,
+					"正式道具 %s 的角标不得与关键词末字重合" % item.item_id)
 		var parsed_item_text: String = screen._tip_rich.get_parsed_text()
 		for line_index: int in screen._tip_rich.get_line_count():
 			var line_range: Vector2i = screen._tip_rich.get_line_range(line_index)
@@ -542,9 +652,11 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 				"关键词末端光标必须落在正文列内")
 		var spark: Control = screen._tip_keyword_sparks[range_index]
 		assert_almost_eq(spark.position.x,
-				roundf(expected_caret_x + EffectTextFormatter.KEYWORD_SPARK_OFFSET.x),
+				roundf(expected_caret_x + screen.TIP_KEYWORD_SPARK_CLEARANCE),
 				0.51,
-				"两端对齐分摊字距后，星芒仍必须贴住关键词末字")
+				"两端对齐分摊字距后，星芒仍按真实关键词末端定位")
+		assert_gte(spark.position.x, expected_caret_x + 1.5,
+				"道具说明角标必须与关键词保留清晰间隙，禁止压住末字")
 	assert_gt(filled_keyword_count, 0,
 			"回归文案必须覆盖至少一个处于两端对齐行的效果关键词")
 	screen._set_l_tip_text("我方获得1点能量", screen.TipContentKind.SKILL)

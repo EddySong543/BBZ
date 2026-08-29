@@ -217,6 +217,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_battle_gd")
 tip_size_m = Vector2(222, 188)
+tip_size_active = Vector2(300, 108)
 tip_size_l = Vector2(388, 144)
 tip_glyph_spacing = 1
 
@@ -407,7 +408,7 @@ anchors_preset = 0
 offset_left = 664.0
 offset_top = 80.0
 offset_right = 756.0
-offset_bottom = 108.0
+offset_bottom = 122.0
 mouse_filter = 2
 script = ExtResource("24_reservehp")
 bottom_shadow_enabled = true
@@ -428,7 +429,7 @@ anchors_preset = 0
 offset_left = 584.0
 offset_top = 80.0
 offset_right = 676.0
-offset_bottom = 108.0
+offset_bottom = 122.0
 mouse_filter = 2
 script = ExtResource("24_reservehp")
 bottom_shadow_enabled = true
@@ -463,10 +464,10 @@ vertical_alignment = 1
 
 [node name="P1StatusAnchor" type="Control" parent="P1Hud"]
 layout_mode = 0
-offset_left = 246.0
-offset_top = 113.0
-offset_right = 246.0
-offset_bottom = 113.0
+offset_left = 28.0
+offset_top = 171.0
+offset_right = 28.0
+offset_bottom = 171.0
 mouse_filter = 2
 
 [node name="P2Hud" type="Control" parent="." unique_id=1758094651]
@@ -552,7 +553,7 @@ anchors_preset = 0
 offset_left = 1164.0
 offset_top = 80.0
 offset_right = 1256.0
-offset_bottom = 108.0
+offset_bottom = 122.0
 mouse_filter = 2
 script = ExtResource("24_reservehp")
 icon_slant = 3.0
@@ -573,7 +574,7 @@ anchors_preset = 0
 offset_left = 1244.0
 offset_top = 80.0
 offset_right = 1336.0
-offset_bottom = 108.0
+offset_bottom = 122.0
 mouse_filter = 2
 script = ExtResource("24_reservehp")
 icon_slant = 3.0
@@ -610,10 +611,10 @@ vertical_alignment = 1
 
 [node name="P2StatusAnchor" type="Control" parent="P2Hud"]
 layout_mode = 0
-offset_left = 1674.0
-offset_top = 113.0
-offset_right = 1674.0
-offset_bottom = 113.0
+offset_left = 1892.0
+offset_top = 171.0
+offset_right = 1892.0
+offset_bottom = 171.0
 mouse_filter = 2
 
 [node name="TimerLabel" type="Label" parent="." unique_id=2111037196]

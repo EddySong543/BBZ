@@ -515,17 +515,41 @@ func test_battle_hud_only_shows_reduced_dynamic_energy_cap() -> void:
 	var screen := packed.instantiate()
 	add_child_autofree(screen)
 	await get_tree().process_frame
-	screen.battle.energy_max.assign([20, 17])
+	screen.battle.energy_max.assign([20, 18])
 	screen.battle.energy.assign([20, 20])
 	screen._update_energy_labels()
 	assert_false(screen.p1_energy_cap_label.visible,
-			"默认 10 点上限不额外占用 HUD 空间")
-	assert_true(screen.p2_energy_cap_label.visible,
-			"被天狗压低后应持续显示敌方动态上限")
-	assert_eq(screen.p2_energy_cap_label.text, "能量上限 8.5",
-			"半能上限按玩家单位显示")
+			"默认上限不额外占用 HUD 文字空间")
+	assert_false(screen.p2_energy_cap_label.visible,
+			"降低后的动态上限只由黑色能量点表达，不重复显示文字")
 	assert_eq(screen.battle.energy[1], 20,
 			"刷新 HUD 不得删除高于新上限的既有能量")
+	assert_eq(screen.p1_coin_row.capacity_disabled_indices(), [],
+			"未降低上限的一侧不生成黑色点")
+	assert_eq(screen.p2_coin_row.capacity_disabled_indices(), [9],
+			"首次降低从固定第 10 个能量点开始变黑")
+	var p1_tenth_rect: Rect2 = screen.p1_coin_row.pip_rect_for_index(9)
+	var p2_tenth_rect: Rect2 = screen.p2_coin_row.pip_rect_for_index(9)
+	screen.battle.energy_max.assign([20, 17])
+	screen._update_energy_labels()
+	assert_false(screen.p2_energy_cap_label.visible)
+	assert_eq(screen.p2_coin_row.capacity_disabled_indices(), [8, 9],
+			"累计降低 1.5 点时向第 9 点继续覆盖，不移动第 10 点")
+	screen.battle.energy_max.assign([16, 14])
+	screen.battle.energy.assign([6, 10])
+	screen._update_energy_labels()
+	assert_eq(screen.p1_coin_row.capacity_disabled_indices(), [8, 9],
+			"己方 h24 降低上限时从第 10 点继续向第 9 点推进")
+	assert_eq(screen.p2_coin_row.capacity_disabled_indices(), [7, 8, 9],
+			"敌方受 h23 影响时同样从最高序号向前推进")
+	assert_eq(screen.p1_coin_row.pip_rect_for_index(9), p1_tenth_rect,
+			"己方黑点不得使既有点位移动")
+	assert_eq(screen.p2_coin_row.pip_rect_for_index(9), p2_tenth_rect,
+			"镜像敌方黑点不得改变尺寸、位置或像素边界")
+	assert_eq(screen.p1_coin_row.pip_rect_for_index(9).size,
+			Vector2.ONE * screen.p1_coin_row.pip_size)
+	assert_eq(screen.p2_coin_row.pip_rect_for_index(9).size,
+			Vector2.ONE * screen.p2_coin_row.pip_size)
 	BattleSetup.reset()
 
 
@@ -569,6 +593,24 @@ func test_death_switch_uses_battle_diamond_frame_and_slant_hp() -> void:
 	click.pressed = true
 	avatar.gui_input.emit(click)
 	assert_signal_emitted_with_parameters(overlay, "selection_made", [1])
+
+
+func test_reserve_shield_uses_a_second_row_without_moving_hp() -> void:
+	var packed := load("res://src/ui/battle_screen1.tscn") as PackedScene
+	var screen := packed.instantiate()
+	add_child_autofree(screen)
+	await get_tree().process_frame
+	var hp_row := screen.get_node("P1Hud/P1Frame1HpRow") as ReserveHpRow
+	var original_top := hp_row.position.y
+	hp_row.set_values(4.5, 2.0)
+	assert_eq(hp_row.position.y, original_top,
+			"替补血量行与头像的既有锚点不得因护盾下移而改变")
+	assert_almost_eq(hp_row.debug_hp_center_y(), 14.0, 0.01,
+			"血量第一行保持原来的纵向中心")
+	assert_gt(hp_row.debug_shield_center_y(), hp_row.debug_hp_center_y(),
+			"护盾独立放在血量正下方，不再与血量同行")
+	assert_gte(hp_row.size.y, hp_row.debug_shield_center_y() + hp_row.icon_h * 0.5,
+			"第二行完整落在替补信息组件范围内，不与下方内容重叠")
 
 
 func test_main_menu_profile_avatar_uses_item_frame() -> void:

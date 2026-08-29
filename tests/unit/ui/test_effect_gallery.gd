@@ -5,6 +5,8 @@ const UnifiedCodexScreen := preload("res://src/ui/codex_screen.gd")
 const EXPECTED_EFFECTS: Array[String] = [
 	"附加效果",
 	"真实伤害",
+	"玄金不动相",
+	"不坠神言",
 	"穿防",
 	"穿大防",
 	"护甲",
@@ -19,6 +21,8 @@ const EXPECTED_GALLERY_ORDER: Array[String] = [
 	"穿防",
 	"穿大防",
 	"真实伤害",
+	"玄金不动相",
+	"不坠神言",
 	"毒素",
 	"脆弱",
 	"剑气",
@@ -27,6 +31,8 @@ const EXPECTED_GALLERY_ORDER: Array[String] = [
 const INSTALLED_EFFECT_ICONS: Array[StringName] = [
 	&"bonus_effect",
 	&"true_damage",
+	&"h02_wave_upgrade",
+	&"h08_retained_big_defend",
 	&"pierce_defense",
 	&"pierce_guard",
 	&"armor",
@@ -43,7 +49,7 @@ func test_effect_catalog_contains_every_current_shared_effect() -> void:
 		return
 	var entries: Array = catalog.call("all")
 	assert_eq(entries.size(), EXPECTED_EFFECTS.size(),
-			"效果图鉴必须覆盖全部 8 项通过效果，而不是只收录毒素")
+			"效果图鉴必须覆盖全部 10 项已接入效果")
 	var names: Array[String] = []
 	var colors: Dictionary = {}
 	for entry: Dictionary in entries:
@@ -57,9 +63,17 @@ func test_effect_catalog_contains_every_current_shared_effect() -> void:
 	assert_eq(String(entries[0].description),
 			"像毒素，剑气等都属于附加效果。附加效果只会被「波」或「大波」命中触发，道具无法触发。",
 			"附加效果必须直接说明波/大波与道具的触发边界")
-	assert_eq(String(entries[5].description),
+	assert_eq(String(entries[7].description),
 			"可叠加。中毒英雄被「大波」命中时，引爆并清除全部毒素，每层造成 0.5 点伤害。",
 			"毒素效果图鉴必须明确只有大波命中才能引爆")
+	assert_eq(String(entries[9].description),
+			"最多积累4点，昴日【鸡】发动「飞洒天星」时消耗全部剑气。",
+			"剑气图鉴必须复用最新主动技能名，并由文案显式补全书名号")
+	var h10 := load("res://assets/data/heroes/h10.tres") as HeroData
+	assert_eq(h10.skill_description, "飞洒天星")
+	assert_eq(h10.skill_detail,
+			"我方每次攻击命中，积累1点剑气，昴日【鸡】可消耗全部剑气发动强力一击（每点造成0.5点伤害。2点穿防，4点穿大防）。",
+			"图鉴与战斗共用的 h10 资源必须完整包含伤害与穿透阈值")
 
 
 func test_effect_gallery_previews_all_entries_and_selects_poison() -> void:
@@ -88,7 +102,7 @@ func test_effect_gallery_previews_all_entries_and_selects_poison() -> void:
 	assert_true(gallery.get_node("DetailArea/EffectIcon") is TextureRect,
 			"效果详情只保留外部图标素材槽，不再使用程序化绘制组件")
 	assert_false(ResourceLoader.exists("res://src/ui/components/effect_icon.gd"))
-	var selected_entry := entries.get_child(5) as Button
+	var selected_entry := entries.get_child(7) as Button
 	assert_true((selected_entry.get_node("SelectionPointer") as Control).visible,
 			"效果页必须与英雄、道具页使用同款像素指针表达选中")
 	assert_null(selected_entry.get_node_or_null("SelectionPaper"),
@@ -126,7 +140,7 @@ func test_effect_index_uses_fixed_hero_style_three_row_tracks_without_overlap() 
 	await get_tree().process_frame
 	var entries := gallery.get_node("EffectList") as Control
 	var expected_columns: Array[float] = [0.0, 170.0, 340.0, 510.0]
-	var expected_rows: Array[float] = [0.0, 196.0]
+	var expected_rows: Array[float] = [0.0, 196.0, 392.0]
 	assert_eq(entries.position, Vector2(188.0, 255.0),
 			"效果目录必须从英雄、道具页同一条首行轨道开始")
 	assert_eq(entries.size.y, 693.0,
@@ -136,7 +150,7 @@ func test_effect_index_uses_fixed_hero_style_three_row_tracks_without_overlap() 
 		assert_eq(button.position.x, expected_columns[index % 4],
 				"效果网格必须与英雄页使用 4 列固定轨道")
 		assert_eq(button.position.y, expected_rows[floori(index / 4.0)],
-				"8 个效果按英雄页行距排成两行")
+				"10 个效果按英雄页行距排成三行")
 		assert_eq(button.size, Vector2(104.0, 140.0))
 		for previous_index: int in index:
 			var previous := entries.get_child(previous_index) as Button
@@ -169,11 +183,11 @@ func test_effect_detail_navigation_matches_other_codex_pages() -> void:
 	var previous := navigation.get_node("PreviousItem") as Button
 	var indicator := navigation.get_node("ItemIndicator") as Label
 	var next := navigation.get_node("NextItem") as Button
-	assert_eq(indicator.text, "01 / 08")
+	assert_eq(indicator.text, "01 / 10")
 	assert_true(previous.disabled)
 	assert_false(next.disabled)
 	next.pressed.emit()
-	assert_eq(indicator.text, "02 / 08")
+	assert_eq(indicator.text, "02 / 10")
 	assert_eq((gallery.get_node("DetailArea/EffectName") as Label).text, "护甲")
 
 

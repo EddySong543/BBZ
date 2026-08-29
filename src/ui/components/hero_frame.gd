@@ -189,6 +189,7 @@ var _bg: TextureRect          # 贴图边框（2026-07-13 换皮·原 shader Col
 var _bg_fill: ColorRect
 var _inner_fx: ColorRect
 var _switch_label: Label   # 主动换人：armed 时盖在立绘上显示「切换」二字（任务5）
+var _switch_icon: TextureRect   # h04 / h21 选敌时显示对应技能图标，替代含混的“攻/揪”。
 var _sel_tween: Tween      # 选中弹跳动画（选择动作时的 pop）
 var _diamond: ColorRect    # 菱形外框（diamond_mode 懒建）
 var _bottom_shadow: ColorRect   # 战斗 HUD 专用定向下投影（opt-in）
@@ -467,7 +468,8 @@ func set_hp(_hp: int, _max_hp: int) -> void:
 
 ## 主动换人 armed 态（任务5）：on=立绘隐藏、框内居中显示「切换」二字 + 边框高亮放大；
 ## off=恢复立绘、去高亮。点替补框进入此态，再次点击=确认换人。
-func set_switch_prompt(on: bool, label_text: String = "切换") -> void:
+func set_switch_prompt(on: bool, label_text: String = "切换",
+		icon_texture: Texture2D = null) -> void:
 	if _switch_label == null:
 		_switch_label = Label.new()
 		_switch_label.name = "SwitchPrompt"
@@ -482,8 +484,24 @@ func set_switch_prompt(on: bool, label_text: String = "切换") -> void:
 		_switch_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
 		_switch_label.add_theme_constant_override("outline_size", 4)
 		add_child(_switch_label)   # 加在最后 → 渲染在边框/立绘之上
-	_switch_label.text = tr(label_text)   # 「切换」(己方换人) / 「揪」(h21 敌方揪目标) 复用同一 label
-	_switch_label.visible = on
+	if _switch_icon == null:
+		_switch_icon = TextureRect.new()
+		_switch_icon.name = "SwitchPromptIcon"
+		_switch_icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		# 菱形头像的安全内切正方形明显小于外接框；缩到约 32px，避免图标压过斜边。
+		_switch_icon.offset_left = 22.0
+		_switch_icon.offset_top = 22.0
+		_switch_icon.offset_right = -22.0
+		_switch_icon.offset_bottom = -22.0
+		_switch_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		_switch_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		_switch_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		_switch_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_switch_icon)
+	_switch_label.text = tr(label_text)
+	_switch_label.visible = on and icon_texture == null
+	_switch_icon.texture = icon_texture
+	_switch_icon.visible = on and icon_texture != null
 	if _portrait:
 		if on:
 			_portrait.visible = false

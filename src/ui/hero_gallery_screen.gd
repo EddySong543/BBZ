@@ -58,6 +58,8 @@ const FRAME_OFFSET_RATIO := Vector2(-9.6 / 68.0, -10.0 / 68.0)
 const CELL_INSET_RATIO := 5.5 / 68.0
 
 var all_heroes: Array[HeroData] = []
+var _hero_catalog: Array[HeroData] = []
+var _search_query := ""
 var card_cards: Array[Button] = []        # 格子点击壳（入场动画/ButtonJuice 挂这层）
 var card_frames: Array[Control] = []      # 图鉴专用头像根节点（不再实例化旧 HeroFrame）
 var card_name_labels: Array[Label] = []
@@ -108,7 +110,8 @@ var _effect_keyword_font: FontVariation
 
 
 func _ready() -> void:
-	all_heroes = HeroData.create_launch_pool(HERO_DATA_DIR)   # 首发 24（h01-h24）
+	_hero_catalog = HeroData.create_launch_pool(HERO_DATA_DIR)   # 首发 24（h01-h24）
+	all_heroes.assign(_hero_catalog)
 	_build_book()
 	_setup_top()
 	_build_pool()
@@ -189,6 +192,51 @@ func _turn_detail(direction: int) -> void:
 	if all_heroes.is_empty():
 		return
 	_select(clampi(_sel_idx + direction, 0, all_heroes.size() - 1))
+
+
+## 统一图鉴搜索只读取本章节的数据；返回值由外层搜索结果列表消费。
+func get_search_entries() -> Array[Dictionary]:
+	var entries: Array[Dictionary] = []
+	for hero: HeroData in _hero_catalog:
+		entries.append({
+			"id": StringName(hero.hero_id),
+			"label": tr(hero.hero_name),
+			"search_text": tr(hero.hero_name),
+		})
+	return entries
+
+
+## 回车后由统一图鉴调用：重建左页，使匹配英雄连续占用原 4×3 书页轨道。
+func set_search_query(query: String) -> void:
+	var normalized := query.strip_edges().to_lower()
+	if normalized == _search_query and not card_cards.is_empty():
+		return
+	_search_query = normalized
+	all_heroes.clear()
+	for hero: HeroData in _hero_catalog:
+		var searchable := tr(hero.hero_name)
+		if normalized.is_empty() or searchable.to_lower().contains(normalized):
+			all_heroes.append(hero)
+	_current_page = 0
+	_sel_idx = -1
+	_build_pool()
+	_refresh_page_visibility()
+	detail_area.visible = not all_heroes.is_empty()
+	if not all_heroes.is_empty():
+		_select(0)
+	else:
+		_refresh_detail_navigation()
+
+
+func search_result_count() -> int:
+	return all_heroes.size()
+
+
+func select_search_result(entry_id: StringName) -> void:
+	for index: int in all_heroes.size():
+		if StringName(all_heroes[index].hero_id) == entry_id:
+			_select(index)
+			return
 
 
 func _make_gallery_frame_material() -> ShaderMaterial:
@@ -283,6 +331,16 @@ func _make_selection_pointer(box: float) -> Control:
 # ============================================================
 
 func _build_pool() -> void:
+	for tween: Tween in _sel_tweens:
+		if tween != null and tween.is_valid():
+			tween.kill()
+	_sel_tweens.clear()
+	for child: Node in portrait_grid.get_children():
+		portrait_grid.remove_child(child)
+		child.free()
+	card_cards.clear()
+	card_frames.clear()
+	card_name_labels.clear()
 	var cols := _grid_columns()
 	var box := _grid_float(&"box_size", BOX)
 	var step_x := _grid_float(&"step_x", STEP_X)

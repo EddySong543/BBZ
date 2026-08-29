@@ -73,6 +73,73 @@ func test_scene6_legendary_debug_entry_is_fully_removed() -> void:
 				"Scene6 临时巨剑测试链必须完整退役: %s" % retired_marker)
 
 
+func test_add_buff_button_opens_picker_and_defaults_to_enemy() -> void:
+	var hero := _hero_by_id("h01")
+	assert_not_null(hero)
+	if hero == null:
+		return
+	var battle := BattleCore.new()
+	battle.setup([hero], [hero.duplicate(true)], 6108)
+	var panel := BattleDebugPanelScript.new()
+	add_child_autofree(panel)
+	panel.setup(battle)
+	var add_button := panel.get_node_or_null("AddBuffButton") as Button
+	var picker := panel.get_node_or_null("BuffPicker") as VBoxContainer
+	assert_not_null(add_button)
+	assert_not_null(picker)
+	if add_button == null or picker == null:
+		return
+	assert_gte(add_button.custom_minimum_size.x, 132.0,
+			"添加 Buff 是调试面板中的大按钮")
+	assert_gte(add_button.custom_minimum_size.y, 40.0)
+	assert_false(picker.visible)
+	add_button.pressed.emit()
+	assert_true(picker.visible, "点击入口只打开列表，不能立即修改状态")
+	assert_eq(int(battle.get_status(0, 0, "poison", 0)), 0)
+	assert_eq(int(battle.get_status(1, 0, "poison", 0)), 0)
+
+	var poison_button := picker.get_node("Buff_poison") as Button
+	poison_button.pressed.emit()
+	assert_eq(int(battle.get_status(1, 0, "poison", 0)), 1,
+			"列表首次打开默认把 Buff 添加到敌方出战英雄")
+	assert_eq(int(battle.get_status(0, 0, "poison", 0)), 0)
+	var target_toggle := picker.get_node("BuffTargetToggle") as Button
+	assert_eq(picker.get_child(picker.get_child_count() - 1), target_toggle,
+			"添加目标按钮固定在 Buff 列表最底端")
+	assert_eq(target_toggle.text, "添加至我方")
+	target_toggle.pressed.emit()
+	assert_eq(target_toggle.text, "添加至敌方")
+	var vulnerable_button := picker.get_node("Buff_vulnerable") as Button
+	vulnerable_button.pressed.emit()
+	assert_eq(int(battle.get_status(0, 0, "vuln", 0)), 1,
+			"切换目标后 Buff 添加到我方出战英雄")
+	assert_eq(int(battle.get_status(1, 0, "vuln", 0)), 0)
+
+
+func test_add_buff_picker_covers_every_battle_buff_semantic() -> void:
+	var hero := _hero_by_id("h01")
+	assert_not_null(hero)
+	if hero == null:
+		return
+	var battle := BattleCore.new()
+	battle.setup([hero], [hero.duplicate(true)], 6109)
+	var panel := BattleDebugPanelScript.new()
+	add_child_autofree(panel)
+	panel.setup(battle)
+	(panel.get_node("AddBuffButton") as Button).pressed.emit()
+	var picker := panel.get_node("BuffPicker") as VBoxContainer
+	for button_name: String in [
+			"Buff_sword_qi", "Buff_h02_wave_upgrade", "Buff_h08_retained_big_defend"]:
+		(picker.get_node(button_name) as Button).pressed.emit()
+	assert_eq(int(battle.get_team_status(1, "jianqi", 0)), 1)
+	assert_true(battle.upgrade_next_wave[1])
+	assert_true(battle.has_retained_big_defend(1))
+	for _stack: int in 8:
+		(picker.get_node("Buff_sword_qi") as Button).pressed.emit()
+	assert_eq(int(battle.get_team_status(1, "jianqi", 0)), 4,
+			"调试入口可重复叠加剑气但遵守正式 4 点上限")
+
+
 func _hero_by_id(hero_id: String) -> HeroData:
 	for hero: HeroData in HeroData.create_launch_pool():
 		if hero.hero_id == hero_id:

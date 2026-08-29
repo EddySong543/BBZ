@@ -81,26 +81,39 @@ offset_top = 196.0
 offset_right = 104.0
 offset_bottom = 336.0
 
-[node name="Poison" parent="EffectList" instance=ExtResource("6_entry")]
+[node name="H02WaveUpgrade" parent="EffectList" instance=ExtResource("6_entry")]
 layout_mode = 0
 offset_left = 170.0
 offset_top = 196.0
 offset_right = 274.0
 offset_bottom = 336.0
 
-[node name="Vulnerable" parent="EffectList" instance=ExtResource("6_entry")]
+[node name="H08RetainedBigDefend" parent="EffectList" instance=ExtResource("6_entry")]
 layout_mode = 0
 offset_left = 340.0
 offset_top = 196.0
 offset_right = 444.0
 offset_bottom = 336.0
 
-[node name="SwordQi" parent="EffectList" instance=ExtResource("6_entry")]
+[node name="Poison" parent="EffectList" instance=ExtResource("6_entry")]
 layout_mode = 0
 offset_left = 510.0
 offset_top = 196.0
 offset_right = 614.0
 offset_bottom = 336.0
+
+[node name="Vulnerable" parent="EffectList" instance=ExtResource("6_entry")]
+layout_mode = 0
+offset_top = 392.0
+offset_right = 104.0
+offset_bottom = 532.0
+
+[node name="SwordQi" parent="EffectList" instance=ExtResource("6_entry")]
+layout_mode = 0
+offset_left = 170.0
+offset_top = 392.0
+offset_right = 274.0
+offset_bottom = 532.0
 
 [node name="DetailArea" type="Control" parent="."]
 layout_mode = 1
@@ -218,7 +231,7 @@ offset_bottom = 54.0
 theme_override_colors/font_color = Color(0.439216, 0.4, 0.333333, 0.68)
 theme_override_fonts/font = ExtResource("4_font")
 theme_override_font_sizes/font_size = 22
-text = "01 / 07"
+text = "01 / 10"
 horizontal_alignment = 1
 vertical_alignment = 1
 

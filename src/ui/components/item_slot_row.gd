@@ -1,7 +1,7 @@
 class_name ItemSlotRow
 extends Control
 
-## 道具栏组件（2026-07-13 无文字状态语言重做·同日二版按 Eddy 反馈修）：横排 3 格。
+## 道具栏组件（2026-07-13 无文字状态语言重做·同日二版按 Eddy 反馈修）：3 格，可横排或纵排。
 ## 状态语言=回纹框（全状态统一·有道具=阶框/无道具=暖骨中性框）+ 小配饰 + 动效，状态文字全退役：
 ##   未解锁=斜贴封条（圆点=剩余回合·到点撕落+框弹亮）；锁中=阶框压暗+角上小封条（单圆点=1回合）；
 ##   可抽/可补=同语言（锦囊轻浮+框金呼吸=本回合可点）；待抽=锦囊压暗静止；
@@ -108,6 +108,9 @@ const TXT_FAINT := Color(0.62, 0.58, 0.50)      # 空格（最弱）
 @export var bottom_shadow_enabled := false
 @export var bottom_shadow_offset := ItemFrameStyle.DROP_SHADOW_OFFSET
 @export var bottom_shadow_color := ItemFrameStyle.DROP_SHADOW_COLOR
+@export var vertical_layout := false
+## 右侧纵向轨的封条朝向战场外侧；完整道具图标不翻转。
+@export var mirror_seals := false
 @export_group("")
 
 ## interactive：本地玩家行可点击。hoverable：非交互行也发悬停信号（P2 敌方道具查看·
@@ -203,11 +206,12 @@ func _set_texture_frame_palette(m: ShaderMaterial, tier: int) -> void:
 
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(SLOT_W * 3 + GAP * 2, SLOT_H)
+	custom_minimum_size = Vector2(SLOT_W, SLOT_H * 3 + GAP * 2) if vertical_layout \
+			else Vector2(SLOT_W * 3 + GAP * 2, SLOT_H)
 	# 根容器不拦截点击：只让每个槽的按钮(STOP)接收（否则上层 HUD 容器会吞点击）。
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	for i in range(3):
-		var base := Vector2(i * (SLOT_W + GAP), 0.0)
+		var base := _slot_base(i)
 		# 与回纹框完全同 alpha 轮廓的定向阴影；先于格底和框体加入，不产生矩形黑底。
 		var bottom_shadow := ItemFrameStyle.make_frame_shadow(
 				base + FRAME_ART_OFFSET, FRAME_ART_SIZE, "BottomShadow%d" % i,
@@ -278,12 +282,13 @@ func _ready() -> void:
 		add_child(lbl)
 		# 点击层（透明 flat 按钮，铺满整格）：仅 interactive 时吃点击。
 		# ── 无文字状态语言部件（封条/小封条/锦囊·全 IGNORE·refresh 控显）──
+		# 锦囊是槽内的常驻物件，封印态只在它上方贴封条，不能把锦囊整个替换掉。
+		var pouch := _make_pouch(base)
+		add_child(pouch)
 		var seal := _make_seal(base)
 		add_child(seal)
 		var mseal := _make_mini_seal(base)
 		add_child(mseal)
-		var pouch := _make_pouch(base)
-		add_child(pouch)
 		var btn := Button.new()
 		btn.flat = true
 		btn.focus_mode = Control.FOCUS_NONE
@@ -331,7 +336,7 @@ func _ready() -> void:
 func _make_seal(base: Vector2) -> Control:
 	var root := Control.new()
 	root.position = base + Vector2(SLOT_W * 0.5, SLOT_H * 0.5)
-	root.rotation = -0.30
+	root.rotation = 0.30 if mirror_seals else -0.30
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.visible = false
 	var w := 72.0   # ≤ 格宽/cos(倾角)——斜贴不探进邻槽（84 实拍越界·2026-07-13）
@@ -365,8 +370,9 @@ func _make_seal(base: Vector2) -> Control:
 ## 斜度与大封条完全同角（-0.30·Eddy 2026-07-13：视觉一致优先——同为横条同角即同斜）。
 func _make_mini_seal(base: Vector2) -> Control:
 	var root := Control.new()
-	root.position = base + Vector2(15.0, 13.0)
-	root.rotation = -0.30
+	root.position = base + Vector2(SLOT_W - 15.0, 13.0) if mirror_seals \
+			else base + Vector2(15.0, 13.0)
+	root.rotation = 0.30 if mirror_seals else -0.30
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.visible = false
 	var w := 44.0
@@ -512,9 +518,11 @@ func refresh(battle: BattleCore, player: int, staged: Array = [], concealed: boo
 		_pouches[i].visible = false
 		match st:
 			BattleCore.SlotState.SEALED:
-				# 未解锁 = 压暗中性回纹框 + 斜贴封条·剩余回合=封条圆点（每回合掉一点）。
+				# 未解锁 = 锦囊仍在槽底，斜贴封条压在其上；剩余回合=封条圆点。
 				ft = EMP_FT; fb = EMP_FB
 				frame_mod = Color(0.58, 0.56, 0.53)
+				_pouches[i].visible = true
+				_pouches[i].modulate = Color(0.48, 0.46, 0.43)
 				_seals[i].visible = true
 				var remain: int = clampi(int(BattleCore.SLOT_UNLOCK_TURN[i]) - battle.turn_number, 0, 3)
 				for k in 3:
@@ -525,8 +533,7 @@ func refresh(battle: BattleCore, player: int, staged: Array = [], concealed: boo
 				_pouches[i].visible = true
 				if battle.can_draw_slot(player, i):
 					_pouches[i].modulate = Color.WHITE
-					if interactive:
-						anim = "cta"
+					anim = "cta"
 				else:
 					frame_mod = Color(0.74, 0.72, 0.69)
 					_pouches[i].modulate = Color(0.72, 0.72, 0.72)
@@ -565,8 +572,7 @@ func refresh(battle: BattleCore, player: int, staged: Array = [], concealed: boo
 					ft = NEU_FT; fb = NEU_FB
 					_pouches[i].visible = true
 					_pouches[i].modulate = Color.WHITE
-					if interactive:
-						anim = "cta"
+					anim = "cta"
 				else:
 					ft = EMP_FT; fb = EMP_FB
 					frame_mod = Color(0.60, 0.58, 0.55)
@@ -576,7 +582,9 @@ func refresh(battle: BattleCore, player: int, staged: Array = [], concealed: boo
 			cell_inner = ft
 		# 点选使用 = 金晕外环 + 框身提金 + 图标下沉 3px（回纹框保留不清除——Eddy 2026-07-13 五改）。
 		var staged_now: bool = staged.has(i)
-		icon.position.y = ICON_INSET + (3.0 if staged_now else 0.0)
+		# 纵向布局必须保留本槽的局部基准；旧写法只写 ICON_INSET，
+		# 会把第2/3格图标在刷新或点选时拉回第1格。
+		icon.position.y = _slot_base(i).y + ICON_INSET + (3.0 if staged_now else 0.0)
 		icon_shadow.position = icon.position + ItemFrameStyle.item_art_shadow_offset(icon.size)
 		icon_shadow.self_modulate = Color(
 				ItemFrameStyle.ITEM_ART_SHADOW_COLOR.r,
@@ -632,7 +640,7 @@ func _set_ambient(i: int, key: String, base_mod: Color) -> void:
 		if old != null and old.is_valid():
 			old.kill()
 	_anim_tweens[i] = []
-	var cy := (SLOT_H - POUCH_H) * 0.5
+	var cy := _slot_base(i).y + (SLOT_H - POUCH_H) * 0.5
 	_pouches[i].position.y = cy
 	_up_chevs[i].position.y = 0.0
 	_tex_frames[i].modulate = base_mod   # 杀掉旧 tween 后必须复位（tween 残值会盖掉刚 apply 的状态色）
@@ -670,7 +678,7 @@ func _set_ambient(i: int, key: String, base_mod: Color) -> void:
 ## 点选入场 pop（一次性）：金晕外环从外扩 3px/全透明 收拢到位+淡入（0.14s·轻快不黏）。
 func _play_stage_pop(i: int) -> void:
 	var ring: ColorRect = _frames[i]
-	var base := Vector2(float(i) * (SLOT_W + GAP), 0.0)
+	var base := _slot_base(i)
 	var end_pos := base - Vector2(RING_PAD, RING_PAD)
 	var end_size := Vector2(SLOT_W + RING_PAD * 2.0, SLOT_H + RING_PAD * 2.0)
 	ring.position = end_pos - Vector2(3.0, 3.0)
@@ -682,6 +690,20 @@ func _play_stage_pop(i: int) -> void:
 	tw.tween_property(ring, "size", end_size, 0.14)\
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tw.tween_property(ring, "modulate:a", 1.0, 0.14)
+
+
+func _slot_base(index: int) -> Vector2:
+	var safe_index := clampi(index, 0, 2)
+	return Vector2(0.0, float(safe_index) * (SLOT_H + GAP)) if vertical_layout \
+			else Vector2(float(safe_index) * (SLOT_W + GAP), 0.0)
+
+
+func slot_global_rect(index: int) -> Rect2:
+	var local_rect := Rect2(_slot_base(index), Vector2(SLOT_W, SLOT_H))
+	var transform := get_global_transform()
+	var top_left := transform * local_rect.position
+	var bottom_right := transform * local_rect.end
+	return Rect2(top_left, bottom_right - top_left).abs()
 
 
 ## 解锁演出：封条幽灵副本撕落飘出（位移+旋转+淡出）+ 回纹框弹亮回落（flash=false 时只撕不闪）。

@@ -81,3 +81,24 @@ func test_battle_screen_top_timer_drives_death_switch_timeout() -> void:
 	assert_signal_emitted_with_parameters(screen._death_switch_overlay, "selection_made", [2])
 	assert_eq(screen.timer_label.text, "0", "统一倒计时归零时顶部保留红色 0")
 	BattleSetup.reset()
+
+
+func test_death_switch_dim_layer_covers_buffs_and_hover_tips() -> void:
+	BattleSetup.reset()
+	var screen := (load("res://src/ui/battle_screen1.tscn") as PackedScene).instantiate()
+	add_child_autofree(screen)
+	await get_tree().process_frame
+	var player: int = screen.PLAYER
+	var slot: int = screen.battle.active_index[player]
+	screen.battle.set_status(player, slot, "poison", 1)
+	screen._refresh_battle_status_rows()
+	var status_row: Control = screen._battle_status_rows[player]
+	var hero := load("res://assets/data/heroes/h01.tres") as HeroData
+	screen._death_switch_overlay.show_selection(player, [[1, hero, 4.5]])
+	assert_gt(screen._death_switch_overlay.z_index, status_row.z_index,
+			"死亡换人暗幕必须盖住 Buff 行，不能让 Buff 保持原亮度")
+	assert_gt(screen._death_switch_overlay.z_index, screen._tip_panel.z_index,
+			"死亡换人暗幕也必须盖住已打开的 Buff 悬停说明")
+	assert_gt((screen._death_switch_overlay.get_node("Background") as ColorRect).color.a,
+			0.0, "覆盖层必须保留实际压暗颜色")
+	BattleSetup.reset()
