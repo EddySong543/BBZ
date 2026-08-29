@@ -53,7 +53,7 @@ const DEFEND_ACTIONS := [Action.DEFEND, Action.BIG_DEFEND]
 ## 穿透等级（二元铁则·2026-06-16）：防御门按此判定，取代旧的"按动作类型判定"。
 enum Pen {
 	NORMAL,         # 防 / 大防 都挡得住（波）
-	PIERCE_DEF,     # 穿防：防挡不住、大防挡得住（大波 / 鸡 2 层一闪）
+	PIERCE_DEF,     # 穿防：防挡不住、大防挡得住（大波 / 鸡 2 层飞洒天星）
 	PIERCE_BIGDEF,  # 穿大防：连大防都挡不住（仅授公开慢蓄 payoff，如鸡满 4 层）
 	TRUE_DMG,       # 真伤：无视一切防御 + 护甲（如娄金追击、心脏掌握魔法）
 }

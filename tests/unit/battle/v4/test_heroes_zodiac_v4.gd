@@ -888,34 +888,47 @@ func test_h09_liuzhaoyanluo_removes_energy_equal_to_damage() -> void:
 	assert_eq(b.energy[1], 8 + 2, "对手攒+2 −碎能2 +被动2 = 净 +2（无碎能应 +4）")
 
 
-# ---- h10 昴日 剑意（攒剑气 + 拔剑一闪穿防）----
+# ---- h10 昴日 剑意（攒剑气 + 飞洒天星穿防）----
 
 func test_h10_taichuwanfa_gains_jianqi_on_hit() -> void:
 	var b := _battle("h10", 5, 8)
 	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.CHARGE)
-	assert_eq(int(b.get_status(0, 0, "jianqi", 0)), 1, "鸡命中 → +1 剑气")
+	assert_eq(int(b.get_team_status(0, "jianqi", 0)), 1, "鸡命中 → 队伍 +1 剑气")
+
+
+func test_h10_sword_qi_is_team_shared_across_switches() -> void:
+	var b := _battle_team(["test_p1_0", "h10", "test_p1_2"], 5, 8)
+	_resolve(b, ActionDef.Action.ATTACK, ActionDef.Action.CHARGE)
+	assert_eq(int(b.get_team_status(0, "jianqi", 0)), 1,
+			"队友命中后由替补昴日积累的剑气属于全队")
+	assert_eq(int(b.get_status(0, 0, "jianqi", 0)), 1)
+	assert_eq(int(b.get_status(0, 1, "jianqi", 0)), 1,
+			"兼容状态读取不得再因英雄槽位不同而看到两份剑气")
+	b.active_index[0] = 2
+	assert_eq(int(b.get_team_status(0, "jianqi", 0)), 1,
+			"切换到任意队友后剑气不能消失")
+	b.active_index[0] = 1
+	assert_true(b.select_active(0), "昴日重新登场后可以消费此前积累的队伍剑气")
 
 func test_h10_taichuwanfa_bajian_pierces_def_with_two_jianqi() -> void:
 	var b := _battle("h10", 5, 8)
 	b.set_status(0, 0, "jianqi", 2)
-	assert_true(b.select_active(0), "有剑气 → 可拔剑一闪")
+	assert_true(b.select_active(0), "有剑气 → 可发动飞洒天星")
 	b.select_action(1, ActionDef.Action.DEFEND)
 	b.resolve()
 	assert_eq(b.hp[1][0], 10 - 4, "剑气2 → 穿防，防挡不住，受 波2+剑气2 = 4 半点(对手 HP5=10半)")
-	assert_eq(int(b.get_status(0, 0, "jianqi", 0)), 0, "一闪消耗全部剑气")
-	assert_eq(b.energy[0], 8 - 4 + 2, "一闪费 2 能(2026-07-05 由 1 能调升)·被动 +1 回填")
+	assert_eq(int(b.get_status(0, 0, "jianqi", 0)), 0, "飞洒天星消耗全部剑气")
+	assert_eq(b.energy[0], 8 - 4 + 2, "飞洒天星费 2 能(2026-07-05 由 1 能调升)·被动 +1 回填")
 
 
 func test_h10_active_attack_does_not_count_as_a_wave_hit() -> void:
 	var b := _battle_team(["h10", "h10", "test_p1_2"], 5, 8)
-	b.set_status(0, 0, "jianqi", 2)
-	b.set_status(0, 1, "jianqi", 0)
+	b.set_team_status(0, "jianqi", 2)
 	assert_true(b.select_active(0))
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
-	assert_eq(int(b.get_status(0, 0, "jianqi", 0)), 0, "一闪正常消耗出手者剑气")
-	assert_eq(int(b.get_status(0, 1, "jianqi", 0)), 0,
-		"攻击型主动技不是波／大波，不触发替补昴日的命中技能")
+	assert_eq(int(b.get_team_status(0, "jianqi", 0)), 0,
+			"飞洒天星消耗全队唯一一份剑气，且主动攻击不能重新积累")
 
 
 # ---- h11 娄金 穷追（对手切换下场 → 被换下者 2.0 真伤·2026-07-04 由 1.0 调升）----

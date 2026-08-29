@@ -102,9 +102,9 @@ static func _status_assets(b: BattleCore, p: int) -> float:
 		t += W_FREE_BIG_ATTACK
 	if int(b.item_buffs[p].get("exhausted_turn", -1)) >= b.turn_number:
 		t -= W_EXHAUSTED_TURN
+	t += 6.0 * float(b.get_team_status(p, "jianqi", 0))              # 剑气层（昴日线团队资源）
 	for s in range(b.heroes[p].size()):
 		if b.hp[p][s] > 0:
-			t += 6.0 * float(b.get_status(p, s, "jianqi", 0))          # 剑气层（昴日线团队资源）
 			# 还魂丹每名英雄整局限用一次，不存在同英雄多层保险。
 			# 低血、在场、最后存活者更容易在下一轮真正兑现，因此只给有限情境加成。
 			var immunity_charges: int = maxi(

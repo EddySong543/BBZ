@@ -24,6 +24,26 @@ const EFFECTS: Array[Dictionary] = [
 		"edge": Color("2D203B"),
 	},
 	{
+		"id": &"h02_wave_upgrade",
+		"name": "玄金不动相",
+		"icon_path": "res://assets/sprites/heroes/h02/h02_skill.png",
+		"description": "我方下一次的波升级为大波。",
+		"show_stack_count": false,
+		"ink": Color("55421C"),
+		"accent": Color("B99A52"),
+		"edge": Color("392C13"),
+	},
+	{
+		"id": &"h08_retained_big_defend",
+		"name": "不坠神言",
+		"icon_path": "res://assets/sprites/heroes/h08/h08_skill.png",
+		"description": "大防直到下回合结束。",
+		"show_stack_count": false,
+		"ink": Color("38475B"),
+		"accent": Color("788BA5"),
+		"edge": Color("252F3D"),
+	},
+	{
 		"id": &"pierce_defense",
 		"name": "穿防",
 		"icon_path": "res://assets/ui/effects/pierce_defense.png",
@@ -74,7 +94,7 @@ const EFFECTS: Array[Dictionary] = [
 		"id": &"sword_qi",
 		"name": "剑气",
 		"icon_path": "res://assets/ui/effects/sword_qi.png",
-		"description": "最多积累4点。昴日【鸡】发动「太初万法剑」时消耗全部剑气，每点增加0.5点伤害；2点穿防，4点穿大防。",
+		"description": "最多积累4点，昴日【鸡】发动「飞洒天星」时消耗全部剑气。",
 		"show_stack_count": true,
 		"ink": Color("24464B"),
 		"accent": Color("5F8C8F"),
@@ -82,11 +102,15 @@ const EFFECTS: Array[Dictionary] = [
 	},
 ]
 
-## 核心状态键与玩家可见效果 id 的唯一适配层；UI 不再散落 poison/vuln/jianqi 判断。
-const BATTLE_STATUS_EFFECTS: Array[Dictionary] = [
+## 英雄槽位状态与队伍状态分开映射；UI 只消费标准化条目，不推断机制归属。
+const HERO_STATUS_EFFECTS: Array[Dictionary] = [
 	{"status_key": "poison", "effect_id": &"poison"},
 	{"status_key": "vuln", "effect_id": &"vulnerable"},
+]
+const TEAM_STATUS_EFFECTS: Array[Dictionary] = [
 	{"status_key": "jianqi", "effect_id": &"sword_qi"},
+	{"status_key": "upgrade_next_wave", "effect_id": &"h02_wave_upgrade"},
+	{"status_key": "retained_big_defend", "effect_id": &"h08_retained_big_defend"},
 ]
 
 
@@ -108,11 +132,22 @@ static func index_of(effect_id: StringName) -> int:
 	return -1
 
 
-static func battle_status_entries(status_values: Dictionary) -> Array[Dictionary]:
+static func battle_status_entries(hero_status_values: Dictionary,
+		team_status_values: Dictionary = {}, hero_slot: int = -1) -> Array[Dictionary]:
 	var entries: Array[Dictionary] = []
-	for mapping: Dictionary in BATTLE_STATUS_EFFECTS:
+	_append_status_entries(entries, HERO_STATUS_EFFECTS, hero_status_values,
+			"hero:%d" % hero_slot)
+	_append_status_entries(entries, TEAM_STATUS_EFFECTS, team_status_values, "team")
+	return entries
+
+
+static func _append_status_entries(entries: Array[Dictionary], mappings: Array[Dictionary],
+		status_values: Dictionary, scope_key: String) -> void:
+	for mapping: Dictionary in mappings:
 		var status_key := String(mapping.status_key)
-		var value := int(status_values.get(status_key, 0))
+		var raw_value: Variant = status_values.get(status_key, 0)
+		var value := int(raw_value) if raw_value is int or raw_value is float else (
+				1 if bool(raw_value) else 0)
 		if value <= 0:
 			continue
 		var entry := get_by_id(StringName(mapping.effect_id))
@@ -120,5 +155,6 @@ static func battle_status_entries(status_values: Dictionary) -> Array[Dictionary
 			continue
 		entry["status_key"] = status_key
 		entry["value"] = value
+		entry["scope"] = scope_key.get_slice(":", 0)
+		entry["instance_key"] = "%s:%s" % [scope_key, status_key]
 		entries.append(entry)
-	return entries

@@ -503,7 +503,7 @@ static func _best_friendly_item_target(b: BattleCore, side: int, data: ItemData)
 			for slot in b.living_reserves(side):
 				var hero_id: String = (b.heroes[side][slot] as HeroData).hero_id
 				var score: int = 3 if hero_id == "h10" and int(
-					b.get_status(side, slot, "jianqi", 0)) < 4 else (2 if hero_id == "h06" else (1 if hero_id == "h20" else -1))
+					b.get_team_status(side, "jianqi", 0)) < 4 else (2 if hero_id == "h06" else (1 if hero_id == "h20" else -1))
 				if score > best_mark_score:
 					best_mark_score = score
 					best_mark = slot
@@ -776,9 +776,9 @@ static func _can_overflow_energy_this_turn(b: BattleCore, side: int,
 
 
 static func _pending_hit_skill_effect_count(b: BattleCore, side: int) -> int:
-	var count: int = 0
+	var count: int = 1 if int(b.get_team_status(side, "jianqi", 0)) > 0 else 0
 	for slot in range(b.hp[side].size()):
-		for key in ["poison", "jianqi", "vuln"]:
+		for key in ["poison", "vuln"]:
 			if int(b.get_status(side, slot, key, 0)) > 0:
 				count += 1
 	return count

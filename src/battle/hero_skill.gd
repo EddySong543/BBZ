@@ -269,7 +269,7 @@ func execute_active(_battle: BattleCore, _player: int, _slot: int) -> void:
 	pass
 
 
-# --- 攻击型主动技（伤害走伤害管线，§D9）。昴日 h10 拔剑一闪 = 当前唯一攻击型主动技 ---
+# --- 攻击型主动技（伤害走伤害管线，§D9）。昴日 h10 飞洒天星 = 当前唯一攻击型主动技 ---
 
 ## 本主动技是否是一次"攻击"（造成伤害、走 _apply_damage 管线）。默认 false（即时型）。
 func active_is_attack() -> bool:

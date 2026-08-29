@@ -255,7 +255,7 @@ func test_legal_actions_lists_switch_targets() -> void:
 
 
 func test_legal_actions_includes_available_active() -> void:
-	# Arrange：h10 昴日 拔剑一闪（主动 2 能·需剑气>0·helper 默认 6 半能足够）
+	# Arrange：h10 昴日 飞洒天星（主动 2 能·需剑气>0·helper 默认 6 半能足够）
 	var b := _battle2([["h10", 4], ["t01", 10], ["t02", 10]], [["t10", 10], ["t11", 10], ["t12", 10]])
 	b.set_status(0, 0, "jianqi", 1)   # 有剑气 → 主动可用
 

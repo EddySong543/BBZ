@@ -43,6 +43,7 @@ func _ready_item_slot(item_id: String) -> Dictionary:
 func _midgame() -> BattleCore:
 	var b := _battle()
 	b.set_status(0, 0, "poison", 2)
+	b.set_team_status(0, "jianqi", 3)
 	b.set_status(1, 1, "marked", 1)
 	b.set_status(1, 2, "broken_armor", 1)
 	b.item_buffs[0]["next_atk_bonus"] = 2
@@ -91,6 +92,8 @@ func test_battle_core_snapshot_roundtrip_preserves_state() -> void:
 	var ok := b2.from_snapshot(b.to_snapshot())
 	# Assert：再快照逐位一致（含 rng 字符串）
 	assert_true(ok, "恢复应成功")
+	assert_eq(int(b2.get_team_status(0, "jianqi", 0)), 3,
+			"队伍共享剑气必须独立进入快照，不能落回任一英雄槽位")
 	assert_eq_deep(b2.to_snapshot(), b.to_snapshot())
 
 
@@ -382,6 +385,9 @@ func test_snapshot_malformed_rejected_without_mutation() -> void:
 	var missing_h02_state: Dictionary = before.duplicate(true)
 	missing_h02_state.erase("upgrade_next_wave")
 	assert_false(b.from_snapshot(missing_h02_state), "缺牛金团队波升级状态应拒")
+	var missing_team_statuses: Dictionary = before.duplicate(true)
+	missing_team_statuses.erase("team_statuses")
+	assert_false(b.from_snapshot(missing_team_statuses), "缺队伍共享状态容器应拒")
 	var missing_h08_state: Dictionary = before.duplicate(true)
 	missing_h08_state.erase("retained_big_defend")
 	assert_false(b.from_snapshot(missing_h08_state), "缺鬼金团队保留大防状态应拒")

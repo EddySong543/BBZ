@@ -47,6 +47,9 @@ var max_hp: Array = [[], []]              # 半点
 var shield: Array = [[], []]              # shield[player][slot]，半点
 var pending_damage: Array = [[], []]      # 半点，旧延迟伤害队列（Phase0 结算）；妖火已改用 timed_item_effects
 var statuses: Array = [[], []]            # statuses[player][slot]: Dictionary，per-slot 状态容器 (§D5)
+## 队伍级状态与出战槽无关。剑气是首个迁入者；统一容器避免未来再把共享资源误绑到英雄槽位。
+var team_statuses: Array[Dictionary] = [{}, {}]
+const TEAM_SCOPED_STATUS_KEYS: Array[String] = ["jianqi"]
 
 var selected_action: Array[int] = [-1, -1]
 var _switch_to: Array[int] = [-1, -1]               # SWITCH 动作的目标槽位
@@ -145,6 +148,7 @@ func setup(p1_heroes: Array, p2_heroes: Array, seed_value: int = 0) -> void:
 	shield = [[], []]
 	pending_damage = [[], []]
 	statuses = [[], []]
+	team_statuses = [{}, {}]
 	_death_processed = [[], []]
 	_killer = [[], []]
 	for p in [0, 1]:
@@ -372,10 +376,30 @@ func action_cost(player: int, action: int) -> int:
 	return maxi(0, _get_cost(player, action) + _queued_action_cost_delta(player, action))
 
 func get_status(player: int, slot: int, key: String, default: Variant = null) -> Variant:
+	if TEAM_SCOPED_STATUS_KEYS.has(key):
+		return get_team_status(player, key, default)
 	return statuses[player][slot].get(key, default)
 
 func set_status(player: int, slot: int, key: String, value: Variant) -> void:
+	if TEAM_SCOPED_STATUS_KEYS.has(key):
+		set_team_status(player, key, value)
+		return
 	statuses[player][slot][key] = value
+
+
+func get_team_status(player: int, key: String, default: Variant = null) -> Variant:
+	if player < 0 or player >= team_statuses.size():
+		return default
+	return team_statuses[player].get(key, default)
+
+
+func set_team_status(player: int, key: String, value: Variant) -> void:
+	if player < 0 or player >= team_statuses.size():
+		return
+	if (value is int or value is float) and int(value) <= 0:
+		team_statuses[player].erase(key)
+	else:
+		team_statuses[player][key] = value
 
 
 ## 罪已昭只记录并回收自己实际补上的脆弱层数，避免到期时误删猎物印记等其他来源。
@@ -1125,14 +1149,20 @@ func _resolve_reserve_pursuits(events: Array) -> void:
 		pursuits.append({player = p, from_slot = source, pursuer = pursuer, target = target})
 
 	for pursuit: Dictionary in pursuits:
+		var switch_event_start: int = events.size()
 		_perform_switch(
 			int(pursuit["player"]),
 			int(pursuit["from_slot"]),
 			int(pursuit["pursuer"]),
 			events)
+		for event_index: int in range(switch_event_start, events.size()):
+			var switch_event: Dictionary = events[event_index]
+			switch_event["resolution_phase"] = "h16_pursuit_switch"
+			switch_event["pursuit_player"] = int(pursuit["player"])
 
 	for pursuit: Dictionary in pursuits:
 		var p: int = int(pursuit["player"])
+		var source: int = int(pursuit["from_slot"])
 		var pursuer: int = int(pursuit["pursuer"])
 		var target: int = int(pursuit["target"])
 		var sk: HeroSkill = _skills[p][pursuer]
@@ -1141,10 +1171,27 @@ func _resolve_reserve_pursuits(events: Array) -> void:
 		var damage: int = sk.reserve_pursuit_damage()
 		if damage <= 0:
 			continue
-		events.append({id = "h16_reserve_pursuit", player = p, slot = pursuer, target = target})
-		_apply_damage(
+		var pursuit_event := {
+			id = "h16_reserve_pursuit", player = p, from_slot = source,
+			slot = pursuer, target = target,
+		}
+		events.append(pursuit_event)
+		var detail_event_start: int = events.size()
+		var outcome: Dictionary = {}
+		var hp_damage: int = _apply_damage(
 			1 - p, damage, p, ActionDef.Action.ATTACK, ActionDef.Pen.NORMAL,
-			ActionDef.Action.CHARGE, events, [], "skill", pursuer, target, false)
+			ActionDef.Action.CHARGE, events, [], "skill", pursuer, target, false,
+			outcome)
+		for event_index: int in range(detail_event_start, events.size()):
+			var detail_event: Dictionary = events[event_index]
+			detail_event["resolution_phase"] = "h16_pursuit"
+			detail_event["pursuit_player"] = p
+		pursuit_event["hp_damage"] = hp_damage
+		pursuit_event["damage_total"] = int(outcome.get("damage_total", 0))
+		pursuit_event["shield_damage"] = maxi(
+			int(outcome.get("damage_total", 0)) - hp_damage, 0)
+		pursuit_event["connected"] = bool(outcome.get("connected", false))
+		pursuit_event["target_defeated"] = bool(outcome.get("defeated", false))
 
 
 # === 道具（ADR-003）===
@@ -1609,13 +1656,16 @@ func clear_pending_hit_skill_effects() -> int:
 	var cleared: int = 0
 	for side in [0, 1]:
 		for slot in range(statuses[side].size()):
-			for key in ["poison", "jianqi", "vuln"]:
+			for key in ["poison", "vuln"]:
 				if int(get_status(side, slot, key, 0)) > 0:
 					if key == "vuln":
 						clear_vulnerability(side, slot)
 					else:
 						(statuses[side][slot] as Dictionary).erase(key)
 					cleared += 1
+		if int(get_team_status(side, "jianqi", 0)) > 0:
+			set_team_status(side, "jianqi", 0)
+			cleared += 1
 	return cleared
 
 
@@ -2250,8 +2300,8 @@ func _resolve_borrowed_marks(player: int, context: Dictionary, events: Array) ->
 				set_status(target_player, target_slot, "poison", int(
 					get_status(target_player, target_slot, "poison", 0)) + 1)
 			"h10":
-				set_status(player, slot, "jianqi", mini(4, int(
-					get_status(player, slot, "jianqi", 0)) + 1))
+				set_team_status(player, "jianqi", mini(4, int(
+					get_team_status(player, "jianqi", 0)) + 1))
 			"h20":
 				apply_h20_vulnerability(target_player, target_slot)
 			_:
@@ -3297,6 +3347,7 @@ func clone() -> BattleCore:
 	c.shield = shield.duplicate(true)
 	c.pending_damage = pending_damage.duplicate(true)
 	c.statuses = statuses.duplicate(true)
+	c.team_statuses = team_statuses.duplicate(true)
 	c.selected_action = selected_action.duplicate()
 	c._empowered_wave = _empowered_wave.duplicate()
 	c._split_big_wave = _split_big_wave.duplicate()
@@ -3371,12 +3422,12 @@ func clone() -> BattleCore:
 #       b.select_action(0, ...)                           # 恢复后战局含随机流逐位一致，直接续打
 # 行为锁定：tests/unit/battle/v4/test_battle_snapshot.gd
 
-const SNAPSHOT_VERSION := 19
+const SNAPSHOT_VERSION := 20
 const HERO_RES_DIR := "res://assets/data/heroes/"
 ## 快照必需键（2026-07-17 终审修复·schema 门）：⚠新增引擎状态字段的"三处同步"升级为四处——
 ## clone() / to_snapshot()+from_snapshot() / 本表 / 快照测试。
 const SNAP_REQUIRED_KEYS: Array[String] = ["v", "heroes", "active_index", "energy", "energy_max", "hp", "max_hp",
-	"shield", "pending_damage", "statuses", "selected_action", "switch_to", "forced_pull",
+	"shield", "pending_damage", "statuses", "team_statuses", "selected_action", "switch_to", "forced_pull",
 	"active_target", "attack_target", "second_action", "second_attack_target", "pending_death_switch", "death_processed", "empowered_wave", "split_big_wave", "blood_payment", "blood_payment_source", "energy_cap_discount", "free_switch_usage_turn", "free_switch_uses", "pending_free_switches", "killer",
 	"last_action", "items", "item_uses", "info_distortion", "item_buffs", "timed_item_effects", "imod", "relics", "slots",
 	"battle_backpack_enabled", "battle_backpacks", "used_item_history", "revealed_backpack_uids", "next_backpack_uid",
@@ -3398,6 +3449,7 @@ func to_snapshot() -> Dictionary:
 		shield = shield.duplicate(true),
 		pending_damage = pending_damage.duplicate(true),
 		statuses = statuses.duplicate(true),
+		team_statuses = team_statuses.duplicate(true),
 		selected_action = selected_action.duplicate(),
 		switch_to = _switch_to.duplicate(),
 		forced_pull = _forced_pull.duplicate(),
@@ -3469,6 +3521,9 @@ func from_snapshot(d: Dictionary) -> bool:
 	shield = s["shield"]
 	pending_damage = s["pending_damage"]
 	statuses = s["statuses"]
+	var restored_team_statuses: Array[Dictionary] = []
+	restored_team_statuses.assign(s["team_statuses"])
+	team_statuses = restored_team_statuses
 	selected_action.assign(s["selected_action"])
 	_switch_to.assign(s["switch_to"])
 	_forced_pull.assign(s["forced_pull"])

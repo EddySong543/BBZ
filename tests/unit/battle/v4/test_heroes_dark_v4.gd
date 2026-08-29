@@ -257,6 +257,42 @@ func test_h16_reserve_pursuit_switches_in_and_hits_same_active_target() -> void:
 	assert_true(_has_event(result, "h16_reserve_pursuit"), "结算事件应记录广寒追击")
 
 
+func test_h16_pursuit_events_expose_a_strict_serial_playback_phase() -> void:
+	var b := _battle_team(["test_p0_0", "h16", "test_p0_2"], 5, 8)
+	b.select_action(0, ActionDef.Action.ATTACK)
+	b.select_action(1, ActionDef.Action.CHARGE)
+	var result: Dictionary = b.resolve()
+	var primary_damage_index := -1
+	var pursuit_switch_index := -1
+	var pursuit_start_index := -1
+	var pursuit_damage_index := -1
+	var pursuit_event: Dictionary = {}
+	for event_index: int in (result["events"] as Array).size():
+		var event: Dictionary = result["events"][event_index]
+		var phase := String(event.get("resolution_phase", ""))
+		if String(event.get("id", "")) == "damage_taken" and phase.is_empty():
+			primary_damage_index = event_index
+		elif String(event.get("id", "")) == "switch" \
+				and phase == "h16_pursuit_switch":
+			pursuit_switch_index = event_index
+		elif String(event.get("id", "")) == "h16_reserve_pursuit":
+			pursuit_start_index = event_index
+			pursuit_event = event
+		elif String(event.get("id", "")) == "damage_taken" \
+				and phase == "h16_pursuit":
+			pursuit_damage_index = event_index
+	assert_gte(primary_damage_index, 0)
+	assert_gt(pursuit_switch_index, primary_damage_index,
+			"UI 必须能识别主攻击命中完成后才开始的 h16 换人段")
+	assert_gt(pursuit_start_index, pursuit_switch_index,
+			"h16 独立攻击段必须位于追击换人之后")
+	assert_gt(pursuit_damage_index, pursuit_start_index,
+			"追击伤害事件必须位于 h16 攻击揭示之后")
+	assert_eq(int(pursuit_event.get("hp_damage", -1)), 2)
+	assert_eq(int(pursuit_event.get("damage_total", -1)), 2)
+	assert_false(bool(pursuit_event.get("target_defeated", true)))
+
+
 func test_h16_blocked_team_attack_does_not_trigger_pursuit() -> void:
 	var b := _battle_team(["test_p0_0", "h16", "test_p0_2"], 5, 8)
 	b.select_action(0, ActionDef.Action.ATTACK)
