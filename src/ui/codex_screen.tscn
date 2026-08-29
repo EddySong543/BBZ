@@ -8,8 +8,13 @@
 [ext_resource type="Script" uid="uid://bcupaxwu5egvq" path="res://src/ui/components/codex_native_text_layer.gd" id="10_native_text"]
 [ext_resource type="PackedScene" uid="uid://8wfbqj0otq8e" path="res://src/ui/hero_gallery_screen.tscn" id="11_hero_gallery"]
 [ext_resource type="PackedScene" uid="uid://cepywg5ctrnk5" path="res://src/ui/item_gallery_screen.tscn" id="12_item_gallery"]
-[ext_resource type="Shader" path="res://assets/shaders/canvas_ui_codex_rarity_edge.gdshader" id="13_rarity_edge"]
+[ext_resource type="Shader" uid="uid://rmmb0uqwgbxq" path="res://assets/shaders/canvas_ui_codex_rarity_edge.gdshader" id="13_rarity_edge"]
 [ext_resource type="PackedScene" path="res://src/ui/effect_gallery_screen.tscn" id="14_effect_gallery"]
+[ext_resource type="FontVariation" path="res://assets/font/zlabs_pixel_ui.tres" id="15_search_font"]
+[ext_resource type="Script" path="res://src/ui/components/codex_search_field_frame.gd" id="16_search_frame"]
+[ext_resource type="Texture2D" path="res://assets/ui/codex/search_cat_head.png" id="17_search_cat"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_ui_codex_search_cat_ink.gdshader" id="18_search_cat_shader"]
+[ext_resource type="Script" path="res://src/ui/components/codex_search_curved_text.gd" id="19_search_curved_text"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_backdrop"]
 shader = ExtResource("9_backdrop_shader")
@@ -30,10 +35,6 @@ content_margin_right = 4.0
 content_margin_left = 2.0
 content_margin_right = 2.0
 
-[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_rarity_idle"]
-content_margin_left = 19.0
-content_margin_right = 2.0
-
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_normal_idle_edge"]
 resource_local_to_scene = true
 shader = ExtResource("13_rarity_edge")
@@ -49,6 +50,10 @@ shader_parameter/rarity_color = Color(0.247059, 0.494118, 0.815686, 1)
 shader_parameter/edge_end_uv = 0.16
 shader_parameter/blend_width_uv = 0.035
 shader_parameter/tint_strength = 0.88
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_rarity_idle"]
+content_margin_left = 19.0
+content_margin_right = 2.0
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_rare_idle_edge"]
 resource_local_to_scene = true
@@ -81,6 +86,21 @@ shader_parameter/rarity_color = Color(0.796078, 0.545098, 0.141176, 1)
 shader_parameter/edge_end_uv = 0.16
 shader_parameter/blend_width_uv = 0.035
 shader_parameter/tint_strength = 0.88
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_search_input"]
+content_margin_left = 12.0
+content_margin_top = 3.0
+content_margin_right = 38.0
+content_margin_bottom = 3.0
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_search_cat"]
+atlas = ExtResource("17_search_cat")
+region = Rect2(277, 64, 1001, 895)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_search_cat_ink"]
+shader = ExtResource("18_search_cat_shader")
+shader_parameter/ink_color = Color(0.290196, 0.227451, 0.176471, 1)
+shader_parameter/detail_strength = 0.12
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_back_short"]
 atlas = ExtResource("2_chapter_idle")
@@ -127,7 +147,7 @@ offset_bottom = 1007.6
 mouse_filter = 2
 color = Color(0.141176, 0.109804, 0.0901961, 0.14)
 
-[node name="OuterFade" type="ColorRect" parent="BookContactShadow"]
+[node name="OuterFade" type="ColorRect" parent="BookContactShadow" unique_id=791461388]
 show_behind_parent = true
 layout_mode = 0
 offset_left = -10.0
@@ -137,7 +157,7 @@ offset_bottom = 917.2
 mouse_filter = 2
 color = Color(0.141176, 0.109804, 0.0901961, 0.06)
 
-[node name="MidFade" type="ColorRect" parent="BookContactShadow"]
+[node name="MidFade" type="ColorRect" parent="BookContactShadow" unique_id=984597420]
 show_behind_parent = true
 layout_mode = 0
 offset_left = -5.0
@@ -309,7 +329,7 @@ mouse_filter = 2
 texture = ExtResource("3_chapter_selected")
 expand_mode = 1
 
-[node name="EffectBookmark" type="Button" parent="BookmarkLayer"]
+[node name="EffectBookmark" type="Button" parent="BookmarkLayer" unique_id=1404821737]
 layout_mode = 0
 offset_left = 9.6
 offset_top = 366.75
@@ -323,7 +343,7 @@ theme_override_styles/focus = SubResource("StyleBoxEmpty_chapter_idle")
 toggle_mode = true
 text = "效果"
 
-[node name="IdleShadow" type="TextureRect" parent="BookmarkLayer/EffectBookmark"]
+[node name="IdleShadow" type="TextureRect" parent="BookmarkLayer/EffectBookmark" unique_id=307899869]
 self_modulate = Color(0.164706, 0.12549, 0.0941176, 0.38)
 show_behind_parent = true
 texture_filter = 1
@@ -341,7 +361,7 @@ mouse_filter = 2
 texture = ExtResource("2_chapter_idle")
 expand_mode = 1
 
-[node name="SelectedShadow" type="TextureRect" parent="BookmarkLayer/EffectBookmark"]
+[node name="SelectedShadow" type="TextureRect" parent="BookmarkLayer/EffectBookmark" unique_id=1478934895]
 visible = false
 self_modulate = Color(0.164706, 0.12549, 0.0941176, 0.38)
 show_behind_parent = true
@@ -360,7 +380,7 @@ mouse_filter = 2
 texture = ExtResource("3_chapter_selected")
 expand_mode = 1
 
-[node name="IdleArt" type="TextureRect" parent="BookmarkLayer/EffectBookmark"]
+[node name="IdleArt" type="TextureRect" parent="BookmarkLayer/EffectBookmark" unique_id=68032878]
 show_behind_parent = true
 texture_filter = 1
 layout_mode = 1
@@ -373,7 +393,7 @@ mouse_filter = 2
 texture = ExtResource("2_chapter_idle")
 expand_mode = 1
 
-[node name="SelectedArt" type="TextureRect" parent="BookmarkLayer/EffectBookmark"]
+[node name="SelectedArt" type="TextureRect" parent="BookmarkLayer/EffectBookmark" unique_id=1732955887]
 visible = false
 show_behind_parent = true
 texture_filter = 1
@@ -474,9 +494,9 @@ expand_mode = 1
 
 [node name="IdleStripe" type="TextureRect" parent="BookmarkLayer/RarityBookmarks/Normal" unique_id=1703208890]
 visible = false
-material = SubResource("ShaderMaterial_normal_idle_edge")
 show_behind_parent = true
 texture_filter = 1
+material = SubResource("ShaderMaterial_normal_idle_edge")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -490,9 +510,9 @@ texture = ExtResource("2_chapter_idle")
 expand_mode = 1
 
 [node name="SelectedStripe" type="TextureRect" parent="BookmarkLayer/RarityBookmarks/Normal" unique_id=499216397]
-material = SubResource("ShaderMaterial_normal_selected_edge")
 show_behind_parent = true
 texture_filter = 1
+material = SubResource("ShaderMaterial_normal_selected_edge")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -583,9 +603,9 @@ texture = ExtResource("3_chapter_selected")
 expand_mode = 1
 
 [node name="IdleStripe" type="TextureRect" parent="BookmarkLayer/RarityBookmarks/Rare" unique_id=1404150061]
-material = SubResource("ShaderMaterial_rare_idle_edge")
 show_behind_parent = true
 texture_filter = 1
+material = SubResource("ShaderMaterial_rare_idle_edge")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -600,9 +620,9 @@ expand_mode = 1
 
 [node name="SelectedStripe" type="TextureRect" parent="BookmarkLayer/RarityBookmarks/Rare" unique_id=1671001515]
 visible = false
-material = SubResource("ShaderMaterial_rare_selected_edge")
 show_behind_parent = true
 texture_filter = 1
+material = SubResource("ShaderMaterial_rare_selected_edge")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -693,9 +713,9 @@ texture = ExtResource("3_chapter_selected")
 expand_mode = 1
 
 [node name="IdleStripe" type="TextureRect" parent="BookmarkLayer/RarityBookmarks/Legendary" unique_id=494533063]
-material = SubResource("ShaderMaterial_legendary_idle_edge")
 show_behind_parent = true
 texture_filter = 1
+material = SubResource("ShaderMaterial_legendary_idle_edge")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -710,9 +730,9 @@ expand_mode = 1
 
 [node name="SelectedStripe" type="TextureRect" parent="BookmarkLayer/RarityBookmarks/Legendary" unique_id=1621951405]
 visible = false
-material = SubResource("ShaderMaterial_legendary_selected_edge")
 show_behind_parent = true
 texture_filter = 1
+material = SubResource("ShaderMaterial_legendary_selected_edge")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -734,16 +754,16 @@ offset_bottom = 1166.4
 scale = Vector2(0.84, 0.84)
 mouse_filter = 2
 
-[node name="HeroGallery" parent="GalleryHost" instance=ExtResource("11_hero_gallery")]
+[node name="HeroGallery" parent="GalleryHost" unique_id=1589706812 instance=ExtResource("11_hero_gallery")]
 layout_mode = 1
 embedded_in_codex = true
 
-[node name="ItemGallery" parent="GalleryHost" instance=ExtResource("12_item_gallery")]
+[node name="ItemGallery" parent="GalleryHost" unique_id=1343118981 instance=ExtResource("12_item_gallery")]
 visible = false
 layout_mode = 1
 embedded_in_codex = true
 
-[node name="EffectGallery" parent="GalleryHost" instance=ExtResource("14_effect_gallery")]
+[node name="EffectGallery" parent="GalleryHost" unique_id=1105789521 instance=ExtResource("14_effect_gallery")]
 visible = false
 layout_mode = 1
 embedded_in_codex = true
@@ -758,6 +778,175 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("10_native_text")
 
+[node name="SearchEmptyState" type="Control" parent="."]
+visible = false
+z_index = 29
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="LeftMessage" type="Label" parent="SearchEmptyState"]
+layout_mode = 0
+offset_left = 244.0
+offset_top = 480.0
+offset_right = 900.0
+offset_bottom = 548.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.290196, 0.227451, 0.176471, 1)
+theme_override_fonts/font = ExtResource("15_search_font")
+theme_override_font_sizes/font_size = 28
+text = "没有找到对应的结果..."
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RightMessage" type="Label" parent="SearchEmptyState"]
+layout_mode = 0
+offset_left = 1000.0
+offset_top = 480.0
+offset_right = 1690.0
+offset_bottom = 548.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.290196, 0.227451, 0.176471, 1)
+theme_override_fonts/font = ExtResource("15_search_font")
+theme_override_font_sizes/font_size = 28
+text = ""
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CatGroup" type="Control" parent="SearchEmptyState"]
+visible = false
+layout_mode = 0
+offset_left = 1235.0
+offset_top = 418.0
+offset_right = 1455.0
+offset_bottom = 632.0
+mouse_filter = 2
+
+[node name="Meow" type="Label" parent="SearchEmptyState/CatGroup"]
+layout_mode = 0
+offset_right = 220.0
+offset_bottom = 40.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.290196, 0.227451, 0.176471, 1)
+theme_override_fonts/font = ExtResource("15_search_font")
+theme_override_font_sizes/font_size = 28
+text = "喵"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CatHead" type="TextureRect" parent="SearchEmptyState/CatGroup"]
+texture_filter = 1
+material = SubResource("ShaderMaterial_search_cat_ink")
+layout_mode = 0
+offset_left = 26.0
+offset_top = 52.0
+offset_right = 194.0
+offset_bottom = 202.0
+mouse_filter = 2
+texture = SubResource("AtlasTexture_search_cat")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="SearchControl" type="Control" parent="." unique_id=1840241223]
+editor_description = "手动移动整套搜索 UI：只调整本节点 Layout > Transform > Position。移动它会让放大镜、弧形输入框和清除键保持同步。"
+z_index = 30
+anchors_preset = 0
+offset_left = 220.0
+offset_top = 140.0
+offset_right = 800.0
+offset_bottom = 180.0
+mouse_filter = 2
+
+[node name="SearchButton" type="Button" parent="SearchControl" unique_id=105968649]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+focus_mode = 0
+mouse_default_cursor_shape = 2
+theme_override_styles/normal = SubResource("StyleBoxEmpty_chapter_selected")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_chapter_selected")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_chapter_selected")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_chapter_selected")
+flat = true
+
+[node name="Lens" type="Line2D" parent="SearchControl/SearchButton" unique_id=753565902]
+position = Vector2(28, 5)
+points = PackedVector2Array(8, 16, 9, 11, 13, 8, 19, 8, 24, 11, 26, 16, 24, 21, 20, 24, 14, 24, 10, 21, 8, 16)
+width = 3.0
+default_color = Color(0.290196, 0.227451, 0.176471, 1)
+
+[node name="Handle" type="Line2D" parent="SearchControl/SearchButton" unique_id=1500123463]
+position = Vector2(28, 5)
+points = PackedVector2Array(22, 22, 31, 31)
+width = 3.0
+default_color = Color(0.290196, 0.227451, 0.176471, 1)
+
+[node name="SearchFieldFrame" type="Control" parent="SearchControl"]
+layout_mode = 0
+offset_left = 77.0
+offset_top = 5.0
+offset_right = 680.0
+offset_bottom = 38.0
+mouse_filter = 2
+script = ExtResource("16_search_frame")
+
+[node name="SearchInput" type="LineEdit" parent="SearchControl" unique_id=1400612535]
+editor_description = "你已手调为 Position=(77,5)、Size=(603,33)。如继续调整，SearchFieldFrame 必须保持相同 Position/Size，SearchClearButton 跟随输入框右缘移动。"
+layout_mode = 0
+offset_left = 77.0
+offset_top = 5.0
+offset_right = 680.0
+offset_bottom = 38.0
+theme_override_colors/font_color = Color(0.203922, 0.156863, 0.113725, 0)
+theme_override_colors/font_placeholder_color = Color(0.403922, 0.341176, 0.27451, 0)
+theme_override_colors/caret_color = Color(0.603922, 0.407843, 0.156863, 0)
+theme_override_colors/selection_color = Color(0.709804, 0.603922, 0.447059, 0)
+theme_override_fonts/font = ExtResource("15_search_font")
+theme_override_font_sizes/font_size = 17
+theme_override_styles/normal = SubResource("StyleBoxEmpty_search_input")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_search_input")
+placeholder_text = "搜索..."
+max_length = 32
+
+[node name="SearchCurvedText" type="Control" parent="SearchControl"]
+layout_mode = 0
+offset_left = 77.0
+offset_top = 5.0
+offset_right = 680.0
+offset_bottom = 38.0
+mouse_filter = 2
+script = ExtResource("19_search_curved_text")
+font = ExtResource("15_search_font")
+
+[node name="SearchClearButton" type="Button" parent="SearchControl"]
+visible = false
+layout_mode = 0
+offset_left = 646.0
+offset_top = 5.0
+offset_right = 678.0
+offset_bottom = 37.0
+focus_mode = 0
+mouse_default_cursor_shape = 2
+theme_override_styles/normal = SubResource("StyleBoxEmpty_chapter_selected")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_chapter_selected")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_chapter_selected")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_chapter_selected")
+flat = true
+
+[node name="StrokeA" type="Line2D" parent="SearchControl/SearchClearButton"]
+points = PackedVector2Array(10, 12, 13, 15, 16, 18, 19, 21, 22, 24)
+width = 2.0
+default_color = Color(0.290196, 0.227451, 0.176471, 1)
+
+[node name="StrokeB" type="Line2D" parent="SearchControl/SearchClearButton"]
+points = PackedVector2Array(22, 12, 19, 15, 16, 18, 13, 21, 10, 24)
+width = 2.0
+default_color = Color(0.290196, 0.227451, 0.176471, 1)
+
 [node name="CloseButton" type="Button" parent="." unique_id=1275900280]
 editor_description = "Inspector 手动调整：必须移动本 CloseButton 节点，而不是下面两条 Stroke。Layout > Transform 的 Position 会同时移动图案与点击区；Size 保持 40×40。"
 layout_mode = 0
@@ -767,18 +956,18 @@ offset_right = 1683.0
 offset_bottom = 180.0
 focus_mode = 0
 mouse_default_cursor_shape = 2
-flat = true
 theme_override_styles/normal = SubResource("StyleBoxEmpty_chapter_selected")
-theme_override_styles/pressed = SubResource("StyleBoxEmpty_chapter_selected")
-theme_override_styles/hover = SubResource("StyleBoxEmpty_chapter_selected")
-theme_override_styles/hover_pressed = SubResource("StyleBoxEmpty_chapter_selected")
-theme_override_styles/focus = SubResource("StyleBoxEmpty_chapter_selected")
-theme_override_styles/disabled = SubResource("StyleBoxEmpty_chapter_selected")
 theme_override_styles/normal_mirrored = SubResource("StyleBoxEmpty_chapter_selected")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_chapter_selected")
 theme_override_styles/pressed_mirrored = SubResource("StyleBoxEmpty_chapter_selected")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_chapter_selected")
 theme_override_styles/hover_mirrored = SubResource("StyleBoxEmpty_chapter_selected")
+theme_override_styles/hover_pressed = SubResource("StyleBoxEmpty_chapter_selected")
 theme_override_styles/hover_pressed_mirrored = SubResource("StyleBoxEmpty_chapter_selected")
+theme_override_styles/disabled = SubResource("StyleBoxEmpty_chapter_selected")
 theme_override_styles/disabled_mirrored = SubResource("StyleBoxEmpty_chapter_selected")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_chapter_selected")
+flat = true
 
 [node name="StrokeA" type="Line2D" parent="CloseButton" unique_id=397635845]
 points = PackedVector2Array(8, 7, 13, 12, 18, 16, 23, 21, 31, 32)

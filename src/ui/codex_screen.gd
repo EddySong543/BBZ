@@ -58,6 +58,7 @@ const BACK_ARROW_PRESS_SHIFT := Vector2(1.0, 0.0)
 const CLOSE_IDLE_COLOR := Color("4A3A2D")
 const CLOSE_HOVER_COLOR := Color("9A6828")
 const CLOSE_PRESSED_COLOR := Color("2F241B")
+const SEARCH_PLACEHOLDER := "搜索..."
 const CLOSE_STYLE_STATES: Array[StringName] = [
 	&"normal", &"hover", &"pressed", &"hover_pressed", &"focus", &"disabled",
 	&"normal_mirrored", &"hover_mirrored", &"pressed_mirrored",
@@ -70,6 +71,8 @@ const CLOSE_STYLE_STATES: Array[StringName] = [
 @export_range(0.55, 0.92, 0.01) var bookmark_fold_min_scale := 0.78
 @export_range(0.02, 0.20, 0.005) var bookmark_fold_collapse_duration := 0.075
 @export_range(0.02, 0.20, 0.005) var bookmark_fold_expand_duration := 0.09
+@export_group("搜索彩蛋")
+@export_range(0.0, 1.0, 0.01) var search_cat_easter_egg_chance := 0.10
 
 @onready var gallery_host: Control = $GalleryHost
 @onready var native_text_layer: CodexNativeTextLayer = $NativeTextLayer
@@ -87,6 +90,16 @@ const CLOSE_STYLE_STATES: Array[StringName] = [
 ]
 @onready var book_contact_shadow: ColorRect = $BookContactShadow
 @onready var close_button: Button = $CloseButton
+@onready var search_control: Control = $SearchControl
+@onready var search_button: Button = $SearchControl/SearchButton
+@onready var search_frame: CodexSearchFieldFrame = $SearchControl/SearchFieldFrame
+@onready var search_input: LineEdit = $SearchControl/SearchInput
+@onready var search_curved_text: CodexSearchCurvedText = $SearchControl/SearchCurvedText
+@onready var search_clear_button: Button = $SearchControl/SearchClearButton
+@onready var search_empty_state: Control = $SearchEmptyState
+@onready var search_empty_left: Label = $SearchEmptyState/LeftMessage
+@onready var search_empty_right: Label = $SearchEmptyState/RightMessage
+@onready var search_empty_cat_group: Control = $SearchEmptyState/CatGroup
 @onready var back_button: Button = $BackButton
 @onready var back_arrow: Polygon2D = $BackButton/BackArrow
 @onready var back_text: Label = $BackButton/BackText
@@ -103,6 +116,8 @@ var _bookmark_fold_scales: Dictionary = {}
 var _rarity_group_tween: Tween
 var _overlay_open_tween: Tween
 var _overlay_close_tween: Tween
+var _applied_search_query := ""
+var _showing_search_cat_egg := false
 
 
 func _ready() -> void:
@@ -126,6 +141,7 @@ func _ready() -> void:
 	_apply_rarity_stripe_colors()
 	_setup_back_button()
 	_setup_close_button()
+	_setup_search()
 	_configure_embedded_overlay()
 	# 图鉴已经统一为场景内浮层；旧返回签只保留为历史节点，不再参与运行时布局或输入。
 	back_button.visible = false
@@ -151,11 +167,14 @@ func show_section(section: int) -> void:
 		cached.visible = is_active
 		cached.set_process_unhandled_input(is_active)
 	current_section = safe_section
+	_apply_search_to_gallery(gallery)
 	native_text_layer.set_source_root(gallery)
+	_refresh_search_empty_state()
+	_refresh_search_scope()
 	var animate := previous_section >= 0 and previous_section != current_section
 	_refresh_chapter_bookmarks(animate)
 	_position_effect_bookmark(current_section == Section.ITEM, animate)
-	if current_section == Section.ITEM:
+	if current_section == Section.ITEM and _applied_search_query.is_empty():
 		_open_rarity_bookmarks(animate)
 		_refresh_rarity_bookmarks(_item_tier(gallery), animate)
 	else:
@@ -168,8 +187,11 @@ func reset_for_open() -> void:
 	if current_section != Section.ITEM:
 		return
 	var gallery := get_gallery(Section.ITEM)
-	gallery.call("select_tier", 1)
-	_refresh_rarity_bookmarks(1, false)
+	if _applied_search_query.is_empty():
+		gallery.call("select_tier", 1)
+		_refresh_rarity_bookmarks(1, false)
+	else:
+		_apply_search_to_gallery(gallery)
 
 
 ## 场景内呼出只做视觉偏移与淡入，不改变书本、页签或文字的真实布局坐标。
@@ -188,6 +210,8 @@ func play_overlay_open_animation() -> void:
 		bookmark_layer,
 		gallery_host,
 		native_text_layer,
+		search_empty_state,
+		search_control,
 		close_button,
 	]
 	for layer: Control in lifted_layers:
@@ -221,6 +245,8 @@ func play_overlay_close_animation() -> void:
 		bookmark_layer,
 		gallery_host,
 		native_text_layer,
+		search_empty_state,
+		search_control,
 		close_button,
 	]
 	_overlay_close_tween = create_tween().bind_node(self).set_parallel(true)
@@ -562,6 +588,164 @@ func _setup_close_button() -> void:
 	close_button.button_down.connect(_on_close_down)
 	close_button.button_up.connect(_on_close_up)
 	_on_close_hover(false)
+
+
+func _setup_search() -> void:
+	search_button.pressed.connect(_focus_search)
+	search_button.mouse_entered.connect(_on_search_icon_hover.bind(true))
+	search_button.mouse_exited.connect(_on_search_icon_hover.bind(false))
+	search_button.button_down.connect(_on_search_icon_down)
+	search_button.button_up.connect(_on_search_icon_up)
+	search_input.text_submitted.connect(_on_search_text_submitted)
+	search_input.text_changed.connect(_on_search_text_changed)
+	search_input.focus_entered.connect(_on_search_focus_changed.bind(true))
+	search_input.focus_exited.connect(_on_search_focus_changed.bind(false))
+	search_input.gui_input.connect(_on_search_input_gui)
+	search_clear_button.pressed.connect(_clear_applied_search)
+	search_clear_button.mouse_entered.connect(_on_search_clear_hover.bind(true))
+	search_clear_button.mouse_exited.connect(_on_search_clear_hover.bind(false))
+	search_clear_button.button_down.connect(_on_search_clear_down)
+	search_clear_button.button_up.connect(_on_search_clear_up)
+	search_input.caret_blink = true
+	search_input.caret_blink_interval = 0.55
+	search_curved_text.caret_blink_interval = search_input.caret_blink_interval
+	search_input.keep_editing_on_text_submit = true
+	search_clear_button.visible = false
+	_on_search_icon_hover(false)
+	_on_search_clear_hover(false)
+	_refresh_search_scope()
+
+
+func _focus_search() -> void:
+	search_input.grab_focus()
+	search_input.caret_column = search_input.text.length()
+
+
+func _refresh_search_scope() -> void:
+	search_input.placeholder_text = tr(SEARCH_PLACEHOLDER)
+	search_curved_text.queue_redraw()
+
+
+func _on_search_text_submitted(text: String) -> void:
+	_applied_search_query = text.strip_edges()
+	_showing_search_cat_egg = not _applied_search_query.is_empty() \
+			and randf() < search_cat_easter_egg_chance
+	search_input.text = _applied_search_query
+	search_input.caret_column = search_input.text.length()
+	search_clear_button.visible = not _applied_search_query.is_empty()
+	for gallery: Control in _galleries:
+		if gallery != null:
+			_apply_search_to_gallery(gallery)
+	if current_section >= 0:
+		var current_gallery := get_gallery(current_section)
+		native_text_layer.set_source_root(current_gallery)
+		_refresh_search_empty_state()
+		if current_section == Section.ITEM:
+			if _applied_search_query.is_empty():
+				_open_rarity_bookmarks(false)
+				_refresh_rarity_bookmarks(_item_tier(current_gallery), false)
+			else:
+				_close_rarity_bookmarks(false)
+	search_input.grab_focus()
+
+
+func _on_search_text_changed(text: String) -> void:
+	search_clear_button.visible = not text.is_empty()
+	# 已提交的搜索被手动删空时同步恢复书页，避免“框已空但过滤仍存在”。
+	if text.is_empty() and not _applied_search_query.is_empty():
+		_clear_applied_search()
+
+
+func _apply_search_to_gallery(gallery: Control) -> void:
+	if gallery.has_method("set_search_query"):
+		gallery.call("set_search_query", _applied_search_query)
+
+
+func _clear_applied_search() -> void:
+	_applied_search_query = ""
+	_showing_search_cat_egg = false
+	if not search_input.text.is_empty():
+		search_input.clear()
+	search_clear_button.visible = false
+	for gallery: Control in _galleries:
+		if gallery != null:
+			_apply_search_to_gallery(gallery)
+	if current_section >= 0:
+		var current_gallery := get_gallery(current_section)
+		native_text_layer.set_source_root(current_gallery)
+		_refresh_search_empty_state()
+		if current_section == Section.ITEM:
+			_open_rarity_bookmarks(false)
+			_refresh_rarity_bookmarks(_item_tier(current_gallery), false)
+	search_input.grab_focus()
+	search_input.caret_column = 0
+
+
+func _refresh_search_empty_state() -> void:
+	if current_section < 0 or _applied_search_query.is_empty():
+		search_empty_state.visible = false
+		return
+	var gallery := get_gallery(current_section)
+	var result_count := 0
+	if gallery.has_method("search_result_count"):
+		result_count = int(gallery.call("search_result_count"))
+	var has_no_results := result_count <= 0
+	search_empty_state.visible = has_no_results
+	if not has_no_results:
+		return
+	search_empty_left.text = "没搜到..." if _showing_search_cat_egg \
+			else "没有找到对应的结果..."
+	search_empty_right.text = ""
+	search_empty_right.visible = false
+	search_empty_cat_group.visible = _showing_search_cat_egg
+
+
+func _on_search_focus_changed(focused: bool) -> void:
+	search_frame.set_focused(focused)
+
+
+func _on_search_input_gui(event: InputEvent) -> void:
+	if not event is InputEventKey:
+		return
+	var key_event := event as InputEventKey
+	if not key_event.pressed or key_event.echo or key_event.keycode != KEY_ESCAPE:
+		return
+	search_input.release_focus()
+	search_input.accept_event()
+
+
+func _set_search_icon_color(color: Color) -> void:
+	(search_button.get_node("Lens") as Line2D).default_color = color
+	(search_button.get_node("Handle") as Line2D).default_color = color
+
+
+func _on_search_icon_hover(hovered: bool) -> void:
+	_set_search_icon_color(CLOSE_HOVER_COLOR if hovered else CLOSE_IDLE_COLOR)
+
+
+func _on_search_icon_down() -> void:
+	_set_search_icon_color(CLOSE_PRESSED_COLOR)
+
+
+func _on_search_icon_up() -> void:
+	_on_search_icon_hover(search_button.is_hovered())
+
+
+func _set_search_clear_color(color: Color) -> void:
+	(search_clear_button.get_node("StrokeA") as Line2D).default_color = color
+	(search_clear_button.get_node("StrokeB") as Line2D).default_color = color
+
+
+func _on_search_clear_hover(hovered: bool) -> void:
+	_set_search_clear_color(CLOSE_HOVER_COLOR if hovered else CLOSE_IDLE_COLOR)
+
+
+func _on_search_clear_down() -> void:
+	_set_search_clear_color(CLOSE_PRESSED_COLOR)
+
+
+func _on_search_clear_up() -> void:
+	_on_search_clear_hover(search_clear_button.is_hovered())
 
 
 func _on_close_hover(hovered: bool) -> void:
