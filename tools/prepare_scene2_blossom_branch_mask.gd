@@ -15,6 +15,7 @@ const HIDDEN_TRUNK_HALF_WIDTH := 4.0
 const BLOSSOM_SAMPLE_RADIUS := 10
 const BLOSSOM_SEAM_RADIUS := 4
 const BLOSSOM_SEAM_RECT := Rect2i(34, 24, 94, 52)
+const BRANCH_JOINT_UNDERLAP_RECT := Rect2i(100, 37, 19, 13)
 
 const LEFT_BRANCH := Color(1.0, 0.0, 0.0, 1.0)
 const UPPER_BRANCH := Color(0.0, 1.0, 0.0, 1.0)
@@ -202,8 +203,33 @@ func _build_underpaint(source: Image, mask: Image) -> Image:
 				underpaint.set_pixel(x, y, nearest_wood)
 
 	_paint_blossom_repairs(source, mask, underpaint)
+	_paint_branch_joint_underlap(source, mask, underpaint)
 	_clear_upper_branch_gap(source, underpaint)
 	return underpaint
+
+
+func _paint_branch_joint_underlap(
+		source: Image,
+		mask: Image,
+		underpaint: Image) -> void:
+	# The red and green branch groups rotate on independent phases. Their dark
+	# wood pixels meet inside this joint, so removing both source groups before
+	# drawing their rotated copies can expose a one-pixel slit. Preserve a narrow
+	# source-colored wood underlap beneath the moving pieces: it is invisible at
+	# rest and closes the joint throughout the full cycle without freezing either
+	# branch or expanding the tree silhouette.
+	for y: int in range(
+			BRANCH_JOINT_UNDERLAP_RECT.position.y,
+			BRANCH_JOINT_UNDERLAP_RECT.end.y):
+		for x: int in range(
+				BRANCH_JOINT_UNDERLAP_RECT.position.x,
+				BRANCH_JOINT_UNDERLAP_RECT.end.x):
+			var source_color := source.get_pixel(x, y)
+			if mask.get_pixel(x, y).a <= 0.5 \
+					or not _is_wood_color(source_color) \
+					or underpaint.get_pixel(x, y).a > 0.05:
+				continue
+			underpaint.set_pixel(x, y, source_color)
 
 
 func _clear_upper_branch_gap(source: Image, underpaint: Image) -> void:

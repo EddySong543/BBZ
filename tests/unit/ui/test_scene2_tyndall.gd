@@ -3,6 +3,10 @@ extends GutTest
 const SCENE1_PATH := "res://src/ui/scenes/scene1.tscn"
 const SCENE2_PATH := "res://src/ui/scenes/scene2.tscn"
 const SKY_GRADE_SHADER_PATH := "res://assets/shaders/canvas_env_scene2_sky_grade.gdshader"
+const BLOSSOM_SOURCE_PATH := "res://assets/scenes/scene2/scene2_blossom_tree.png"
+const BLOSSOM_MASK_PATH := "res://assets/scenes/scene2/scene2_blossom_branch_mask.png"
+const BLOSSOM_UNDERPAINT_PATH := \
+		"res://assets/scenes/scene2/scene2_blossom_underpaint.png"
 
 
 func test_scene2_tyndall_stays_pixel_stepped_and_restrained() -> void:
@@ -121,6 +125,32 @@ func test_scene2_p1_limits_large_highlights_without_extra_fullscreen_work() -> v
 	stage.free()
 
 
+func test_scene2_blossom_underpaint_covers_the_independent_branch_joint() -> void:
+	var source := Image.load_from_file(ProjectSettings.globalize_path(BLOSSOM_SOURCE_PATH))
+	var mask := Image.load_from_file(ProjectSettings.globalize_path(BLOSSOM_MASK_PATH))
+	var underpaint := Image.load_from_file(
+			ProjectSettings.globalize_path(BLOSSOM_UNDERPAINT_PATH))
+	assert_not_null(source)
+	assert_not_null(mask)
+	assert_not_null(underpaint)
+	if source == null or mask == null or underpaint == null:
+		return
+	var covered_pixels := 0
+	for y: int in range(37, 50):
+		for x: int in range(100, 119):
+			var source_color := source.get_pixel(x, y)
+			if mask.get_pixel(x, y).a <= 0.5 \
+					or not _is_scene2_tree_wood_color(source_color):
+				continue
+			covered_pixels += 1
+			var underpaint_color := underpaint.get_pixel(x, y)
+			assert_gt(underpaint_color.a, 0.5,
+					"Independent branch joint must retain opaque underlap at (%d, %d)"
+					% [x, y])
+	assert_gt(covered_pixels, 50,
+			"The regression must exercise the complete red/green branch joint")
+
+
 func test_scene2_p2_uses_waterfall_led_staggered_motion() -> void:
 	var stage := (load(SCENE2_PATH) as PackedScene).instantiate()
 	var waterfall_material := stage.get_node("Waterfall").material as ShaderMaterial
@@ -148,3 +178,9 @@ func test_scene2_p2_uses_waterfall_led_staggered_motion() -> void:
 	assert_lte(total_particles, 70,
 			"Ambient particle count must stay subordinate to the waterfall")
 	stage.free()
+
+
+func _is_scene2_tree_wood_color(color: Color) -> bool:
+	return color.r < 0.52 \
+			and color.g >= color.r * 0.72 \
+			and color.b >= color.r * 0.72
