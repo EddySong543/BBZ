@@ -33,27 +33,231 @@ func _run() -> void:
 			).material as ShaderMaterial
 
 	var palette_metrics := _probe_palette()
+	var glacier_contact_metrics := _probe_glacier_contact()
 	var shore_ice_metrics := _probe_far_shore_ice()
 	var near_floe_metrics := _probe_near_floes()
 	var platform_contact_metrics := _probe_platform_contact()
 	var wave_metrics := _probe_wave_motion()
 	var reflection_metrics := _probe_reflection_geometry()
+	var diagonal_glint_metrics := _probe_diagonal_glints()
 	var passed := bool(palette_metrics["passed"]) \
+			and bool(glacier_contact_metrics["passed"]) \
 			and bool(shore_ice_metrics["passed"]) \
 			and bool(near_floe_metrics["passed"]) \
 			and bool(platform_contact_metrics["passed"]) \
 			and bool(wave_metrics["passed"]) \
-			and bool(reflection_metrics["passed"])
+			and bool(reflection_metrics["passed"]) \
+			and bool(diagonal_glint_metrics["passed"])
 	print(
 			"SCENE8_LAKE_SURFACE_PROBE: ", "PASS" if passed else "FAIL",
 			" palette=", palette_metrics,
+			" glacier_contact=", glacier_contact_metrics,
 			" shore_ice=", shore_ice_metrics,
 			" near_floes=", near_floe_metrics,
 			" platform_contact=", platform_contact_metrics,
 			" wave=", wave_metrics,
-			" reflection=", reflection_metrics)
+			" reflection=", reflection_metrics,
+			" diagonal_glints=", diagonal_glint_metrics)
 	_stage.queue_free()
 	quit(0 if passed else 1)
+
+
+func _probe_glacier_contact() -> Dictionary:
+	var water_cells := 0
+	var contact_cells := 0
+	var open_water_cells := 0
+	var shadow_cells := 0
+	var glint_cells := 0
+	var contact_columns: Dictionary[int, int] = {}
+	var shadow_strength := float(_lake_material.get_shader_parameter(
+			"glacier_contact_shadow_strength"))
+	var glint_strength := float(_lake_material.get_shader_parameter(
+			"glacier_contact_glint_strength"))
+	for y: int in LOGICAL_SIZE.y:
+		for x: int in LOGICAL_SIZE.x:
+			var topology := _topology_image.get_pixel(x, y)
+			if topology.r < 0.5:
+				continue
+			water_cells += 1
+			if topology.a < 0.05:
+				open_water_cells += 1
+				continue
+			contact_cells += 1
+			contact_columns[x] = int(contact_columns.get(x, 0)) + 1
+			var column_group := floorf(float(x) / 3.0)
+			var column_break := _step(
+					0.22,
+					_hash21(Vector2(column_group + 79.0, 149.0)))
+			var row_break := lerpf(
+					0.72,
+					1.0,
+					_step(0.44, _hash21(Vector2(
+							column_group + 101.0, float(y) + 167.0))))
+			var contact_mask := topology.a \
+					* lerpf(0.58, 1.0, column_break) * row_break
+			shadow_cells += int(contact_mask * shadow_strength >= 0.03)
+			var contact_edge := smoothstep(0.42, 0.94, topology.a)
+			var glint_break := _step(
+					0.48,
+					_hash21(Vector2(
+							floorf(float(x) / 2.0) + 269.0,
+							float(y) + 283.0)))
+			glint_cells += int(
+					contact_edge * glint_break * glint_strength >= 0.03)
+	var maximum_rows := 0
+	for rows: int in contact_columns.values():
+		maximum_rows = maxi(maximum_rows, rows)
+	var contact_coverage := float(contact_cells) / maxf(float(water_cells), 1.0)
+	var shadow_coverage := float(shadow_cells) / maxf(float(contact_cells), 1.0)
+	var passed := contact_cells >= 160 and contact_cells <= 2400 \
+			and contact_columns.size() >= 260 \
+			and open_water_cells > contact_cells * 5 \
+			and maximum_rows <= 5 \
+			and shadow_coverage >= 0.68 and shadow_coverage <= 1.0 \
+			and glint_cells >= 80 and glint_cells <= contact_cells * 0.65
+	return {
+		"passed": passed,
+		"contact_cells": contact_cells,
+		"contact_columns": contact_columns.size(),
+		"max_rows": maximum_rows,
+		"contact_coverage": snappedf(contact_coverage, 0.0001),
+		"shadow_coverage": snappedf(shadow_coverage, 0.001),
+		"glint_cells": glint_cells,
+		"open_water_cells": open_water_cells,
+	}
+
+
+func _probe_diagonal_glints() -> Dictionary:
+	var masks: Array[PackedByteArray] = []
+	var first_count := 0
+	var water_count := 0
+	var segment_x_totals := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+	var segment_counts := PackedInt32Array([0, 0, 0, 0])
+	for time_seconds: float in [0.0, 6.0]:
+		var mask := PackedByteArray()
+		mask.resize(LOGICAL_SIZE.x * LOGICAL_SIZE.y)
+		for y: int in LOGICAL_SIZE.y:
+			for x: int in LOGICAL_SIZE.x:
+				var topology := _topology_image.get_pixel(x, y)
+				if topology.r < 0.5:
+					continue
+				if is_zero_approx(time_seconds):
+					water_count += 1
+				var cell := Vector2(x, y)
+				var wave := _shared_wave_field(cell, topology.b, time_seconds)
+				var glint := _broken_diagonal_glint(
+						cell, topology.b, topology.g, wave, time_seconds)
+				var ice := _shore_ice_mask(
+						cell, topology.g, topology.b, wave)
+				var near_ice := _near_floe_mask(
+						cell, topology.g, topology.b)
+				glint *= 1.0 - clampf(ice + near_ice, 0.0, 1.0)
+				if glint <= 0.06:
+					continue
+				mask[y * LOGICAL_SIZE.x + x] = 1
+				if not is_zero_approx(time_seconds):
+					continue
+				first_count += 1
+				var segment_index := _glint_segment_index(topology.b)
+				if segment_index >= 0:
+					segment_x_totals[segment_index] += float(x)
+					segment_counts[segment_index] += 1
+		masks.append(mask)
+
+	var segment_means := PackedFloat32Array()
+	var active_segments := 0
+	for index: int in 4:
+		if segment_counts[index] <= 0:
+			segment_means.append(-1.0)
+			continue
+		active_segments += 1
+		segment_means.append(
+				segment_x_totals[index] / float(segment_counts[index]))
+	var diagonal_order := active_segments == 4
+	for index: int in range(1, segment_means.size()):
+		diagonal_order = diagonal_order \
+				and segment_means[index] > segment_means[index - 1] + 12.0
+	var changed_cells := 0
+	for index: int in masks[0].size():
+		changed_cells += int(masks[0][index] != masks[1][index])
+	var coverage := float(first_count) / maxf(float(water_count), 1.0)
+	var passed := (
+			coverage >= 0.0006 and coverage <= 0.008
+			and active_segments == 4 and diagonal_order
+			and changed_cells >= 18
+			and float(_lake_material.get_shader_parameter(
+					"diagonal_glint_drift_cells")) <= 1.0)
+	return {
+		"passed": passed,
+		"coverage": snappedf(coverage, 0.0001),
+		"active_cells": first_count,
+		"active_segments": active_segments,
+		"segment_mean_x": segment_means,
+		"diagonal_order": diagonal_order,
+		"changed_cells_6s": changed_cells,
+	}
+
+
+func _glint_segment_index(depth: float) -> int:
+	var centers := _lake_material.get_shader_parameter(
+			"diagonal_glint_centers") as Vector4
+	var widths := _lake_material.get_shader_parameter(
+			"diagonal_glint_half_widths") as Vector4
+	for index: int in 4:
+		if absf(depth - centers[index]) <= widths[index] + 0.012:
+			return index
+	return -1
+
+
+func _broken_diagonal_glint(
+		cell: Vector2,
+		depth: float,
+		shore_distance: float,
+		shared_wave: Vector3,
+		time_seconds: float) -> float:
+	var start_x := float(_lake_material.get_shader_parameter(
+			"diagonal_glint_start_x"))
+	var end_x := float(_lake_material.get_shader_parameter(
+			"diagonal_glint_end_x"))
+	var centers := _lake_material.get_shader_parameter(
+			"diagonal_glint_centers") as Vector4
+	var widths := _lake_material.get_shader_parameter(
+			"diagonal_glint_half_widths") as Vector4
+	var cycle := float(_lake_material.get_shader_parameter(
+			"diagonal_glint_cycle_sec"))
+	var drift_cells := float(_lake_material.get_shader_parameter(
+			"diagonal_glint_drift_cells"))
+	var phase := time_seconds * TAU / maxf(cycle, 0.001)
+	var diagonal_x := lerpf(
+			start_x, end_x, smoothstep(0.14, 0.88, depth)) \
+			* float(LOGICAL_SIZE.x) + sin(phase) * drift_cells
+	var line_width := lerpf(0.62, 1.18, depth)
+	var diagonal_line := 1.0 - smoothstep(
+			line_width, line_width + 0.62, absf(cell.x - diagonal_x))
+	var segments := 0.0
+	for index: int in 4:
+		segments += _soft_depth_segment(depth, centers[index], widths[index])
+	segments = clampf(segments, 0.0, 1.0)
+	var broken_cells := float(_hash21(Vector2(
+			floor(cell.x / 3.0) + 719.0,
+			floor(cell.y / 2.0) + 733.0)) >= 0.38)
+	var water_response := lerpf(0.58, 1.0, shared_wave.x) \
+			* lerpf(0.82, 1.0, _ordered_dither_4x4(cell))
+	var pulse := 0.68 + 0.32 * sin(phase * 0.73 + depth * 8.0)
+	var open_water := smoothstep(0.18, 0.42, shore_distance)
+	return diagonal_line * segments * broken_cells \
+			* water_response * pulse * open_water
+
+
+func _soft_depth_segment(depth: float, center: float, half_width: float) -> float:
+	const FEATHER := 0.012
+	return smoothstep(
+			center - half_width - FEATHER,
+			center - half_width,
+			depth) * (1.0 - smoothstep(
+			center + half_width,
+			center + half_width + FEATHER,
+			depth))
 
 
 func _probe_palette() -> Dictionary:
@@ -122,7 +326,9 @@ func _probe_far_shore_ice() -> Dictionary:
 			if topology.r < 0.5:
 				continue
 			water_count += 1
-			if _shore_ice_mask(Vector2(x, y), topology.g, topology.b) < 0.5:
+			var cell := Vector2(x, y)
+			var wave := _shared_wave_field(cell, topology.b, 0.0)
+			if _shore_ice_mask(cell, topology.g, topology.b, wave) < 0.5:
 				continue
 			mask[y * LOGICAL_SIZE.x + x] = 1
 			ice_count += 1
@@ -143,12 +349,12 @@ func _probe_far_shore_ice() -> Dictionary:
 		minimum_depth_variety = mini(
 				minimum_depth_variety, int(component["depth_variety"]))
 	var ice_coverage := float(ice_count) / maxf(float(water_count), 1.0)
-	var passed := ice_coverage >= 0.003 \
+	var passed := ice_coverage >= 0.0025 \
 			and ice_coverage <= 0.015 \
-			and qualifying_components >= 2 \
+			and qualifying_components >= 3 \
 			and all_attached \
-			and maximum_reach <= 3.25 \
-			and maximum_fill <= 0.82 \
+			and maximum_reach <= 2.5 \
+			and maximum_fill <= 0.80 \
 			and minimum_depth_variety >= 2
 	return {
 		"passed": passed,
@@ -523,44 +729,54 @@ func _topology_palette(depth: float, cell: Vector2) -> Color:
 			near_color, middle_to_near)
 
 
-func _shore_ice_mask(cell: Vector2, shore_distance: float, depth: float) -> float:
-	var spacing := maxf(float(_lake_material.get_shader_parameter(
-			"ice_lens_spacing_cells")), 1.0)
+func _shore_ice_mask(
+		cell: Vector2,
+		shore_distance: float,
+		depth: float,
+		wave: Vector3) -> float:
+	var segment_width := maxf(float(_lake_material.get_shader_parameter(
+			"ice_segment_cells")), 1.0)
 	var presence := float(_lake_material.get_shader_parameter(
 			"thin_ice_presence"))
-	var lens_id := floorf(cell.x / spacing)
-	var active_seed := _hash21(Vector2(lens_id + 101.0, 307.0))
-	var lens_active := _step(1.0 - presence, active_seed)
-	var center_offset := lerpf(
-			0.32, 0.68, _hash21(Vector2(lens_id + 127.0, 331.0)))
-	var lens_center := (lens_id + center_offset) * spacing
-	var half_width := spacing * lerpf(
-			0.18, 0.32, _hash21(Vector2(lens_id + 149.0, 353.0)))
-	var normalized_x := absf(cell.x - lens_center) / maxf(half_width, 1.0)
-	var lens_profile := sqrt(maxf(1.0 - normalized_x * normalized_x, 0.0))
-	lens_profile = pow(lens_profile, 1.35)
+	var segment_id := floorf(cell.x / segment_width)
+	var segment_position := fposmod(cell.x / segment_width, 1.0)
+	var segment_active := _step(
+			1.0 - presence,
+			_hash21(Vector2(segment_id + 101.0, 307.0)))
+	var reach_left := _hash21(Vector2(segment_id + 127.0, 331.0))
+	var reach_right := _hash21(Vector2(segment_id + 128.0, 331.0))
+	var reach_blend := smoothstep(0.0, 1.0, segment_position)
+	var reach_seed := lerpf(reach_left, reach_right, reach_blend)
 	var rough_group := floorf(cell.x / 3.0)
 	var edge_roughness := (
-			_hash21(Vector2(rough_group + 173.0, lens_id + 379.0)) - 0.5) \
-			* 1.6 * lens_profile
+			_hash21(Vector2(rough_group + 173.0, segment_id + 379.0)) - 0.5) \
+			* 1.25
 	var reach_fraction := float(_lake_material.get_shader_parameter(
 			"shore_ice_reach"))
 	var shore_cells_total := float(_lake_material.get_shader_parameter(
 			"shore_distance_cells"))
 	var maximum_reach_cells := reach_fraction * shore_cells_total
-	var lens_reach_cells := lerpf(
-			2.0, maximum_reach_cells,
-			_hash21(Vector2(lens_id + 191.0, 401.0)))
-	lens_reach_cells = clampf(
-			lens_reach_cells * lens_profile + edge_roughness,
-			0.0, maximum_reach_cells)
+	var reach_cells := lerpf(0.65, maximum_reach_cells, reach_seed)
+	reach_cells = clampf(
+			reach_cells + edge_roughness - wave.y * 0.75,
+			0.35,
+			maximum_reach_cells)
 	var shore_cells := shore_distance * shore_cells_total
-	var inside_lens := 1.0 - _step(1.0, normalized_x)
 	var attached_to_shore := 1.0 - _step(
-			lens_reach_cells + 0.001, shore_cells)
+			reach_cells + 0.001, shore_cells)
+	var erosion_zone := smoothstep(
+			0.22, 1.0, shore_cells / maxf(reach_cells, 0.001))
+	var breakup_seed := _hash21(Vector2(
+			floorf(cell.x / 3.0) + 211.0,
+			floorf(shore_cells) + segment_id + 419.0))
+	var breakup := _step(
+			breakup_seed,
+			float(_lake_material.get_shader_parameter("shore_ice_breakup"))
+					* erosion_zone)
 	var depth_limit := float(_lake_material.get_shader_parameter("thin_ice_depth"))
 	var shallow_depth_guard := 1.0 - _step(depth_limit, depth)
-	return lens_active * inside_lens * attached_to_shore * shallow_depth_guard
+	return segment_active * attached_to_shore * (1.0 - breakup) \
+			* shallow_depth_guard
 
 
 func _ellipse_floe_lobe(

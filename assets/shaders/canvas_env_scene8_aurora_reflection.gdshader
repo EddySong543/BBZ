@@ -82,7 +82,11 @@ void fragment() {
 	if (reflection_zone <= 0.0) {
 		discard;
 	}
-	vec3 shared_wave = shared_wave_field(cell, depth, motion_time());
+	vec4 click_ripple = scene8_click_ripple(
+			SCREEN_UV, depth, cell);
+	vec3 shared_wave = shared_wave_field(
+			cell + vec2(click_ripple.w, 0.0),
+			depth, motion_time());
 	float reflection_wave = mix(reflection_floor, 1.0, clamp(
 			shared_wave.x + shared_wave.y * 0.35, 0.0, 1.0));
 	float x_offset_cells = round(clamp(
@@ -99,6 +103,7 @@ void fragment() {
 	vec2 screen_sample_uv = vec2(
 			stretched_source_x + x_offset_cells / pixel_grid.x,
 			source_pixel_y);
+	screen_sample_uv.x += click_ripple.w / pixel_grid.x;
 	screen_sample_uv = clamp(screen_sample_uv, vec2(0.001), vec2(0.999));
 	vec3 source = textureLod(screen_tex, screen_sample_uv, 0.0).rgb;
 	float luma = dot(source, vec3(0.2126, 0.7152, 0.0722));
@@ -126,6 +131,11 @@ void fragment() {
 			smoothstep(0.18, reflection_end_depth, depth));
 	vec3 reflected = clamp(
 			saturated_source * depth_absorption, vec3(0.0), vec3(1.0));
+	reflected = mix(
+			reflected,
+			min(reflected * vec3(1.14, 1.32, 1.24), vec3(1.0)),
+			clamp(click_ripple.y * 0.52
+					+ click_ripple.z * 0.42, 0.0, 0.88));
 
 	float brightness_presence = smoothstep(0.008, 0.24, luma);
 	float shore_reflection_fade = smoothstep(
@@ -138,5 +148,8 @@ void fragment() {
 	float alpha = reflection_strength * brightness_presence
 			* shore_reflection_fade * depth_fade
 			* reflection_wave * aurora_presence * reflection_zone;
+	alpha *= 1.0 - click_ripple.x * 0.34;
+	alpha = min(alpha + click_ripple.y * 0.16
+			+ click_ripple.z * 0.10, 1.0);
 	COLOR = vec4(reflected, alpha);
 }

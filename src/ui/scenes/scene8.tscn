@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://bdx1bpiq0gxga"]
 
 [ext_resource type="Script" uid="uid://di0qh6ki88n6e" path="res://src/ui/components/battle_stage.gd" id="1_stage"]
-[ext_resource type="Shader" uid="uid://c5xjdx10sg3xe" path="res://assets/shaders/canvas_env_night_sky.gdshader" id="2_night_sky"]
+[ext_resource type="Shader" uid="uid://c1arh45qotiao" path="res://assets/shaders/canvas_env_scene8_aurora_sky.gdshader" id="2_night_sky"]
 [ext_resource type="Shader" uid="uid://byjlefsgiyyte" path="res://assets/shaders/canvas_env_stars.gdshader" id="3_stars"]
 [ext_resource type="Texture2D" uid="uid://nhcl7dupb3ud" path="res://assets/scenes/scene8/scene8_ref48_aurora.png" id="4_pixel_aurora"]
 [ext_resource type="Texture2D" uid="uid://buk88w0e5jk8k" path="res://assets/scenes/scene8/scene8_far_mountain.png" id="5_far_mountain"]
@@ -14,49 +14,68 @@
 [ext_resource type="Shader" uid="uid://lku5l1bl8pvp" path="res://assets/shaders/canvas_env_scene8_platform_float.gdshader" id="12_platform_float"]
 [ext_resource type="Shader" uid="uid://c22d4nj6ho78k" path="res://assets/shaders/canvas_env_scene8_platform_water_contact.gdshader" id="13_platform_contact"]
 [ext_resource type="Shader" uid="uid://cwu2pcebocwoc" path="res://assets/shaders/canvas_env_scene8_ref48_aurora_motion.gdshader" id="14_aurora_motion"]
-[ext_resource type="Texture2D" uid="uid://tuqfdbrxefyn" path="res://assets/scenes/scene8/scene8_foreground_center_snow.png" id="15_foreground_center_snow"]
+[ext_resource type="Texture2D" uid="uid://d0ytif8qprl5o" path="res://assets/scenes/scene8/scene8_far_glacier.png" id="16_far_glacier"]
+[ext_resource type="Texture2D" uid="uid://bd78scl8x4myu" path="res://assets/scenes/scene8/scene8_far_mountain_left.png" id="17_far_mountain_left"]
+[ext_resource type="Texture2D" uid="uid://tit6kicx42nn" path="res://assets/scenes/scene8/scene8_far_mountain_right.png" id="18_far_mountain_right"]
+[ext_resource type="Texture2D" uid="uid://ckbxwoualq6m" path="res://assets/scenes/scene8/scene8_foreground_snowfield.png" id="19_foreground_snowfield"]
+[ext_resource type="Shader" uid="uid://k404s0qxrx5f" path="res://assets/shaders/canvas_env_scene8_far_depth_grade.gdshader" id="20_far_depth_grade"]
+[ext_resource type="Shader" uid="uid://clrgu8wcf3dxs" path="res://assets/shaders/canvas_env_scene8_foreground_grade.gdshader" id="21_foreground_grade"]
+[ext_resource type="Script" uid="uid://d0x20aqfjkeet" path="res://src/ui/components/scene8_crystal_spark_controller.gd" id="22_crystal_spark_controller"]
+[ext_resource type="Script" path="res://src/ui/components/scene8_surface_interaction_controller.gd" id="23_surface_interaction_controller"]
 
 [sub_resource type="ShaderMaterial" id="Scene8NightSkyMat"]
 resource_local_to_scene = true
 shader = ExtResource("2_night_sky")
-shader_parameter/zenith_color = Color(0.012, 0.02, 0.047, 1)
-shader_parameter/horizon_color = Color(0.07, 0.105, 0.155, 1)
-shader_parameter/gradient_curve = 1.35
-shader_parameter/horizon_pos = 1.0
-shader_parameter/glow_color = Color(0.12, 0.2, 0.28, 1)
-shader_parameter/glow_width = 0.32
-shader_parameter/glow_intensity = 0.22
-shader_parameter/breath_amount = 0.03
-shader_parameter/breath_speed = 0.08
-shader_parameter/breath_scale = 1.4
-shader_parameter/dither_amount = 0.012
-shader_parameter/posterize_steps = 160
-shader_parameter/pixel_grid = Vector2(1920, 1080)
+shader_parameter/zenith_color = Color(0.018, 0.048, 0.115, 1)
+shader_parameter/upper_color = Color(0.025, 0.083, 0.165, 1)
+shader_parameter/horizon_color = Color(0.047, 0.154, 0.255, 1)
+shader_parameter/upper_transition = 0.38
+shader_parameter/horizon_transition = 0.62
+shader_parameter/scene_exposure = 1.0
+shader_parameter/airglow_blue = Color(0.07, 0.29, 0.49, 1)
+shader_parameter/airglow_green = Color(0.045, 0.4, 0.33, 1)
+shader_parameter/airglow_violet = Color(0.29, 0.13, 0.47, 1)
+shader_parameter/airglow_center = 0.41
+shader_parameter/airglow_width = 0.145
+shader_parameter/airglow_strength = 0.115
+shader_parameter/airglow_irregularity = 0.065
+shader_parameter/airglow_drift = 0.003
+shader_parameter/horizon_green_color = Color(0.035, 0.34, 0.24, 1)
+shader_parameter/horizon_green_start = 0.29
+shader_parameter/horizon_green_crest = 0.5
+shader_parameter/horizon_green_fade_end = 0.68
+shader_parameter/horizon_green_strength = 0.14
+shader_parameter/horizon_green_irregularity = 0.025
+shader_parameter/texture_strength = 0.018
+shader_parameter/dither_amount = 0.002
+shader_parameter/posterize_steps = 144
+shader_parameter/pixel_grid = Vector2(320, 180)
+shader_parameter/diagnostic_time_sec = -1.0
 
 [sub_resource type="ShaderMaterial" id="Scene8StarsMat"]
 resource_local_to_scene = true
 shader = ExtResource("3_stars")
 shader_parameter/grid = Vector2(120, 70)
-shader_parameter/coverage = 0.06
+shader_parameter/coverage = 0.042
 shader_parameter/band_scale = 2.5
-shader_parameter/gap_threshold = 0.64
-shader_parameter/band_soft = 0.08
+shader_parameter/gap_threshold = 0.67
+shader_parameter/band_soft = 0.07
 shader_parameter/seed = 161.746007682935
-shader_parameter/star_color = Color(0.86, 0.92, 1, 1)
+shader_parameter/star_color = Color(0.82, 0.9, 1, 1)
 shader_parameter/star_color_warm = Color(1, 0.94, 0.84, 1)
-shader_parameter/warm_ratio = 0.18
-shader_parameter/brightness = 1.0
-shader_parameter/faint_floor = 0.2
-shader_parameter/twinkle_speed = 0.7
-shader_parameter/twinkle_depth = 0.3
-shader_parameter/bright_ratio = 0.03
+shader_parameter/warm_ratio = 0.14
+shader_parameter/brightness = 0.84
+shader_parameter/faint_floor = 0.14
+shader_parameter/twinkle_speed = 0.45
+shader_parameter/twinkle_depth = 0.14
+shader_parameter/bright_ratio = 0.025
 shader_parameter/spike_strength = 0.0
 shader_parameter/moon_pos = Vector2(0.5, 0.3981)
 shader_parameter/moon_clear = 0.0
 shader_parameter/edge_margin = 0.14
 shader_parameter/sky_bottom = 0.5
-shader_parameter/sky_fade = 0.14
-shader_parameter/top_concentration = 0.5
+shader_parameter/sky_fade = 0.17
+shader_parameter/top_concentration = 0.4
 shader_parameter/pixel_grid = 800.0
 
 [sub_resource type="ShaderMaterial" id="Scene8PixelAuroraMotionMat"]
@@ -73,10 +92,13 @@ shader_parameter/sway_y_pixels = 1.1
 shader_parameter/motion_floor = 0.68
 shader_parameter/energy_strength = 0.14
 shader_parameter/alpha_variation = 0.06
-shader_parameter/body_opacity_top = 0.74
-shader_parameter/body_opacity_bottom = 0.89
-shader_parameter/halo_strength = 0.14
+shader_parameter/body_opacity_top = 0.68
+shader_parameter/body_opacity_bottom = 0.84
+shader_parameter/halo_strength = 0.22
 shader_parameter/halo_radius_pixels = 2.0
+shader_parameter/far_halo_strength = 0.1
+shader_parameter/far_halo_radius_pixels = 6.0
+shader_parameter/atmosphere_tint = Color(0.1, 0.25, 0.36, 1)
 shader_parameter/diagnostic_time_sec = -1.0
 
 [sub_resource type="ShaderMaterial" id="Scene8OpenLakeMat"]
@@ -107,13 +129,30 @@ shader_parameter/glint_color = Color(0.2, 0.5, 0.67, 1)
 shader_parameter/palette_depth_variation = 0.018
 shader_parameter/bank_shadow_distance = 0.14
 shader_parameter/ripple_strength = 0.3
-shader_parameter/thin_ice_depth = 0.04
-shader_parameter/thin_ice_presence = 0.38
-shader_parameter/shore_ice_reach = 0.135
-shader_parameter/ice_lens_spacing_cells = 42.0
+shader_parameter/glacier_contact_shadow_color = Color(0.012, 0.07, 0.145, 1)
+shader_parameter/glacier_contact_glint_color = Color(0.26, 0.55, 0.64, 1)
+shader_parameter/glacier_ice_color = Color(0.25, 0.46, 0.56, 1)
+shader_parameter/glacier_contact_shadow_strength = 0.38
+shader_parameter/glacier_contact_glint_strength = 0.24
+shader_parameter/shore_ice_glacier_mix = 0.72
+shader_parameter/diagonal_glint_color = Color(0.38, 0.74, 0.84, 1)
+shader_parameter/diagonal_glint_strength = 0.32
+shader_parameter/diagonal_glint_start_x = 0.24
+shader_parameter/diagonal_glint_end_x = 0.72
+shader_parameter/diagonal_glint_centers = Vector4(0.24, 0.4, 0.58, 0.75)
+shader_parameter/diagonal_glint_half_widths = Vector4(0.028, 0.037, 0.045, 0.038)
+shader_parameter/diagonal_glint_drift_cells = 0.8
+shader_parameter/diagonal_glint_cycle_sec = 24.0
+shader_parameter/thin_ice_depth = 0.025
+shader_parameter/thin_ice_presence = 0.5
+shader_parameter/shore_ice_reach = 0.09
+shader_parameter/ice_segment_cells = 14.0
+shader_parameter/shore_ice_breakup = 0.62
+shader_parameter/shore_ice_water_inlay = 0.38
 shader_parameter/ice_color = Color(0.23, 0.41, 0.52, 1)
-shader_parameter/shore_ice_opacity = 0.56
-shader_parameter/shore_ice_front_strength = 0.28
+shader_parameter/shore_ice_opacity = 0.44
+shader_parameter/shore_ice_front_strength = 0.2
+shader_parameter/shore_ice_crack_strength = 0.22
 shader_parameter/near_floe_min_depth = 0.68
 shader_parameter/near_floe_max_depth = 0.92
 shader_parameter/near_floe_min_shore_distance = 0.92
@@ -158,6 +197,111 @@ shader_parameter/reflection_value_ceiling = 0.9
 shader_parameter/chroma_gate_low = 0.025
 shader_parameter/chroma_gate_high = 0.1
 shader_parameter/deep_color_absorption = 0.07
+
+[sub_resource type="ShaderMaterial" id="Scene8FarMountainLeftMat"]
+resource_local_to_scene = true
+shader = ExtResource("20_far_depth_grade")
+shader_parameter/sky_tint = Color(0.055, 0.17, 0.265, 1)
+shader_parameter/aurora_tint = Color(0.07, 0.4, 0.33, 1)
+shader_parameter/distance_mix = 0.18
+shader_parameter/contrast_retention = 0.98
+shader_parameter/saturation_retention = 0.96
+shader_parameter/brightness = 0.70000002160666
+shader_parameter/visibility_lift = 0.01
+shader_parameter/upper_air_bias = 0.7
+shader_parameter/aurora_bounce = 0.04
+shader_parameter/palette_steps = 96.0
+shader_parameter/edge_sky_mix = 0.18
+shader_parameter/edge_aurora_mix = 0.045
+
+[sub_resource type="ShaderMaterial" id="Scene8FarSnowfieldMat"]
+resource_local_to_scene = true
+shader = ExtResource("20_far_depth_grade")
+shader_parameter/sky_tint = Color(0.052, 0.165, 0.255, 1)
+shader_parameter/aurora_tint = Color(0.065, 0.36, 0.31, 1)
+shader_parameter/distance_mix = 0.06
+shader_parameter/contrast_retention = 1.0
+shader_parameter/saturation_retention = 0.98
+shader_parameter/brightness = 0.6800000220537
+shader_parameter/visibility_lift = 0.006
+shader_parameter/upper_air_bias = 0.52
+shader_parameter/aurora_bounce = 0.025
+shader_parameter/palette_steps = 96.0
+shader_parameter/edge_sky_mix = 0.1
+shader_parameter/edge_aurora_mix = 0.025
+
+[sub_resource type="ShaderMaterial" id="Scene8FarMountainRightMat"]
+resource_local_to_scene = true
+shader = ExtResource("20_far_depth_grade")
+shader_parameter/sky_tint = Color(0.058, 0.175, 0.27, 1)
+shader_parameter/aurora_tint = Color(0.075, 0.38, 0.34, 1)
+shader_parameter/distance_mix = 0.16
+shader_parameter/contrast_retention = 0.98
+shader_parameter/saturation_retention = 0.96
+shader_parameter/brightness = 0.70000002160666
+shader_parameter/visibility_lift = 0.01
+shader_parameter/upper_air_bias = 0.68
+shader_parameter/aurora_bounce = 0.04
+shader_parameter/palette_steps = 96.0
+shader_parameter/edge_sky_mix = 0.16
+shader_parameter/edge_aurora_mix = 0.05
+
+[sub_resource type="ShaderMaterial" id="Scene8FarGlacierMat"]
+resource_local_to_scene = true
+shader = ExtResource("20_far_depth_grade")
+shader_parameter/sky_tint = Color(0.065, 0.19, 0.29, 1)
+shader_parameter/aurora_tint = Color(0.075, 0.39, 0.34, 1)
+shader_parameter/distance_mix = 0.22
+shader_parameter/contrast_retention = 0.96
+shader_parameter/saturation_retention = 0.93
+shader_parameter/brightness = 0.9
+shader_parameter/visibility_lift = 0.01
+shader_parameter/upper_air_bias = 0.72
+shader_parameter/aurora_bounce = 0.04
+shader_parameter/palette_steps = 96.0
+shader_parameter/edge_sky_mix = 0.14
+shader_parameter/edge_aurora_mix = 0.05
+
+[sub_resource type="CanvasItemMaterial" id="Scene8SnowMoteBlend"]
+blend_mode = 1
+
+[sub_resource type="Gradient" id="Scene8SnowMoteDotGradient"]
+offsets = PackedFloat32Array(0, 0.5, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0.78, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture2D" id="Scene8SnowMoteTexture"]
+gradient = SubResource("Scene8SnowMoteDotGradient")
+width = 8
+height = 8
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[sub_resource type="Gradient" id="Scene8SnowMoteLifeGradient"]
+offsets = PackedFloat32Array(0, 0.22, 0.72, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0.82, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="Scene8SnowMoteLifeRamp"]
+gradient = SubResource("Scene8SnowMoteLifeGradient")
+
+[sub_resource type="ParticleProcessMaterial" id="Scene8SnowMotesFarMat"]
+resource_local_to_scene = true
+emission_shape = 3
+emission_box_extents = Vector3(430, 170, 1)
+direction = Vector3(-0.12, 1, 0)
+spread = 18.0
+initial_velocity_min = 2.5
+initial_velocity_max = 5.0
+gravity = Vector3(0.35, 0.7, 0)
+damping_min = 0.1
+damping_max = 0.35
+scale_min = 0.5
+scale_max = 1.05
+color = Color(0.7, 0.88, 1, 0.3)
+color_ramp = SubResource("Scene8SnowMoteLifeRamp")
+turbulence_enabled = true
+turbulence_noise_strength = 1.2
+turbulence_noise_scale = 1.0
 
 [sub_resource type="ShaderMaterial" id="Scene8PlatformWaterContactMat"]
 resource_local_to_scene = true
@@ -213,9 +357,85 @@ shader_parameter/underside_tint = Color(0.045, 0.14, 0.24, 1)
 shader_parameter/wet_edge_tint = Color(0.08, 0.27, 0.38, 1)
 shader_parameter/underside_strength = 0.3
 shader_parameter/wet_edge_strength = 0.48
+shader_parameter/platform_break_amount = 0.0
+shader_parameter/crack_start_row = 90.0
+shader_parameter/crack_end_row = 103.0
+shader_parameter/crack_core_color = Color(0.015, 0.07, 0.13, 1)
+shader_parameter/crack_branch_color = Color(0.025, 0.16, 0.23, 1)
+shader_parameter/crack_glint_color = Color(0.22, 0.68, 0.72, 1)
+
+[sub_resource type="ParticleProcessMaterial" id="Scene8SnowMotesNearMat"]
+resource_local_to_scene = true
+emission_shape = 3
+emission_box_extents = Vector3(390, 145, 1)
+direction = Vector3(0.16, 1, 0)
+spread = 22.0
+initial_velocity_min = 5.5
+initial_velocity_max = 10.0
+gravity = Vector3(-0.45, 1.2, 0)
+damping_min = 0.08
+damping_max = 0.28
+scale_min = 1.35
+scale_max = 2.25
+color = Color(0.68, 1, 0.82, 0.34)
+color_ramp = SubResource("Scene8SnowMoteLifeRamp")
+turbulence_enabled = true
+turbulence_noise_strength = 1.8
+turbulence_noise_scale = 1.25
+
+[sub_resource type="ShaderMaterial" id="Scene8ForegroundSnowfieldMat"]
+resource_local_to_scene = true
+shader = ExtResource("21_foreground_grade")
+shader_parameter/shadow_palette = Color(0.045, 0.09, 0.16, 1)
+shader_parameter/middle_palette = Color(0.13, 0.25, 0.38, 1)
+shader_parameter/snow_palette = Color(0.52, 0.68, 0.78, 1)
+shader_parameter/aurora_tint = Color(0.12, 0.44, 0.36, 1)
+shader_parameter/brightness = 0.92
+shader_parameter/saturation_retention = 0.92
+shader_parameter/palette_strength = 0.26
+shader_parameter/snow_threshold = 0.48
+shader_parameter/snow_softness = 0.24
+shader_parameter/snow_retention = 0.7
+shader_parameter/lower_depth_strength = 0.04
+shader_parameter/aurora_response = 0.04
+shader_parameter/palette_steps = 96.0
+
+[sub_resource type="ShaderMaterial" id="Scene8ForegroundLeftMat"]
+resource_local_to_scene = true
+shader = ExtResource("21_foreground_grade")
+shader_parameter/shadow_palette = Color(0.045, 0.09, 0.16, 1)
+shader_parameter/middle_palette = Color(0.13, 0.25, 0.38, 1)
+shader_parameter/snow_palette = Color(0.52, 0.68, 0.78, 1)
+shader_parameter/aurora_tint = Color(0.12, 0.44, 0.36, 1)
+shader_parameter/brightness = 0.94
+shader_parameter/saturation_retention = 0.92
+shader_parameter/palette_strength = 0.22
+shader_parameter/snow_threshold = 0.48
+shader_parameter/snow_softness = 0.24
+shader_parameter/snow_retention = 0.7
+shader_parameter/lower_depth_strength = 0.06
+shader_parameter/aurora_response = 0.045
+shader_parameter/palette_steps = 96.0
+
+[sub_resource type="ShaderMaterial" id="Scene8ForegroundRightMat"]
+resource_local_to_scene = true
+shader = ExtResource("21_foreground_grade")
+shader_parameter/shadow_palette = Color(0.045, 0.09, 0.16, 1)
+shader_parameter/middle_palette = Color(0.13, 0.25, 0.38, 1)
+shader_parameter/snow_palette = Color(0.52, 0.68, 0.78, 1)
+shader_parameter/aurora_tint = Color(0.12, 0.44, 0.36, 1)
+shader_parameter/brightness = 0.94
+shader_parameter/saturation_retention = 0.92
+shader_parameter/palette_strength = 0.22
+shader_parameter/snow_threshold = 0.48
+shader_parameter/snow_softness = 0.24
+shader_parameter/snow_retention = 0.7
+shader_parameter/lower_depth_strength = 0.06
+shader_parameter/aurora_response = 0.045
+shader_parameter/palette_steps = 96.0
 
 [node name="Scene8" type="Control" unique_id=1051971769]
-editor_description = "Scene8 天光镜湖。极光静态像素轮廓与慢速动态保持不变；远山以同源错位、翻转和低对比三层轮廓补出空气纵深，中央 snow 作为近景下沿接入，湖面、冰、水线和既有手调构图保持不变。"
+editor_description = "Scene8 天光镜湖。澄澈微亮极夜在远山交界处以克制绿色空气辉光承接极光；远景按视差深度分层融入天际；所有环境资产 Transform 保持当前手调值。"
 texture_filter = 1
 layout_mode = 3
 anchors_preset = 15
@@ -225,9 +445,12 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("1_stage")
+pointer_strength = 2.0
+pointer_smooth = 6.0
+pointer_zoom = 0.0
 
 [node name="Sky" type="ColorRect" parent="." unique_id=599315019]
-editor_description = "复刻 Scene1 的成熟深夜夜空材质与参数。"
+editor_description = "Scene8 专属澄澈极夜：顶部偏黑冷蓝，远山交界处以轻微不规则绿色辉光承接极光；不是直线梯度，也不增加灰雾。"
 material = SubResource("Scene8NightSkyMat")
 layout_mode = 1
 anchors_preset = 15
@@ -246,7 +469,7 @@ metadata/pointer_parallax_factor = 0.0
 metadata/_edit_lock_ = true
 
 [node name="Stars" type="ColorRect" parent="." unique_id=699244428]
-editor_description = "复刻 Scene1 星空参数；关闭 Scene1 专属月盘避让，其余密度、色温与闪烁保持一致。"
+editor_description = "回退到旧版细星骨架：800 级细小星点、低密度聚散、无十字星芒，并在远山上方提前淡出，避免方块星与满屏覆盖感。"
 material = SubResource("Scene8StarsMat")
 layout_mode = 1
 anchors_preset = 15
@@ -261,7 +484,7 @@ metadata/pointer_parallax_factor = 0.0
 metadata/_edit_lock_ = true
 
 [node name="PixelAurora" type="TextureRect" parent="." unique_id=344487219]
-editor_description = "ref48 原始 256x144 主体的像素修复版；静态 PNG 与已通过轮廓保持不变。Scene8 专用材质让整幅极光以 26/38 秒错相周期缓慢摆动，并用半透明主体与 2 像素阶梯光晕融入夜空。"
+editor_description = "ref48 像素轮廓保持不变；26/38 秒错相慢速摆动，主体保持清晰，并由 2 像素近散射与 6 像素远散射把颜色扩散进天空。"
 texture_filter = 1
 material = SubResource("Scene8PixelAuroraMotionMat")
 layout_mode = 1
@@ -288,11 +511,11 @@ metadata/_edit_lock_ = true
 
 [node name="LakeTopology" type="Node" parent="." unique_id=1597038595]
 process_priority = 100
-editor_description = "启动时从远山 alpha 一次性生成 320x180 湖域/岸距/逐列纵深；运行期只同步远山变换，不重建像素。"
+editor_description = "启动时合并两层 FarSnowfield 的真实岸线，并读取 FarGlacier 底边生成独立接触通道；320x180 拓扑同时驱动湖域、岸距、纵深与冰川湿边。"
 script = ExtResource("11_lake_topology")
 
 [node name="MirrorLake" type="ColorRect" parent="." unique_id=1790463199]
-editor_description = "开放水面主体；连续冷蓝纵深、拓扑岸影与共享横向碎波；远岸仅有半透薄冰，近景仅留两片不规则碎冰。"
+editor_description = "开放水面主体；连续冷蓝纵深、拓扑岸影与共享横向碎波；冰川底边使用实测接触通道生成断续湿边，岸冰在该区域与冰川共用色系。"
 material = SubResource("Scene8OpenLakeMat")
 layout_mode = 1
 anchors_preset = 15
@@ -302,6 +525,8 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 metadata/parallax_factor = 0.58
+metadata/pointer_parallax_factor = 1.0
+metadata/dolly_parallax_factor = 1.0
 metadata/_edit_lock_ = true
 
 [node name="AuroraReflection" type="ColorRect" parent="." unique_id=1860457149]
@@ -315,45 +540,120 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 metadata/parallax_factor = 0.28
+metadata/pointer_parallax_factor = 1.0
+metadata/dolly_parallax_factor = 1.0
 metadata/_edit_lock_ = true
 
-[node name="FarMountainDistant" type="Sprite2D" parent="." unique_id=1046136694]
-editor_description = "同源远山的最远轮廓；水平翻转、抬高并压低对比度，只露出峰顶，避免一张山脉贴图直接贴在天空前。"
-self_modulate = Color(0.38, 0.52, 0.7, 0.33)
+[node name="FarMountainLeft" type="TextureRect" parent="." unique_id=1350893276]
+editor_description = "当前手调左远山；Transform、轮廓与 alpha 不动，顶部1–3个源像素在山体内部承接天空蓝与极光冷绿，避免贴图边缘。"
 texture_filter = 1
-position = Vector2(-70, -78)
-scale = Vector2(6.35, 6.35)
+material = SubResource("Scene8FarMountainLeftMat")
+layout_mode = 0
+offset_left = 4.0
+offset_top = 177.0
+offset_right = 186.0
+offset_bottom = 266.0
+scale = Vector2(5, 5)
+mouse_filter = 2
+texture = ExtResource("17_far_mountain_left")
+expand_mode = 1
+metadata/parallax_factor = 0.12
+metadata/pointer_parallax_factor = 0.08
+metadata/dolly_parallax_factor = 1.0
+metadata/composition_role = "far_mountain_left"
+
+[node name="FarSnowfield2" type="TextureRect" parent="." unique_id=2095266114]
+editor_description = "当前手调保留的最近远景岸线；维持 Transform、层级与湖面拓扑职责，只做最弱空气透视，保持岸水贴合和最高辨识度。"
+texture_filter = 1
+material = SubResource("Scene8FarSnowfieldMat")
+layout_mode = 0
+offset_left = 765.0
+offset_top = 167.00002
+offset_right = 926.0
+offset_bottom = 290.66672
+scale = Vector2(6, 6)
+mouse_filter = 2
 texture = ExtResource("5_far_mountain")
-centered = false
+expand_mode = 1
 flip_h = true
-metadata/parallax_factor = 0.06
-metadata/composition_role = "far_mountain_distant"
-metadata/_edit_lock_ = true
+metadata/parallax_factor = 0.15
+metadata/pointer_parallax_factor = 0.1
+metadata/dolly_parallax_factor = 1.0
 
-[node name="FarMountainMiddle" type="Sprite2D" parent="." unique_id=1813529988]
-editor_description = "同源远山的中间轮廓；错位抬高并保留较弱冷蓝明度，在最远峰与原始岸线之间建立第二个空气层级。"
-self_modulate = Color(0.58, 0.7, 0.82, 0.48)
+[node name="FarMountainRight" type="TextureRect" parent="." unique_id=572437580]
+editor_description = "当前手调右远山；与左山使用错开的内部天空边缘和极光响应，保持不透明轮廓与原始清晰度。"
 texture_filter = 1
-position = Vector2(-108, -36)
-scale = Vector2(6.12, 6.12)
-texture = ExtResource("5_far_mountain")
-centered = false
-metadata/parallax_factor = 0.1
-metadata/composition_role = "far_mountain_middle"
+material = SubResource("Scene8FarMountainRightMat")
+layout_mode = 0
+offset_left = 989.0
+offset_top = 206.0
+offset_right = 1181.7998
+offset_bottom = 289.8
+scale = Vector2(5, 5)
+mouse_filter = 2
+texture = ExtResource("18_far_mountain_right")
+expand_mode = 1
+metadata/parallax_factor = 0.12
+metadata/pointer_parallax_factor = 0.08
+metadata/dolly_parallax_factor = 1.0
+metadata/composition_role = "far_mountain_right"
 metadata/_edit_lock_ = true
 
 [node name="FarSnowfield" type="TextureRect" parent="." unique_id=1843340025]
-editor_description = "Eddy 提供的完整远山源图；保持原有 6x 手调 Transform，作为三层远山中最近且最清晰的岸线，并继续以原 alpha 负责湖岸最终遮挡。"
+editor_description = "当前手调保留的最近远景岸线；维持 Transform、层级与湖面拓扑职责，只做最弱空气透视，保持岸水贴合和最高辨识度。"
 texture_filter = 1
+material = SubResource("Scene8FarSnowfieldMat")
 layout_mode = 0
-offset_left = -36.0
-offset_right = 296.0
-offset_bottom = 188.0
+offset_left = -10.0
+offset_top = 191.0
+offset_right = 137.50002
+offset_bottom = 312.6667
 scale = Vector2(6, 6)
 mouse_filter = 2
 texture = ExtResource("5_far_mountain")
 expand_mode = 1
 metadata/parallax_factor = 0.15
+metadata/pointer_parallax_factor = 0.1
+metadata/dolly_parallax_factor = 1.0
+metadata/_edit_lock_ = true
+
+[node name="FarGlacier" type="TextureRect" parent="." unique_id=911824680]
+editor_description = "当前手调冰川为视差最远层；原图保持完整不透明，其顶部用内部像素融入天空，底部轮廓写入湖面接触通道，不靠透明叠层。"
+texture_filter = 1
+material = SubResource("Scene8FarGlacierMat")
+layout_mode = 0
+offset_left = -60.999996
+offset_top = 183.0
+offset_right = 347.0
+offset_bottom = 319.0
+scale = Vector2(5, 5)
+mouse_filter = 2
+texture = ExtResource("16_far_glacier")
+expand_mode = 1
+metadata/parallax_factor = 0.08
+metadata/pointer_parallax_factor = 0.06
+metadata/dolly_parallax_factor = 1.0
+metadata/composition_role = "far_glacier"
+metadata/_edit_lock_ = true
+
+[node name="SnowMotesFar" type="GPUParticles2D" parent="." unique_id=900968293]
+editor_description = "逐项复用 Scene3 远层粒子的圆点、数量、尺寸、生命周期与随机节奏；仅改为冷蓝极光色并向下飘落。"
+texture_filter = 1
+material = SubResource("Scene8SnowMoteBlend")
+position = Vector2(925, 522)
+amount = 9
+texture = SubResource("Scene8SnowMoteTexture")
+lifetime = 11.0
+preprocess = 8.0
+explosiveness = 0.12
+randomness = 0.82
+visibility_rect = Rect2(-520, -260, 1040, 520)
+local_coords = true
+process_material = SubResource("Scene8SnowMotesFarMat")
+metadata/parallax_factor = 0.28
+metadata/pointer_parallax_factor = 0.08
+metadata/dolly_parallax_factor = 1.0
+metadata/composition_role = "ambient_snow_motes_far"
 metadata/_edit_lock_ = true
 
 [node name="PlatformWaterContact" type="ColorRect" parent="." unique_id=1919535168]
@@ -368,11 +668,13 @@ offset_bottom = 826.0
 mouse_filter = 2
 color = Color(0, 0, 0, 0)
 metadata/parallax_factor = 1.0
+metadata/pointer_parallax_factor = 1.0
+metadata/dolly_parallax_factor = 1.0
 metadata/composition_role = "platform_water_contact"
 metadata/_edit_lock_ = true
 
 [node name="BattlePlatform" type="TextureRect" parent="." unique_id=107535611]
-editor_description = "Eddy 提供的完整平台源图；Transform 保持手调值，场景专属材质仅让湖水遮住过深侧壁，留下浅浮冰边。"
+editor_description = "Eddy 提供的完整平台源图；Transform 保持手调值。场景专属材质维持浅浮冰吃水边；彩蛋在中央生长一条细长纵向像素裂纹，保留完整 alpha、平台轮廓与点击面，不再挖洞露水。"
 texture_filter = 1
 material = SubResource("Scene8PlatformFloatMat")
 layout_mode = 0
@@ -385,27 +687,53 @@ mouse_filter = 2
 texture = ExtResource("6_platform")
 expand_mode = 1
 metadata/parallax_factor = 1.0
+metadata/pointer_parallax_factor = 1.0
+metadata/dolly_parallax_factor = 1.0
 metadata/_edit_lock_ = true
 
-[node name="ForegroundCenterSnow" type="TextureRect" parent="." unique_id=26214753]
-editor_description = "Eddy 提供的中央近景 snow；3x 整数缩放，只覆盖屏幕下沿与平台下部，不压角色脚位，并以略强于左右近景的视差补出中央前后关系。"
+[node name="SnowMotesNear" type="GPUParticles2D" parent="." unique_id=2024532952]
+editor_description = "逐项复用 Scene3 近层粒子的圆点、数量、尺寸、生命周期与随机节奏；仅改为淡绿极光色并向下飘落。"
 texture_filter = 1
+material = SubResource("Scene8SnowMoteBlend")
+position = Vector2(960, 620)
+amount = 6
+texture = SubResource("Scene8SnowMoteTexture")
+lifetime = 8.0
+preprocess = 5.0
+explosiveness = 0.18
+randomness = 0.86
+visibility_rect = Rect2(-500, -250, 1000, 500)
+local_coords = true
+process_material = SubResource("Scene8SnowMotesNearMat")
+metadata/parallax_factor = 1.3
+metadata/pointer_parallax_factor = 1.04
+metadata/dolly_parallax_factor = 1.0
+metadata/composition_role = "ambient_snow_motes_near"
+metadata/_edit_lock_ = true
+
+[node name="ForegroundSnowfield" type="TextureRect" parent="." unique_id=1627483479]
+editor_description = "中央近景雪地衔接层；保持当前手调 Transform 与原素材主色，仅以弱极夜校色连接远景，并与左右近景共用视差。"
+texture_filter = 1
+material = SubResource("Scene8ForegroundSnowfieldMat")
 layout_mode = 0
-offset_left = 1890.0
-offset_top = 2198.0
-offset_right = 2539.0686
-offset_bottom = 2660.0483
-rotation = 3.1415927
-scale = Vector2(3, 3)
+offset_left = -46.0
+offset_top = 242.0
+offset_right = 290.6667
+offset_bottom = 426.3333
+scale = Vector2(6, 6)
 mouse_filter = 2
-texture = ExtResource("15_foreground_center_snow")
+texture = ExtResource("19_foreground_snowfield")
 expand_mode = 1
-metadata/parallax_factor = 1.22
-metadata/composition_role = "foreground_center_snow"
+metadata/parallax_factor = 1.18
+metadata/pointer_parallax_factor = 1.08
+metadata/dolly_parallax_factor = 1.0
+metadata/composition_role = "foreground_snowfield"
+metadata/_edit_lock_ = true
 
 [node name="ForegroundLeft" type="TextureRect" parent="." unique_id=1428487288]
-editor_description = "Eddy 提供的左侧雪地近景；3x 整数缩放，有效透明边界贴齐左侧与底部。"
+editor_description = "左侧雪地近景；当前手调 Transform 不动。四簇冰晶仅保留点击像素火花响应，前景材质本身完全静态。"
 texture_filter = 1
+material = SubResource("Scene8ForegroundLeftMat")
 layout_mode = 0
 offset_left = -99.0
 offset_top = 620.0
@@ -416,11 +744,15 @@ mouse_filter = 2
 texture = ExtResource("7_foreground_left")
 expand_mode = 1
 metadata/parallax_factor = 1.18
+metadata/pointer_parallax_factor = 1.08
+metadata/dolly_parallax_factor = 1.0
+metadata/composition_role = "foreground_left_bank"
 metadata/_edit_lock_ = true
 
 [node name="ForegroundRight" type="TextureRect" parent="." unique_id=1212273803]
-editor_description = "Eddy 提供的右侧雪地近景；3x 整数缩放，有效透明边界贴齐右侧与底部。"
+editor_description = "右侧雪地近景；当前手调 Transform 不动。两簇冰晶仅保留点击像素火花响应，前景材质本身完全静态。"
 texture_filter = 1
+material = SubResource("Scene8ForegroundRightMat")
 layout_mode = 0
 offset_left = 1336.0
 offset_top = 616.0
@@ -431,7 +763,22 @@ mouse_filter = 2
 texture = ExtResource("8_foreground_right")
 expand_mode = 1
 metadata/parallax_factor = 1.18
+metadata/pointer_parallax_factor = 1.08
+metadata/dolly_parallax_factor = 1.0
+metadata/composition_role = "foreground_right_bank"
 metadata/_edit_lock_ = true
+
+[node name="CrystalSparkController" type="Node" parent="."]
+editor_description = "Scene8 专属冰晶触碰反馈：精准命中六簇冰晶实际像素后，依次播放接触亮点、沿各自晶面方向移动的折光与三条受控短碎光；无自动播放、无整片扫光、无径向爆炸，也不吞掉战斗输入。"
+script = ExtResource("22_crystal_spark_controller")
+response_lifetime_sec = 0.64
+shard_count = 3
+minimum_facet_length_px = 20.0
+maximum_facet_length_px = 44.0
+
+[node name="SurfaceInteractionController" type="Node" parent="."]
+editor_description = "Scene8 专属水面与浮冰点击反馈：湖面生成克制的透视像素涟漪并同步扰动极光倒影，底部按钮条与两侧道具轨不向场景透传；平台在真实顶部冰面撒出小冰屑并短促同步震动，彩蛋以大震动生长永久中央纵向裂纹，不删平台像素；水线与上方角色/阴影同位移。"
+script = ExtResource("23_surface_interaction_controller")
 
 [node name="CompositionGuides" type="Node2D" parent="." unique_id=1177821167]
 editor_description = "不可见构图基线；导入环境素材时围绕基线适配，不移动成熟人物。"

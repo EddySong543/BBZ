@@ -7,8 +7,9 @@ signal battle_response_requested(strength: float, direction: float)
 ##
 ## 各子节点通过 metadata `parallax_factor` 声明视差强度：
 ## 0 = 静止背景（天空），1 = 与舞台地面同步，>1 = 前景（飘叶等）。
-## 单层可用 `pointer_parallax_factor` 只覆写鼠标响应，同时保留原系数对
-## idle、震屏和镜头推近的作用；未声明时自动沿用 `parallax_factor`。
+## 单层可用 `pointer_parallax_factor` 只覆写鼠标响应，也可用
+## `dolly_parallax_factor` 单独覆写攻击/对焦推近；两者未声明时都自动沿用
+## `parallax_factor`，所以已有场景保持原行为。
 ## 脚本在 _ready 缓存各层基准位置，随后按 idle 漂移 / 命中抖动 / 可选鼠标视差
 ## 偏移各层位置。素材到位后，在编辑器里直接替换对应 TextureRect 的 texture
 ## 即可，无需改动脚本。
@@ -75,6 +76,10 @@ var _factors: PackedFloat32Array = PackedFloat32Array()
 ## Optional per-layer mouse response. It falls back to `parallax_factor`, so
 ## existing scenes retain their exact behavior unless a layer opts out.
 var _pointer_factors: PackedFloat32Array = PackedFloat32Array()
+## Optional per-layer attack/focus dolly. Scene8 uses this to keep its isolated
+## floe, lake and authored landscape on one camera plane during attack zoom,
+## while every legacy scene falls back to its original parallax factor.
+var _dolly_factors: PackedFloat32Array = PackedFloat32Array()
 var _base_scales: PackedVector2Array = PackedVector2Array()   # 各层基准 scale（保留 .tscn 预设）
 var _time: float = 0.0
 var _shake_amp: float = 0.0
@@ -100,6 +105,8 @@ func _ready() -> void:
 			_factors.append(factor)
 			_pointer_factors.append(float(child.get_meta(
 					"pointer_parallax_factor", factor)))
+			_dolly_factors.append(float(child.get_meta(
+					"dolly_parallax_factor", factor)))
 			_base_scales.append(child.get(&"scale"))
 	# 镜头推近用动态对焦点（显式 position 数学绕 _focal 缩放·见 _process）→ 焦点可随动作左右偏置。
 	_focal = focus_point
@@ -214,6 +221,7 @@ func _process(delta: float) -> void:
 	for i in _layers.size():
 		var f: float = _factors[i]
 		var pointer_f: float = _pointer_factors[i]
+		var dolly_f: float = _dolly_factors[i]
 		var idle_w: float = maxf(f - ground_parallax, IDLE_FAR_CAP)
 		var off := Vector2(
 			drift_x * idle_w + (shake_x + _shake_kick) * f
@@ -221,7 +229,7 @@ func _process(delta: float) -> void:
 			shake_y * f)
 		# 镜头推近：绕动态对焦点 _focal 缩放（显式 position 数学·焦点随动作左右偏置=聚焦敌/我）。
 		# k=1（静止）时退化为 position=base+off、scale=base → 与原始画面一像素不差。
-		var k: float = 1.0 + (_focus * focus_zoom + _punch * punch_zoom) * f
+		var k: float = 1.0 + (_focus * focus_zoom + _punch * punch_zoom) * dolly_f
 		# 鼠标缩放偏置只给比地面更近的层（地面/远景 km=1 → 角色零缩放；近景微放大出「凑近看」）。
 		# ⚠只做横向：均匀缩放的纵向分量会让底部檐角随鼠标上下起伏 1-2px（"建筑呼吸"·
 		# Eddy 2026-07-09 否）——横向 0.3~0.8% 拉伸像素上不可见，纵向不缩不挪。

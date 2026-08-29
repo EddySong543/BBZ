@@ -83,11 +83,13 @@ func _run() -> void:
 	var marked_cleanup := _probe_marked_cleanup()
 	var distribution := _probe_pixel_distribution()
 	var rendering := _probe_full_curtain_motion()
+	var atmosphere_spread := _probe_atmosphere_spread()
 	var reflection := _probe_continuous_reflection()
 	var passed := bool(preservation["passed"]) \
 			and bool(marked_cleanup["passed"]) \
 			and bool(distribution["passed"]) \
 			and bool(rendering["passed"]) \
+			and bool(atmosphere_spread["passed"]) \
 			and bool(reflection["passed"])
 	print(
 			"SCENE8_AURORA_PROBE: ", "PASS" if passed else "FAIL",
@@ -95,6 +97,7 @@ func _run() -> void:
 			" marked_cleanup=", marked_cleanup,
 			" distribution=", distribution,
 			" rendering=", rendering,
+			" atmosphere_spread=", atmosphere_spread,
 			" reflection=", reflection)
 	_stage.queue_free()
 	quit(0 if passed else 1)
@@ -418,6 +421,10 @@ func _probe_full_curtain_motion() -> Dictionary:
 	var body_opacity_bottom := float(_motion_material.get_shader_parameter(
 			"body_opacity_bottom"))
 	var halo_strength := float(_motion_material.get_shader_parameter("halo_strength"))
+	var far_halo_strength := float(_motion_material.get_shader_parameter(
+			"far_halo_strength"))
+	var far_halo_radius := float(_motion_material.get_shader_parameter(
+			"far_halo_radius_pixels"))
 	var shader_source := FileAccess.get_file_as_string(MOTION_SHADER_PATH)
 	var occupied_by_band := PackedInt32Array()
 	var moving_by_band := PackedInt32Array()
@@ -474,9 +481,11 @@ func _probe_full_curtain_motion() -> Dictionary:
 				and sway_x >= 1.4 and sway_x <= 2.0
 				and sway_y >= 0.8 and sway_y <= 1.3
 				and energy_strength >= 0.10 and energy_strength <= 0.18
-				and body_opacity_top >= 0.68 and body_opacity_top <= 0.78
-				and body_opacity_bottom >= 0.84 and body_opacity_bottom <= 0.92
-				and halo_strength >= 0.08 and halo_strength <= 0.20
+				and body_opacity_top >= 0.64 and body_opacity_top <= 0.72
+				and body_opacity_bottom >= 0.80 and body_opacity_bottom <= 0.88
+				and halo_strength >= 0.18 and halo_strength <= 0.27
+				and far_halo_strength >= 0.07 and far_halo_strength <= 0.14
+				and far_halo_radius >= 5.0 and far_halo_radius <= 8.0
 				and every_band_moves and every_band_changes_energy
 				and maximum_short_screen_delta.x <= 5.0
 				and maximum_short_screen_delta.y <= 3.0
@@ -485,6 +494,8 @@ func _probe_full_curtain_motion() -> Dictionary:
 				and shader_source.contains("TIME")
 				and shader_source.contains("diagnostic_time_sec")
 				and shader_source.contains("floor(source_px + vec2(0.5))")
+				and shader_source.contains("neighbor_field")
+				and shader_source.contains("far_halo_only")
 				and not ResourceLoader.exists(RETIRED_SHADER_PATH),
 		"texture_path": texture_path,
 		"nearest_filter": _aurora.texture_filter,
@@ -496,6 +507,7 @@ func _probe_full_curtain_motion() -> Dictionary:
 		"maximum_long_screen_delta": maximum_long_screen_delta,
 		"body_opacity_range": Vector2(body_opacity_top, body_opacity_bottom),
 		"halo_strength": halo_strength,
+		"far_halo": Vector2(far_halo_strength, far_halo_radius),
 		"retired_shader_removed": not ResourceLoader.exists(RETIRED_SHADER_PATH),
 	}
 
@@ -538,6 +550,71 @@ func _motion_energy(pixel: Vector2, time_sec: float) -> float:
 	var energy_b := 0.5 + 0.5 * sin(
 			energy_phase * 0.61 + phase_x * 2.0 - depth)
 	return energy_a * 0.68 + energy_b * 0.32
+
+
+func _probe_atmosphere_spread() -> Dictionary:
+	var near_radius := roundi(float(_motion_material.get_shader_parameter(
+			"halo_radius_pixels")))
+	var far_radius := roundi(float(_motion_material.get_shader_parameter(
+			"far_halo_radius_pixels")))
+	var body_pixels := 0
+	var near_only_pixels := 0
+	var far_only_pixels := 0
+	var spread_by_band := PackedInt32Array()
+	spread_by_band.resize(8)
+	for y: int in LOGICAL_SIZE.y:
+		for x: int in LOGICAL_SIZE.x:
+			var occupied := _image.get_pixel(x, y).a > 0.0
+			if occupied:
+				body_pixels += 1
+				continue
+			var near_presence := _has_occupied_neighbor(x, y, near_radius)
+			var far_presence := _has_occupied_neighbor(x, y, far_radius)
+			if near_presence:
+				near_only_pixels += 1
+			if far_presence and not near_presence:
+				far_only_pixels += 1
+			if near_presence or far_presence:
+				spread_by_band[mini(x * 8 / LOGICAL_SIZE.x, 7)] += 1
+	var total_spread := near_only_pixels + far_only_pixels
+	var spread_ratio := float(total_spread) / float(maxi(body_pixels, 1))
+	var far_extension_ratio := float(far_only_pixels) / float(maxi(body_pixels, 1))
+	var every_band_spreads := true
+	for band_count: int in spread_by_band:
+		every_band_spreads = every_band_spreads and band_count >= 20
+	return {
+		"passed": (
+				near_radius == 2 and far_radius >= 5 and far_radius <= 8
+				and near_only_pixels >= 500
+				and far_only_pixels >= 250
+				and spread_ratio >= 0.15 and spread_ratio <= 1.5
+				and far_extension_ratio >= 0.03
+				and every_band_spreads),
+		"near_radius": near_radius,
+		"far_radius": far_radius,
+		"body_pixels": body_pixels,
+		"near_only_pixels": near_only_pixels,
+		"far_only_pixels": far_only_pixels,
+		"spread_ratio": snappedf(spread_ratio, 0.001),
+		"far_extension_ratio": snappedf(far_extension_ratio, 0.001),
+		"spread_by_eighth": spread_by_band,
+	}
+
+
+func _has_occupied_neighbor(x: int, y: int, radius: int) -> bool:
+	const DIRECTIONS: Array[Vector2i] = [
+		Vector2i(-1, 0), Vector2i(1, 0),
+		Vector2i(0, -1), Vector2i(0, 1),
+		Vector2i(-1, -1), Vector2i(1, -1),
+		Vector2i(-1, 1), Vector2i(1, 1),
+	]
+	for direction: Vector2i in DIRECTIONS:
+		var sample := Vector2i(x, y) + direction * radius
+		if (sample.x >= 0 and sample.y >= 0
+				and sample.x < LOGICAL_SIZE.x and sample.y < LOGICAL_SIZE.y
+				and _image.get_pixelv(sample).a > 0.0):
+			return true
+	return false
 
 
 func _probe_continuous_reflection() -> Dictionary:

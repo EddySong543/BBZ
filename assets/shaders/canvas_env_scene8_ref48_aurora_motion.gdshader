@@ -16,10 +16,13 @@ uniform float sway_y_pixels : hint_range(0.0, 3.0, 0.1) = 1.1;
 uniform float motion_floor : hint_range(0.0, 1.0, 0.01) = 0.68;
 uniform float energy_strength : hint_range(0.0, 0.4, 0.01) = 0.14;
 uniform float alpha_variation : hint_range(0.0, 0.20, 0.01) = 0.06;
-uniform float body_opacity_top : hint_range(0.4, 1.0, 0.01) = 0.74;
-uniform float body_opacity_bottom : hint_range(0.4, 1.0, 0.01) = 0.89;
-uniform float halo_strength : hint_range(0.0, 0.4, 0.01) = 0.14;
+uniform float body_opacity_top : hint_range(0.4, 1.0, 0.01) = 0.68;
+uniform float body_opacity_bottom : hint_range(0.4, 1.0, 0.01) = 0.84;
+uniform float halo_strength : hint_range(0.0, 0.4, 0.01) = 0.22;
 uniform float halo_radius_pixels : hint_range(1.0, 4.0, 1.0) = 2.0;
+uniform float far_halo_strength : hint_range(0.0, 0.3, 0.01) = 0.10;
+uniform float far_halo_radius_pixels : hint_range(3.0, 10.0, 1.0) = 6.0;
+uniform vec4 atmosphere_tint : source_color = vec4(0.10, 0.25, 0.36, 1.0);
 uniform float diagnostic_time_sec : hint_range(-1.0, 300.0, 0.1) = -1.0;
 
 varying vec4 vertex_modulate;
@@ -38,6 +41,36 @@ vec4 aurora_texel(vec2 logical_pixel) {
 	}
 	vec2 snapped_uv = (floor(logical_pixel) + vec2(0.5)) / logical_size;
 	return texture(source_texture, snapped_uv);
+}
+
+
+vec4 neighbor_field(vec2 source_pixel, float radius_pixels) {
+	vec4 sample_left = aurora_texel(source_pixel + vec2(-radius_pixels, 0.0));
+	vec4 sample_right = aurora_texel(source_pixel + vec2(radius_pixels, 0.0));
+	vec4 sample_up = aurora_texel(source_pixel + vec2(0.0, -radius_pixels));
+	vec4 sample_down = aurora_texel(source_pixel + vec2(0.0, radius_pixels));
+	vec4 sample_up_left = aurora_texel(
+			source_pixel + vec2(-radius_pixels, -radius_pixels));
+	vec4 sample_up_right = aurora_texel(
+			source_pixel + vec2(radius_pixels, -radius_pixels));
+	vec4 sample_down_left = aurora_texel(
+			source_pixel + vec2(-radius_pixels, radius_pixels));
+	vec4 sample_down_right = aurora_texel(
+			source_pixel + vec2(radius_pixels, radius_pixels));
+	float weight = sample_left.a + sample_right.a + sample_up.a + sample_down.a
+			+ sample_up_left.a + sample_up_right.a
+			+ sample_down_left.a + sample_down_right.a;
+	vec3 light = (
+			sample_left.rgb * sample_left.a
+			+ sample_right.rgb * sample_right.a
+			+ sample_up.rgb * sample_up.a
+			+ sample_down.rgb * sample_down.a
+			+ sample_up_left.rgb * sample_up_left.a
+			+ sample_up_right.rgb * sample_up_right.a
+			+ sample_down_left.rgb * sample_down_left.a
+			+ sample_down_right.rgb * sample_down_right.a)
+			/ max(weight, 0.001);
+	return vec4(light, clamp(weight / 3.0, 0.0, 1.0));
 }
 
 
@@ -72,41 +105,14 @@ void fragment() {
 	vec2 source_pixel = floor(source_px + vec2(0.5));
 	vec4 texel = aurora_texel(source_pixel);
 
-	// A small logical-pixel halo is derived from the same moving source. It lets
-	// the night sky show through and softens the cutout boundary without adding
-	// a duplicate sprite, blur texture, or independently moving overlay.
-	vec4 neighbor_left = aurora_texel(
-			source_pixel + vec2(-halo_radius_pixels, 0.0));
-	vec4 neighbor_right = aurora_texel(
-			source_pixel + vec2(halo_radius_pixels, 0.0));
-	vec4 neighbor_up = aurora_texel(
-			source_pixel + vec2(0.0, -halo_radius_pixels));
-	vec4 neighbor_down = aurora_texel(
-			source_pixel + vec2(0.0, halo_radius_pixels));
-	vec4 neighbor_up_left = aurora_texel(
-			source_pixel + vec2(-halo_radius_pixels, -halo_radius_pixels));
-	vec4 neighbor_up_right = aurora_texel(
-			source_pixel + vec2(halo_radius_pixels, -halo_radius_pixels));
-	vec4 neighbor_down_left = aurora_texel(
-			source_pixel + vec2(-halo_radius_pixels, halo_radius_pixels));
-	vec4 neighbor_down_right = aurora_texel(
-			source_pixel + vec2(halo_radius_pixels, halo_radius_pixels));
-	float neighbor_weight = neighbor_left.a + neighbor_right.a
-			+ neighbor_up.a + neighbor_down.a
-			+ neighbor_up_left.a + neighbor_up_right.a
-			+ neighbor_down_left.a + neighbor_down_right.a;
-	vec3 neighbor_light = (
-			neighbor_left.rgb * neighbor_left.a
-			+ neighbor_right.rgb * neighbor_right.a
-			+ neighbor_up.rgb * neighbor_up.a
-			+ neighbor_down.rgb * neighbor_down.a
-			+ neighbor_up_left.rgb * neighbor_up_left.a
-			+ neighbor_up_right.rgb * neighbor_up_right.a
-			+ neighbor_down_left.rgb * neighbor_down_left.a
-			+ neighbor_down_right.rgb * neighbor_down_right.a)
-			/ max(neighbor_weight, 0.001);
-	float neighbor_presence = clamp(neighbor_weight / 3.0, 0.0, 1.0);
-	float halo_only = max(neighbor_presence - texel.a, 0.0);
+	// Two fields come from the same moving source. The near field preserves a
+	// stepped pixel edge; the far field supplies the atmospheric color spread
+	// that makes the curtain belong to the sky instead of reading as a sticker.
+	vec4 near_field = neighbor_field(source_pixel, halo_radius_pixels);
+	vec4 far_field = neighbor_field(source_pixel, far_halo_radius_pixels);
+	float halo_only = max(near_field.a - texel.a, 0.0);
+	float far_halo_only = max(
+			far_field.a - max(texel.a, near_field.a * 0.34), 0.0);
 
 	// One long energy clock drives two wide fronts. Color and opacity now change
 	// continuously, avoiding the previous fast five-step brightness flicker.
@@ -127,13 +133,22 @@ void fragment() {
 	float veil_alpha = mix(1.0 - alpha_variation, 1.0, energy);
 	float body_alpha = texel.a * depth_opacity * veil_alpha;
 	float halo_alpha = halo_only * halo_strength * mix(0.76, 1.0, energy);
+	float far_halo_alpha = far_halo_only * far_halo_strength
+			* mix(0.82, 1.0, energy);
 	vec3 body_color = texel.rgb * brightness * moving_tint;
 	vec3 halo_color = mix(
-			neighbor_light, vec3(0.12, 0.25, 0.39), 0.24)
+			near_field.rgb, atmosphere_tint.rgb, 0.26)
 			* mix(0.78, 1.0, energy);
-	float combined_alpha = body_alpha + halo_alpha * (1.0 - body_alpha);
+	vec3 far_halo_color = mix(
+			far_field.rgb, atmosphere_tint.rgb, 0.52)
+			* mix(0.72, 0.92, energy);
+	float combined_alpha = body_alpha
+			+ halo_alpha * (1.0 - body_alpha)
+			+ far_halo_alpha * (1.0 - body_alpha) * (1.0 - halo_alpha);
 	vec3 combined_premultiplied = body_color * body_alpha
-			+ halo_color * halo_alpha * (1.0 - body_alpha);
+			+ halo_color * halo_alpha * (1.0 - body_alpha)
+			+ far_halo_color * far_halo_alpha
+					* (1.0 - body_alpha) * (1.0 - halo_alpha);
 	vec3 combined_color = combined_premultiplied / max(combined_alpha, 0.001);
 	COLOR = vec4(combined_color, combined_alpha) * vertex_modulate;
 }

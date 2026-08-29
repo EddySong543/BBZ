@@ -16,6 +16,15 @@ uniform float shore_distance_cells : hint_range(1.0, 64.0, 1.0) = 24.0;
 uniform float diagnostic_time_sec : hint_range(-1.0, 300.0, 0.1) = -1.0;
 group_uniforms;
 
+group_uniforms shared_click_ripple;
+uniform sampler2D click_ripple_events : filter_nearest, repeat_disable;
+uniform int click_ripple_count = 0;
+uniform float click_ripple_duration_sec = 1.65;
+uniform float click_ripple_far_radius_x = 0.0280;
+uniform float click_ripple_near_radius_x = 0.0450;
+uniform float click_ripple_vertical_compression = 0.38;
+group_uniforms;
+
 
 float scene8_hash21(vec2 p) {
 	p = mod(p, vec2(509.0, 251.0));
@@ -48,6 +57,86 @@ float ordered_dither_4x4(vec2 cell) {
 }
 
 
+vec4 scene8_single_click_ripple(
+		vec2 screen_uv,
+		float depth,
+		vec2 cell,
+		vec4 event_data) {
+	if (event_data.w <= 0.0) {
+		return vec4(0.0);
+	}
+	float normalized_age = clamp(
+			event_data.z / max(click_ripple_duration_sec, 0.001),
+			0.0, 1.0);
+	// The first frame already owns a small readable crest, then the ripple
+	// expands and fades. Every sample is snapped to the shared logical grid.
+	float rise = mix(0.62, 1.0, smoothstep(0.0, 0.08, normalized_age));
+	float fall = 1.0 - smoothstep(0.58, 1.0, normalized_age);
+	float life = rise * fall * event_data.w;
+	vec2 pixel_uv = (floor(screen_uv * pixel_grid) + 0.5) / pixel_grid;
+	vec2 event_uv = (floor(event_data.xy * pixel_grid) + 0.5) / pixel_grid;
+	vec2 delta = pixel_uv - event_uv;
+	float maximum_radius_x = mix(
+			click_ripple_far_radius_x,
+			click_ripple_near_radius_x, depth);
+	vec2 ellipse_radius = vec2(
+			maximum_radius_x,
+			maximum_radius_x * click_ripple_vertical_compression);
+	float ellipse_distance = length(delta / max(ellipse_radius, vec2(0.0001)));
+	float ring_radius = mix(
+			0.12, 1.0, 1.0 - pow(1.0 - normalized_age, 2.0));
+	float band_width = mix(0.075, 0.045, depth);
+	float angle = atan(
+			delta.y / max(click_ripple_vertical_compression, 0.001),
+			delta.x);
+	float segment_id = floor((angle + PI) / TAU * 18.0);
+	float primary_breaks = step(
+			0.18, scene8_hash21(vec2(segment_id + 1201.0, 1217.0)));
+	float secondary_breaks = step(
+			0.30, scene8_hash21(vec2(segment_id + 1237.0, 1259.0)));
+	float primary_ring = (1.0 - step(
+			band_width, abs(ellipse_distance - ring_radius)))
+			* primary_breaks * life;
+	float secondary_radius = ring_radius * 0.67;
+	float secondary_ring = (1.0 - step(
+			band_width * 0.88,
+			abs(ellipse_distance - secondary_radius)))
+			* secondary_breaks
+			* smoothstep(0.12, 0.30, normalized_age) * life * 0.72;
+	float inner_trough = (1.0 - step(
+			band_width * 1.45,
+			abs(ellipse_distance - ring_radius + band_width * 1.9)))
+			* primary_breaks * life * 0.62;
+	float horizontal_direction = sign(delta.x);
+	float offset_cells = round(
+			(primary_ring + secondary_ring)
+			* mix(1.0, 2.0, depth)) * horizontal_direction;
+	return vec4(
+			inner_trough,
+			primary_ring,
+			secondary_ring,
+			offset_cells);
+}
+
+
+vec4 scene8_click_ripple(vec2 screen_uv, float depth, vec2 cell) {
+	vec4 combined = vec4(0.0);
+	for (int ripple_index = 0;
+			ripple_index < click_ripple_count; ripple_index++) {
+		vec4 event_data = texelFetch(
+				click_ripple_events, ivec2(ripple_index, 0), 0);
+		vec4 response = scene8_single_click_ripple(
+				screen_uv, depth, cell, event_data);
+		combined = vec4(
+				max(combined.x, response.x),
+				max(combined.y, response.y),
+				max(combined.z, response.z),
+				clamp(combined.w + response.w, -3.0, 3.0));
+	}
+	return combined;
+}
+
+
 vec2 scene8_lake_topology_uv(vec2 fallback_pixel_uv, vec2 screen_uv) {
 	if (!use_lake_topology) {
 		return fallback_pixel_uv;
@@ -76,7 +165,7 @@ vec4 sample_lake_topology(
 				0.0, 1.0);
 		return vec4(
 				fallback_water, fallback_depth,
-				fallback_depth, 1.0);
+				fallback_depth, 0.0);
 	}
 	return texture(lake_topology, topology_uv);
 }

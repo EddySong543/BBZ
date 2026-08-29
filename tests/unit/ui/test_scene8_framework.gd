@@ -5,6 +5,8 @@ const BATTLE8_PATH := "res://src/ui/battle_screen8.tscn"
 const BATTLE_BASE_PATH := "res://src/ui/battle_screen_base.tscn"
 const SCENE1_PATH := "res://src/ui/scenes/scene1.tscn"
 const NIGHT_SKY_SHADER_PATH := "res://assets/shaders/canvas_env_night_sky.gdshader"
+const SCENE8_AURORA_SKY_SHADER_PATH := (
+		"res://assets/shaders/canvas_env_scene8_aurora_sky.gdshader")
 const STARS_SHADER_PATH := "res://assets/shaders/canvas_env_stars.gdshader"
 const REF48_PATH := "res://ref/ref48.png"
 const PIXEL_AURORA_TEXTURE_PATH := (
@@ -31,13 +33,29 @@ const FOREGROUND_LEFT_PATH := "res://assets/scenes/scene8/scene8_foreground_left
 const FOREGROUND_RIGHT_PATH := "res://assets/scenes/scene8/scene8_foreground_right.png"
 const FOREGROUND_CENTER_SNOW_PATH := (
 		"res://assets/scenes/scene8/scene8_foreground_center_snow.png")
+const FAR_GLACIER_PATH := "res://assets/scenes/scene8/scene8_far_glacier.png"
+const FAR_MOUNTAIN_LEFT_PATH := (
+		"res://assets/scenes/scene8/scene8_far_mountain_left.png")
+const FAR_MOUNTAIN_RIGHT_PATH := (
+		"res://assets/scenes/scene8/scene8_far_mountain_right.png")
+const FOREGROUND_SNOWFIELD_PATH := (
+		"res://assets/scenes/scene8/scene8_foreground_snowfield.png")
 const CHARACTER_LIGHT_SHADER_PATH := (
 		"res://assets/shaders/canvas_env_scene8_character_light.gdshader")
+const FAR_DEPTH_GRADE_SHADER_PATH := (
+		"res://assets/shaders/canvas_env_scene8_far_depth_grade.gdshader")
+const FOREGROUND_GRADE_SHADER_PATH := (
+		"res://assets/shaders/canvas_env_scene8_foreground_grade.gdshader")
+const RETIRED_SNOW_CRYSTALS_SHADER_PATH := (
+		"res://assets/shaders/canvas_env_scene8_snow_crystals.gdshader")
+const RETIRED_SCENE8_SNOWFALL_SCRIPT_PATH := (
+		"res://src/ui/components/scene8_snowfall_field.gd")
 
 
 func test_scene8_resources_exist() -> void:
 	assert_true(ResourceLoader.exists(SCENE8_PATH))
 	assert_true(ResourceLoader.exists(BATTLE8_PATH))
+	assert_true(ResourceLoader.exists(SCENE8_AURORA_SKY_SHADER_PATH))
 	assert_true(ResourceLoader.exists(OPEN_LAKE_SHADER_PATH))
 	assert_true(ResourceLoader.exists(AURORA_REFLECTION_SHADER_PATH))
 	assert_true(ResourceLoader.exists(SHARED_WATER_WAVE_INCLUDE_PATH))
@@ -47,7 +65,14 @@ func test_scene8_resources_exist() -> void:
 	assert_true(ResourceLoader.exists(PIXEL_AURORA_TEXTURE_PATH))
 	assert_true(ResourceLoader.exists(PIXEL_AURORA_MOTION_SHADER_PATH))
 	assert_true(ResourceLoader.exists(FOREGROUND_CENTER_SNOW_PATH))
+	assert_true(ResourceLoader.exists(FAR_GLACIER_PATH))
+	assert_true(ResourceLoader.exists(FAR_MOUNTAIN_LEFT_PATH))
+	assert_true(ResourceLoader.exists(FAR_MOUNTAIN_RIGHT_PATH))
+	assert_true(ResourceLoader.exists(FOREGROUND_SNOWFIELD_PATH))
 	assert_true(ResourceLoader.exists(CHARACTER_LIGHT_SHADER_PATH))
+	assert_true(ResourceLoader.exists(FAR_DEPTH_GRADE_SHADER_PATH))
+	assert_false(ResourceLoader.exists(RETIRED_SNOW_CRYSTALS_SHADER_PATH))
+	assert_false(ResourceLoader.exists(RETIRED_SCENE8_SNOWFALL_SCRIPT_PATH))
 	assert_false(ResourceLoader.exists(RETIRED_PIXEL_AURORA_SHADER_PATH))
 
 
@@ -65,16 +90,17 @@ func test_scene8_framework_has_direct_editable_depth_roles() -> void:
 		"Sky": 0.0,
 		"Stars": 0.0,
 		"PixelAurora": 0.0,
-		"FarMountainDistant": 0.06,
-		"FarMountainMiddle": 0.10,
+		"FarGlacier": 0.08,
+		"FarMountainLeft": 0.12,
+		"FarMountainRight": 0.12,
 		"FarSnowfield": 0.15,
 		"AuroraReflection": 0.28,
 		"MirrorLake": 0.58,
 		"PlatformWaterContact": 1.0,
 		"BattlePlatform": 1.0,
+		"ForegroundSnowfield": 1.18,
 		"ForegroundLeft": 1.18,
 		"ForegroundRight": 1.18,
-		"ForegroundCenterSnow": 1.22,
 	}
 	for node_name: String in expected_factors:
 		var layer := stage.get_node_or_null(node_name) as CanvasItem
@@ -91,7 +117,232 @@ func test_scene8_framework_has_direct_editable_depth_roles() -> void:
 			"The temporary framework color must leave once the real sky is active")
 
 
-func test_scene8_replicates_scene1_night_sky_and_star_contract() -> void:
+func test_scene8_pointer_parallax_keeps_water_contacts_and_copied_depth_groups_coherent() -> void:
+	if not ResourceLoader.exists(SCENE8_PATH):
+		return
+
+	var stage := (load(SCENE8_PATH) as PackedScene).instantiate() as BattleStage
+	add_child_autofree(stage)
+	assert_not_null(stage)
+	if stage == null:
+		return
+	assert_eq((stage.get_script() as Script).resource_path,
+			"res://src/ui/components/battle_stage.gd",
+			"Scene8 must tune the mature shared parallax instead of forking it")
+	assert_eq(stage.pointer_strength, 2.0)
+	assert_eq(stage.pointer_smooth, 6.0)
+	assert_eq(stage.pointer_zoom, 0.0,
+			"Mirror-lake foregrounds must not stretch sideways with the pointer")
+
+	var expected_pointer_factors := {
+		"Sky": 0.0,
+		"Stars": 0.0,
+		"PixelAurora": 0.0,
+		"FarGlacier": 0.06,
+		"FarMountainLeft": 0.08,
+		"FarMountainRight": 0.08,
+		"FarSnowfield": 0.10,
+		"FarSnowfield2": 0.10,
+		"MirrorLake": 1.0,
+		"AuroraReflection": 1.0,
+		"PlatformWaterContact": 1.0,
+		"BattlePlatform": 1.0,
+		"ForegroundSnowfield": 1.08,
+		"ForegroundLeft": 1.08,
+		"ForegroundRight": 1.08,
+	}
+	for node_name: String in expected_pointer_factors:
+		var layer := stage.get_node(node_name) as CanvasItem
+		assert_eq(
+				float(layer.get_meta("pointer_parallax_factor")),
+				float(expected_pointer_factors[node_name]))
+
+	var strength := stage.pointer_strength
+	var platform_factor := float((stage.get_node("BattlePlatform") as CanvasItem
+			).get_meta("pointer_parallax_factor"))
+	for node_name: String in [
+		"MirrorLake", "AuroraReflection", "PlatformWaterContact",
+	]:
+		var factor := float((stage.get_node(node_name) as CanvasItem
+				).get_meta("pointer_parallax_factor"))
+		assert_almost_eq(absf(factor - platform_factor) * strength, 0.0, 0.001,
+				"Water, reflection and contact waves must move with the floating ice")
+	var far_pointer_span := (
+			float(expected_pointer_factors["FarSnowfield"])
+			- float(expected_pointer_factors["FarGlacier"])) * strength
+	assert_lte(far_pointer_span, 0.081,
+			"Copied far layers may not split into visible cards during pointer travel")
+	var foreground_extra := (
+			float(expected_pointer_factors["ForegroundLeft"])
+			- platform_factor) * strength
+	assert_lte(foreground_extra, 0.161,
+			"Foreground framing should stay subtle around the isolated ice platform")
+
+
+func test_scene8_attack_dolly_keeps_the_floating_world_on_one_camera_plane() -> void:
+	if not ResourceLoader.exists(SCENE8_PATH):
+		return
+
+	var stage := (load(SCENE8_PATH) as PackedScene).instantiate() as BattleStage
+	add_child_autofree(stage)
+	assert_not_null(stage)
+	if stage == null:
+		return
+
+	var expected_dolly_factors := {
+		"MirrorLake": 1.0,
+		"AuroraReflection": 1.0,
+		"FarMountainLeft": 1.0,
+		"FarSnowfield2": 1.0,
+		"FarMountainRight": 1.0,
+		"FarSnowfield": 1.0,
+		"FarGlacier": 1.0,
+		"SnowMotesFar": 1.0,
+		"PlatformWaterContact": 1.0,
+		"BattlePlatform": 1.0,
+		"SnowMotesNear": 1.0,
+		"ForegroundSnowfield": 1.0,
+		"ForegroundLeft": 1.0,
+		"ForegroundRight": 1.0,
+	}
+	for node_name: String in expected_dolly_factors:
+		var layer := stage.get_node(node_name) as CanvasItem
+		assert_true(layer.has_meta("dolly_parallax_factor"),
+				"%s must opt into Scene8's unified attack dolly" % node_name)
+		if not layer.has_meta("dolly_parallax_factor"):
+			continue
+		assert_eq(
+				float(layer.get_meta("dolly_parallax_factor")),
+				float(expected_dolly_factors[node_name]))
+
+	for node_name: String in ["Sky", "Stars", "PixelAurora"]:
+		var layer := stage.get_node(node_name) as CanvasItem
+		assert_false(layer.has_meta("dolly_parallax_factor"),
+				"Static sky layers must stay outside the Scene8 world dolly")
+
+	var cached_layers := stage.get("_layers") as Array
+	var cached_dolly_variant: Variant = stage.get("_dolly_factors")
+	assert_true(cached_dolly_variant is PackedFloat32Array,
+			"BattleStage must cache a dolly factor independently from mouse parallax")
+	if not cached_dolly_variant is PackedFloat32Array:
+		return
+	var cached_dolly := cached_dolly_variant as PackedFloat32Array
+	for index: int in cached_layers.size():
+		var layer := cached_layers[index] as CanvasItem
+		if expected_dolly_factors.has(String(layer.name)):
+			assert_almost_eq(cached_dolly[index], 1.0, 0.001,
+					"Scene8 landscape, water and platform must zoom together")
+
+
+func test_scene1_through_scene7_keep_the_legacy_attack_dolly_contract() -> void:
+	for scene_id: int in range(1, 8):
+		var scene_path := "res://src/ui/scenes/scene%d.tscn" % scene_id
+		assert_true(ResourceLoader.exists(scene_path))
+		if not ResourceLoader.exists(scene_path):
+			continue
+		var stage := (load(scene_path) as PackedScene).instantiate() as BattleStage
+		add_child_autofree(stage)
+		assert_not_null(stage)
+		if stage == null:
+			continue
+		var cached_factors := stage.get("_factors") as PackedFloat32Array
+		var cached_dolly_variant: Variant = stage.get("_dolly_factors")
+		assert_true(cached_dolly_variant is PackedFloat32Array,
+				"Shared BattleStage must preserve a fallback for Scene%d" % scene_id)
+		if not cached_dolly_variant is PackedFloat32Array:
+			continue
+		var cached_dolly := cached_dolly_variant as PackedFloat32Array
+		assert_eq(cached_dolly.size(), cached_factors.size())
+		for index: int in cached_factors.size():
+			assert_almost_eq(cached_dolly[index], cached_factors[index], 0.0001,
+					"Scene%d attack dolly must remain pixel-for-pixel compatible" % scene_id)
+
+
+func test_scene8_uses_scene3_style_snow_mote_depths_and_four_broken_diagonal_glints() -> void:
+	if not ResourceLoader.exists(SCENE8_PATH):
+		return
+
+	var stage := (load(SCENE8_PATH) as PackedScene).instantiate() as BattleStage
+	add_child_autofree(stage)
+	assert_not_null(stage)
+	if stage == null:
+		return
+	var far_snow := stage.get_node_or_null("SnowMotesFar") as GPUParticles2D
+	var near_snow := stage.get_node_or_null("SnowMotesNear") as GPUParticles2D
+	assert_not_null(far_snow, "Scene8 needs Scene3-style far snow motes")
+	assert_not_null(near_snow, "Scene8 needs Scene3-style near snow motes")
+	if far_snow == null or near_snow == null:
+		return
+	assert_null(stage.get_node_or_null("SnowfallFar"))
+	assert_null(stage.get_node_or_null("SnowfallNear"))
+	var far_process := far_snow.process_material as ParticleProcessMaterial
+	var near_process := near_snow.process_material as ParticleProcessMaterial
+	var snow_texture := far_snow.texture as GradientTexture2D
+	var snow_blend := far_snow.material as CanvasItemMaterial
+	assert_not_null(far_process)
+	assert_not_null(near_process)
+	assert_not_null(snow_texture)
+	assert_not_null(snow_blend)
+	if far_process == null or near_process == null:
+		return
+	assert_eq(far_snow.amount, 9)
+	assert_eq(near_snow.amount, 6)
+	assert_eq(far_snow.texture, near_snow.texture)
+	assert_eq(snow_texture.width, 8)
+	assert_eq(snow_texture.height, 8)
+	assert_eq(snow_blend.blend_mode, CanvasItemMaterial.BLEND_MODE_ADD)
+	assert_eq(far_snow.lifetime, 11.0)
+	assert_eq(near_snow.lifetime, 8.0)
+	assert_true(far_snow.emitting and near_snow.emitting)
+	assert_true(far_snow.interpolate and near_snow.interpolate)
+	assert_gt(far_process.direction.y, 0.95)
+	assert_gt(near_process.direction.y, 0.95)
+	assert_eq(far_process.initial_velocity_min, 2.5)
+	assert_eq(far_process.initial_velocity_max, 5.0)
+	assert_eq(near_process.initial_velocity_min, 5.5)
+	assert_eq(near_process.initial_velocity_max, 10.0)
+	assert_lt(far_process.scale_max, near_process.scale_min)
+	assert_almost_eq(far_process.scale_min, 0.5, 0.001)
+	assert_almost_eq(far_process.scale_max, 1.05, 0.001)
+	assert_almost_eq(near_process.scale_min, 1.35, 0.001)
+	assert_almost_eq(near_process.scale_max, 2.25, 0.001)
+	assert_eq(float(far_snow.get_meta("parallax_factor")), 0.28)
+	assert_eq(float(near_snow.get_meta("parallax_factor")), 1.3)
+	assert_eq(float(far_snow.get_meta("pointer_parallax_factor")), 0.08)
+	assert_eq(float(near_snow.get_meta("pointer_parallax_factor")), 1.04)
+	assert_lt(stage.get_node("FarGlacier").get_index(), far_snow.get_index())
+	assert_lt(far_snow.get_index(), stage.get_node("PlatformWaterContact").get_index())
+	assert_lt(stage.get_node("BattlePlatform").get_index(), near_snow.get_index())
+	assert_lt(near_snow.get_index(), stage.get_node("ForegroundSnowfield").get_index())
+	var scene_source := FileAccess.get_file_as_string(SCENE8_PATH)
+	assert_false(scene_source.contains("SnowfallFar"))
+	assert_false(scene_source.contains("SnowfallNear"))
+	assert_false(scene_source.contains("scene8_snowfall_field.gd"))
+
+	var lake_material := (
+			stage.get_node("MirrorLake") as ColorRect).material as ShaderMaterial
+	assert_not_null(lake_material)
+	if lake_material == null:
+		return
+	var centers := lake_material.get_shader_parameter(
+			"diagonal_glint_centers") as Vector4
+	var widths := lake_material.get_shader_parameter(
+			"diagonal_glint_half_widths") as Vector4
+	assert_lt(centers.x, centers.y)
+	assert_lt(centers.y, centers.z)
+	assert_lt(centers.z, centers.w)
+	assert_lte(maxf(maxf(widths.x, widths.y), maxf(widths.z, widths.w)), 0.055)
+	assert_lt(float(lake_material.get_shader_parameter(
+			"diagonal_glint_start_x")), float(lake_material.get_shader_parameter(
+			"diagonal_glint_end_x")),
+			"Broken light must form a diagonal route instead of another horizontal band")
+	assert_between(float(lake_material.get_shader_parameter(
+			"diagonal_glint_strength")), 0.24, 0.38)
+	assert_lte(float(lake_material.get_shader_parameter(
+			"diagonal_glint_drift_cells")), 1.0)
+
+
+func test_scene8_uses_a_local_bright_polar_night_and_quiet_star_field() -> void:
 	if not ResourceLoader.exists(SCENE8_PATH):
 		return
 
@@ -99,41 +350,94 @@ func test_scene8_replicates_scene1_night_sky_and_star_contract() -> void:
 	var scene8 := (load(SCENE8_PATH) as PackedScene).instantiate()
 	add_child_autofree(scene1)
 	add_child_autofree(scene8)
-	for node_name: String in ["Sky", "Stars"]:
-		var scene1_name := "NightSky" if node_name == "Sky" else node_name
-		var source_material := (
-				scene1.get_node(scene1_name) as ColorRect).material as ShaderMaterial
-		var copied_material := (
-				scene8.get_node(node_name) as ColorRect).material as ShaderMaterial
-		assert_not_null(copied_material)
-		if copied_material == null:
-			continue
-		assert_true(copied_material.resource_local_to_scene)
-		assert_eq(copied_material.shader.resource_path,
-				NIGHT_SKY_SHADER_PATH if node_name == "Sky" else STARS_SHADER_PATH)
-		for parameter: StringName in (
-				[
-					&"zenith_color", &"horizon_color", &"gradient_curve",
-					&"horizon_pos", &"glow_color", &"glow_width",
-					&"glow_intensity", &"breath_amount", &"breath_speed",
-					&"breath_scale", &"dither_amount", &"posterize_steps",
-					&"pixel_grid",
-				] if node_name == "Sky" else [
-					&"grid", &"coverage", &"band_scale", &"gap_threshold",
-					&"band_soft", &"star_color", &"star_color_warm",
-					&"warm_ratio", &"brightness", &"faint_floor",
-					&"twinkle_speed", &"twinkle_depth", &"bright_ratio",
-					&"spike_strength",
-					&"edge_margin", &"sky_bottom", &"sky_fade",
-					&"top_concentration", &"pixel_grid",
-				]):
-			assert_eq(copied_material.get_shader_parameter(parameter),
-					source_material.get_shader_parameter(parameter),
-					"Scene8 must replicate Scene1 parameter: %s" % parameter)
+	var scene1_sky := (
+			scene1.get_node("NightSky") as ColorRect).material as ShaderMaterial
+	var scene1_stars := (
+			scene1.get_node("Stars") as ColorRect).material as ShaderMaterial
+	var sky_material := (
+			scene8.get_node("Sky") as ColorRect).material as ShaderMaterial
 	var stars_material := (
 			scene8.get_node("Stars") as ColorRect).material as ShaderMaterial
-	assert_eq(float(stars_material.get_shader_parameter("moon_clear")), 0.0,
-			"Scene8 has no moon disc, so Scene1's moon-only star hole must be disabled")
+	assert_not_null(sky_material)
+	assert_not_null(stars_material)
+	if sky_material == null or stars_material == null:
+		return
+	assert_eq(scene1_sky.shader.resource_path, NIGHT_SKY_SHADER_PATH,
+			"Scene1's mature shared sky must remain untouched")
+	assert_eq(scene1_stars.shader.resource_path, STARS_SHADER_PATH,
+			"Scene1's mature shared star field must remain untouched")
+	assert_true(sky_material.resource_local_to_scene)
+	assert_eq(sky_material.shader.resource_path, SCENE8_AURORA_SKY_SHADER_PATH)
+	var zenith := sky_material.get_shader_parameter("zenith_color") as Color
+	var upper := sky_material.get_shader_parameter("upper_color") as Color
+	var horizon := sky_material.get_shader_parameter("horizon_color") as Color
+	assert_between(zenith.get_luminance(), 0.035, 0.065)
+	assert_between(upper.get_luminance(), 0.065, 0.105)
+	assert_between(horizon.get_luminance(), 0.125, 0.19)
+	assert_lt(zenith.get_luminance(), upper.get_luminance())
+	assert_lt(upper.get_luminance(), horizon.get_luminance())
+	assert_gt(maxf(maxf(zenith.r, zenith.g), zenith.b)
+			- minf(minf(zenith.r, zenith.g), zenith.b), 0.085,
+			"The zenith must remain chromatic blue instead of grey haze")
+	assert_gt(maxf(maxf(horizon.r, horizon.g), horizon.b)
+			- minf(minf(horizon.r, horizon.g), horizon.b), 0.18,
+			"The bright mountain boundary must remain clear blue")
+	assert_between(float(sky_material.get_shader_parameter(
+			"airglow_center")), 0.37, 0.45)
+	assert_between(float(sky_material.get_shader_parameter(
+			"airglow_width")), 0.12, 0.17)
+	assert_between(float(sky_material.get_shader_parameter(
+			"airglow_strength")), 0.09, 0.13)
+	assert_lte(float(sky_material.get_shader_parameter("texture_strength")), 0.025,
+			"Low-frequency texture must not grey over the clear sky")
+	assert_lte(float(sky_material.get_shader_parameter("dither_amount")), 0.003,
+			"Dither must not read as dirty atmospheric grain")
+	assert_lte(float(sky_material.get_shader_parameter("airglow_drift")), 0.005,
+			"The atmospheric veil must drift much slower than the curtain")
+	var horizon_green := sky_material.get_shader_parameter(
+			"horizon_green_color") as Color
+	assert_gt(horizon_green.g, horizon_green.b)
+	assert_gt(horizon_green.b, horizon_green.r)
+	assert_between(float(sky_material.get_shader_parameter(
+			"horizon_green_start")), 0.26, 0.34)
+	assert_between(float(sky_material.get_shader_parameter(
+			"horizon_green_crest")), 0.46, 0.54)
+	assert_between(float(sky_material.get_shader_parameter(
+			"horizon_green_strength")), 0.10, 0.18,
+			"The green mountain veil must remain visible but restrained")
+	assert_eq(sky_material.get_shader_parameter("pixel_grid"), Vector2(320.0, 180.0))
+	var sky_source := FileAccess.get_file_as_string(SCENE8_AURORA_SKY_SHADER_PATH)
+	assert_true(sky_source.contains("layered_airglow"))
+	assert_true(sky_source.contains("broad_noise"))
+	assert_true(sky_source.contains("ridge_noise"))
+	assert_true(sky_source.contains("upper_echo"),
+			"The mountain-to-aurora transition must not collapse into one gradient")
+	assert_true(sky_source.contains("horizon_green_veil"))
+	assert_true(sky_source.contains("horizon_rise"))
+	assert_true(sky_source.contains("veil_bend"),
+			"The mountain veil must not become a straight gradient strip")
+	assert_true(sky_source.contains("floor(UV * pixel_grid)"),
+			"The atmospheric field must retain the Scene8 pixel language")
+	assert_false(sky_source.contains("hint_screen_texture"))
+
+	assert_true(stars_material.resource_local_to_scene)
+	assert_eq(stars_material.shader.resource_path, STARS_SHADER_PATH,
+			"Scene8 must return to the approved fine-star shader skeleton")
+	assert_eq(stars_material.get_shader_parameter("grid"), Vector2(120.0, 70.0))
+	assert_eq(float(stars_material.get_shader_parameter("pixel_grid")), 800.0,
+			"Fine stars must not collapse to Scene8's 320x180 block grid")
+	assert_between(float(stars_material.get_shader_parameter("coverage")), 0.035, 0.05)
+	assert_between(float(stars_material.get_shader_parameter("brightness")), 0.76, 0.90)
+	assert_lte(float(stars_material.get_shader_parameter("twinkle_depth")), 0.16)
+	assert_eq(float(stars_material.get_shader_parameter("spike_strength")), 0.0,
+			"The restored fine stars must not add repeated cross spikes")
+	assert_lte(float(stars_material.get_shader_parameter("sky_bottom")), 0.52,
+			"Stars must fade before the green mountain boundary")
+	assert_lte(float(stars_material.get_shader_parameter("top_concentration")), 0.42,
+			"The lower sky must remain quieter than the upper sky")
+	assert_false(FileAccess.get_file_as_string(SCENE8_PATH).contains(
+			"canvas_env_scene8_clear_stars.gdshader"),
+			"The rejected block-star shader may not be referenced by Scene8")
 
 
 func test_scene8_imported_far_mountain_and_platform_preserve_current_composition() -> void:
@@ -150,18 +454,20 @@ func test_scene8_imported_far_mountain_and_platform_preserve_current_composition
 	var platform := stage.get_node("BattlePlatform") as TextureRect
 	assert_eq(mountain.texture.resource_path, FAR_MOUNTAIN_PATH)
 	assert_eq(platform.texture.resource_path, PLATFORM_PATH)
-	assert_eq(mountain.size, Vector2(332.0, 188.0))
+	assert_almost_eq(mountain.size.x, 147.50002, 0.001)
+	assert_almost_eq(mountain.size.y, 121.6667, 0.001)
 	assert_eq(platform.size, Vector2(288.0, 188.0))
 	assert_eq(mountain.scale, Vector2(6.0, 6.0))
 	assert_eq(mountain.rotation, 0.0,
 			"Topology mapping assumes the authored mountain stays axis-aligned")
 	assert_eq(platform.scale, Vector2(6.0, 6.0))
-	assert_eq(mountain.position, Vector2(-36.0, 0.0))
+	assert_eq(mountain.position, Vector2(-10.0, 191.0),
+			"Preserve Eddy's current manually adjusted legacy shoreline")
 	assert_eq(platform.position, Vector2(88.0, 166.0))
 	var mountain_rect := _displayed_used_rect(mountain)
 	var platform_rect := _displayed_used_rect(platform)
-	assert_between(mountain_rect.position.y, 317.0, 319.0)
-	assert_between(mountain_rect.end.y, 569.0, 571.0)
+	assert_between(mountain_rect.position.y, 396.0, 398.0)
+	assert_between(mountain_rect.end.y, 559.0, 561.0)
 	assert_between(platform_rect.position.y, 705.0, 707.0)
 	assert_between(platform_rect.end.y, 879.0, 881.0)
 	var reflection_grab := (
@@ -198,7 +504,8 @@ func test_scene8_platform_has_a_shallow_wall_and_real_water_contact() -> void:
 	assert_eq(contact.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST)
 	assert_eq(contact.mouse_filter, Control.MOUSE_FILTER_IGNORE)
 	assert_lt(mountain.get_index(), contact.get_index())
-	assert_lt(contact.get_index(), platform.get_index())
+	assert_lt(contact.get_index(), platform.get_index(),
+			"The restored contact layer must remain below the platform")
 	assert_lt(platform.get_index(), stage.get_node("ForegroundLeft").get_index())
 
 	var platform_material := platform.material as ShaderMaterial
@@ -292,11 +599,15 @@ func test_scene8_platform_has_a_shallow_wall_and_real_water_contact() -> void:
 	assert_true(platform_source.contains("source_visible"))
 	assert_true(platform_source.contains("visible_bottom_row"))
 	assert_true(platform_source.contains("source_surface *= source_visible"))
+	assert_false(platform_source.contains("waterline_edge"),
+			"The rejected extra wet-edge emphasis must stay rolled back")
 	assert_false(platform_source.contains("hint_screen_texture"))
 	assert_false(platform_source.contains("TIME"))
 	assert_true(contact_source.contains("platform_texture"))
 	assert_true(contact_source.contains("source_contact_alpha"))
 	assert_true(contact_source.contains("shared_wave_field"))
+	assert_true(contact_source.contains("step(shadow_depth_px, distance_below)"),
+			"The restored crest row must remain below the pressure shadow")
 	assert_true(contact_source.contains(SHARED_WATER_WAVE_INCLUDE_PATH))
 	assert_false(contact_source.contains("hint_screen_texture"))
 
@@ -309,21 +620,25 @@ func test_scene8_builds_one_shared_lake_topology_from_the_far_mountain() -> void
 	add_child_autofree(stage)
 	var topology := stage.get_node_or_null("LakeTopology")
 	var mountain := stage.get_node_or_null("FarSnowfield") as TextureRect
+	var mountain_secondary := stage.get_node_or_null("FarSnowfield2") as TextureRect
 	var lake := stage.get_node_or_null("MirrorLake") as ColorRect
 	var reflection := stage.get_node_or_null("AuroraReflection") as ColorRect
 	var contact := stage.get_node_or_null("PlatformWaterContact") as ColorRect
 	assert_not_null(topology)
 	assert_not_null(mountain)
+	assert_not_null(mountain_secondary)
 	assert_not_null(lake)
 	assert_not_null(reflection)
 	assert_not_null(contact)
-	if (topology == null or mountain == null or lake == null
+	if (topology == null or mountain == null or mountain_secondary == null or lake == null
 			or reflection == null or contact == null):
 		return
 
 	assert_eq(topology.get_script().resource_path, LAKE_TOPOLOGY_SCRIPT_PATH)
 	assert_eq(topology.get("grid_size"), Vector2i(320, 180))
 	assert_eq(topology.get("design_size"), Vector2(1920.0, 1080.0))
+	assert_eq(topology.get("far_mountain_secondary_path"),
+			NodePath("../FarSnowfield2"))
 	assert_true(bool(topology.call("rebuild")))
 	var topology_image := topology.call("get_topology_image") as Image
 	assert_not_null(topology_image)
@@ -366,14 +681,17 @@ func test_scene8_builds_one_shared_lake_topology_from_the_far_mountain() -> void
 			"topology_current_origin_uv"))
 	assert_eq(initial_size, contact_material.get_shader_parameter(
 			"topology_current_size_uv"))
+	assert_eq(lake_material.get_shader_parameter("topology_base_origin_uv"),
+			Vector2.ZERO)
+	assert_eq(lake_material.get_shader_parameter("topology_base_size_uv"),
+			Vector2.ONE)
 
 	var grid_size := Vector2i(320, 180)
 	var design_size: Vector2 = topology.get("design_size")
 	var cell_size := design_size / Vector2(grid_size)
 	var overlap_cells := int(topology.get("shore_overlap_cells"))
 	var alpha_threshold := float(topology.get("mountain_alpha_threshold"))
-	var mountain_image := mountain.texture.get_image()
-	var mountain_draw_size := mountain.size * mountain.scale
+	var shoreline_layers: Array[TextureRect] = [mountain, mountain_secondary]
 	var minimum_first_water := grid_size.y
 	var maximum_first_water := -1
 	for x: int in grid_size.x:
@@ -399,20 +717,11 @@ func test_scene8_builds_one_shared_lake_topology_from_the_far_mountain() -> void
 		if x % 16 != 0 and x != grid_size.x - 1:
 			continue
 		var screen_x := (float(x) + 0.5) * cell_size.x
-		var source_u := clampf(
-				(screen_x - mountain.position.x) / mountain_draw_size.x,
-				0.0, 0.999999)
-		var source_x := clampi(
-				int(floor(source_u * float(mountain_image.get_width()))),
-				0, mountain_image.get_width() - 1)
-		var source_bottom := _bottom_alpha_row(
-				mountain_image, source_x, alpha_threshold)
-		assert_gte(source_bottom, 0)
-		if source_bottom < 0:
-			continue
-		var shore_screen_y := mountain.position.y + (
-				(float(source_bottom) + 1.0)
-				/ float(mountain_image.get_height())) * mountain_draw_size.y
+		var shore_screen_y := _composite_shore_y(
+				shoreline_layers,
+				screen_x,
+				float(topology.get("fallback_horizon_y")) * design_size.y,
+				alpha_threshold)
 		var expected_first_water := clampi(int(ceil(
 				(shore_screen_y - float(overlap_cells) * cell_size.y)
 				/ cell_size.y - 0.5)), 0, grid_size.y - 1)
@@ -438,8 +747,10 @@ func test_scene8_builds_one_shared_lake_topology_from_the_far_mountain() -> void
 		assert_gte(topology_image.get_pixel(x, grid_size.y - 1).g, 0.99)
 		assert_gte(topology_image.get_pixel(x, grid_size.y - 1).b, 0.98)
 
-	assert_between(maximum_first_water - minimum_first_water, 2, 4,
-			"The shoreline must preserve the far mountain's per-column variation")
+	assert_between(maximum_first_water - minimum_first_water, 2, 18,
+			"The composite shoreline must preserve both snowfield silhouettes")
+	var base_mountain_origin := mountain.position
+	var base_mountain_draw_size := mountain.size * mountain.scale
 	mountain.position += Vector2(24.0, 12.0)
 	mountain.scale *= Vector2(1.01, 1.01)
 	topology.call("sync_shader_mapping")
@@ -467,10 +778,13 @@ func test_scene8_builds_one_shared_lake_topology_from_the_far_mountain() -> void
 			mountain.size.x, 0.0)
 	var expected_bottom_px: Vector2 = mountain_transform * Vector2(
 			0.0, mountain.size.y)
-	var expected_origin_uv: Vector2 = expected_origin_px / viewport_size
-	var expected_size_uv := Vector2(
+	var expected_anchor_size := Vector2(
 			expected_right_px.x - expected_origin_px.x,
-			expected_bottom_px.y - expected_origin_px.y) / viewport_size
+			expected_bottom_px.y - expected_origin_px.y)
+	var mapping_scale := expected_anchor_size / base_mountain_draw_size
+	var expected_origin_uv := (
+			expected_origin_px - base_mountain_origin * mapping_scale) / viewport_size
+	var expected_size_uv := design_size * mapping_scale / viewport_size
 	assert_almost_eq(shifted_origin.x, expected_origin_uv.x, 0.000001)
 	assert_almost_eq(shifted_origin.y, expected_origin_uv.y, 0.000001)
 	assert_almost_eq(shifted_size.x, expected_size_uv.x, 0.000001)
@@ -524,70 +838,213 @@ func test_scene8_imported_foregrounds_frame_the_lake_without_crowding_center() -
 	assert_lt(foreground_left.get_index(), foreground_right.get_index())
 
 
-func test_scene8_far_mountain_depth_and_center_snow_complete_the_frame() -> void:
+func test_scene8_current_manual_mountain_simplification_is_preserved() -> void:
 	if not ResourceLoader.exists(SCENE8_PATH):
 		return
 
-	assert_true(ResourceLoader.exists(FOREGROUND_CENTER_SNOW_PATH))
-	assert_false(FileAccess.file_exists("res://assets/import/snow.png"))
 	var stage := (load(SCENE8_PATH) as PackedScene).instantiate()
 	add_child_autofree(stage)
-	var distant := stage.get_node_or_null("FarMountainDistant") as Sprite2D
-	var middle := stage.get_node_or_null("FarMountainMiddle") as Sprite2D
 	var shoreline := stage.get_node_or_null("FarSnowfield") as TextureRect
-	var center_snow := stage.get_node_or_null("ForegroundCenterSnow") as TextureRect
-	assert_not_null(distant)
-	assert_not_null(middle)
 	assert_not_null(shoreline)
-	assert_not_null(center_snow)
-	if distant == null or middle == null or shoreline == null or center_snow == null:
+	if shoreline == null:
 		return
 
-	assert_eq(distant.texture.resource_path, FAR_MOUNTAIN_PATH)
-	assert_eq(middle.texture.resource_path, FAR_MOUNTAIN_PATH)
-	assert_true(distant.flip_h,
-			"The farthest ridge must break the single-texture repetition")
-	assert_false(middle.flip_h)
-	assert_eq(distant.position, Vector2(-70.0, -78.0))
-	assert_eq(distant.scale, Vector2(6.35, 6.35))
-	assert_eq(middle.position, Vector2(-108.0, -36.0))
-	assert_eq(middle.scale, Vector2(6.12, 6.12))
-	assert_lt(float(distant.get_meta("parallax_factor")),
-			float(middle.get_meta("parallax_factor")))
-	assert_lt(float(middle.get_meta("parallax_factor")),
-			float(shoreline.get_meta("parallax_factor")))
-	var distant_rect := _displayed_sprite_used_rect(distant)
-	var middle_rect := _displayed_sprite_used_rect(middle)
+	assert_false(stage.has_node("FarMountainDistant"))
+	assert_false(stage.has_node("FarMountainMiddle"))
+	assert_false(stage.has_node("ForegroundCenterSnow"))
+	assert_eq(shoreline.texture.resource_path, FAR_MOUNTAIN_PATH)
+	assert_eq(shoreline.position, Vector2(-10.0, 191.0))
+	assert_almost_eq(shoreline.size.x, 147.50002, 0.001)
+	assert_almost_eq(shoreline.size.y, 121.6667, 0.001)
+	assert_eq(shoreline.scale, Vector2(6.0, 6.0))
 	var shoreline_rect := _displayed_used_rect(shoreline)
-	assert_lt(distant_rect.position.y, middle_rect.position.y)
-	assert_lt(middle_rect.position.y, shoreline_rect.position.y)
-	assert_lt(distant_rect.end.y, middle_rect.end.y)
-	assert_lt(middle_rect.end.y, shoreline_rect.end.y)
-	assert_lte(distant_rect.position.x, 0.0)
-	assert_gte(distant_rect.end.x, 1920.0)
-	assert_lte(middle_rect.position.x, 0.0)
-	assert_gte(middle_rect.end.x, 1920.0)
-	assert_lt(stage.get_node("AuroraReflection").get_index(), distant.get_index())
-	assert_lt(distant.get_index(), middle.get_index())
-	assert_lt(middle.get_index(), shoreline.get_index())
+	assert_between(shoreline_rect.position.y, 396.0, 398.0)
+	assert_between(shoreline_rect.end.y, 559.0, 561.0)
+	var shoreline_secondary := stage.get_node("FarSnowfield2") as TextureRect
+	assert_eq(shoreline_secondary.position, Vector2(765.0, 167.00002))
+	assert_eq(shoreline_secondary.scale, Vector2(6.0, 6.0))
+	assert_true(shoreline_secondary.flip_h)
+	assert_lt(stage.get_node("FarMountainRight").get_index(), shoreline.get_index())
+	assert_lt(shoreline.get_index(), stage.get_node("FarGlacier").get_index())
 
-	assert_eq(center_snow.texture.resource_path, FOREGROUND_CENTER_SNOW_PATH)
-	assert_eq(center_snow.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST)
-	assert_almost_eq(center_snow.position.x, 1890.0, 0.001)
-	assert_almost_eq(center_snow.position.y, 2198.0, 0.001)
-	assert_almost_eq(center_snow.size.x, 649.0686, 0.001)
-	assert_almost_eq(center_snow.size.y, 462.0484, 0.001)
-	assert_almost_eq(center_snow.rotation, PI, 0.0001)
-	assert_eq(center_snow.scale, Vector2(3.0, 3.0))
-	var snow_rect := _displayed_used_rect(center_snow)
-	assert_between(snow_rect.position.x, -40.0, 0.0)
-	assert_between(snow_rect.end.x, 1870.0, 1890.0)
-	assert_between(snow_rect.position.y, 1000.0, 1020.0)
-	assert_between(snow_rect.end.y, 1405.0, 1425.0)
-	assert_gt(snow_rect.position.y, 900.0,
-			"Current manual center snow framing must not cover combat feet")
-	assert_lt(stage.get_node("BattlePlatform").get_index(), center_snow.get_index())
-	assert_lt(center_snow.get_index(), stage.get_node("ForegroundLeft").get_index())
+
+func test_scene8_new_assets_preserve_eddy_current_manual_composition() -> void:
+	if not ResourceLoader.exists(SCENE8_PATH):
+		return
+
+	var stage := (load(SCENE8_PATH) as PackedScene).instantiate()
+	add_child_autofree(stage)
+	var far_glacier := stage.get_node_or_null("FarGlacier") as TextureRect
+	var far_left := stage.get_node_or_null("FarMountainLeft") as TextureRect
+	var far_right := stage.get_node_or_null("FarMountainRight") as TextureRect
+	var foreground_snow := stage.get_node_or_null("ForegroundSnowfield") as TextureRect
+	assert_not_null(far_glacier)
+	assert_not_null(far_left)
+	assert_not_null(far_right)
+	assert_not_null(foreground_snow)
+	if (far_glacier == null or far_left == null or far_right == null
+			or foreground_snow == null):
+		return
+
+	var expected_paths := {
+		far_glacier: FAR_GLACIER_PATH,
+		far_left: FAR_MOUNTAIN_LEFT_PATH,
+		far_right: FAR_MOUNTAIN_RIGHT_PATH,
+		foreground_snow: FOREGROUND_SNOWFIELD_PATH,
+	}
+	for layer: TextureRect in expected_paths:
+		assert_eq(layer.texture.resource_path, expected_paths[layer])
+		assert_eq(layer.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST)
+
+	assert_eq(far_glacier.texture.get_size(), Vector2(408.0, 136.0))
+	assert_eq(far_left.texture.get_size(), Vector2(408.0, 136.0))
+	assert_eq(far_right.texture.get_size(), Vector2(408.0, 136.0))
+	assert_eq(foreground_snow.texture.get_size(), Vector2(332.0, 188.0))
+	assert_almost_eq(far_left.position.x, 4.000004, 0.001)
+	assert_almost_eq(far_left.position.y, 177.0, 0.001)
+	assert_eq(far_left.scale, Vector2(5.0, 5.0))
+	assert_almost_eq(far_right.position.x, 989.0, 0.001)
+	assert_almost_eq(far_right.position.y, 206.0, 0.001)
+	assert_eq(far_right.scale, Vector2(5.0, 5.0))
+	assert_almost_eq(far_glacier.position.x, -60.999996, 0.001)
+	assert_almost_eq(far_glacier.position.y, 183.0, 0.001)
+	assert_eq(far_glacier.scale, Vector2(5.0, 5.0))
+	assert_almost_eq(foreground_snow.position.x, -46.0, 0.001)
+	assert_almost_eq(foreground_snow.position.y, 242.0, 0.001)
+	assert_eq(foreground_snow.scale, Vector2(6.0, 6.0))
+	assert_lt(stage.get_node("AuroraReflection").get_index(), far_left.get_index())
+	assert_lt(far_left.get_index(), stage.get_node("FarSnowfield2").get_index())
+	assert_lt(stage.get_node("FarSnowfield2").get_index(), far_right.get_index())
+	assert_lt(far_right.get_index(), stage.get_node("FarSnowfield").get_index())
+	assert_lt(stage.get_node("FarSnowfield").get_index(), far_glacier.get_index())
+	assert_lt(stage.get_node("BattlePlatform").get_index(), foreground_snow.get_index())
+	assert_lt(foreground_snow.get_index(), stage.get_node("ForegroundLeft").get_index())
+	for imported_path: String in [
+			"res://assets/import/冰川.png",
+			"res://assets/import/左远山.png",
+			"res://assets/import/右远山.png",
+			"res://assets/import/近景雪景.png",
+	]:
+		assert_false(FileAccess.file_exists(imported_path),
+				"Integrated assets must leave the import inbox: %s" % imported_path)
+
+
+func test_scene8_foregrounds_share_one_opaque_polar_night_grade_and_parallax() -> void:
+	if not ResourceLoader.exists(SCENE8_PATH):
+		return
+
+	assert_true(ResourceLoader.exists(FOREGROUND_GRADE_SHADER_PATH))
+	var stage := (load(SCENE8_PATH) as PackedScene).instantiate()
+	add_child_autofree(stage)
+	var center := stage.get_node("ForegroundSnowfield") as TextureRect
+	var left := stage.get_node("ForegroundLeft") as TextureRect
+	var right := stage.get_node("ForegroundRight") as TextureRect
+	var layers: Array[TextureRect] = [center, left, right]
+	var materials: Array[ShaderMaterial] = []
+	for layer: TextureRect in layers:
+		assert_eq(layer.self_modulate, Color.WHITE,
+				"Foreground integration must not lower authored opacity")
+		assert_eq(float(layer.get_meta("parallax_factor")), 1.18,
+				"Overlapping foregrounds need one parallax plane to keep seams closed")
+		var material := layer.material as ShaderMaterial
+		assert_not_null(material)
+		if material == null:
+			continue
+		materials.append(material)
+		assert_true(material.resource_local_to_scene)
+		assert_eq(material.shader.resource_path, FOREGROUND_GRADE_SHADER_PATH)
+		assert_between(float(material.get_shader_parameter("brightness")), 0.90, 0.96)
+		assert_gte(float(material.get_shader_parameter("saturation_retention")), 0.90,
+				"The foreground must keep its authored palette instead of turning blue")
+		assert_between(float(material.get_shader_parameter(
+				"palette_strength")), 0.18, 0.30,
+				"Polar-night mapping must remain a weak linking grade")
+		assert_lte(float(material.get_shader_parameter("aurora_response")), 0.05)
+	assert_eq(materials.size(), 3)
+	if materials.size() == 3:
+		assert_false(materials[0] == materials[1])
+		assert_false(materials[1] == materials[2])
+	assert_lt(center.get_index(), left.get_index())
+	assert_lt(center.get_index(), right.get_index())
+
+	var shader_source := FileAccess.get_file_as_string(
+			FOREGROUND_GRADE_SHADER_PATH)
+	assert_true(shader_source.contains("COLOR = vec4(color, source.a)"),
+			"Foreground grade must preserve every authored alpha pixel")
+	assert_true(shader_source.contains("TEXTURE_PIXEL_SIZE"),
+			"Snow-edge response must be derived from authored neighbour pixels")
+	assert_false(shader_source.contains("hint_screen_texture"),
+			"Foreground grading must remain Scene8-local")
+	assert_false(shader_source.contains("glint"),
+			"The foreground grade must remain fully static after sweep removal")
+	assert_not_null(stage.get_node_or_null("CrystalSparkController"),
+			"Scene8 keeps click-only crystal feedback outside the foreground shader")
+
+
+func test_scene8_far_assets_use_layered_aerial_perspective_without_recomposition() -> void:
+	if not ResourceLoader.exists(SCENE8_PATH):
+		return
+
+	var stage := (load(SCENE8_PATH) as PackedScene).instantiate()
+	add_child_autofree(stage)
+	var glacier := stage.get_node("FarGlacier") as TextureRect
+	var left := stage.get_node("FarMountainLeft") as TextureRect
+	var right := stage.get_node("FarMountainRight") as TextureRect
+	var shoreline := stage.get_node("FarSnowfield") as TextureRect
+	var layers: Array[TextureRect] = [glacier, left, right, shoreline]
+	for layer: TextureRect in layers:
+		var material := layer.material as ShaderMaterial
+		assert_not_null(material, "%s needs its own Scene8 depth grade" % layer.name)
+		if material == null:
+			continue
+		assert_true(material.resource_local_to_scene)
+		assert_eq(material.shader.resource_path, FAR_DEPTH_GRADE_SHADER_PATH)
+		assert_eq(layer.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST)
+
+	var glacier_material := glacier.material as ShaderMaterial
+	var left_material := left.material as ShaderMaterial
+	var right_material := right.material as ShaderMaterial
+	var shore_material := shoreline.material as ShaderMaterial
+	assert_gt(float(glacier_material.get_shader_parameter("distance_mix")),
+			float(left_material.get_shader_parameter("distance_mix")))
+	assert_gt(float(left_material.get_shader_parameter("distance_mix")),
+			float(shore_material.get_shader_parameter("distance_mix")))
+	assert_gt(float(right_material.get_shader_parameter("distance_mix")),
+			float(shore_material.get_shader_parameter("distance_mix")))
+	assert_lt(float(glacier_material.get_shader_parameter("contrast_retention")),
+			float(left_material.get_shader_parameter("contrast_retention")))
+	assert_lt(float(left_material.get_shader_parameter("contrast_retention")),
+			float(shore_material.get_shader_parameter("contrast_retention")))
+	for material: ShaderMaterial in [
+		glacier_material, left_material, right_material, shore_material,
+	]:
+		assert_null(material.get_shader_parameter("opacity"),
+				"Far materials must never lower opacity to fake distance")
+		assert_gte(float(material.get_shader_parameter("saturation_retention")), 0.93,
+				"Far integration must not become a grey atmospheric wash")
+		assert_lte(float(material.get_shader_parameter("visibility_lift")), 0.015,
+				"Far-layer lift must not make distant highlights eye-catching")
+	assert_almost_eq(float(glacier_material.get_shader_parameter("brightness")),
+			0.90, 0.001)
+	assert_almost_eq(float(left_material.get_shader_parameter("brightness")),
+			0.70, 0.001)
+	assert_almost_eq(float(right_material.get_shader_parameter("brightness")),
+			0.70, 0.001)
+	assert_almost_eq(float(shore_material.get_shader_parameter("brightness")),
+			0.68, 0.001)
+
+	var shader_source := FileAccess.get_file_as_string(FAR_DEPTH_GRADE_SHADER_PATH)
+	assert_true(shader_source.contains("COLOR = vec4(color, source.a)"),
+			"The authored alpha silhouette must remain fully intact")
+	assert_true(shader_source.contains("visible_luma"),
+			"Sky tint must preserve source luminance instead of darkening assets")
+	assert_false(shader_source.contains("uniform float opacity"))
+	assert_true(shader_source.contains("upper_air"),
+			"Atmosphere must follow each silhouette vertically, not become flat fog")
+	assert_true(shader_source.contains("aurora_receiver"))
+	assert_false(shader_source.contains("hint_screen_texture"))
+	assert_false(shader_source.contains("TIME"),
+			"Far integration must not add another competing motion system")
 
 
 func test_scene8_sky_aurora_follows_scene8_4_bottom_curve_without_breaks() -> void:
@@ -625,14 +1082,19 @@ func test_scene8_sky_aurora_follows_scene8_4_bottom_curve_without_breaks() -> vo
 		assert_between(float(motion_material.get_shader_parameter(
 				"energy_strength")), 0.10, 0.18)
 		assert_between(float(motion_material.get_shader_parameter(
-				"body_opacity_top")), 0.68, 0.78,
+				"body_opacity_top")), 0.64, 0.72,
 				"The night sky must remain visible through the upper curtain")
 		assert_between(float(motion_material.get_shader_parameter(
-				"body_opacity_bottom")), 0.84, 0.92,
+				"body_opacity_bottom")), 0.80, 0.88,
 				"The fluorescent lower rim may remain brighter than the upper curtain")
 		assert_between(float(motion_material.get_shader_parameter(
-				"halo_strength")), 0.08, 0.20,
-				"A restrained pixel halo must blend the texture into the night sky")
+				"halo_strength")), 0.18, 0.27,
+				"The near pixel halo must bridge the curtain edge into the sky")
+		assert_between(float(motion_material.get_shader_parameter(
+				"far_halo_strength")), 0.07, 0.14,
+				"A second low-alpha field must spread aurora color into the atmosphere")
+		assert_between(float(motion_material.get_shader_parameter(
+				"far_halo_radius_pixels")), 5.0, 8.0)
 		assert_eq(float(motion_material.get_shader_parameter("diagnostic_time_sec")), -1.0)
 		var motion_source := FileAccess.get_file_as_string(PIXEL_AURORA_MOTION_SHADER_PATH)
 		assert_true(motion_source.contains("TIME"))
@@ -640,8 +1102,10 @@ func test_scene8_sky_aurora_follows_scene8_4_bottom_curve_without_breaks() -> vo
 		assert_true(motion_source.contains("source_pixel"))
 		assert_true(motion_source.contains("floor(source_px + vec2(0.5))"),
 				"Motion sampling must stay locked to the accepted 256x144 pixel grid")
-		assert_true(motion_source.contains("neighbor_light"))
 		assert_true(motion_source.contains("halo_only"))
+		assert_true(motion_source.contains("neighbor_field"))
+		assert_true(motion_source.contains("far_halo_only"))
+		assert_true(motion_source.contains("far_halo_color"))
 		assert_false(motion_source.contains("floor(energy * 5.0)"),
 				"Slow aurora light must not jump between five coarse brightness levels")
 		assert_false(motion_source.contains("discard"),
@@ -958,10 +1422,15 @@ func test_scene8_open_lake_is_water_first_and_preserves_layer_contract() -> void
 	assert_between(float(lake_material.get_shader_parameter("horizon_y")),
 			0.50, 0.55)
 	assert_lte(float(lake_material.get_shader_parameter("thin_ice_depth")), 0.040)
-	assert_lte(float(lake_material.get_shader_parameter("thin_ice_presence")), 0.45)
+	assert_between(float(lake_material.get_shader_parameter("thin_ice_presence")),
+			0.46, 0.54)
 	assert_lte(float(lake_material.get_shader_parameter("shore_ice_reach")), 0.18)
 	assert_between(float(lake_material.get_shader_parameter(
-			"shore_ice_opacity")), 0.48, 0.62)
+			"shore_ice_opacity")), 0.38, 0.48)
+	assert_between(float(lake_material.get_shader_parameter(
+			"shore_ice_breakup")), 0.56, 0.68)
+	assert_between(float(lake_material.get_shader_parameter(
+			"shore_ice_water_inlay")), 0.30, 0.48)
 	assert_between(float(lake_material.get_shader_parameter(
 			"near_floe_min_depth")), 0.62, 0.72)
 	assert_between(float(lake_material.get_shader_parameter(
@@ -1024,6 +1493,13 @@ func test_scene8_lake_palette_and_ice_follow_topology_without_hard_bands() -> vo
 	assert_true(lake_source.contains("topology_palette"))
 	assert_true(lake_source.contains("bank_shadow_mask"))
 	assert_true(lake_source.contains("shore_ice_mask"))
+	assert_true(lake_source.contains("ice_segment_cells"))
+	assert_true(lake_source.contains("shore_ice_breakup"))
+	assert_true(lake_source.contains("shore_ice_water_inlay"))
+	assert_true(lake_source.contains("shared_wave.y * 0.22"),
+			"Far ice color must be interrupted by the shared water field")
+	assert_false(lake_source.contains("ice_lens_spacing_cells"),
+			"The rejected regular lens construction must not return")
 	assert_true(lake_source.contains("near_floe_mask"))
 	assert_true(lake_source.contains("irregular_floe_shape"))
 	assert_true(lake_source.contains("near_floe_contact"))
@@ -1340,6 +1816,37 @@ func _bottom_alpha_row(image: Image, x: int, threshold: float) -> int:
 		if image.get_pixel(x, y).a >= threshold:
 			return y
 	return -1
+
+
+func _composite_shore_y(
+		layers: Array[TextureRect],
+		screen_x: float,
+		fallback_y: float,
+		threshold: float) -> float:
+	var found := false
+	var shore_y := fallback_y
+	for layer: TextureRect in layers:
+		var draw_size := layer.size * layer.scale
+		if draw_size.x <= 0.0 or draw_size.y <= 0.0:
+			continue
+		var source_u := (screen_x - layer.position.x) / draw_size.x
+		if source_u < 0.0 or source_u >= 1.0:
+			continue
+		if layer.flip_h:
+			source_u = 1.0 - source_u
+		var image := layer.texture.get_image()
+		var source_x := clampi(
+				int(floor(source_u * float(image.get_width()))),
+				0,
+				image.get_width() - 1)
+		var bottom := _bottom_alpha_row(image, source_x, threshold)
+		if bottom < 0:
+			continue
+		var candidate := layer.position.y + (
+				(float(bottom) + 1.0) / float(image.get_height())) * draw_size.y
+		shore_y = maxf(shore_y, candidate) if found else candidate
+		found = true
+	return shore_y
 
 
 func _scene8_stable_hash(value: float) -> float:
