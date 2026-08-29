@@ -1,0 +1,193 @@
+[gd_scene load_steps=13 format=3 uid="uid://blv5x6nricr0h"]
+
+[ext_resource type="Script" uid="uid://di0qh6ki88n6e" path="res://src/ui/components/battle_stage.gd" id="1_stage"]
+[ext_resource type="Texture2D" uid="uid://by5ujkcp78lvo" path="res://assets/scenes/scene9/scene9_battle_platform.png" id="2_platform"]
+[ext_resource type="Texture2D" uid="uid://drjnf7djv1jg3" path="res://assets/scenes/scene9/scene9_foreground_left.png" id="3_foreground_left"]
+[ext_resource type="Texture2D" uid="uid://dgg6f4030uj0w" path="res://assets/scenes/scene9/scene9_foreground_right.png" id="4_foreground_right"]
+[ext_resource type="Script" uid="uid://c8v3gdbsbehju" path="res://src/ui/components/scene9_silver_grassland.gd" id="5_grassland"]
+[ext_resource type="Shader" uid="uid://bglxitr2lkpof" path="res://assets/shaders/canvas_env_scene9_silver_ground.gdshader" id="6_ground_shader"]
+[ext_resource type="Shader" uid="uid://cwjb0au80dvy7" path="res://assets/shaders/canvas_env_scene9_silver_grass.gdshader" id="7_grass_shader"]
+[ext_resource type="Texture2D" uid="uid://cp1xidsdyn87f" path="res://assets/scenes/scene9/scene9_grass_01.png" id="8_grass_01"]
+[ext_resource type="Texture2D" uid="uid://i0aw8mma3wla" path="res://assets/scenes/scene9/scene9_grass_02.png" id="9_grass_02"]
+[ext_resource type="Texture2D" uid="uid://bpng3ss2ookmb" path="res://assets/scenes/scene9/scene9_grass_03.png" id="10_grass_03"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ground"]
+resource_local_to_scene = true
+shader = ExtResource("6_ground_shader")
+shader_parameter/horizon_color = Color(0.37, 0.42, 0.43, 1)
+shader_parameter/middle_color = Color(0.52, 0.58, 0.57, 1)
+shader_parameter/foreground_color = Color(0.63, 0.68, 0.65, 1)
+shader_parameter/cool_gleam = Color(0.82, 0.88, 0.89, 1)
+shader_parameter/horizon_y = 0.325
+shader_parameter/foreground_y = 0.74
+shader_parameter/horizon_feather = 0.055
+shader_parameter/broad_wave_strength = 0.055
+shader_parameter/fine_breakup_strength = 0.055
+shader_parameter/grass_grain_strength = 0.09
+shader_parameter/wind_direction = Vector2(1, 0)
+shader_parameter/wind_speed = 0.72
+shader_parameter/broad_time_scale = 0.17
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_grass"]
+resource_local_to_scene = true
+shader = ExtResource("7_grass_shader")
+shader_parameter/root_shadow = Color(0.55, 0.61, 0.61, 1)
+shader_parameter/silver_mid = Color(0.67, 0.72, 0.71, 1)
+shader_parameter/silver_tip = Color(0.84, 0.87, 0.85, 1)
+shader_parameter/cool_highlight = Color(0.8, 0.85, 0.88, 1)
+shader_parameter/wind_direction = Vector2(1, 0)
+shader_parameter/wind_speed = 0.72
+shader_parameter/wind_strength = 10.0
+shader_parameter/tip_lift = 2.4
+shader_parameter/original_color_influence = 0.04
+shader_parameter/alpha_cutoff = 0.025
+shader_parameter/root_fade_start = 0.96
+
+[node name="Scene9" type="Control" unique_id=2004449928]
+editor_description = "Scene9 银辉草原。程序地表承担连续透视草海，三种完整草簇只作埋入平台后的轮廓强调，并共享统一风场；平台和左右近景保留 Eddy 当前手调构图。"
+texture_filter = 1
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_stage")
+
+[node name="FrameworkBackdrop" type="ColorRect" parent="." unique_id=949102840]
+editor_description = "Scene9 临时天空底色；正式天空素材接入后删除。"
+texture_filter = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.258824, 0.282353, 0.305882, 1)
+metadata/parallax_factor = 0.0
+metadata/pointer_parallax_factor = 0.0
+metadata/composition_role = "temporary_framework_backdrop"
+
+[node name="SilverGrassland" type="Node2D" parent="." unique_id=2086800204]
+editor_description = "连续银色草海：地表在屏幕外延伸；远中近三层草簇沿完整横向冠层排列并相互遮根，不再二维随机散落。"
+script = ExtResource("5_grassland")
+metadata/parallax_factor = 0.72
+metadata/pointer_parallax_factor = 0.42
+metadata/composition_role = "procedural_silver_field_with_accent_clumps"
+
+[node name="PerspectiveGround" type="Polygon2D" parent="SilverGrassland" unique_id=70144558]
+material = SubResource("ShaderMaterial_ground")
+polygon = PackedVector2Array(-220, 350, 2140, 350, 2240, 820, -320, 820)
+
+[node name="FarGrass" type="Node2D" parent="SilverGrassland" unique_id=1600712745]
+
+[node name="Variant01" type="MultiMeshInstance2D" parent="SilverGrassland/FarGrass" unique_id=77279096]
+texture_filter = 1
+material = SubResource("ShaderMaterial_grass")
+texture = ExtResource("8_grass_01")
+
+[node name="Variant02" type="MultiMeshInstance2D" parent="SilverGrassland/FarGrass" unique_id=1481449304]
+texture_filter = 1
+material = SubResource("ShaderMaterial_grass")
+texture = ExtResource("9_grass_02")
+
+[node name="Variant03" type="MultiMeshInstance2D" parent="SilverGrassland/FarGrass" unique_id=934326225]
+texture_filter = 1
+material = SubResource("ShaderMaterial_grass")
+texture = ExtResource("10_grass_03")
+
+[node name="MidGrass" type="Node2D" parent="SilverGrassland" unique_id=1615243944]
+
+[node name="Variant01" type="MultiMeshInstance2D" parent="SilverGrassland/MidGrass" unique_id=418166454]
+texture_filter = 1
+material = SubResource("ShaderMaterial_grass")
+texture = ExtResource("8_grass_01")
+
+[node name="Variant02" type="MultiMeshInstance2D" parent="SilverGrassland/MidGrass" unique_id=1786423323]
+texture_filter = 1
+material = SubResource("ShaderMaterial_grass")
+texture = ExtResource("9_grass_02")
+
+[node name="Variant03" type="MultiMeshInstance2D" parent="SilverGrassland/MidGrass" unique_id=96828539]
+texture_filter = 1
+material = SubResource("ShaderMaterial_grass")
+texture = ExtResource("10_grass_03")
+
+[node name="NearGrass" type="Node2D" parent="SilverGrassland" unique_id=1183656638]
+
+[node name="Variant01" type="MultiMeshInstance2D" parent="SilverGrassland/NearGrass" unique_id=161981]
+texture_filter = 1
+material = SubResource("ShaderMaterial_grass")
+texture = ExtResource("8_grass_01")
+
+[node name="Variant02" type="MultiMeshInstance2D" parent="SilverGrassland/NearGrass" unique_id=2035546143]
+texture_filter = 1
+material = SubResource("ShaderMaterial_grass")
+texture = ExtResource("9_grass_02")
+
+[node name="Variant03" type="MultiMeshInstance2D" parent="SilverGrassland/NearGrass" unique_id=844386094]
+texture_filter = 1
+material = SubResource("ShaderMaterial_grass")
+texture = ExtResource("10_grass_03")
+
+[node name="BattlePlatform" type="TextureRect" parent="." unique_id=963214304]
+editor_description = "Eddy 当前手调的完整平台源图；保持当前整体尺寸、6 倍等比节点缩放和位置，不拆段、不平铺。"
+texture_filter = 1
+layout_mode = 0
+offset_left = -182.0
+offset_top = 166.0
+offset_right = 205.0
+offset_bottom = 373.0
+scale = Vector2(6, 6)
+mouse_filter = 2
+texture = ExtResource("2_platform")
+expand_mode = 1
+metadata/parallax_factor = 1.0
+metadata/pointer_parallax_factor = 1.0
+metadata/composition_role = "battle_platform"
+
+[node name="ForegroundLeft" type="TextureRect" parent="." unique_id=1757281403]
+editor_description = "Eddy 当前手调的左近景完整源图；保持当前整体尺寸、3 倍等比节点缩放和位置。"
+texture_filter = 1
+layout_mode = 0
+offset_left = -126.0
+offset_top = 667.0
+offset_right = 152.33334
+offset_bottom = 834.6666
+scale = Vector2(3, 3)
+mouse_filter = 2
+texture = ExtResource("3_foreground_left")
+expand_mode = 1
+metadata/parallax_factor = 1.18
+metadata/pointer_parallax_factor = 1.08
+metadata/composition_role = "foreground_left"
+
+[node name="ForegroundRight" type="TextureRect" parent="." unique_id=362427215]
+editor_description = "Eddy 当前手调的右近景完整源图；保持当前整体尺寸、3 倍等比节点缩放和位置。"
+texture_filter = 1
+layout_mode = 0
+offset_left = 1244.0
+offset_top = 680.0
+offset_right = 1480.0
+offset_bottom = 834.0
+scale = Vector2(3, 3)
+mouse_filter = 2
+texture = ExtResource("4_foreground_right")
+expand_mode = 1
+metadata/parallax_factor = 1.18
+metadata/pointer_parallax_factor = 1.08
+metadata/composition_role = "foreground_right"
+
+[node name="CompositionGuides" type="Node2D" parent="." unique_id=302158477]
+editor_description = "成熟战斗构图基线；后续环境围绕这些锚点适配，不移动人物。"
+
+[node name="P1Baseline" type="Marker2D" parent="CompositionGuides" unique_id=1458309586]
+position = Vector2(480, 748)
+
+[node name="P2Baseline" type="Marker2D" parent="CompositionGuides" unique_id=1540454828]
+position = Vector2(1440, 748)
+
+[node name="PlatformBaseline" type="Marker2D" parent="CompositionGuides" unique_id=835483841]
+position = Vector2(960, 748)
