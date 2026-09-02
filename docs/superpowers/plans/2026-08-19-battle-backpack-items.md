@@ -1,5 +1,7 @@
 # 战斗背包首批道具 Implementation Plan
 
+> **历史实施计划，禁止作为现行规格继续执行。** 其中旧 1 能补充、抽后即用、免费使用与旧背包状态只描述迁移前版本；当前唯一入口见 [`2026-08-30-item-system-current-standard.md`](../specs/2026-08-30-item-system-current-standard.md)。
+
 > **For agentic workers:** 本计划在当前会话内顺序执行，不启用子智能体。
 
 **Goal:** 建立不破坏旧经济模式的最小战斗背包运行时，并完整实装寄存牌、押物票、回购券、保价封、应急箱、换签筒、听匣筒、承露盏和纳盈葫芦。

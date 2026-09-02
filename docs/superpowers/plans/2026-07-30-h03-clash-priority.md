@@ -1,5 +1,7 @@
 # h03「白额雷音」Implementation Plan
 
+> ⚠️ **历史实施计划，2026-08-30 已被取代。**正文保留旧“对攻先制 / 击杀断招”实现过程，仅供溯源，不得继续执行；当前规则见 [`2026-08-30-h03-sequence-shift-design.md`](../specs/2026-08-30-h03-sequence-shift-design.md)。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 将 h03 重做为 5 HP 的对攻先制英雄：双方均使用「波」或「大波」时，尾火的基础攻击优先结算；若该攻击实际击杀敌方攻击英雄，则取消敌方此次基础攻击。

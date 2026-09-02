@@ -1,5 +1,7 @@
 # h04「十方无次第」Implementation Plan
 
+> ⚠️ **H03 交互为历史记录。**本计划中的 H04 自由选敌设计仍可溯源，但“H03 对攻先制 / 击杀断招”边界已于 2026-08-30 退役；当前 H03 规则见 [`2026-08-30-h03-sequence-shift-design.md`](../specs/2026-08-30-h03-sequence-shift-design.md)。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 将 h04 房日重做为 5 HP 的进攻英雄：其「波」和「大波」可指定任一存活敌方英雄，并完整退役旧版“敌方重复动作产能”。

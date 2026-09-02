@@ -1,5 +1,7 @@
 # 稀有道具最终改版 Implementation Plan
 
+> **历史实施计划，禁止作为现行规格继续执行。** 其中点金石升 T3、旧抽取 / 使用经济及旧池数量均已被 [`2026-08-30-item-system-current-standard.md`](../specs/2026-08-30-item-system-current-standard.md) 取代。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use bounded subagents by file ownership; shared worktree edits must not overlap.
 
 **Goal:** 将用户在 2026-08-10 确认的 21 件正式 T2 机制完整同步到运行时、UI、联机、AI、测试、i18n和设计真相源。

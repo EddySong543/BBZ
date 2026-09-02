@@ -1,5 +1,7 @@
 # Combat Copy Terminology Implementation Plan
 
+> ⚠️ **历史实施计划。**其中 H03“攻击优先结算”文案与机制已于 2026-08-30 退役，正文只作当时术语迁移记录；当前 H03 规则见 [`2026-08-30-h03-sequence-shift-design.md`](../specs/2026-08-30-h03-sequence-shift-design.md)。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 固定“攻击／伤害／成功防御”的玩家文案含义，并把 h02、h03、h04 的技能小字缩短为已批准版本，不改变任何战斗机制。
