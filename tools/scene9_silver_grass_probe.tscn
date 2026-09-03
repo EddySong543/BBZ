@@ -1,6 +1,0 @@
-[gd_scene load_steps=2 format=3]
-
-[ext_resource type="Script" uid="uid://dpqw8bjpwd728" path="res://tools/scene9_silver_grass_probe.gd" id="1_probe"]
-
-[node name="Scene9SilverGrassProbe" type="Node"]
-script = ExtResource("1_probe")

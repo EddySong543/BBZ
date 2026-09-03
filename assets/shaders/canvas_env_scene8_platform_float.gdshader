@@ -122,15 +122,24 @@ void fragment() {
 	float crack_relative_column = source_column - floor(source_width * 0.5);
 	float crack_vertical = step(crack_start_row, source_row)
 			* (1.0 - step(crack_end_row + 1.0, source_row));
-	float crack_reveal = fissure_growth(crack_local_row);
-	float vertical_fissure_core = crack_vertical * crack_reveal
-			* pixel_match(
-					crack_relative_column,
-					crack_path_offset(authored_row));
-	float branch_reveal = crack_vertical * crack_reveal
-			* fissure_branch(crack_relative_column, authored_row);
-	float glint_reveal = crack_vertical * crack_reveal
-			* fissure_glint(crack_relative_column, authored_row);
+	// Do not even evaluate the central fissure silhouette while the easter egg
+	// is idle. Besides making the state contract explicit, this prevents a
+	// single precision-dependent core sample from leaking into the untouched
+	// platform centre on some canvas backends.
+	float vertical_fissure_core = 0.0;
+	float branch_reveal = 0.0;
+	float glint_reveal = 0.0;
+	if (platform_break_amount > 0.001) {
+		float crack_reveal = fissure_growth(crack_local_row);
+		vertical_fissure_core = crack_vertical * crack_reveal
+				* pixel_match(
+						crack_relative_column,
+						crack_path_offset(authored_row));
+		branch_reveal = crack_vertical * crack_reveal
+				* fissure_branch(crack_relative_column, authored_row);
+		glint_reveal = crack_vertical * crack_reveal
+				* fissure_glint(crack_relative_column, authored_row);
+	}
 	float ice_block = floor(source_column / max(ice_block_width, 1.0));
 	float edge_step = step(0.72, stable_hash(ice_block))
 			* edge_variation_rows;
@@ -151,15 +160,17 @@ void fragment() {
 	floating_ice = mix(
 			floating_ice, wet_edge_tint.rgb,
 			bottom_edge * wet_edge_strength);
-	float source_ice = step(0.03, source_surface.a);
-	floating_ice = mix(
-			floating_ice, crack_branch_color.rgb,
-			branch_reveal * source_ice * 0.92);
-	floating_ice = mix(
-			floating_ice, crack_core_color.rgb,
-			vertical_fissure_core * source_ice);
-	floating_ice = mix(
-			floating_ice, crack_glint_color.rgb,
-			glint_reveal * source_ice * 0.72);
+	if (platform_break_amount > 0.001) {
+		float source_ice = step(0.03, source_surface.a);
+		floating_ice = mix(
+				floating_ice, crack_branch_color.rgb,
+				branch_reveal * source_ice * 0.92);
+		floating_ice = mix(
+				floating_ice, crack_core_color.rgb,
+				vertical_fissure_core * source_ice);
+		floating_ice = mix(
+				floating_ice, crack_glint_color.rgb,
+				glint_reveal * source_ice * 0.72);
+	}
 	COLOR = vec4(floating_ice, source_surface.a);
 }

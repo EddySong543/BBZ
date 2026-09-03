@@ -45,6 +45,46 @@ func test_scene8_surface_controller_listens_before_gui_without_consuming_input()
 	assert_eq(int(controller.call("active_lake_ripple_count_for_testing")), 1)
 
 
+func test_platform_idle_state_has_no_central_black_fissure_seed() -> void:
+	var shader_source := FileAccess.get_file_as_string(PLATFORM_SHADER_PATH)
+	assert_eq(shader_source.count("if (platform_break_amount > 0.001)"), 2,
+			"The central fissure must be completely gated while the easter egg is idle")
+	var stage := (load(SCENE8_PATH) as PackedScene).instantiate() as BattleStage
+	add_child_autofree(stage)
+	await get_tree().process_frame
+	var platform := stage.get_node("BattlePlatform") as TextureRect
+	var material := platform.material as ShaderMaterial
+	assert_almost_eq(float(material.get_shader_parameter(
+			&"platform_break_amount")), 0.0, 0.0001,
+			"A fresh Scene8 instance must not retain any fissure reveal state")
+	var image := platform.texture.get_image()
+	var center_x := image.get_width() / 2
+	var minimum_luma := 1.0
+	var isolated_alpha_holes := 0
+	for y: int in range(90, 104):
+		for x: int in range(center_x - 4, center_x + 5):
+			var color := image.get_pixel(x, y)
+			if color.a >= 0.8:
+				minimum_luma = minf(
+						minimum_luma,
+						color.r * 0.2126 + color.g * 0.7152 + color.b * 0.0722)
+			elif color.a < 0.12:
+				var opaque_neighbors := 0
+				for offset_y: int in range(-1, 2):
+					for offset_x: int in range(-1, 2):
+						if offset_x == 0 and offset_y == 0:
+							continue
+						if image.get_pixel(
+								x + offset_x, y + offset_y).a >= 0.8:
+							opaque_neighbors += 1
+				if opaque_neighbors >= 6:
+					isolated_alpha_holes += 1
+	assert_eq(isolated_alpha_holes, 0,
+			"The intact central platform may not contain an isolated alpha pinhole")
+	assert_gt(minimum_luma, 0.45,
+			"The intact central platform source may not contain a black seed pixel")
+
+
 func test_lake_click_creates_pixel_perspective_ripples() -> void:
 	var include_source := FileAccess.get_file_as_string(WATER_INCLUDE_PATH)
 	var lake_source := FileAccess.get_file_as_string(LAKE_SHADER_PATH)

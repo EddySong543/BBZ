@@ -1,187 +1,919 @@
-[gd_scene load_steps=13 format=3 uid="uid://blv5x6nricr0h"]
+[gd_scene format=3 uid="uid://blv5x6nricr0h"]
 
-[ext_resource type="Script" uid="uid://di0qh6ki88n6e" path="res://src/ui/components/battle_stage.gd" id="1_stage"]
-[ext_resource type="Texture2D" uid="uid://by5ujkcp78lvo" path="res://assets/scenes/scene9/scene9_battle_platform.png" id="2_platform"]
+[ext_resource type="Script" uid="uid://io0jd7vb1c0x" path="res://src/ui/components/scene9_battle_stage.gd" id="1_stage"]
 [ext_resource type="Texture2D" uid="uid://drjnf7djv1jg3" path="res://assets/scenes/scene9/scene9_foreground_left.png" id="3_foreground_left"]
 [ext_resource type="Texture2D" uid="uid://dgg6f4030uj0w" path="res://assets/scenes/scene9/scene9_foreground_right.png" id="4_foreground_right"]
-[ext_resource type="Script" uid="uid://c8v3gdbsbehju" path="res://src/ui/components/scene9_silver_grassland.gd" id="5_grassland"]
-[ext_resource type="Shader" uid="uid://bglxitr2lkpof" path="res://assets/shaders/canvas_env_scene9_silver_ground.gdshader" id="6_ground_shader"]
-[ext_resource type="Shader" uid="uid://cwjb0au80dvy7" path="res://assets/shaders/canvas_env_scene9_silver_grass.gdshader" id="7_grass_shader"]
-[ext_resource type="Texture2D" uid="uid://cp1xidsdyn87f" path="res://assets/scenes/scene9/scene9_grass_01.png" id="8_grass_01"]
-[ext_resource type="Texture2D" uid="uid://i0aw8mma3wla" path="res://assets/scenes/scene9/scene9_grass_02.png" id="9_grass_02"]
-[ext_resource type="Texture2D" uid="uid://bpng3ss2ookmb" path="res://assets/scenes/scene9/scene9_grass_03.png" id="10_grass_03"]
+[ext_resource type="Texture2D" uid="uid://bik5kw6jonffd" path="res://assets/scenes/scene9/scene9_sky.png" id="11_sky"]
+[ext_resource type="Texture2D" uid="uid://e1ctnjlqiwnr" path="res://assets/scenes/scene9/scene9_grass.png" id="12_grass"]
+[ext_resource type="Texture2D" uid="uid://1lbqfnlh513w" path="res://assets/scenes/scene9/scene9_distant_left.png" id="14_distant_left"]
+[ext_resource type="Texture2D" uid="uid://dylxafiqe083w" path="res://assets/scenes/scene9/scene9_distant_right.png" id="15_distant_right"]
+[ext_resource type="Shader" uid="uid://b2fln2d5ud6sl" path="res://assets/shaders/canvas_env_scene9_static_depth.gdshader" id="19_static_depth"]
+[ext_resource type="Script" uid="uid://cum6ef8jkdxxg" path="res://src/ui/components/scene5_wheat_mesh.gd" id="23_grass_mesh"]
+[ext_resource type="Shader" uid="uid://b7d5c8juht7fu" path="res://assets/shaders/canvas_env_scene9_distant_grass_wind.gdshader" id="24_grass_wind"]
+[ext_resource type="Script" uid="uid://3ntaa3loq8ia" path="res://src/ui/components/scene9_distant_pixel_cloud_bank.gd" id="27_distant_cloud_bank"]
+[ext_resource type="Texture2D" uid="uid://dddfh51mmnvqa" path="res://assets/scenes/scene9/scene9_platform_new.png" id="28_platform_new"]
+[ext_resource type="Texture2D" uid="uid://cd2w4y72mqg44" path="res://assets/scenes/scene9/scene9_mountain_left.png" id="29_mountain_left"]
+[ext_resource type="Texture2D" uid="uid://duft5giy7nt0h" path="res://assets/scenes/scene9/scene9_mountain_right.png" id="30_mountain_right"]
+[ext_resource type="Shader" uid="uid://blfl40yfui8ph" path="res://assets/shaders/canvas_env_scene9_far_mountain_wind.gdshader" id="31_mountain_wind"]
+[ext_resource type="Shader" uid="uid://c6k2u05cg2qp4" path="res://assets/shaders/canvas_env_scene9_platform_interlock.gdshader" id="32_platform_interlock"]
+[ext_resource type="Shader" uid="uid://dasagtkfamus4" path="res://assets/shaders/canvas_env_scene9_distant_grass_interlock.gdshader" id="33_grass_interlock"]
+[ext_resource type="Script" uid="uid://cscurki462bh6" path="res://src/ui/components/scene9_interaction_controller.gd" id="34_interaction"]
+[ext_resource type="PackedScene" path="res://src/ui/components/scene9_grass_click_group.tscn" id="35_grass_click_group"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_env_scene9_foreground_wind.gdshader" id="39_foreground_wind"]
+[ext_resource type="Script" path="res://src/ui/components/scene9_foreground_wind_mesh.gd" id="40_foreground_mesh"]
+[ext_resource type="Shader" path="res://assets/shaders/canvas_env_scene9_pixel_cloud_motion.gdshader" id="41_pixel_cloud_motion"]
+[ext_resource type="Script" path="res://src/ui/components/scene9_eye_socket_bird_flock.gd" id="42_eye_socket_birds"]
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_ground"]
+[sub_resource type="ShaderMaterial" id="Scene9SkyRef49Material"]
 resource_local_to_scene = true
-shader = ExtResource("6_ground_shader")
-shader_parameter/horizon_color = Color(0.37, 0.42, 0.43, 1)
-shader_parameter/middle_color = Color(0.52, 0.58, 0.57, 1)
-shader_parameter/foreground_color = Color(0.63, 0.68, 0.65, 1)
-shader_parameter/cool_gleam = Color(0.82, 0.88, 0.89, 1)
-shader_parameter/horizon_y = 0.325
-shader_parameter/foreground_y = 0.74
-shader_parameter/horizon_feather = 0.055
-shader_parameter/broad_wave_strength = 0.055
-shader_parameter/fine_breakup_strength = 0.055
-shader_parameter/grass_grain_strength = 0.09
-shader_parameter/wind_direction = Vector2(1, 0)
-shader_parameter/wind_speed = 0.72
-shader_parameter/broad_time_scale = 0.17
+shader = ExtResource("19_static_depth")
+shader_parameter/tint_color = Color(0.98, 1, 1, 1)
+shader_parameter/brightness = 1.0
+shader_parameter/saturation = 0.85
+shader_parameter/contrast = 0.96
+shader_parameter/palette_steps = 32.0
+shader_parameter/palette_remap_strength = 0.28
+shader_parameter/palette_shadow_color = Color(0.39215687, 0.6431373, 0.89411765, 1)
+shader_parameter/palette_mid_color = Color(0.5176471, 0.76862746, 0.95686275, 1)
+shader_parameter/palette_highlight_color = Color(0.76862746, 0.89411765, 0.9882353, 1)
+shader_parameter/hard_cut_enabled = false
+shader_parameter/hard_cut_y = 0.0
+shader_parameter/hard_cut_step_width_px = 12.0
+shader_parameter/source_trim_enabled = false
+shader_parameter/source_trim_rect_px = Vector4(0, 0, 0, 0)
+shader_parameter/click_response_scene_rect = Vector4(0, 0, 1, 1)
+shader_parameter/click_wave_0 = Vector4(0, 0, 0, 0)
+shader_parameter/click_wave_1 = Vector4(0, 0, 0, 0)
+shader_parameter/click_wave_2 = Vector4(0, 0, 0, 0)
+shader_parameter/click_wave_duration_sec = 1.55
+shader_parameter/click_wave_speed_px = 360.0
+shader_parameter/click_wave_band_px = 62.0
+shader_parameter/click_press_radius_px = 118.0
+shader_parameter/click_displacement_px = 0.72
+shader_parameter/click_highlight_strength = 0.16
+shader_parameter/click_highlight_color = Color(0.93, 0.97, 1, 1)
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_grass"]
+[sub_resource type="ShaderMaterial" id="Scene9CloudRef49Material"]
 resource_local_to_scene = true
-shader = ExtResource("7_grass_shader")
-shader_parameter/root_shadow = Color(0.55, 0.61, 0.61, 1)
-shader_parameter/silver_mid = Color(0.67, 0.72, 0.71, 1)
-shader_parameter/silver_tip = Color(0.84, 0.87, 0.85, 1)
-shader_parameter/cool_highlight = Color(0.8, 0.85, 0.88, 1)
-shader_parameter/wind_direction = Vector2(1, 0)
-shader_parameter/wind_speed = 0.72
-shader_parameter/wind_strength = 10.0
-shader_parameter/tip_lift = 2.4
-shader_parameter/original_color_influence = 0.04
-shader_parameter/alpha_cutoff = 0.025
-shader_parameter/root_fade_start = 0.96
+shader = ExtResource("41_pixel_cloud_motion")
+shader_parameter/source_phase = 0.0
+shader_parameter/impact_source_x_px = 365.0
+shader_parameter/maximum_horizontal_displacement_px = 3.0
+shader_parameter/maximum_vertical_displacement_px = 3.0
+shader_parameter/bottom_lock_depth_px = 8.0
+shader_parameter/motion_blend_depth_px = 16.0
+shader_parameter/ripple_active = false
+shader_parameter/ripple_center_px = Vector2(0, 0)
+shader_parameter/ripple_phase = 0.0
+shader_parameter/tint_color = Color(0.98, 1, 1, 1)
+shader_parameter/brightness = 1.0
+shader_parameter/saturation = 0.82
+shader_parameter/contrast = 0.98
+shader_parameter/palette_steps = 32.0
+shader_parameter/palette_remap_strength = 0.28
+shader_parameter/palette_shadow_color = Color(0.5176471, 0.76862746, 0.95686275, 1)
+shader_parameter/palette_mid_color = Color(0.76862746, 0.89411765, 0.9882353, 1)
+shader_parameter/palette_highlight_color = Color(0.95686275, 0.9882353, 0.9882353, 1)
+
+[sub_resource type="ShaderMaterial" id="Scene9FarMountainRightMaterial"]
+resource_local_to_scene = true
+shader = ExtResource("31_mountain_wind")
+shader_parameter/motion_strength = 1.0
+shader_parameter/ridge_start_x = 0.02
+shader_parameter/ridge_end_x = 0.98
+shader_parameter/ridge_start_y = 0.88
+shader_parameter/ridge_end_y = 0.07
+shader_parameter/ridge_curve_power = 0.82
+shader_parameter/ridge_band = 0.05
+shader_parameter/ridge_feather = 0.015
+shader_parameter/cycle_sec = 19.0
+shader_parameter/sway_px = 0.55
+shader_parameter/detail_px = 0.15
+shader_parameter/lift_px = 0.15
+shader_parameter/phase_seed = 5.7
+shader_parameter/field_depth = 0.28
+shader_parameter/field_wave_strength = 0.12
+shader_parameter/field_wave_speed = 0.014
+shader_parameter/field_wave_color = Color(0.9254902, 0.95686275, 0.95686275, 1)
+shader_parameter/tint_color = Color(0.98, 0.99, 1, 1)
+shader_parameter/brightness = 0.92
+shader_parameter/saturation = 0.7
+shader_parameter/contrast = 0.88
+shader_parameter/palette_steps = 20.0
+shader_parameter/palette_remap_strength = 0.42
+shader_parameter/palette_shadow_color = Color(0.45490196, 0.54901963, 0.7058824, 1)
+shader_parameter/palette_mid_color = Color(0.6117647, 0.7058824, 0.83137256, 1)
+shader_parameter/palette_highlight_color = Color(0.9254902, 0.95686275, 0.95686275, 1)
+
+[sub_resource type="ShaderMaterial" id="Scene9FarMountainLeftMaterial"]
+resource_local_to_scene = true
+shader = ExtResource("31_mountain_wind")
+shader_parameter/motion_strength = 1.0
+shader_parameter/ridge_start_x = 0.02
+shader_parameter/ridge_end_x = 0.98
+shader_parameter/ridge_start_y = 0.23
+shader_parameter/ridge_end_y = 0.69
+shader_parameter/ridge_curve_power = 0.55
+shader_parameter/ridge_band = 0.045
+shader_parameter/ridge_feather = 0.015
+shader_parameter/cycle_sec = 18.0
+shader_parameter/sway_px = 0.7
+shader_parameter/detail_px = 0.2
+shader_parameter/lift_px = 0.2
+shader_parameter/phase_seed = 1.3
+shader_parameter/field_depth = 0.24
+shader_parameter/field_wave_strength = 0.1
+shader_parameter/field_wave_speed = 0.014
+shader_parameter/field_wave_color = Color(0.9254902, 0.95686275, 0.95686275, 1)
+shader_parameter/tint_color = Color(0.98, 0.99, 1, 1)
+shader_parameter/brightness = 0.97
+shader_parameter/saturation = 0.72
+shader_parameter/contrast = 0.9
+shader_parameter/palette_steps = 20.0
+shader_parameter/palette_remap_strength = 0.38
+shader_parameter/palette_shadow_color = Color(0.45490196, 0.54901963, 0.7058824, 1)
+shader_parameter/palette_mid_color = Color(0.6117647, 0.7058824, 0.83137256, 1)
+shader_parameter/palette_highlight_color = Color(0.9254902, 0.95686275, 0.95686275, 1)
+
+[sub_resource type="ShaderMaterial" id="Scene9FarGrassMaterial"]
+resource_local_to_scene = true
+shader = ExtResource("24_grass_wind")
+shader_parameter/geometry_y_start = 0.18
+shader_parameter/geometry_y_feather = 0.04
+shader_parameter/root_y = 0.98
+shader_parameter/bend_power = 1.65
+shader_parameter/cycle_sec = 10.6
+shader_parameter/sway_px = 2.6
+shader_parameter/detail_px = 0.55
+shader_parameter/gust_lift_px = 0.75
+shader_parameter/gust_cycle_sec = 7.8
+shader_parameter/phase_seed = 4.2
+shader_parameter/click_wave_0 = Vector4(0, 0, 0, 0)
+shader_parameter/click_wave_1 = Vector4(0, 0, 0, 0)
+shader_parameter/click_wave_2 = Vector4(0, 0, 0, 0)
+shader_parameter/click_wave_duration_sec = 1.55
+shader_parameter/click_wave_speed_px = 360.0
+shader_parameter/click_wave_band_px = 62.0
+shader_parameter/click_press_radius_px = 118.0
+shader_parameter/click_displacement_px = 0.72
+shader_parameter/click_highlight_strength = 0.16
+shader_parameter/click_highlight_color = Color(0.93, 0.97, 1, 1)
+shader_parameter/field_wave_strength = 0.14
+shader_parameter/field_wave_speed = 0.028
+shader_parameter/field_wave_color = Color(0.9254902, 0.95686275, 0.95686275, 1)
+shader_parameter/tint_color = Color(0.98, 0.99, 1, 1)
+shader_parameter/brightness = 1.02
+shader_parameter/saturation = 0.72
+shader_parameter/contrast = 0.94
+shader_parameter/palette_steps = 20.0
+shader_parameter/palette_remap_strength = 0.4
+shader_parameter/palette_shadow_color = Color(0.6117647, 0.7058824, 0.83137256, 1)
+shader_parameter/palette_mid_color = Color(0.76862746, 0.83137256, 0.9882353, 1)
+shader_parameter/palette_highlight_color = Color(0.9254902, 0.95686275, 0.95686275, 1)
+shader_parameter/ground_harmony_strength = 0.44
+shader_parameter/ground_harmony_start = 0.3
+shader_parameter/ground_harmony_color = Color(0.32941177, 0.42352942, 0.5176471, 1)
+shader_parameter/source_trim_enabled = false
+shader_parameter/source_trim_rect_px = Vector4(0, 0, 0, 0)
+
+[sub_resource type="CanvasItemMaterial" id="Scene9SilverMoteBlend"]
+resource_local_to_scene = true
+blend_mode = 1
+
+[sub_resource type="Gradient" id="Scene9SilverMoteDotGradient"]
+offsets = PackedFloat32Array(0, 0.55, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0.8, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture2D" id="Scene9SilverMoteTexture"]
+gradient = SubResource("Scene9SilverMoteDotGradient")
+width = 8
+height = 8
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[sub_resource type="Gradient" id="Scene9SilverMoteLifeGradient"]
+offsets = PackedFloat32Array(0, 0.28, 0.62, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="Scene9SilverMoteLifeRamp"]
+gradient = SubResource("Scene9SilverMoteLifeGradient")
+
+[sub_resource type="ParticleProcessMaterial" id="Scene9SilverMotesFarMat"]
+resource_local_to_scene = true
+emission_shape = 3
+emission_box_extents = Vector3(900, 130, 1)
+direction = Vector3(0.18, -1, 0)
+spread = 20.0
+initial_velocity_min = 1.5
+initial_velocity_max = 4.5
+gravity = Vector3(0.3, -1.5, 0)
+scale_min = 0.22
+scale_max = 0.65
+color = Color(0.82, 0.87, 0.98, 0.26)
+color_ramp = SubResource("Scene9SilverMoteLifeRamp")
+turbulence_enabled = true
+turbulence_noise_strength = 1.6
+turbulence_noise_scale = 1.1
+
+[sub_resource type="ShaderMaterial" id="Scene9PlatformMaterial"]
+resource_local_to_scene = true
+shader = ExtResource("32_platform_interlock")
+shader_parameter/tint_color = Color(0.96, 0.99, 1, 1)
+shader_parameter/brightness = 1.1
+shader_parameter/saturation = 0.62
+shader_parameter/contrast = 0.98
+shader_parameter/palette_steps = 20.0
+shader_parameter/palette_remap_strength = 0.38
+shader_parameter/palette_shadow_color = Color(0.078431375, 0.23529412, 0.26666668, 1)
+shader_parameter/palette_mid_color = Color(0.32941177, 0.42352942, 0.5176471, 1)
+shader_parameter/palette_highlight_color = Color(0.6745098, 0.76862746, 0.9254902, 1)
+shader_parameter/contact_enabled = false
+shader_parameter/contact_right_texture = ExtResource("15_distant_right")
+shader_parameter/self_scene_rect = Vector4(-17, 490, 2448, 816)
+shader_parameter/contact_right_rect_a = Vector4(-1486, 433.99997, 2448, 680)
+shader_parameter/contact_right_rect_b = Vector4(-108, 426, 2448, 680)
+shader_parameter/contact_cluster_size = Vector2(18, 12)
+shader_parameter/contact_shadow_enabled = true
+shader_parameter/contact_shadow_color = Color(0.18039216, 0.25490198, 0.30980393, 1)
+shader_parameter/contact_shadow_strength = 0.24
+shader_parameter/contact_shadow_radius_px = 12.0
+shader_parameter/contact_shadow_offset_px = Vector2(0, 6)
+
+[sub_resource type="ShaderMaterial" id="Scene9FarLeftGrassMaterialTwo"]
+resource_local_to_scene = true
+shader = ExtResource("33_grass_interlock")
+shader_parameter/geometry_y_start = 0.18
+shader_parameter/geometry_y_feather = 0.04
+shader_parameter/root_y = 0.98
+shader_parameter/bend_power = 1.65
+shader_parameter/cycle_sec = 10.6
+shader_parameter/sway_px = 2.6
+shader_parameter/detail_px = 0.55
+shader_parameter/gust_lift_px = 0.75
+shader_parameter/gust_cycle_sec = 7.8
+shader_parameter/phase_seed = 4.2
+shader_parameter/click_wave_0 = Vector4(0, 0, 0, 0)
+shader_parameter/click_wave_1 = Vector4(0, 0, 0, 0)
+shader_parameter/click_wave_2 = Vector4(0, 0, 0, 0)
+shader_parameter/click_wave_duration_sec = 1.55
+shader_parameter/click_wave_speed_px = 360.0
+shader_parameter/click_wave_band_px = 62.0
+shader_parameter/click_press_radius_px = 118.0
+shader_parameter/click_displacement_px = 0.72
+shader_parameter/click_highlight_strength = 0.16
+shader_parameter/click_highlight_color = Color(0.93, 0.97, 1, 1)
+shader_parameter/field_wave_strength = 0.14
+shader_parameter/field_wave_speed = 0.028
+shader_parameter/field_wave_color = Color(0.9254902, 0.95686275, 0.95686275, 1)
+shader_parameter/tint_color = Color(0.98, 0.99, 1, 1)
+shader_parameter/brightness = 1.02
+shader_parameter/saturation = 0.72
+shader_parameter/contrast = 0.94
+shader_parameter/palette_steps = 20.0
+shader_parameter/palette_remap_strength = 0.4
+shader_parameter/palette_shadow_color = Color(0.6117647, 0.7058824, 0.83137256, 1)
+shader_parameter/palette_mid_color = Color(0.76862746, 0.83137256, 0.9882353, 1)
+shader_parameter/palette_highlight_color = Color(0.9254902, 0.95686275, 0.95686275, 1)
+shader_parameter/ground_harmony_strength = 0.44
+shader_parameter/ground_harmony_start = 0.26
+shader_parameter/ground_harmony_color = Color(0.32941177, 0.42352942, 0.5176471, 1)
+shader_parameter/source_trim_enabled = true
+shader_parameter/source_trim_rect_px = Vector4(0, 0, 109, 80)
+shader_parameter/contact_enabled = false
+shader_parameter/contact_platform_texture = ExtResource("28_platform_new")
+shader_parameter/self_scene_rect = Vector4(1089, 505.99997, 1660, 940)
+shader_parameter/contact_platform_rect = Vector4(-17, 490, 2448, 816)
+shader_parameter/contact_platform_texel_size = Vector2(0.00245098, 0.007352941)
+shader_parameter/contact_cluster_size = Vector2(18, 12)
+shader_parameter/contact_shadow_enabled = true
+shader_parameter/contact_shadow_color = Color(0.18039216, 0.25490198, 0.30980393, 1)
+shader_parameter/contact_shadow_strength = 0.18
+shader_parameter/contact_shadow_radius_px = 10.0
+shader_parameter/contact_shadow_offset_px = Vector2(0, 0)
+
+[sub_resource type="ShaderMaterial" id="Scene9FarLeftGrassMaterial"]
+resource_local_to_scene = true
+shader = ExtResource("33_grass_interlock")
+shader_parameter/geometry_y_start = 0.18
+shader_parameter/geometry_y_feather = 0.04
+shader_parameter/root_y = 0.98
+shader_parameter/bend_power = 1.65
+shader_parameter/cycle_sec = 10.6
+shader_parameter/sway_px = 2.6
+shader_parameter/detail_px = 0.55
+shader_parameter/gust_lift_px = 0.75
+shader_parameter/gust_cycle_sec = 7.8
+shader_parameter/phase_seed = 4.2
+shader_parameter/click_wave_0 = Vector4(0, 0, 0, 0)
+shader_parameter/click_wave_1 = Vector4(0, 0, 0, 0)
+shader_parameter/click_wave_2 = Vector4(0, 0, 0, 0)
+shader_parameter/click_wave_duration_sec = 1.55
+shader_parameter/click_wave_speed_px = 360.0
+shader_parameter/click_wave_band_px = 62.0
+shader_parameter/click_press_radius_px = 118.0
+shader_parameter/click_displacement_px = 0.72
+shader_parameter/click_highlight_strength = 0.16
+shader_parameter/click_highlight_color = Color(0.93, 0.97, 1, 1)
+shader_parameter/field_wave_strength = 0.14
+shader_parameter/field_wave_speed = 0.028
+shader_parameter/field_wave_color = Color(0.9254902, 0.95686275, 0.95686275, 1)
+shader_parameter/tint_color = Color(0.98, 0.99, 1, 1)
+shader_parameter/brightness = 1.02
+shader_parameter/saturation = 0.72
+shader_parameter/contrast = 0.94
+shader_parameter/palette_steps = 20.0
+shader_parameter/palette_remap_strength = 0.4
+shader_parameter/palette_shadow_color = Color(0.6117647, 0.7058824, 0.83137256, 1)
+shader_parameter/palette_mid_color = Color(0.76862746, 0.83137256, 0.9882353, 1)
+shader_parameter/palette_highlight_color = Color(0.9254902, 0.95686275, 0.95686275, 1)
+shader_parameter/ground_harmony_strength = 0.44
+shader_parameter/ground_harmony_start = 0.26
+shader_parameter/ground_harmony_color = Color(0.32941177, 0.42352942, 0.5176471, 1)
+shader_parameter/source_trim_enabled = true
+shader_parameter/source_trim_rect_px = Vector4(0, 0, 109, 80)
+shader_parameter/contact_enabled = false
+shader_parameter/contact_platform_texture = ExtResource("28_platform_new")
+shader_parameter/self_scene_rect = Vector4(-350, 491, 1992, 940)
+shader_parameter/contact_platform_rect = Vector4(-17, 490, 2448, 816)
+shader_parameter/contact_platform_texel_size = Vector2(0.00245098, 0.007352941)
+shader_parameter/contact_cluster_size = Vector2(18, 12)
+shader_parameter/contact_shadow_enabled = true
+shader_parameter/contact_shadow_color = Color(0.18039216, 0.25490198, 0.30980393, 1)
+shader_parameter/contact_shadow_strength = 0.18
+shader_parameter/contact_shadow_radius_px = 10.0
+shader_parameter/contact_shadow_offset_px = Vector2(0, 0)
+
+[sub_resource type="ShaderMaterial" id="Scene9MidGrassMaterial"]
+resource_local_to_scene = true
+shader = ExtResource("39_foreground_wind")
+shader_parameter/motion_strength = 1.0
+shader_parameter/geometry_y_start = 0.455
+shader_parameter/geometry_y_feather = 0.012
+shader_parameter/root_y = 0.816
+shader_parameter/root_lock_depth = 0.065
+shader_parameter/bend_power = 1.25
+shader_parameter/cycle_sec = 10.8
+shader_parameter/sway_px = 1.6
+shader_parameter/branch_detail_px = 0.45
+shader_parameter/branch_lift_px = 0.42
+shader_parameter/gust_cycle_sec = 17.5
+shader_parameter/gust_px = 0.7
+shader_parameter/phase_seed = 2.15
+shader_parameter/branch_clusters = 12.0
+shader_parameter/tint_color = Color(0.98, 0.99, 1, 1)
+shader_parameter/brightness = 1.08
+shader_parameter/saturation = 0.35
+shader_parameter/contrast = 0.94
+shader_parameter/palette_steps = 20.0
+shader_parameter/palette_remap_strength = 0.72
+shader_parameter/palette_shadow_color = Color(0.6117647, 0.7058824, 0.83137256, 1)
+shader_parameter/palette_mid_color = Color(0.76862746, 0.83137256, 0.9882353, 1)
+shader_parameter/palette_highlight_color = Color(0.9254902, 0.95686275, 0.95686275, 1)
+shader_parameter/hard_cut_enabled = false
+shader_parameter/hard_cut_y = 0.0
+shader_parameter/hard_cut_step_width_px = 12.0
+shader_parameter/source_trim_enabled = false
+shader_parameter/source_trim_rect_px = Vector4(0, 0, 0, 0)
+shader_parameter/click_response_scene_rect = Vector4(0, 0, 1, 1)
+shader_parameter/click_wave_0 = Vector4(0, 0, 0, 0)
+shader_parameter/click_wave_1 = Vector4(0, 0, 0, 0)
+shader_parameter/click_wave_2 = Vector4(0, 0, 0, 0)
+shader_parameter/click_wave_duration_sec = 1.55
+shader_parameter/click_wave_speed_px = 360.0
+shader_parameter/click_wave_band_px = 62.0
+shader_parameter/click_press_radius_px = 118.0
+shader_parameter/click_displacement_px = 0.72
+shader_parameter/click_highlight_strength = 0.16
+shader_parameter/click_highlight_color = Color(0.93, 0.97, 1, 1)
+
+[sub_resource type="ParticleProcessMaterial" id="Scene9SilverValleyDustMat"]
+resource_local_to_scene = true
+emission_shape = 3
+emission_box_extents = Vector3(480, 280, 1)
+direction = Vector3(-0.15, 1, 0)
+spread = 25.0
+initial_velocity_min = 4.0
+initial_velocity_max = 10.0
+gravity = Vector3(-0.8, 5.5, 0)
+scale_min = 0.35
+scale_max = 0.8
+color = Color(0.74, 0.8, 0.95, 0.4)
+color_ramp = SubResource("Scene9SilverMoteLifeRamp")
+turbulence_enabled = true
+turbulence_noise_strength = 1.5
+turbulence_noise_scale = 1.0
+
+[sub_resource type="ParticleProcessMaterial" id="Scene9SilverGroundPollenMat"]
+resource_local_to_scene = true
+emission_shape = 3
+emission_box_extents = Vector3(920, 120, 1)
+direction = Vector3(-0.2, -1, 0)
+spread = 20.0
+initial_velocity_min = 3.0
+initial_velocity_max = 7.5
+gravity = Vector3(-0.7, -3.5, 0)
+scale_min = 0.4
+scale_max = 1.8
+color = Color(0.9, 0.92, 1, 0.35)
+color_ramp = SubResource("Scene9SilverMoteLifeRamp")
+turbulence_enabled = true
+turbulence_noise_strength = 2.6
+turbulence_noise_scale = 1.4
+
+[sub_resource type="ParticleProcessMaterial" id="Scene9SilverMotesNearMat"]
+resource_local_to_scene = true
+emission_shape = 3
+emission_box_extents = Vector3(940, 150, 1)
+direction = Vector3(0.22, -1, 0)
+spread = 24.0
+initial_velocity_min = 6.0
+initial_velocity_max = 12.0
+gravity = Vector3(1, -5.5, 0)
+scale_min = 2.0
+scale_max = 3.4
+color = Color(0.8, 0.85, 0.98, 0.35)
+color_ramp = SubResource("Scene9SilverMoteLifeRamp")
+turbulence_enabled = true
+turbulence_noise_strength = 3.2
+turbulence_noise_scale = 1.6
+
+[sub_resource type="ShaderMaterial" id="Scene9NearForegroundLeftMaterial"]
+resource_local_to_scene = true
+shader = ExtResource("39_foreground_wind")
+shader_parameter/motion_strength = 1.0
+shader_parameter/geometry_y_start = 0.058
+shader_parameter/geometry_y_feather = 0.014
+shader_parameter/root_y = 0.878
+shader_parameter/root_lock_depth = 0.075
+shader_parameter/bend_power = 1.32
+shader_parameter/cycle_sec = 12.6
+shader_parameter/sway_px = 2.25
+shader_parameter/branch_detail_px = 0.62
+shader_parameter/branch_lift_px = 0.52
+shader_parameter/gust_cycle_sec = 19.0
+shader_parameter/gust_px = 0.95
+shader_parameter/phase_seed = 0.8
+shader_parameter/branch_clusters = 9.0
+shader_parameter/tint_color = Color(0.98, 0.99, 1, 1)
+shader_parameter/brightness = 1.06
+shader_parameter/saturation = 0.58
+shader_parameter/contrast = 0.96
+shader_parameter/palette_steps = 20.0
+shader_parameter/palette_remap_strength = 0.62
+shader_parameter/palette_shadow_color = Color(0.23529412, 0.29803923, 0.20392157, 1)
+shader_parameter/palette_mid_color = Color(0.6117647, 0.6745098, 0.76862746, 1)
+shader_parameter/palette_highlight_color = Color(0.7058824, 0.76862746, 0.9254902, 1)
+shader_parameter/hard_cut_enabled = false
+shader_parameter/hard_cut_y = 0.0
+shader_parameter/hard_cut_step_width_px = 12.0
+shader_parameter/source_trim_enabled = false
+shader_parameter/source_trim_rect_px = Vector4(0, 0, 0, 0)
+shader_parameter/click_response_scene_rect = Vector4(0, 0, 1, 1)
+shader_parameter/click_wave_0 = Vector4(0, 0, 0, 0)
+shader_parameter/click_wave_1 = Vector4(0, 0, 0, 0)
+shader_parameter/click_wave_2 = Vector4(0, 0, 0, 0)
+shader_parameter/click_wave_duration_sec = 1.55
+shader_parameter/click_wave_speed_px = 360.0
+shader_parameter/click_wave_band_px = 62.0
+shader_parameter/click_press_radius_px = 118.0
+shader_parameter/click_displacement_px = 0.72
+shader_parameter/click_highlight_strength = 0.16
+shader_parameter/click_highlight_color = Color(0.93, 0.97, 1, 1)
+
+[sub_resource type="ShaderMaterial" id="Scene9NearForegroundRightMaterial"]
+resource_local_to_scene = true
+shader = ExtResource("39_foreground_wind")
+shader_parameter/motion_strength = 1.0
+shader_parameter/geometry_y_start = 0.078
+shader_parameter/geometry_y_feather = 0.014
+shader_parameter/root_y = 0.958
+shader_parameter/root_lock_depth = 0.075
+shader_parameter/bend_power = 1.28
+shader_parameter/cycle_sec = 13.4
+shader_parameter/sway_px = 2.45
+shader_parameter/branch_detail_px = 0.68
+shader_parameter/branch_lift_px = 0.55
+shader_parameter/gust_cycle_sec = 19.0
+shader_parameter/gust_px = 1.0
+shader_parameter/phase_seed = 4.35
+shader_parameter/branch_clusters = 8.0
+shader_parameter/tint_color = Color(0.98, 0.99, 1, 1)
+shader_parameter/brightness = 1.06
+shader_parameter/saturation = 0.58
+shader_parameter/contrast = 0.96
+shader_parameter/palette_steps = 20.0
+shader_parameter/palette_remap_strength = 0.62
+shader_parameter/palette_shadow_color = Color(0.23529412, 0.29803923, 0.20392157, 1)
+shader_parameter/palette_mid_color = Color(0.6117647, 0.6745098, 0.76862746, 1)
+shader_parameter/palette_highlight_color = Color(0.7058824, 0.76862746, 0.9254902, 1)
+shader_parameter/hard_cut_enabled = false
+shader_parameter/hard_cut_y = 0.0
+shader_parameter/hard_cut_step_width_px = 12.0
+shader_parameter/source_trim_enabled = false
+shader_parameter/source_trim_rect_px = Vector4(0, 0, 0, 0)
+shader_parameter/click_response_scene_rect = Vector4(0, 0, 1, 1)
+shader_parameter/click_wave_0 = Vector4(0, 0, 0, 0)
+shader_parameter/click_wave_1 = Vector4(0, 0, 0, 0)
+shader_parameter/click_wave_2 = Vector4(0, 0, 0, 0)
+shader_parameter/click_wave_duration_sec = 1.55
+shader_parameter/click_wave_speed_px = 360.0
+shader_parameter/click_wave_band_px = 62.0
+shader_parameter/click_press_radius_px = 118.0
+shader_parameter/click_displacement_px = 0.72
+shader_parameter/click_highlight_strength = 0.16
+shader_parameter/click_highlight_color = Color(0.93, 0.97, 1, 1)
 
 [node name="Scene9" type="Control" unique_id=2004449928]
-editor_description = "Scene9 银辉草原。程序地表承担连续透视草海，三种完整草簇只作埋入平台后的轮廓强调，并共享统一风场；平台和左右近景保留 Eddy 当前手调构图。"
+editor_description = "Scene9 银辉草原。Eddy 的现有手调构图保持不变；浮空岛与瀑布已正式退役，代码云、远山、草原和平台构成当前运行画面。"
 texture_filter = 1
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = -230.0
+offset_top = -96.0
+offset_right = -230.0
+offset_bottom = -96.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("1_stage")
 
-[node name="FrameworkBackdrop" type="ColorRect" parent="." unique_id=949102840]
-editor_description = "Scene9 临时天空底色；正式天空素材接入后删除。"
+[node name="SceneInteractionController" type="Node" parent="." unique_id=1541709683]
+editor_description = "Scene9 专属左键输入与银草响应：在全屏战斗 GUI 之前观察点击但不吞事件；可见草地优先于背后云层，并抛出 Scene5 式局部银色草屑。"
+script = ExtResource("34_interaction")
+
+[node name="SceneSky" type="TextureRect" parent="." unique_id=949102840]
+editor_description = "Scene9 正式天空源图；以 4 倍整数缩放居中覆盖 1920×1080，不做滤镜或非整数拉伸。"
 texture_filter = 1
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
+material = SubResource("Scene9SkyRef49Material")
+layout_mode = 0
+offset_left = 34.0
+offset_top = -25.0
+offset_right = 610.0
+offset_bottom = 299.0
+scale = Vector2(4, 4)
 mouse_filter = 2
-color = Color(0.258824, 0.282353, 0.305882, 1)
+texture = ExtResource("11_sky")
+expand_mode = 1
 metadata/parallax_factor = 0.0
 metadata/pointer_parallax_factor = 0.0
-metadata/composition_role = "temporary_framework_backdrop"
+metadata/composition_role = "pixel_sky"
+metadata/_edit_lock_ = true
 
-[node name="SilverGrassland" type="Node2D" parent="." unique_id=2086800204]
-editor_description = "连续银色草海：地表在屏幕外延伸；远中近三层草簇沿完整横向冠层排列并相互遮根，不再二维随机散落。"
-script = ExtResource("5_grassland")
-metadata/parallax_factor = 0.72
-metadata/pointer_parallax_factor = 0.42
-metadata/composition_role = "procedural_silver_field_with_accent_clumps"
-
-[node name="PerspectiveGround" type="Polygon2D" parent="SilverGrassland" unique_id=70144558]
-material = SubResource("ShaderMaterial_ground")
-polygon = PackedVector2Array(-220, 350, 2140, 350, 2240, 820, -320, 820)
-
-[node name="FarGrass" type="Node2D" parent="SilverGrassland" unique_id=1600712745]
-
-[node name="Variant01" type="MultiMeshInstance2D" parent="SilverGrassland/FarGrass" unique_id=77279096]
+[node name="DistantPixelCloudBank2" type="TextureRect" parent="." unique_id=308867326]
+editor_description = "Scene9 单体远景像素云；透明留白中仅放置一次代码蓝图，原始深浅像素与上缘轮廓从视觉中心向两侧同步起伏，底缘固定；18 秒慢速循环采用每源相位 4.5 次时间采样，无拼贴、调色遮罩或接地色带。"
 texture_filter = 1
-material = SubResource("ShaderMaterial_grass")
-texture = ExtResource("8_grass_01")
-
-[node name="Variant02" type="MultiMeshInstance2D" parent="SilverGrassland/FarGrass" unique_id=1481449304]
-texture_filter = 1
-material = SubResource("ShaderMaterial_grass")
-texture = ExtResource("9_grass_02")
-
-[node name="Variant03" type="MultiMeshInstance2D" parent="SilverGrassland/FarGrass" unique_id=934326225]
-texture_filter = 1
-material = SubResource("ShaderMaterial_grass")
-texture = ExtResource("10_grass_03")
-
-[node name="MidGrass" type="Node2D" parent="SilverGrassland" unique_id=1615243944]
-
-[node name="Variant01" type="MultiMeshInstance2D" parent="SilverGrassland/MidGrass" unique_id=418166454]
-texture_filter = 1
-material = SubResource("ShaderMaterial_grass")
-texture = ExtResource("8_grass_01")
-
-[node name="Variant02" type="MultiMeshInstance2D" parent="SilverGrassland/MidGrass" unique_id=1786423323]
-texture_filter = 1
-material = SubResource("ShaderMaterial_grass")
-texture = ExtResource("9_grass_02")
-
-[node name="Variant03" type="MultiMeshInstance2D" parent="SilverGrassland/MidGrass" unique_id=96828539]
-texture_filter = 1
-material = SubResource("ShaderMaterial_grass")
-texture = ExtResource("10_grass_03")
-
-[node name="NearGrass" type="Node2D" parent="SilverGrassland" unique_id=1183656638]
-
-[node name="Variant01" type="MultiMeshInstance2D" parent="SilverGrassland/NearGrass" unique_id=161981]
-texture_filter = 1
-material = SubResource("ShaderMaterial_grass")
-texture = ExtResource("8_grass_01")
-
-[node name="Variant02" type="MultiMeshInstance2D" parent="SilverGrassland/NearGrass" unique_id=2035546143]
-texture_filter = 1
-material = SubResource("ShaderMaterial_grass")
-texture = ExtResource("9_grass_02")
-
-[node name="Variant03" type="MultiMeshInstance2D" parent="SilverGrassland/NearGrass" unique_id=844386094]
-texture_filter = 1
-material = SubResource("ShaderMaterial_grass")
-texture = ExtResource("10_grass_03")
-
-[node name="BattlePlatform" type="TextureRect" parent="." unique_id=963214304]
-editor_description = "Eddy 当前手调的完整平台源图；保持当前整体尺寸、6 倍等比节点缩放和位置，不拆段、不平铺。"
-texture_filter = 1
+material = SubResource("Scene9CloudRef49Material")
 layout_mode = 0
-offset_left = -182.0
-offset_top = 166.0
-offset_right = 205.0
-offset_bottom = 373.0
+offset_left = -699.0
+offset_top = -129.0
+offset_right = 1922.5713
+offset_bottom = 450.00006
+scale = Vector2(1.4, 1.4)
+mouse_filter = 2
+expand_mode = 1
+script = ExtResource("27_distant_cloud_bank")
+metadata/parallax_factor = 0.3
+metadata/pointer_parallax_factor = 0.18
+metadata/composition_role = "distant_pixel_cloud_bank"
+
+[node name="DistantRightMountain" type="Control" parent="." unique_id=1032003491]
+editor_description = "Scene9 右远山完整源图；细分网格只驱动山脊雪草，岩体固定，保留当前手调 Transform。"
+texture_filter = 1
+material = SubResource("Scene9FarMountainRightMaterial")
+anchors_preset = 0
+offset_left = 381.0
+offset_top = -36.0
+offset_right = 789.0
+offset_bottom = 108.0
 scale = Vector2(6, 6)
 mouse_filter = 2
-texture = ExtResource("2_platform")
+script = ExtResource("23_grass_mesh")
+texture = ExtResource("30_mountain_right")
+mesh_columns = 56
+mesh_rows = 18
+metadata/parallax_factor = 0.15
+metadata/pointer_parallax_factor = 0.1
+metadata/dolly_parallax_factor = 0.15
+metadata/composition_role = "distant_right_mountain"
+metadata/_edit_lock_ = true
+
+[node name="DistantLeftMountain" type="Control" parent="." unique_id=1902516516]
+editor_description = "Scene9 左远山完整源图；细分网格只驱动山脊草冠，岩体固定，保留当前手调 Transform。"
+texture_filter = 1
+material = SubResource("Scene9FarMountainLeftMaterial")
+anchors_preset = 0
+offset_left = 184.0
+offset_top = 59.0
+offset_right = 472.0
+offset_bottom = 275.0
+scale = Vector2(4, 4)
+mouse_filter = 2
+script = ExtResource("23_grass_mesh")
+texture = ExtResource("29_mountain_left")
+mesh_columns = 48
+mesh_rows = 18
+metadata/parallax_factor = 0.15
+metadata/pointer_parallax_factor = 0.1
+metadata/dolly_parallax_factor = 0.15
+metadata/composition_role = "distant_left_mountain"
+metadata/_edit_lock_ = true
+
+[node name="EyeSocketBirdFlock" type="Control" parent="DistantLeftMountain"]
+editor_description = "Scene9 可重复彩蛋：8 只 5×3 源像素远景鸟从左山眼窝分三批飞出，三帧硬边振翅、整数源像素轨迹，进入后绘制的云层后自然遮挡；不使用粒子、模糊、发光或透明度淡出。"
+texture_filter = 1
+layout_mode = 0
+offset_right = 288.0
+offset_bottom = 216.0
+mouse_filter = 2
+script = ExtResource("42_eye_socket_birds")
+metadata/composition_role = "scene9_eye_socket_bird_flock_easter_egg"
+metadata/_edit_lock_ = true
+
+[node name="DistantPixelCloudBank" type="TextureRect" parent="." unique_id=321608064]
+editor_description = "Scene9 单体远景像素云；透明留白中仅放置一次代码蓝图，原始深浅像素与上缘轮廓从视觉中心向两侧同步起伏，底缘固定；18 秒慢速循环采用每源相位 4.5 次时间采样，无拼贴、调色遮罩或接地色带。"
+texture_filter = 1
+material = SubResource("Scene9CloudRef49Material")
+layout_mode = 0
+offset_left = -504.0
+offset_top = 107.0
+offset_right = 1864.0
+offset_bottom = 651.0
+scale = Vector2(1.4, 1.4)
+mouse_filter = 2
+expand_mode = 1
+script = ExtResource("27_distant_cloud_bank")
+metadata/parallax_factor = 0.3
+metadata/pointer_parallax_factor = 0.18
+metadata/composition_role = "distant_pixel_cloud_bank"
+metadata/_edit_lock_ = true
+
+[node name="DistantRight2" type="Control" parent="." unique_id=269905083]
+editor_description = "Scene9 右远景完整源图；复用 Scene5 细分网格风场，仅上部草叶摆动，根部固定且不响应鼠标横移。"
+texture_filter = 1
+material = SubResource("Scene9FarGrassMaterial")
+anchors_preset = 0
+offset_left = -108.0
+offset_top = 426.0
+offset_right = 300.0
+offset_bottom = 562.0
+scale = Vector2(6, 5)
+mouse_filter = 2
+script = ExtResource("23_grass_mesh")
+texture = ExtResource("15_distant_right")
+mesh_columns = 56
+mesh_rows = 12
+metadata/parallax_factor = 1.0
+metadata/pointer_parallax_factor = 0.0
+metadata/dolly_parallax_factor = 1.0
+metadata/composition_role = "distant_right"
+metadata/_edit_lock_ = true
+
+[node name="DistantRight" type="Control" parent="." unique_id=1085675698]
+editor_description = "Scene9 右远景完整源图；复用 Scene5 细分网格风场，仅上部草叶摆动，根部固定且不响应鼠标横移。"
+texture_filter = 1
+material = SubResource("Scene9FarGrassMaterial")
+anchors_preset = 0
+offset_left = -1486.0
+offset_top = 433.99997
+offset_right = -1078.0
+offset_bottom = 570.0
+scale = Vector2(6, 5)
+mouse_filter = 2
+script = ExtResource("23_grass_mesh")
+texture = ExtResource("15_distant_right")
+mesh_columns = 56
+mesh_rows = 12
+metadata/parallax_factor = 1.0
+metadata/pointer_parallax_factor = 0.0
+metadata/dolly_parallax_factor = 1.0
+metadata/composition_role = "distant_right"
+metadata/_edit_lock_ = true
+
+[node name="BattlePlatformNew" type="TextureRect" parent="." unique_id=418449184]
+editor_description = "Scene9 完整战斗平台；只在真实草地重叠轮廓附近加入局部像素投影柔化，不裁切轮廓、不增加接地条或延伸地表。"
+texture_filter = 1
+material = SubResource("Scene9PlatformMaterial")
+layout_mode = 0
+offset_left = -17.0
+offset_top = 490.0
+offset_right = 391.0
+offset_bottom = 626.0
+scale = Vector2(6, 6)
+mouse_filter = 2
+texture = ExtResource("28_platform_new")
 expand_mode = 1
 metadata/parallax_factor = 1.0
+metadata/pointer_parallax_factor = 0.0
+metadata/dolly_parallax_factor = 1.0
+metadata/composition_role = "battle_platform_new"
+metadata/_edit_lock_ = true
+
+[node name="DistantLeft2" type="Control" parent="." unique_id=941884401]
+editor_description = "Scene9 左远景完整源图；复用 Scene5 细分网格风场，仅上部草叶摆动，根部固定且不响应鼠标横移。"
+texture_filter = 1
+material = SubResource("Scene9FarLeftGrassMaterialTwo")
+anchors_preset = 0
+offset_left = 1060.0001
+offset_top = 485.0
+offset_right = 1392.0001
+offset_bottom = 673.0
+scale = Vector2(5, 5)
+mouse_filter = 2
+script = ExtResource("23_grass_mesh")
+texture = ExtResource("14_distant_left")
+mesh_columns = 48
+mesh_rows = 12
+metadata/parallax_factor = 1.0
+metadata/pointer_parallax_factor = 0.0
+metadata/dolly_parallax_factor = 1.0
+metadata/composition_role = "distant_left"
+metadata/_edit_lock_ = true
+
+[node name="DistantLeft" type="Control" parent="." unique_id=1849125617]
+editor_description = "Scene9 左远景完整源图；复用 Scene5 细分网格风场，仅上部草叶摆动，根部固定且不响应鼠标横移。"
+texture_filter = 1
+material = SubResource("Scene9FarLeftGrassMaterial")
+anchors_preset = 0
+offset_left = -263.0
+offset_top = 477.0
+offset_right = 69.0
+offset_bottom = 665.0
+scale = Vector2(6, 5)
+mouse_filter = 2
+script = ExtResource("23_grass_mesh")
+texture = ExtResource("14_distant_left")
+mesh_columns = 48
+mesh_rows = 12
+metadata/parallax_factor = 1.0
+metadata/pointer_parallax_factor = 0.0
+metadata/dolly_parallax_factor = 1.0
+metadata/composition_role = "distant_left"
+metadata/_edit_lock_ = true
+
+[node name="SilverMotesFar" type="GPUParticles2D" parent="." unique_id=284763093]
+editor_description = "复刻 Scene2 PollenFar：少量、细小、缓慢上浮的远层银尘，只调整为 Scene9 冷银色与地平线高度。"
+texture_filter = 1
+material = SubResource("Scene9SilverMoteBlend")
+position = Vector2(960, 455)
+amount = 18
+texture = SubResource("Scene9SilverMoteTexture")
+lifetime = 13.0
+preprocess = 9.0
+explosiveness = 0.1
+randomness = 0.72
+visibility_rect = Rect2(-1100, -300, 2200, 600)
+local_coords = true
+process_material = SubResource("Scene9SilverMotesFarMat")
+metadata/parallax_factor = 0.5
+metadata/pointer_parallax_factor = 0.42
+metadata/dolly_parallax_factor = 0.5
+metadata/composition_role = "silver_motes_far"
+metadata/_edit_lock_ = true
+
+[node name="SilverValleyDust" type="GPUParticles2D" parent="."]
+editor_description = "复刻 Scene2 ValleyDust：极少量谷地微尘以反向缓降打破统一流向，颜色适配 Scene9 银蓝远景。"
+texture_filter = 1
+position = Vector2(960, 400)
+amount = 7
+texture = SubResource("Scene9SilverMoteTexture")
+lifetime = 10.0
+preprocess = 6.0
+explosiveness = 0.18
+randomness = 0.78
+visibility_rect = Rect2(-700, -360, 1400, 720)
+local_coords = true
+process_material = SubResource("Scene9SilverValleyDustMat")
+metadata/parallax_factor = 0.72
+metadata/pointer_parallax_factor = 0.62
+metadata/dolly_parallax_factor = 0.72
+metadata/composition_role = "silver_valley_dust"
+metadata/_edit_lock_ = true
+
+[node name="GrassClickPool1" parent="." instance=ExtResource("35_grass_click_group")]
+metadata/parallax_factor = 1.0
+metadata/pointer_parallax_factor = 0.0
+metadata/dolly_parallax_factor = 1.0
+
+[node name="GrassClickPool2" parent="." instance=ExtResource("35_grass_click_group")]
+metadata/parallax_factor = 1.0
+metadata/pointer_parallax_factor = 0.0
+metadata/dolly_parallax_factor = 1.0
+
+[node name="GrassClickPool3" parent="." instance=ExtResource("35_grass_click_group")]
+metadata/parallax_factor = 1.0
+metadata/pointer_parallax_factor = 0.0
+metadata/dolly_parallax_factor = 1.0
+
+[node name="ForegroundMid" type="Control" parent="." unique_id=1610298850]
+editor_description = "Scene9 中部近景草层；保留 4×4 手调构图，以根部锁定细分网格呈现可读草浪。"
+texture_filter = 1
+material = SubResource("Scene9MidGrassMaterial")
+anchors_preset = 0
+offset_left = 253.0
+offset_top = 746.0
+offset_right = 661.0
+offset_bottom = 882.0
+scale = Vector2(4, 4)
+mouse_filter = 2
+script = ExtResource("40_foreground_mesh")
+texture = ExtResource("12_grass")
+mesh_columns = 68
+mesh_rows = 18
+metadata/parallax_factor = 1.18
+metadata/pointer_parallax_factor = 1.08
+metadata/dolly_parallax_factor = 1.18
+metadata/composition_role = "silver_grass"
+metadata/_edit_lock_ = true
+
+[node name="SilverGroundPollen" type="GPUParticles2D" parent="."]
+editor_description = "复刻 Scene2 GroundPollen：贴着银草地缓慢上扬的中层尘光，以数量而非大尺寸形成连续气息。"
+texture_filter = 1
+material = SubResource("Scene9SilverMoteBlend")
+position = Vector2(960, 755)
+amount = 30
+texture = SubResource("Scene9SilverMoteTexture")
+lifetime = 9.0
+preprocess = 5.0
+explosiveness = 0.14
+randomness = 0.68
+visibility_rect = Rect2(-1100, -220, 2200, 440)
+local_coords = true
+process_material = SubResource("Scene9SilverGroundPollenMat")
+metadata/parallax_factor = 1.1
 metadata/pointer_parallax_factor = 1.0
-metadata/composition_role = "battle_platform"
+metadata/dolly_parallax_factor = 1.1
+metadata/composition_role = "ground_silver_pollen"
+metadata/_edit_lock_ = true
 
-[node name="ForegroundLeft" type="TextureRect" parent="." unique_id=1757281403]
-editor_description = "Eddy 当前手调的左近景完整源图；保持当前整体尺寸、3 倍等比节点缩放和位置。"
+[node name="SilverMotesNear" type="GPUParticles2D" parent="." unique_id=2134385616]
+editor_description = "复刻 Scene2 PollenNear：只保留 7 个偶发近层尘光，以尺度差建立景深，避免铺满屏幕的硬圆点。"
 texture_filter = 1
-layout_mode = 0
-offset_left = -126.0
-offset_top = 667.0
-offset_right = 152.33334
-offset_bottom = 834.6666
+material = SubResource("Scene9SilverMoteBlend")
+position = Vector2(960, 860)
+amount = 7
+texture = SubResource("Scene9SilverMoteTexture")
+lifetime = 8.0
+preprocess = 5.0
+explosiveness = 0.22
+randomness = 0.82
+visibility_rect = Rect2(-1120, -260, 2240, 520)
+local_coords = true
+process_material = SubResource("Scene9SilverMotesNearMat")
+metadata/parallax_factor = 1.5
+metadata/pointer_parallax_factor = 1.38
+metadata/dolly_parallax_factor = 1.5
+metadata/composition_role = "silver_motes_near"
+metadata/_edit_lock_ = true
+
+[node name="ForegroundLeft" type="Control" parent="." unique_id=1757281403]
+editor_description = "Scene9 左近景完整源图；保留 3×3 手调构图，枝叶分区明显摇摆且真实根部固定。"
+texture_filter = 1
+material = SubResource("Scene9NearForegroundLeftMaterial")
+anchors_preset = 0
+offset_left = -96.0
+offset_top = 749.0
+offset_right = 236.0
+offset_bottom = 937.0
 scale = Vector2(3, 3)
 mouse_filter = 2
+script = ExtResource("40_foreground_mesh")
 texture = ExtResource("3_foreground_left")
-expand_mode = 1
+mesh_columns = 56
+mesh_rows = 24
 metadata/parallax_factor = 1.18
 metadata/pointer_parallax_factor = 1.08
+metadata/dolly_parallax_factor = 1.18
 metadata/composition_role = "foreground_left"
+metadata/_edit_lock_ = true
 
-[node name="ForegroundRight" type="TextureRect" parent="." unique_id=362427215]
-editor_description = "Eddy 当前手调的右近景完整源图；保持当前整体尺寸、3 倍等比节点缩放和位置。"
+[node name="ForegroundRight" type="Control" parent="." unique_id=362427215]
+editor_description = "Scene9 右近景完整源图；保留 3×3 手调构图，枝叶分区明显摇摆且真实根部固定。"
 texture_filter = 1
-layout_mode = 0
-offset_left = 1244.0
-offset_top = 680.0
-offset_right = 1480.0
-offset_bottom = 834.0
+material = SubResource("Scene9NearForegroundRightMaterial")
+anchors_preset = 0
+offset_left = 1420.0
+offset_top = 701.0
+offset_right = 1708.0
+offset_bottom = 917.0
 scale = Vector2(3, 3)
 mouse_filter = 2
+script = ExtResource("40_foreground_mesh")
 texture = ExtResource("4_foreground_right")
-expand_mode = 1
+mesh_columns = 48
+mesh_rows = 28
 metadata/parallax_factor = 1.18
 metadata/pointer_parallax_factor = 1.08
+metadata/dolly_parallax_factor = 1.18
 metadata/composition_role = "foreground_right"
+metadata/_edit_lock_ = true
 
 [node name="CompositionGuides" type="Node2D" parent="." unique_id=302158477]
 editor_description = "成熟战斗构图基线；后续环境围绕这些锚点适配，不移动人物。"
+top_level = true
+metadata/_edit_lock_ = true
 
 [node name="P1Baseline" type="Marker2D" parent="CompositionGuides" unique_id=1458309586]
 position = Vector2(480, 748)

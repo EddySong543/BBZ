@@ -1,102 +1,83 @@
 shader_type canvas_item;
 render_mode unshaded, blend_mix;
 
-uniform vec4 horizon_color : source_color = vec4(0.37, 0.42, 0.43, 1.0);
-uniform vec4 middle_color : source_color = vec4(0.52, 0.58, 0.57, 1.0);
-uniform vec4 foreground_color : source_color = vec4(0.63, 0.68, 0.65, 1.0);
-uniform vec4 cool_gleam : source_color = vec4(0.82, 0.88, 0.89, 1.0);
+uniform vec4 horizon_color : source_color = vec4(0.50, 0.60, 0.64, 1.0);
+uniform vec4 far_color : source_color = vec4(0.58, 0.67, 0.68, 1.0);
+uniform vec4 middle_color : source_color = vec4(0.66, 0.73, 0.72, 1.0);
+uniform vec4 foreground_color : source_color = vec4(0.73, 0.78, 0.74, 1.0);
+uniform vec4 shadow_color : source_color = vec4(0.43, 0.53, 0.56, 1.0);
+uniform vec4 cool_gleam : source_color = vec4(0.86, 0.90, 0.88, 1.0);
 uniform float horizon_y : hint_range(0.0, 1.0, 0.001) = 0.325;
 uniform float foreground_y : hint_range(0.0, 1.0, 0.001) = 0.74;
-uniform float horizon_feather : hint_range(0.0, 0.15, 0.001) = 0.055;
-uniform float broad_wave_strength : hint_range(0.0, 0.3, 0.005) = 0.055;
-uniform float fine_breakup_strength : hint_range(0.0, 0.2, 0.005) = 0.055;
-uniform float grass_grain_strength : hint_range(0.0, 0.3, 0.005) = 0.09;
+uniform float pixel_block_size : hint_range(1.0, 8.0, 1.0) = 4.0;
 uniform vec2 wind_direction = vec2(1.0, 0.0);
 uniform float wind_speed : hint_range(0.0, 4.0, 0.01) = 0.72;
-uniform float broad_time_scale : hint_range(0.0, 1.0, 0.01) = 0.17;
+uniform float wind_fps : hint_range(1.0, 16.0, 1.0) = 8.0;
 
-float value_noise(vec2 position) {
-	vec2 cell = floor(position);
-	vec2 local = fract(position);
-	local = local * local * (3.0 - 2.0 * local);
-	float a = fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453);
-	float b = fract(sin(dot(cell + vec2(1.0, 0.0), vec2(127.1, 311.7))) * 43758.5453);
-	float c = fract(sin(dot(cell + vec2(0.0, 1.0), vec2(127.1, 311.7))) * 43758.5453);
-	float d = fract(sin(dot(cell + vec2(1.0, 1.0), vec2(127.1, 311.7))) * 43758.5453);
-	return mix(mix(a, b, local.x), mix(c, d, local.x), local.y);
+float hash_cell(vec2 cell) {
+	return fract(sin(dot(floor(cell), vec2(127.1, 311.7))) * 43758.5453);
 }
 
-float blade_layer(vec2 pixel, vec2 screen_pixel_size,
-		float horizon_pixels, float depth, float spacing_scale, float seed) {
-	float row_spacing = mix(6.0, 22.0, depth) * spacing_scale;
-	float relative_y = max(pixel.y - horizon_pixels, 0.0);
+float pixel_blade_layer(vec2 cell, float horizon_cell, float depth,
+		float wind_tick, float seed) {
+	float row_spacing = floor(mix(2.0, 6.0, depth) + 0.5);
+	float relative_y = max(cell.y - horizon_cell, 0.0);
 	float row_id = floor(relative_y / row_spacing) + 1.0;
-	float root_y = horizon_pixels + row_id * row_spacing;
-	float height_from_root = root_y - pixel.y;
-	float root_depth = clamp(
-		(root_y * screen_pixel_size.y - horizon_y)
-		/ max(foreground_y - horizon_y, 0.001), 0.0, 1.0);
-	float cell_width = mix(3.5, 12.0, root_depth) * spacing_scale;
-	float gust = sin(TIME * wind_speed + row_id * 0.71 + seed * 5.3)
-		* mix(0.45, 2.4, root_depth);
-	float shifted_x = pixel.x
-		+ height_from_root * mix(0.13, 0.28, root_depth)
-		+ gust * height_from_root / max(row_spacing, 1.0);
-	float cell_id = floor(shifted_x / cell_width);
-	float random_height = value_noise(vec2(
-		cell_id * 0.47 + seed * 19.0,
-		row_id * 0.61 + seed * 7.0));
-	float height_limit = row_spacing * mix(0.70, 1.46, random_height);
-	float center_distance = abs(fract(shifted_x / cell_width) - 0.5)
-		* cell_width;
-	float blade_width = mix(0.48, 1.28, root_depth);
-	float line = 1.0 - smoothstep(
-		blade_width, blade_width + 0.9, center_distance);
-	float height_mask = step(0.0, height_from_root)
-		* (1.0 - step(height_limit, height_from_root));
-	float tip_taper = 1.0 - smoothstep(
-		height_limit * 0.76, height_limit, height_from_root);
-	return line * height_mask * tip_taper;
+	float cell_width = floor(mix(2.0, 5.0, depth) + 0.5);
+	float column_id = floor(cell.x / cell_width);
+	float row_offset = floor(hash_cell(vec2(column_id + seed * 31.0,
+		row_id + seed * 17.0)) * row_spacing);
+	float root_y = horizon_cell + row_id * row_spacing
+		+ row_offset - floor(row_spacing * 0.5);
+	float blade_height = root_y - cell.y;
+	float gust = floor(sin(wind_tick * wind_speed * 3.0
+		+ row_id * 0.73 + seed * 5.0) * 1.25 + 0.5);
+	float shifted_x = cell.x
+		+ floor(blade_height * mix(0.18, 0.38, depth))
+		+ gust * wind_direction.x * step(1.0, blade_height);
+	float blade_id = floor(shifted_x / cell_width);
+	float random_height = hash_cell(vec2(blade_id + seed * 23.0,
+		row_id + seed * 11.0));
+	float height_limit = 1.0 + floor(random_height * mix(2.0, 5.0, depth));
+	float local_x = mod(shifted_x, cell_width);
+	float one_cell_wide = 1.0 - step(1.0, local_x);
+	float below_tip = 1.0 - step(height_limit + 1.0, blade_height);
+	return one_cell_wide * step(0.0, blade_height) * below_tip;
 }
 
 void fragment() {
-	vec4 vertex_color = COLOR;
-	float depth = smoothstep(horizon_y, foreground_y, SCREEN_UV.y);
-	vec3 base = mix(horizon_color.rgb, middle_color.rgb, smoothstep(0.0, 0.58, depth));
-	base = mix(base, foreground_color.rgb, smoothstep(0.50, 1.0, depth));
+	vec2 screen_pixel = SCREEN_UV / SCREEN_PIXEL_SIZE;
+	vec2 pixel_cell = floor(screen_pixel / pixel_block_size);
+	vec2 snapped_uv = (pixel_cell * pixel_block_size
+		+ vec2(pixel_block_size * 0.5)) * SCREEN_PIXEL_SIZE;
+	float depth = clamp((snapped_uv.y - horizon_y)
+		/ max(foreground_y - horizon_y, 0.001), 0.0, 1.0);
+	float depth_variation = (hash_cell(vec2(
+		floor(pixel_cell.x / 5.0), floor(pixel_cell.y / 2.0))) - 0.5) * 0.14;
+	float palette_depth = clamp(depth + depth_variation, 0.0, 1.0);
+	vec3 base = horizon_color.rgb;
+	base = mix(base, far_color.rgb, step(0.18, palette_depth));
+	base = mix(base, middle_color.rgb, step(0.43, palette_depth));
+	base = mix(base, foreground_color.rgb, step(0.72, palette_depth));
 
-	vec2 broad_position = vec2(
-		SCREEN_UV.x * 3.4 - wind_direction.x * TIME * wind_speed * broad_time_scale,
-		SCREEN_UV.y * 5.2 - wind_direction.y * TIME * wind_speed * broad_time_scale);
-	float broad_wave = value_noise(broad_position) * 2.0 - 1.0;
-	float fine_breakup = value_noise(
-		SCREEN_UV * vec2(17.0, 25.0)
-		- wind_direction * TIME * wind_speed * broad_time_scale * 1.9) * 2.0 - 1.0;
-	float moving_gleam = smoothstep(0.38, 0.86,
-		value_noise(SCREEN_UV * vec2(5.5, 7.0)
-		- wind_direction * TIME * wind_speed * broad_time_scale * 0.72));
+	float coarse_noise = hash_cell(vec2(
+		floor(pixel_cell.x / mix(7.0, 3.0, depth)),
+		floor(pixel_cell.y / mix(3.0, 2.0, depth))));
+	base = mix(base, shadow_color.rgb, step(coarse_noise, 0.13) * 0.38);
+	base = mix(base, cool_gleam.rgb, step(0.87, coarse_noise) * 0.28);
 
-	base *= 1.0 + broad_wave * broad_wave_strength;
-	base *= 1.0 + fine_breakup * fine_breakup_strength * mix(0.2, 1.0, depth);
-	vec2 pixel = SCREEN_UV / SCREEN_PIXEL_SIZE;
-	float horizon_pixels = horizon_y / SCREEN_PIXEL_SIZE.y;
-	float blades = blade_layer(pixel, SCREEN_PIXEL_SIZE, horizon_pixels + 2.0,
-		depth, 1.0, 0.17);
-	blades = max(blades, blade_layer(pixel, SCREEN_PIXEL_SIZE, horizon_pixels + 5.0,
-		depth, 0.72, 0.61) * 0.72);
+	float wind_tick = floor(TIME * wind_fps) / wind_fps;
+	float horizon_cell = floor((horizon_y / SCREEN_PIXEL_SIZE.y)
+		/ pixel_block_size);
+	float blades = pixel_blade_layer(pixel_cell, horizon_cell,
+		depth, wind_tick, 0.19);
+	blades = max(blades, pixel_blade_layer(pixel_cell + vec2(1.0, 0.0),
+		horizon_cell + 1.0, depth, wind_tick, 0.67) * 0.72);
 	vec3 blade_color = mix(middle_color.rgb, cool_gleam.rgb,
-		mix(0.28, 0.62, depth));
-	base = mix(base, blade_color, blades * mix(0.24, 0.44, depth));
-	float row_frequency = mix(215.0, 92.0, depth);
-	float row_index = floor((SCREEN_UV.y - horizon_y) * row_frequency);
-	float blade_noise = value_noise(vec2(
-		floor(SCREEN_UV.x * mix(260.0, 118.0, depth)) * 0.37,
-		row_index * 0.41));
-	float blade_grain = smoothstep(0.73, 0.98, blade_noise)
-		* smoothstep(0.0, 0.16, depth);
-	base = mix(base, cool_gleam.rgb,
-		blade_grain * grass_grain_strength * mix(0.25, 1.0, depth));
-	base = mix(base, cool_gleam.rgb, moving_gleam * 0.055 * mix(0.2, 1.0, depth));
-	float horizon_alpha = smoothstep(horizon_y, horizon_y + horizon_feather, SCREEN_UV.y);
-	COLOR = vec4(base * vertex_color.rgb, vertex_color.a * horizon_alpha);
+		step(0.48, depth) * 0.52);
+	float blade_weight = mix(0.40, 0.64, step(0.50, depth));
+	base = mix(base, blade_color, blades * blade_weight);
+
+	float horizon_alpha = step(horizon_y, snapped_uv.y);
+	COLOR = vec4(base, horizon_alpha);
 }

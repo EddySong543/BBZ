@@ -11,6 +11,6 @@
 
 ## 用法
 
-- **道具图标**：按【道具中文名】命名 PNG 丢进来 → 跑 `tools/import_item_art.gd` 同名归位到 `assets/sprites/items/`。
+- **道具图标**：按【道具中文名】命名 PNG 丢进来 → 跑 `tools/import_item_art.gd`，新版自动归位到 `assets/sprites/items/v2/`，旧版归位到 `assets/sprites/items/legacy/`。
 - **英雄美术**：`hXX.png`（立绘）+ `hXX_idle.png`（idle sheet）复制到 `assets/sprites/heroes/hXX/`，再跑 `tools/import_hero_art.gd` 切帧（256px 网格·4 列·跳全透明格）。
 - 归位并确认无误后，清空本目录。
