@@ -1,6 +1,7 @@
 extends Node
 
-const OUTPUT_DIR := "D:/Game/BoBoZan/boot_intro_runtime_frames"
+const OUTPUT_DIR := (
+	"D:/Game/BoBoZan/_probe_output/boot_intro_runtime_frames")
 const BOOT_SCREEN_PATH := "res://src/ui/boot_screen.tscn"
 
 
@@ -18,7 +19,7 @@ func _ready() -> void:
 
 	var intro := boot.get_node_or_null(
 		"IntroController") as BootIntroController
-	var prompt := boot.get_node_or_null("EnterPrompt") as BootEnterPrompt
+	var menu := boot.get_node_or_null("BootMenu") as BootMenuController
 	var star := boot.get_node_or_null(
 		"Character/Rig/RearHandEnergyAnchor/RearHandStar") as ColorRect
 	var stage := boot.get_node_or_null("BackgroundStage") as Control
@@ -32,15 +33,15 @@ func _ready() -> void:
 		"BackgroundStage/PressureContours") as ColorRect
 	var title := boot.get_node_or_null(
 		"TitleColumn/BoTop") as TextureRect
-	var english := boot.get_node_or_null(
-		"TitleColumn/EnglishSubtitle") as TextureRect
+	var chuan := boot.get_node_or_null("TitleColumn/Chuan") as TextureRect
+	var shuo := boot.get_node_or_null("TitleColumn/Shuo") as TextureRect
 	var character_base := boot.get_node_or_null(
 		"Character/Rig/Base") as Sprite2D
 	var title_controller := boot.get_node_or_null(
 		"TitleColumn") as BootTitleController
 	if (
 		intro == null
-		or prompt == null
+		or menu == null
 		or star == null
 		or stage == null
 		or black_base == null
@@ -48,7 +49,8 @@ func _ready() -> void:
 		or gold == null
 		or contours == null
 		or title == null
-		or english == null
+		or chuan == null
+		or shuo == null
 		or character_base == null
 		or title_controller == null
 	):
@@ -197,8 +199,8 @@ func _ready() -> void:
 			return
 	title_controller.preview_pointer_tilt(Vector2.ZERO)
 
-	if black_base.color != Color.BLACK:
-		push_error("Boot intro black base is not pure black.")
+	if not black_base.color.is_equal_approx(Color("#c8d3d0")):
+		push_error("Boot intro base does not use the current palette A paper.")
 		get_tree().quit(1)
 		return
 	if _lit_fraction(
@@ -218,7 +220,7 @@ func _ready() -> void:
 		or _shader_float(blue_mid, &"intro_stroke_progress") > 0.001
 		or _shader_float(gold, &"intro_path_progress") > 0.001
 		or _shader_float(title, &"intro_reveal_progress") > 0.001
-		or prompt.visible
+		or menu.visible
 	):
 		push_error("Boot initial character-only frame drifted.")
 		get_tree().quit(1)
@@ -239,8 +241,8 @@ func _ready() -> void:
 			return
 	if (
 		_shader_float(title, &"intro_reveal_progress") <= 0.0
-		or _shader_float(english, &"intro_reveal_progress") <= 0.0
-		or not prompt.visible
+		or _shader_float(chuan, &"intro_reveal_progress") <= 0.0
+		or not menu.visible
 	):
 		push_error("Boot title did not start with the brush impact.")
 		get_tree().quit(1)
@@ -287,7 +289,7 @@ func _ready() -> void:
 		_shader_float(blue_mid, &"intro_stroke_progress") < 0.999
 		or _shader_float(gold, &"intro_path_progress") < 0.999
 		or _shader_float(title, &"intro_reveal_progress") < 0.999
-		or not prompt.visible
+		or not menu.visible
 	):
 		push_error("Boot parallel layers did not settle together.")
 		get_tree().quit(1)
@@ -300,31 +302,40 @@ func _ready() -> void:
 		title,
 		&"intro_reveal_progress")
 	var title_material := title.material as ShaderMaterial
-	var english_material := english.material as ShaderMaterial
+	var chuan_material := chuan.material as ShaderMaterial
+	var shuo_material := shuo.material as ShaderMaterial
 	if (
 		title_entry_progress <= 0.0
 		or title_entry_progress >= 1.0
 		or title_material.get_shader_parameter(
 			&"intro_activation_map") == null
 		or not is_equal_approx(
-			_shader_float(english, &"intro_reveal_progress"),
+			_shader_float(chuan, &"intro_reveal_progress"),
 			title_entry_progress)
-		or english_material.get_shader_parameter(
+		or not is_equal_approx(
+			_shader_float(shuo, &"intro_reveal_progress"),
+			title_entry_progress)
+		or chuan_material.get_shader_parameter(
+			&"intro_activation_map") == null
+		or shuo_material.get_shader_parameter(
 			&"intro_activation_map") == null
 		or not is_equal_approx(
-			_shader_float(english, &"intro_progress_delay"),
-			0.052632)
+			_shader_float(chuan, &"intro_progress_delay"),
+			0.0)
+		or not is_equal_approx(
+			_shader_float(shuo, &"intro_progress_delay"),
+			0.0)
 		or title_material.shader.code.contains("blade_coordinate")
-		or not prompt.visible
-		or prompt.modulate.a <= 0.0
+		or not menu.visible
+		or menu.modulate.a <= 0.0
 	):
-		push_error("Boot title, subtitle, and prompt are not synchronized.")
+		push_error("Boot five-glyph title and menu are not synchronized.")
 		get_tree().quit(1)
 		return
 
 	intro.finish_immediately()
 	await get_tree().process_frame
-	if not boot.can_enter() or not prompt.visible:
+	if not boot.can_enter() or not menu.visible:
 		push_error("Boot intro did not restore the idle input contract.")
 		get_tree().quit(1)
 		return
@@ -337,9 +348,9 @@ func _ready() -> void:
 	await get_tree().process_frame
 	var runtime_intro := runtime_boot.get_node_or_null(
 		"IntroController") as BootIntroController
-	var runtime_prompt := runtime_boot.get_node_or_null(
-		"EnterPrompt") as BootEnterPrompt
-	if runtime_intro == null or runtime_prompt == null:
+	var runtime_menu := runtime_boot.get_node_or_null(
+		"BootMenu") as BootMenuController
+	if runtime_intro == null or runtime_menu == null:
 		push_error("Boot continuous intro nodes are incomplete.")
 		get_tree().quit(1)
 		return
@@ -357,10 +368,10 @@ func _ready() -> void:
 	if (
 		runtime_boot.can_enter()
 		or TransitionManager.is_busy()
-		or not runtime_prompt.visible
+		or not runtime_menu.visible
 	):
 		push_error(
-			"Boot intro input lock or synchronized prompt contract failed.")
+			"Boot intro input lock or synchronized menu contract failed.")
 		get_tree().quit(1)
 		return
 
@@ -373,7 +384,7 @@ func _ready() -> void:
 		playback_seconds < 1.15
 		or playback_seconds > 1.60
 		or not runtime_boot.can_enter()
-		or not runtime_prompt.visible
+		or not runtime_menu.visible
 	):
 		push_error(
 			"Boot continuous playback contract failed: %.3f"

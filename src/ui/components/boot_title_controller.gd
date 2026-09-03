@@ -5,11 +5,43 @@ signal flow_phase_changed(phase: float)
 
 const TITLE_TEXTURE_SIZE := 252.0
 const TITLE_GROUP_WIDTH := 726.0
-const TITLE_PART_COUNT := 3
-const FLOW_START_PIXELS: Array[float] = [224.5, 224.5, 215.5]
-const FLOW_END_PIXELS: Array[float] = [63.5, 45.5, 45.5]
-const GROUP_START_PIXELS: Array[float] = [456.0, 228.0, 0.0]
-const GROUP_END_PIXELS: Array[float] = [726.0, 498.0, 270.0]
+const TITLE_PART_COUNT := 5
+const FLOW_RELEASE_PART_COUNT := 3
+const FLOW_START_PIXELS: Array[float] = [
+	224.5,
+	224.5,
+	215.5,
+	224.5,
+	224.5,
+]
+const FLOW_END_PIXELS: Array[float] = [
+	45.5,
+	45.5,
+	63.5,
+	45.5,
+	63.5,
+]
+const GROUP_START_PIXELS: Array[float] = [
+	510.0,
+	327.0,
+	456.0,
+	228.0,
+	0.0,
+]
+const GROUP_END_PIXELS: Array[float] = [
+	726.0,
+	543.0,
+	726.0,
+	498.0,
+	270.0,
+]
+const TITLE_INTRO_MAPS: Array[Texture2D] = [
+	preload("res://assets/ui/boot/title_intro_shuo.png"),
+	preload("res://assets/ui/boot/title_intro_chuan.png"),
+	preload("res://assets/ui/boot/title_intro_zan_bottom.png"),
+	preload("res://assets/ui/boot/title_intro_bo_middle.png"),
+	preload("res://assets/ui/boot/title_intro_bo_top.png"),
+]
 
 @export_group("Palette")
 @export var face_color: Color = Color(
@@ -36,7 +68,6 @@ const GROUP_END_PIXELS: Array[float] = [726.0, 498.0, 270.0]
 @export_range(0.001, 0.05, 0.001) var intro_reveal_feather: float = 0.012
 @export_range(0.01, 0.30, 0.001) var intro_crack_peak_width: float = 0.11
 @export_range(0.0, 0.20, 0.001) var intro_shadow_lag: float = 0.055
-@export_range(0.0, 0.25, 0.001) var intro_english_delay: float = 0.052632
 
 @export_group("Pointer Perspective")
 @export_range(0.0, 10.0, 0.1) var pointer_yaw_degrees: float = 6.0
@@ -49,13 +80,13 @@ const GROUP_END_PIXELS: Array[float] = [726.0, 498.0, 270.0]
 @onready var _bo_top_shadow: TextureRect = $BoTopShadow
 @onready var _bo_middle_shadow: TextureRect = $BoMiddleShadow
 @onready var _zan_bottom_shadow: TextureRect = $ZanBottomShadow
-@onready var _english_subtitle: TextureRect = $EnglishSubtitle
-@onready var _english_subtitle_shadow: TextureRect = $EnglishSubtitleShadow
+@onready var _chuan: TextureRect = $Chuan
+@onready var _shuo: TextureRect = $Shuo
+@onready var _chuan_shadow: TextureRect = $ChuanShadow
+@onready var _shuo_shadow: TextureRect = $ShuoShadow
 
 var _materials: Array[ShaderMaterial] = []
 var _shadow_materials: Array[ShaderMaterial] = []
-var _english_material: ShaderMaterial
-var _english_shadow_material: ShaderMaterial
 var _phase_tween: Tween
 var _current_flow_phase: float = 0.0
 var _pointer_tilt: Vector2 = Vector2.ZERO
@@ -64,8 +95,8 @@ var _pointer_tilt: Vector2 = Vector2.ZERO
 func _ready() -> void:
 	_cache_materials()
 	if (
-		_materials.size() != 3
-		or _shadow_materials.size() != 3
+		_materials.size() != TITLE_PART_COUNT
+		or _shadow_materials.size() != TITLE_PART_COUNT
 	):
 		return
 	_apply_shared_parameters()
@@ -114,7 +145,7 @@ func current_flow_phase() -> float:
 
 func final_flow_release_seconds() -> float:
 	return minf(
-		float(TITLE_PART_COUNT - 1) * flow_stagger_seconds
+		float(FLOW_RELEASE_PART_COUNT - 1) * flow_stagger_seconds
 			+ flow_duration_seconds
 			+ release_duration_seconds,
 		maxf(flow_period_seconds, 0.001),
@@ -138,14 +169,6 @@ func set_intro_progress(progress: float) -> void:
 		shader_material.set_shader_parameter(
 			&"intro_reveal_progress",
 			safe_progress)
-	if _english_material != null:
-		_english_material.set_shader_parameter(
-			&"intro_reveal_progress",
-			safe_progress)
-	if _english_shadow_material != null:
-		_english_shadow_material.set_shader_parameter(
-			&"intro_reveal_progress",
-			safe_progress)
 
 
 func finish_intro() -> void:
@@ -157,40 +180,50 @@ func _cache_materials() -> void:
 	_materials.clear()
 	_shadow_materials.clear()
 	var title_nodes: Array[TextureRect] = [
+		_shuo,
+		_chuan,
 		_zan_bottom,
 		_bo_middle,
 		_bo_top,
 	]
-	for title_node: TextureRect in title_nodes:
-		var shader_material := title_node.material as ShaderMaterial
+	for index: int in title_nodes.size():
+		var title_node := title_nodes[index]
+		var shader_material := (
+			title_node.material.duplicate(true) as ShaderMaterial)
 		if shader_material == null:
 			push_error(
 				"Boot title node %s requires a ShaderMaterial."
 				% title_node.name)
 			_materials.clear()
 			return
+		title_node.material = shader_material
+		shader_material.set_shader_parameter(
+			&"intro_activation_map",
+			TITLE_INTRO_MAPS[index])
 		_materials.append(shader_material)
 
 	var shadow_nodes: Array[TextureRect] = [
+		_shuo_shadow,
+		_chuan_shadow,
 		_zan_bottom_shadow,
 		_bo_middle_shadow,
 		_bo_top_shadow,
 	]
-	for shadow_node: TextureRect in shadow_nodes:
-		var shader_material := shadow_node.material as ShaderMaterial
+	for index: int in shadow_nodes.size():
+		var shadow_node := shadow_nodes[index]
+		var shader_material := (
+			shadow_node.material.duplicate(true) as ShaderMaterial)
 		if shader_material == null:
 			push_error(
 				"Boot title shadow %s requires a ShaderMaterial."
 				% shadow_node.name)
 			_shadow_materials.clear()
 			return
+		shadow_node.material = shader_material
+		shader_material.set_shader_parameter(
+			&"intro_activation_map",
+			TITLE_INTRO_MAPS[index])
 		_shadow_materials.append(shader_material)
-
-	_english_material = _english_subtitle.material as ShaderMaterial
-	_english_shadow_material = (
-		_english_subtitle_shadow.material as ShaderMaterial)
-	if _english_material == null or _english_shadow_material == null:
-		push_error("Boot English subtitle requires title ShaderMaterials.")
 
 func _apply_shared_parameters() -> void:
 	var safe_period := maxf(flow_period_seconds, 0.001)
@@ -250,7 +283,8 @@ func _apply_shared_parameters() -> void:
 		shader_material.set_shader_parameter(
 			&"group_x_max",
 			GROUP_END_PIXELS[index] / TITLE_GROUP_WIDTH)
-	for shadow_material: ShaderMaterial in _shadow_materials:
+	for index: int in _shadow_materials.size():
+		var shadow_material := _shadow_materials[index]
 		shadow_material.set_shader_parameter(&"flow_enabled", false)
 		shadow_material.set_shader_parameter(&"intro_shadow", true)
 		shadow_material.set_shader_parameter(&"intro_progress_delay", 0.0)
@@ -260,10 +294,12 @@ func _apply_shared_parameters() -> void:
 		shadow_material.set_shader_parameter(
 			&"intro_shadow_lag",
 			intro_shadow_lag)
-	_apply_english_parameters(
-		safe_period,
-		normalized_flow_duration,
-		normalized_release_duration)
+		shadow_material.set_shader_parameter(
+			&"group_x_min",
+			GROUP_START_PIXELS[index] / TITLE_GROUP_WIDTH)
+		shadow_material.set_shader_parameter(
+			&"group_x_max",
+			GROUP_END_PIXELS[index] / TITLE_GROUP_WIDTH)
 	_apply_palette()
 	_apply_pointer_tilt()
 
@@ -286,87 +322,6 @@ func _apply_pointer_tilt() -> void:
 		shader_material.set_shader_parameter(
 			&"pointer_pitch_strength",
 			pitch_strength)
-	for shader_material: ShaderMaterial in [
-		_english_material,
-		_english_shadow_material,
-	]:
-		if shader_material == null:
-			continue
-		shader_material.set_shader_parameter(
-			&"pointer_yaw",
-			_pointer_tilt.x)
-		shader_material.set_shader_parameter(
-			&"pointer_pitch",
-			_pointer_tilt.y)
-		shader_material.set_shader_parameter(
-			&"pointer_yaw_strength",
-			yaw_strength)
-		shader_material.set_shader_parameter(
-			&"pointer_pitch_strength",
-			pitch_strength)
-func _apply_english_parameters(
-	safe_period: float,
-	normalized_flow_duration: float,
-	normalized_release_duration: float,
-) -> void:
-	if _english_material == null or _english_shadow_material == null:
-		return
-	_english_material.set_shader_parameter(
-		&"flow_enabled",
-		true)
-	_english_material.set_shader_parameter(
-		&"flow_delay",
-		0.12 / safe_period)
-	_english_material.set_shader_parameter(
-		&"flow_duration",
-		normalized_flow_duration)
-	_english_material.set_shader_parameter(
-		&"release_duration",
-		normalized_release_duration)
-	_english_material.set_shader_parameter(
-		&"head_width_texels",
-		maxf(head_width_texels - 1.0, 1.0))
-	_english_material.set_shader_parameter(
-		&"tail_length_texels",
-		maxf(tail_length_texels - 4.0, 4.0))
-	_english_material.set_shader_parameter(
-		&"flow_pixel_step_texels",
-		flow_pixel_step_texels)
-	_english_material.set_shader_parameter(
-		&"flow_value_steps",
-		flow_value_steps)
-	_english_material.set_shader_parameter(
-		&"structure_tint_strength",
-		structure_tint_strength)
-	_english_material.set_shader_parameter(
-		&"intro_reveal_feather",
-		intro_reveal_feather)
-	_english_material.set_shader_parameter(
-		&"intro_crack_peak_width",
-		intro_crack_peak_width)
-	_english_material.set_shader_parameter(&"intro_shadow", false)
-	_english_material.set_shader_parameter(
-		&"intro_progress_delay",
-		intro_english_delay)
-	_english_material.set_shader_parameter(&"flow_start_uv_x", 0.98)
-	_english_material.set_shader_parameter(&"flow_end_uv_x", 0.02)
-	_english_material.set_shader_parameter(&"group_x_min", 0.0)
-	_english_material.set_shader_parameter(&"group_x_max", 1.0)
-	_english_shadow_material.set_shader_parameter(
-		&"flow_enabled",
-		false)
-	_english_shadow_material.set_shader_parameter(
-		&"intro_shadow",
-		true)
-	_english_shadow_material.set_shader_parameter(
-		&"intro_progress_delay",
-		intro_english_delay)
-	_english_shadow_material.set_shader_parameter(
-		&"intro_reveal_feather",
-		intro_reveal_feather)
-	_english_shadow_material.set_shader_parameter(
-		&"intro_shadow_lag",
-		intro_shadow_lag)
 
 
 func _apply_palette() -> void:
@@ -377,17 +332,6 @@ func _apply_palette() -> void:
 			structure_color)
 		shader_material.set_shader_parameter(&"energy_color", energy_color)
 		shader_material.set_shader_parameter(
-			&"energy_peak_color",
-			energy_peak_color)
-	if _english_material != null:
-		_english_material.set_shader_parameter(&"face_color", face_color)
-		_english_material.set_shader_parameter(
-			&"structure_color",
-			structure_color)
-		_english_material.set_shader_parameter(
-			&"energy_color",
-			energy_color)
-		_english_material.set_shader_parameter(
 			&"energy_peak_color",
 			energy_peak_color)
 
@@ -410,10 +354,6 @@ func _set_flow_phase(phase: float) -> void:
 	_current_flow_phase = clampf(phase, 0.0, 1.0)
 	for shader_material: ShaderMaterial in _materials:
 		shader_material.set_shader_parameter(
-			&"flow_phase",
-			_current_flow_phase)
-	if _english_material != null:
-		_english_material.set_shader_parameter(
 			&"flow_phase",
 			_current_flow_phase)
 	flow_phase_changed.emit(_current_flow_phase)

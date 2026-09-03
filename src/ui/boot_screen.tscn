@@ -19,21 +19,31 @@
 [ext_resource type="Script" uid="uid://b4ihh610vdrnm" path="res://src/ui/components/boot_pressure_motion.gd" id="17_motion_script"]
 [ext_resource type="Shader" uid="uid://cnxchyste4tw6" path="res://assets/shaders/canvas_boot_gold_energy.gdshader" id="18_gold_shader"]
 [ext_resource type="Script" uid="uid://bv4s0isdxh2dc" path="res://src/ui/components/boot_blue_flow_motion.gd" id="19_blue_motion_script"]
-[ext_resource type="Script" uid="uid://b1tr4f3xwq31v" path="res://src/ui/components/boot_enter_prompt.gd" id="20_enter_prompt_script"]
 [ext_resource type="Shader" uid="uid://bdm3wx2k3ah2h" path="res://assets/shaders/canvas_boot_pressure_contours.gdshader" id="21_pressure_contour_shader"]
 [ext_resource type="Shader" uid="uid://cor5j57f5augg" path="res://assets/shaders/canvas_boot_foreground_brush.gdshader" id="22_foreground_brush_shader"]
 [ext_resource type="Script" uid="uid://biat3b5r8flp4" path="res://src/ui/components/boot_intro_controller.gd" id="23_intro_script"]
 [ext_resource type="Texture2D" uid="uid://bkr4k2kn7f3nu" path="res://assets/ui/boot/boot_pressure_blue_intro_path.png" id="24_blue_intro_path"]
 [ext_resource type="Texture2D" uid="uid://cfbf55vc2ugkj" path="res://assets/ui/boot/boot_pressure_gold_intro_path.png" id="25_gold_intro_path"]
-[ext_resource type="Texture2D" uid="uid://cdwgtbs67ytic" path="res://assets/ui/boot/title_bobozan.png" id="26_english_title"]
+[ext_resource type="Texture2D" uid="uid://chexpov0phrrt" path="res://assets/ui/boot/title_chuan.png" id="26_chuan_title"]
 [ext_resource type="Texture2D" uid="uid://48ajon6a3pf3" path="res://assets/ui/boot/title_intro_bo_top.png" id="27_title_intro_bo_top"]
 [ext_resource type="Texture2D" uid="uid://r56ii48jfaj" path="res://assets/ui/boot/title_intro_bo_middle.png" id="28_title_intro_bo_middle"]
 [ext_resource type="Texture2D" uid="uid://vcxkxewbr3eu" path="res://assets/ui/boot/title_intro_zan_bottom.png" id="29_title_intro_zan_bottom"]
-[ext_resource type="Texture2D" uid="uid://kg8kj5g3voa0" path="res://assets/ui/boot/title_intro_bobozan.png" id="30_title_intro_bobozan"]
+[ext_resource type="Texture2D" uid="uid://c8vpq5qpy0427" path="res://assets/ui/boot/title_intro_chuan.png" id="30_title_intro_chuan"]
+[ext_resource type="Texture2D" uid="uid://wq0230in5vhs" path="res://assets/ui/boot/title_shuo.png" id="31_shuo_title"]
+[ext_resource type="Script" uid="uid://dqufivu21ye5q" path="res://src/ui/components/boot_menu_controller.gd" id="32_boot_menu"]
+[ext_resource type="Shader" uid="uid://dy1poy5w7h40t" path="res://assets/shaders/canvas_ui_command_cross_star_ssaa.gdshader" id="33_cw1yx"]
+[ext_resource type="Texture2D" uid="uid://behfn0wwhwgvh" path="res://assets/ui/boot/menu_icons/steam.png" id="33_steam_icon"]
+[ext_resource type="Texture2D" uid="uid://bwhajb81173oq" path="res://assets/ui/boot/menu_icons/discord.png" id="34_discord_icon"]
+[ext_resource type="Texture2D" uid="uid://d2eu6w3nm33n4" path="res://assets/ui/boot/menu_icons/qq.png" id="35_qq_icon"]
+[ext_resource type="Texture2D" uid="uid://dukxa6dq7xhto" path="res://assets/ui/boot/menu_icons/feedback.png" id="37_feedback_icon"]
+[ext_resource type="FontVariation" path="res://assets/font/zlabs_pixel_ui.tres" id="38_boot_font"]
+[ext_resource type="Script" uid="uid://cmaj2bifx78ew" path="res://src/ui/components/boot_icon_base.gd" id="39_icon_base"]
+[ext_resource type="Script" uid="uid://buodh8wwm1upt" path="res://src/ui/components/boot_menu_button_motion.gd" id="40_button_motion"]
+[ext_resource type="Script" path="res://src/ui/components/boot_menu_focus_mark.gd" id="41_focus_mark"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_paper"]
 shader = ExtResource("15_paper_shader")
-shader_parameter/paper_color = Color(0.031373, 0.039216, 0.058824, 1)
+shader_parameter/paper_color = Color(0.784314, 0.827451, 0.815686, 1)
 shader_parameter/fine_grain_strength = 0.01
 shader_parameter/broad_grain_strength = 0.014
 shader_parameter/grain_cells = Vector2(480, 270)
@@ -48,7 +58,7 @@ shader_parameter/wave_period = 44.0
 shader_parameter/wave_spacing = 0.22500000614672
 shader_parameter/wave_half_width = 0.018
 shader_parameter/wave_feather = 0.016
-shader_parameter/wave_color = Color(0.105882, 0.14902, 0.192157, 0.42)
+shader_parameter/wave_color = Color(0.32549, 0.423529, 0.47451, 0.42)
 shader_parameter/flow_direction = Vector2(-1, 0.55)
 shader_parameter/direction_spread = 0.69999998807907
 shader_parameter/right_fade_start = 0.44
@@ -63,9 +73,9 @@ shader_parameter/motion_period = 7.4
 shader_parameter/bend_pixels = 0.0
 shader_parameter/flow_contrast = 0.0
 shader_parameter/motion_direction = Vector2(-1, 0.55)
-shader_parameter/palette_shadow = Vector3(0.203922, 0.227451, 0.25098)
-shader_parameter/palette_mid = Vector3(0.34902, 0.388235, 0.431373)
-shader_parameter/palette_light = Vector3(0.666667, 0.705882, 0.745098)
+shader_parameter/palette_shadow = Vector3(0.262745, 0.364706, 0.419608)
+shader_parameter/palette_mid = Vector3(0.435294, 0.529412, 0.572549)
+shader_parameter/palette_light = Vector3(0.619608, 0.678431, 0.690196)
 shader_parameter/palette_strength = 1.0
 shader_parameter/intro_path_texture = ExtResource("24_blue_intro_path")
 shader_parameter/intro_stroke_progress = 1.0
@@ -82,9 +92,9 @@ shader_parameter/motion_period = 5.0
 shader_parameter/bend_pixels = 2.0
 shader_parameter/flow_contrast = 0.1
 shader_parameter/motion_direction = Vector2(-1, 0.55)
-shader_parameter/palette_shadow = Vector3(0.203922, 0.227451, 0.25098)
-shader_parameter/palette_mid = Vector3(0.34902, 0.388235, 0.431373)
-shader_parameter/palette_light = Vector3(0.666667, 0.705882, 0.745098)
+shader_parameter/palette_shadow = Vector3(0.262745, 0.364706, 0.419608)
+shader_parameter/palette_mid = Vector3(0.435294, 0.529412, 0.572549)
+shader_parameter/palette_light = Vector3(0.619608, 0.678431, 0.690196)
 shader_parameter/palette_strength = 1.0
 shader_parameter/intro_path_texture = ExtResource("24_blue_intro_path")
 shader_parameter/intro_stroke_progress = 1.0
@@ -101,9 +111,9 @@ shader_parameter/motion_period = 3.6
 shader_parameter/bend_pixels = 3.2
 shader_parameter/flow_contrast = 0.18
 shader_parameter/motion_direction = Vector2(-1, 0.55)
-shader_parameter/palette_shadow = Vector3(0.203922, 0.227451, 0.25098)
-shader_parameter/palette_mid = Vector3(0.34902, 0.388235, 0.431373)
-shader_parameter/palette_light = Vector3(0.666667, 0.705882, 0.745098)
+shader_parameter/palette_shadow = Vector3(0.262745, 0.364706, 0.419608)
+shader_parameter/palette_mid = Vector3(0.435294, 0.529412, 0.572549)
+shader_parameter/palette_light = Vector3(0.619608, 0.678431, 0.690196)
 shader_parameter/palette_strength = 1.0
 shader_parameter/intro_path_texture = ExtResource("24_blue_intro_path")
 shader_parameter/intro_stroke_progress = 1.0
@@ -135,7 +145,7 @@ shader_parameter/intro_contact_path_ceiling = 0.32
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_foreground_brush"]
 shader = ExtResource("22_foreground_brush_shader")
-shader_parameter/tint_color = Color(0.227451, 0.254902, 0.282353, 1)
+shader_parameter/tint_color = Color(0.262745, 0.364706, 0.419608, 1)
 shader_parameter/opacity = 0.16
 shader_parameter/tint_strength = 0.9
 shader_parameter/fringe_cleanup = 0.14
@@ -264,10 +274,10 @@ shader_parameter/intro_shadow = true
 shader_parameter/intro_shadow_lag = 0.055
 shader_parameter/intro_crack_peak_width = 0.11
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_english_shadow"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_extension_shadow_template"]
 shader = ExtResource("6_title_shader")
-shader_parameter/perspective_strength = 0.04
-shader_parameter/edge_padding = 0.025
+shader_parameter/perspective_strength = 0.1
+shader_parameter/edge_padding = 0.04
 shader_parameter/group_x_min = 0.0
 shader_parameter/group_x_max = 1.0
 shader_parameter/pointer_yaw = 0.0
@@ -292,14 +302,14 @@ shader_parameter/head_width_texels = 6.0
 shader_parameter/tail_length_texels = 28.0
 shader_parameter/flow_pixel_step_texels = 4.0
 shader_parameter/flow_value_steps = 3.0
-shader_parameter/structure_tint_strength = 0.42
+shader_parameter/structure_tint_strength = 0.0
 shader_parameter/outline_color = Color(0.058824, 0.105882, 0.14902, 0.88)
 shader_parameter/outline_width_texels = 1.0
 shader_parameter/outline_strength = 0.0
-shader_parameter/intro_activation_map = ExtResource("30_title_intro_bobozan")
+shader_parameter/intro_activation_map = ExtResource("30_title_intro_chuan")
 shader_parameter/intro_reveal_progress = 1.0
 shader_parameter/intro_reveal_feather = 0.012
-shader_parameter/intro_progress_delay = 0.052632
+shader_parameter/intro_progress_delay = 0.0
 shader_parameter/intro_shadow = true
 shader_parameter/intro_shadow_lag = 0.055
 shader_parameter/intro_crack_peak_width = 0.11
@@ -424,10 +434,10 @@ shader_parameter/intro_shadow = false
 shader_parameter/intro_shadow_lag = 0.055
 shader_parameter/intro_crack_peak_width = 0.11
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_english"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_extension_face_template"]
 shader = ExtResource("6_title_shader")
-shader_parameter/perspective_strength = 0.04
-shader_parameter/edge_padding = 0.025
+shader_parameter/perspective_strength = 0.1
+shader_parameter/edge_padding = 0.04
 shader_parameter/group_x_min = 0.0
 shader_parameter/group_x_max = 1.0
 shader_parameter/pointer_yaw = 0.0
@@ -441,7 +451,7 @@ shader_parameter/structure_color = Color(0.058824, 0.105882, 0.14902, 1)
 shader_parameter/face_color = Color(0.956863, 0.964706, 0.972549, 1)
 shader_parameter/energy_color = Color(0.929412, 0.65098, 0.227451, 1)
 shader_parameter/energy_peak_color = Color(1, 0.843137, 0.45098, 1)
-shader_parameter/flow_enabled = true
+shader_parameter/flow_enabled = false
 shader_parameter/flow_phase = 0.0
 shader_parameter/flow_delay = 0.0
 shader_parameter/flow_duration = 0.321429
@@ -456,13 +466,94 @@ shader_parameter/structure_tint_strength = 0.42
 shader_parameter/outline_color = Color(0.058824, 0.105882, 0.14902, 1)
 shader_parameter/outline_width_texels = 1.0
 shader_parameter/outline_strength = 1.0
-shader_parameter/intro_activation_map = ExtResource("30_title_intro_bobozan")
+shader_parameter/intro_activation_map = ExtResource("30_title_intro_chuan")
 shader_parameter/intro_reveal_progress = 1.0
 shader_parameter/intro_reveal_feather = 0.012
-shader_parameter/intro_progress_delay = 0.052632
+shader_parameter/intro_progress_delay = 0.0
 shader_parameter/intro_shadow = false
 shader_parameter/intro_shadow_lag = 0.055
 shader_parameter/intro_crack_peak_width = 0.11
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_boot_button"]
+
+[sub_resource type="Theme" id="Theme_boot_menu"]
+BootIconButton/base_type = &"Button"
+BootIconButton/colors/icon_disabled_color = Color(1, 1, 1, 1)
+BootIconButton/colors/icon_focus_color = Color(1, 1, 1, 1)
+BootIconButton/colors/icon_hover_color = Color(1, 1, 1, 1)
+BootIconButton/colors/icon_hover_pressed_color = Color(1, 1, 1, 1)
+BootIconButton/colors/icon_normal_color = Color(1, 1, 1, 1)
+BootIconButton/colors/icon_pressed_color = Color(1, 1, 1, 1)
+BootIconButton/constants/icon_max_width = 48
+BootIconButton/styles/disabled = SubResource("StyleBoxEmpty_boot_button")
+BootIconButton/styles/focus = SubResource("StyleBoxEmpty_boot_button")
+BootIconButton/styles/hover = SubResource("StyleBoxEmpty_boot_button")
+BootIconButton/styles/hover_pressed = SubResource("StyleBoxEmpty_boot_button")
+BootIconButton/styles/normal = SubResource("StyleBoxEmpty_boot_button")
+BootIconButton/styles/pressed = SubResource("StyleBoxEmpty_boot_button")
+BootMainButton/base_type = &"Button"
+BootMainButton/colors/font_color = Color(0.12549, 0.188235, 0.227451, 0.96)
+BootMainButton/colors/font_disabled_color = Color(0.12549, 0.188235, 0.227451, 0.96)
+BootMainButton/colors/font_focus_color = Color(0.12549, 0.188235, 0.227451, 0.96)
+BootMainButton/colors/font_hover_color = Color(0.12549, 0.188235, 0.227451, 0.96)
+BootMainButton/colors/font_hover_pressed_color = Color(0.12549, 0.188235, 0.227451, 0.96)
+BootMainButton/colors/font_outline_color = Color(0.031373, 0.070588, 0.164706, 0.42)
+BootMainButton/colors/font_pressed_color = Color(0.12549, 0.188235, 0.227451, 0.96)
+BootMainButton/constants/outline_size = 2
+BootMainButton/font_sizes/font_size = 28
+BootMainButton/fonts/font = ExtResource("38_boot_font")
+BootMainButton/styles/disabled = SubResource("StyleBoxEmpty_boot_button")
+BootMainButton/styles/focus = SubResource("StyleBoxEmpty_boot_button")
+BootMainButton/styles/hover = SubResource("StyleBoxEmpty_boot_button")
+BootMainButton/styles/hover_pressed = SubResource("StyleBoxEmpty_boot_button")
+BootMainButton/styles/normal = SubResource("StyleBoxEmpty_boot_button")
+BootMainButton/styles/pressed = SubResource("StyleBoxEmpty_boot_button")
+BootStatusLabel/base_type = &"Label"
+BootStatusLabel/colors/font_color = Color(0.435294, 0.294118, 0.094118, 0.96)
+BootStatusLabel/colors/font_outline_color = Color(0.02, 0.025, 0.04, 0.94)
+BootStatusLabel/constants/outline_size = 2
+BootStatusLabel/font_sizes/font_size = 16
+BootStatusLabel/fonts/font = ExtResource("38_boot_font")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_7igcv"]
+shader = ExtResource("33_cw1yx")
+shader_parameter/star_center = Vector2(33.5, 64.5)
+shader_parameter/star_radii = Vector2(14, 13)
+shader_parameter/profile_power = 5.0
+shader_parameter/star_color = Color(0.9490196, 0.9098039, 0.8, 1)
+shader_parameter/shadow_offset = Vector2(1, 2)
+shader_parameter/shadow_expand = 1.0
+shader_parameter/shadow_color = Color(0.02, 0.012, 0.008, 0.52)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ma61q"]
+shader = ExtResource("33_cw1yx")
+shader_parameter/star_center = Vector2(33.5, 64.5)
+shader_parameter/star_radii = Vector2(14, 13)
+shader_parameter/profile_power = 5.0
+shader_parameter/star_color = Color(0.9490196, 0.9098039, 0.8, 1)
+shader_parameter/shadow_offset = Vector2(1, 2)
+shader_parameter/shadow_expand = 1.0
+shader_parameter/shadow_color = Color(0.02, 0.012, 0.008, 0.52)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_uhkco"]
+shader = ExtResource("33_cw1yx")
+shader_parameter/star_center = Vector2(33.5, 64.5)
+shader_parameter/star_radii = Vector2(14, 13)
+shader_parameter/profile_power = 5.0
+shader_parameter/star_color = Color(0.9490196, 0.9098039, 0.8, 1)
+shader_parameter/shadow_offset = Vector2(1, 2)
+shader_parameter/shadow_expand = 1.0
+shader_parameter/shadow_color = Color(0.02, 0.012, 0.008, 0.52)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_wbutq"]
+shader = ExtResource("33_cw1yx")
+shader_parameter/star_center = Vector2(33.5, 64.5)
+shader_parameter/star_radii = Vector2(14, 13)
+shader_parameter/profile_power = 5.0
+shader_parameter/star_color = Color(0.9490196, 0.9098039, 0.8, 1)
+shader_parameter/shadow_offset = Vector2(1, 2)
+shader_parameter/shadow_expand = 1.0
+shader_parameter/shadow_color = Color(0.02, 0.012, 0.008, 0.52)
 
 [node name="BootScreen" type="Control" unique_id=30656907]
 layout_mode = 3
@@ -482,7 +573,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0, 0, 0, 1)
+color = Color(0.784314, 0.827451, 0.815686, 1)
 metadata/_edit_lock_ = true
 
 [node name="BackgroundStage" type="Control" parent="." unique_id=1754067425]
@@ -642,7 +733,7 @@ script = ExtResource("17_motion_script")
 anchors_preset = 0
 offset_left = 37.0
 offset_top = 263.0
-offset_right = 843.4
+offset_right = 1054.0
 offset_bottom = 603.0
 mouse_filter = 2
 script = ExtResource("7_title_controller")
@@ -676,26 +767,37 @@ metadata/_edit_lock_ = true
 texture_filter = 1
 material = SubResource("ShaderMaterial_zan_bottom_shadow")
 layout_mode = 0
-offset_left = 552.0
-offset_top = -55.0
-offset_right = 822.0
-offset_bottom = 215.0
+offset_left = 555.0
+offset_top = -58.0
+offset_right = 825.0
+offset_bottom = 212.0
 mouse_filter = 2
 texture = ExtResource("5_zan_bottom")
 metadata/_edit_lock_ = true
 
-[node name="EnglishSubtitleShadow" type="TextureRect" parent="TitleColumn" unique_id=1875208388]
+[node name="ChuanShadow" type="TextureRect" parent="TitleColumn" unique_id=1875208388]
 texture_filter = 1
-material = SubResource("ShaderMaterial_english_shadow")
+material = SubResource("ShaderMaterial_extension_shadow_template")
 layout_mode = 0
-offset_left = 526.0
-offset_top = 198.0
-offset_right = 922.0
-offset_bottom = 288.0
+offset_left = 557.0
+offset_top = 181.0
+offset_right = 827.0
+offset_bottom = 451.0
+scale = Vector2(0.75, 0.75)
 mouse_filter = 2
-texture = ExtResource("26_english_title")
-expand_mode = 1
-metadata/_edit_lock_ = true
+texture = ExtResource("26_chuan_title")
+
+[node name="ShuoShadow" type="TextureRect" parent="TitleColumn" unique_id=1076438958]
+texture_filter = 1
+material = SubResource("ShaderMaterial_extension_shadow_template")
+layout_mode = 0
+offset_left = 729.0
+offset_top = 186.0
+offset_right = 999.0
+offset_bottom = 456.0
+scale = Vector2(0.75, 0.75)
+mouse_filter = 2
+texture = ExtResource("31_shuo_title")
 
 [node name="BoTop" type="TextureRect" parent="TitleColumn" unique_id=866388521]
 texture_filter = 1
@@ -725,69 +827,319 @@ metadata/_edit_lock_ = true
 texture_filter = 1
 material = SubResource("ShaderMaterial_zan_bottom")
 layout_mode = 0
-offset_left = 546.0
-offset_top = -62.0
-offset_right = 816.0
-offset_bottom = 208.0
+offset_left = 549.0
+offset_top = -65.0
+offset_right = 819.0
+offset_bottom = 205.0
 mouse_filter = 2
 texture = ExtResource("5_zan_bottom")
-metadata/_edit_lock_ = true
 
-[node name="EnglishSubtitle" type="TextureRect" parent="TitleColumn" unique_id=110825678]
+[node name="Chuan" type="TextureRect" parent="TitleColumn" unique_id=110825678]
 texture_filter = 1
-material = SubResource("ShaderMaterial_english")
+material = SubResource("ShaderMaterial_extension_face_template")
 layout_mode = 0
-offset_left = 520.0
-offset_top = 191.0
-offset_right = 916.0
-offset_bottom = 281.0
+offset_left = 551.0
+offset_top = 174.0
+offset_right = 821.0
+offset_bottom = 444.0
+scale = Vector2(0.75, 0.75)
 mouse_filter = 2
-texture = ExtResource("26_english_title")
-expand_mode = 1
-metadata/_edit_lock_ = true
+texture = ExtResource("26_chuan_title")
 
-[node name="EnterPrompt" type="Control" parent="." unique_id=1040569598]
+[node name="Shuo" type="TextureRect" parent="TitleColumn" unique_id=1048346188]
+texture_filter = 1
+material = SubResource("ShaderMaterial_extension_face_template")
+layout_mode = 0
+offset_left = 723.0
+offset_top = 179.0
+offset_right = 993.0
+offset_bottom = 449.0
+scale = Vector2(0.75, 0.75)
+mouse_filter = 2
+texture = ExtResource("31_shuo_title")
+
+[node name="InterfaceLayer" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="BootMenu" type="Control" parent="InterfaceLayer" unique_id=773836705]
+z_index = 20
 anchors_preset = 0
-offset_left = 300.0
-offset_top = 610.0
-offset_right = 720.0
-offset_bottom = 668.0
-pivot_offset = Vector2(210, 29)
-mouse_filter = 2
-script = ExtResource("20_enter_prompt_script")
-metadata/_edit_lock_ = true
+offset_left = 166.0
+offset_top = 598.0
+offset_right = 646.0
+offset_bottom = 961.0
+mouse_filter = 1
+theme = SubResource("Theme_boot_menu")
+script = ExtResource("32_boot_menu")
 
-[node name="LineLeft" type="ColorRect" parent="EnterPrompt" unique_id=1583791424]
+[node name="MainButtons" type="VBoxContainer" parent="InterfaceLayer/BootMenu" unique_id=770293028]
 layout_mode = 0
-offset_left = -11.0
-offset_top = 1.0
-offset_right = 53.0
-offset_bottom = 4.0
-mouse_filter = 2
-color = Color(0.956863, 0.964706, 0.972549, 1)
+offset_left = -5.0
+offset_top = -23.0
+offset_right = 415.0
+offset_bottom = 217.0
+theme_override_constants/separation = 8
 
-[node name="Label" type="Label" parent="EnterPrompt" unique_id=160821434]
+[node name="StartGame" type="Button" parent="InterfaceLayer/BootMenu/MainButtons" unique_id=9266161]
+custom_minimum_size = Vector2(420, 54)
+layout_mode = 2
+theme_type_variation = &"BootMainButton"
+text = "开始游戏"
+
+[node name="FocusMark" type="Control" parent="InterfaceLayer/BootMenu/MainButtons/StartGame"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("41_focus_mark")
+
+[node name="Motion" type="Node" parent="InterfaceLayer/BootMenu/MainButtons/StartGame" unique_id=729349698]
+script = ExtResource("40_button_motion")
+focus_mark_path = NodePath("../FocusMark")
+
+[node name="LoadGame" type="Button" parent="InterfaceLayer/BootMenu/MainButtons" unique_id=434579573]
+custom_minimum_size = Vector2(420, 54)
+layout_mode = 2
+tooltip_text = "完整进度存档系统接入后启用"
+theme_type_variation = &"BootMainButton"
+text = "读取存档"
+
+[node name="FocusMark" type="Control" parent="InterfaceLayer/BootMenu/MainButtons/LoadGame"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("41_focus_mark")
+
+[node name="Motion" type="Node" parent="InterfaceLayer/BootMenu/MainButtons/LoadGame" unique_id=2129989032]
+script = ExtResource("40_button_motion")
+focus_mark_path = NodePath("../FocusMark")
+
+[node name="Wishlist" type="Button" parent="InterfaceLayer/BootMenu/MainButtons" unique_id=975716736]
+custom_minimum_size = Vector2(420, 54)
+layout_mode = 2
+tooltip_text = "愿望单链接待配置"
+theme_type_variation = &"BootMainButton"
+text = "加入愿望单"
+
+[node name="FocusMark" type="Control" parent="InterfaceLayer/BootMenu/MainButtons/Wishlist"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("41_focus_mark")
+
+[node name="Motion" type="Node" parent="InterfaceLayer/BootMenu/MainButtons/Wishlist" unique_id=1921406261]
+script = ExtResource("40_button_motion")
+focus_mark_path = NodePath("../FocusMark")
+
+[node name="QuitGame" type="Button" parent="InterfaceLayer/BootMenu/MainButtons" unique_id=1365657858]
+custom_minimum_size = Vector2(420, 54)
+layout_mode = 2
+theme_type_variation = &"BootMainButton"
+text = "退出游戏"
+
+[node name="FocusMark" type="Control" parent="InterfaceLayer/BootMenu/MainButtons/QuitGame"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("41_focus_mark")
+
+[node name="Motion" type="Node" parent="InterfaceLayer/BootMenu/MainButtons/QuitGame" unique_id=1627034078]
+script = ExtResource("40_button_motion")
+focus_mark_path = NodePath("../FocusMark")
+
+[node name="SmallButtons" type="Control" parent="InterfaceLayer/BootMenu" unique_id=2084828242]
+anchors_preset = 0
+offset_left = 54.0
+offset_top = 256.0
+offset_right = 398.0
+offset_bottom = 304.0
+
+[node name="Steam" type="Button" parent="InterfaceLayer/BootMenu/SmallButtons" unique_id=710716604]
 layout_mode = 0
-offset_left = 63.0
-offset_top = -27.0
-offset_right = 335.0
-offset_bottom = 31.0
-theme_override_colors/font_color = Color(0.956863, 0.964706, 0.972549, 1)
-theme_override_colors/font_outline_color = Color(0.031373, 0.039216, 0.05098, 0.92)
-theme_override_constants/outline_size = 2
-theme_override_font_sizes/font_size = 28
-text = "点击进入游戏"
+offset_left = -211.0
+offset_top = -79.0
+offset_right = -163.0
+offset_bottom = -31.0
+tooltip_text = "Steam 链接待配置"
+theme_type_variation = &"BootIconButton"
+icon = ExtResource("33_steam_icon")
+icon_alignment = 1
+expand_icon = true
+
+[node name="Base" type="Control" parent="InterfaceLayer/BootMenu/SmallButtons/Steam" unique_id=1950621274]
+self_modulate = Color(1, 1, 1, 0.42)
+show_behind_parent = true
+material = SubResource("ShaderMaterial_7igcv")
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -33.0
+offset_top = -53.0
+offset_right = 33.0
+offset_bottom = 13.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+script = ExtResource("39_icon_base")
+tuning_center_offset = Vector2(0.5, 0)
+tuning_horizontal_radius = 14.0
+tuning_waist_power = 5.0
+tuning_shadow_offset = Vector2(1, 2)
+tuning_shadow_expand = 1.0
+
+[node name="Motion" type="Node" parent="InterfaceLayer/BootMenu/SmallButtons/Steam" unique_id=1664817833]
+script = ExtResource("40_button_motion")
+presentation_mode = 1
+icon_base_path = NodePath("../Base")
+
+[node name="Discord" type="Button" parent="InterfaceLayer/BootMenu/SmallButtons" unique_id=593157173]
+layout_mode = 0
+offset_left = -211.0
+offset_right = -163.0
+offset_bottom = 48.0
+tooltip_text = "Discord 链接待配置"
+theme_type_variation = &"BootIconButton"
+icon = ExtResource("34_discord_icon")
+icon_alignment = 1
+expand_icon = true
+
+[node name="Base" type="Control" parent="InterfaceLayer/BootMenu/SmallButtons/Discord" unique_id=1336991929]
+self_modulate = Color(1, 1, 1, 0.42)
+show_behind_parent = true
+material = SubResource("ShaderMaterial_ma61q")
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -33.0
+offset_top = -53.0
+offset_right = 33.0
+offset_bottom = 13.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+script = ExtResource("39_icon_base")
+tuning_center_offset = Vector2(0.5, 0)
+tuning_horizontal_radius = 14.0
+tuning_waist_power = 5.0
+tuning_shadow_offset = Vector2(1, 2)
+tuning_shadow_expand = 1.0
+
+[node name="Motion" type="Node" parent="InterfaceLayer/BootMenu/SmallButtons/Discord" unique_id=171356868]
+script = ExtResource("40_button_motion")
+presentation_mode = 1
+icon_base_path = NodePath("../Base")
+
+[node name="QQ" type="Button" parent="InterfaceLayer/BootMenu/SmallButtons" unique_id=117950253]
+layout_mode = 0
+offset_left = -211.0
+offset_top = 85.0
+offset_right = -163.0
+offset_bottom = 133.0
+tooltip_text = "QQ 链接待配置"
+theme_type_variation = &"BootIconButton"
+icon = ExtResource("35_qq_icon")
+icon_alignment = 1
+expand_icon = true
+
+[node name="Base" type="Control" parent="InterfaceLayer/BootMenu/SmallButtons/QQ" unique_id=1964557274]
+self_modulate = Color(1, 1, 1, 0.42)
+show_behind_parent = true
+material = SubResource("ShaderMaterial_uhkco")
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -33.0
+offset_top = -53.0
+offset_right = 33.0
+offset_bottom = 13.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+script = ExtResource("39_icon_base")
+tuning_center_offset = Vector2(0.5, 0)
+tuning_horizontal_radius = 14.0
+tuning_waist_power = 5.0
+tuning_shadow_offset = Vector2(1, 2)
+tuning_shadow_expand = 1.0
+
+[node name="Motion" type="Node" parent="InterfaceLayer/BootMenu/SmallButtons/QQ" unique_id=703987849]
+script = ExtResource("40_button_motion")
+presentation_mode = 1
+icon_base_path = NodePath("../Base")
+
+[node name="Feedback" type="Button" parent="InterfaceLayer/BootMenu/SmallButtons" unique_id=1163516338]
+layout_mode = 0
+offset_left = -211.0
+offset_top = 156.0
+offset_right = -163.0
+offset_bottom = 222.0
+tooltip_text = "问题反馈链接待配置"
+theme_type_variation = &"BootIconButton"
+icon = ExtResource("37_feedback_icon")
+icon_alignment = 1
+expand_icon = true
+
+[node name="Base" type="Control" parent="InterfaceLayer/BootMenu/SmallButtons/Feedback" unique_id=474329763]
+self_modulate = Color(1, 1, 1, 0.42)
+show_behind_parent = true
+material = SubResource("ShaderMaterial_wbutq")
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -33.0
+offset_top = -71.0
+offset_right = 33.0
+offset_bottom = -5.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+script = ExtResource("39_icon_base")
+tuning_center_offset = Vector2(0.5, 0)
+tuning_horizontal_radius = 14.0
+tuning_waist_power = 5.0
+tuning_shadow_offset = Vector2(1, 2)
+tuning_shadow_expand = 1.0
+
+[node name="Motion" type="Node" parent="InterfaceLayer/BootMenu/SmallButtons/Feedback" unique_id=1262493470]
+script = ExtResource("40_button_motion")
+presentation_mode = 1
+icon_base_path = NodePath("../Base")
+
+[node name="StatusLabel" type="Label" parent="InterfaceLayer/BootMenu" unique_id=1317550398]
+layout_mode = 0
+offset_top = 315.0
+offset_right = 480.0
+offset_bottom = 349.0
+theme_type_variation = &"BootStatusLabel"
 horizontal_alignment = 1
 vertical_alignment = 1
-
-[node name="LineRight" type="ColorRect" parent="EnterPrompt" unique_id=847842358]
-layout_mode = 0
-offset_left = 345.0
-offset_top = 1.0
-offset_right = 409.0
-offset_bottom = 4.0
-mouse_filter = 2
-color = Color(0.956863, 0.964706, 0.972549, 1)
 
 [node name="Character" parent="." unique_id=1898497878 instance=ExtResource("2_character")]
 layout_mode = 0

@@ -30,7 +30,7 @@ signal intro_finished
 
 @onready var _character: BootCharacterIdle = $"../Character"
 @onready var _title: BootTitleController = $"../TitleColumn"
-@onready var _prompt: BootEnterPrompt = $"../EnterPrompt"
+@onready var _menu: BootMenuController = $"../InterfaceLayer/BootMenu"
 @onready var _blue_motion: BootBlueFlowMotion = (
 	$"../BackgroundStage/BlueFlowMotion")
 @onready var _pressure_motion: BootPressureMotion = (
@@ -110,7 +110,7 @@ func _prepare_intro() -> void:
 	_prepared = true
 	_character.prepare_intro()
 	_title.prepare_intro()
-	_prompt.prepare_intro()
+	_menu.prepare_intro()
 	_blue_motion.prepare_intro()
 	_pressure_motion.prepare_intro()
 	_background_stage.modulate.a = 1.0
@@ -166,7 +166,7 @@ func _apply_time(seconds: float) -> void:
 		pressure_opacity,
 		gold_progress)
 	_title.set_intro_progress(title_progress)
-	_prompt.set_intro_reveal(prompt_progress)
+	_menu.set_intro_reveal(prompt_progress)
 
 
 func _apply_exit_progress(progress: float) -> void:
@@ -326,7 +326,7 @@ func _finish_intro() -> void:
 	_finished = true
 	_character.finish_intro()
 	_title.finish_intro()
-	_prompt.finish_intro()
+	_menu.finish_intro()
 	_blue_motion.finish_intro()
 	_pressure_motion.finish_intro()
 	_background_stage.modulate.a = 1.0

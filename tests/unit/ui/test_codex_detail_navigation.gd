@@ -35,7 +35,7 @@ func test_item_right_page_navigation_is_global_across_rarity_tiers() -> void:
 	var total := int(gallery.call("_catalog_item_count"))
 	assert_gt(total, 1)
 	assert_eq(indicator.text, "%02d / %02d" % [1, total])
-	var common_count := ItemCatalog.all_for_tier(1).size()
+	var common_count := ItemCatalog.all_active_for_tier(1).size()
 	for step: int in common_count:
 		gallery.call("_turn_detail", 1)
 	assert_eq(int(gallery.call("get_current_tier")), 2,

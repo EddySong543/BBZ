@@ -67,13 +67,13 @@ func test_effect_catalog_contains_every_current_shared_effect() -> void:
 			"可叠加。中毒英雄被「大波」命中时，引爆并清除全部毒素，每层造成 0.5 点伤害。",
 			"毒素效果图鉴必须明确只有大波命中才能引爆")
 	assert_eq(String(entries[9].description),
-			"最多积累4点，昴日【鸡】发动「飞洒天星」时消耗全部剑气。",
-			"剑气图鉴必须复用最新主动技能名，并由文案显式补全书名号")
+			"最多积累4点，昴日【鸡】强化攻击时消耗全部剑气。",
+			"剑气图鉴明确它服务于基础攻击强化")
 	var h10 := load("res://assets/data/heroes/h10.tres") as HeroData
 	assert_eq(h10.skill_description, "飞洒天星")
 	assert_eq(h10.skill_detail,
-			"我方每次攻击命中，积累1点剑气，昴日【鸡】可消耗全部剑气发动强力一击（每点造成0.5点伤害。2点穿防，4点穿大防）。",
-			"图鉴与战斗共用的 h10 资源必须完整包含伤害与穿透阈值")
+			"我方每次攻击命中，积累1点剑气。可消耗全部剑气强化攻击。（2点穿防，4点穿大防）",
+			"图鉴与战斗共用的 h10 资源不再承诺独立伤害，只说明穿透阈值")
 
 
 func test_effect_gallery_previews_all_entries_and_selects_poison() -> void:
@@ -582,9 +582,9 @@ func test_armor_rename_keeps_item_names_and_matching_art_paths() -> void:
 	assert_eq(worn_armor.item_name, "破旧的护甲")
 	assert_eq(sturdy_armor.item_name, "坚固的护甲")
 	assert_eq(ItemCatalog.icon_path("t1_jiudun"),
-			"res://assets/sprites/items/破旧的护甲.png")
+			"res://assets/sprites/items/legacy/破旧的护甲.png")
 	assert_eq(ItemCatalog.icon_path("t2_jiandun"),
-			"res://assets/sprites/items/坚固的护甲.png")
+			"res://assets/sprites/items/legacy/坚固的护甲.png")
 	assert_true(ResourceLoader.exists(ItemCatalog.icon_path("t1_jiudun")))
 	assert_true(ResourceLoader.exists(ItemCatalog.icon_path("t2_jiandun")))
 

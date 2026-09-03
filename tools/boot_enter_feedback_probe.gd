@@ -224,7 +224,13 @@ func _verify_static_prompt_lines(prompt: BootEnterPrompt) -> bool:
 func _verify_static_chinese_title_pulse(
 		title: BootTitleController,
 ) -> bool:
-	for node_name: String in ["BoTop", "BoMiddle", "ZanBottom"]:
+	for node_name: String in [
+		"BoTop",
+		"BoMiddle",
+		"ZanBottom",
+		"Chuan",
+		"Shuo",
+	]:
 		var glyph := title.get_node(NodePath(node_name)) as TextureRect
 		var glyph_material := glyph.material as ShaderMaterial
 		if bool(glyph_material.get_shader_parameter(&"flow_enabled")):
@@ -232,11 +238,6 @@ func _verify_static_chinese_title_pulse(
 				"Boot Chinese title still has internal pulse: %s"
 				% node_name)
 			return false
-	var english := title.get_node("EnglishSubtitle") as TextureRect
-	var english_material := english.material as ShaderMaterial
-	if not bool(english_material.get_shader_parameter(&"flow_enabled")):
-		push_error("Boot English subtitle flow changed unexpectedly.")
-		return false
 	return true
 
 

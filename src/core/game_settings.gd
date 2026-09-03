@@ -135,6 +135,18 @@ static func apply_volumes() -> void:
 		_apply_one(k)
 
 
+## 确保所有入口（包括编辑器直接 F6 某个战斗场景）使用同一套 2D 设计画布。
+## 这里只设置画布映射，不读取存档、不切换窗口模式，也不会改动用户分辨率。
+static func ensure_canvas_scaling() -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	var win := tree.root
+	win.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+	win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
+	win.content_scale_size = DESIGN_SIZE
+
+
 static func _apply_one(key: String) -> void:
 	match key:
 		"master_volume":
@@ -163,14 +175,9 @@ static func _apply_bus_volume(bus_name: String, v: float) -> void:
 ## 设计画布恒 1920×1080：先确保 content_scale 等比缩放接管（工程未配 stretch），
 ## 再按模式切窗口——窗口化时用 resolution 设尺寸并居中；全屏两档由系统接管尺寸。
 static func _apply_display() -> void:
+	ensure_canvas_scaling()
 	if DisplayServer.get_name() == "headless":
 		return   # GUT / CLI 截图等无窗环境跳过
-	var tree := Engine.get_main_loop() as SceneTree
-	if tree != null:
-		var win := tree.root
-		win.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
-		win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
-		win.content_scale_size = DESIGN_SIZE
 	match String(get_value("window_mode")):
 		"fullscreen":
 			if DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN:

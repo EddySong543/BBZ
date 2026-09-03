@@ -35,6 +35,18 @@ const GOLD_FLOW_PATH := (
 	"res://assets/ui/boot/boot_pressure_gold_flow.png")
 const BLUE_INTRO_PATH := (
 	"res://assets/ui/boot/boot_pressure_blue_intro_path.png")
+const BOOT_ICON_BASE_PATH := (
+	"res://src/ui/components/boot_icon_base.gd")
+const COMMAND_SLOT_SKIN_PATH := (
+	"res://src/ui/components/command_sequence_slot_skin.gd")
+const COMMAND_CROSS_STAR_SHADER_PATH := (
+	"res://assets/shaders/canvas_ui_command_cross_star_ssaa.gdshader")
+const BOOT_BUTTON_MOTION_PATH := (
+	"res://src/ui/components/boot_menu_button_motion.gd")
+const BOOT_FOCUS_MARK_PATH := (
+	"res://src/ui/components/boot_menu_focus_mark.gd")
+const BOOT_BUTTON_FOCUS_SHADER_PATH := (
+	"res://assets/shaders/canvas_ui_boot_menu_focus.gdshader")
 
 
 func test_boot_pressure_assets_are_transparent_full_size_layers() -> void:
@@ -101,13 +113,13 @@ func test_boot_pressure_assets_are_transparent_full_size_layers() -> void:
 			"The lower-right brush center must reveal as one stroke.")
 
 
-func test_boot_screen_uses_black_stage_graphite_brush_and_stable_gold() -> void:
+func test_boot_screen_uses_palette_a_brush_and_stable_gold() -> void:
 	var boot := await _instantiate_boot()
 	var black_base := boot.get_node("IntroBlackBase") as ColorRect
 	var stage := boot.get_node("BackgroundStage") as BattleStage
 
 	assert_not_null(black_base)
-	assert_eq(black_base.color, Color.BLACK)
+	assert_true(black_base.color.is_equal_approx(Color("#c8d3d0")))
 	assert_eq(black_base.get_index(), 0)
 	assert_not_null(stage)
 	assert_true(stage.idle_drift)
@@ -139,7 +151,7 @@ func test_boot_screen_uses_black_stage_graphite_brush_and_stable_gold() -> void:
 		assert_true(
 			Color(paper_material.get_shader_parameter(
 					&"paper_color")).is_equal_approx(
-						Color("#080a0f")))
+						Color("#c8d3d0")))
 		assert_almost_eq(
 			float(paper_material.get_shader_parameter(
 					&"fine_grain_strength")),
@@ -166,7 +178,7 @@ func test_boot_screen_uses_black_stage_graphite_brush_and_stable_gold() -> void:
 		assert_true(
 			Color(contour_material.get_shader_parameter(
 					&"wave_color")).is_equal_approx(
-						Color(0.105882, 0.149020, 0.192157, 0.42)))
+						Color(0.325490, 0.423529, 0.474510, 0.42)))
 		assert_true(
 			Vector2(contour_material.get_shader_parameter(
 					&"virtual_resolution")).is_equal_approx(
@@ -237,15 +249,15 @@ func test_boot_screen_uses_black_stage_graphite_brush_and_stable_gold() -> void:
 		assert_true(
 			Vector3(material.get_shader_parameter(
 					&"palette_shadow")).is_equal_approx(
-						Vector3(0.203922, 0.227451, 0.250980)))
+						Vector3(0.262745, 0.364706, 0.419608)))
 		assert_true(
 			Vector3(material.get_shader_parameter(
 					&"palette_mid")).is_equal_approx(
-						Vector3(0.349020, 0.388235, 0.431373)))
+						Vector3(0.435294, 0.529412, 0.572549)))
 		assert_true(
 			Vector3(material.get_shader_parameter(
 					&"palette_light")).is_equal_approx(
-						Vector3(0.666667, 0.705882, 0.745098)))
+						Vector3(0.619608, 0.678431, 0.690196)))
 		assert_almost_eq(
 			float(material.get_shader_parameter(&"palette_strength")),
 			1.0,
@@ -360,7 +372,7 @@ func test_boot_screen_uses_black_stage_graphite_brush_and_stable_gold() -> void:
 		assert_true(
 			Color(foreground_material.get_shader_parameter(
 					&"tint_color")).is_equal_approx(
-						Color("#3a4148")))
+						Color("#435d6b")))
 		assert_almost_eq(
 			float(foreground_material.get_shader_parameter(
 					&"opacity")),
@@ -486,7 +498,7 @@ func test_boot_gold_shader_advects_upper_right_without_breathing() -> void:
 	assert_false(source.contains("energy.a *="))
 
 
-func test_boot_title_uses_white_gold_palette_on_black_stage() -> void:
+func test_boot_title_uses_white_gold_palette_on_bright_stage() -> void:
 	var boot := await _instantiate_boot()
 	var title_column := boot.get_node("TitleColumn")
 	assert_true(title_column.visible)
@@ -494,7 +506,8 @@ func test_boot_title_uses_white_gold_palette_on_black_stage() -> void:
 		["BoTopShadow", "BoTop", false],
 		["BoMiddleShadow", "BoMiddle", false],
 		["ZanBottomShadow", "ZanBottom", false],
-		["EnglishSubtitleShadow", "EnglishSubtitle", true],
+		["ChuanShadow", "Chuan", false],
+		["ShuoShadow", "Shuo", false],
 	]
 	for contract: Array in contracts:
 		var shadow := title_column.get_node(contract[0]) as TextureRect
@@ -513,6 +526,20 @@ func test_boot_title_uses_white_gold_palette_on_black_stage() -> void:
 		assert_eq(
 			shadow_material.get_shader_parameter(&"outline_strength"),
 			0.0)
+		assert_almost_eq(
+			float(shadow_material.get_shader_parameter(
+				&"perspective_strength")),
+			0.10,
+			0.001)
+		assert_almost_eq(
+			float(shadow_material.get_shader_parameter(&"edge_padding")),
+			0.04,
+			0.001)
+		assert_almost_eq(
+			float(shadow_material.get_shader_parameter(
+				&"structure_tint_strength")),
+			0.0,
+			0.001)
 
 		var face_material := face.material as ShaderMaterial
 		assert_eq(
@@ -553,6 +580,20 @@ func test_boot_title_uses_white_gold_palette_on_black_stage() -> void:
 		assert_eq(
 			face_material.get_shader_parameter(&"outline_width_texels"),
 			1.0)
+		assert_almost_eq(
+			float(face_material.get_shader_parameter(
+				&"perspective_strength")),
+			0.10,
+			0.001)
+		assert_almost_eq(
+			float(face_material.get_shader_parameter(&"edge_padding")),
+			0.04,
+			0.001)
+		assert_almost_eq(
+			float(face_material.get_shader_parameter(
+				&"structure_tint_strength")),
+			0.42,
+			0.001)
 		var outline_color: Color = face_material.get_shader_parameter(
 				&"outline_color")
 		assert_true(
@@ -599,7 +640,7 @@ func test_boot_title_uses_one_horizontal_perspective_field() -> void:
 	var boot := await _instantiate_boot()
 	var title_column := boot.get_node("TitleColumn") as Control
 	assert_true(title_column.position.is_equal_approx(Vector2(37.0, 263.0)))
-	assert_true(title_column.size.is_equal_approx(Vector2(806.4, 340.0)))
+	assert_true(title_column.size.is_equal_approx(Vector2(1017.0, 340.0)))
 	assert_eq(title_column.rotation, 0.0)
 
 	var contracts: Array[Array] = [
@@ -609,6 +650,7 @@ func test_boot_title_uses_one_horizontal_perspective_field() -> void:
 			Vector2(93.0, -67.0),
 			0.0,
 			270.0 / 726.0,
+			Vector2.ONE,
 		],
 		[
 			"BoMiddleShadow",
@@ -616,13 +658,31 @@ func test_boot_title_uses_one_horizontal_perspective_field() -> void:
 			Vector2(321.0, -62.0),
 			228.0 / 726.0,
 			498.0 / 726.0,
+			Vector2.ONE,
 		],
 		[
 			"ZanBottomShadow",
 			"ZanBottom",
-			Vector2(546.0, -62.0),
+			Vector2(549.0, -65.0),
 			456.0 / 726.0,
 			1.0,
+			Vector2.ONE,
+		],
+		[
+			"ChuanShadow",
+			"Chuan",
+			Vector2(551.0, 174.0),
+			327.0 / 726.0,
+			543.0 / 726.0,
+			Vector2(0.75, 0.75),
+		],
+		[
+			"ShuoShadow",
+			"Shuo",
+			Vector2(723.0, 179.0),
+			510.0 / 726.0,
+			1.0,
+			Vector2(0.75, 0.75),
 		],
 	]
 	for contract: Array in contracts:
@@ -632,8 +692,8 @@ func test_boot_title_uses_one_horizontal_perspective_field() -> void:
 		assert_eq(shadow.position - face.position, Vector2(6.0, 7.0))
 		assert_true(face.size.is_equal_approx(Vector2(270.0, 270.0)))
 		assert_true(shadow.size.is_equal_approx(Vector2(270.0, 270.0)))
-		assert_eq(face.scale, Vector2.ONE)
-		assert_eq(shadow.scale, Vector2.ONE)
+		assert_eq(face.scale, contract[5])
+		assert_eq(shadow.scale, contract[5])
 		assert_eq(face.rotation, 0.0)
 		assert_eq(shadow.rotation, 0.0)
 
@@ -657,40 +717,47 @@ func test_boot_title_uses_one_horizontal_perspective_field() -> void:
 			assert_true(is_equal_approx(
 				float(group_x_max),
 				float(contract[4])))
-
-	var english := title_column.get_node("EnglishSubtitle") as TextureRect
-	var english_shadow := title_column.get_node(
-		"EnglishSubtitleShadow") as TextureRect
-	assert_eq(english.position, Vector2(520.0, 191.0))
-	assert_true(english.size.is_equal_approx(Vector2(396.0, 90.0)))
-	assert_eq(
-		english_shadow.position - english.position,
-		Vector2(6.0, 7.0))
-	assert_true(
-		english_shadow.size.is_equal_approx(Vector2(396.0, 90.0)))
-	assert_eq(english.scale, Vector2.ONE)
-	assert_eq(english_shadow.scale, Vector2.ONE)
-	assert_eq(
-		english.texture.resource_path,
-		"res://assets/ui/boot/title_bobozan.png")
-	var english_image := english.texture.get_image()
+	var chuan := title_column.get_node("Chuan") as TextureRect
+	var shuo := title_column.get_node("Shuo") as TextureRect
+	assert_eq(chuan.texture.resource_path,
+		"res://assets/ui/boot/title_chuan.png")
+	assert_eq(shuo.texture.resource_path,
+		"res://assets/ui/boot/title_shuo.png")
+	var chuan_image := chuan.texture.get_image()
+	var shuo_image := shuo.texture.get_image()
 	var source_energy := Color8(221, 86, 57, 255)
 	var source_face := Color8(245, 232, 209, 255)
+	var source_structure := Color8(15, 27, 38, 255)
+	for image: Image in [chuan_image, shuo_image]:
+		assert_eq(image.get_size(), Vector2i(252, 252))
+		assert_eq(image.get_used_rect().size, Vector2i(216, 216))
+		var palette_counts := {
+			source_energy: 0,
+			source_face: 0,
+			source_structure: 0,
+		}
+		for y: int in image.get_height():
+			for x: int in image.get_width():
+				var pixel := image.get_pixel(x, y)
+				if palette_counts.has(pixel):
+					palette_counts[pixel] += 1
+		assert_gt(int(palette_counts[source_face]), 15000)
+		assert_gt(int(palette_counts[source_structure]), 500)
+		assert_gt(int(palette_counts[source_energy]), 300)
+
+	# User-marked micro corrections remain local: two protruding 传 caps stay
+	# clear, while the isolated lower-left 说 counter is closed by one face cell.
+	for cell: Vector2i in [
+		Vector2i(5, 3),
+		Vector2i(5, 4),
+		Vector2i(19, 21),
+		Vector2i(21, 22),
+	]:
+		var sample := cell * 9 + Vector2i(4, 4)
+		assert_ne(chuan_image.get_pixelv(sample), source_face)
 	assert_eq(
-		english_image.get_pixel(43, 46),
-		source_energy)
-	assert_eq(
-		english_image.get_pixel(91, 46),
-		source_energy)
-	assert_eq(english_image.get_pixel(48, 28), source_face)
-	assert_eq(english_image.get_pixel(16, 33), source_face)
-	assert_gt(english_image.get_pixel(43, 46).a, 0.99)
-	assert_gt(english_image.get_pixel(91, 46).a, 0.99)
-	assert_almost_eq(
-		float((english.material as ShaderMaterial).get_shader_parameter(
-			&"perspective_strength")),
-		0.04,
-		0.001)
+		shuo_image.get_pixelv(Vector2i(9, 21) * 9 + Vector2i(4, 4)),
+		source_face)
 
 
 func test_boot_character_uses_size_driven_presentation() -> void:
@@ -888,84 +955,382 @@ func _animation_has_track(animation: Animation, path: NodePath) -> bool:
 	return false
 
 
-func test_boot_enter_prompt_matches_click_anywhere_behavior() -> void:
+func test_boot_menu_replaces_click_anywhere_with_explicit_actions() -> void:
 	var boot := await _instantiate_boot()
-	var prompt := boot.get_node("EnterPrompt") as Control
-	var label := prompt.get_node("Label") as Label
-	var left_line := prompt.get_node("LineLeft") as ColorRect
-	var right_line := prompt.get_node("LineRight") as ColorRect
+	var menu := boot.get_node("InterfaceLayer/BootMenu") as BootMenuController
+	var main_buttons := menu.get_node("MainButtons") as VBoxContainer
+	var small_buttons := menu.get_node("SmallButtons") as Control
+	var expected_main: Array[String] = [
+		"开始游戏", "读取存档", "加入愿望单", "退出游戏",
+	]
+	var expected_small_paths: Array[String] = [
+		"res://assets/ui/boot/menu_icons/steam.png",
+		"res://assets/ui/boot/menu_icons/discord.png",
+		"res://assets/ui/boot/menu_icons/qq.png",
+		"res://assets/ui/boot/menu_icons/feedback.png",
+	]
+	var expected_small_names: Array[String] = [
+		"Steam", "Discord", "QQ", "Feedback",
+	]
 
-	assert_not_null(prompt)
-	assert_true(prompt.visible)
-	assert_eq(prompt.mouse_filter, Control.MOUSE_FILTER_IGNORE)
-	assert_eq(label.text, "点击进入游戏")
-	assert_eq(label.mouse_filter, Control.MOUSE_FILTER_IGNORE)
+	assert_null(boot.get_node_or_null("EnterPrompt"))
+	assert_true(menu.visible)
+	assert_true(menu.is_interaction_enabled())
+	assert_gt(menu.size.x, 0.0)
+	assert_gt(menu.size.y, 0.0)
+	assert_gte(menu.position.x, 0.0)
+	assert_gte(menu.position.y, 0.0)
+	assert_lte(menu.position.x + menu.size.x, 1920.0)
+	assert_lte(menu.position.y + menu.size.y, 1080.0)
+	assert_eq(main_buttons.get_child_count(), 4)
+	assert_eq(small_buttons.get_child_count(), 4)
+	assert_null(small_buttons.get_node_or_null("Settings"))
+	assert_false(small_buttons is Container)
+	assert_null(menu.get_node_or_null("IconDock"))
+	for index: int in expected_main.size():
+		var button := main_buttons.get_child(index) as Button
+		assert_eq(button.text, expected_main[index])
+		assert_false(button.disabled)
+		assert_null(button.get_node_or_null("Plate"))
+		assert_eq(button.theme_type_variation, &"BootMainButton")
+		assert_true(
+			button.get_theme_color(&"font_color").is_equal_approx(
+				Color(0.12549, 0.188235, 0.227451, 0.96)))
+		var motion := button.get_node("Motion") as BootMenuButtonMotion
+		assert_not_null(motion)
+		assert_eq(motion.get_script().resource_path, BOOT_BUTTON_MOTION_PATH)
+		assert_eq(motion.focus_mark_path, NodePath("../FocusMark"))
+		var focus_mark := button.get_node_or_null("FocusMark") as Control
+		assert_not_null(focus_mark)
+		if focus_mark != null:
+			assert_eq(focus_mark.get_script().resource_path, BOOT_FOCUS_MARK_PATH)
+			assert_eq(focus_mark.mouse_filter, Control.MOUSE_FILTER_IGNORE)
+			assert_almost_eq(focus_mark.anchor_right, 1.0, 0.001)
+			assert_almost_eq(focus_mark.anchor_bottom, 1.0, 0.001)
+		assert_null(button.get_node_or_null("ButtonJuice"))
+	for index: int in expected_small_paths.size():
+		var button := small_buttons.get_child(index) as Button
+		assert_eq(button.name, expected_small_names[index])
+		assert_eq(button.text, "")
+		assert_eq(button.icon.resource_path, expected_small_paths[index])
+		assert_true(button.expand_icon)
+		assert_false(button.disabled)
+		assert_null(button.get_node_or_null("Plate"))
+		assert_eq(button.theme_type_variation, &"BootIconButton")
+		var icon_base := button.get_node("Base") as BootIconBase
+		assert_not_null(icon_base)
+		assert_true(icon_base is Control)
+		assert_eq(icon_base.get_script().resource_path, BOOT_ICON_BASE_PATH)
+		assert_true(icon_base.show_behind_parent)
+		assert_true(icon_base.size.is_equal_approx(Vector2(66.0, 66.0)))
+		assert_almost_eq(icon_base.anchor_left, 0.5, 0.001)
+		assert_almost_eq(icon_base.anchor_right, 0.5, 0.001)
+		assert_almost_eq(icon_base.anchor_top, 1.0, 0.001)
+		assert_almost_eq(icon_base.anchor_bottom, 1.0, 0.001)
+		assert_true(icon_base.material is ShaderMaterial)
+		assert_eq(
+			(icon_base.material as ShaderMaterial).shader.resource_path,
+			COMMAND_CROSS_STAR_SHADER_PATH)
+		var geometry: Dictionary = icon_base.debug_geometry()
+		assert_eq(geometry["star_center"], Vector2(33.5, 64.5))
+		assert_eq(geometry["star_radii"], Vector2(14.0, 13.0))
+		assert_almost_eq(float(geometry["profile_power"]), 5.0, 0.001)
+		assert_eq(geometry["bottom_shadow_offset"], Vector2(1.0, 2.0))
+		assert_almost_eq(float(geometry["bottom_shadow_expand"]), 1.0, 0.001)
+		assert_eq(String(geometry["render_path"]), "analytic_ssaa_9x9")
+		var motion := button.get_node("Motion") as BootMenuButtonMotion
+		assert_not_null(motion)
+		assert_eq(motion.icon_base_path, NodePath("../Base"))
+		assert_null(button.get_node_or_null("ButtonJuice"))
+	var feedback_button := small_buttons.get_node("Feedback") as Button
+	assert_eq(feedback_button.get_theme_constant(&"icon_max_width"), 48)
+	var status := menu.get_node("StatusLabel") as Label
+	assert_eq(status.theme_type_variation, &"BootStatusLabel")
+
+
+func test_boot_menu_small_buttons_are_individually_inspector_adjustable() -> void:
+	var boot := await _instantiate_boot()
+	var menu := boot.get_node("InterfaceLayer/BootMenu") as BootMenuController
+	var small_buttons := menu.get_node("SmallButtons") as Control
+	var names: Array[String] = [
+		"Steam", "Discord", "QQ", "Feedback",
+	]
+	for index: int in names.size():
+		var button := small_buttons.get_node(names[index]) as Button
+		var icon_base := button.get_node("Base") as BootIconBase
+		var original_offsets := Vector4(
+			icon_base.offset_left,
+			icon_base.offset_top,
+			icon_base.offset_right,
+			icon_base.offset_bottom)
+		var test_position := Vector2(7.0 + index * 59.0, 3.0 + index)
+		var test_size := Vector2(42.0 + index, 44.0 + index)
+		button.position = test_position
+		button.size = test_size
+		await get_tree().process_frame
+		assert_true(button.position.is_equal_approx(test_position), names[index])
+		assert_true(button.size.is_equal_approx(test_size), names[index])
+		assert_eq(Vector4(
+			icon_base.offset_left,
+			icon_base.offset_top,
+			icon_base.offset_right,
+			icon_base.offset_bottom), original_offsets)
+		assert_true(icon_base.size.is_equal_approx(Vector2(66.0, 66.0)))
+
+
+func test_boot_menu_focus_motion_is_clear_without_changing_layout_rects() -> void:
+	var boot := await _instantiate_boot()
+	var menu := boot.get_node("InterfaceLayer/BootMenu") as BootMenuController
+	var start_button := menu.get_node("MainButtons/StartGame") as Button
+	var start_motion := (
+		start_button.get_node("Motion") as BootMenuButtonMotion)
+	var start_mark := start_button.get_node_or_null("FocusMark") as Control
+	assert_not_null(start_mark)
+	if start_mark == null:
+		return
+	var discord := menu.get_node("SmallButtons/Discord") as Button
+	var discord_base := discord.get_node("Base") as BootIconBase
+	var discord_motion := discord.get_node("Motion") as BootMenuButtonMotion
+	var start_position := start_button.position
+	var discord_position := discord.position
+
+	await get_tree().create_timer(0.15).timeout
+	var start_state := start_motion.debug_state()
+	assert_almost_eq(float(start_state["focus_strength"]), 0.0, 0.001)
 	assert_true(
-		label.get_theme_color("font_color").is_equal_approx(
-			Color("#f4f6f8")))
-	assert_true(left_line.color.is_equal_approx(Color("#f4f6f8")))
-	assert_true(right_line.color.is_equal_approx(Color("#f4f6f8")))
-	assert_null(left_line.material)
-	assert_null(label.material)
-	assert_null(right_line.material)
-	assert_true(prompt.position.is_equal_approx(Vector2(300.0, 610.0)))
-	assert_true(prompt.size.is_equal_approx(Vector2(420.0, 58.0)))
-	assert_true(label.position.is_equal_approx(Vector2(63.0, -27.0)))
-	assert_true(label.size.is_equal_approx(Vector2(272.0, 58.0)))
-	assert_eq(label.get_theme_font_size("font_size"), 28)
-	assert_true(left_line.position.is_equal_approx(Vector2(-11.0, 1.0)))
-	assert_true(left_line.size.is_equal_approx(Vector2(64.0, 3.0)))
-	assert_true(right_line.position.is_equal_approx(Vector2(345.0, 1.0)))
-	assert_true(right_line.size.is_equal_approx(Vector2(64.0, 3.0)))
-	assert_eq(prompt.scale, Vector2.ONE)
-	assert_eq(label.scale, Vector2.ONE)
-	assert_eq(left_line.scale, Vector2.ONE)
-	assert_eq(right_line.scale, Vector2.ONE)
-	assert_almost_eq(left_line.rotation, 0.0, 0.0001)
-	assert_almost_eq(right_line.rotation, 0.0, 0.0001)
-	assert_almost_eq(prompt.rotation, 0.0, 0.0001)
-	assert_true(float(prompt.get("fade_duration")) >= 1.8)
-	assert_true(float(prompt.get("minimum_alpha")) >= 0.84)
+		Vector2(start_state["visual_offset"]).is_equal_approx(Vector2.ZERO))
+	assert_true(Vector2(start_state["scale"]).is_equal_approx(Vector2.ONE))
+	var start_mark_state: Dictionary = start_mark.call(&"debug_state")
+	assert_false(bool(start_mark_state["active"]))
 
-
-func test_boot_enter_prompt_peaks_after_title_flow_finishes() -> void:
-	var boot := await _instantiate_boot()
-	var title := boot.get_node("TitleColumn") as Control
-	var prompt := boot.get_node("EnterPrompt") as Control
-
-	assert_true(bool(prompt.call(&"is_title_synchronized")))
-	var flow_end_seconds := float(
-		title.call(&"final_flow_release_seconds"))
-	var flow_period_seconds := float(title.get("flow_period_seconds"))
-	var peak_delay_seconds := float(
-		prompt.get("title_peak_delay_seconds"))
-	var expected_peak_phase := (
-		(flow_end_seconds + peak_delay_seconds)
-		/ flow_period_seconds)
-	assert_almost_eq(flow_end_seconds, 5.40, 0.001)
+	start_button.grab_focus()
+	await get_tree().create_timer(0.15).timeout
+	start_state = start_motion.debug_state()
+	assert_gt(float(start_state["focus_strength"]), 0.98)
+	assert_true(
+		Vector2(start_state["visual_offset"]).is_equal_approx(
+			Vector2(4.0, 0.0)))
+	assert_true(Vector2(start_state["scale"]).is_equal_approx(
+		Vector2(1.03, 1.03)))
+	assert_eq(start_button.position, start_position)
+	var start_material := start_button.material as ShaderMaterial
+	assert_not_null(start_material)
+	assert_eq(start_material.shader.resource_path, BOOT_BUTTON_FOCUS_SHADER_PATH)
 	assert_almost_eq(
-		float(prompt.call(&"synced_peak_phase")),
-		expected_peak_phase,
+		float(start_material.get_shader_parameter(&"focus_tint_strength")),
+		0.0,
 		0.001)
+	start_mark_state = start_mark.call(&"debug_state")
+	assert_true(bool(start_mark_state["active"]))
+	assert_almost_eq(float(start_mark_state["blade_height"]), 18.0, 0.001)
+	assert_true(
+		Color(start_mark_state["blade_color"]).is_equal_approx(
+			Color("eda63a")))
+	assert_true(
+		Color(start_mark_state["separator_color"]).is_equal_approx(
+			Color("0f1b26")))
+	assert_eq(bool(start_state["sweep_enabled"]), false)
 
-	title.call(
-		&"_set_flow_phase",
-		flow_end_seconds / flow_period_seconds)
-	assert_almost_eq(prompt.modulate.a, prompt.minimum_alpha, 0.001)
-	title.call(&"_set_flow_phase", expected_peak_phase)
-	assert_almost_eq(prompt.modulate.a, 1.0, 0.001)
+	discord.grab_focus()
+	await get_tree().create_timer(0.15).timeout
+	var discord_state := discord_motion.debug_state()
+	var base_state := discord_base.debug_state()
+	assert_gt(float(discord_state["focus_strength"]), 0.98)
+	assert_true(
+		Vector2(discord_state["visual_offset"]).is_equal_approx(
+			Vector2(0.0, -4.0)))
+	assert_true(Vector2(discord_state["scale"]).is_equal_approx(
+		Vector2.ONE))
+	assert_gt(float(base_state["focus_strength"]), 0.98)
+	assert_true(bool(base_state["hot"]))
+	assert_almost_eq(float(base_state["base_alpha"]), 1.0, 0.001)
+	assert_eq(String(base_state["render_path"]), "analytic_ssaa_9x9")
+	var focused_star_color: Color = base_state["star_color"]
+	assert_gt(focused_star_color.r, 0.98)
+	assert_gt(focused_star_color.g, 0.85)
+	assert_gt(focused_star_color.b, 0.53)
+	assert_eq(discord.position, discord_position)
+	assert_eq(bool(discord_state["sweep_enabled"]), false)
+	assert_true(
+		Color(discord_state["focus_color"]).is_equal_approx(
+			Color(1.0, 0.86, 0.54, 1.0)))
+	assert_almost_eq(float(discord_state["focus_tint_strength"]), 0.14, 0.001)
+
+	discord.button_down.emit()
+	await get_tree().create_timer(0.06).timeout
+	discord_state = discord_motion.debug_state()
+	base_state = discord_base.debug_state()
+	assert_gt(float(discord_state["press_strength"]), 0.98)
+	assert_true(Vector2(discord_state["scale"]).is_equal_approx(
+		Vector2.ONE))
+	assert_true(
+		Vector2(discord_state["visual_offset"]).is_equal_approx(
+			Vector2.ZERO))
+	assert_gt(float(base_state["press_strength"]), 0.98)
+	assert_lt(float(base_state["base_alpha"]), 0.84)
+	discord.button_up.emit()
 
 
-func test_boot_enter_prompt_click_feedback_stays_crisp_without_scaling() -> void:
+func test_boot_menu_icons_preserve_internal_white_and_clear_only_exterior() -> void:
+	var icon_contracts: Array[Array] = [
+		["steam", Vector2i(88, 88), 183],
+		["discord", Vector2i(48, 48), 459],
+		["qq", Vector2i(80, 96), 1239],
+	]
+	for contract: Array in icon_contracts:
+		var path := (
+			"res://assets/ui/boot/menu_icons/%s.png" % String(contract[0]))
+		var image := Image.load_from_file(ProjectSettings.globalize_path(path))
+		assert_not_null(image, path)
+		if image == null:
+			continue
+		assert_eq(image.get_size(), contract[1])
+		for corner: Vector2i in [
+			Vector2i.ZERO,
+			Vector2i(image.get_width() - 1, 0),
+			Vector2i(0, image.get_height() - 1),
+			image.get_size() - Vector2i.ONE,
+		]:
+			assert_almost_eq(image.get_pixelv(corner).a, 0.0, 0.001)
+		var preserved_white := 0
+		for y: int in image.get_height():
+			for x: int in image.get_width():
+				var pixel := image.get_pixel(x, y)
+				if (
+					pixel.a > 0.99
+					and pixel.r >= 237.0 / 255.0
+					and pixel.g >= 237.0 / 255.0
+					and pixel.b >= 237.0 / 255.0
+				):
+					preserved_white += 1
+		assert_eq(preserved_white, int(contract[2]))
+		if String(contract[0]) == "discord":
+			assert_eq(image.get_used_rect().size, Vector2i(44, 40))
+
+	var feedback_path := "res://assets/ui/boot/menu_icons/feedback.png"
+	var feedback := Image.load_from_file(
+		ProjectSettings.globalize_path(feedback_path))
+	assert_not_null(feedback, feedback_path)
+	if feedback != null:
+		assert_eq(feedback.get_size(), Vector2i(48, 48))
+		assert_eq(feedback.get_used_rect().size, Vector2i(44, 26))
+
+
+func test_boot_menu_cross_star_base_reuses_the_sequence_slot_geometry() -> void:
 	var boot := await _instantiate_boot()
-	var prompt := boot.get_node("EnterPrompt") as Control
+	var menu := boot.get_node("InterfaceLayer/BootMenu") as BootMenuController
+	var small_buttons := menu.get_node("SmallButtons") as Control
+	var sequence_script := load(COMMAND_SLOT_SKIN_PATH) as Script
+	for button_name: String in ["Steam", "Discord", "QQ", "Feedback"]:
+		var base := small_buttons.get_node("%s/Base" % button_name) as BootIconBase
+		assert_not_null(base, button_name)
+		assert_true(base.get_script().get_base_script() == sequence_script, button_name)
+		var geometry: Dictionary = base.debug_geometry()
+		assert_true(bool(geometry["smooth_vector_rendering"]), button_name)
+		assert_true(bool(geometry["analytic_antialiasing"]), button_name)
+		assert_false(bool(geometry["geometry_antialiasing"]), button_name)
+	assert_false(FileAccess.file_exists(
+		"res://assets/ui/boot/menu_frames/icon_frame_idle.png"))
+	assert_false(FileAccess.file_exists(
+		"res://assets/ui/boot/menu_frames/icon_frame_focus.png"))
 
-	prompt.call(&"play_enter_feedback")
-	assert_true(bool(prompt.call(&"is_enter_feedback_active")))
-	assert_almost_eq(prompt.modulate.a, 1.0, 0.001)
-	await get_tree().create_timer(0.12).timeout
-	assert_eq(prompt.scale, Vector2.ONE)
-	assert_almost_eq(prompt.modulate.a, 1.0, 0.001)
+
+func test_boot_menu_placeholders_report_unconfigured_actions() -> void:
+	var boot := await _instantiate_boot()
+	var menu := boot.get_node("InterfaceLayer/BootMenu") as BootMenuController
+	var status := menu.get_node("StatusLabel") as Label
+	var load_button := menu.get_node("MainButtons/LoadGame") as Button
+	var steam_button := menu.get_node("SmallButtons/Steam") as Button
+
+	load_button.pressed.emit()
+	assert_eq(status.text, "读取存档功能待接入")
+	steam_button.pressed.emit()
+	assert_eq(status.text, "Steam链接待配置")
+	assert_null(menu.get_node_or_null("SmallButtons/Settings"))
+	assert_true(menu.is_interaction_enabled())
+
+
+func test_boot_menu_starts_unselected_and_keeps_keyboard_neighbors() -> void:
+	var boot := await _instantiate_boot()
+	var menu := boot.get_node("InterfaceLayer/BootMenu") as BootMenuController
+	var start_button := menu.get_node("MainButtons/StartGame") as Button
+	var load_button := menu.get_node("MainButtons/LoadGame") as Button
+	var quit_button := menu.get_node("MainButtons/QuitGame") as Button
+	var steam_button := menu.get_node("SmallButtons/Steam") as Button
+	var qq_button := menu.get_node("SmallButtons/QQ") as Button
+	var feedback_button := menu.get_node("SmallButtons/Feedback") as Button
+
+	assert_eq(start_button.focus_neighbor_bottom, start_button.get_path_to(load_button))
+	assert_eq(quit_button.focus_neighbor_bottom, quit_button.get_path_to(steam_button))
+	assert_eq(qq_button.focus_neighbor_right, qq_button.get_path_to(feedback_button))
+	assert_eq(feedback_button.focus_neighbor_left, feedback_button.get_path_to(qq_button))
+	assert_null(get_viewport().gui_get_focus_owner())
+	start_button.grab_focus()
+	assert_eq(get_viewport().gui_get_focus_owner(), start_button)
+
+
+func test_boot_menu_isolated_canvas_stays_outside_scene_modulation_chain() -> void:
+	var boot := await _instantiate_boot()
+	var interface_layer := boot.get_node("InterfaceLayer") as CanvasLayer
+	var menu := interface_layer.get_node("BootMenu") as BootMenuController
+	assert_not_null(interface_layer)
+	assert_gt(interface_layer.layer, 0)
+	assert_eq(menu.get_parent(), interface_layer)
+	assert_false(menu.use_parent_material)
+	assert_true(menu.modulate.is_equal_approx(Color.WHITE))
+	var menu_origin := menu.get_global_transform_with_canvas().origin
+	boot.position += Vector2(83.0, 47.0)
+	boot.modulate = Color(0.2, 0.3, 0.4, 0.5)
+	await get_tree().process_frame
+	assert_true(
+		menu.get_global_transform_with_canvas().origin.is_equal_approx(menu_origin),
+		"独立 UI 画布不得继承场景根节点的波动位移")
+	assert_true(menu.modulate.is_equal_approx(Color.WHITE))
+
+
+func test_boot_menu_intro_locks_input_without_using_gray_disabled_state() -> void:
+	var packed := load(BOOT_SCREEN_PATH) as PackedScene
+	var boot := packed.instantiate() as Control
+	add_child_autofree(boot)
+	await get_tree().process_frame
+	var menu := boot.get_node("InterfaceLayer/BootMenu") as BootMenuController
+	menu.prepare_intro()
+	for button: Button in menu.find_children("*", "Button", true, false):
+		assert_false(button.disabled, button.name)
+		assert_eq(button.mouse_filter, Control.MOUSE_FILTER_IGNORE, button.name)
+		assert_eq(button.focus_mode, Control.FOCUS_NONE, button.name)
+		if button.theme_type_variation == &"BootIconButton":
+			assert_eq(
+				button.get_theme_color(&"icon_disabled_color"),
+				button.get_theme_color(&"icon_normal_color"),
+				button.name)
+		elif button.theme_type_variation == &"BootMainButton":
+			assert_eq(
+				button.get_theme_color(&"font_disabled_color"),
+				button.get_theme_color(&"font_color"),
+				button.name)
+	menu.set_intro_reveal(0.5)
+	assert_true(menu.visible)
+	menu.finish_intro()
+	for button: Button in menu.find_children("*", "Button", true, false):
+		assert_false(button.disabled, button.name)
+		assert_eq(button.mouse_filter, Control.MOUSE_FILTER_STOP, button.name)
+		assert_eq(button.focus_mode, Control.FOCUS_ALL, button.name)
+
+
+func test_boot_menu_focus_shader_has_no_sweep_path() -> void:
+	var file := FileAccess.open(BOOT_BUTTON_FOCUS_SHADER_PATH, FileAccess.READ)
+	assert_not_null(file)
+	if file == null:
+		return
+	var source := file.get_as_text()
+	assert_false(source.contains("glint"))
+	assert_false(source.contains("glint_band"))
+	assert_false(source.contains("glint_progress"))
+	var motion_file := FileAccess.open(BOOT_BUTTON_MOTION_PATH, FileAccess.READ)
+	assert_not_null(motion_file)
+	if motion_file != null:
+		assert_false(motion_file.get_as_text().contains("glint"))
 
 
 func _instantiate_boot() -> Control:

@@ -29,8 +29,14 @@ const TITLE_PARTS: Array[Dictionary] = [
 		"group_end": 1.0,
 	},
 	{
-		"source": "res://assets/ui/boot/title_bobozan.png",
-		"output": "res://assets/ui/boot/title_intro_bobozan.png",
+		"source": "res://assets/ui/boot/title_chuan.png",
+		"output": "res://assets/ui/boot/title_intro_chuan.png",
+		"group_start": 0.0,
+		"group_end": 1.0,
+	},
+	{
+		"source": "res://assets/ui/boot/title_shuo.png",
+		"output": "res://assets/ui/boot/title_intro_shuo.png",
 		"group_start": 0.0,
 		"group_end": 1.0,
 	},

@@ -215,18 +215,18 @@ func test_boot_intro_keeps_composition_anchored_without_shake() -> void:
 	var intro := boot.get_node("IntroController")
 	var stage := boot.get_node("BackgroundStage") as Control
 	var title := boot.get_node("TitleColumn") as Control
-	var prompt := boot.get_node("EnterPrompt") as Control
+	var menu := boot.get_node("InterfaceLayer/BootMenu") as Control
 	var character := boot.get_node("Character") as Control
 	var stage_origin := stage.position
 	var title_origin := title.position
-	var prompt_origin := prompt.position
+	var menu_origin := menu.position
 	var character_origin := character.position
 
 	for sample_seconds: float in [0.0, 0.15, 0.34, 0.53, 1.32]:
 		intro.call(&"preview_at_time", sample_seconds)
 		assert_eq(stage.position, stage_origin)
 		assert_eq(title.position, title_origin)
-		assert_eq(prompt.position, prompt_origin)
+		assert_eq(menu.position, menu_origin)
 		assert_eq(character.position, character_origin)
 
 
@@ -238,9 +238,11 @@ func test_boot_title_pointer_tilt_uses_one_shared_perspective_plane() -> void:
 		boot.get_node("TitleColumn/BoTop") as TextureRect,
 		boot.get_node("TitleColumn/BoMiddle") as TextureRect,
 		boot.get_node("TitleColumn/ZanBottom") as TextureRect,
-		boot.get_node("TitleColumn/EnglishSubtitle") as TextureRect,
+		boot.get_node("TitleColumn/Chuan") as TextureRect,
+		boot.get_node("TitleColumn/Shuo") as TextureRect,
 		boot.get_node("TitleColumn/BoTopShadow") as TextureRect,
-		boot.get_node("TitleColumn/EnglishSubtitleShadow") as TextureRect,
+		boot.get_node("TitleColumn/ChuanShadow") as TextureRect,
+		boot.get_node("TitleColumn/ShuoShadow") as TextureRect,
 	]
 
 	assert_almost_eq(float(title.get("pointer_yaw_degrees")), 6.0, 0.001)
@@ -272,15 +274,19 @@ func test_boot_title_pointer_tilt_uses_one_shared_perspective_plane() -> void:
 	assert_null(boot.get_node_or_null("TitleColumn/EnglishPlus"))
 
 
-func test_boot_enter_prompt_keeps_decoration_lines_static() -> void:
+func test_boot_menu_uses_text_and_imported_icons_without_plates() -> void:
 	var boot := await _instantiate_boot()
-	var prompt := boot.get_node("EnterPrompt") as BootEnterPrompt
-	var left_line := prompt.get_node("LineLeft") as ColorRect
-	var right_line := prompt.get_node("LineRight") as ColorRect
+	var menu := boot.get_node("InterfaceLayer/BootMenu") as BootMenuController
+	var start_button := menu.get_node("MainButtons/StartGame") as Button
+	var steam_button := menu.get_node("SmallButtons/Steam") as Button
 
-	assert_null(left_line.material)
-	assert_null(right_line.material)
-	assert_false(prompt.has_method(&"set_line_pulse_phase"))
+	assert_null(start_button.get_node_or_null("Plate"))
+	assert_eq(start_button.text, "开始游戏")
+	assert_eq(steam_button.text, "")
+	assert_eq(
+		steam_button.icon.resource_path,
+		"res://assets/ui/boot/menu_icons/steam.png")
+	assert_null(boot.get_node_or_null("EnterPrompt"))
 
 
 func test_boot_exit_energy_builds_one_way_without_intro_pulse_falloff() -> void:
@@ -373,7 +379,7 @@ func test_boot_intro_starts_with_character_only_and_locks_entry() -> void:
 	var intro := boot.get_node("IntroController")
 	var stage := boot.get_node("BackgroundStage") as Control
 	var black_base := boot.get_node("IntroBlackBase") as ColorRect
-	var prompt := boot.get_node("EnterPrompt") as Control
+	var menu := boot.get_node("InterfaceLayer/BootMenu") as BootMenuController
 	var star := boot.get_node(
 		"Character/Rig/RearHandEnergyAnchor/RearHandStar") as ColorRect
 	var blue_mid := stage.get_node("BlueMid") as TextureRect
@@ -385,8 +391,9 @@ func test_boot_intro_starts_with_character_only_and_locks_entry() -> void:
 
 	intro.call(&"preview_at_time", 0.0)
 	assert_false(boot.can_enter())
-	assert_false(prompt.visible)
-	assert_eq(black_base.color, Color.BLACK)
+	assert_false(menu.visible)
+	assert_false(menu.is_interaction_enabled())
+	assert_true(black_base.color.is_equal_approx(Color("#c8d3d0")))
 	assert_almost_eq(stage.modulate.a, 1.0, 0.001)
 	assert_almost_eq(
 		_shader_float(star, &"intensity"),
@@ -426,7 +433,7 @@ func test_boot_intro_star_brush_gold_and_title_progress_together() -> void:
 	var gold := stage.get_node("GoldEnergy") as TextureRect
 	var contours := stage.get_node("PressureContours") as ColorRect
 	var title := boot.get_node("TitleColumn/BoTop") as TextureRect
-	var prompt := boot.get_node("EnterPrompt") as Control
+	var menu := boot.get_node("InterfaceLayer/BootMenu") as BootMenuController
 	var star := boot.get_node(
 		"Character/Rig/RearHandEnergyAnchor/RearHandStar") as ColorRect
 	var character_base := boot.get_node(
@@ -459,8 +466,9 @@ func test_boot_intro_star_brush_gold_and_title_progress_together() -> void:
 		_shader_float(character_base, &"intro_impact_progress"),
 		1.0)
 	assert_almost_eq(stage.modulate.a, 1.0, 0.001)
-	assert_true(prompt.visible)
-	assert_gt(prompt.modulate.a, 0.0)
+	assert_true(menu.visible)
+	assert_gt(menu.modulate.a, 0.0)
+	assert_false(menu.is_interaction_enabled())
 	var star_material := star.material as ShaderMaterial
 	assert_almost_eq(
 		float(star_material.get_shader_parameter(
@@ -486,7 +494,7 @@ func test_boot_intro_finishes_parallel_layers_together() -> void:
 	var blue_mid := stage.get_node("BlueMid") as TextureRect
 	var gold := stage.get_node("GoldEnergy") as TextureRect
 	var title := boot.get_node("TitleColumn/BoTop") as TextureRect
-	var prompt := boot.get_node("EnterPrompt") as Control
+	var menu := boot.get_node("InterfaceLayer/BootMenu") as BootMenuController
 
 	var parallel_placed_sample := maxf(
 		float(intro.get("brush_start_seconds"))
@@ -506,7 +514,7 @@ func test_boot_intro_finishes_parallel_layers_together() -> void:
 		_shader_float(title, &"intro_reveal_progress"),
 		1.0,
 		0.001)
-	assert_true(prompt.visible)
+	assert_true(menu.visible)
 	assert_true(boot.scale.is_equal_approx(Vector2.ONE))
 	assert_true(boot.position.is_equal_approx(Vector2.ZERO))
 
@@ -516,22 +524,38 @@ func test_boot_title_intro_grows_from_authored_energy_cuts_without_ghosts() -> v
 	var title := boot.get_node("TitleColumn/BoTop") as TextureRect
 	var title_shadow := boot.get_node(
 		"TitleColumn/BoTopShadow") as TextureRect
-	var english := boot.get_node(
-		"TitleColumn/EnglishSubtitle") as TextureRect
-	var english_shadow := boot.get_node(
-		"TitleColumn/EnglishSubtitleShadow") as TextureRect
+	var chuan := boot.get_node("TitleColumn/Chuan") as TextureRect
+	var shuo := boot.get_node("TitleColumn/Shuo") as TextureRect
+	var chuan_shadow := boot.get_node(
+		"TitleColumn/ChuanShadow") as TextureRect
+	var shuo_shadow := boot.get_node(
+		"TitleColumn/ShuoShadow") as TextureRect
 	var title_controller := boot.get_node("TitleColumn")
 	var title_material := title.material as ShaderMaterial
 	var title_shadow_material := title_shadow.material as ShaderMaterial
-	var english_material := english.material as ShaderMaterial
-	var english_shadow_material := english_shadow.material as ShaderMaterial
+	var chuan_material := chuan.material as ShaderMaterial
+	var shuo_material := shuo.material as ShaderMaterial
+	var chuan_shadow_material := chuan_shadow.material as ShaderMaterial
+	var shuo_shadow_material := shuo_shadow.material as ShaderMaterial
 
 	assert_null(boot.get_node_or_null("TitleColumn/TitleBladeLight"))
 	assert_false(title_controller.has_method(&"set_intro_state"))
 	assert_not_null(title_material.get_shader_parameter(
 		&"intro_activation_map"))
-	assert_not_null(english_material.get_shader_parameter(
+	assert_not_null(chuan_material.get_shader_parameter(
 		&"intro_activation_map"))
+	assert_not_null(shuo_material.get_shader_parameter(
+		&"intro_activation_map"))
+	assert_eq(
+		(chuan_material.get_shader_parameter(
+			&"intro_activation_map") as Texture2D).resource_path,
+		"res://assets/ui/boot/title_intro_chuan.png")
+	assert_eq(
+		(shuo_material.get_shader_parameter(
+			&"intro_activation_map") as Texture2D).resource_path,
+		"res://assets/ui/boot/title_intro_shuo.png")
+	assert_ne(chuan_material, shuo_material)
+	assert_ne(chuan_shadow_material, shuo_shadow_material)
 	assert_eq(
 		title_material.get_shader_parameter(&"intro_shadow"),
 		false)
@@ -539,7 +563,10 @@ func test_boot_title_intro_grows_from_authored_energy_cuts_without_ghosts() -> v
 		title_shadow_material.get_shader_parameter(&"intro_shadow"),
 		true)
 	assert_eq(
-		english_shadow_material.get_shader_parameter(&"intro_shadow"),
+		chuan_shadow_material.get_shader_parameter(&"intro_shadow"),
+		true)
+	assert_eq(
+		shuo_shadow_material.get_shader_parameter(&"intro_shadow"),
 		true)
 	assert_null(boot.get_node_or_null("TitleColumn/ChinesePlus"))
 	assert_null(boot.get_node_or_null("TitleColumn/ChinesePlusShadow"))
@@ -550,8 +577,12 @@ func test_boot_title_intro_grows_from_authored_energy_cuts_without_ghosts() -> v
 		0.0,
 		0.001)
 	assert_almost_eq(
-		float(english_material.get_shader_parameter(&"intro_progress_delay")),
-		0.052632,
+		float(chuan_material.get_shader_parameter(&"intro_progress_delay")),
+		0.0,
+		0.001)
+	assert_almost_eq(
+		float(shuo_material.get_shader_parameter(&"intro_progress_delay")),
+		0.0,
 		0.001)
 	assert_gt(
 		float(title_shadow_material.get_shader_parameter(&"intro_shadow_lag")),
@@ -571,7 +602,11 @@ func test_boot_title_intro_grows_from_authored_energy_cuts_without_ghosts() -> v
 	assert_gt(reveal_progress, 0.0)
 	assert_lt(reveal_progress, 1.0)
 	assert_almost_eq(
-		_shader_float(english, &"intro_reveal_progress"),
+		_shader_float(chuan, &"intro_reveal_progress"),
+		reveal_progress,
+		0.001)
+	assert_almost_eq(
+		_shader_float(shuo, &"intro_reveal_progress"),
 		reveal_progress,
 		0.001)
 
@@ -585,7 +620,11 @@ func test_boot_title_intro_grows_from_authored_energy_cuts_without_ghosts() -> v
 		1.0,
 		0.001)
 	assert_almost_eq(
-		_shader_float(english, &"intro_reveal_progress"),
+		_shader_float(chuan, &"intro_reveal_progress"),
+		1.0,
+		0.001)
+	assert_almost_eq(
+		_shader_float(shuo, &"intro_reveal_progress"),
 		1.0,
 		0.001)
 
@@ -594,12 +633,12 @@ func test_boot_intro_finishes_on_the_existing_idle_contract() -> void:
 	var boot := await _instantiate_boot()
 	var intro := boot.get_node("IntroController")
 	var stage := boot.get_node("BackgroundStage") as Control
-	var prompt := boot.get_node("EnterPrompt") as Control
+	var menu := boot.get_node("InterfaceLayer/BootMenu") as BootMenuController
 	var blue_mid := stage.get_node("BlueMid") as TextureRect
 	var gold := stage.get_node("GoldEnergy") as TextureRect
 	var title := boot.get_node("TitleColumn/BoTop") as TextureRect
-	var english := boot.get_node(
-		"TitleColumn/EnglishSubtitle") as TextureRect
+	var chuan := boot.get_node("TitleColumn/Chuan") as TextureRect
+	var shuo := boot.get_node("TitleColumn/Shuo") as TextureRect
 	var character_base := boot.get_node(
 		"Character/Rig/Base") as Sprite2D
 	var pressure_motion := stage.get_node("PressureMotion")
@@ -609,7 +648,8 @@ func test_boot_intro_finishes_on_the_existing_idle_contract() -> void:
 	await get_tree().process_frame
 
 	assert_true(boot.can_enter())
-	assert_true(prompt.visible)
+	assert_true(menu.visible)
+	assert_true(menu.is_interaction_enabled())
 	assert_almost_eq(
 		_shader_float(blue_mid, &"intro_stroke_progress"),
 		1.0,
@@ -623,7 +663,11 @@ func test_boot_intro_finishes_on_the_existing_idle_contract() -> void:
 		1.0,
 		0.001)
 	assert_almost_eq(
-		_shader_float(english, &"intro_reveal_progress"),
+		_shader_float(chuan, &"intro_reveal_progress"),
+		1.0,
+		0.001)
+	assert_almost_eq(
+		_shader_float(shuo, &"intro_reveal_progress"),
 		1.0,
 		0.001)
 	assert_almost_eq(

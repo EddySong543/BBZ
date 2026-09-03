@@ -450,7 +450,7 @@ func test_main_menu_uses_single_banner_and_pre_anchor_bottom_dock() -> void:
 	assert_eq(switch_button.text, "")
 	var banner_art := banner_button.get_node("Banner") as TextureRect
 	assert_eq(banner_art.texture.resource_path,
-			"res://assets/ui/main_menu/battle_banner.png")
+			"res://assets/ui/main_menu/expedition_banner.png")
 	assert_eq(banner_art.stretch_mode, TextureRect.STRETCH_KEEP_ASPECT_COVERED)
 	assert_eq(banner_art.offset_left, 0.0)
 	assert_eq(banner_art.offset_top, 0.0)
@@ -489,7 +489,9 @@ func test_main_menu_uses_single_banner_and_pre_anchor_bottom_dock() -> void:
 	assert_null(switch_button.get_node_or_null("Icon"),
 			"模式切换不得继续使用语义含混的通用switch图标")
 	var carousel_glyph := switch_button.get_node("CarouselGlyph") as Control
-	assert_eq(int(carousel_glyph.get("selected_index")), 0)
+	assert_eq(int(carousel_glyph.get("selected_index")), 1)
+	assert_false(switch_button.visible, "PvP 休眠时不显示模式切换入口")
+	assert_true(switch_button.disabled, "隐藏入口仍须禁用，防旧信号触发")
 	var switch_bg := switch_button.get_node("Bg") as ColorRect
 	assert_eq((switch_bg.material as ShaderMaterial).shader.resource_path,
 			"res://assets/shaders/canvas_button_jelly.gdshader")
@@ -510,11 +512,14 @@ func test_main_menu_uses_single_banner_and_pre_anchor_bottom_dock() -> void:
 	assert_eq(banner_art.texture.resource_path,
 			"res://assets/ui/main_menu/expedition_banner.png")
 	assert_eq(int(carousel_glyph.get("selected_index")), 1,
-			"轮播箭头与页码必须跟随当前模式反向")
+			"PvP 休眠时不得从远征切回匹配")
 	assert_eq((menu.get_node("UI/NavHeroes") as Button).position, Vector2(48.0, 916.0))
 	assert_eq((menu.get_node("UI/NavBackpack") as Button).position, Vector2(1640.0, 916.0))
 	assert_eq((menu.get_node("UI/NavWarehouse") as Button).position, Vector2(1772.0, 916.0))
-	assert_eq((menu.get_node("UI/NetLobbyButton") as Button).position, Vector2(1652.0, 108.0))
+	assert_null(menu.get_node_or_null("UI/NetLobbyButton"),
+			"PvP 休眠时不创建局域网大厅入口")
+	assert_false((menu.get_node("UI/IdentityButton/RankLabel") as Label).visible,
+			"PvP 休眠时不展示段位占位")
 
 
 func test_main_menu_merges_hero_and_item_codex_entry() -> void:
@@ -588,38 +593,21 @@ func test_world_focus_only_changes_presentation_state() -> void:
 	assert_eq(String(world.get("_focused_destination")), "")
 
 
-func test_match_state_uses_icon_and_blue_portal_energy_then_restores_on_cancel() -> void:
+func test_pvp_match_calls_are_inert_while_runtime_gate_is_closed() -> void:
 	var menu: Control = _make_menu()
 	var match_entry := menu.get_node("UI/ModeBanner") as Button
 	var world := menu.get_node("MenuWorld") as MainMenuWorld
 	menu.call("_start_search")
-	await get_tree().create_timer(1.15).timeout
+	menu.call("_on_match_found")
+	await get_tree().process_frame
 	assert_null(match_entry.get_node_or_null("Caption"))
 	assert_null(match_entry.get_node_or_null("Status"))
-	assert_eq(match_entry.tooltip_text, "匹配中 0:01")
-	assert_eq((match_entry.get_node("Banner") as TextureRect).self_modulate,
-			Color("FFD4B8"))
-	for stone: TextureRect in world.portal_stones:
-		assert_eq((stone.material as ShaderMaterial).get_shader_parameter("energy_color"),
-				MainMenuWorld.PORTAL_ENERGY_BLUE)
-	var search_levels: Array[float] = world.get("_portal_energy_levels")
-	assert_gt(search_levels[0], 0.9)
-	assert_gt(search_levels[1], 0.9)
-	assert_gt(search_levels[2], 0.9)
-	assert_eq(search_levels[3], 0.0,
-			"匹配成功前第四颗必须保持白色，避免虚假显示连接完成")
-	world.complete_portal_connection(MainMenuWorld.PORTAL_ENERGY_BLUE)
-	assert_false(bool(world.get_visual_contract()["portal_connection_complete"]),
-			"服务器确认后仍要等第四束光柱真正冲顶，不能提前宣告视觉连接完成")
-	assert_almost_eq(float((world.portal_stones[3].material as ShaderMaterial)
-			.get_shader_parameter("energy_mix")), 1.0, 0.001)
-	assert_false(world.portal_beams[3].visible,
-			"第四颗必须先完成发光，下一拍才从石头格升起光柱")
-	await world.wait_for_portal_beams(0.12)
-	assert_true(bool(world.get_visual_contract()["portal_connection_complete"]))
-	menu.call("_cancel_search")
-	assert_eq(match_entry.tooltip_text, "匹配")
+	assert_eq(match_entry.tooltip_text, "远征")
 	assert_eq((match_entry.get_node("Banner") as TextureRect).self_modulate,
 			Color.WHITE)
-	await get_tree().create_timer(0.35).timeout
-	assert_almost_eq(float(world.get_visual_contract()["portal_energy_mix"]), 0.0, 0.001)
+	assert_eq(int(menu.get("_match_state")), 0)
+	assert_null(menu.get_node_or_null("UI/CancelMatchButton"))
+	for stone: TextureRect in world.portal_stones:
+		assert_almost_eq(float((stone.material as ShaderMaterial)
+				.get_shader_parameter("energy_mix")), 0.0, 0.001)
+	assert_false(bool(world.get_visual_contract()["portal_connection_complete"]))

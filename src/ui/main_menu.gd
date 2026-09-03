@@ -10,6 +10,7 @@ const BACKPACK_OVERLAY_SCENE := preload("res://src/ui/backpack_screen.tscn")
 const WAREHOUSE_OVERLAY_SCENE := preload("res://src/ui/warehouse_screen.tscn")
 const CODEX_OVERLAY_SCRIPT := preload("res://src/ui/components/battle_codex_overlay.gd")
 const ProfileStore := preload("res://src/core/player_profile.gd")   # 个人资料存档（headless 安全走 preload）
+const RuntimeFeatures := preload("res://src/core/runtime_features.gd")
 
 # ---- 匹配状态机：IDLE 点入口=开始；SEARCHING 再点/ESC/取消钮=取消；FOUND 锁输入。----
 # 本地用 mock_match_seconds 定时模拟匹配成功；联机时把定时器换成真匹配回调，状态机原样复用。
@@ -99,10 +100,13 @@ class ModeCarouselGlyph extends Control:
 var _backpack_overlay: BackpackScreen
 var _warehouse_overlay: WarehouseScreen
 var _codex_overlay: Control
-var _primary_mode: int = PrimaryMode.MATCH
+var _primary_mode: int = PrimaryMode.MATCH if RuntimeFeatures.PVP_ENABLED \
+		else PrimaryMode.EXPEDITION
 
 
 func _ready() -> void:
+	if not RuntimeFeatures.PVP_ENABLED:
+		BattleSetup.close_net_session()
 	_build_vignette()
 	_setup_identity()
 	_setup_settings()
@@ -194,20 +198,22 @@ func _setup_identity() -> void:
 	btn.mouse_exited.connect(func() -> void: ring.visible = false)
 	_attach_juice(btn)   # 悬停轻放大+按压反馈+手型金晕指针（导航钮同手感）
 	var rank_lbl: Label = $UI/IdentityButton/RankLabel
-	FontManager.apply(rank_lbl, 16)
-	rank_lbl.add_theme_color_override("font_color", INK)     # 段位章在羊皮板上→墨字
-	_add_plate_bg(rank_lbl)
-	# 段位盾徽（icon 排查清单·先程序绘制占位）
-	var shield := TextureRect.new()
-	shield.name = "RankIcon"
-	shield.texture = PixelGlyphs.icon_texture("shield")
-	shield.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	shield.stretch_mode = TextureRect.STRETCH_SCALE
-	shield.position = Vector2(6, 9)
-	shield.size = Vector2(16, 16)
-	shield.modulate = INK
-	shield.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	rank_lbl.add_child(shield)
+	rank_lbl.visible = RuntimeFeatures.PVP_ENABLED
+	if RuntimeFeatures.PVP_ENABLED:
+		FontManager.apply(rank_lbl, 16)
+		rank_lbl.add_theme_color_override("font_color", INK)     # 段位章在羊皮板上→墨字
+		_add_plate_bg(rank_lbl)
+		# 段位盾徽（icon 排查清单·先程序绘制占位）
+		var shield := TextureRect.new()
+		shield.name = "RankIcon"
+		shield.texture = PixelGlyphs.icon_texture("shield")
+		shield.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		shield.stretch_mode = TextureRect.STRETCH_SCALE
+		shield.position = Vector2(6, 9)
+		shield.size = Vector2(16, 16)
+		shield.modulate = INK
+		shield.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		rank_lbl.add_child(shield)
 	btn.pressed.connect(_on_profile_pressed)
 
 
@@ -258,10 +264,14 @@ func _setup_modes() -> void:
 	_setup_mode_banner_button()
 	_setup_mode_carousel_button()
 	_match_entry.pressed.connect(_on_mode_banner_pressed)
-	_mode_switch.pressed.connect(_on_mode_switch_pressed)
+	_mode_switch.visible = RuntimeFeatures.PVP_ENABLED
+	_mode_switch.disabled = not RuntimeFeatures.PVP_ENABLED
+	if RuntimeFeatures.PVP_ENABLED:
+		_mode_switch.pressed.connect(_on_mode_switch_pressed)
 	_refresh_mode_banner()
-	_build_cancel_button()
-	_build_net_button()
+	if RuntimeFeatures.PVP_ENABLED:
+		_build_cancel_button()
+		_build_net_button()
 	_match_entry.grab_focus()
 
 
@@ -376,6 +386,8 @@ func _setup_mode_carousel_button() -> void:
 
 
 func _refresh_mode_banner() -> void:
+	if not RuntimeFeatures.PVP_ENABLED:
+		_primary_mode = PrimaryMode.EXPEDITION
 	var is_match: bool = _primary_mode == PrimaryMode.MATCH
 	var texture: Texture2D = BATTLE_BANNER_TEX if is_match else EXPEDITION_BANNER_TEX
 	(_match_entry.get_node("Banner") as TextureRect).texture = texture
@@ -386,6 +398,9 @@ func _refresh_mode_banner() -> void:
 
 
 func _on_mode_banner_pressed() -> void:
+	if not RuntimeFeatures.PVP_ENABLED:
+		_on_expedition_pressed()
+		return
 	if _primary_mode == PrimaryMode.MATCH:
 		_on_match_pressed()
 	else:
@@ -393,6 +408,8 @@ func _on_mode_banner_pressed() -> void:
 
 
 func _on_mode_switch_pressed() -> void:
+	if not RuntimeFeatures.PVP_ENABLED:
+		return
 	if _match_state != MatchState.IDLE:
 		return
 	_primary_mode = PrimaryMode.EXPEDITION \
@@ -402,6 +419,8 @@ func _on_mode_switch_pressed() -> void:
 
 ## M1：局域网对战入口移至右上设置下方，不与中央模式Banner抢层级。
 func _build_net_button() -> void:
+	if not RuntimeFeatures.PVP_ENABLED:
+		return
 	var b := Button.new()
 	b.name = "NetLobbyButton"
 	b.text = tr("联机对战·局域网")
@@ -709,6 +728,8 @@ func _animate_in() -> void:
 
 
 func _on_match_pressed() -> void:
+	if not RuntimeFeatures.PVP_ENABLED:
+		return
 	match _match_state:
 		MatchState.IDLE:
 			_begin_match_entry()
@@ -719,6 +740,8 @@ func _on_match_pressed() -> void:
 
 
 func _begin_match_entry() -> void:
+	if not RuntimeFeatures.PVP_ENABLED:
+		return
 	_start_search()
 
 
@@ -733,6 +756,8 @@ func _unhandled_input(event: InputEvent) -> void:
 # ============================================================
 
 func _start_search() -> void:
+	if not RuntimeFeatures.PVP_ENABLED:
+		return
 	_match_state = MatchState.SEARCHING
 	_search_elapsed = 0.0
 	_last_secs = -1
@@ -770,6 +795,8 @@ func _process(delta: float) -> void:
 
 ## 匹配成功：第四石接入并与前三束共同维持，再由底部波幕传送进备战。
 func _on_match_found() -> void:
+	if not RuntimeFeatures.PVP_ENABLED:
+		return
 	_match_state = MatchState.FOUND
 	_menu_world.complete_portal_connection(MainMenuWorld.PORTAL_ENERGY_BLUE)
 	_set_match_button_status("已找到", "")

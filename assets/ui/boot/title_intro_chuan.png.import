@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cdwgtbs67ytic"
-path="res://.godot/imported/title_bobozan.png-074877751d8e399dbf59770abeaa3fc2.ctex"
+uid="uid://c8vpq5qpy0427"
+path="res://.godot/imported/title_intro_chuan.png-dd948e58cf34d6d99a91e687eed0f8c8.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/boot/title_bobozan.png"
-dest_files=["res://.godot/imported/title_bobozan.png-074877751d8e399dbf59770abeaa3fc2.ctex"]
+source_file="res://assets/ui/boot/title_intro_chuan.png"
+dest_files=["res://.godot/imported/title_intro_chuan.png-dd948e58cf34d6d99a91e687eed0f8c8.ctex"]
 
 [params]
 

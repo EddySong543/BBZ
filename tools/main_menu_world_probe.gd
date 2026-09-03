@@ -44,10 +44,10 @@ func _run() -> void:
 			contract.get("rendered_cell_size", Vector2.ZERO))
 	if view_size != Vector2(1920.0, 1080.0):
 		failures.append("map viewport does not cover the 1920 by 1080 design frame")
-	if not rendered_cell_size.is_equal_approx(Vector2(1920.0 / 19.0, 1080.0 / 11.0)):
-		failures.append("rendered cell does not match the 19 by 11 full-screen grid")
-	if not (view_size / rendered_cell_size).is_equal_approx(Vector2(19.0, 11.0)):
-		failures.append("viewport is not a complete 19 by 11 grid")
+	if not rendered_cell_size.is_equal_approx(Vector2(1920.0 / 23.0, 1080.0 / 13.0)):
+		failures.append("rendered cell does not match the 23 by 13 full-screen grid")
+	if not (view_size / rendered_cell_size).is_equal_approx(Vector2(23.0, 13.0)):
+		failures.append("viewport is not a complete 23 by 13 grid")
 	if world.map_view.position != Vector2.ZERO:
 		failures.append("map viewport still exposes an outer fallback ring")
 	var render_scale := Vector2(contract.get("render_scale", Vector2.ZERO))
@@ -62,9 +62,9 @@ func _run() -> void:
 		failures.append("initial cell does not match this load's spawn")
 	if not world._view_position_for_cell(hub_center).is_equal_approx(view_size * 0.5):
 		failures.append("hub center cell is not at exact screen center")
-	if world._cell_from_view_position(Vector2(0.5, 0.5)) != Vector2i(7, 4):
+	if world._cell_from_view_position(Vector2(0.5, 0.5)) != Vector2i(5, 3):
 		failures.append("top-left screen edge cuts a grid cell")
-	if world._cell_from_view_position(Vector2(1919.5, 1079.5)) != Vector2i(25, 14):
+	if world._cell_from_view_position(Vector2(1919.5, 1079.5)) != Vector2i(27, 15):
 		failures.append("bottom-right screen edge cuts a grid cell")
 	if int(contract.get("ground_cell_count", 0)) != 576:
 		failures.append("ground cell count mismatch")
@@ -98,7 +98,7 @@ func _run() -> void:
 				+ MainMenuWorld.PORTAL_STONE_FOOT_ANCHORS[index]
 		if actual_foot != expected_foot:
 			failures.append("portal stone foot anchor mismatch at index %d" % index)
-		if world.portal_stones[index].scale != MainMenuWorld.TOKEN_ASPECT_COMPENSATION \
+		if world.portal_stones[index].scale != world._current_aspect_compensation() \
 				* MainMenuWorld.PORTAL_STONE_SCALE:
 			failures.append("portal stone scale mismatch at index %d" % index)
 	world.play_portal_activation(
@@ -118,107 +118,16 @@ func _run() -> void:
 			failures.append("expedition gold energy is not applied")
 		if not is_equal_approx(float(stone_material.get_shader_parameter("energy_mix")), 1.0):
 			failures.append("portal energy mix is not active")
-	world.begin_portal_search(MainMenuWorld.PORTAL_ENERGY_BLUE)
-	await create_timer(1.15).timeout
-	var search_levels: Array[float] = world.get("_portal_energy_levels")
-	if search_levels[0] < 0.99 or search_levels[1] < 0.99 \
-			or search_levels[2] < 0.99 or search_levels[3] > 0.0:
-		failures.append("match search must reserve the fourth stone for connection success")
-	world.complete_portal_connection(MainMenuWorld.PORTAL_ENERGY_BLUE)
-	for stone: TextureRect in world.portal_stones:
-		if (stone.material as ShaderMaterial).get_shader_parameter("energy_color") \
-				!= MainMenuWorld.PORTAL_ENERGY_BLUE:
-			failures.append("match blue energy is not applied")
-	await world.play_portal_beam(MainMenuWorld.PORTAL_ENERGY_BLUE, 0.12)
-	if world.portal_beam == null or not world.portal_beam.visible:
-		failures.append("connected portal does not raise the center beam")
+	if world.portal_beams.size() != 4:
+		failures.append("each portal stone must own one beam")
 	else:
-		var beam_rect := Rect2(world.portal_beam.position, world.portal_beam.size)
-		var base_rect := Rect2(view_size * 0.5 - rendered_cell_size * 1.5,
-				rendered_cell_size * 3.0)
-		if not is_zero_approx(beam_rect.position.y) or not beam_rect.encloses(base_rect):
-			failures.append("portal beam does not reach screen top from the center nine cells")
-		var beam_contract: Dictionary = world.portal_beam.get_visual_contract()
-		if String(beam_contract.get("implementation", "")) \
-				!= "ref44_contoured_pixel_portal_beam" \
-				or String(beam_contract.get("reference_profile", "")) != "ref44":
-			failures.append("portal beam is not using the ref44 contour")
-		if not bool(beam_contract.get("uses_subviewport", false)) \
-				or not bool(beam_contract.get("uses_runtime_viewport_texture", false)) \
-				or bool(beam_contract.get("uses_external_texture", true)) \
-				or bool(beam_contract.get("uses_shader", true)) \
-				or bool(beam_contract.get("uses_sprite_sheet", true)):
-			failures.append("portal beam runtime source contract mismatch")
-		if bool(beam_contract.get("uses_antialiasing", true)) \
-				or bool(beam_contract.get("uses_continuous_gradients", true)) \
-				or bool(beam_contract.get("uses_tapered_staircase_edges", true)):
-			failures.append("portal beam is not built from hard rectangular pixels")
-		if bool(beam_contract.get("uses_full_frame_additive_blend", true)) \
-				or not bool(beam_contract.get("uses_controlled_value_layers", false)) \
-				or not bool(beam_contract.get("uses_connected_profile", false)) \
-				or not bool(beam_contract.get("uses_single_connected_column", false)) \
-				or not bool(beam_contract.get("uses_colored_outline", false)) \
-				or not bool(beam_contract.get("uses_ivory_core", false)) \
-				or bool(beam_contract.get("uses_internal_cutouts", true)) \
-				or bool(beam_contract.get("uses_full_body_rect", true)) \
-				or bool(beam_contract.get("uses_flat_top_cap", true)) \
-				or not bool(beam_contract.get("uses_coherent_upward_streams", false)) \
-				or bool(beam_contract.get("uses_hash_mosaic", true)) \
-				or bool(beam_contract.get("uses_isolated_noise_chunks", true)):
-			failures.append("portal beam still uses a flat additive rectangle instead of a connected value-layered profile")
-		if not bool(beam_contract.get("core_rises_before_body", false)) \
-				or int(beam_contract.get("beam_stage_count", 0)) < 5 \
-				or int(beam_contract.get("column_layer_count", 0)) < 4:
-			failures.append("portal beam has no readable ignition, rise, sustain and peak hierarchy")
-		if String(beam_contract.get("color_mode", "")) != "ref44_purple_ivory" \
-				or beam_contract.get("outline_color", Color.TRANSPARENT) != Color("822B85") \
-				or beam_contract.get("core_color", Color.TRANSPARENT) != Color("FDFCF7"):
-			failures.append("portal beam does not use the ref44 purple and ivory palette")
-		if int(beam_contract.get("leading_prong_count", 0)) != 1 \
-				or int(beam_contract.get("silhouette_state_count", 0)) != 6:
-			failures.append("portal beam does not have the single-front six-state silhouette")
-		if Vector2i(beam_contract.get("logical_canvas_size", Vector2i.ZERO)) \
-				!= Vector2i(240, 135) or int(beam_contract.get("integer_scale", 0)) != 8:
-			failures.append("portal beam is not rendered at 240 by 135 then enlarged 8x")
-		if not bool(beam_contract.get("texture_filter_nearest", false)):
-			failures.append("portal beam runtime texture is not nearest filtered")
-		if not bool(beam_contract.get("profile_spans_portal_width", false)) \
-				or not bool(beam_contract.get("base_spans_nine_cells", false)):
-			failures.append("portal beam profile does not span the center three columns and nine-cell base")
-		var logical_base := Rect2i(beam_contract.get("logical_base_rect", Rect2i()))
-		var logical_body := Rect2i(beam_contract.get("main_body_rect_logical", Rect2i()))
-		if logical_body.position.x > logical_base.position.x \
-				or logical_body.end.x < logical_base.end.x \
-				or logical_body.position.y != 0:
-			failures.append("portal beam profile bounds do not cover all three center columns to the top")
-		if int(beam_contract.get("visible_upward_stream_count", 0)) <= 0 \
-				or int(beam_contract.get("visible_edge_tongue_count", -1)) != 0:
-			failures.append("portal beam does not use clean ref44 edges and internal upward glints")
-		if not bool(beam_contract.get("reaches_screen_top", false)):
-			failures.append("portal beam does not reach the top edge")
-		world.set_process(false)
-		world.portal_beam.set_anim_time(4.0)
-		await process_frame
-		await process_frame
-		var beam_pixels_a: Dictionary = world.portal_beam.get_runtime_pixel_metrics()
-		world.portal_beam.set_anim_time(4.25)
-		await process_frame
-		await process_frame
-		var beam_pixels_b: Dictionary = world.portal_beam.get_runtime_pixel_metrics()
-		world.set_process(true)
-		if not bool(beam_pixels_a.get("image_ready", false)) \
-				or not bool(beam_pixels_a.get("base_spans_full_rect", false)) \
-				or float(beam_pixels_a.get("base_coverage_ratio", 0.0)) < 0.90 \
-				or float(beam_pixels_a.get("base_coverage_ratio", 1.0)) > 1.0 \
-				or int(beam_pixels_a.get("covered_column_rows", 0)) != logical_body.size.y \
-				or float(beam_pixels_a.get("column_fill_ratio", 0.0)) < 0.85 \
-				or float(beam_pixels_a.get("column_fill_ratio", 1.0)) > 0.99 \
-				or int(beam_pixels_a.get("distinct_row_width_count", 0)) < 4 \
-				or int(beam_pixels_a.get("bright_pixel_count", 0)) <= 0:
-			failures.append("portal beam integer-canvas profile metrics are outside the approved range")
-		if int(beam_pixels_a.get("frame_signature", 0)) \
-				== int(beam_pixels_b.get("frame_signature", 0)):
-			failures.append("portal beam sustain frame is static")
+		for beam: PortalPixelBeam in world.portal_beams:
+			if not beam.visible or float(beam.beam_progress) < 0.999:
+				failures.append("connected portal beam is not fully raised")
+				break
+			if not bool(beam.get_visual_contract().get("reaches_screen_top", false)):
+				failures.append("portal beam does not reach the screen top")
+				break
 	if menu.get_node_or_null("UI/ModeMatch") != null \
 			or menu.get_node_or_null("UI/ModeTower") != null:
 		failures.append("obsolete dual mode buttons still exist")
@@ -242,8 +151,8 @@ func _run() -> void:
 		failures.append("single mode banner geometry mismatch")
 	elif banner_button.get_node_or_null("Banner") == null \
 			or (banner_button.get_node("Banner") as TextureRect).texture.resource_path \
-			!= "res://assets/ui/main_menu/battle_banner.png":
-		failures.append("battle banner is not the initial single mode artwork")
+			!= "res://assets/ui/main_menu/expedition_banner.png":
+		failures.append("expedition banner is not the only current mode artwork")
 	else:
 		var banner_art := banner_button.get_node("Banner") as TextureRect
 		var banner_bg := banner_button.get_node_or_null("Bg") as ColorRect
@@ -281,14 +190,9 @@ func _run() -> void:
 	else:
 		var carousel_glyph := switch_button.get_node_or_null("CarouselGlyph") as Control
 		if switch_button.get_node_or_null("Icon") != null or carousel_glyph == null \
-				or int(carousel_glyph.get("selected_index")) != 0:
-			failures.append("mode carousel rail still uses the rejected switch icon")
-		switch_button.pressed.emit()
-		if (banner_button.get_node("Banner") as TextureRect).texture.resource_path \
-				!= "res://assets/ui/main_menu/expedition_banner.png":
-			failures.append("mode switch does not replace the single banner artwork")
-		if carousel_glyph != null and int(carousel_glyph.get("selected_index")) != 1:
-			failures.append("mode carousel direction and page state did not update")
+				or int(carousel_glyph.get("selected_index")) != 1 \
+				or switch_button.visible or not switch_button.disabled:
+			failures.append("dormant PvP carousel is not hidden and locked to expedition")
 	if menu.get_node_or_null("UI/NavShop") != null:
 		failures.append("shop placeholder still exists")
 	var backpack_button := menu.get_node_or_null("UI/NavBackpack") as Button
@@ -310,8 +214,8 @@ func _run() -> void:
 	if codex_button != null and codex_button.position.y + codex_button.size.y > view_size.y:
 		failures.append("pre-grid-anchor codex button is not fully visible")
 	var net_button := menu.get_node_or_null("UI/NetLobbyButton") as Button
-	if net_button == null or net_button.position != Vector2(1652.0, 108.0):
-		failures.append("online battle entry is not below settings")
+	if net_button != null:
+		failures.append("dormant online battle entry is still visible")
 	for path: String in ["UI/ModeBanner", "UI/ModeSwitch", "UI/NavHeroes",
 			"UI/NavBackpack", "UI/NavWarehouse"]:
 		var dock_button := menu.get_node(path) as Button

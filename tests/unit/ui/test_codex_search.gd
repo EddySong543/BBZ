@@ -162,7 +162,7 @@ func test_submitted_query_filters_only_the_active_chapter_data_source() -> void:
 	var codex := _make_codex()
 	await get_tree().process_frame
 	var search_input := codex.get_node("SearchControl/SearchInput") as LineEdit
-	var item: ItemData = ItemCatalog.all_for_tier(1)[0]
+	var item: ItemData = ItemCatalog.all_active_for_tier(1)[0]
 	codex.show_section(CodexScreen.Section.ITEM)
 	search_input.text = item.item_name
 	codex.call("_on_search_text_submitted", item.item_name)

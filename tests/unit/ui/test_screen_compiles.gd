@@ -144,7 +144,7 @@ func test_item_gallery_first_batch_is_scene_backed_and_page_native() -> void:
 			"删除底部快捷键小字")
 
 
-func test_item_gallery_second_batch_uses_twelve_card_pages() -> void:
+func test_item_gallery_uses_twelve_card_pages_and_active_rarity_pool_navigation() -> void:
 	var packed := load("res://src/ui/item_gallery_screen.tscn") as PackedScene
 	var screen := packed.instantiate()
 	add_child_autofree(screen)
@@ -155,7 +155,6 @@ func test_item_gallery_second_batch_uses_twelve_card_pages() -> void:
 	var next := navigation.get_node("NextPage") as Button
 	var page_size: int = 12
 	var page_count: int = screen._catalog_page_count()
-	var tier_page_count: int = ceili(screen._items.size() / float(page_size))
 	assert_eq(grid.get("columns"), 4, "道具图鉴每页使用 4 列")
 	assert_eq(grid.get("cards_per_page"), page_size, "道具图鉴每页只展示 12 件")
 	assert_true(navigation.visible, "完整道具图鉴超过一页时显示翻页导航")
@@ -167,32 +166,19 @@ func test_item_gallery_second_batch_uses_twelve_card_pages() -> void:
 			mini(page_size, screen._items.size()), "第一页只显示本页道具")
 	assert_eq(indicator.text, "%02d / %02d" % [1, page_count], "页码使用两位图鉴编号")
 	assert_true(previous.disabled, "第一页禁用上一页")
-	assert_false(next.disabled, "存在下一页时允许翻页")
+	assert_false(next.disabled, "存在下一稀有度时允许翻页")
 	next.pressed.emit()
-	assert_eq(screen.get("_current_page"), 1, "下一页按钮进入第二页")
-	assert_eq(screen._sel_idx, page_size, "翻页后保留当前格位并选择下一页首件")
-	assert_eq(indicator.text, "%02d / %02d" % [2, page_count], "翻页后同步页码")
-	assert_false(previous.disabled, "第二页允许返回")
-	assert_false(next.disabled, "普通池仍有后续页面或稀有档时允许继续翻页")
-	for expected_page: int in range(2, tier_page_count):
-		next.pressed.emit()
-		assert_eq(screen._tier, 1, "普通池扩充后应先遍历全部普通页面")
-		assert_eq(screen.get("_current_page"), expected_page,
-				"普通池扩充后进入对应档内页面")
-	assert_eq(screen.get("_current_page"), tier_page_count - 1,
-			"跨稀有度前停在普通最后一页")
-	next.pressed.emit()
-	assert_eq(screen._tier, 2, "普通最后一页继续点击下一页进入稀有档")
+	assert_eq(screen._tier, 2, "新版12件普通池一页展示，下一页进入稀有档")
 	assert_eq(screen.get("_current_page"), 0, "跨稀有度后进入新档第一页")
 	assert_eq(screen._sel_idx, 0, "跨稀有度分页后保留第一页首格")
-	assert_eq(indicator.text, "%02d / %02d" % [tier_page_count + 1, page_count],
+	assert_eq(indicator.text, "%02d / %02d" % [2, page_count],
 			"跨稀有度后页码继续使用全图鉴序号")
+	assert_false(previous.disabled, "稀有档允许返回普通档")
+	assert_false(next.disabled, "稀有档后仍有传说档")
 	previous.pressed.emit()
-	assert_eq(screen._tier, 1, "稀有第一页点击上一页返回普通最后一页")
-	assert_eq(screen.get("_current_page"), tier_page_count - 1,
-			"返回普通最后一页时恢复档内页码")
-	assert_eq(screen._sel_idx, (tier_page_count - 1) * page_size,
-			"返回上一档时保留当前格位")
+	assert_eq(screen._tier, 1, "稀有第一页点击上一页返回普通页")
+	assert_eq(screen.get("_current_page"), 0)
+	assert_eq(screen._sel_idx, 0)
 	screen._select(screen._items.size() - 1)
 	var right := InputEventAction.new()
 	right.action = "ui_right"
@@ -220,8 +206,11 @@ func test_item_gallery_third_batch_uses_clean_right_page_hierarchy() -> void:
 			"右页使用留白而非突兀水平分割线")
 	assert_lte(name_label.position.y + name_label.size.y, frame.position.y,
 			"右页按道具名到大图标排列")
-	assert_lte(frame.position.y + frame.size.y, rarity_badge.position.y,
-			"稀有度纸签位于大图标下方")
+	var frame_bottom: float = frame.position.y + frame.size.y
+	assert_lt(rarity_badge.position.y, frame_bottom,
+			"稀有度纸签上移并压住大图标框底边")
+	assert_gt(rarity_badge.position.y + rarity_badge.size.y, frame_bottom,
+			"稀有度纸签跨过框底形成独立挂签")
 	assert_lte(rarity_badge.position.y + rarity_badge.size.y, description.position.y,
 			"效果描述位于稀有度纸签下方且保留留白")
 	assert_lte(description.position.y + description.size.y, flavor.position.y,
@@ -342,8 +331,12 @@ func test_all_item_tiers_use_static_fill_and_shared_directional_shadow() -> void
 	shadow.free()
 	var art_shadow := ItemFrameStyle.make_item_art_shadow(
 			null, Vector2(10.0, 20.0), Vector2(192.0, 192.0))
-	assert_eq(art_shadow.position, Vector2(14.0, 26.0),
-			"大号道具图案投影按比例放大但封顶为 2 倍偏移")
+	assert_almost_eq(art_shadow.rotation, ItemFrameStyle.ITEM_ART_ROTATION, 0.001,
+			"道具图案与投影都不在Godot内追加固定旋转")
+	assert_almost_eq(ItemFrameStyle.ITEM_ART_ROTATION, 0.0, 0.001,
+			"默认朝向由新版PNG本身承担")
+	assert_eq(art_shadow.get_meta("item_art_target_rect"),
+			Rect2(10.0, 20.0, 192.0, 192.0), "投影保留所属道具框的目标区域")
 	assert_eq(art_shadow.self_modulate, ItemFrameStyle.ITEM_ART_SHADOW_COLOR,
 			"所有道具图案复用统一投影色")
 	art_shadow.free()
@@ -378,6 +371,142 @@ func test_item_gallery_rarity_badge_tracks_selected_item_without_click_behavior(
 	assert_eq(label.text, "传说", "选择传说道具时标签文字同步更新")
 	assert_eq(mark.get("passive_color"), ItemGalleryScreen.TIER_TAG_COLOR[3],
 			"传说道具使用克制金色长方形印签")
+
+
+func test_item_gallery_shows_cost_durability_shape_and_full_price() -> void:
+	var packed := load("res://src/ui/item_gallery_screen.tscn") as PackedScene
+	var screen := packed.instantiate()
+	add_child_autofree(screen)
+	var first_card := screen._cards[0] as Button
+	var card_cost := first_card.get_node_or_null("UseCostBadge") as IconBadge
+	var card_durability := first_card.get_node_or_null("DurabilityBadge") as IconBadge
+	assert_not_null(card_cost, "左页每件道具显示使用费角标")
+	assert_not_null(card_durability, "左页每件道具显示最大耐久角标")
+	if card_cost == null or card_durability == null:
+		return
+	assert_eq(card_cost.number, 1, "首件生锈的飞镖使用费为1")
+	assert_eq(card_durability.number, 2, "首件生锈的飞镖最大耐久为2")
+	assert_true(card_cost.visible and card_durability.visible, "0费以外的两种角标均可见")
+	assert_eq(card_durability.sheet.resource_path,
+			"res://assets/ui/icons/item_durability.png", "耐久角标使用Eddy提供的新图标")
+	for index: int in screen._cards.size():
+		var item: ItemData = screen._items[index]
+		var cost_badge := screen._cards[index].get_node("UseCostBadge") as IconBadge
+		var durability_badge := screen._cards[index].get_node("DurabilityBadge") as IconBadge
+		assert_eq(cost_badge.number, item.use_cost, "%s使用费角标读取目录" % item.item_id)
+		assert_eq(durability_badge.number, item.max_durability,
+				"%s耐久角标读取目录" % item.item_id)
+		var badge_axis_center: float = (
+				cost_badge.position.x + cost_badge.size.x * 0.5
+				+ durability_badge.position.x + durability_badge.size.x * 0.5) * 0.5
+		var card_frame := screen._cards[index].get_node("Frame") as TextureRect
+		assert_almost_eq(badge_axis_center,
+				card_frame.position.x + card_frame.size.x * 0.5, 0.01,
+				"左右角标关于实际金属道具框中心对称")
+		assert_almost_eq(
+			maxf(cost_badge.debug_icon_visible_rect().size.x,
+				cost_badge.debug_icon_visible_rect().size.y),
+			maxf(durability_badge.debug_icon_visible_rect().size.x,
+				durability_badge.debug_icon_visible_rect().size.y), 0.01,
+			"能量与耐久图标按真实alpha轮廓显示为同一尺度")
+
+	var detail_cost := screen.get_node_or_null("DetailArea/UseCostBadge") as IconBadge
+	var detail_durability := screen.get_node_or_null("DetailArea/DurabilityBadge") as IconBadge
+	var facts := screen.get_node_or_null("DetailArea/ItemFacts") as Control
+	var shape_preview := screen.get_node_or_null(
+			"DetailArea/ItemFacts/ShapePreview") as Control
+	var price_label := screen.get_node_or_null("DetailArea/ItemFacts/PriceLabel") as Label
+	assert_not_null(detail_cost, "右页大图显示使用费")
+	assert_not_null(detail_durability, "右页大图显示最大耐久")
+	assert_not_null(facts, "右页属性条由场景承载")
+	assert_not_null(shape_preview, "右页显示初始占格形状")
+	assert_null(screen.get_node_or_null("DetailArea/ItemFacts/ShapeLabel"),
+			"占格区域只保留图形，不再显示任何文字")
+	assert_not_null(price_label, "右页显示满耐久价格")
+	if detail_cost == null or detail_durability == null or facts == null \
+			or shape_preview == null or price_label == null:
+		return
+	assert_eq(detail_cost.number, 1)
+	assert_eq(detail_durability.number, 2)
+	assert_almost_eq(
+		maxf(detail_cost.debug_icon_visible_rect().size.x,
+			detail_cost.debug_icon_visible_rect().size.y),
+		maxf(detail_durability.debug_icon_visible_rect().size.x,
+			detail_durability.debug_icon_visible_rect().size.y), 0.01,
+		"右页能量与耐久图标也使用同一可见尺度")
+	assert_eq(facts.owner, screen, "稳定属性条保存在tscn中，便于编辑器调整")
+	var detail_badge_axis_center: float = (
+			detail_cost.position.x + detail_cost.size.x * 0.5
+			+ detail_durability.position.x + detail_durability.size.x * 0.5) * 0.5
+	assert_almost_eq(detail_badge_axis_center,
+			ItemGalleryScreen.PAGE_R.position.x + ItemGalleryScreen.PAGE_R.size.x * 0.5,
+			0.01, "右页大图角标关于书页中心对称")
+	assert_eq(shape_preview.get("shape_cells"),
+			[Vector2i(0, 0), Vector2i(1, 0)], "图鉴只显示初始横2格")
+	var shape_script_source := FileAccess.get_file_as_string(
+			"res://src/ui/components/item_shape_preview.gd")
+	assert_true(shape_script_source.contains("CELL_OUTER_STROKE"),
+			"每个占用格使用不规则手绘方框")
+	assert_false(shape_script_source.contains("X_STROKE"),
+			"占格预览不再把每个格子误画成X")
+	assert_eq(price_label.text, "价格 24,000 金币")
+	var rarity_badge := screen.get_node("DetailArea/RarityBadge") as Control
+	var detail_frame := screen.get_node("DetailArea/DetailFrame") as TextureRect
+	var description := screen.get_node("DetailArea/Description") as Label
+	assert_lt(rarity_badge.position.y, detail_frame.position.y + detail_frame.size.y,
+			"稀有度标签继续上移并压住大框底边，形成独立挂签")
+	assert_lte(rarity_badge.position.y + rarity_badge.size.y, facts.position.y,
+			"属性条排列在稀有度之后")
+	assert_lte(facts.position.y + facts.size.y, description.position.y,
+			"效果文案排列在属性条之后")
+
+	# 0费也必须明确显示，不能把“免费”误读为缺失数据。
+	var silver_coin_index: int = -1
+	for index: int in screen._items.size():
+		if screen._items[index].item_id == "v2_t1_silver_coin":
+			silver_coin_index = index
+			break
+	assert_gte(silver_coin_index, 0)
+	if silver_coin_index >= 0:
+		var zero_badge := screen._cards[silver_coin_index].get_node("UseCostBadge") as IconBadge
+		assert_true(zero_badge.visible, "0费角标仍然显示")
+		assert_eq(zero_badge.number, 0)
+
+	var hook_index: int = -1
+	for index: int in screen._items.size():
+		if screen._items[index].item_id == "v2_t1_armor_hammer":
+			hook_index = index
+			break
+	assert_gte(hook_index, 0)
+	if hook_index >= 0:
+		screen._select(hook_index)
+		assert_eq(shape_preview.get("shape_cells"), [
+			Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0),
+		], "短柄铁钩图鉴保持初始横3格")
+		assert_eq(price_label.text, "价格 30,000 金币")
+		var detail_icon := screen.get_node("DetailArea/ItemIcon") as TextureRect
+		var target_rect: Rect2 = detail_icon.get_meta("item_art_target_rect")
+		var visible_rect: Rect2 = detail_icon.get_meta("visible_alpha_rect")
+		assert_true(target_rect.encloses(visible_rect),
+			"短柄铁钩按源PNG方向显示时仍完整留在大号道具框内")
+		assert_almost_eq(detail_icon.rotation, ItemFrameStyle.ITEM_ART_ROTATION, 0.001)
+
+
+func test_every_prototype_item_art_fits_its_frame_without_runtime_rotation() -> void:
+	var target_rect := Rect2(Vector2(12.0, 12.0), Vector2(96.0, 96.0))
+	for item_id: String in ItemCatalog.prototype_ids():
+		var texture: Texture2D = ItemCatalog.load_icon(item_id)
+		assert_not_null(texture, "%s必须有可用道具美术" % item_id)
+		if texture == null:
+			continue
+		var icon := TextureRect.new()
+		add_child_autofree(icon)
+		ItemFrameStyle.configure_item_art(icon, texture, target_rect)
+		var visible_rect: Rect2 = icon.get_meta("visible_alpha_rect")
+		assert_true(target_rect.encloses(visible_rect),
+				"%s真实可见范围不得越出道具框" % item_id)
+		assert_almost_eq(icon.rotation, ItemFrameStyle.ITEM_ART_ROTATION, 0.001,
+				"%s不得在Godot内追加固定旋转" % item_id)
 
 
 func test_item_gallery_selection_keeps_rarity_frame_and_uses_pointer() -> void:
@@ -446,7 +575,23 @@ func test_battle_switch_module_expands_right_and_owns_active_switch() -> void:
 	var expected_left_slot: int = screen.p1_frame_slots[1]
 	var right_slot: int = screen.p1_frame_slots[2]
 	first_candidate.gui_input.emit(click)
-	assert_eq(screen._armed_switch_frame, 1, "左下候选头像进入对应替补的切换态")
+	assert_eq(screen._armed_switch_frame, -1, "候选头像单击只保留浏览，不再确认切换")
+	var source: Vector2 = first_candidate.get_global_rect().get_center()
+	var target: Vector2 = screen._command_next_slot.get_global_rect().get_center()
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.pressed = true
+	press.position = source
+	screen._input(press)
+	var motion := InputEventMouseMotion.new()
+	motion.position = target
+	screen._input(motion)
+	var release := InputEventMouseButton.new()
+	release.button_index = MOUSE_BUTTON_LEFT
+	release.pressed = false
+	release.position = target
+	screen._input(release)
+	assert_eq(screen._armed_switch_frame, 1, "拖入末端顺序槽后进入对应替补的切换态")
 	assert_eq(screen.selected_switch, expected_left_slot,
 			"底部左侧第一候选严格对应顶部左侧第一名队友")
 	assert_ne(screen.selected_switch, right_slot,
@@ -454,7 +599,11 @@ func test_battle_switch_module_expands_right_and_owns_active_switch() -> void:
 	assert_eq(screen.selected_action, ActionDef.Action.SWITCH,
 			"新模块继续复用成熟的切换动作提交语义")
 	assert_true(screen._switch_tray.visible, "选定候选后保持展开层，避免选择反馈瞬间消失")
-	assert_true(first_candidate.is_selected, "已选候选持续高亮")
+	assert_false(first_candidate.is_selected, "切换选择状态改由顺序槽表达，来源候选不持续高亮")
+	assert_null(screen._command_order_row.get_node_or_null("Step0/Visual/Art/Portrait"),
+			"候选层负责英雄身份，顺序槽不再重复头像框")
+	assert_not_null(screen._command_order_row.get_node_or_null("Step0/Visual/Art/SwitchIcon"),
+			"顺序槽使用与基础行动一致的纯切换图标")
 	assert_eq(screen.btn_switch.text, "", "切换主按钮不再残留文字")
 	var switch_icon := screen.btn_switch.get_node_or_null("SwitchIcon") as HoverIcon
 	assert_not_null(switch_icon, "切换主按钮使用正式图标")
@@ -478,10 +627,11 @@ func test_battle_switch_module_expands_right_and_owns_active_switch() -> void:
 	screen.btn_switch.mouse_exited.emit()
 	assert_eq(int(switch_icon.get("_frame")), switch_icon.rest_frame,
 			"移出按钮后回到静止帧")
-	assert_ne(switch_icon.self_modulate, Color.WHITE,
-			"待提交态以图标提金代替已选文字")
-	assert_true(bool(screen.btn_switch.get_meta("switch_selected", false)),
-			"切换主按钮保留明确的选中态")
+	assert_eq(switch_icon.self_modulate, Color.WHITE,
+			"切换主按钮不再沿用旧版持续提金选中态")
+	var switch_juice := screen.btn_switch.get_node_or_null("ButtonJuice") as ButtonJuice
+	assert_false(bool(switch_juice.get("_selected")),
+			"切换主按钮保持普通状态，待提交语义只读顺序槽")
 	BattleSetup.reset()
 
 
@@ -607,10 +757,18 @@ func test_reserve_shield_uses_a_second_row_without_moving_hp() -> void:
 			"替补血量行与头像的既有锚点不得因护盾下移而改变")
 	assert_almost_eq(hp_row.debug_hp_center_y(), 14.0, 0.01,
 			"血量第一行保持原来的纵向中心")
+	assert_almost_eq(hp_row.shield_row_gap, 12.0, 0.01,
+			"护盾与血量之间保留12px净间距，避免数字描边和阴影几乎相碰")
 	assert_gt(hp_row.debug_shield_center_y(), hp_row.debug_hp_center_y(),
 			"护盾独立放在血量正下方，不再与血量同行")
 	assert_gte(hp_row.size.y, hp_row.debug_shield_center_y() + hp_row.icon_h * 0.5,
 			"第二行完整落在替补信息组件范围内，不与下方内容重叠")
+	var narrow_origins: PackedVector2Array = hp_row.debug_segment_origins(4.5, 2.0)
+	assert_almost_eq(narrow_origins[0].x, narrow_origins[1].x, 0.01,
+			"护盾行必须复用血量行的水平起点，不能按自身短数字重新居中")
+	var wide_origins: PackedVector2Array = hp_row.debug_segment_origins(4.5, 12.0)
+	assert_almost_eq(wide_origins[0].x, wide_origins[1].x, 0.01,
+			"护盾位数变化时也必须和血量图标、数字列保持对齐")
 
 
 func test_main_menu_profile_avatar_uses_item_frame() -> void:
