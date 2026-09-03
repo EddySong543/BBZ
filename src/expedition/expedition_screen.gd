@@ -24,6 +24,7 @@ const SearchState := preload("res://src/expedition/expedition_search_state.gd")
 const Loot := preload("res://src/expedition/expedition_loot.gd")
 const PixelArt := preload("res://src/expedition/expedition_pixel_art.gd")
 const ItemCatalog := preload("res://src/battle/item_catalog.gd")
+const ItemGridArtLayoutScript := preload("res://src/ui/components/item_grid_art_layout.gd")
 const HeroDataScript := preload("res://src/battle/hero_data.gd")   # class_name 在 headless 可能未注册→走 preload
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")
 const TERRAIN_SHADER := preload("res://assets/shaders/canvas_ui_expedition_terrain.gdshader")
@@ -108,6 +109,7 @@ const COL_CONSUM_ITEM := Color("4f9d52")   # 状态绿
 const COL_RARE_ITEM := ItemCatalog.RARITY_RARE  # 稀有紫
 const COL_OK := Color(0.4, 0.9, 0.5, 0.55)
 const COL_BAD := Color(0.95, 0.35, 0.3, 0.55)
+const BACKPACK_ITEM_SHADOW := Color(0.02, 0.01, 0.0, 0.68)
 const GROUND_GRASS_DARK_INDEX: int = 0
 const GROUND_GRASS_LIGHT_INDEX: int = 1
 const GROUND_DIRT_INDEX: int = 2
@@ -1826,13 +1828,22 @@ func _draw_backpack_layer(f16: Font) -> void:
 	for p: Dictionary in bp.placements:
 		var it: Dictionary = p["item"]
 		var col: Color = _cat_color(String(it["cat"]))
-		for off: Vector2i in p["shape"]:
+		var current_shape: Array = p["shape"]
+		for off: Vector2i in current_shape:
 			var c: Vector2i = Vector2i(p["anchor"]) + off
 			var cell_rect := Rect2(BP_ORIGIN + Vector2(c.x * BP_CELL + 3, c.y * BP_CELL + 3), Vector2(BP_CELL - 9, BP_CELL - 9))
 			bp_canvas.draw_rect(cell_rect, col.darkened(0.35))
 			bp_canvas.draw_rect(cell_rect, col, false, 1.0)
-		var a: Vector2i = p["anchor"]
-		bp_canvas.draw_texture_rect(_item_texture(it), Rect2(BP_ORIGIN + Vector2(a.x * BP_CELL + 4, a.y * BP_CELL + 4), Vector2(BP_CELL - 11, BP_CELL - 11)), false)
+		var base_shape_value: Variant = it.get("shape", current_shape)
+		var base_shape: Array = base_shape_value as Array \
+				if base_shape_value is Array else current_shape
+		if base_shape.is_empty():
+			base_shape = current_shape
+		var art_bounds: Rect2 = _backpack_shape_bounds(
+				Vector2i(p["anchor"]), current_shape).grow(-7.0)
+		ItemGridArtLayoutScript.draw_item_art(
+				bp_canvas, _item_texture(it), base_shape, current_shape, art_bounds,
+				Vector2(3.0, 4.0), BACKPACK_ITEM_SHADOW)
 	if not held.is_empty():
 		var cell: Vector2i = _bp_cell_at(mouse_pos)
 		var shape: Array = held["shape"]
@@ -1846,6 +1857,13 @@ func _draw_backpack_layer(f16: Font) -> void:
 				bp_canvas.draw_rect(Rect2(mouse_pos + Vector2(off.x, off.y) * BP_CELL * 0.6, Vector2(BP_CELL, BP_CELL) * 0.55), Color(_cat_color(String(held["item"]["cat"])), 0.7))
 			bp_canvas.draw_texture_rect(_item_texture(held["item"]), Rect2(mouse_pos + Vector2(2, 2), Vector2(BP_CELL, BP_CELL) * 0.5), false)
 		bp_canvas.draw_string(f16, mouse_pos + Vector2(20, -12), String(held["item"]["name"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, COL_TEXT)
+
+
+func _backpack_shape_bounds(anchor: Vector2i, shape: Array) -> Rect2:
+	var shape_size: Vector2i = Loot.shape_size(shape)
+	return Rect2(
+			BP_ORIGIN + Vector2(anchor) * float(BP_CELL),
+			Vector2(shape_size) * float(BP_CELL))
 
 
 ## 物品图标：战斗道具优先用真 PvP 图标（ItemCatalog·60 张现役素材），缺图/其余回退像素图签。

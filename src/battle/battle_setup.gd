@@ -2,6 +2,8 @@ extends Node
 
 ## Autoload — passes hero lineups between scenes.
 
+const RuntimeFeatures := preload("res://src/core/runtime_features.gd")
+
 var p1_heroes: Array[HeroData] = []
 var p2_heroes: Array[HeroData] = []
 ## 赛前构筑完成后注入的战斗背包道具 id；两侧均为空时保持旧版经济兼容路径。
@@ -23,9 +25,20 @@ var expedition_state: Dictionary = {} # {map, bp, pending, log, seed, tile:Vecto
 
 # ── 联机交接（M1·2026-07-12）──
 # 大厅屏创建（net_session.gd）→ battle_screen 消费（每帧 pump·退场 close+置空）。
-# ⚠ 不入 reset()：联机局生命周期由大厅/battle_screen 显式管理（reset 是"阵容消费即清"语义）。
+# PvP 开启时不由 reset() 清理；联机局生命周期仍由大厅/battle_screen 显式管理。
+# PvP 休眠时 reset() 会兜底关闭残留会话，防单机流程误入网络镜像。
 var net_session: RefCounted = null    # null=本地局；非空=联机局（battle_screen 走镜像+协议驱动）
 var net_rtk := ""                     # 重连令牌（2026-07-17 身份门·battle_screen 从 match_start 转存·大厅重连 hello 带上·开新局被覆盖）
+
+
+## 显式结束联机会话。保留为公共收口，避免各单机场景只置 null 却遗漏释放 peer。
+func close_net_session(clear_token: bool = true) -> void:
+	if net_session != null:
+		if net_session.has_method("close"):
+			net_session.call("close")
+		net_session = null
+	if clear_token:
+		net_rtk = ""
 
 
 ## 设置一局远征战斗。只接受有稳定 hero_id 的完整 HeroData，从入口禁止
@@ -36,6 +49,7 @@ func configure_pve(
 		player_hp: Array = [],
 		opponent_hp: Array = [],
 		seed_value: int = 0) -> bool:
+	close_net_session()
 	pve_mode = false
 	p1_heroes.clear()
 	p2_heroes.clear()
@@ -91,3 +105,5 @@ func reset() -> void:
 	pve_player_hp.clear()
 	pve_opponent_hp.clear()
 	pve_seed = 0
+	if not RuntimeFeatures.PVP_ENABLED:
+		close_net_session()

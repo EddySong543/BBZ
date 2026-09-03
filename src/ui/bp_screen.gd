@@ -20,7 +20,9 @@ extends Control
 enum Step { BAN, PICK, REVEAL }
 
 const HERO_DATA_DIR := "res://assets/data/heroes/"
+const MENU_SCENE := "res://src/ui/main_menu.tscn"
 const HERO_CARD_SCENE := preload("res://src/ui/components/hero_card.tscn")
+const RuntimeFeatures := preload("res://src/core/runtime_features.gd")
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")
 # ── 家族换装（2026-07-16 Epic 项⑭·裸件全退役：灰蓝平板/黑方块槽/黑信息板/鎏金 jelly 钮）──
 const TOOLTIP_TEX := preload("res://assets/ui/ui_tooltip.png")            # 深框奶油纸（战场悬浮件语言·牌池桌面+信息板）
@@ -114,6 +116,13 @@ var _glow_tween: Tween
 
 
 func _ready() -> void:
+	if not RuntimeFeatures.PVP_ENABLED:
+		BattleSetup.close_net_session()
+		visible = false
+		set_process(false)
+		bp_timer.stop()
+		call_deferred("_return_to_menu_if_direct_scene")
+		return
 	all_heroes = HeroData.create_launch_pool(HERO_DATA_DIR)   # 首发 24（12 生肖 + 黑暗全 12·子鼠…亥猪 h01-h24）
 	# B4 启动断言：ROWS 布局容量必须 == 英雄池 size（防"加/减英雄忘同步 ROWS"的静默错位）
 	var _rows_cap: int = 0
@@ -125,6 +134,11 @@ func _ready() -> void:
 	_build_pool()
 	_enter_step(Step.PICK)   # 去 ban：12 池容不下 ban，直接 pick-only（BAN 分支保留为死路）
 	_play_intro()
+
+
+func _return_to_menu_if_direct_scene() -> void:
+	if is_inside_tree() and get_tree().current_scene == self:
+		TransitionManager.transition_to(MENU_SCENE)
 
 
 # ============================================================
@@ -710,6 +724,8 @@ func _spawn_cer_card(cer: Control, h: HeroData, state: int) -> HeroCard:
 
 
 func _start_battle() -> void:
+	if not RuntimeFeatures.PVP_ENABLED:
+		return
 	var p1_lineup: Array[HeroData] = []
 	for idx in my_picks:
 		p1_lineup.append(all_heroes[idx])

@@ -8,9 +8,10 @@ extends RefCounted
 ##   submit_turn  {v, kind, turn, action:int, target:int, item_slots:Array[int], item_slot_targets:Array[int],
 ##                 item_slot_choices:Array[int],
 ##                 double:bool(保留字段·须为false),
-##                 empowered_wave:bool, split_big_wave:bool, blood_payment:bool,
+##                 empowered_wave:bool, split_big_wave:bool, jianqi_attack:bool, blood_payment:bool,
 ##                 free_switches:Array[int], blood_payment_step:int, energy_cap_discount:bool,
-##                 second_action:int, second_target:int}
+##                 second_action:int, second_target:int,
+##                 command_sequence:Array[{kind,...}]（真实编排顺序；旧客户端可省略）}
 ##   econ_draft   {v, kind, turn, slot}            → 服务器回 draft_offer（仅发本人）
 ##   econ_upgrade {v, kind, turn, slot}            → 服务器回 draft_offer(upgrade)（仅发本人）
 ##   econ_refill  {v, kind, turn, slot}            → 付能补充（start_refill）→ draft_offer（仅发本人）
@@ -41,6 +42,7 @@ const MAX_ITEM_CHOICE := 255   # 回购券可从整场普通道具历史中选�
 const MAX_ACTION := 16         # 动作枚举安全上限（真合法性由 match_room 按 legal_actions 判）
 const MAX_TEAM_SLOT := 2       # 槽位 0..2
 const MAX_FREE_SWITCHES := 1   # h07 每回合最多一次免费切换；协议入口同步收紧
+const MAX_COMMAND_STEPS := 7   # 1 次免费切换 + 3 件道具 + 主行动 + 连环鼓第二行动 + 余量
 
 
 ## 校验客户端入包。返回 ""=通过，否则错误码（服务器直接回 error 不进业务层）。
@@ -157,6 +159,8 @@ static func validate_c2s(msg: Variant) -> String:
 				return "bad_empowered_wave_flag"
 			if not (d.get("split_big_wave", false) is bool):
 				return "bad_split_big_wave_flag"
+			if not (d.get("jianqi_attack", false) is bool):
+				return "bad_jianqi_attack_flag"
 			if not (d.get("blood_payment", false) is bool):
 				return "bad_blood_payment_flag"
 			if not (d.get("energy_cap_discount", false) is bool):
@@ -173,6 +177,10 @@ static func validate_c2s(msg: Variant) -> String:
 				return "bad_blood_payment_step"
 			if not bool(d.get("blood_payment", false)) and int(blood_step) != -1:
 				return "bad_blood_payment_step"
+			if d.has("command_sequence") and not _command_sequence_ok(
+					d, slots as Array, item_slot_targets, item_slot_choices,
+					free_switches as Array):
+				return "bad_command_sequence"
 		"econ_draft", "econ_upgrade", "econ_refill":
 			if not _slot_ok(d):
 				return "bad_slot"
@@ -213,6 +221,89 @@ static func _is_int(v: Variant) -> bool:
 	return v is int or (v is float and is_equal_approx(v, roundf(v)))
 
 
+static func _command_sequence_ok(d: Dictionary, item_slots: Array,
+		item_targets: Array, item_choices: Array, free_switches: Array) -> bool:
+	var sequence_v: Variant = d.get("command_sequence")
+	if not (sequence_v is Array):
+		return false
+	var sequence: Array = sequence_v
+	if sequence.is_empty() or sequence.size() > MAX_COMMAND_STEPS:
+		return false
+	var seen_items: Dictionary = {}
+	var actual_items: Array[int] = []
+	var actual_item_targets: Array[int] = []
+	var actual_item_choices: Array[int] = []
+	var actual_actions: Array[Dictionary] = []
+	var actual_switches: Array[int] = []
+	for step_v: Variant in sequence:
+		if not (step_v is Dictionary):
+			return false
+		var step: Dictionary = step_v
+		match String(step.get("kind", "")):
+			"item":
+				var slot_v: Variant = step.get("slot")
+				var target_v: Variant = step.get("target", -1)
+				var choice_v: Variant = step.get("choice", -1)
+				if not _is_int(slot_v) or int(slot_v) < 0 or int(slot_v) >= MAX_ITEM_SLOTS \
+						or seen_items.has(int(slot_v)):
+					return false
+				if not _is_int(target_v) or int(target_v) < -1 or int(target_v) > MAX_TEAM_SLOT:
+					return false
+				if not _is_int(choice_v) or int(choice_v) < -1 or int(choice_v) > MAX_ITEM_CHOICE:
+					return false
+				seen_items[int(slot_v)] = true
+				actual_items.append(int(slot_v))
+				actual_item_targets.append(int(target_v))
+				actual_item_choices.append(int(choice_v))
+			"action":
+				var action_v: Variant = step.get("action")
+				var action_target_v: Variant = step.get("target", -1)
+				if not _is_int(action_v) or int(action_v) < 0 \
+						or (int(action_v) > MAX_ACTION and int(action_v) != ActionDef.ACTIVE):
+					return false
+				if not _is_int(action_target_v) or int(action_target_v) < -1 \
+						or int(action_target_v) > MAX_TEAM_SLOT:
+					return false
+				actual_actions.append({action = int(action_v), target = int(action_target_v)})
+			"free_switch":
+				var switch_target_v: Variant = step.get("target")
+				if not _is_int(switch_target_v) or int(switch_target_v) < 0 \
+						or int(switch_target_v) > MAX_TEAM_SLOT:
+					return false
+				actual_switches.append(int(switch_target_v))
+			_:
+				return false
+	if not _same_int_array(actual_items, item_slots) \
+			or not _same_int_array(actual_item_targets, item_targets) \
+			or not _same_int_array(actual_item_choices, item_choices) \
+			or not _same_int_array(actual_switches, free_switches):
+		return false
+	var expected_actions: Array[Dictionary] = [{
+		action = int(d["action"]), target = int(d["target"]),
+	}]
+	if int(d.get("second_action", -1)) >= 0:
+		expected_actions.append({
+			action = int(d["second_action"]), target = int(d.get("second_target", -1)),
+		})
+	if actual_actions.size() != expected_actions.size():
+		return false
+	for index: int in range(expected_actions.size()):
+		if int(actual_actions[index]["action"]) != int(expected_actions[index]["action"]) \
+				or int(actual_actions[index]["target"]) != int(expected_actions[index]["target"]):
+			return false
+	return true
+
+
+static func _same_int_array(left: Array, right: Array) -> bool:
+	if left.size() != right.size():
+		return false
+	for index: int in range(left.size()):
+		if not _is_int(left[index]) or not _is_int(right[index]) \
+				or int(left[index]) != int(right[index]):
+			return false
+	return true
+
+
 # —— C2S 构造（客户端用·保证自家包永远过校验）——
 
 static func msg_submit_turn(turn: int, action: int, target: int, item_slots: Array,
@@ -220,7 +311,8 @@ static func msg_submit_turn(turn: int, action: int, target: int, item_slots: Arr
 		blood_payment: bool = false, free_switches: Array = [],
 		blood_payment_step: int = -1, energy_cap_discount: bool = false,
 		item_slot_targets: Array = [], item_slot_choices: Array = [],
-		second_action: int = -1, second_target: int = -1) -> Dictionary:
+		second_action: int = -1, second_target: int = -1,
+		command_sequence: Array = [], jianqi_attack: bool = false) -> Dictionary:
 	var normalized_item_targets: Array = item_slot_targets.duplicate()
 	if normalized_item_targets.is_empty() and not item_slots.is_empty():
 		normalized_item_targets.resize(item_slots.size())
@@ -229,14 +321,31 @@ static func msg_submit_turn(turn: int, action: int, target: int, item_slots: Arr
 	if normalized_item_choices.is_empty() and not item_slots.is_empty():
 		normalized_item_choices.resize(item_slots.size())
 		normalized_item_choices.fill(-1)
+	var normalized_sequence: Array = command_sequence.duplicate(true)
+	if normalized_sequence.is_empty():
+		for switch_target: Variant in free_switches:
+			normalized_sequence.append({kind = "free_switch", target = int(switch_target)})
+		for index: int in range(item_slots.size()):
+			normalized_sequence.append({
+				kind = "item",
+				slot = int(item_slots[index]),
+				target = int(normalized_item_targets[index]),
+				choice = int(normalized_item_choices[index]),
+			})
+		normalized_sequence.append({kind = "action", action = action, target = target})
+		if second_action >= 0:
+			normalized_sequence.append({
+				kind = "action", action = second_action, target = second_target,
+			})
 	return {v = PROTO_VERSION, kind = "submit_turn", turn = turn, action = action, target = target,
 		item_slots = item_slots.duplicate(), item_slot_targets = normalized_item_targets,
 		item_slot_choices = normalized_item_choices,
 		double = double, empowered_wave = empowered_wave,
-		split_big_wave = split_big_wave, blood_payment = blood_payment,
+		split_big_wave = split_big_wave, jianqi_attack = jianqi_attack,
+		blood_payment = blood_payment,
 		free_switches = free_switches.duplicate(), blood_payment_step = blood_payment_step,
 		energy_cap_discount = energy_cap_discount, second_action = second_action,
-		second_target = second_target}
+		second_target = second_target, command_sequence = normalized_sequence}
 
 
 static func msg_item_draft(turn: int, slot: int, target: int) -> Dictionary:

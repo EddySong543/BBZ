@@ -55,7 +55,7 @@ func _pending_h07_switch_battle() -> BattleCore:
 	var battle := BattleCore.new()
 	battle.setup(
 		[_hero("test_a"), _hero("test_b"), _hero("test_c")],
-		[_hero("test_x"), _hero("h07"), _hero("test_z")],
+		[_hero("h07"), _hero("test_y"), _hero("test_z")],
 		SEED)
 	battle.energy = [20, 20]
 	assert_true(_use(battle, 1, "t3_yemingzhu"))
@@ -416,7 +416,7 @@ func test_tianluo_cancels_h07_free_switch_before_any_switch_side_effect() -> voi
 	assert_eq(battle.active_index[1], 1, "选择期仍预览免费切换后的出战英雄")
 	var result := _resolve(battle, A.DEFEND, A.DEFEND)
 	assert_eq(battle.active_index[1], 0, "天罗令选择期免费切换的位置变化无效")
-	assert_eq(battle.hp[0][0], 20, "h07 入场冲撞不得先发生再回滚")
+	assert_eq(battle.hp[0][0], 20, "被取消的免费离场不得提前产生任何登场伤害")
 	assert_eq(battle.shield[1][1], 0, "夜明珠护甲不得先发生再回滚")
 	assert_eq(int(battle.relics[1][0]["state"].get("charges", 0)), 3,
 		"夜明珠次数不得消耗")
@@ -443,7 +443,7 @@ func test_sage_book_blocks_tianluo_then_h07_free_switch_commits_once() -> void:
 	assert_true(battle.free_switch(1, 1))
 	_resolve(battle, A.DEFEND, A.DEFEND)
 	assert_eq(battle.active_index[1], 1)
-	assert_eq(battle.hp[0][0], 17, "圣贤书抵消天罗后，h07冲撞与夜明珠伤害各结算一次")
+	assert_eq(battle.hp[0][0], 18, "圣贤书抵消天罗后，只结算新登场英雄的夜明珠伤害")
 	assert_eq(battle.shield[1][1], 2)
 	assert_eq(int(battle.relics[1][0]["state"].get("charges", 0)), 2)
 	assert_eq(int(battle.get_status(1, 0, "vuln", 0)), 0)

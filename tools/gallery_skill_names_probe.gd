@@ -20,7 +20,7 @@ func _ready() -> void:
 	var failures: Array[String] = []
 	await _verify_name(gallery, 14, "h15", "七杀战鬼", failures)
 	await _verify_name(gallery, 15, "h16", "白虹", failures)
-	await _verify_name(gallery, 16, "h17", "同源万化妄真身", failures)
+	await _verify_name(gallery, 16, "h17", "无我亦无穷", failures)
 	await _verify_name(gallery, 17, "h18", "游丝引", failures)
 
 	if failures.is_empty():

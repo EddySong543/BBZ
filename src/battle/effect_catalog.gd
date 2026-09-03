@@ -94,7 +94,7 @@ const EFFECTS: Array[Dictionary] = [
 		"id": &"sword_qi",
 		"name": "剑气",
 		"icon_path": "res://assets/ui/effects/sword_qi.png",
-		"description": "最多积累4点，昴日【鸡】发动「飞洒天星」时消耗全部剑气。",
+		"description": "最多积累4点，昴日【鸡】强化攻击时消耗全部剑气。",
 		"show_stack_count": true,
 		"ink": Color("24464B"),
 		"accent": Color("5F8C8F"),

@@ -91,6 +91,56 @@ func test_match_room_full_game_over_protocol() -> void:
 	assert_eq((clients[1] as MatchClient).errors.size(), 0, "全程不应有拒绝: %s" % [(clients[1] as MatchClient).errors])
 
 
+func test_match_room_resolve_carries_authoritative_action_step_ids() -> void:
+	var t := _table(5)
+	var clients: Array = t.clients
+	_pump(t)
+	(clients[0] as MatchClient).submit(A.ATTACK)
+	(clients[1] as MatchClient).submit(A.DEFEND)
+	_pump(t)
+
+	var host_resolve: Dictionary = (clients[0] as MatchClient).resolves[-1]
+	var join_resolve: Dictionary = (clients[1] as MatchClient).resolves[-1]
+	var step_ids: Array = host_resolve.get("action_step_ids", [])
+	assert_eq(step_ids.size(), 2, "权威结算必须携带双方真实行动节点 ID")
+	if step_ids.size() == 2:
+		assert_false(String(step_ids[0]).is_empty())
+		assert_false(String(step_ids[1]).is_empty())
+		assert_ne(String(step_ids[0]), String(step_ids[1]))
+	assert_eq(join_resolve.get("action_step_ids", []), step_ids,
+		"两端收到同一组 opaque 节点 ID；显示层只交换所属位置，不重写 ID")
+	var command_sequences: Array = host_resolve.get("command_sequences", [])
+	assert_eq(command_sequences.size(), 2, "结算包保留双方提交的权威顺序供回放/演出消费")
+	assert_eq(join_resolve.get("command_sequences", []), command_sequences)
+
+
+func test_command_sequence_cannot_borrow_energy_from_a_later_item() -> void:
+	var room: MatchRoom = MatchRoom.new()
+	room.start(_team("a", 5), _team("b", 5), SEED, func(_p: int, _msg: Dictionary) -> void: pass)
+	room.battle.energy[0] = 0
+	room.battle.slots[0] = [
+		_ready_item_slot("t1_ronglu"),
+		_ready_item_slot("t1_feibiao"),
+		_ready_item_slot("t1_jiudun"),
+	]
+	var item_first: Dictionary = NetProtocol.msg_submit_turn(
+		room.battle.turn_number, A.ATTACK, -1, [0], false, false, false, false,
+		[], -1, false, [1], [-1])
+	item_first["command_sequence"] = [
+		{kind = "item", slot = 0, target = 1, choice = -1},
+		{kind = "action", action = A.ATTACK, target = -1},
+	]
+	var action_first: Dictionary = item_first.duplicate(true)
+	action_first["command_sequence"] = [
+		{kind = "action", action = A.ATTACK, target = -1},
+		{kind = "item", slot = 0, target = 1, choice = -1},
+	]
+	assert_true(room._apply_payload(room.battle.clone(), 0, item_first),
+		"道具先产能时，本序列应能支付后续波")
+	assert_false(room._apply_payload(room.battle.clone(), 0, action_first),
+		"行动不得借用排在它后面的道具产能")
+
+
 func test_match_room_rejects_illegal_submissions() -> void:
 	# Arrange
 	var sent: Array = [[], []]
@@ -479,23 +529,52 @@ func test_match_room_accepts_h24_discount_and_rejects_forged_one() -> void:
 	assert_eq(forged.battle.energy_max[0], 20, "非法减费提交不得污染真局上限")
 
 
-func test_match_room_replays_single_h07_free_switch_before_paid_h07_action() -> void:
+func test_match_room_replays_single_h07_free_exit_before_paid_h14_action() -> void:
 	var sent: Array = [[], []]
 	var room: MatchRoom = MatchRoom.new()
 	room.start(
-		[_hero("h14", 6), _hero("h07", 6), _hero("h17", 7)],
+		[_hero("h07", 6), _hero("h14", 6), _hero("h17", 7)],
 		_team("b", 5),
 		SEED,
 		func(p: int, msg: Dictionary) -> void: (sent[p] as Array).append(msg))
 	room.battle.energy = [0, 0]
 	room.handle(0, NetProtocol.msg_submit_turn(
-		0, A.BIG_ATTACK, -1, [], false, false, false, true, [1], 0))
+		0, A.BIG_ATTACK, -1, [], false, false, false, true, [1], 1))
 	room.handle(1, NetProtocol.msg_submit_turn(0, A.CHARGE, -1, []))
 
-	assert_eq(room.battle.active_index[0], 1, "权威端应重放本回合唯一一次蚩尤→星日免费切换")
-	assert_eq(room.battle.hp[0][0], 6, "星日大波的 3 点费用应由原槽蚩尤支付")
+	assert_eq(room.battle.active_index[0], 1, "权威端应重放本回合唯一一次星日→蚩尤免费离场")
+	assert_eq(room.battle.hp[0][1], 6, "蚩尤登场后应由自身支付大波的 3 点费用")
 	assert_eq(room.battle.energy[0], 2, "血量支付不得误扣团队能量，只获得正常回合被动能量")
-	assert_eq(room.battle.hp[1][0], 5, "星日登场0.5点并继续打出大波2点")
+	assert_eq(room.battle.hp[1][0], 6, "星日离场不造成伤害，蚩尤正常打出大波2点")
+
+
+func test_match_room_accepts_h07_free_entry_and_rejects_a_second_same_turn_switch() -> void:
+	var sent: Array = [[], []]
+	var room := MatchRoom.new()
+	room.start(
+		[_hero("plain", 6), _hero("h07", 6), _hero("third", 6)],
+		_team("enemy", 5), SEED,
+		func(p: int, msg: Dictionary) -> void: (sent[p] as Array).append(msg))
+	room.handle(0, NetProtocol.msg_submit_turn(
+		0, A.CHARGE, -1, [], false, false, false, false, [1]))
+	room.handle(1, NetProtocol.msg_submit_turn(0, A.CHARGE, -1, []))
+
+	assert_eq(_last_error(sent[0]), "", "权威端应接受本回合一次的其他英雄→星日免费切换")
+	assert_eq(room.battle.active_index[0], 1, "免费切换后星日应正常登场")
+	assert_eq(room.battle.hp[1][0], 9, "星日完成登场后再造成0.5点伤害")
+
+	var forged_sent: Array = [[], []]
+	var forged := MatchRoom.new()
+	forged.start(
+		[_hero("plain", 6), _hero("h07", 6), _hero("third", 6)],
+		_team("enemy", 5), SEED,
+		func(p: int, msg: Dictionary) -> void: (forged_sent[p] as Array).append(msg))
+	forged.handle(0, NetProtocol.msg_submit_turn(
+		0, A.CHARGE, -1, [], false, false, false, false, [1, 2]))
+
+	assert_eq(_last_error(forged_sent[0]), "bad_free_switches",
+		"切入星日已经消耗次数，同一提交不得再免费切出")
+	assert_eq(forged.battle.active_index[0], 0, "非法连续切换不得污染权威出战位")
 
 
 func test_match_room_tianluo_cancels_h07_preview_for_both_players_and_arrival_orders() -> void:
@@ -506,7 +585,7 @@ func test_match_room_tianluo_cancels_h07_preview_for_both_players_and_arrival_or
 			var sent: Array = [[], []]
 			var room: MatchRoom = MatchRoom.new()
 			var h07_team: Array = [
-				_hero("h07_origin", 10), _hero("h07", 10), _hero("h07_third", 10),
+				_hero("h07", 10), _hero("h07_target", 10), _hero("h07_third", 10),
 			]
 			var plain_team: Array = _team("plain", 10)
 			room.start(h07_team if h07_player == 0 else plain_team,
@@ -533,7 +612,7 @@ func test_match_room_tianluo_cancels_h07_preview_for_both_players_and_arrival_or
 			assert_eq(room.battle.active_index[h07_player], 0,
 				"天罗必须取消选择期免费切换预览")
 			assert_eq(room.battle.hp[tianluo_player][0], enemy_hp_before,
-				"被取消的星日登场不能先造成冲撞")
+				"被取消的星日免费离场不能先产生任何换人副作用")
 			assert_eq(room.battle.shield[h07_player][1], 0,
 				"被取消的夜明珠不能给预览目标护甲")
 			assert_eq(int(room.battle.relics[h07_player][0]["state"].get("charges", 0)), 3,
@@ -559,7 +638,7 @@ func test_match_room_sage_book_preserves_h07_switch_against_tianluo() -> void:
 	var sent: Array = [[], []]
 	var room: MatchRoom = MatchRoom.new()
 	room.start(
-		[_hero("origin", 10), _hero("h07", 10), _hero("third", 10)],
+		[_hero("h07", 10), _hero("target", 10), _hero("third", 10)],
 		_team("enemy", 10), SEED,
 		func(p: int, msg: Dictionary) -> void: (sent[p] as Array).append(msg))
 	room.battle.energy = [0, 0]
@@ -577,8 +656,8 @@ func test_match_room_sage_book_preserves_h07_switch_against_tianluo() -> void:
 
 	assert_eq(room.battle.active_index[0], 1,
 		"圣贤书抵消天罗后，免费切换应在权威端恰好兑现一次")
-	assert_eq(enemy_hp_before - room.battle.hp[1][0], 3,
-		"星日冲撞与夜明珠伤害应各兑现一次")
+	assert_eq(enemy_hp_before - room.battle.hp[1][0], 2,
+		"星日离场不造成冲撞，新登场英雄只结算一次夜明珠伤害")
 	assert_eq(room.battle.shield[0][1], 2)
 	assert_eq(int(room.battle.relics[0][0]["state"].get("charges", 0)), 2)
 	assert_eq(int(room.battle.get_status(0, 0, "vuln", 0)), 0)
@@ -687,12 +766,22 @@ func test_match_client_snapshot_flip_roundtrip() -> void:
 		{id = "damage_taken", player = 0, amount = 2},
 		{id = "victory", winner = BattleCore.WINNER_P1},
 		{id = "relic_trigger", player = 0, item_id = "t3_yemingzhu"},
+		{id = "sequence_shifted", player = 1, source_player = 0, event_id = 7},
+		{id = "h21_action_cancelled", player = 1, source_player = 0,
+			slot = 0, action = ActionDef.Action.BIG_ATTACK},
 	]
 	var fev: Array = MatchClient.flip_events(evs)
 	assert_eq(int(fev[0]["player"]), 1)
 	assert_eq(int(fev[1]["winner"]), BattleCore.WINNER_P2)
 	assert_eq(int(fev[2]["player"]), 1)
 	assert_eq(String(fev[2]["item_id"]), "t3_yemingzhu", "遗物ID不是阵营字段，不得被视角翻转改写")
+	assert_eq(int(fev[3]["player"]), 0, "被后移方必须随本地视角翻转")
+	assert_eq(int(fev[3]["source_player"]), 1, "白额雷音来源方必须随本地视角翻转")
+	assert_eq(int(fev[4]["player"]), 0, "惊蛰受害方必须随本地视角翻转")
+	assert_eq(int(fev[4]["source_player"]), 1, "惊蛰施法方必须随本地视角翻转")
+	assert_eq(int(fev[4]["action"]), ActionDef.Action.BIG_ATTACK,
+		"动作与英雄槽位不是阵营字段，不得被翻转改写")
+	assert_eq(MatchClient.flip_events(fev), evs, "包含来源方的权威事件双翻仍须恒等")
 
 
 func test_match_room_deadline_force_submits_charge() -> void:

@@ -10,6 +10,7 @@ const CHAFF_ATLAS_PATH := "res://assets/tilesets/qingfeng_ricefield/wind_chaff_0
 const HeroDataScript := preload("res://src/battle/hero_data.gd")
 const MapStateScript := preload("res://src/expedition/expedition_map_state.gd")
 const QingfengLayoutScript := preload("res://src/expedition/maps/qingfeng_ricefield_layout.gd")
+const BackpackGridViewScript := preload("res://src/ui/components/backpack_grid_view.gd")
 const GRASS_TILE_PATH := "res://assets/tilesets/qingfeng_ricefield/grass_ref37_ref39_plain_v1.png"
 const GRASS_PLAIN_TILE_PATH := "res://assets/tilesets/qingfeng_ricefield/grass_ref37_ref39_plain_v1.png"
 const TELEPORT_TILE_PATH := "res://assets/tilesets/qingfeng_ricefield/qingfeng_teleport_v1.png"
@@ -50,6 +51,32 @@ const GROUND_PATHS: Array[String] = [
 	TELEPORT_TILE_PATH,
 ]
 const OBJECT_PATHS: Array[String] = OVERLAY_PATHS + GROUND_DETAIL_PATHS
+
+
+func test_backpack_item_art_orientation_follows_rotated_shape() -> void:
+	var view := BackpackGridViewScript.new()
+	add_child_autofree(view)
+	var horizontal_two: Array = [Vector2i(0, 0), Vector2i(1, 0)]
+	var vertical_two: Array = [Vector2i(0, 0), Vector2i(0, 1)]
+	var horizontal_three: Array = [
+		Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0),
+	]
+	var vertical_three: Array = [
+		Vector2i(0, 0), Vector2i(0, 1), Vector2i(0, 2),
+	]
+	assert_eq(int(view.call("_shape_rotation_quarters", horizontal_two, horizontal_two)), 0)
+	assert_eq(int(view.call("_shape_rotation_quarters", horizontal_two, vertical_two)), 1,
+			"横向初始形状转为纵向时，美术同步顺时针旋转90度")
+	assert_eq(int(view.call("_shape_rotation_quarters", vertical_two, horizontal_two)), 1,
+			"竖向初始形状转为横向时，美术同步顺时针旋转90度")
+	assert_eq(int(view.call("_shape_rotation_quarters", horizontal_three, vertical_three)), 1)
+	var layout: Dictionary = view.call("_item_art_layout",
+			Vector2(64.0, 32.0), Rect2(Vector2.ZERO, Vector2(48.0, 108.0)), 1)
+	assert_eq(layout["oriented_size"], Vector2(48.0, 96.0),
+			"64×32图案旋转后按32×64比例利用纵向占格")
+	assert_eq(layout["draw_size"], Vector2(96.0, 48.0),
+			"绘制前保留源图比例，由Canvas变换负责旋转")
+	assert_eq(layout["center"], Vector2(24.0, 54.0), "美术围绕整件道具占格中心旋转")
 
 
 func test_qingfeng_tile_assets_are_square_textures_and_overlays_keep_alpha() -> void:

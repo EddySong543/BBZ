@@ -1305,6 +1305,26 @@ func _shortlist(b: BattleCore, player: int) -> Array:
 		if b.can_split_big_wave_action(player, a, true, true):
 			forms.append({split_big_wave = true, blood_payment = true,
 				energy_cap_discount = true})
+		if b.can_jianqi_attack_action(player, a):
+			forms.append({jianqi_attack = true})
+		if b.can_jianqi_attack_action(player, a, false, false, true):
+			forms.append({jianqi_attack = true, energy_cap_discount = true})
+		if b.can_jianqi_attack_action(player, a, false, true):
+			forms.append({jianqi_attack = true, blood_payment = true})
+		if b.can_jianqi_attack_action(player, a, false, true, true):
+			forms.append({jianqi_attack = true, blood_payment = true,
+				energy_cap_discount = true})
+		if b.can_jianqi_attack_action(player, a, true):
+			forms.append({empowered_wave = true, jianqi_attack = true})
+		if b.can_jianqi_attack_action(player, a, true, false, true):
+			forms.append({empowered_wave = true, jianqi_attack = true,
+				energy_cap_discount = true})
+		if b.can_jianqi_attack_action(player, a, true, true):
+			forms.append({empowered_wave = true, jianqi_attack = true,
+				blood_payment = true})
+		if b.can_jianqi_attack_action(player, a, true, true, true):
+			forms.append({empowered_wave = true, jianqi_attack = true,
+				blood_payment = true, energy_cap_discount = true})
 		for form in forms:
 			var choice: Dictionary = {action = a, target = action_target}
 			choice.merge(form)

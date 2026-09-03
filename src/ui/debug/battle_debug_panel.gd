@@ -10,6 +10,7 @@ extends VBoxContainer
 signal state_changed                        # 改了 battle 状态 → 请 battle_screen 刷新
 signal hit_fx(player: int, dmg_half: int)   # 造伤按钮 → 请 battle_screen 播打击表现（飘字/斩击/震屏）
 signal overtime_requested                   # 一键进加时赛 → 请 battle_screen 组白板 1v1 并重载场景
+signal enemy_switch_requested(target_slot: int) # 敌方正式选择切换，用于巡检切换触发技能与演出
 
 const PLAYER := 0
 const AI := 1
@@ -42,6 +43,7 @@ func setup(battle_ref: BattleCore) -> void:
 		["敌 +盾2", _dbg_shield_enemy],
 		["我 下个英雄", _dbg_next_hero_self],
 		["敌 下个英雄", _dbg_next_hero_enemy],
+		["敌方切换", _dbg_enemy_switch_next],
 		["进加时赛", _dbg_enter_overtime],
 	]
 	for d in defs:
@@ -169,6 +171,20 @@ func _dbg_shield_enemy() -> void:
 	var s: int = _battle.active_index[AI]
 	_battle.shield[AI][s] += 2 * BattleCore.HP_UNIT
 	state_changed.emit()
+
+
+## 请求敌方按槽位顺序切到下一名存活替补。面板本身不改 active_index，必须由
+## battle_screen 从正式选招/resolve 入口提交，才能覆盖 h11 等离场钩子与公共换人演出。
+func _dbg_enemy_switch_next() -> void:
+	if _battle == null or not _battle.can_switch(AI):
+		return
+	var active: int = _battle.active_index[AI]
+	var team_size: int = _battle.heroes[AI].size()
+	for offset: int in range(1, team_size):
+		var candidate: int = (active + offset) % team_size
+		if _battle.is_living_reserve(AI, candidate):
+			enemy_switch_requested.emit(candidate)
+			return
 
 
 func _dbg_next_hero_self() -> void:

@@ -14,6 +14,7 @@ const NetSession := preload("res://src/net/net_session.gd")
 const NetProtocol := preload("res://src/net/net_protocol.gd")
 const LanDiscovery := preload("res://src/net/lan_discovery.gd")
 const RoomCode := preload("res://src/net/room_code.gd")
+const RuntimeFeatures := preload("res://src/core/runtime_features.gd")
 const DEFAULT_PICK: Array = ["h01", "h05", "h06"]
 const JOIN_TIMEOUT := 8.0
 const PICK_MAX := 3
@@ -45,6 +46,11 @@ func _ready() -> void:
 	FontManager.apply_btn($TopBand/BackButton, 24)
 	($TopBand/BackButton as Button).pressed.connect(_on_back)
 	var box: VBoxContainer = $Panel
+	if not RuntimeFeatures.PVP_ENABLED:
+		BattleSetup.close_net_session()
+		set_process(false)
+		_show_pvp_disabled(box)
+		return
 
 	# —— 阵容自选（24 英雄·选 3·默认预选）——
 	_pick_label = Label.new()
@@ -129,7 +135,19 @@ func _ready() -> void:
 		_browser = null
 
 
+func _show_pvp_disabled(box: VBoxContainer) -> void:
+	var notice := Label.new()
+	notice.text = tr("联机对战暂未开放")
+	notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	notice.custom_minimum_size = Vector2(920.0, 80.0)
+	notice.add_theme_color_override("font_color", Color(0.85, 0.78, 0.62))
+	FontManager.apply(notice, 24)
+	box.add_child(notice)
+
+
 func _process(delta: float) -> void:
+	if not RuntimeFeatures.PVP_ENABLED:
+		return
 	_refresh_rooms(delta)
 	if _beacon != null:
 		_beacon.tick(delta)
@@ -192,6 +210,8 @@ func _team_names() -> Array:
 
 
 func _on_host() -> void:
+	if not RuntimeFeatures.PVP_ENABLED:
+		return
 	if not _pick_ready():
 		return
 	var room_pass := _pass_edit.text.strip_edges()
@@ -213,6 +233,8 @@ func _on_host() -> void:
 
 
 func _on_join() -> void:
+	if not RuntimeFeatures.PVP_ENABLED:
+		return
 	if not _pick_ready():
 		return
 	var raw := _ip_edit.text.strip_edges()
@@ -291,6 +313,8 @@ func _refresh_rooms(delta: float) -> void:
 
 
 func _on_room_clicked(ip: String, has_pass: bool) -> void:
+	if not RuntimeFeatures.PVP_ENABLED:
+		return
 	_ip_edit.text = ip
 	if has_pass and _pass_edit.text.strip_edges().is_empty():
 		_status.text = tr("这个房间设了口令：先在上面填口令，再点「加 入 / 重连」。")

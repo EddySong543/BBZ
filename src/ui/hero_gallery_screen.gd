@@ -621,7 +621,9 @@ func _rebuild_effect_keyword_emphasis(text: String) -> void:
 	var font_size := _d_detail.get_theme_font_size("font_size")
 	var layout_text := EffectTextFormatterScript.protect_cjk_line_breaks(text)
 	var paragraph := TextParagraph.new()
-	paragraph.width = _d_detail.size.x
+	# 每行统一预留一枚关键词星芒的尾部宽度；不改正文框尺寸，也不为 h10 单独挪轨。
+	# 否则同一行出现两次“剑气”时，排版器未计入装饰间距，会把首字推近左侧竖线。
+	paragraph.width = _d_detail.size.x - EffectTextFormatterScript.KEYWORD_GAP_AFTER
 	paragraph.alignment = HORIZONTAL_ALIGNMENT_CENTER
 	# 不能再按全文关键词数量扣宽度；那会让 h10/h11 获得不同排版轨道。
 	# 中文正文允许在字素间换行，语言信息负责句末标点禁则。

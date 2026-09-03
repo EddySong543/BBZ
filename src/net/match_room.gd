@@ -133,6 +133,8 @@ func _on_submit(player: int, d: Dictionary) -> void:
 func _apply_payload(core: BattleCore, player: int, d: Dictionary) -> bool:
 	if bool(d.get("double", false)):
 		return false   # 旧 h16 双动作字段只为线协议兼容保留；现行规则不接受 true
+	if d.has("command_sequence"):
+		return _apply_ordered_payload(core, player, d)
 	var want_blood_payment := bool(d.get("blood_payment", false))
 	var free_switches: Array = d.get("free_switches", [])
 	var blood_payment_step := int(d.get("blood_payment_step", -1))
@@ -178,12 +180,14 @@ func _apply_payload(core: BattleCore, player: int, d: Dictionary) -> bool:
 	var want_target := int(d["target"])
 	var want_empowered_wave := bool(d.get("empowered_wave", false))
 	var want_split_big_wave := bool(d.get("split_big_wave", false))
+	var want_jianqi_attack := bool(d.get("jianqi_attack", false))
 	var want_energy_cap_discount := bool(d.get("energy_cap_discount", false))
 	var legal := false
 	for la in core.legal_actions(player):
 		if int(la["action"]) == want_action and int(la["target"]) == want_target \
 				and bool(la.get("empowered_wave", false)) == want_empowered_wave \
 				and bool(la.get("split_big_wave", false)) == want_split_big_wave \
+				and bool(la.get("jianqi_attack", false)) == want_jianqi_attack \
 				and bool(la.get("blood_payment", false)) == want_blood_payment \
 				and bool(la.get("energy_cap_discount", false)) == want_energy_cap_discount:
 			legal = true
@@ -195,6 +199,7 @@ func _apply_payload(core: BattleCore, player: int, d: Dictionary) -> bool:
 		target = want_target,
 		empowered_wave = want_empowered_wave,
 		split_big_wave = want_split_big_wave,
+		jianqi_attack = want_jianqi_attack,
 		blood_payment = want_blood_payment,
 		energy_cap_discount = want_energy_cap_discount,
 	}):
@@ -208,6 +213,111 @@ func _apply_payload(core: BattleCore, player: int, d: Dictionary) -> bool:
 	if second_action < 0 and core.has_lianhuan_gu_queued(player):
 		return false
 	return true
+
+
+func _apply_ordered_payload(core: BattleCore, player: int, d: Dictionary) -> bool:
+	var sequence: Array = d.get("command_sequence", [])
+	var want_blood_payment: bool = bool(d.get("blood_payment", false))
+	var blood_payment_step: int = int(d.get("blood_payment_step", -1))
+	var processed_switches: int = 0
+	var processed_actions: int = 0
+	var blood_activated: bool = false
+	if want_blood_payment and blood_payment_step <= 0:
+		if not core.set_blood_payment_active(player, true):
+			return false
+		blood_activated = true
+	for step_v: Variant in sequence:
+		var step: Dictionary = step_v
+		match String(step.get("kind", "")):
+			"free_switch":
+				if not core.free_switch(player, int(step.get("target", -1))):
+					return false
+				processed_switches += 1
+				if want_blood_payment and not blood_activated \
+						and blood_payment_step == processed_switches:
+					if not core.set_blood_payment_active(player, true):
+						return false
+					blood_activated = true
+			"item":
+				if not _apply_ordered_item_step(core, player, step):
+					return false
+			"action":
+				if processed_actions == 0:
+					if not _apply_ordered_primary_action(core, player, d, step):
+						return false
+				elif processed_actions == 1:
+					if int(d.get("second_action", -1)) < 0 or not core.apply_second_choice(player, {
+						action = int(step.get("action", -1)),
+						target = int(step.get("target", -1)),
+					}):
+						return false
+				else:
+					return false
+				processed_actions += 1
+			_:
+				return false
+	if want_blood_payment and not blood_activated:
+		return false
+	var expected_actions: int = 2 if int(d.get("second_action", -1)) >= 0 else 1
+	if processed_actions != expected_actions:
+		return false
+	if int(d.get("second_action", -1)) < 0 and core.has_lianhuan_gu_queued(player):
+		return false
+	return true
+
+
+func _apply_ordered_item_step(core: BattleCore, player: int, step: Dictionary) -> bool:
+	var source_slot: int = int(step.get("slot", -1))
+	var item_target: int = int(step.get("target", -1))
+	var item_choice: int = int(step.get("choice", -1))
+	var source_item: ItemData = core.slot_item(player, source_slot)
+	if source_item == null:
+		return false
+	if source_item.item_id in ["t2_dianjinshi", "t2_huanqian_tong", "t2_huigou_quan"]:
+		var cache_key: String = "draft" if source_item.item_id == "t2_huanqian_tong" \
+			else "upg_draft"
+		if item_choice < 0 or (core.slots[player][source_slot][cache_key] as Array).is_empty():
+			return false
+	elif item_choice != -1:
+		return false
+	var hero_target: int = item_target \
+		if BattleCore.item_requires_friendly_hero_target(source_item) else -1
+	var slot_target: int = -1 if hero_target >= 0 else item_target
+	return core.use_slot(player, source_slot, hero_target, slot_target, item_choice)
+
+
+func _apply_ordered_primary_action(core: BattleCore, player: int, d: Dictionary,
+		step: Dictionary) -> bool:
+	var want_action: int = int(step.get("action", -1))
+	var want_target: int = int(step.get("target", -1))
+	var want_blood_payment: bool = bool(d.get("blood_payment", false))
+	var want_empowered_wave: bool = bool(d.get("empowered_wave", false))
+	var want_split_big_wave: bool = bool(d.get("split_big_wave", false))
+	var want_jianqi_attack: bool = bool(d.get("jianqi_attack", false))
+	var want_energy_cap_discount: bool = bool(d.get("energy_cap_discount", false))
+	var legal: bool = false
+	for legal_action_v: Variant in core.legal_actions(player):
+		var legal_action: Dictionary = legal_action_v
+		if int(legal_action["action"]) == want_action \
+				and int(legal_action["target"]) == want_target \
+				and bool(legal_action.get("empowered_wave", false)) == want_empowered_wave \
+				and bool(legal_action.get("split_big_wave", false)) == want_split_big_wave \
+				and bool(legal_action.get("jianqi_attack", false)) == want_jianqi_attack \
+				and bool(legal_action.get("blood_payment", false)) == want_blood_payment \
+				and bool(legal_action.get("energy_cap_discount", false)) == want_energy_cap_discount:
+			legal = true
+			break
+	if not legal:
+		return false
+	return core.apply_choice(player, {
+		action = want_action,
+		target = want_target,
+		empowered_wave = want_empowered_wave,
+		split_big_wave = want_split_big_wave,
+		jianqi_attack = want_jianqi_attack,
+		blood_payment = want_blood_payment,
+		energy_cap_discount = want_energy_cap_discount,
+	})
 
 
 func _commit_and_resolve() -> void:
@@ -226,6 +336,11 @@ func _commit_and_resolve() -> void:
 	for p in 2:
 		_send.call(p, {v = NetProtocol.PROTO_VERSION, kind = "resolve",
 			actions = [r.get("p1_action", -1), r.get("p2_action", -1)],
+			action_step_ids = r.get("action_step_ids", []),
+			command_sequences = [
+				(_pending[0] as Dictionary).get("command_sequence", []),
+				(_pending[1] as Dictionary).get("command_sequence", []),
+			],
 			events = r.get("events", []), pending = pending, view = _view(p),
 			snap = _snap_for(p)})
 	if phase == Phase.OVER:

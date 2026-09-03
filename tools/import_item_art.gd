@@ -1,7 +1,7 @@
 extends SceneTree
 
-## 道具图标导入 / 分配（B·2026-06-20·2026-06-27 改：正式目录图标 = 中文道具名.png，与游戏内名同步）。
-## 把 assets/import/ 里【按中文名命名】的图标，同名拷入正式目录 assets/sprites/items/。
+## 道具图标导入 / 分配（2026-09-03 改：新版与旧版分仓，正式图标 = 中文道具名.png）。
+## 把 assets/import/ 里【按中文名命名】的图标分配到 assets/sprites/items/v2/ 或 legacy/。
 ## 运行：<godot> --headless --path <proj> --script res://tools/import_item_art.gd
 ##
 ## 设计：
@@ -27,7 +27,9 @@ func _initialize() -> void:
 
 	var name2id: Dictionary = ItemCatalog.name_to_id()
 	var known_ids := {}
-	for id in ItemCatalog.ids():
+	for id: String in ItemCatalog.ids():
+		known_ids[id] = true
+	for id: String in ItemCatalog.prototype_ids():
 		known_ids[id] = true
 
 	var matched := 0
@@ -49,7 +51,7 @@ func _initialize() -> void:
 		var err := DirAccess.copy_absolute(g_from, g_to)
 		if err == OK:
 			matched += 1
-			print("[导入] %s → %s" % [f, ItemCatalog.icon_path(id).get_file()])
+			print("[导入] %s → %s" % [f, ItemCatalog.icon_path(id)])
 		else:
 			push_error("[失败] 复制 %s → %s（err=%d）" % [f, id, err])
 
@@ -60,28 +62,43 @@ func _initialize() -> void:
 		print("⚠ 未匹配 %d 件（名字对不上·只报告不瞎猜，请对照 %s 核名）：" % [unmatched.size(), MAP_DOC])
 		for f in unmatched:
 			print("    - %s" % f)
-	print("\n提示：matched 文件已【复制】到 assets/sprites/items/；import 源文件保留，确认后可自行清空。")
+	print("\n提示：matched 文件已按当前/旧版 id 自动分仓；import 源文件保留，确认后可自行清空。")
 	print("      再到 Godot 编辑器导入一次（或 --import），游戏里即显示。")
 	quit()
 
 
 ## 生成 / 刷新「中文名 ↔ id」对照表（从 ItemCatalog 实时取，按 tier→完整无声调拼音排）。
 func _write_map_doc() -> void:
-	var items: Array[ItemData] = ItemCatalog.all()   # 已按玩家显示顺序
+	var current_items: Array[ItemData] = ItemCatalog.all_active()
+	var legacy_items: Array[ItemData] = ItemCatalog.all()
 	var lines: Array[String] = []
 	lines.append("# 道具「中文名 ↔ 代码 id」对照表")
 	lines.append("")
 	lines.append("> 由 `tools/import_item_art.gd` 从 `ItemCatalog` 实时生成，**勿手改**（改了会被覆盖）。")
 	lines.append("> **图标文件名 = 中文道具名**（与游戏内显示名一致·按名更新美术）；下表 id 仅代码内部用。")
 	lines.append("> ⚠ id 拼音是历史化石、≠ 显示名（如 `t1_siyecao`=最后一箭）；命名美术只看「中文名」列。")
-	lines.append("> 当前实装 %d 件，表内各 tier 按显示名全拼排序（设计全集见 design/items-list.md）。" % items.size())
+	lines.append("> 当前启用新版 %d 件归入 `v2/`；隐藏旧版 %d 件归入 `legacy/`。" % [
+		current_items.size(), legacy_items.size()])
+	lines.append("")
+	lines.append("# 新版 v2")
 	lines.append("")
 	for t in [1, 2, 3]:
 		lines.append("## T%d" % t)
 		lines.append("")
 		lines.append("| 中文名（= 图标文件名） | 代码 id（仅代码内部） | 维度 |")
 		lines.append("|---|---|---|")
-		for it in items:
+		for it: ItemData in current_items:
+			if it.tier == t:
+				lines.append("| %s | `%s` | %s |" % [it.item_name, it.item_id, it.dimension])
+		lines.append("")
+	lines.append("# 旧版 legacy")
+	lines.append("")
+	for t in [1, 2, 3]:
+		lines.append("## T%d" % t)
+		lines.append("")
+		lines.append("| 中文名（= 图标文件名） | 代码 id（仅代码内部） | 维度 |")
+		lines.append("|---|---|---|")
+		for it: ItemData in legacy_items:
 			if it.tier == t:
 				lines.append("| %s | `%s` | %s |" % [it.item_name, it.item_id, it.dimension])
 		lines.append("")
@@ -91,4 +108,5 @@ func _write_map_doc() -> void:
 		return
 	fa.store_string("\n".join(lines))
 	fa.close()
-	print("[对照表] 已刷新 %s（%d 件）" % [MAP_DOC, items.size()])
+	print("[对照表] 已刷新 %s（新版%d / 旧版%d）" % [
+		MAP_DOC, current_items.size(), legacy_items.size()])

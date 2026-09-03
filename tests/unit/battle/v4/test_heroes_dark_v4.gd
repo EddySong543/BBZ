@@ -7,11 +7,11 @@ extends GutTest
 ## h14【天不葬】= 经济·主动：按下后，本回合行动费用由出战蚩尤以等量生命支付。
 ## h15【七杀战鬼】= 进攻：出战时无法用防/大防（can_afford gate·下场即解）+ 波穿防（attack_penetration）。
 ## h16【白虹】= 调度/进攻：队友基础攻击命中时，替补广寒登场并对同一目标追击 1 点伤害。
-## h17【待重命名】= 主动技：占动作+费2能，转变为敌方当前出战英雄；复制英雄本体状态，不复制团队能量。
+## h17【无我亦无穷】= 主动技：占动作+费2能，转变为敌方当前出战英雄；复制英雄本体状态，不复制团队能量。
 ## h18【游丝引】= 控制·被动：出战时，双方「波 / 大波」的基础伤害均视为 1 点；后续强化与独立伤害照常。
 ## h19【奔雷】= 进攻：攻击命中时，目标至多承受 1.0HP，超过部分转移给当前生命最高的另一名敌人。
 ## h20【罪已昭】= 状态·被动：命中敌方出战使其获得脆弱（vuln），受伤 +0.5，持续到下回合结束。
-## h21【调虎离山】= 干扰·主动技：占动作+费1能（批④降费·原2能）+每局2次+须出战，强制对手换人、揪其指定（未指定→随机）存活替补上场。
+## h21【惊蛰】= 控制·主动技：占动作+费2能+每局2次+须出战，强制指定替补登场，并取消原出战英雄尚未结算的基础行动且不返能。
 ## h22【焚天火兆】= 控制·主动技：占动作+免费+每局2次 → 下一回合结束时双方失去全部能量。
 ## h23【天光长蚀】= 干扰：「波 / 大波」实际造成多少伤害，就等量降低敌方团队能量上限；最低 3 点，现有超额能量保留。
 ## h24【待命名】= 经济：在队时，可降低 1 点能量上限，使本回合行动少消耗 1 点能量；上限最低 3 点。
@@ -174,33 +174,33 @@ func test_h14_blood_payment_uses_hp_not_shield_and_can_pay_exactly() -> void:
 	assert_eq(b.hp[1][0], 8, "即使支付后阵亡，本轮已经提交的波仍应完成结算")
 
 
-func test_h14_blood_payment_survives_h07_free_switch_and_charges_original_h14() -> void:
+func test_h14_can_pay_for_h07_after_a_free_switch_into_h07() -> void:
 	var b := _battle_team(["h14", "h07", "test_p0_2"], 6, 0)
 	assert_true(b.set_blood_payment_active(0, true), "蚩尤出战时应能开启生命支付")
-	assert_true(b.free_switch(0, 1), "顶星日上场应为免费切换")
-	assert_eq(b.active_index[0], 1, "免费切换后应由星日出战")
-	assert_true(b.select_action(0, ActionDef.Action.BIG_ATTACK, -1, false, false, true),
-		"星日应能继续使用由蚩尤付款的大波")
+	assert_true(b.free_switch(0, 1), "其他英雄切入星日也应使用本回合一次免费切换")
+	assert_eq(b.blood_payment_source(0), 0, "免费调度不应取消已记录的蚩尤付款者")
+	assert_true(b.select_action(0, ActionDef.Action.ATTACK, -1, false, false, true),
+		"星日登场后可继续由原蚩尤支付波的费用")
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
 
-	assert_eq(b.hp[0][0], 6, "大波的3点费用必须扣最初发动技能的蚩尤")
-	assert_eq(b.hp[0][1], 12, "当前出战的星日不应误付生命")
-	assert_eq(b.energy[0], 2, "免费切换后的行动仍不消耗团队能量")
+	assert_eq(b.active_index[0], 1, "免费切换后星日应正常登场")
+	assert_eq(b.hp[0][0], 10, "波的 1 能费用应由原蚩尤支付 1 点生命")
+	assert_eq(b.hp[1][0], 7, "星日登场 0.5 点与随后波 1 点应分别结算")
 
 
 func test_h14_blood_payment_cannot_extend_h07_into_second_free_switch() -> void:
-	var b := _battle_team(["h14", "h07", "h17"], 6, 0)
-	assert_true(b.set_blood_payment_active(0, true))
-	assert_true(b.free_switch(0, 1), "蚩尤应能免费切到星日")
-	assert_false(b.free_switch(0, 2), "千里自在风同回合不能再免费切到烛阴")
+	var b := _battle_team(["h07", "h14", "h17"], 6, 0)
+	assert_true(b.free_switch(0, 1), "星日可免费离场并让蚩尤登场")
+	assert_true(b.set_blood_payment_active(0, true), "预览中的蚩尤应能开启生命支付")
+	assert_false(b.free_switch(0, 2), "免费离场次数不能被新出战的蚩尤刷新")
 	assert_true(b.select_action(0, ActionDef.Action.BIG_ATTACK, -1, false, false, true),
-		"星日仍可继续使用由蚩尤付款的大波")
+		"蚩尤可在免费登场后用自身生命支付大波")
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
 
-	assert_eq(b.active_index[0], 1, "本回合应停留在第一次免费切入的星日")
-	assert_eq(b.hp[0][0], 6, "星日大波消耗3点能量，应改扣蚩尤3点生命")
+	assert_eq(b.active_index[0], 1, "本回合应停留在免费切入的蚩尤")
+	assert_eq(b.hp[0][1], 6, "蚩尤大波消耗3点能量，应扣自身3点生命")
 
 
 # ---- h15 穷奇 七杀战鬼（出战不能防御 + 波穿防）----
@@ -340,7 +340,7 @@ func test_h16_multihit_action_triggers_only_one_pursuit() -> void:
 	assert_eq(pursuits, 1, "同一个多段攻击动作只触发一次广寒追击")
 
 
-func test_h16_can_repeat_after_h07_and_a_paid_switch_return_her_to_reserve() -> void:
+func test_h16_can_repeat_after_h07_free_switch_returns_her_to_reserve() -> void:
 	var b := _battle_team(["h07", "h16", "test_p0_2"], 5, 20)
 	b.select_action(0, ActionDef.Action.ATTACK)
 	b.select_action(1, ActionDef.Action.CHARGE)
@@ -348,22 +348,17 @@ func test_h16_can_repeat_after_h07_and_a_paid_switch_return_her_to_reserve() -> 
 	assert_eq(b.active_index[0], 1, "第一回合追击后广寒登场")
 	assert_eq(b.hp[1][0], 6)
 
-	assert_true(b.free_switch(0, 0), "广寒可免费切回星日")
-	assert_false(b.free_switch(0, 2), "同回合不能借星日继续免费切到下一名攻击手")
-	assert_true(b.select_switch(0, 2), "可把常规切换作为本回合动作，让下一名攻击手登场")
-	b.select_action(1, ActionDef.Action.CHARGE)
-	b.resolve()
-
-	b.select_action(0, ActionDef.Action.ATTACK)
+	assert_true(b.free_switch(0, 0), "广寒切回星日应使用本回合一次免费切换")
+	assert_true(b.select_action(0, ActionDef.Action.ATTACK), "免费登场后星日可继续攻击")
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
 
 	assert_eq(b.active_index[0], 1, "广寒回到替补后可再次追击登场")
 	assert_eq(b.hp[1][0], 1,
-		"经过一回合常规换位后，第二次波与追击仍可成立")
+		"星日免费登场伤害、第二次波与广寒追击应按顺序分别结算")
 
 
-func test_h16_item_and_attack_active_do_not_trigger_pursuit() -> void:
+func test_h16_item_does_not_trigger_but_h10_jianqi_wave_does() -> void:
 	var item_battle := _battle_team(["test_p0_0", "h16", "test_p0_2"], 5, 8)
 	var dart: int = item_battle.give_item(0, ItemCatalog.make("t1_feibiao"))
 	assert_true(item_battle.use_item(0, dart))
@@ -372,12 +367,17 @@ func test_h16_item_and_attack_active_do_not_trigger_pursuit() -> void:
 	item_battle.resolve()
 	assert_eq(item_battle.active_index[0], 0, "道具命中不触发广寒追击")
 
-	var active_battle := _battle_team(["h10", "h16", "test_p0_2"], 5, 8)
-	active_battle.set_status(0, 0, "jianqi", 2)
-	assert_true(active_battle.select_active(0))
-	active_battle.select_action(1, ActionDef.Action.CHARGE)
-	active_battle.resolve()
-	assert_eq(active_battle.active_index[0], 0, "攻击型主动技命中不触发广寒追击")
+	var wave_battle := _battle_team(["h10", "h16", "test_p0_2"], 5, 8)
+	wave_battle.set_team_status(0, "jianqi", 2)
+	assert_true(wave_battle.apply_choice(0, {
+		action = ActionDef.Action.ATTACK,
+		target = -1,
+		jianqi_attack = true,
+	}))
+	wave_battle.select_action(1, ActionDef.Action.CHARGE)
+	wave_battle.resolve()
+	assert_eq(wave_battle.active_index[0], 1,
+			"剑气强化波仍是基础攻击，命中后应正常触发广寒追击")
 
 
 func test_h16_does_not_pursue_when_source_or_target_dies_in_primary_exchange() -> void:
@@ -540,16 +540,55 @@ func test_h18_field_preserves_empowered_wave_and_vulnerability_after_base_value(
 	assert_eq(vulnerable.hp[1][0], 7, "脆弱应在归一后的1点大波上继续增加0.5点伤害")
 
 
-func test_h18_field_does_not_modify_attack_active_damage() -> void:
+func test_h18_damage_number_feedback_marks_only_an_actual_base_reduction() -> void:
+	var limited := _battle("h18", 5, 20)
+	limited.set_status(1, 0, "vuln", 1)
+	limited.select_action(0, ActionDef.Action.BIG_ATTACK)
+	limited.select_action(1, ActionDef.Action.CHARGE)
+	var limited_result: Dictionary = limited.resolve()
+	var limited_event: Dictionary = {}
+	for event: Dictionary in limited_result["events"]:
+		if event.get("id", "") == "damage_taken" and int(event.get("player", -1)) == 1:
+			limited_event = event
+			break
+	assert_eq(int(limited_event.get("amount", -1)), 3,
+			"游丝引只限制基础值；公共数字仍须显示脆弱结算后的实际1.5点伤害")
+	assert_eq(limited_event.get("damage_number_state", &"normal"), &"limited",
+			"仅当大波基础值确实从2点收束到1点时，事件才提交limited语义")
+
+	var unchanged := _battle("h18", 5, 20)
+	unchanged.select_action(0, ActionDef.Action.ATTACK)
+	unchanged.select_action(1, ActionDef.Action.CHARGE)
+	var unchanged_result: Dictionary = unchanged.resolve()
+	var unchanged_event: Dictionary = {}
+	for event: Dictionary in unchanged_result["events"]:
+		if event.get("id", "") == "damage_taken" and int(event.get("player", -1)) == 1:
+			unchanged_event = event
+			break
+	assert_eq(unchanged_event.get("damage_number_state", &"normal"), &"normal",
+			"普通波原本就是1点，未被压低时不得虚假播放游丝引限制反馈")
+
+
+func test_h18_field_applies_to_h10_jianqi_base_attack() -> void:
 	var b := _battle_vs(
 		["h18", "test_p0_1", "test_p0_2"],
 		["h10", "test_p1_1", "test_p1_2"], 5, 20)
-	b.set_status(1, 0, "jianqi", 4)
+	b.set_team_status(1, "jianqi", 4)
 	b.select_action(0, ActionDef.Action.CHARGE)
-	assert_true(b.select_active(1))
-	b.resolve()
+	assert_true(b.apply_choice(1, {
+		action = ActionDef.Action.BIG_ATTACK,
+		target = -1,
+		jianqi_attack = true,
+	}))
+	var result: Dictionary = b.resolve()
 
-	assert_eq(b.hp[0][0], 4, "昴日满层主动技仍应造成3点独立伤害")
+	assert_eq(b.hp[0][0], 8, "剑气强化仍是基础大波，应受游丝引归一为1点伤害")
+	assert_eq(int(b.get_team_status(1, "jianqi", 0)), 1,
+			"旧剑气在攻击形成时清空，命中后重新积累1点")
+	for event: Dictionary in result["events"]:
+		if event.get("id", "") == "damage_taken" and int(event.get("player", -1)) == 0:
+			assert_eq(event.get("damage_number_state", &"normal"), &"limited",
+					"剑气强化大波仍走公共攻击反馈，不再形成独立主动伤害")
 
 
 func test_h18_no_longer_has_an_active_skill() -> void:
@@ -566,9 +605,17 @@ func test_h19_jianta_overflow_tramples_reserve() -> void:
 	b.hp[1] = [10, 6, 8]
 	b.select_action(0, ActionDef.Action.BIG_ATTACK)
 	b.select_action(1, ActionDef.Action.CHARGE)
-	b.resolve()
+	var result: Dictionary = b.resolve()
 	assert_eq(b.hp[1], [8, 6, 6],
 		"大波总伤害守恒：原目标只承受1点，余下1点转移给最高生命的另一名敌人")
+	var transfer_event: Dictionary = {}
+	for event: Dictionary in result["events"]:
+		if String(event.get("id", "")) == "h19_damage_transferred":
+			transfer_event = event
+			break
+	assert_eq(int(transfer_event.get("hp_damage", -1)), 2,
+		"H19 演出事件必须显式给出替补实际承受的生命伤害，不能让 UI 猜测")
+	assert_eq(int(transfer_event.get("shield_damage", -1)), 0)
 
 
 func test_h19_jianta_normal_wave_no_trample() -> void:
@@ -610,10 +657,19 @@ func test_h19_jianta_primary_and_transfer_each_respect_their_own_shield() -> voi
 	b.shield[1][2] = 1
 	b.select_action(0, ActionDef.Action.BIG_ATTACK)
 	b.select_action(1, ActionDef.Action.CHARGE)
-	b.resolve()
+	var result: Dictionary = b.resolve()
 
 	assert_eq(b.hp[1], [10, 6, 7], "两段伤害应分别经过各自目标的护甲")
 	assert_eq(b.shield[1], [0, 0, 0], "原目标吸收1点，转移目标吸收0.5点")
+	var transfer_event: Dictionary = {}
+	for event: Dictionary in result["events"]:
+		if String(event.get("id", "")) == "h19_damage_transferred":
+			transfer_event = event
+			break
+	assert_eq(int(transfer_event.get("hp_damage", -1)), 1,
+		"独立替补数字只显示真正扣除的生命，不把护甲吸收合并成伤害数字")
+	assert_eq(int(transfer_event.get("shield_damage", -1)), 1,
+		"转移轨迹仍需知道护甲吸收量，以便抵达拍刷新正确 HUD")
 
 
 func test_h19_jianta_discards_excess_when_no_other_enemy_is_alive() -> void:
@@ -720,8 +776,94 @@ func test_h21_diaohu_pulls_specified_target() -> void:
 	b.select_action(1, ActionDef.Action.CHARGE)
 	b.resolve()
 	assert_eq(b.active_index[1], 2, "对手被强制揪上玩家指定的 slot2（非血最低）")
-	assert_eq(b.energy[0], 8 - 2 + 2, "调虎离山费 1 能（2 半能·批④降费）+ 被动回 +1 能")
+	assert_eq(b.energy[0], 8 - 4 + 2, "惊蛰费 2 能（4 半能）+ 被动回 +1 能")
 	assert_eq(int(b.get_status(0, 0, "active_uses", 0)), 1, "计 1 次使用")
+
+
+func test_h21_diaohu_cancels_unresolved_attack_without_refunding_cost() -> void:
+	var b := _battle_vs(["h21", "test_p0_1", "test_p0_2"],
+		["test_p1_0", "test_p1_1", "test_p1_2"], 5, 8)
+	assert_true(b.select_active(0, 1), "枭阳指定揪敌方 slot1")
+	assert_true(b.select_action(1, ActionDef.Action.ATTACK))
+	var result: Dictionary = b.resolve()
+
+	assert_eq(b.active_index[1], 1, "指定替补应先完成登场")
+	assert_eq(b.hp[0][0], 10, "原出战英雄尚未结算的波应被取消")
+	assert_eq(b.energy[1], 8, "波的 1 能费用不返还，只叠加回合被动 1 能")
+	assert_true(_has_event(result, "h21_action_cancelled"),
+		"事件流必须公开行动取消，供 UI 与录像统一解释")
+	assert_eq(int(result["p2_action"]), ActionDef.Action.ATTACK,
+		"动作气泡仍应展示玩家原本提交的波")
+
+
+func test_h21_interrupts_h10_empowered_attack_before_sword_qi_is_consumed() -> void:
+	var b := _battle_vs(["h21", "test_p0_1", "test_p0_2"],
+		["h10", "test_p1_1", "test_p1_2"], 5, 8)
+	b.set_team_status(1, "jianqi", 2)
+	assert_true(b.select_active(0, 1))
+	assert_true(b.apply_choice(1, {
+		action = ActionDef.Action.ATTACK,
+		target = -1,
+		jianqi_attack = true,
+	}))
+	b.resolve()
+
+	assert_eq(int(b.get_team_status(1, "jianqi", 0)), 2,
+			"攻击在真正形成前被打断，剑气不得提前消耗")
+
+
+func test_h21_diaohu_cancels_charge_before_energy_is_granted() -> void:
+	var b := _battle_vs(["h21", "test_p0_1", "test_p0_2"],
+		["test_p1_0", "test_p1_1", "test_p1_2"], 5, 8)
+	assert_true(b.select_active(0, 1))
+	assert_true(b.select_action(1, ActionDef.Action.CHARGE))
+	var result: Dictionary = b.resolve()
+
+	assert_eq(b.energy[1], 10, "攒被取消后不得获得主动 1 能，只保留回合被动 1 能")
+	var charge_gain_found := false
+	for event: Dictionary in result["events"]:
+		if String(event.get("id", "")) == "charge_gain" \
+				and int(event.get("player", -1)) == 1:
+			charge_gain_found = true
+	assert_false(charge_gain_found, "被取消的攒不得先发得能事件再回滚")
+
+
+func test_h21_diaohu_cancels_big_wave_and_keeps_all_energy_spent() -> void:
+	var b := _battle_vs(["h21", "test_p0_1", "test_p0_2"],
+		["test_p1_0", "test_p1_1", "test_p1_2"], 5, 8)
+	assert_true(b.select_active(0, 1))
+	assert_true(b.select_action(1, ActionDef.Action.BIG_ATTACK))
+	var result: Dictionary = b.resolve()
+
+	assert_eq(b.hp[0][0], 10, "被取消的大波不得造成伤害")
+	assert_eq(b.energy[1], 4, "大波已支付的 3 能不返还，回合末仅回 1 能")
+	assert_true(_has_event(result, "h21_action_cancelled"))
+
+
+func test_h21_diaohu_does_not_rewind_an_already_completed_switch() -> void:
+	var b := _battle_vs(["h21", "test_p0_1", "test_p0_2"],
+		["test_p1_0", "test_p1_1", "test_p1_2"], 5, 8)
+	assert_true(b.select_active(0, 2), "惊蛰最终指定 slot2")
+	assert_true(b.select_switch(1, 1), "对手先主动切到 slot1")
+	var result: Dictionary = b.resolve()
+
+	assert_eq(b.active_index[1], 2, "主动切换先完成，随后惊蛰再揪上 slot2")
+	assert_false(_has_event(result, "h21_action_cancelled"),
+		"已经完成的切换不能被伪装成尚未结算行动再取消")
+
+
+func test_h21_diaohu_does_not_rewind_an_already_completed_active_skill() -> void:
+	var b := _battle_vs(["h21", "test_p0_1", "test_p0_2"],
+		["h22", "test_p1_1", "test_p1_2"], 5, 8)
+	assert_true(b.select_active(0, 1), "惊蛰指定揪敌方 slot1")
+	assert_true(b.select_active(1), "毕方同拍发动焚天火兆")
+	var result: Dictionary = b.resolve()
+
+	assert_eq(b.active_index[1], 1, "毕方主动技完成后仍会被惊蛰换下")
+	assert_eq(b.energy_burn_turn, b.turn_number,
+		"已在强制登场前完成的主动技能效果必须持续存在")
+	assert_false(_has_event(result, "h21_action_cancelled"),
+		"已执行主动技能不能被回滚或伪报为行动取消")
 
 
 func test_h21_diaohu_does_not_trigger_h11_from_reserve() -> void:

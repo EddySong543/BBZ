@@ -116,11 +116,12 @@ func submit(action: int, target: int = -1, item_slots: Array = [], double: bool 
 		blood_payment: bool = false, free_switches: Array = [],
 		blood_payment_step: int = -1, energy_cap_discount: bool = false,
 		item_slot_targets: Array = [], item_slot_choices: Array = [],
-		second_action: int = -1, second_target: int = -1) -> void:
+		second_action: int = -1, second_target: int = -1,
+		command_sequence: Array = [], jianqi_attack: bool = false) -> void:
 	transport.send(NetProtocol.msg_submit_turn(
 		turn, action, target, item_slots, double, empowered_wave, split_big_wave, blood_payment,
 		free_switches, blood_payment_step, energy_cap_discount, item_slot_targets,
-		item_slot_choices, second_action, second_target))
+		item_slot_choices, second_action, second_target, command_sequence, jianqi_attack))
 
 
 func request_draft(slot: int, upgrade: bool = false) -> void:
@@ -175,13 +176,15 @@ static func flip_snapshot(d: Dictionary) -> Dictionary:
 	return out
 
 
-## 翻转事件批视角（player 字段 0↔1·victory 事件 winner 互换）。深拷。
+## 翻转事件批视角（player / source_player 字段 0↔1·victory 事件 winner 互换）。深拷。
 static func flip_events(events: Array) -> Array:
 	var out: Array = []
 	for e in events:
 		var ev: Dictionary = (e as Dictionary).duplicate(true)
 		if ev.has("player"):
 			ev["player"] = 1 - int(ev["player"])
+		if ev.has("source_player"):
+			ev["source_player"] = 1 - int(ev["source_player"])
 		if ev.has("winner"):
 			ev["winner"] = flip_winner(int(ev["winner"]))
 		out.append(ev)

@@ -1,6 +1,8 @@
 [gd_scene format=3 uid="uid://bn0rjf1qjld17"]
 
 [ext_resource type="Script" uid="uid://uwkgowbdtjd7" path="res://src/ui/battle_screen.gd" id="1_battle_gd"]
+[ext_resource type="Script" uid="uid://b6tgrmhrvw0nf" path="res://src/ui/components/command_sequence_cancel_glyph.gd" id="1_command_cancel_preview"]
+[ext_resource type="Script" uid="uid://b4dmnkp5t44cn" path="res://src/ui/components/command_sequence_slot_skin.gd" id="1_command_star_preview"]
 [ext_resource type="PackedScene" uid="uid://ccx2qeqk5rvx5" path="res://src/ui/components/character_display.tscn" id="2_char_display"]
 [ext_resource type="PackedScene" uid="uid://b6i5h2alff53a" path="res://src/ui/components/hero_frame.tscn" id="3_hero_frame"]
 [ext_resource type="PackedScene" uid="uid://b1iconpiprow0" path="res://src/ui/components/icon_pip_row.tscn" id="4_piprow"]
@@ -79,20 +81,20 @@ shader_parameter/impact_th_in = 0.13
 shader_parameter/impact_white = 0.86
 shader_parameter/impact_px = 3.0
 
-[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_2ef33"]
-
-[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_i03ts"]
-
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_1gnk5"]
-
-[sub_resource type="FontVariation" id="PixelBold16"]
-base_font = ExtResource("23_pixelfont")
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_0pr07"]
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_lani7"]
 
+[sub_resource type="FontVariation" id="PixelBold16"]
+base_font = ExtResource("23_pixelfont")
+
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_qw8oe"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_h2b8k"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_wkd5d"]
 
 [sub_resource type="StyleBoxEmpty" id="BtnTransparent"]
 
@@ -217,9 +219,36 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_battle_gd")
 tip_size_m = Vector2(222, 188)
-tip_size_active = Vector2(300, 108)
 tip_size_l = Vector2(388, 144)
 tip_glyph_spacing = 1
+
+[node name="CommandSequenceStarPreview" type="Control" parent="." unique_id=909727878]
+z_index = 83
+anchors_preset = 0
+offset_left = 927.0
+offset_top = 823.0
+offset_right = 993.0
+offset_bottom = 889.0
+mouse_filter = 2
+script = ExtResource("1_command_star_preview")
+editor_preview = true
+tuning_center_offset = Vector2(0.5, 0)
+tuning_horizontal_radius = 14.0
+tuning_waist_power = 5.0
+tuning_shadow_offset = Vector2(1, 2)
+tuning_shadow_expand = 1.0
+
+[node name="CommandSequenceCancelPreview" type="Control" parent="." unique_id=931448576]
+z_index = 84
+anchors_preset = 0
+offset_left = 999.0
+offset_top = 816.0
+offset_right = 1019.0
+offset_bottom = 836.0
+mouse_filter = 2
+script = ExtResource("1_command_cancel_preview")
+editor_preview = true
+tuning_shadow_offset = Vector2(1, 2)
 
 [node name="StageSlot" type="Control" parent="." unique_id=924300025]
 layout_mode = 1
@@ -389,7 +418,7 @@ offset_left = 26.0
 offset_top = 4.0
 offset_right = 98.0
 offset_bottom = 76.0
-theme_override_styles/panel = SubResource("StyleBoxEmpty_2ef33")
+theme_override_styles/panel = SubResource("StyleBoxEmpty_1gnk5")
 diamond_mode = true
 bottom_shadow_enabled = true
 
@@ -398,7 +427,7 @@ offset_left = 672.0
 offset_top = 2.0
 offset_right = 744.0
 offset_bottom = 74.0
-theme_override_styles/panel = SubResource("StyleBoxEmpty_i03ts")
+theme_override_styles/panel = SubResource("StyleBoxEmpty_0pr07")
 diamond_mode = true
 bottom_shadow_enabled = true
 
@@ -419,7 +448,7 @@ offset_left = 592.0
 offset_top = 2.0
 offset_right = 664.0
 offset_bottom = 74.0
-theme_override_styles/panel = SubResource("StyleBoxEmpty_1gnk5")
+theme_override_styles/panel = SubResource("StyleBoxEmpty_lani7")
 diamond_mode = true
 bottom_shadow_enabled = true
 
@@ -462,8 +491,8 @@ theme_override_font_sizes/font_size = 16
 text = "玩家1"
 vertical_alignment = 1
 
-[node name="P1StatusAnchor" type="Control" parent="P1Hud"]
-layout_mode = 0
+[node name="P1StatusAnchor" type="Control" parent="P1Hud" unique_id=70903306]
+anchors_preset = 0
 offset_left = 28.0
 offset_top = 171.0
 offset_right = 28.0
@@ -534,7 +563,7 @@ offset_left = 1814.0
 offset_top = 4.0
 offset_right = 1886.0
 offset_bottom = 76.0
-theme_override_styles/panel = SubResource("StyleBoxEmpty_0pr07")
+theme_override_styles/panel = SubResource("StyleBoxEmpty_qw8oe")
 diamond_mode = true
 bottom_shadow_enabled = true
 
@@ -543,7 +572,7 @@ offset_left = 1172.0
 offset_top = 2.0
 offset_right = 1244.0
 offset_bottom = 74.0
-theme_override_styles/panel = SubResource("StyleBoxEmpty_lani7")
+theme_override_styles/panel = SubResource("StyleBoxEmpty_h2b8k")
 diamond_mode = true
 bottom_shadow_enabled = true
 
@@ -564,7 +593,7 @@ offset_left = 1252.0
 offset_top = 2.0
 offset_right = 1324.0
 offset_bottom = 74.0
-theme_override_styles/panel = SubResource("StyleBoxEmpty_qw8oe")
+theme_override_styles/panel = SubResource("StyleBoxEmpty_wkd5d")
 diamond_mode = true
 bottom_shadow_enabled = true
 
@@ -609,8 +638,8 @@ text = "玩家2"
 horizontal_alignment = 2
 vertical_alignment = 1
 
-[node name="P2StatusAnchor" type="Control" parent="P2Hud"]
-layout_mode = 0
+[node name="P2StatusAnchor" type="Control" parent="P2Hud" unique_id=688631453]
+anchors_preset = 0
 offset_left = 1892.0
 offset_top = 171.0
 offset_right = 1892.0

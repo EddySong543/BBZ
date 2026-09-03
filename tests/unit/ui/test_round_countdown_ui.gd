@@ -247,10 +247,15 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 	screen.p1_item_row.refresh(screen.battle, screen.PLAYER, [0, 1, 2])
 	for slot_index: int in 3:
 		var slot_base: Vector2 = screen.p1_item_row._slot_base(slot_index)
-		assert_almost_eq(
-				(screen.p1_item_row._icons[slot_index] as Control).position.y,
-				slot_base.y + ItemSlotRowScript.ICON_INSET + 3.0, 0.01,
+		var item_icon := screen.p1_item_row._icons[slot_index] as TextureRect
+		if item_icon.visible:
+			var visible_rect: Rect2 = item_icon.get_meta("visible_alpha_rect")
+			var target_center_y := slot_base.y + ItemSlotRowScript.SLOT_H * 0.5 + 3.0
+			assert_almost_eq(visible_rect.get_center().y, target_center_y, 0.01,
 				"第%d格点选下沉不能跳回第1格" % (slot_index + 1))
+			assert_almost_eq(item_icon.rotation, ItemFrameStyle.ITEM_ART_ROTATION, 0.001,
+				"战斗道具美术直接使用源PNG方向，不追加固定旋转")
+		screen.p1_item_row._set_ambient(slot_index, "", Color.WHITE)
 		screen.p1_item_row._set_ambient(slot_index, "cta", Color.WHITE)
 		assert_almost_eq(
 				(screen.p1_item_row._pouches[slot_index] as Control).position.y,
@@ -267,14 +272,14 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 			(screen.p1_item_row._seals[0] as Control).get_index(),
 			"封印态锦囊绘制在底，封条绘制在上")
 	assert_true((screen.p1_item_row._pouches[1] as Control).visible,
-			"未解锁槽同时保留底部锦囊")
-	screen.battle.slots[screen.AI][0]["state"] = BattleCore.SlotState.OPENED
+			"新版空框在本回合可取得道具时显示锦囊")
+	screen.battle.slots[screen.AI][0]["state"] = BattleCore.SlotState.EMPTY
 	screen.battle.slots[screen.AI][0]["since"] = -1
 	screen.p2_item_row.refresh(screen.battle, screen.AI)
 	assert_true((screen.p2_item_row._pouches[0] as Control).visible,
-			"敌方槽解锁后显示锦囊")
+			"敌方新版空框可取得道具时显示锦囊")
 	assert_eq(screen.p2_item_row._anim_keys[0], "cta",
-			"敌方可抽锦囊不因栏位只读而丢失待机跳动")
+			"敌方可取得锦囊不因栏位只读而丢失待机跳动")
 	var debug_panel := screen.get_node_or_null("DebugButtons") as Control
 	var debug_toggle := screen.get_node_or_null("DebugButtonsToggle") as Button
 	assert_not_null(debug_panel)
@@ -345,6 +350,23 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 				EffectKeywordSpark.MARK_SIZE.x
 						+ screen.TIP_KEYWORD_SPARK_CLEARANCE + 1.0,
 				"战斗悬停的星芒占位必须覆盖完整角标宽度")
+	var tip_item: ItemData = ItemCatalog.make("v2_t1_whetstone")
+	screen.battle.slots[screen.PLAYER][0] = {
+		state = BattleCore.SlotState.CHARGING,
+		item = tip_item,
+		since = -1,
+		used = false,
+		draft = [],
+		upg_draft = [],
+		draft_entry_uids = [],
+		instance_uid = 90_020_026,
+		temporary = false,
+		current_durability = tip_item.max_durability,
+		max_durability = tip_item.max_durability,
+		used_turn = -1,
+		lifecycle = "REAL",
+	}
+	screen.p1_item_row.refresh(screen.battle, screen.PLAYER)
 	var item_tip: String = screen._item_slot_tip(0)
 	assert_false(item_tip.begins_with("【") or item_tip.contains("】\n"),
 			"已有道具名称不再显示书名括号")
@@ -420,6 +442,19 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 			"图案投影严格复制当前道具纹理")
 	assert_lt(battle_icon_shadow.get_index(), screen.p1_item_row._tex_frames[0].get_index(),
 			"图案投影位于格底上方、金属框下方")
+	var battle_cost := screen.p1_item_row._cost_badges[0] as IconBadge
+	var battle_durability := screen.p1_item_row._durability_badges[0] as IconBadge
+	assert_true(battle_cost.visible and battle_durability.visible,
+			"战斗道具框同步显示使用费与当前耐久")
+	assert_eq(battle_cost.number, screen.battle.slot_item(screen.PLAYER, 0).use_cost)
+	assert_eq(battle_durability.number,
+			int(screen.battle.slots[screen.PLAYER][0]["current_durability"]))
+	assert_almost_eq(
+		maxf(battle_cost.debug_icon_visible_rect().size.x,
+			battle_cost.debug_icon_visible_rect().size.y),
+		maxf(battle_durability.debug_icon_visible_rect().size.x,
+			battle_durability.debug_icon_visible_rect().size.y), 0.01,
+		"战斗框中的能量与耐久图标可见尺度一致")
 	assert_almost_eq(screen._tip_item_icon.size.x, 32.0, 0.01,
 			"顶部只保留整像素尺寸的道具图标，避免缩放边框破损")
 	assert_eq(screen._tip_item_icon.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST,

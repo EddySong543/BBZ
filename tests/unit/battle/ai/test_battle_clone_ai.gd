@@ -116,10 +116,10 @@ func test_clone_preserves_h13_split_big_wave_choice_and_keeps_array_independent(
 
 
 func test_clone_preserves_h14_blood_payment_choice_and_keeps_array_independent() -> void:
-	var b := _battle2([["h14", 6], ["h07", 6], ["h17", 7]],
+	var b := _battle2([["h07", 6], ["h14", 6], ["h17", 7]],
 		[["t10", 5], ["t11", 5], ["t12", 5]], 0)
-	assert_true(b.set_blood_payment_active(0, true))
 	assert_true(b.free_switch(0, 1))
+	assert_true(b.set_blood_payment_active(0, true))
 	assert_true(b.select_action(0, BIG, -1, false, false, true))
 
 	var c := b.clone()
@@ -127,12 +127,29 @@ func test_clone_preserves_h14_blood_payment_choice_and_keeps_array_independent()
 	assert_eq(c.active_index[0], 1, "克隆体应保留免费切换后的出战槽")
 	assert_eq(c.free_switch_usage_turn, b.free_switch_usage_turn, "克隆体应保留免费切换回合")
 	assert_eq(c.free_switch_uses, b.free_switch_uses, "克隆体应保留本回合免费切换次数")
-	assert_eq(c.blood_payment_source(0), 0, "克隆体应保留原槽蚩尤为付款者")
+	assert_eq(c.blood_payment_source(0), 1, "克隆体应保留免费登场后的蚩尤为付款者")
 	c.free_switch_uses[0] = 0
 	assert_eq(b.free_switch_uses[0], 1, "克隆体修改免费切换次数不得污染原局")
 	assert_true(c.select_blood_payment(0, false), "克隆体可独立取消生命支付")
 	assert_true(b.blood_payment_selected(0), "克隆体取消不得污染原局")
-	assert_eq(b.blood_payment_source(0), 0, "克隆体取消不得污染原局付款来源")
+	assert_eq(b.blood_payment_source(0), 1, "克隆体取消不得污染原局付款来源")
+
+
+func test_ai_simulation_clone_uses_h07_bidirectional_once_per_turn_legality() -> void:
+	var inbound := _battle2([["t00", 5], ["h07", 6], ["t02", 5]],
+		[["t10", 5], ["t11", 5], ["t12", 5]], 8)
+	var inbound_clone := inbound.clone()
+	assert_true(inbound_clone.is_free_switch_target(0, 1),
+		"AI 推演克隆应把进入 h07 识别为本回合一次免费切换")
+	assert_true(inbound_clone.free_switch(0, 1))
+	assert_false(inbound_clone.is_free_switch_target(0, 0),
+		"进入 h07 已消耗次数，同回合不能再免费离场")
+
+	var outbound := _battle2([["h07", 6], ["t01", 5], ["t02", 5]],
+		[["t10", 5], ["t11", 5], ["t12", 5]], 8)
+	var outbound_clone := outbound.clone()
+	assert_true(outbound_clone.is_free_switch_target(0, 1),
+		"AI 推演克隆应保留 h07 在场时的免费离场资格")
 
 
 func test_clone_preserves_h24_energy_cap_discount_choice_and_keeps_array_independent() -> void:
@@ -254,13 +271,17 @@ func test_legal_actions_lists_switch_targets() -> void:
 	assert_true(1 in switches and 2 in switches, "切换目标为替补槽 1 / 2")
 
 
-func test_legal_actions_includes_available_active() -> void:
-	# Arrange：h10 昴日 飞洒天星（主动 2 能·需剑气>0·helper 默认 6 半能足够）
+func test_legal_actions_includes_h10_attack_modifier_without_active() -> void:
+	# Arrange：h10 昴日有2点剑气时，强化作为普通波的显式变体枚举。
 	var b := _battle2([["h10", 4], ["t01", 10], ["t02", 10]], [["t10", 10], ["t11", 10], ["t12", 10]])
-	b.set_status(0, 0, "jianqi", 1)   # 有剑气 → 主动可用
+	b.set_team_status(0, "jianqi", 2)
 
 	# Assert
-	assert_true(ACTIVE in _actions_of(b.legal_actions(0)), "可用主动技应在合法动作内")
+	assert_false(ACTIVE in _actions_of(b.legal_actions(0)), "飞洒天星不再枚举独立主动行动")
+	assert_true(b.legal_actions(0).any(func(choice: Dictionary) -> bool:
+		return int(choice["action"]) == ATTACK \
+			and bool(choice.get("jianqi_attack", false))),
+		"2点剑气枚举普通波的穿防强化变体")
 
 	# h01 步虚无有乡为纯被动 → 无 ACTIVE
 	var b2 := _battle2([["h01", 4], ["t01", 10], ["t02", 10]], [["t10", 10], ["t11", 10], ["t12", 10]])
@@ -437,9 +458,8 @@ func test_xunxing_target_and_queued_item_survive_clone() -> void:
 # ---- apply_choice：分派正确 ----
 
 func test_apply_choice_dispatches_switch_and_active() -> void:
-	# Arrange：h10 昴日 有主动技（需剑气>0）
-	var b := _battle2([["h10", 4], ["t01", 10], ["t02", 10]], [["t10", 10], ["t11", 10], ["t12", 10]])
-	b.set_status(0, 0, "jianqi", 1)
+	# Arrange：h21 枭阳仍是带目标的占行动主动技。
+	var b := _battle2([["h21", 8], ["t01", 10], ["t02", 10]], [["t10", 10], ["t11", 10], ["t12", 10]])
 
 	# 切换
 	assert_true(b.apply_choice(0, {action = SWITCH, target = 2}), "切换 choice 合法")
@@ -447,7 +467,7 @@ func test_apply_choice_dispatches_switch_and_active() -> void:
 	assert_eq(b._switch_to[0], 2, "切换目标 = 槽 2")
 
 	# 主动技
-	assert_true(b.apply_choice(0, {action = ACTIVE, target = -1}), "主动 choice 合法")
+	assert_true(b.apply_choice(0, {action = ACTIVE, target = 1}), "主动 choice 合法")
 	assert_eq(b.selected_action[0], ACTIVE, "selected_action = ACTIVE")
 
 	# 基础动作

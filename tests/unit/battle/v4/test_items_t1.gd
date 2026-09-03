@@ -368,14 +368,19 @@ func test_total_attack_bonus_and_penalty_apply_once_to_h13_split_wave() -> void:
 	assert_eq(penalty.hp[1][0], 18, "双波总计2点基础伤害，只减少1点")
 
 
-func test_attack_total_modifiers_do_not_apply_to_attack_active_skills() -> void:
+func test_attack_total_modifiers_apply_to_h10_jianqi_wave_as_base_attack() -> void:
 	var b := _battle(20, "h10")
-	b.set_status(0, 0, "jianqi", 1)
+	b.set_team_status(0, "jianqi", 2)
 	assert_true(b.use_item(0, _give(b, 0, "t1_xianshou")))
-	assert_true(b.select_active(0))
-	assert_true(b.select_action(1, A.CHARGE))
+	assert_true(b.apply_choice(0, {
+		action = A.ATTACK,
+		target = -1,
+		jianqi_attack = true,
+	}))
+	assert_true(b.select_action(1, A.DEFEND))
 	b.resolve()
-	assert_eq(b.hp[1][0], 17, "攻击型主动技只造成自身1.5点伤害，不吃先手")
+	assert_eq(b.hp[1][0], 16,
+			"飞洒天星强化的仍是基础波，应穿防并正常获得先手的整次攻击加伤")
 
 
 func test_dutu_coin_has_both_two_point_outcomes() -> void:

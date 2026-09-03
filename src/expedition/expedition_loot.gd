@@ -61,19 +61,28 @@ static func make_consumable(rng: RandomNumberGenerator) -> Dictionary:
 ## 生成一件战斗道具 = 按 tier 随机抽一件真 PvP 道具（名字/图标同源·撤离带出即入 PvP 池的伏笔）。
 static func make_combat(rng: RandomNumberGenerator, tier: int) -> Dictionary:
 	var shape: Array = SHAPE_1X1
-	if tier == 2:
-		shape = SHAPE_1X2 if rng.randf() < 0.8 else SHAPE_1X3
-	elif tier == 3:
-		shape = SHAPE_2X2
-	var pool: Array[ItemData] = ItemCatalog.all_for_tier(tier)
+	var pool: Array[ItemData] = ItemCatalog.all_active_for_tier(tier)
 	var combat_id: String = ""
 	var display: String = "T%d 战斗道具" % tier
+	var gold: int = 0
+	var current_durability: int = 1
+	var max_durability: int = 1
+	var damaged_prices: Dictionary = {}
 	if not pool.is_empty():
 		var pick: ItemData = pool[rng.randi_range(0, pool.size() - 1)]
 		combat_id = String(pick.item_id)
 		display = String(pick.item_name)
+		shape = pick.shape_cells.duplicate()
+		gold = pick.full_price
+		current_durability = pick.max_durability
+		max_durability = pick.max_durability
+		damaged_prices = pick.damaged_prices.duplicate(true)
 	return {"id": "combat_t%d" % tier, "name": display, "cat": "combat",
-		"tier": tier, "shape": shape, "gold": 0, "note": "T%d·可装备或入包带出" % tier,
+		"tier": tier, "shape": shape, "gold": gold,
+		"full_gold": gold, "damaged_prices": damaged_prices,
+		"current_durability": current_durability, "max_durability": max_durability,
+		"note": "T%d·耐久%d/%d·可装备或入包带出" % [
+			tier, current_durability, max_durability],
 		"icon": "sword", "combat_id": combat_id}
 
 

@@ -140,6 +140,31 @@ func test_add_buff_picker_covers_every_battle_buff_semantic() -> void:
 			"调试入口可重复叠加剑气但遵守正式 4 点上限")
 
 
+func test_enemy_switch_button_requests_next_living_reserve_without_direct_mutation() -> void:
+	var h01 := _hero_by_id("h01")
+	var h02 := _hero_by_id("h02")
+	var h03 := _hero_by_id("h03")
+	assert_not_null(h01)
+	assert_not_null(h02)
+	assert_not_null(h03)
+	if h01 == null or h02 == null or h03 == null:
+		return
+	var battle := BattleCore.new()
+	battle.setup([h01], [h01.duplicate(true), h02, h03], 6110)
+	var panel := BattleDebugPanelScript.new()
+	add_child_autofree(panel)
+	panel.setup(battle)
+	watch_signals(panel)
+	var switch_button := _button_with_text(panel, "敌方切换")
+	assert_not_null(switch_button)
+	if switch_button == null:
+		return
+	switch_button.pressed.emit()
+	assert_signal_emitted_with_parameters(panel, "enemy_switch_requested", [1])
+	assert_eq(battle.active_index[1], 0,
+			"调试面板只请求正式结算，不得直接改 active_index 跳过 h11 等切换钩子")
+
+
 func _hero_by_id(hero_id: String) -> HeroData:
 	for hero: HeroData in HeroData.create_launch_pool():
 		if hero.hero_id == hero_id:

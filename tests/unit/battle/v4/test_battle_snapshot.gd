@@ -109,6 +109,24 @@ func test_snapshot_preserves_lianhuan_second_action_and_target() -> void:
 	assert_eq_deep(b2.to_snapshot(), b.to_snapshot())
 
 
+func test_snapshot_preserves_h10_jianqi_attack_selection() -> void:
+	var b := BattleCore.new()
+	var h10 := (load("res://assets/data/heroes/h10.tres") as HeroData).duplicate(true) as HeroData
+	b.setup([h10, _hero("test_b", 10), _hero("test_c", 10)],
+		[_hero("test_x", 10), _hero("test_y", 10), _hero("test_z", 10)], SEED)
+	b.energy = [20, 20]
+	b.set_team_status(0, "jianqi", 2)
+	assert_true(b.apply_choice(0, {
+		action = A.ATTACK,
+		target = -1,
+		jianqi_attack = true,
+	}))
+	var b2 := BattleCore.new()
+	assert_true(b2.from_snapshot(b.to_snapshot()))
+	assert_true(b2.jianqi_attack_selected(0), "待结算的剑气强化选择必须进入快照")
+	assert_eq_deep(b2.to_snapshot(), b.to_snapshot())
+
+
 func test_snapshot_preserves_t3_relic_state_and_free_big_window_independently() -> void:
 	var b := _midgame()
 	var b2 := BattleCore.new()
@@ -272,11 +290,11 @@ func test_snapshot_preserves_h13_split_big_wave_choice() -> void:
 
 func test_snapshot_preserves_h14_blood_payment_choice() -> void:
 	var b := BattleCore.new()
-	b.setup([_hero("h14", 6), _hero("h07", 6), _hero("h17", 7)],
+	b.setup([_hero("h07", 6), _hero("h14", 6), _hero("h17", 7)],
 		[_hero("test_x", 5), _hero("test_y", 5), _hero("test_z", 5)], SEED)
 	b.energy = [0, 0]
-	assert_true(b.set_blood_payment_active(0, true))
 	assert_true(b.free_switch(0, 1))
+	assert_true(b.set_blood_payment_active(0, true))
 	assert_true(b.select_action(0, A.BIG_ATTACK, -1, false, false, true))
 
 	var b2 := BattleCore.new()
@@ -284,14 +302,14 @@ func test_snapshot_preserves_h14_blood_payment_choice() -> void:
 	assert_eq(b2.active_index[0], 1, "快照应保留免费切换后的出战槽")
 	assert_eq(b2.free_switch_usage_turn, b.free_switch_usage_turn, "快照应保留免费切换回合")
 	assert_eq(b2.free_switch_uses, b.free_switch_uses, "快照应保留本回合免费切换次数")
-	assert_eq(b2.blood_payment_source(0), 0, "快照应保留原槽蚩尤为付款者")
+	assert_eq(b2.blood_payment_source(0), 1, "快照应保留免费登场后的蚩尤为付款者")
 	b.select_action(1, A.CHARGE)
 	b2.select_action(1, A.CHARGE)
 	var result1: Dictionary = b.resolve()
 	var result2: Dictionary = b2.resolve()
 
 	assert_eq_deep(result2, result1)
-	assert_eq(b2.hp[0][0], 6, "恢复局应由原槽蚩尤支付星日大波的 3 点生命")
+	assert_eq(b2.hp[0][1], 6, "恢复局应由免费登场后的蚩尤支付大波的 3 点生命")
 
 
 func test_snapshot_preserves_h24_energy_cap_discount_choice() -> void:

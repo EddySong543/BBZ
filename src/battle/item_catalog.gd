@@ -10,8 +10,8 @@ extends RefCounted
 ## 道具均为字符串 id（tier 前缀拼音），无数字编号。⚠ id 拼音为历史化石、≠ 当前显示名
 ## （如 t1_xiangjiaopi=「臭鸡蛋」、t1_lingdang=「STEAL技能卡」）——id 是内部稳定主键、永不展示给玩家，
 ## 故不随显示名改名。显示名 item_name 已与 design/items-list.md 对齐。
-## 美术：图标按约定路径 ICON_DIR/<中文显示名>.png 加载（见底部 icon_path / load_icon）；缺图时 UI 回退占位文字。
-## 2026-08-13 新增 11 件 T1 的名称与图标均为占位，正式机制文案已锁；后续替换命名 / 美术时同步映射与 i18n。
+## 美术：新版与旧版图标分别归档到 items/v2 与 items/legacy，并统一按中文显示名加载；
+## 缺图时 UI 回退占位文字。新版即使暂时复用旧图，也保留独立副本，便于单独调整方向与替换。
 
 const _S_PRE := ItemData.Seq.PRE
 const _S_ANY := ItemData.Seq.ANY
@@ -23,6 +23,117 @@ const RARITY_NORMAL := Color("3F7ED0")
 const RARITY_RARE := Color("7249BC")
 const RARITY_LEGENDARY := Color("CB8B24")
 const _T_SELF := ItemData.Target.SELF
+
+## 新版单机原型唯一启用名单。旧 _DEF / DISPLAY_ORDER 是可复用的 legacy 存档，
+## 仍允许 make(id) 定向读取，但所有新版生产入口只遍历本名单。
+const PROTOTYPE_IDS: Array[String] = [
+	"v2_t1_whetstone",
+	"v2_t1_cracked_shield",
+	"v2_t1_blood_medicine",
+	"v2_t1_silver_coin",
+	"v2_t2_teleport_scroll",
+	"v2_t1_salamander_oil",
+	"v2_t1_heart_guard",
+	"v2_t1_mana_potion",
+	"v2_t1_armor_hammer",
+	"v2_t1_healing_salve",
+	"v2_t2_war_horn",
+	"v2_t1_smoke_bottle",
+	"v2_t2_falcon_feather",
+	"v2_t1_thorn_bracer",
+	"v2_t2_heart_knot",
+	"v2_t1_alchemy_crucible",
+	"v2_t2_iron_eater",
+	"v2_t3_acid_jar",
+	"v2_t3_dispelling_bell",
+	"v2_t3_revive_stone",
+]
+
+## name/desc 是冻结玩家文案；cost 使用整数能量，durability 是实体最大耐久；
+## shape 是固定背包格，price/damaged 是金币整数值；effect/target 供统一规则解释器读取。
+const _V2_DEF := {
+	"v2_t1_whetstone": {
+		name = "生锈的飞镖", tier = 1, dim = "进攻", desc = "我方下一次「波」增加1点伤害。",
+		cost = 1, durability = 2, shape = [Vector2i(0, 0), Vector2i(1, 0)],
+		price = 24000, damaged = {1: 12000}, effect = &"next_wave_bonus", target = &"none"},
+	"v2_t1_cracked_shield": {
+		name = "银质护臂", tier = 1, dim = "防御", desc = "我方出战英雄获得2点护甲。",
+		cost = 1, durability = 1, shape = [Vector2i(0, 0), Vector2i(0, 1)],
+		price = 20000, damaged = {}, effect = &"gain_active_armor", target = &"none"},
+	"v2_t1_blood_medicine": {
+		name = "普通治疗药水", tier = 1, dim = "防御", desc = "我方出战英雄回复2点生命。",
+		cost = 2, durability = 1, shape = [Vector2i(0, 0)],
+		price = 14000, damaged = {}, effect = &"heal_active", target = &"none"},
+	"v2_t1_silver_coin": {
+		name = "瓶装能量", tier = 1, dim = "能量", desc = "下一件道具少消耗1点能量。",
+		cost = 0, durability = 1, shape = [Vector2i(0, 0)],
+		price = 16000, damaged = {}, effect = &"next_item_discount", target = &"none"},
+	"v2_t2_teleport_scroll": {
+		name = "传送卷轴", tier = 2, dim = "节奏", desc = "选择我方一名队友，与出战英雄交换位置。",
+		cost = 1, durability = 1, shape = [Vector2i(0, 0), Vector2i(0, 1)],
+		price = 24000, damaged = {}, effect = &"swap_active", target = &"friendly_reserve"},
+	"v2_t1_salamander_oil": {
+		name = "锋利的飞镖", tier = 1, dim = "进攻", desc = "我方下一次「大波」额外增加1点伤害。",
+		cost = 1, durability = 1, shape = [Vector2i(0, 0), Vector2i(1, 0)],
+		price = 24000, damaged = {}, effect = &"next_big_wave_bonus", target = &"none"},
+	"v2_t1_heart_guard": {
+		name = "银鳞甲", tier = 1, dim = "防御", desc = "我方下一次「防」改为「大防」。",
+		cost = 1, durability = 2, shape = [Vector2i(0, 0), Vector2i(1, 0)],
+		price = 26000, damaged = {1: 13000}, effect = &"next_defend_upgrade", target = &"none"},
+	"v2_t1_mana_potion": {
+		name = "普通魔力药水", tier = 1, dim = "能量", desc = "获得2点能量。",
+		cost = 1, durability = 1, shape = [Vector2i(0, 0)],
+		price = 18000, damaged = {}, effect = &"gain_energy", target = &"none"},
+	"v2_t1_armor_hammer": {
+		name = "短柄铁钩", tier = 1, dim = "进攻", desc = "敌方出战英雄失去2点护甲。",
+		cost = 1, durability = 2, shape = [Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0)],
+		price = 30000, damaged = {1: 15000}, effect = &"break_enemy_armor", target = &"none"},
+	"v2_t1_healing_salve": {
+		name = "简易治愈法杖", tier = 1, dim = "防御", desc = "选择我方一名队友，使其回复2点生命。",
+		cost = 1, durability = 2, shape = [Vector2i(0, 0), Vector2i(1, 0)],
+		price = 26000, damaged = {1: 13000}, effect = &"heal_teammate", target = &"friendly_reserve"},
+	"v2_t2_war_horn": {
+		name = "战争号角", tier = 2, dim = "进攻", desc = "我方下一次攻击多造成1点伤害。",
+		cost = 2, durability = 3, shape = [Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0)],
+		price = 45000, damaged = {2: 34000, 1: 18000}, effect = &"next_attack_bonus", target = &"none"},
+	"v2_t1_smoke_bottle": {
+		name = "袋装石灰粉", tier = 1, dim = "干扰", desc = "敌方下一次攻击少造成1点伤害。",
+		cost = 1, durability = 1, shape = [Vector2i(0, 0), Vector2i(0, 1)],
+		price = 22000, damaged = {}, effect = &"enemy_next_attack_penalty", target = &"none"},
+	"v2_t2_falcon_feather": {
+		name = "猎鹰羽毛", tier = 2, dim = "节奏", desc = "我方下一次攻击可以指定任意一名存活敌人。",
+		cost = 0, durability = 1, shape = [Vector2i(0, 0)],
+		price = 17000, damaged = {}, effect = &"next_attack_any_target", target = &"none"},
+	"v2_t1_thorn_bracer": {
+		name = "荆棘护腕", tier = 1, dim = "防御", desc = "敌方下一次攻击命中我方时，攻击者受到1点伤害。",
+		cost = 1, durability = 2, shape = [Vector2i(0, 0), Vector2i(1, 0)],
+		price = 28000, damaged = {1: 14000}, effect = &"next_hit_thorns", target = &"none"},
+	"v2_t2_heart_knot": {
+		name = "连心结", tier = 2, dim = "节奏", desc = "选择我方一名队友，与出战英雄交换护甲。",
+		cost = 0, durability = 3, shape = [Vector2i(0, 0), Vector2i(1, 0)],
+		price = 30000, damaged = {2: 22000, 1: 12000}, effect = &"swap_armor", target = &"friendly_reserve"},
+	"v2_t1_alchemy_crucible": {
+		name = "炼金坩埚", tier = 1, dim = "能量", desc = "我方出战英雄失去1点护甲，获得1点能量。",
+		cost = 0, durability = 2, shape = [Vector2i(0, 0), Vector2i(1, 0)],
+		price = 26000, damaged = {1: 13000}, effect = &"armor_to_energy", target = &"none"},
+	"v2_t2_iron_eater": {
+		name = "食铁虫", tier = 2, dim = "进攻", desc = "从敌方出战英雄身上夺取1点护甲。",
+		cost = 1, durability = 1, shape = [Vector2i(0, 0)],
+		price = 18000, damaged = {}, effect = &"steal_enemy_armor", target = &"none"},
+	"v2_t3_acid_jar": {
+		name = "酸液陶罐", tier = 3, dim = "干扰", desc = "双方出战英雄失去全部护甲。",
+		cost = 2, durability = 1,
+		shape = [Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)],
+		price = 40000, damaged = {}, effect = &"clear_active_armor", target = &"none"},
+	"v2_t3_dispelling_bell": {
+		name = "破魔铃", tier = 3, dim = "干扰", desc = "双方尚未触发的道具效果全部消失。",
+		cost = 3, durability = 2, shape = [Vector2i(0, 0), Vector2i(0, 1)],
+		price = 40000, damaged = {1: 20000}, effect = &"clear_pending_item_effects", target = &"none"},
+	"v2_t3_revive_stone": {
+		name = "复苏石", tier = 3, dim = "防御", desc = "选择我方一名阵亡队友，使其以1点生命回到后备。",
+		cost = 3, durability = 1, shape = [Vector2i(0, 0), Vector2i(1, 0)],
+		price = 42000, damaged = {}, effect = &"revive_teammate", target = &"friendly_dead"},
+}
 
 ## id → {name, dim, role, seq, target, desc(一句话), params, script}
 const _DEF := {
@@ -621,6 +732,8 @@ const DISPLAY_ORDER := [
 
 ## 构造一件道具（带独立 effect 实例 + 独立 params 副本）。未知 id 返回 null。
 static func make(id: String) -> ItemData:
+	if _V2_DEF.has(id):
+		return _make_v2(id)
 	if not _DEF.has(id):
 		push_error("ItemCatalog: 未知道具 id %s" % id)
 		return null
@@ -641,6 +754,55 @@ static func make(id: String) -> ItemData:
 	item.params = (d["params"] as Dictionary).duplicate(true)
 	item.effect = d["script"].new()
 	return item
+
+
+static func _make_v2(id: String) -> ItemData:
+	var d: Dictionary = _V2_DEF[id]
+	var item := ItemData.new()
+	item.item_id = id
+	item.item_name = String(d["name"])
+	item.tier = int(d["tier"])
+	item.dimension = String(d["dim"])
+	item.role = "新版原型"
+	item.sequence_tag = ItemData.Seq.ANY
+	item.target_mode = ItemData.Target.SELF
+	item.description = _display_description(String(d["desc"]))
+	item.ev_half = 2
+	item.params = {}
+	item.effect = ItemEffect.new()
+	item.prototype_enabled = true
+	item.use_cost = int(d["cost"])
+	item.max_durability = int(d["durability"])
+	item.shape_cells.assign((d["shape"] as Array).duplicate())
+	item.full_price = int(d["price"])
+	item.damaged_prices = (d["damaged"] as Dictionary).duplicate(true)
+	item.effect_key = StringName(d["effect"])
+	item.target_key = StringName(d["target"])
+	item.icon_source_id = String(d.get("icon", ""))
+	return item
+
+
+static func is_prototype_id(id: String) -> bool:
+	return _V2_DEF.has(id)
+
+
+static func prototype_ids() -> Array[String]:
+	return PROTOTYPE_IDS.duplicate()
+
+
+static func all_active() -> Array[ItemData]:
+	var out: Array[ItemData] = []
+	for id: String in PROTOTYPE_IDS:
+		out.append(make(id))
+	return out
+
+
+static func all_active_for_tier(t: int) -> Array[ItemData]:
+	var out: Array[ItemData] = []
+	for id: String in PROTOTYPE_IDS:
+		if int((_V2_DEF[id] as Dictionary)["tier"]) == t:
+			out.append(make(id))
+	return out
 
 
 ## 玩家可见说明保留原始句号；防御性补齐漏写的末尾句号，不改写句内标点。
@@ -685,17 +847,19 @@ static func ids() -> Array:
 	return DISPLAY_ORDER.duplicate()
 
 
-# ========== 美术图标约定（B·2026-06-20）==========
-## 图标按约定路径加载、无需逐件配字段：res://assets/sprites/items/<中文道具名>.png。
-## 2026-06-27 Eddy：图标文件名 = 游戏内中文道具名（与 _DEF[id].name 同步），便于按名更新美术；
-##   暂存区 assets/import/ 同样按中文名命名（tools/import_item_art.gd 直接同名拷入）；UI 缺图回退占位文字。
-const ICON_DIR := "res://assets/sprites/items/"
+# ========== 美术图标约定（2026-09-03 新旧池分仓）==========
+## 图标文件名始终等于游戏内中文名。新版只读 v2/，旧版只读 legacy/；
+## 暂存区 assets/import/ 仍按中文名命名，由 tools/import_item_art.gd 根据 id 自动分仓。
+const LEGACY_ICON_DIR := "res://assets/sprites/items/legacy/"
+const V2_ICON_DIR := "res://assets/sprites/items/v2/"
 
 
 ## 某 id 的图标约定路径（文件不一定存在）。文件名 = 该 id 的中文道具名（_DEF[id].name）。
 static func icon_path(id: String) -> String:
-	var nm: String = _DEF[id]["name"] if _DEF.has(id) else id
-	return ICON_DIR + nm + ".png"
+	if _V2_DEF.has(id):
+		return V2_ICON_DIR + String((_V2_DEF[id] as Dictionary)["name"]) + ".png"
+	var nm: String = String((_DEF[id] as Dictionary)["name"]) if _DEF.has(id) else id
+	return LEGACY_ICON_DIR + nm + ".png"
 
 
 ## 加载某 id 的图标；未导入 / 不存在则返回 null（调用方据此回退占位文字）。
@@ -717,13 +881,19 @@ static func rarity_color(tier: int) -> Color:
 		_: return RARITY_NORMAL
 
 
-## 显示名 → id 映射（从 _DEF 实时构建，永不过时）。重名会 push_error（当前全唯一）。
-## 供 tools/import_item_art.gd 把「臭鸡蛋.png」分配为「t1_xiangjiaopi.png」。
+## 显示名 → id 映射。新版启用池优先；与隐藏旧池同名时落到新版 id，
+## 供 tools/import_item_art.gd 决定文件应进入 v2/ 还是 legacy/。
 static func name_to_id() -> Dictionary:
 	var m := {}
+	for id: String in PROTOTYPE_IDS:
+		var active_name: String = (_V2_DEF[id] as Dictionary)["name"]
+		if m.has(active_name):
+			push_error("ItemCatalog: 新版显示名重复『%s』(id %s / %s)" % [
+				active_name, m[active_name], id])
+		m[active_name] = id
 	for id in _DEF:
 		var nm: String = (_DEF[id] as Dictionary)["name"]
 		if m.has(nm):
-			push_error("ItemCatalog: 显示名重复『%s』(id %s / %s)，名→id 映射有歧义" % [nm, m[nm], id])
+			continue
 		m[nm] = id
 	return m

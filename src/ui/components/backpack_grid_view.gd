@@ -9,6 +9,7 @@ signal item_drop_requested(
 		target_container: String, target_index: int, grab_offset: Vector2i)
 
 const ItemCatalogScript := preload("res://src/battle/item_catalog.gd")
+const ItemGridArtLayoutScript := preload("res://src/ui/components/item_grid_art_layout.gd")
 const GRID_FILL := Color("211713")
 const GRID_CELL := Color("4B352B")
 const GRID_CELL_LINE := Color("6A5042")
@@ -115,11 +116,18 @@ func _draw() -> void:
 		var texture := ItemCatalogScript.load_icon(item_id)
 		if texture == null or shape.is_empty():
 			continue
-		var bounds := _placement_bounds(anchor, shape).grow(-10.0)
-		var icon_rect := _fit_square(bounds)
-		var shadow_rect := Rect2(icon_rect.position + Vector2(3.0, 4.0), icon_rect.size)
-		draw_texture_rect(texture, shadow_rect, false, ITEM_SHADOW)
-		draw_texture_rect(texture, icon_rect, false)
+		var base_shape_value: Variant = item.get("shape", shape)
+		var base_shape: Array = base_shape_value as Array \
+				if base_shape_value is Array else shape
+		if base_shape.is_empty():
+			base_shape = shape
+		var raw_bounds := _placement_bounds(anchor, shape)
+		var padding: float = minf(10.0,
+				floorf(minf(raw_bounds.size.x, raw_bounds.size.y) * 0.12))
+		var bounds: Rect2 = raw_bounds.grow(-padding)
+		ItemGridArtLayoutScript.draw_item_art(
+				self, texture, base_shape, shape, bounds,
+				Vector2(3.0, 4.0), ITEM_SHADOW)
 	if _hovered_cell >= 0:
 		var hovered := _placement_at_index(_hovered_cell)
 		if hovered.is_empty():
@@ -235,9 +243,13 @@ func _placement_bounds(anchor: Vector2i, shape: Array) -> Rect2:
 	return Rect2(top_left, bottom_right_rect.end - top_left)
 
 
-func _fit_square(bounds: Rect2) -> Rect2:
-	var side := minf(bounds.size.x, bounds.size.y)
-	return Rect2(bounds.position + (bounds.size - Vector2.ONE * side) * 0.5, Vector2.ONE * side)
+func _shape_rotation_quarters(base_shape: Array, current_shape: Array) -> int:
+	return ItemGridArtLayoutScript.shape_rotation_quarters(base_shape, current_shape)
+
+
+func _item_art_layout(
+		texture_size: Vector2, bounds: Rect2, quarter_turns: int) -> Dictionary:
+	return ItemGridArtLayoutScript.item_art_layout(texture_size, bounds, quarter_turns)
 
 
 ## 只用两笔 1px 断续纤维打破纯色色块；位置由格坐标决定，不形成木板或凹槽错觉。

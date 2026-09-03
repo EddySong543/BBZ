@@ -79,6 +79,29 @@ func test_jia_attack_hits_newly_switched_in_hero() -> void:
 	assert_eq(b.hp[0][0], HP_HALF, "换下去的旧英雄(slot0)毫发无损")
 
 
+func test_switch_event_keeps_incoming_hp_before_the_following_attack() -> void:
+	var b := _battle()
+	b.hp[0][1] = 14
+	b.shield[0][1] = 2
+	b.select_switch(0, 1)
+	b.select_action(1, ActionDef.Action.ATTACK)
+	var result: Dictionary = b.resolve()
+	var switch_event: Dictionary = {}
+	for event_variant: Variant in result.get("events", []):
+		var event: Dictionary = event_variant
+		if String(event.get("id", "")) == "switch" \
+				and int(event.get("player", -1)) == 0:
+			switch_event = event
+			break
+
+	assert_eq(int(switch_event.get("to_hp", -1)), 14,
+		"换人事件必须保留新英雄刚登场时的血量，不能只剩动作结算后的最终值")
+	assert_eq(int(switch_event.get("to_shield", -1)), 2,
+		"新英雄的护甲也必须与登场快照同拍交给UI")
+	assert_eq(b.hp[0][1], 14, "后续攻击先由新英雄登场时已有护甲承受")
+	assert_eq(b.shield[0][1], 0, "动作结算后的最终护甲仍应正确扣除")
+
+
 func test_both_switch_no_damage() -> void:
 	var b := _battle()
 	b.select_switch(0, 1)

@@ -213,14 +213,18 @@ func test_slot_row_staged_highlight() -> void:
 	assert_eq(row._frame_mats[0].get_shader_parameter("edge_mid"), ItemSlotRow.GOLD_STAGED, "金晕 = 最亮金")
 	assert_eq(row._tex_frames[0].modulate, ItemSlotRow.STAGED_TINT, "点选 = 框身提金")
 	assert_false(row._up_badges[0].visible, "点选时升箭角标让位金晕")
-	assert_eq(row._icons[0].position.y, ItemSlotRow.ICON_INSET + 3.0, "点选 = 图标下沉（按下感）")
+	var staged_visible_rect: Rect2 = row._icons[0].get_meta("visible_alpha_rect")
+	assert_almost_eq(staged_visible_rect.get_center().y,
+			ItemSlotRow.SLOT_H * 0.5 + 3.0, 0.01, "点选 = 图标下沉（按下感）")
 	assert_eq(row._labels[0].text, "", "状态文字全退役")
 	# 取消点选 → 金晕隐藏 + 图标回弹，回纹阶框一直在。
 	row.refresh(b, 0, [])
 	assert_true(row._tex_frames[0].visible, "取消点选 = 回纹阶框仍在")
 	assert_eq(row._tex_frames[0].texture, ItemSlotRow.ITEM_FRAME_TEX, "三阶共享同一框母版")
 	assert_false(row._frames[0].visible, "金晕外环隐藏")
-	assert_eq(row._icons[0].position.y, ItemSlotRow.ICON_INSET, "取消点选 = 图标回弹")
+	var resting_visible_rect: Rect2 = row._icons[0].get_meta("visible_alpha_rect")
+	assert_almost_eq(resting_visible_rect.get_center().y,
+			ItemSlotRow.SLOT_H * 0.5, 0.01, "取消点选 = 图标回弹")
 
 
 func test_slot_row_new_frame_palette_and_inner_mask_fit() -> void:

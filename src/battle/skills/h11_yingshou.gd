@@ -7,7 +7,8 @@ extends HeroSkill
 
 const ZHUIBU_DMG := 4   # 4 半点 = 2.0 真伤（2026-07-04 由 2 半点调升）
 
-func on_enemy_switch_out(enemy_slot: int, battle: BattleCore, player: int, _slot: int) -> void:
+func on_enemy_switch_out(enemy_slot: int, battle: BattleCore, player: int,
+		slot: int, events: Array) -> void:
 	var opp: int = 1 - player
 	if enemy_slot < 0 or enemy_slot >= battle.hp[opp].size():
 		return
@@ -15,8 +16,12 @@ func on_enemy_switch_out(enemy_slot: int, battle: BattleCore, player: int, _slot
 		return
 	if battle.damage_immune(opp):   # 周天罡气：穷追真伤也免
 		return
-	if battle._consume_fatal_damage_immunity(opp, enemy_slot, ZHUIBU_DMG, []):
+	if battle._consume_fatal_damage_immunity(opp, enemy_slot, ZHUIBU_DMG, events):
 		return
+	var dealt: int = mini(battle.hp[opp][enemy_slot], ZHUIBU_DMG)
 	battle.hp[opp][enemy_slot] -= ZHUIBU_DMG   # 2.0HP = 4 半点，真伤直接扣本体血
+	events.append({id = "h11_switch_chase", player = opp, slot = enemy_slot,
+		amount = dealt, source_player = player, source_slot = slot,
+		pen = ActionDef.Pen.TRUE_DMG})
 	if battle.hp[opp][enemy_slot] <= 0:
 		battle.credit_kill(player, opp, enemy_slot)

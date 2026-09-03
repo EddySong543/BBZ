@@ -1,23 +1,23 @@
 extends HeroSkill
 
 ## h21 枭阳【惊蛰】主动技 · 干扰 · HP4（精准设局·目标选择）
-## 主动技「调虎离山」(占动作·费 1 能·每局 cap 2·须亲自出战)：强制对手换人，把对手藏在后排的英雄
-##   揪到台前 → 作废"出战保护"、使能你方整条进攻线（集火脆皮 carry / 配暗蛇钳形）。
-## 2026-07-06 批④（Eddy 批 B 案·降费 2 能→1 能·文案零变动）：探针查案实锤——被揪方下拍免费切回
-##   且切换结算先于伤害=揪几乎必被无偿撤销·搜索在教科书斩杀窗仍 0% 按；
-##   降费=把"稳亏 2 能"减到"亏 1 能"·治标承认（钉一拍案 A 被 Eddy 否·留观察）。探针=tools/probe_h21.gd。
+## 主动技「惊蛰」(占动作·费 2 能·每局 cap 2·须亲自出战)：强制对手换人，把对手藏在后排的英雄
+##   揪到台前，并取消原出战英雄尚未结算的基础行动；已支付的行动能量不返还。
+## 2026-08-31 方案 A：由旧版 1 能纯换人调整为 2 能控制。取消只覆盖尚未执行的
+##   攒/波/防/大波/大防；已经完成的切换或主动技不倒退，也不追加伤害或锁换人。
 ##
 ## 引擎实现（与打神鞭强制切换同语义·独立计揪）：
 ##   execute_active 在对手身上调 BattleCore.request_forced_pull(敌方, 揪目标槽)；
 ##   resolve Phase 2.7 在切换之后、伤害之前执行 _perform_switch(敌方, 出战→揪目标) →
-##   被揪英雄成为对手出战(本回合攻击落它身上)。影狩只在娄金出战时监听；枭阳发动本技能时娄金在替补，二者不联动。
+##   被揪英雄成为对手出战，并由核心撤销受害方尚未结算的基础行动。
+##   影狩只在娄金出战时监听；枭阳发动本技能时娄金在替补，二者不联动。
 ##   目标 = 玩家指定的对手存活替补(UI 点选敌方替补框·battle.active_target 读)；
 ##   指定目标已死 / 无效 → 作废(不改揪别人)；未指定(AI / 未选) → 随机揪一个存活替补(battle.rng·确定性)。（Eddy 2026-07-02 定）
 ##
 ## 设计依据（design/heroes-dark-h21-h24.md）：维度=干扰·共享原语=目标选择。是暗蛇阴阳对子(蛇锁原地/猴拽出)。
 ##   cap：占动作 + 费 2 能 + 每局 2 次 + 须出战(暴露 HP4 脆皮)。对手出口=摊平血量/速攻点死猴/换回去。
 
-const COST := 2   # 2 半能 = 1 能（2026-07-06 批④降费·原 4 半能）
+const COST := 4   # 4 半能 = 2 能（2026-08-31 方案 A）
 
 
 func has_active() -> bool:
@@ -39,6 +39,10 @@ func can_use_active(battle: BattleCore, player: int, _slot: int) -> bool:
 
 func active_needs_enemy_target() -> bool:
 	return true   # UI 点选敌方存活替补作揪目标（未选 → execute_active 随机揪）
+
+
+func active_preempts_enemy_basic_action() -> bool:
+	return true
 
 
 func execute_active(battle: BattleCore, player: int, _slot: int) -> void:

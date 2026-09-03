@@ -43,6 +43,8 @@ const FRAME_MID_T := ItemFrameStyle.FRAME_MID
 const FRAME_HIGHLIGHT_T := ItemFrameStyle.FRAME_HIGHLIGHT
 const CELL_BG_SHADER := ItemFrameStyle.CELL_SHADER
 const JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")          # 仅「升」角标用
+const ENERGY_COST_SHEET := preload("res://assets/ui/icons/energy_idle.png")
+const DURABILITY_BADGE_ICON := preload("res://assets/ui/icons/item_durability.png")
 const FRAME_EDGE_OUTER := Color(0.16, 0.10, 0.06)   # 框外轮廓=深咖（与图鉴同）
 const FRAME_ART_SIZE := Vector2.ONE * SLOT_W * ItemFrameStyle.FRAME_ART_SCALE
 const FRAME_ART_OFFSET := Vector2(SLOT_W, SLOT_H) * ItemFrameStyle.FRAME_OFFSET_RATIO
@@ -148,6 +150,8 @@ var _tex_frames: Array[TextureRect] = []       # 每槽回纹阶框贴图（有�
 var _tex_frame_mats: Array[ShaderMaterial] = [] # 新框明暗母版按阶级重映射为蓝 / 紫 / 金
 var _icon_shadows: Array[TextureRect] = []     # 道具图案 alpha 投影：格底之上、金属框之下
 var _icons: Array[TextureRect] = []            # 道具图标层（缺图隐藏 → 回退文字·零回归）
+var _cost_badges: Array[IconBadge] = []        # 左上：逐次使用费（0费也显示）
+var _durability_badges: Array[IconBadge] = []  # 右上：当前剩余耐久
 var _icon_cache := {}                          # id → Texture2D / null（避免每帧 load/exists）
 var _labels: Array[Label] = []                 # 仅缺图回退道具名（状态文字 2026-07-13 全退役）
 var _buttons: Array[Button] = []
@@ -205,6 +209,24 @@ func _set_texture_frame_palette(m: ShaderMaterial, tier: int) -> void:
 	ItemFrameStyle.apply_frame_palette(m, tier)
 
 
+func _make_item_stat_badge(name_value: String, texture: Texture2D,
+		hframes_value: int, vframes_value: int, badge_position: Vector2,
+		badge_size: Vector2) -> IconBadge:
+	var badge := IconBadge.new()
+	badge.name = name_value
+	badge.position = badge_position
+	badge.size = badge_size
+	badge.z_index = 20
+	badge.set_icon(texture, hframes_value, vframes_value, 0)
+	badge.normalize_icon_visual = true
+	badge.icon_visual_ratio = 0.82
+	badge.font_size = 11
+	badge.outline_size = 3
+	badge.embolden = 0.7
+	badge.visible = false
+	return badge
+
+
 func _ready() -> void:
 	custom_minimum_size = Vector2(SLOT_W, SLOT_H * 3 + GAP * 2) if vertical_layout \
 			else Vector2(SLOT_W * 3 + GAP * 2, SLOT_H)
@@ -259,14 +281,24 @@ func _ready() -> void:
 		add_child(tframe)
 		# 道具图标层（铺在框之上、文字之下；缺图隐藏 → 回退文字）。
 		var icon := TextureRect.new()
-		icon.position = icon_position
-		icon.size = icon_size
+		icon.name = "ItemIcon%d" % i
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE   # 小尺寸须 IGNORE_SIZE 否则被纹理顶大
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST   # 像素清晰
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		icon.visible = false
+		ItemFrameStyle.configure_item_art(icon, null, Rect2(icon_position, icon_size))
 		add_child(icon)
+		var stat_badge_size := Vector2(30.0, 30.0)
+		var stat_positions := ItemFrameStyle.stat_badge_positions(
+			Rect2(base + FRAME_ART_OFFSET, FRAME_ART_SIZE), stat_badge_size)
+		var cost_badge := _make_item_stat_badge(
+			"UseCostBadge%d" % i, ENERGY_COST_SHEET, 4, 4,
+			stat_positions["cost"], stat_badge_size)
+		var durability_badge := _make_item_stat_badge(
+			"DurabilityBadge%d" % i, DURABILITY_BADGE_ICON, 1, 1,
+			stat_positions["durability"], stat_badge_size)
+		add_child(cost_badge)
+		add_child(durability_badge)
 		var lbl := Label.new()
 		lbl.position = base
 		lbl.size = Vector2(SLOT_W, SLOT_H)
@@ -301,12 +333,13 @@ func _ready() -> void:
 		btn.mouse_entered.connect(_on_slot_hover.bind(i))
 		btn.mouse_exited.connect(_on_slot_unhover)
 		add_child(btn)
-		# 升箭角标（右上·可点=升级）：金色双升箭+深描边·加在点击层之后=接管角标区点击。
+		# 升箭角标（顶边居中·可点=升级）：避开右上耐久章，同时保留独立点击区。
 		var badge := Button.new()
 		badge.flat = true
 		badge.focus_mode = Control.FOCUS_NONE
-		badge.position = base + Vector2(SLOT_W - 18.0, -4.0)
+		badge.position = base + Vector2((SLOT_W - 22.0) * 0.5, -8.0)
 		badge.size = Vector2(22.0, 22.0)
+		badge.z_index = 24
 		badge.visible = false
 		badge.pressed.connect(_on_up_badge_pressed.bind(i))
 		badge.mouse_entered.connect(_on_slot_hover.bind(i))   # 角标区悬停仍算槽悬停（提示框不闪断）
@@ -323,6 +356,8 @@ func _ready() -> void:
 		_tex_frame_mats.append(tfmat)
 		_icon_shadows.append(icon_shadow)
 		_icons.append(icon)
+		_cost_badges.append(cost_badge)
+		_durability_badges.append(durability_badge)
 		_labels.append(lbl)
 		_buttons.append(btn)
 		_seals.append(seal)
@@ -501,6 +536,8 @@ func refresh(battle: BattleCore, player: int, staged: Array = [], concealed: boo
 		var icon_shadow: TextureRect = _icon_shadows[i]
 		icon.visible = false
 		icon_shadow.visible = false
+		_cost_badges[i].visible = false
+		_durability_badges[i].visible = false
 		lbl.text = ""                      # 状态文字全退役——label 只留缺图回退道具名
 		var ft := SEAL_FT
 		var fb := SEAL_FB                   # = 格底四角色（fill_color）
@@ -537,7 +574,7 @@ func refresh(battle: BattleCore, player: int, staged: Array = [], concealed: boo
 				else:
 					frame_mod = Color(0.74, 0.72, 0.69)
 					_pouches[i].modulate = Color(0.72, 0.72, 0.72)
-			BattleCore.SlotState.CHARGING:
+			BattleCore.SlotState.CHARGING, BattleCore.SlotState.DEPLETED_PENDING:
 				var item: ItemData = null if concealed else battle.slot_item(player, i)
 				has_item = item != null
 				if has_item:
@@ -567,8 +604,11 @@ func refresh(battle: BattleCore, player: int, staged: Array = [], concealed: boo
 					icon.modulate = Color(0.62, 0.62, 0.66)
 					_mini_seals[i].visible = true
 			BattleCore.SlotState.EMPTY:
-				# 可补 = 与可抽同语言（Eddy 定）：锦囊浮动+框金呼吸，补货费见悬停提示；不可补 = 纯空暗格。
-				if battle.can_refill(player, i):
+				# 新版空框承载本回合免费取得入口；旧版空框继续承载付费补充入口。
+				# 两者复用同一锦囊语言，但可用性必须读取各自的权威规则。
+				var can_acquire: bool = battle.can_item_v2_draw(player) \
+						if battle.item_v2_enabled else battle.can_refill(player, i)
+				if can_acquire:
 					ft = NEU_FT; fb = NEU_FB
 					_pouches[i].visible = true
 					_pouches[i].modulate = Color.WHITE
@@ -582,10 +622,19 @@ func refresh(battle: BattleCore, player: int, staged: Array = [], concealed: boo
 			cell_inner = ft
 		# 点选使用 = 金晕外环 + 框身提金 + 图标下沉 3px（回纹框保留不清除——Eddy 2026-07-13 五改）。
 		var staged_now: bool = staged.has(i)
-		# 纵向布局必须保留本槽的局部基准；旧写法只写 ICON_INSET，
-		# 会把第2/3格图标在刷新或点选时拉回第1格。
-		icon.position.y = _slot_base(i).y + ICON_INSET + (3.0 if staged_now else 0.0)
-		icon_shadow.position = icon.position + ItemFrameStyle.item_art_shadow_offset(icon.size)
+		if has_item and icon.texture != null:
+			var runtime_item: ItemData = battle.slot_item(player, i)
+			var art_target := Rect2(
+				_slot_base(i) + Vector2(ICON_INSET, ICON_INSET + (3.0 if staged_now else 0.0)),
+				Vector2(SLOT_W - ICON_INSET * 2.0, SLOT_H - ICON_INSET * 2.0))
+			ItemFrameStyle.configure_item_art(icon, icon.texture, art_target)
+			ItemFrameStyle.configure_item_art(icon_shadow, icon.texture, art_target,
+				ItemFrameStyle.item_art_shadow_offset(art_target.size))
+			_cost_badges[i].set_number(int(runtime_item.use_cost))
+			_durability_badges[i].set_number(int(
+				battle.slots[player][i].get("current_durability", runtime_item.max_durability)))
+			_cost_badges[i].visible = true
+			_durability_badges[i].visible = true
 		icon_shadow.self_modulate = Color(
 				ItemFrameStyle.ITEM_ART_SHADOW_COLOR.r,
 				ItemFrameStyle.ITEM_ART_SHADOW_COLOR.g,
@@ -704,6 +753,12 @@ func slot_global_rect(index: int) -> Rect2:
 	var top_left := transform * local_rect.position
 	var bottom_right := transform * local_rect.end
 	return Rect2(top_left, bottom_right - top_left).abs()
+
+
+func slot_upgrade_badge_global_rect(index: int) -> Rect2:
+	if index < 0 or index >= _up_badges.size() or not _up_badges[index].visible:
+		return Rect2()
+	return (_up_badges[index] as Control).get_global_rect()
 
 
 ## 解锁演出：封条幽灵副本撕落飘出（位移+旋转+淡出）+ 回纹框弹亮回落（flash=false 时只撕不闪）。

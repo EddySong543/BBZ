@@ -17,10 +17,13 @@ const EXCHANGE_ITEM_ID := "t2_huanqian_tong"
 const REPURCHASE_ITEM_ID := "t2_huigou_quan"
 const ENERGY_COST_SHEET := preload("res://assets/ui/icons/energy_idle.png")
 const HEART_COST_SHEET := preload("res://assets/ui/icons/heart_idle.png")
+const DURABILITY_BADGE_ICON := preload("res://assets/ui/icons/item_durability.png")
 const LONGYUJI_SKILL_ICON := preload("res://assets/sprites/heroes/h05/h05_skill.png")
+const H10_SKILL_ICON := preload("res://assets/sprites/heroes/h10/h10_skill.png")
 const ANCHAO_SKILL_ICON := preload("res://assets/sprites/heroes/h13/h13_skill.png")
 const H24_SKILL_ICON := preload("res://assets/sprites/heroes/h24/h24_skill.png")
 const EffectTextFormatterScript := preload("res://src/ui/effect_text_formatter.gd")
+const RuntimeFeatures := preload("res://src/core/runtime_features.gd")
 const EFFECT_KEYWORD_SPARK_SCRIPT := preload("res://src/ui/components/effect_keyword_spark.gd")
 const ITEM_TIP_DIVIDER_SCRIPT := preload("res://src/ui/components/item_tip_pixel_divider.gd")
 const BATTLE_STATUS_ROW_SCRIPT := preload("res://src/ui/components/battle_status_row.gd")
@@ -38,6 +41,32 @@ const BACKPACK_ICON := preload("res://assets/ui/icons/backpack.png")
 const SCREEN_W := 1920.0
 const SCREEN_H := 1080.0
 const BATTLE_STATUS_Z_INDEX := 45
+const COMMAND_DRAG_THRESHOLD := 10.0
+## 行动顺序栏默认位置。手动微调只需修改第二个数值：增大向下，减小向上。
+const COMMAND_STRIP_RECT := Rect2(600.0, 816.0, 720.0, 80.0)
+const COMMAND_SLOT_SIZE := 66.0
+const COMMAND_SLOT_GAP := 10.0
+const COMMAND_SLOT_ART_INSET := 4.0
+const COMMAND_SLOT_ART_OFFSET_Y := -12.0
+const COMMAND_SLOT_DROP_PADDING := 26.0
+const COMMAND_SLOT_MAGNET_RADIUS := 138.0
+const COMMAND_SLOT_LAND_DURATION := 0.12
+const COMMAND_REFRESH_DURATION := 0.12
+const COMMAND_REFRESH_OFFSET_Y := 2.0
+const COMMAND_REFRESH_START_ALPHA := 0.76
+const COMMAND_SLOT_SKIN := preload(
+	"res://src/ui/components/command_sequence_slot_skin.gd")
+const COMMAND_CANCEL_GLYPH := preload(
+	"res://src/ui/components/command_sequence_cancel_glyph.gd")
+const COMMAND_CANCEL_SIZE := 20.0
+const COMMAND_RESOLUTION_ALPHA := 0.40
+
+
+func _enter_tree() -> void:
+	# 正常启动由 Boot 应用显示设置；编辑器直接 F6 战斗场景会跳过 Boot。
+	# 两条入口都必须先统一为目标分辨率直接渲染的 Canvas Items 模式，避免
+	# 将 1920×1080 的低分辨率 UI 栅格整体放大后暴露像素台阶。
+	GameSettings.ensure_canvas_scaling()
 
 ## 出战血条低血红闪阈值（HP 占比 ≤ 此值）；闪烁在 IconPipRow 内部实现（任务5：红光改到剩余血量爱心上）。
 const LOW_HP_RATIO := 0.5
@@ -120,6 +149,13 @@ const DEBUG_BUTTONS := true
 const ProfileStore := preload("res://src/core/player_profile.gd")   # 个人资料战绩计数（同上·preload 引用）
 const RoundLabelOrnamentsComponent := preload("res://src/ui/components/round_label_ornaments.gd")
 const CentralTurnCueComponent := preload("res://src/ui/components/central_turn_cue.gd")
+const H11BiteFxScript := preload("res://src/ui/components/h11_bite_fx.gd")
+const DamageTransferTrailScript := preload(
+	"res://src/ui/components/damage_transfer_trail.gd")
+const ReserveAvatarImpactFxScript := preload(
+	"res://src/ui/components/reserve_avatar_impact_fx.gd")
+const ReserveAvatarHitGlowScript := preload(
+	"res://src/ui/components/reserve_avatar_hit_glow.gd")
 ## 出战血条＝斜切分段条（2026-07-18 取代心形 IconPipRow）。走 preload 常量当类型：
 ## 新 class_name 在 headless/GUT 首跑可能尚未注册（踩过·见 memory godot-headless-classname-preload）。
 const HpSlantBarScript := preload("res://src/ui/components/hp_slant_bar.gd")
@@ -146,6 +182,18 @@ const HpSlantBarScript := preload("res://src/ui/components/hp_slant_bar.gd")
 @export_range(12.0, 72.0, 1.0) var switch_travel_distance: float = 34.0
 @export_range(0.0, 24.0, 1.0) var switch_vertical_drop: float = 8.0
 @export_range(4, 16, 1) var switch_pixel_steps: int = 8
+@export_range(0.08, 0.40, 0.01) var h11_pre_switch_damage_hold: float = 0.18
+@export var h11_bite_size: Vector2 = Vector2(208.0, 208.0)
+@export_range(0.08, 0.50, 0.01) var h11_bite_close_duration: float = 0.22
+@export_range(0.0, 0.20, 0.01) var h11_bite_impact_hold: float = 0.04
+@export_range(0.04, 0.40, 0.01) var h11_bite_release_duration: float = 0.08
+@export_group("")
+@export_group("乌骓溢出转移")
+## 主目标伤害数字先单独留一拍，再让溢出轨迹出发；两项均用真实时间，避免顿帧拖慢读序。
+@export_range(0.04, 0.30, 0.01) var h19_transfer_primary_hold_duration: float = 0.11
+@export_range(0.08, 0.36, 0.01) var h19_transfer_source_hold_duration: float = 0.20
+@export_range(0.12, 0.70, 0.01) var h19_transfer_duration: float = 0.46
+@export_range(0.08, 0.24, 0.01) var h19_transfer_impact_duration: float = 0.14
 @export_group("")
 @export_group("烛阴转变")
 @export_range(0.30, 1.20, 0.01) var h17_transform_duration: float = 0.64
@@ -186,7 +234,6 @@ const COUNTDOWN_ALERT_OUTLINE_COLOR := Color(0.07, 0.04, 0.02, 0.86)
 @export var countdown_ornament_color: Color = Color("#f2e8cc")
 @export var countdown_ornament_underlay_color: Color = Color(0.07, 0.04, 0.02, 0.88)
 @export_range(0.0, 6.0, 0.5) var countdown_ornament_underlay_width: float = 3.0
-
 enum State { TURN_INTRO, PLAYER_SELECT, RESOLVING, HERO_SELECT, GAME_OVER }
 enum ItemSlotTargetMode { NONE, CONSUMES, TRANSFORMS, PRESERVES }
 
@@ -199,6 +246,8 @@ const AI := 1       # 对手 AI
 
 # ---- @onready: battle_screen_base.tscn 内预置节点（布局保留，路径勿改）----
 @onready var timer_label: Label = $TimerLabel
+@onready var command_sequence_star_preview: Control = $CommandSequenceStarPreview
+@onready var command_sequence_cancel_preview: Control = $CommandSequenceCancelPreview
 @onready var status_label: Label = $StatusLabel
 @onready var event_label: Label = $EventLabel
 @onready var big_turn_label: Label = $BigTurnLabel
@@ -341,21 +390,48 @@ var _second_enemy_target_pick: int = -1
 var _second_action_btn: Button = null
 var selected_switch: int = -1
 var selected_btn: Button = null
+var _debug_forced_ai_switch_slot: int = -1
 
 # ---- 攻击变体（程序化创建·不入 .tscn）----
 var longyuji_picker: Control = null
 var btn_longyuji_branch: Button = null
+var jianqi_attack_picker: Control = null
+var btn_jianqi_attack: Button = null
 var split_big_wave_picker: Control = null
 var btn_split_big_wave: Button = null
 var h24_discount_picker: Control = null
 var btn_h24_discount: Button = null
 var _empowered_wave_armed: bool = false   # 本回合是否为已选「波」追加龙御极的 1 能 / 1 伤
+var _jianqi_attack_armed: bool = false     # 本回合是否由昴日消耗全部剑气强化基础攻击穿透
 var _split_big_wave_armed: bool = false   # 本回合是否把玄冥的「大波」改为连续两次「波」
 var _blood_payment_armed: bool = false    # 本回合是否由出战蚩尤以等量生命支付行动费用
 var _energy_cap_discount_armed: bool = false # 本回合是否降低 1 点能量上限，换取行动费用 -1
 var _free_switch_sequence: Array[int] = [] # 联机提交时重放本回合千里自在风的逻辑预览序列
 var _blood_payment_activation_step: int = -1 # 在第几次免费切换前由蚩尤发动（-1=未发动）
 var _switch_handoff_running: bool = false # 免费切换即时交接期间锁住重复选择
+
+# ---- 拖拽编排 ----
+# 队列只保存本地私有意图；结束时才序列化并交 BattleCore / 联机权威端原子重放。
+var _turn_command_queue: Array[Dictionary] = []
+var _command_drag_candidate: Dictionary = {}
+var _command_drag_origin: Vector2 = Vector2.ZERO
+var _command_drag_source_rect: Rect2 = Rect2()
+var _command_drag_grab_offset: Vector2 = Vector2.ZERO
+var _command_dragging: bool = false
+var _command_drag_over_slot: bool = false
+var _command_drag_preview: Control = null
+var _command_drag_source_canvas: CanvasItem = null
+var _command_drag_source_modulate: Color = Color.WHITE
+var _command_drag_source_dim: Panel = null
+var _command_drop_landing_index: int = -1
+var _command_order_strip: Control = null
+var _command_order_row: Control = null
+var _command_next_slot: Control = null
+var _command_next_slot_skin: Control = null
+var _command_rendered_entry_count: int = 0
+var _command_render_signature: String = ""
+var _command_strip_initialized: bool = false
+var _command_refresh_tween: Tween = null
 
 # ---- 主动换人（任务5）：点替补框→框内显「切换」(armed)→再次点=选择(动画)→「结束」提交 ----
 var _armed_switch_frame: int = -1   # 当前 armed 的替补框索引（1 / 2），-1=无
@@ -430,7 +506,7 @@ func _ready() -> void:
 	battle = BattleCore.new()
 	_overtime = BattleSetup.overtime   # 须在 reset() 前读取
 	_pve = BattleSetup.pve_mode        # 远征 PvE（任务 D）·同样须在 reset() 前读取
-	_net = BattleSetup.net_session != null   # 联机局（M1）·net_session 不被 reset() 清（生命周期独立）
+	_net = RuntimeFeatures.PVP_ENABLED and BattleSetup.net_session != null
 	var pve_player_hp: Array = BattleSetup.pve_player_hp.duplicate()
 	var pve_opponent_hp: Array = BattleSetup.pve_opponent_hp.duplicate()
 	var pve_seed: int = BattleSetup.pve_seed
@@ -460,7 +536,17 @@ func _ready() -> void:
 	if not _net:
 		BattleSetup.reset()   # 消费即清空：防止下一局（未经 BP）复用本局阵容
 		battle.setup(p0, p1, pve_seed if _pve and pve_seed != 0 else randi())
-		if not p1_item_backpack.is_empty() or not p2_item_backpack.is_empty():
+		if RuntimeFeatures.ITEM_V2_ENABLED and not _overtime:
+			var p0_v2_ids: Array[String] = []
+			var p1_v2_ids: Array[String] = []
+			for item_id: String in p1_item_backpack:
+				if ItemCatalog.is_prototype_id(item_id):
+					p0_v2_ids.append(item_id)
+			for item_id: String in p2_item_backpack:
+				if ItemCatalog.is_prototype_id(item_id):
+					p1_v2_ids.append(item_id)
+			battle.enable_item_v2(p0_v2_ids, p1_v2_ids)
+		elif not p1_item_backpack.is_empty() or not p2_item_backpack.is_empty():
 			battle.configure_battle_backpacks(p1_item_backpack, p2_item_backpack)
 	if _overtime:
 		# 加时赛（Q5·2026-07-03；2026-07-05 修订）：白板满血 1v1——slot0 出战、其余队友 0 血躺板凳
@@ -510,6 +596,13 @@ func _ready() -> void:
 		FontManager.apply(cap_label, 16)
 
 	_build_item_rows()
+	if command_sequence_star_preview.has_signal("tuning_changed"):
+		command_sequence_star_preview.tuning_changed.connect(
+			_on_command_star_tuning_changed)
+	if command_sequence_cancel_preview.has_signal("tuning_changed"):
+		command_sequence_cancel_preview.tuning_changed.connect(
+			_on_command_cancel_tuning_changed)
+	_build_command_drag_ui()
 	_build_hover_tips()        # 悬停提示（底部按钮+我方道具槽·2026-07-11）
 	_connect_hero_skill_tips()
 	if _overtime:
@@ -630,6 +723,18 @@ func _init_buttons() -> void:
 	btn_longyuji_branch.pressed.connect(_on_longyuji_branch_pressed)
 	longyuji_picker.add_child(btn_longyuji_branch)
 
+	# 飞洒天星：昴日选择波或大波后，可在正上方切换“消耗全部剑气强化穿透”。
+	jianqi_attack_picker = Control.new()
+	jianqi_attack_picker.name = "JianqiAttackPicker"
+	jianqi_attack_picker.mouse_filter = Control.MOUSE_FILTER_PASS
+	jianqi_attack_picker.size = btn_attack.size
+	jianqi_attack_picker.visible = false
+	buttons_ctrl.add_child(jianqi_attack_picker)
+	btn_jianqi_attack = _make_jianqi_attack_branch_button()
+	btn_jianqi_attack.position = Vector2.ZERO
+	btn_jianqi_attack.pressed.connect(_on_jianqi_attack_branch_pressed)
+	jianqi_attack_picker.add_child(btn_jianqi_attack)
+
 	# 并封：选择正费用行动后，在该动作正上方提供技能 icon 分支；与龙御极并存时向上叠一层。
 	h24_discount_picker = Control.new()
 	h24_discount_picker.name = "H24DiscountPicker"
@@ -663,7 +768,7 @@ func _init_buttons() -> void:
 	# 阴影是按钮子节点，会跟随现有 hover/selected 缩放，但不改变点击矩形。
 	for button: Button in action_btn_list + [
 			btn_confirm, btn_backpack, btn_switch, btn_longyuji_branch,
-			btn_split_big_wave, btn_h24_discount]:
+			btn_jianqi_attack, btn_split_big_wave, btn_h24_discount]:
 		_attach_button_bottom_shadow(button)
 
 	# 镜头偏焦改由「执行动作」触发（见 _play_battle_anims）：波/大波→右聚敌、防/大防→左聚己、其余回正。
@@ -837,6 +942,41 @@ func _make_split_big_wave_branch_button() -> Button:
 	var icon := TextureRect.new()
 	icon.name = "SkillIcon"
 	icon.texture = ANCHAO_SKILL_ICON
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.position = (choice.size - Vector2(64.0, 64.0)) * 0.5
+	icon.size = Vector2(64.0, 64.0)
+	choice.add_child(icon)
+	_attach_button_juice(choice)
+	return choice
+
+
+func _make_jianqi_attack_branch_button() -> Button:
+	var choice := Button.new()
+	choice.name = "BtnJianqiAttack"
+	choice.focus_mode = Control.FOCUS_NONE
+	choice.size = btn_attack.size
+	for state_name in ["normal", "hover", "pressed", "disabled", "focus"]:
+		choice.add_theme_stylebox_override(state_name, StyleBoxEmpty.new())
+
+	var source_bg := btn_attack.get_node_or_null("Bg") as ColorRect
+	if source_bg != null and source_bg.material is ShaderMaterial:
+		var bg := ColorRect.new()
+		bg.name = "Bg"
+		bg.show_behind_parent = true
+		bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		var material := (source_bg.material as ShaderMaterial).duplicate() as ShaderMaterial
+		material.set_shader_parameter("aspect", choice.size.x / choice.size.y)
+		bg.material = material
+		choice.add_child(bg)
+		choice.move_child(bg, 0)
+
+	var icon := TextureRect.new()
+	icon.name = "SkillIcon"
+	icon.texture = H10_SKILL_ICON
 	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -1164,11 +1304,12 @@ func _on_switch_main_pressed() -> void:
 
 
 func _on_switch_candidate_input(event: InputEvent, frame_idx: int) -> void:
-	if not (event is InputEventMouseButton):
-		return
-	var mb := event as InputEventMouseButton
-	if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
-		_on_switch_candidate_pressed(frame_idx)
+	# 候选头像的单击只保留悬停说明，不再确认切换；实际指令由全局拖拽状态机
+	# 在头像进入顺序栏末端空槽并松手后调用 _on_switch_candidate_pressed。
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
+			get_viewport().set_input_as_handled()
 
 
 func _on_switch_candidate_pressed(frame_idx: int) -> void:
@@ -1242,7 +1383,9 @@ func _refresh_switch_module() -> void:
 			continue
 		_update_single_frame(frame, null, PLAYER, slot, false, pcolor)
 		var available := _is_switchable_reserve(frame_idx)
-		var candidate_selected := _switch_selected and _armed_switch_frame == frame_idx
+		# 切换结果由顺序槽中的英雄头像表达；候选头像回到普通可拖状态，
+		# 不继续沿用旧版“按钮已选中”的常亮/放大反馈。
+		var candidate_selected := false
 		if frame.is_selected != candidate_selected:
 			frame.is_selected = candidate_selected
 		if not frame.is_selected:
@@ -1257,13 +1400,13 @@ func _set_switch_button_feedback(selected: bool) -> void:
 		return
 	btn_switch.text = ""
 	if _switch_button_icon != null:
-		_switch_button_icon.self_modulate = Color(1.16, 1.10, 0.82) if selected \
-			else (Color(0.62, 0.65, 0.62) if btn_switch.disabled else Color.WHITE)
+		_switch_button_icon.self_modulate = Color(0.62, 0.65, 0.62) \
+			if btn_switch.disabled else Color.WHITE
 	var previous := bool(btn_switch.get_meta("switch_selected", false))
 	if previous == selected:
 		return
 	btn_switch.set_meta("switch_selected", selected)
-	_set_btn_selected(btn_switch, selected)
+	_set_btn_selected(btn_switch, false)
 
 
 ## 背包与图鉴使用相同的场景内浮层生命周期；按入口呼出，浮层内 X / ESC 关闭。
@@ -1310,11 +1453,16 @@ func _start_player_select() -> void:
 	selected_btn = null
 	_empowered_wave_armed = false
 	_split_big_wave_armed = false
+	_jianqi_attack_armed = false
 	_blood_payment_armed = false
 	_energy_cap_discount_armed = false
 	_free_switch_sequence.clear()
 	_blood_payment_activation_step = -1
 	_clear_selected_items()   # M3：每回合重置使用件、槽目标与待选来源
+	_turn_command_queue.clear()
+	_refresh_command_order_strip()
+	if battle.item_v2_enabled:
+		_item_v2_ai_draw()
 	status_label.visible = false   # 去除「选择你的动作」提示
 	event_label.visible = false
 	_set_buttons_active(true)
@@ -1429,7 +1577,7 @@ func _on_circle_pressed(action: int, btn: Button) -> void:
 			var first_ok: bool = preview.select_action(PLAYER, selected_action,
 				_enemy_target_pick if ActionDef.is_attack(selected_action) else -1,
 				_empowered_wave_armed, _split_big_wave_armed, _blood_payment_armed,
-				_energy_cap_discount_armed)
+				_energy_cap_discount_armed, _jianqi_attack_armed)
 			var second_target: int = preview.active_index[AI] \
 				if preview.can_target_any_enemy_with_base_attack(PLAYER, action) else -1
 			if first_ok and preview.select_second_action(PLAYER, action, second_target):
@@ -1453,6 +1601,7 @@ func _on_circle_pressed(action: int, btn: Button) -> void:
 		selected_btn = null
 		_empowered_wave_armed = false
 		_split_big_wave_armed = false
+		_jianqi_attack_armed = false
 		_energy_cap_discount_armed = false
 		_reset_button_styles()
 		_update_button_states()
@@ -1467,6 +1616,7 @@ func _on_circle_pressed(action: int, btn: Button) -> void:
 	selected_switch = -1
 	_empowered_wave_armed = false
 	_split_big_wave_armed = false
+	_jianqi_attack_armed = false
 	_energy_cap_discount_armed = false
 	_reset_button_styles()
 	selected_btn = btn
@@ -1486,9 +1636,12 @@ func _on_circle_pressed(action: int, btn: Button) -> void:
 
 
 func _on_confirm_pressed() -> void:
-	if state != State.PLAYER_SELECT or not _pending_pointstone_offer.is_empty():
+	if state != State.PLAYER_SELECT or _has_incomplete_command_selection():
 		return
 	_ensure_lianhuan_choice(_battle_after_selected_items())
+	var command_sequence: Array[Dictionary] = _command_sequence_for_submit()
+	if not _validate_local_command_sequence(command_sequence):
+		return
 	game_timer.stop()
 	_hold_timer_at_zero()
 
@@ -1496,32 +1649,58 @@ func _on_confirm_pressed() -> void:
 	if _net:
 		_net_submit_turn()
 		return
+	if battle.item_v2_enabled:
+		if not battle.submit_item_v2_command_sequence(PLAYER, command_sequence):
+			return
+		var forced_ai_slot: int = _debug_forced_ai_switch_slot
+		_debug_forced_ai_switch_slot = -1
+		var ai_sequence: Array[Dictionary] = _item_v2_ai_sequence(AI, forced_ai_slot)
+		if not battle.submit_item_v2_command_sequence(AI, ai_sequence):
+			battle.submit_item_v2_command_sequence(AI, [
+				{"kind": "action", "action": A.CHARGE, "target": -1}])
+		_clear_selected_items()
+		selected_action = -1
+		selected_second_action = -1
+		_second_enemy_target_pick = -1
+		_second_action_btn = null
+		selected_switch = -1
+		selected_btn = null
+		_empowered_wave_armed = false
+		_split_big_wave_armed = false
+		_jianqi_attack_armed = false
+		_energy_cap_discount_armed = false
+		_blood_payment_armed = false
+		_reset_button_styles()
+		_set_confirm_active(false)
+		await _resolve()
+		return
 
-	# M3：道具先提交。槽依赖来源必须先于目标；即时产能/减费随后才能支付本回合动作。
-	for s in _ordered_selected_item_slots():
-		battle.use_slot(PLAYER, s, int(selected_item_hero_targets.get(s, -1)),
-			int(selected_item_targets.get(s, -1)),
-			int(selected_item_choices.get(s, -1)))
-
-	# 玩家提交（未选 → 默认攒）
-	if selected_action == ACTIVE:
-		battle.select_active(
-			PLAYER, _enemy_target_pick, _blood_payment_armed,
-			_energy_cap_discount_armed)   # 玩家点选的敌方揪目标（-1=未选→引擎随机）
-	elif selected_action == A.SWITCH and selected_switch >= 0:
-		battle.select_switch(PLAYER, selected_switch)
-	elif selected_action >= 0:
-		battle.select_action(PLAYER, selected_action,
-			_enemy_target_pick if ActionDef.is_attack(selected_action) else -1,
-			_empowered_wave_armed, _split_big_wave_armed, _blood_payment_armed,
-			_energy_cap_discount_armed)
-	else:
-		battle.select_action(PLAYER, A.CHARGE)
-	if selected_second_action >= 0:
-		battle.select_second_action(PLAYER, selected_second_action, _second_enemy_target_pick)
+	# 按顺序逐步重放本地私有编排。行动步骤会立刻做可支付校验，不能借用排在其后的道具产能。
+	var action_ordinal: int = 0
+	for step: Dictionary in command_sequence:
+		match String(step.get("kind", "")):
+			"item":
+				battle.use_slot(PLAYER, int(step["slot"]),
+					int(selected_item_hero_targets.get(int(step["slot"]), -1)),
+					int(selected_item_targets.get(int(step["slot"]), -1)),
+					int(selected_item_choices.get(int(step["slot"]), -1)))
+			"action":
+				if action_ordinal == 0:
+					_apply_local_primary_command(step)
+				else:
+					battle.select_second_action(
+						PLAYER, int(step["action"]), int(step.get("target", -1)))
+				action_ordinal += 1
 
 	# PvE 与本地 PvP 共用当前 BattleAI：合法行动、道具决策和提交入口全部同源。
-	if not _ai_pick_precomputed():
+	# 调试强制换人只覆盖 AI 这一次选择，后续仍走相同 resolve/事件/演出链。
+	if _debug_forced_ai_switch_slot >= 0:
+		var forced_switch_slot: int = _debug_forced_ai_switch_slot
+		_debug_forced_ai_switch_slot = -1
+		_discard_ai_precomputed()
+		if not battle.select_switch(AI, forced_switch_slot):
+			_ai_pick(AI)
+	elif not _ai_pick_precomputed():
 		_ai_pick(AI)   # 任务G 兜底：预想未命中（状态变过/没来得及想）→ 原同步路径
 	_clear_selected_items()
 
@@ -1533,11 +1712,70 @@ func _on_confirm_pressed() -> void:
 	selected_btn = null
 	_empowered_wave_armed = false
 	_split_big_wave_armed = false
+	_jianqi_attack_armed = false
 	_energy_cap_discount_armed = false
 	_blood_payment_armed = false
 	_reset_button_styles()
 	_set_confirm_active(false)   # 停止呼吸：已确认提交
 	await _resolve()
+
+
+func _has_incomplete_command_selection() -> bool:
+	return not _pending_pointstone_offer.is_empty() or _pending_item_target_slot >= 0 \
+		or _pending_item_hero_target_slot >= 0 or _pending_enemy_item_target_slot >= 0
+
+
+func _apply_local_primary_command(step: Dictionary) -> void:
+	var action: int = int(step.get("action", A.CHARGE))
+	var target: int = int(step.get("target", -1))
+	if action == ACTIVE:
+		battle.select_active(PLAYER, target, _blood_payment_armed, _energy_cap_discount_armed)
+	elif action == A.SWITCH and target >= 0:
+		battle.select_switch(PLAYER, target)
+	else:
+		battle.select_action(PLAYER, action,
+			target if ActionDef.is_attack(action) else -1,
+			_empowered_wave_armed, _split_big_wave_armed, _blood_payment_armed,
+			_energy_cap_discount_armed, _jianqi_attack_armed)
+
+
+func _validate_local_command_sequence(command_sequence: Array[Dictionary]) -> bool:
+	if battle.item_v2_enabled:
+		return battle.validate_item_v2_command_sequence(PLAYER, command_sequence)
+	var probe: BattleCore = battle.clone()
+	var action_ordinal: int = 0
+	for step: Dictionary in command_sequence:
+		match String(step.get("kind", "")):
+			"item":
+				var slot: int = int(step.get("slot", -1))
+				var item: ItemData = probe.slot_item(PLAYER, slot)
+				var target: int = int(step.get("target", -1))
+				var hero_target: int = target \
+					if BattleCore.item_requires_friendly_hero_target(item) else -1
+				var slot_target: int = -1 if hero_target >= 0 else target
+				if not probe.use_slot(PLAYER, slot, hero_target, slot_target,
+						int(step.get("choice", -1))):
+					return false
+			"action":
+				if action_ordinal == 0:
+					var action: int = int(step.get("action", A.CHARGE))
+					var target: int = int(step.get("target", -1))
+					var accepted: bool = probe.select_active(
+						PLAYER, target, _blood_payment_armed, _energy_cap_discount_armed) \
+						if action == ACTIVE else (
+							probe.select_switch(PLAYER, target) if action == A.SWITCH else
+							probe.select_action(PLAYER, action,
+								target if ActionDef.is_attack(action) else -1,
+								_empowered_wave_armed, _split_big_wave_armed,
+								_blood_payment_armed, _energy_cap_discount_armed,
+								_jianqi_attack_armed))
+					if not accepted:
+						return false
+				elif not probe.select_second_action(
+						PLAYER, int(step.get("action", -1)), int(step.get("target", -1))):
+					return false
+				action_ordinal += 1
+	return action_ordinal >= 1
 
 
 func _ensure_lianhuan_choice(preview: BattleCore) -> void:
@@ -1552,12 +1790,13 @@ func _ensure_lianhuan_choice(preview: BattleCore) -> void:
 		selected_btn = btn_charge
 		_empowered_wave_armed = false
 		_split_big_wave_armed = false
+		_jianqi_attack_armed = false
 		_blood_payment_armed = false
 		_energy_cap_discount_armed = false
 	if not preview.select_action(PLAYER, selected_action,
 			_enemy_target_pick if ActionDef.is_attack(selected_action) else -1,
 			_empowered_wave_armed, _split_big_wave_armed, _blood_payment_armed,
-			_energy_cap_discount_armed):
+			_energy_cap_discount_armed, _jianqi_attack_armed):
 		return
 	if selected_second_action >= 0 and preview.select_second_action(
 			PLAYER, selected_second_action, _second_enemy_target_pick):
@@ -1698,6 +1937,9 @@ func _net_submit_turn() -> void:
 		and preview.can_empower_wave_action(PLAYER, action, blood_payment, energy_cap_discount)
 	var split_big_wave: bool = _split_big_wave_armed \
 		and preview.can_split_big_wave_action(PLAYER, action, blood_payment, energy_cap_discount)
+	var jianqi_attack: bool = _jianqi_attack_armed \
+		and preview.can_jianqi_attack_action(
+			PLAYER, action, empowered, blood_payment, energy_cap_discount)
 	var ordered_item_slots: Array[int] = _ordered_selected_item_slots()
 	var item_slot_targets: Array[int] = []
 	var item_slot_choices: Array[int] = []
@@ -1705,11 +1947,24 @@ func _net_submit_turn() -> void:
 		item_slot_targets.append(int(selected_item_hero_targets.get(
 			s, selected_item_targets.get(s, -1))))
 		item_slot_choices.append(int(selected_item_choices.get(s, -1)))
+	var command_sequence: Array[Dictionary] = _command_sequence_for_submit()
+	var action_ordinal: int = 0
+	for step: Dictionary in command_sequence:
+		if String(step.get("kind", "")) != "action":
+			continue
+		if action_ordinal == 0:
+			step["action"] = action
+			step["target"] = target
+			step["jianqi_attack"] = jianqi_attack
+		else:
+			step["action"] = selected_second_action
+			step["target"] = _second_enemy_target_pick
+		action_ordinal += 1
 	BattleSetup.net_session.client.submit(
 		action, target, ordered_item_slots, false, empowered, split_big_wave, blood_payment,
 		_free_switch_sequence.duplicate(), _blood_payment_activation_step, energy_cap_discount,
 		item_slot_targets, item_slot_choices, selected_second_action,
-		_second_enemy_target_pick)
+		_second_enemy_target_pick, command_sequence, jianqi_attack)
 	_clear_selected_items()
 	selected_action = -1
 	selected_second_action = -1
@@ -1719,6 +1974,7 @@ func _net_submit_turn() -> void:
 	selected_btn = null
 	_empowered_wave_armed = false
 	_split_big_wave_armed = false
+	_jianqi_attack_armed = false
 	_energy_cap_discount_armed = false
 	_blood_payment_armed = false
 	_free_switch_sequence.clear()
@@ -1748,13 +2004,20 @@ func _net_play_resolution(msg: Dictionary) -> void:
 	_net_apply_snap(msg["snap"])
 	var events: Array = msg.get("events", [])
 	var actions: Array = msg.get("actions", [-1, -1])
+	var action_step_ids: Array = msg.get("action_step_ids", [])
+	var command_sequences: Array = msg.get("command_sequences", [[], []])
 	var pending: Array = (msg.get("pending", [false, false]) as Array).duplicate()
 	if _net_flipped():
 		events = MatchClientScript.flip_events(events)
 		actions = [actions[1], actions[0]]
+		if action_step_ids.size() == 2:
+			action_step_ids = [action_step_ids[1], action_step_ids[0]]
+		if command_sequences.size() == 2:
+			command_sequences = [command_sequences[1], command_sequences[0]]
 		pending = [pending[1], pending[0]]
 	await _animate_resolution(
-		{events = events, p1_action = int(actions[0]), p2_action = int(actions[1])},
+		{events = events, p1_action = int(actions[0]), p2_action = int(actions[1]),
+			action_step_ids = action_step_ids, command_sequences = command_sequences},
 		active_before, hp_before)
 	if battle.game_over:
 		await _wait_for_active_death_dissolves()
@@ -1854,6 +2117,149 @@ func _net_game_over(w: int) -> void:
 # 任务G：AI 异步预想（选招期后台想·确认时重放·详见 _think_* 变量注释）
 # ============================================================
 
+func _item_v2_ai_draw() -> void:
+	if not battle.can_item_v2_draw(AI):
+		return
+	var options: Array[ItemData] = battle.begin_item_v2_draw(AI)
+	if options.is_empty():
+		battle.pass_item_v2_draw(AI)
+		return
+	var best_index: int = 0
+	var best_score: int = -1
+	for index: int in range(options.size()):
+		var item: ItemData = options[index]
+		var score: int = item.tier * 100 + item.max_durability * 10 - item.use_cost
+		if score > best_score:
+			best_score = score
+			best_index = index
+	battle.pick_item_v2_draw(AI, best_index)
+
+
+func _item_v2_action_step_from_choice(choice: Dictionary) -> Dictionary:
+	var step := {
+		"kind": "action",
+		"action": int(choice.get("action", A.CHARGE)),
+		"target": int(choice.get("target", -1)),
+	}
+	for key: String in ["empowered_wave", "split_big_wave", "blood_payment",
+			"energy_cap_discount"]:
+		if bool(choice.get(key, false)):
+			step[key] = true
+	return step
+
+
+func _item_v2_ai_target(side: int, item: ItemData) -> int:
+	match String(item.target_key):
+		"friendly_dead":
+			for slot: int in range(battle.hp[side].size()):
+				if battle.is_dead_reserve(side, slot):
+					return slot
+		"friendly_reserve":
+			var best_slot: int = -1
+			var best_value: int = -1
+			for slot: int in range(battle.hp[side].size()):
+				if not battle.is_living_reserve(side, slot):
+					continue
+				var value: int = battle.max_hp[side][slot] - battle.hp[side][slot] \
+					if item.effect_key == &"heal_teammate" else battle.hp[side][slot]
+				if item.effect_key == &"swap_armor":
+					value = battle.shield[side][slot]
+				if value > best_value:
+					best_value = value
+					best_slot = slot
+			return best_slot
+	return -1
+
+
+func _item_v2_ai_item_is_useful(side: int, item: ItemData,
+		target: int, action_step: Dictionary) -> bool:
+	var action: int = int(action_step.get("action", A.CHARGE))
+	var active: int = battle.active_index[side]
+	var foe: int = 1 - side
+	var foe_active: int = battle.active_index[foe]
+	match String(item.effect_key):
+		"next_wave_bonus":
+			return action == A.ATTACK or bool(action_step.get("split_big_wave", false))
+		"next_big_wave_bonus":
+			return action == A.BIG_ATTACK or (action == A.ATTACK and battle.upgrade_next_wave[side])
+		"next_defend_upgrade":
+			return action == A.DEFEND
+		"next_attack_bonus", "next_attack_any_target":
+			return ActionDef.is_attack(action)
+		"heal_active":
+			return battle.hp[side][active] < battle.max_hp[side][active]
+		"heal_teammate":
+			return target >= 0 and battle.hp[side][target] < battle.max_hp[side][target]
+		"swap_active":
+			return target >= 0 and battle.hp[side][target] > battle.hp[side][active]
+		"swap_armor":
+			return target >= 0 and battle.shield[side][target] != battle.shield[side][active]
+		"break_enemy_armor", "steal_enemy_armor":
+			return battle.shield[foe][foe_active] > 0
+		"gain_energy":
+			return battle.energy[side] < battle.energy_max[side]
+		"armor_to_energy":
+			return battle.shield[side][active] >= BattleCore.HP_UNIT
+		"clear_active_armor":
+			return battle.shield[side][active] > 0 or battle.shield[foe][foe_active] > 0
+		"clear_pending_item_effects":
+			return not battle.item_v2_pending[0].is_empty() \
+				or not battle.item_v2_pending[1].is_empty()
+		"revive_teammate":
+			return target >= 0
+	return true
+
+
+func _item_v2_ai_sequence(side: int, forced_switch_slot: int = -1) -> Array[Dictionary]:
+	var choice: Dictionary = {"action": A.SWITCH, "target": forced_switch_slot} \
+		if forced_switch_slot >= 0 else _ai.choose_action(battle, side)
+	var action_step: Dictionary = _item_v2_action_step_from_choice(choice)
+	if not battle.validate_item_v2_command_sequence(side, [action_step]):
+		action_step = {"kind": "action", "action": A.CHARGE, "target": -1}
+	var candidates: Array[Dictionary] = []
+	for slot_index: int in range(battle.slots[side].size()):
+		if not battle.slot_ready(side, slot_index):
+			continue
+		var item: ItemData = battle.slot_item(side, slot_index)
+		if item == null or not item.is_prototype_v2():
+			continue
+		var target: int = _item_v2_ai_target(side, item)
+		if not _item_v2_ai_item_is_useful(side, item, target, action_step):
+			continue
+		var priority: int = 10
+		if item.effect_key == &"next_item_discount":
+			priority = 0
+		elif item.effect_key == &"gain_energy":
+			priority = 1
+		elif item.effect_key == &"armor_to_energy":
+			priority = 2
+		candidates.append({"priority": priority,
+			"step": {"kind": "item", "slot": slot_index, "target": target}})
+	candidates.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
+		return int(left["priority"]) < int(right["priority"]))
+	var before: Array[Dictionary] = []
+	var after: Array[Dictionary] = []
+	for candidate: Dictionary in candidates:
+		var item_step: Dictionary = candidate["step"]
+		var trial_before: Array[Dictionary] = before.duplicate(true)
+		trial_before.append(item_step)
+		trial_before.append(action_step)
+		trial_before.append_array(after)
+		if battle.validate_item_v2_command_sequence(side, trial_before):
+			before.append(item_step)
+			continue
+		var trial_after: Array[Dictionary] = before.duplicate(true)
+		trial_after.append(action_step)
+		trial_after.append_array(after)
+		trial_after.append(item_step)
+		if battle.validate_item_v2_command_sequence(side, trial_after):
+			after.append(item_step)
+	var result: Array[Dictionary] = before
+	result.append(action_step)
+	result.append_array(after)
+	return result
+
+
 ## 把本回合已完成配对的道具按依赖顺序提交到克隆；用于动作可支付预览与 AI 预想。
 ## 熔炉/魔晶即时产能、爆裂即时减费与点金石原位升级都由 use_slot 统一反映。
 func _battle_after_selected_items() -> BattleCore:
@@ -1909,7 +2315,8 @@ func _items_key() -> String:
 
 ## 拉起/重启本地 AI 后台预想。PvE 与本地 PvP 共用；联机局由对端玩家决策。
 func _start_ai_think() -> void:
-	if _net or state != State.PLAYER_SELECT or battle == null or battle.game_over:
+	if _net or battle == null or battle.item_v2_enabled \
+			or state != State.PLAYER_SELECT or battle.game_over:
 		return   # 联机局无本地 AI（对手=真人·M1）
 	if _think_task >= 0:
 		_think_restart = true   # 正在想：标记重拉（旧结果会因 items_key/turn 校验不符被弃）
@@ -1976,6 +2383,17 @@ func _ai_pick_precomputed() -> bool:
 	if not battle.apply_choice(AI, choice):
 		battle.select_action(AI, A.CHARGE)   # 兜底（与同步路径同款保险）
 	return true
+
+
+## 调试入口覆盖本回合 AI 选择时，安全回收只读克隆上的后台预想并丢弃结果。
+func _discard_ai_precomputed() -> void:
+	if _think_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_think_task)
+		_think_task = -1
+	_think_mutex.lock()
+	_think_out = {}
+	_think_mutex.unlock()
+	_think_restart = false
 
 
 func _ai_pick(side: int) -> void:
@@ -2059,17 +2477,29 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 	var corrected_active_before: Array[int] = corrected_baselines["active"]
 	var corrected_hp_before: Array[float] = corrected_baselines["hp"]
 	var h16_pursuits: Array[Dictionary] = _h16_pursuit_specs(resolution_events)
+	var h11_switch_chases: Array[Dictionary] = _h11_switch_chase_specs(resolution_events)
+	var h19_transfers: Array[Dictionary] = _h19_transfer_specs(resolution_events)
+	var h07_entry_impacts: Array[Dictionary] = _h07_entry_impact_specs(resolution_events)
+	var h07_entry_deaths: Array[bool] = [false, false]
+	for impact: Dictionary in h07_entry_impacts:
+		var impact_player: int = int(impact.get("player", -1))
+		if impact_player >= PLAYER and impact_player <= AI \
+				and bool(impact.get("defeated", false)):
+			h07_entry_deaths[impact_player] = true
 	var display_slots: Array[int] = [battle.active_index[0], battle.active_index[1]]
 	# BattleCore 已经是最终快照；h16 的最终 active_index 不能倒灌到主行动段。
 	for pursuit: Dictionary in h16_pursuits:
 		var pursuit_player := int(pursuit.get("player", -1))
 		if pursuit_player >= PLAYER and pursuit_player <= AI:
 			display_slots[pursuit_player] = int(corrected_active_before[pursuit_player])
+	var switch_entry_values: Array[Dictionary] = _switch_entry_value_specs(
+		resolution_events, display_slots)
 	var dmg: Array[int] = [0, 0]
 	var reserve_hits: Array[Dictionary] = [{}, {}]   # slot → {amount, pen}，防替补受击误打中央角色
 	var reserve_blocks: Array[Dictionary] = [{}, {}] # slot → 是否挡下大波，防替补格挡误播到中央角色
 	var dead: Array[bool] = [false, false]
 	var pen_max: Array[int] = [0, 0]        # ⑧ 本拍最高穿透档（damage_taken.pen·Pen 枚举有序 → 取最高档配色）
+	var damage_number_states: Array[StringName] = [&"normal", &"normal"]
 	var blocked: Array[bool] = [false, false]     # ② 该方本拍挡下过攻击（player=防守方）
 	var block_big_atk: Array[bool] = [false, false]  # ② 挡下的是不是大波（演出隆重度）
 	var egain: Array[int] = [0, 0]          # ③ 本拍能量获得（半能单位）
@@ -2078,13 +2508,14 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 	#   替补席事件（牧羊/饕餮回血、替补位延迟伤害）不在角色身位飘字——replay 到 HUD 替补行=后续候选。
 	var tags: Array = [[], []]
 	var pre_tags: Array = [[], []]
-	var cancelled_attacks: Array[bool] = [false, false]
+	var cancelled_actions: Array[bool] = [false, false]
 	var transform_players: Array[int] = []
 	# 力量的代价属于回合末自我处决，而非对方动作击杀。保留死亡演出，
 	# 但不能误触发对方终结技或“大波命中”的镜头判断。
 	var strength_price_executed: Array[bool] = [false, false]
 	for ev in resolution_events:
-		if _is_h16_pursuit_detail_event(ev):
+		if _is_h16_pursuit_detail_event(ev) or _is_h19_transfer_detail_event(ev) \
+				or _is_h07_entry_detail_event(ev):
 			continue
 		var p: int = int(ev.get("player", 0))
 		var event_slot: int = int(ev.get("slot", display_slots[p]))
@@ -2095,13 +2526,20 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 				if counter_player >= 0 and counter_player < pre_tags.size():
 					pre_tags[counter_player].append({text = tr("反制"), col = COL_TAG_BREAK})
 			"damage_taken":
+				var number_state: StringName = StringName(
+					ev.get("damage_number_state", &"normal"))
 				if on_display:
 					dmg[p] += int(ev.get("amount", 0))
 					pen_max[p] = maxi(pen_max[p], int(ev.get("pen", 0)))
+					if number_state != &"normal":
+						damage_number_states[p] = number_state
 				else:
-					var reserve_hit: Dictionary = reserve_hits[p].get(event_slot, {amount = 0, pen = 0})
+					var reserve_hit: Dictionary = reserve_hits[p].get(
+						event_slot, {amount = 0, pen = 0, special_state = &"normal"})
 					reserve_hit["amount"] = int(reserve_hit["amount"]) + int(ev.get("amount", 0))
 					reserve_hit["pen"] = maxi(int(reserve_hit["pen"]), int(ev.get("pen", 0)))
+					if number_state != &"normal":
+						reserve_hit["special_state"] = number_state
 					reserve_hits[p][event_slot] = reserve_hit
 			"life_lost", "yaohuo_loss":
 				# 失去生命绕过伤害管线，但仍必须进入受击演出，避免血量无提示跳变。
@@ -2128,7 +2566,7 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 						block_big_atk[p] = true
 				else:
 					reserve_blocks[p][event_slot] = bool(reserve_blocks[p].get(event_slot, false)) or blocked_big
-			"charge_gain":
+			"charge_gain", "item_v2_energy_gained":
 				egain[p] += int(ev.get("amount", 0))
 			"poison_detonate":
 				if on_display:
@@ -2179,8 +2617,15 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 					strength_price_executed[p] = true
 					tags[p].append({text = tr("代价"), col = COL_TAG_BREAK, pr = 0})
 			"base_attack_cancelled":
-				cancelled_attacks[p] = true
+				cancelled_actions[p] = true
 				tags[p].append({text = tr("断招"), col = COL_TAG_BREAK, pr = 0})
+			"h21_action_cancelled":
+				cancelled_actions[p] = true
+				pre_tags[p].append({
+					text = tr("惊蛰·行动取消"),
+					col = BattleFxScript.COL_BLOCK_TEXT,
+					pr = 0,
+				})
 			"exhausted":
 				pre_tags[p].append({text = tr("力竭"), col = BattleFxScript.COL_BLOCK_TEXT})
 			"switch_locked":
@@ -2199,38 +2644,149 @@ func _animate_resolution(r: Dictionary, active_before: Array[int], hp_before: Ar
 			var hp_now := battle.hp_display(battle.hp[p][corrected_active_before[p]])
 			if hp_now > corrected_hp_before[p]:
 				healed[p] = hp_now - corrected_hp_before[p]
-	var resolved_actions: Array[int] = [
-		int(r.get("p1_action", -1)), int(r.get("p2_action", -1))]
-	var h10_active_players: Array[int] = []
-	for p in 2:
-		# H17 可能在最终快照里变成 h10，不能因此误播飞洒天星的攻击帧。
-		var source_slot: int = int(corrected_active_before[p])
-		if resolved_actions[p] == ACTIVE and not transform_players.has(p) \
-				and source_slot >= 0 and source_slot < battle.heroes[p].size() \
-				and (battle.heroes[p][source_slot] as HeroData).hero_id == "h10":
-			h10_active_players.append(p)
-
 	# 头顶招式圆圈（揭示双方盲选出招）→ 消失 → 再播打斗动画
 	await _show_action_indicators(
 		r.get("p1_action", -1), r.get("p2_action", -1), resolution_events)
 	var anim_actions: Array[int] = [int(r.get("p1_action", -1)), int(r.get("p2_action", -1))]
 	for p in 2:
-		if cancelled_attacks[p]:
+		if cancelled_actions[p]:
 			anim_actions[p] = -1
 	await _play_battle_anims(anim_actions[0], anim_actions[1], dmg, dead,
 		{pen = pen_max, blocked = blocked, block_big = block_big_atk, egain = egain, healed = healed,
+			damage_number_states = damage_number_states,
 			tags = tags, pre_tags = pre_tags, reserve_hits = reserve_hits, reserve_blocks = reserve_blocks,
 			strength_price_executed = strength_price_executed,
 			transform_players = transform_players,
-			h10_active_players = h10_active_players,
 			h16_pursuits = h16_pursuits,
+			h11_switch_chases = h11_switch_chases,
+			h07_entry_impacts = h07_entry_impacts,
+			h07_entry_deaths = h07_entry_deaths,
+			h19_transfers = h19_transfers,
+			switch_entry_values = switch_entry_values,
 			active_before = corrected_active_before})
 	_resolution_frame_value_overrides.clear()
 	_update_all()
+	if battle.item_v2_enabled and r.has("resolved_columns"):
+		event_label.text = _item_v2_resolution_log(r["resolved_columns"])
+		event_label.visible = not event_label.text.is_empty()
+
+
+func _item_v2_resolution_log(columns: Array) -> String:
+	var chunks: Array[String] = []
+	for column_variant: Variant in columns:
+		var column: Dictionary = column_variant
+		var steps: Array = column.get("steps", [null, null])
+		var left: String = _item_v2_step_log_name(steps[0] if steps.size() > 0 else null)
+		var right: String = _item_v2_step_log_name(steps[1] if steps.size() > 1 else null)
+		chunks.append("%d %s / %s" % [int(column.get("column", chunks.size())) + 1,
+			left, right])
+	return tr("结算序列：") + "  →  ".join(chunks)
+
+
+func _item_v2_step_log_name(value: Variant) -> String:
+	if not value is Dictionary:
+		return "—"
+	var step: Dictionary = value
+	match String(step.get("kind", "")):
+		"item":
+			var item: ItemData = ItemCatalog.make(String(step.get("item_id", "")))
+			return tr(item.item_name) if item != null else tr("道具")
+		"action":
+			return _action_name(int(step.get("action", -1)))
+		"free_switch":
+			return tr("免费切换")
+		"wait":
+			return tr("延后")
+	return "—"
 
 
 func _is_h16_pursuit_detail_event(event: Dictionary) -> bool:
 	return String(event.get("resolution_phase", "")) == "h16_pursuit"
+
+
+## H19 的替补扣血是转移抵达拍，不属于主命中拍的 reserve_hits。
+func _is_h19_transfer_detail_event(event: Dictionary) -> bool:
+	return String(event.get("id", "")) == "damage_taken" \
+		and String(event.get("src", "")) == "h19_transfer"
+
+
+## 星日登场伤害有自己的弧形命中拍，不得再次并入主行动的公共命中。
+func _is_h07_entry_detail_event(event: Dictionary) -> bool:
+	return String(event.get("id", "")) == "damage_taken" \
+		and String(event.get("src", "")) == "h07_entry"
+
+
+func _h07_entry_impact_specs(events: Array) -> Array[Dictionary]:
+	var specs: Array[Dictionary] = []
+	for event_variant: Variant in events:
+		var event: Dictionary = event_variant
+		if String(event.get("id", "")) == "h07_entry_impact":
+			specs.append(event.duplicate(true))
+	return specs
+
+
+## 取每方主行动段真正登场的最后一次切换快照。h16 追击有自己的延后交接与数值快照，
+## 不能提前塞进主行动段；多次强制切换则以最终显示槽对应的最后一条为准。
+func _switch_entry_value_specs(events: Array, display_slots: Array[int]) -> Array[Dictionary]:
+	var by_player: Dictionary = {}
+	for event_variant: Variant in events:
+		var event: Dictionary = event_variant
+		if String(event.get("id", "")) != "switch" \
+				or String(event.get("resolution_phase", "")) == "h16_pursuit_switch":
+			continue
+		var player: int = int(event.get("player", -1))
+		var from_to: Array = event.get("from_to", [])
+		if player < PLAYER or player > AI or from_to.size() < 2 \
+				or not event.has("to_hp") or not event.has("to_shield"):
+			continue
+		var slot: int = int(from_to[1])
+		if player >= display_slots.size() or slot != display_slots[player]:
+			continue
+		by_player[player] = {
+			player = player,
+			slot = slot,
+			hp = int(event["to_hp"]),
+			shield = int(event["to_shield"]),
+		}
+	var specs: Array[Dictionary] = []
+	for player: int in [PLAYER, AI]:
+		if by_player.has(player):
+			specs.append((by_player[player] as Dictionary).duplicate(true))
+	return specs
+
+
+func _h19_transfer_specs(events: Array) -> Array[Dictionary]:
+	var specs: Array[Dictionary] = []
+	for event_variant: Variant in events:
+		var event: Dictionary = event_variant
+		if String(event.get("id", "")) != "h19_damage_transferred":
+			continue
+		var spec: Dictionary = event.duplicate(true)
+		# 旧联机录像没有细分字段时，以同槽 h19_transfer 的 damage_taken 补齐生命伤害；
+		# 新事件始终直接携带 hp/shield 两段，避免 UI 猜测 actual 的含义。
+		if not spec.has("hp_damage"):
+			var hp_damage := 0
+			for detail_variant: Variant in events:
+				var detail: Dictionary = detail_variant
+				if _is_h19_transfer_detail_event(detail) \
+						and int(detail.get("player", -1)) == int(spec.get("player", -1)) \
+						and int(detail.get("slot", -1)) == int(spec.get("to", -1)):
+					hp_damage += int(detail.get("amount", 0))
+			spec["hp_damage"] = hp_damage
+		if not spec.has("shield_damage"):
+			spec["shield_damage"] = maxi(
+				0, int(spec.get("actual", 0)) - int(spec.get("hp_damage", 0)))
+		specs.append(spec)
+	return specs
+
+
+func _h11_switch_chase_specs(events: Array) -> Array[Dictionary]:
+	var specs: Array[Dictionary] = []
+	for event_variant: Variant in events:
+		var event: Dictionary = event_variant
+		if String(event.get("id", "")) == "h11_switch_chase":
+			specs.append(event.duplicate(true))
+	return specs
 
 
 func _death_belongs_to_h16_pursuit(
@@ -2504,6 +3060,7 @@ func _select_switch(frame_idx: int) -> void:
 	selected_btn = null
 	_empowered_wave_armed = false
 	_split_big_wave_armed = false
+	_jianqi_attack_armed = false
 	_energy_cap_discount_armed = false
 	_blood_payment_armed = false
 	battle.set_blood_payment_active(PLAYER, false)
@@ -2525,6 +3082,7 @@ func _deselect_switch() -> void:
 	selected_switch = -1
 	_empowered_wave_armed = false
 	_split_big_wave_armed = false
+	_jianqi_attack_armed = false
 	_energy_cap_discount_armed = false
 	_blood_payment_armed = false
 	battle.set_blood_payment_active(PLAYER, false)
@@ -2556,8 +3114,8 @@ func _free_switch_now(frame_idx: int) -> void:
 		return
 	_disarm_switch()
 	if battle.free_switch(PLAYER, slot):
-		if _net:
-			_free_switch_sequence.append(slot)
+		# 本地与联机都保留同一份操作序列：既供顺序条展示，也让后续蚩尤付款时点一致。
+		_free_switch_sequence.append(slot)
 		selected_action = -1
 		selected_second_action = -1
 		_second_enemy_target_pick = -1
@@ -2566,6 +3124,7 @@ func _free_switch_now(frame_idx: int) -> void:
 		selected_btn = null
 		_empowered_wave_armed = false
 		_split_big_wave_armed = false
+		_jianqi_attack_armed = false
 		_energy_cap_discount_armed = false
 		_reset_button_styles()
 		# 核心 active_index 已切到预览英雄，中央立绘仍是旧英雄；复用结算阶段的
@@ -2599,6 +3158,7 @@ func _clear_action_selection_full(preserve_blood_payment: bool = false) -> void:
 	selected_btn = null
 	_empowered_wave_armed = false
 	_split_big_wave_armed = false
+	_jianqi_attack_armed = false
 	_energy_cap_discount_armed = false
 	if not preserve_blood_payment:
 		_blood_payment_armed = false
@@ -2739,6 +3299,7 @@ func _set_buttons_active(active: bool, dim_inactive: bool = true) -> void:
 	var show_affordance := active or not dim_inactive
 	var alpha := 1.0 if show_affordance else 0.4
 	buttons_ctrl.modulate = Color(1, 1, 1, alpha)
+	_sync_command_strip_activity(active, dim_inactive)
 	if show_affordance:
 		_refresh_action_affordance()   # 按能量显示亮/暗（开局与选择阶段一致）
 	else:
@@ -2889,18 +3450,16 @@ func _attach_button_juice(btn: BaseButton) -> void:
 		btn.add_child(bj)
 
 
-## 选中态视觉：果冻底常显，选中按钮整体提亮 + 从中心放大（缩放手感交给 ButtonJuice 弹性处理）。
-## （不再用不透明 StyleBox 盖住果冻 —— 那正是"点击后变回老版"的根因）。
+## 点击只进入预选态，拖入顺序槽才成为有效指令；来源按钮仍保留成熟的选中反馈，
+## 让龙御极、暗潮、并封等上方分支能继续以底部按钮为视觉锚点展开。
 func _set_btn_selected(btn: Button, on: bool) -> void:
-	# B「典籍朱印」：羊皮按钮选中态镀金箔 —— 暖金提亮 modulate，呼应金箔高亮语言（源自原技能卡体系·卡已退役）。
 	btn.modulate = Color(1.5, 1.32, 0.82) if on else Color.WHITE
 	var juice := btn.get_node_or_null("ButtonJuice") as ButtonJuice
 	if juice != null:
-		juice.set_selected(on)   # 弹性放大/复位（带 overshoot）
+		juice.set_selected(on)
 	else:
 		btn.pivot_offset = btn.size * 0.5
 		btn.scale = Vector2.ONE * (1.08 if on else 1.0)
-	# 任务7：选中该动作按钮后，让按钮内的美术图标持续播 idle（取消选中则回静止帧）。
 	var hi := btn.get_node_or_null("HoverIcon") as HoverIcon
 	if hi != null:
 		hi.set_selected_play(on)
@@ -2975,6 +3534,22 @@ func _on_longyuji_branch_pressed() -> void:
 	_refresh_action_affordance()
 
 
+## 飞洒天星只强化当前基础攻击的穿透；再次点击撤销，不增加独立行动。
+func _on_jianqi_attack_branch_pressed() -> void:
+	if state != State.PLAYER_SELECT or not ActionDef.is_attack(selected_action):
+		return
+	if selected_btn != btn_attack and selected_btn != btn_big_attack:
+		return
+	var preview: BattleCore = _battle_after_selected_items()
+	var enable: bool = not _jianqi_attack_armed
+	if enable and not preview.can_jianqi_attack_action(
+			PLAYER, selected_action, _empowered_wave_armed,
+			_blood_payment_armed, _energy_cap_discount_armed):
+		return
+	_jianqi_attack_armed = enable
+	_refresh_action_affordance()
+
+
 ## 暗潮使用「大波」上方的技能 icon 分支；再次点击可撤销，退回普通大波。
 func _on_split_big_wave_pressed() -> void:
 	if state != State.PLAYER_SELECT:
@@ -2985,6 +3560,7 @@ func _on_split_big_wave_pressed() -> void:
 		return
 	_split_big_wave_armed = not _split_big_wave_armed
 	_empowered_wave_armed = false
+	_jianqi_attack_armed = false
 	_refresh_action_modifiers()
 
 
@@ -2994,6 +3570,10 @@ func _selected_action_can_pay(blood_payment: bool, energy_cap_discount: bool) ->
 		return preview.can_use_active(PLAYER, blood_payment, energy_cap_discount)
 	if selected_action < 0 or selected_action == A.SWITCH:
 		return true
+	if _jianqi_attack_armed:
+		return preview.can_jianqi_attack_action(
+			PLAYER, selected_action, _empowered_wave_armed,
+			blood_payment, energy_cap_discount)
 	if _empowered_wave_armed:
 		return preview.can_empower_wave_action(
 			PLAYER, selected_action, blood_payment, energy_cap_discount)
@@ -3045,12 +3625,14 @@ func _refresh_action_modifiers() -> void:
 	_set_btn_selected(btn_special, special_selected)
 
 
-## 刷新攻击变体：龙御极位于「波」上方，暗潮位于「大波」上方。
+## 刷新攻击变体：所有分支都锚定当前基础动作，按固定层高向上堆叠。
 func _refresh_longyuji() -> void:
-	if longyuji_picker == null or split_big_wave_picker == null or btn_split_big_wave == null:
+	if longyuji_picker == null or jianqi_attack_picker == null \
+			or split_big_wave_picker == null or btn_split_big_wave == null:
 		return
 	var preview: BattleCore = _battle_after_selected_items()
 	var has_empowered: bool = preview.has_empowered_wave(PLAYER)
+	var has_jianqi: bool = preview.has_jianqi_attack(PLAYER)
 	var has_split: bool = preview.has_split_big_wave(PLAYER)
 	if not has_empowered:
 		_empowered_wave_armed = false
@@ -3070,6 +3652,32 @@ func _refresh_longyuji() -> void:
 		_set_btn_selected(btn_longyuji_branch, _empowered_wave_armed)
 		if btn_longyuji_branch.disabled:
 			btn_longyuji_branch.modulate = Color(0.52, 0.50, 0.47)
+
+	if not has_jianqi:
+		_jianqi_attack_armed = false
+	elif _jianqi_attack_armed and not preview.can_jianqi_attack_action(
+			PLAYER, selected_action, _empowered_wave_armed,
+			_blood_payment_armed, _energy_cap_discount_armed):
+		_jianqi_attack_armed = false
+	var show_jianqi_picker: bool = state == State.PLAYER_SELECT and has_jianqi \
+		and ActionDef.is_attack(selected_action) \
+		and (selected_btn == btn_attack or selected_btn == btn_big_attack)
+	jianqi_attack_picker.visible = show_jianqi_picker
+	if show_jianqi_picker:
+		var anchor_button: Button = btn_attack if selected_action == A.ATTACK else btn_big_attack
+		var lower_stack: float = 0.0
+		if selected_action == A.ATTACK and longyuji_picker.visible:
+			lower_stack = longyuji_picker.size.y + 14.0
+		jianqi_attack_picker.position = Vector2(
+			anchor_button.position.x + (anchor_button.size.x - jianqi_attack_picker.size.x) * 0.5,
+			anchor_button.position.y - jianqi_attack_picker.size.y - 14.0 - lower_stack)
+		var can_jianqi: bool = preview.can_jianqi_attack_action(
+			PLAYER, selected_action, _empowered_wave_armed,
+			_blood_payment_armed, _energy_cap_discount_armed)
+		btn_jianqi_attack.disabled = not can_jianqi
+		_set_btn_selected(btn_jianqi_attack, _jianqi_attack_armed)
+		if btn_jianqi_attack.disabled:
+			btn_jianqi_attack.modulate = Color(0.52, 0.50, 0.47)
 
 	if not has_split:
 		_split_big_wave_armed = false
@@ -3113,6 +3721,8 @@ func _refresh_h24_discount() -> void:
 	elif selected_btn == btn_big_attack and split_big_wave_picker != null \
 			and split_big_wave_picker.visible:
 		stack_offset = split_big_wave_picker.size.y + 14.0
+	if jianqi_attack_picker != null and jianqi_attack_picker.visible:
+		stack_offset += jianqi_attack_picker.size.y + 14.0
 	h24_discount_picker.position = Vector2(
 		selected_btn.position.x + (selected_btn.size.x - h24_discount_picker.size.x) * 0.5,
 		selected_btn.position.y - h24_discount_picker.size.y - 14.0 - stack_offset)
@@ -3213,6 +3823,674 @@ func _build_item_rows() -> void:
 				- ITEM_MIDDLE_CENTER_LOCAL * ITEM_ROW_SCALE)
 	p2_item_row.slot_clicked.connect(_on_p2_item_target_clicked)
 	p2_hud.add_child(p2_item_row)
+
+
+func _build_command_drag_ui() -> void:
+	_command_order_strip = Control.new()
+	_command_order_strip.name = "CommandOrderStrip"
+	_command_order_strip.position = COMMAND_STRIP_RECT.position
+	_command_order_strip.size = COMMAND_STRIP_RECT.size
+	_command_order_strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_command_order_strip.z_index = 83
+	add_child(_command_order_strip)
+	_command_order_row = Control.new()
+	_command_order_row.name = "Entries"
+	_command_order_row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_command_order_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_command_order_strip.add_child(_command_order_row)
+	_refresh_command_order_strip()
+
+
+func _make_command_slot(node_name: String, empty: bool) -> Control:
+	# 十字星槽没有可见面板，不应使用会接管 Control 子节点布局的 Container。
+	# 普通 Control 保证正式场景与 Base 预览使用完全相同的局部坐标和轮廓。
+	var slot := Control.new()
+	slot.name = node_name
+	slot.size = Vector2.ONE * COMMAND_SLOT_SIZE
+	slot.custom_minimum_size = slot.size
+	slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# 空槽只有提示星体；保持父节点全亮，让星体自身的慢闪峰值真正达到已填槽颜色。
+	slot.modulate.a = 1.0
+	# 直接复制 Base 中由用户手调完成的预览节点。正式场景只接管位置和运行状态，
+	# 不再新建一个“近似实现”后重算轮廓。
+	var skin := command_sequence_star_preview.duplicate() as Control
+	skin.name = "SlotSkin"
+	skin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	skin.set("editor_preview", false)
+	skin.visible = true
+	skin.z_index = 0
+	skin.set_meta("uses_base_preview_template", true)
+	slot.add_child(skin)
+	# 不再经过 Container 排版；直接复刻 Base 预览的绘制尺寸。
+	skin.position = Vector2.ZERO
+	skin.size = command_sequence_star_preview.size
+	skin.scale = Vector2.ONE
+	skin.rotation = 0.0
+	_configure_command_slot_skin(skin, empty)
+	if empty:
+		_command_next_slot_skin = skin
+	return slot
+
+
+func _configure_command_slot_skin(skin: Control, is_empty: bool) -> void:
+	if skin == null:
+		return
+	var preview := command_sequence_star_preview
+	skin.configure(is_empty, countdown_ornament_color,
+		countdown_ornament_underlay_color, countdown_ornament_underlay_width,
+		preview.get("tuning_center_offset"),
+		Vector2(float(preview.get("tuning_horizontal_radius")),
+			float(preview.get("tuning_vertical_radius"))),
+		float(preview.get("tuning_waist_power")),
+		float(preview.get("tuning_pulse_duration")),
+		float(preview.get("tuning_idle_alpha")),
+		preview.get("tuning_shadow_color"),
+		preview.get("tuning_shadow_offset"),
+		float(preview.get("tuning_shadow_expand")))
+
+
+func _on_command_star_tuning_changed() -> void:
+	# Remote Inspector 修改预览节点时，将同一组参数实时推送到已生成的全部顺序槽。
+	if _command_order_row == null:
+		return
+	for skin_node: Node in _command_order_row.find_children(
+			"SlotSkin", "Control", true, false):
+		var skin := skin_node as Control
+		_configure_command_slot_skin(skin, bool(skin.get("empty")))
+
+
+func _configure_command_cancel_glyph(glyph: Control) -> void:
+	if glyph == null:
+		return
+	glyph.configure(countdown_ornament_color,
+		UI_BOTTOM_SHADOW_COLOR, UI_BOTTOM_SHADOW_OFFSET,
+		command_sequence_cancel_preview)
+
+
+func _on_command_cancel_tuning_changed() -> void:
+	if _command_order_row == null:
+		return
+	for glyph_node: Node in _command_order_row.find_children(
+			"CancelGlyph", "Control", true, false):
+		_configure_command_cancel_glyph(glyph_node as Control)
+	for cancel_node: Node in _command_order_row.find_children(
+			"Cancel", "Button", true, false):
+		(cancel_node as Control).position = Vector2(
+			COMMAND_SLOT_SIZE - 6.0, -15.0) \
+			+ command_sequence_cancel_preview.get("tuning_slot_offset")
+
+
+func _copy_control_transform(source: Control, target: Control) -> void:
+	target.position = source.position
+	target.size = source.size
+	target.scale = source.scale
+	target.rotation = source.rotation
+	target.pivot_offset = source.pivot_offset
+	target.z_index = source.z_index
+	target.visible = source.visible
+	target.self_modulate = source.self_modulate
+	target.modulate = source.modulate
+	target.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+
+func _copy_icon_badge(source: IconBadge) -> IconBadge:
+	var target := IconBadge.new()
+	target.name = source.name
+	_copy_control_transform(source, target)
+	target.sheet = source.sheet
+	target.hframes = source.hframes
+	target.vframes = source.vframes
+	target.frame = source.frame
+	target.icon_modulate = source.icon_modulate
+	target.number = source.number
+	target.show_number = source.show_number
+	target.number_color = source.number_color
+	target.number_outline = source.number_outline
+	target.outline_size = source.outline_size
+	target.font_size = source.font_size
+	target.embolden = source.embolden
+	target.number_offset = source.number_offset
+	return target
+
+
+func _ignore_mouse_recursive(node: Node) -> void:
+	if node is Control:
+		(node as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for child: Node in node.get_children():
+		_ignore_mouse_recursive(child)
+
+
+func _make_button_command_art(button: Button) -> Control:
+	var art := Control.new()
+	art.name = "Art"
+	art.size = button.size
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for child: Node in button.get_children():
+		if not (child is CanvasItem) or not (child as CanvasItem).visible:
+			continue
+		var copy: Node = _copy_icon_badge(child as IconBadge) \
+			if child is IconBadge else child.duplicate()
+		if copy == null:
+			continue
+		_ignore_mouse_recursive(copy)
+		art.add_child(copy)
+	return art
+
+
+func _make_switch_command_art() -> Control:
+	# 顺序条记录完整“切换按钮”：蓝色果冻底、像素外框与图标全部复用正式按钮；
+	# 目标英雄仍由队列数据保存，不再通过头像框重复表达。
+	return _make_button_command_art(btn_switch) if btn_switch != null else Control.new()
+
+
+func _make_item_command_art(slot_index: int, side: float = ITEM_FRAME_SIZE,
+		complete_frame: bool = false) -> Control:
+	var art := Control.new()
+	art.name = "Art"
+	art.size = Vector2.ONE * side
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var item: ItemData = _effective_slot_item(slot_index)
+	var texture: Texture2D = ItemCatalog.load_icon(item.item_id) if item != null else null
+	var icon_position := Vector2.ONE * (side * 0.08)
+	var icon_size := Vector2.ONE * (side * 0.84)
+	if complete_frame:
+		# 落槽后恢复图鉴 / 战斗道具栏同源的完整结构。side 表示最终外框尺寸，
+		# 内部槽位按 item_frame 的透明边逆推，避免框被当作 68px 槽再额外放大。
+		var tier := item.tier if item != null else 1
+		var slot_size := Vector2.ONE * side / ItemFrameStyle.FRAME_ART_SCALE
+		var slot_position := -slot_size * ItemFrameStyle.FRAME_OFFSET_RATIO
+		var inset := slot_size * ItemFrameStyle.CELL_INSET_RATIO
+		icon_position = slot_position + inset
+		icon_size = slot_size - inset * 2.0
+		var cell := ColorRect.new()
+		cell.name = "ItemCell"
+		cell.color = Color.WHITE
+		cell.position = icon_position
+		cell.size = icon_size
+		cell.material = ItemFrameStyle.make_cell_material(
+			tier, minf(slot_size.x, slot_size.y) / 6.0, 0.18)
+		cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		art.add_child(cell)
+		if texture != null:
+			art.add_child(ItemFrameStyle.make_item_art_shadow(
+				texture, icon_position, icon_size, "ItemArtShadow"))
+		var frame := TextureRect.new()
+		frame.name = "ItemFrame"
+		frame.texture = ItemFrameStyle.FRAME_TEXTURE
+		frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		frame.stretch_mode = TextureRect.STRETCH_SCALE
+		frame.position = Vector2.ZERO
+		frame.size = Vector2.ONE * side
+		frame.material = ItemFrameStyle.make_frame_material(tier)
+		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		art.add_child(frame)
+	if texture != null:
+		var icon := TextureRect.new()
+		icon.name = "ItemIcon"
+		icon.texture = texture
+		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		ItemFrameStyle.configure_item_art(icon, texture, Rect2(icon_position, icon_size))
+		art.add_child(icon)
+	if complete_frame and item != null:
+		var badge_side := clampf(side * 0.38, 24.0, 34.0)
+		var badge_size := Vector2.ONE * badge_side
+		var positions := ItemFrameStyle.stat_badge_positions(
+			Rect2(Vector2.ZERO, Vector2.ONE * side), badge_size)
+		var current_durability := item.max_durability
+		if slot_index >= 0 and slot_index < battle.slots[PLAYER].size():
+			current_durability = int(battle.slots[PLAYER][slot_index].get(
+				"current_durability", item.max_durability))
+		art.add_child(_make_item_command_stat_badge(
+			"UseCostBadge", ENERGY_COST_SHEET, 4, 4, item.use_cost,
+			positions["cost"], badge_size))
+		art.add_child(_make_item_command_stat_badge(
+			"DurabilityBadge", DURABILITY_BADGE_ICON, 1, 1, current_durability,
+			positions["durability"], badge_size))
+	return art
+
+
+func _make_item_command_stat_badge(name_value: String, texture: Texture2D,
+		hframes_value: int, vframes_value: int, number: int,
+		badge_position: Vector2, badge_size: Vector2) -> IconBadge:
+	var badge := IconBadge.new()
+	badge.name = name_value
+	badge.position = badge_position
+	badge.size = badge_size
+	badge.z_index = 20
+	badge.set_icon(texture, hframes_value, vframes_value, 0)
+	badge.set_number(number)
+	badge.normalize_icon_visual = true
+	badge.icon_visual_ratio = 0.82
+	badge.font_size = 11
+	badge.outline_size = 3
+	badge.embolden = 0.7
+	return badge
+
+
+func _make_hero_command_art(source_frame: HeroFrame) -> Control:
+	if source_frame == null:
+		return Control.new()
+	var frame := HERO_FRAME_SCENE.instantiate() as HeroFrame
+	frame.name = "Art"
+	frame.frame_size = source_frame.frame_size
+	frame.size = source_frame.frame_size
+	frame.portrait_path = source_frame.portrait_path
+	frame.hero_name = source_frame.hero_name
+	frame.player_color = source_frame.player_color
+	frame.diamond_mode = source_frame.diamond_mode
+	frame.diamond_portrait_zoom = source_frame.diamond_portrait_zoom
+	frame.diamond_portrait_px = source_frame.diamond_portrait_px
+	frame.diamond_portrait_rise = source_frame.diamond_portrait_rise
+	frame.diamond_portrait_shift_x = source_frame.diamond_portrait_shift_x
+	frame.diamond_stroke_px = source_frame.diamond_stroke_px
+	frame.diamond_rim_px = source_frame.diamond_rim_px
+	frame.diamond_inner_rim_px = source_frame.diamond_inner_rim_px
+	frame.diamond_top_slack_px = source_frame.diamond_top_slack_px
+	frame.bottom_shadow_enabled = true
+	frame.is_dead = false
+	frame.is_selected = false
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var marker_texture := AtlasTexture.new()
+	marker_texture.atlas = SWITCH_ICON_TEX
+	marker_texture.region = Rect2(
+		Vector2.ZERO,
+		Vector2(SWITCH_ICON_TEX.get_width() / 4.0, SWITCH_ICON_TEX.get_height() / 2.0))
+	var marker := Sprite2D.new()
+	marker.name = "SwitchMarker"
+	marker.texture = marker_texture
+	# 撤销 x 位于外层槽右上；切换标记填入头像右下角，保持清楚但不遮脸。
+	var marker_display_size := clampf(
+		minf(source_frame.frame_size.x, source_frame.frame_size.y) * 0.42, 26.0, 32.0)
+	marker.position = source_frame.frame_size - Vector2.ONE * (marker_display_size + 2.0)
+	marker.centered = false
+	var marker_source_size := marker_texture.get_size()
+	marker.scale = Vector2.ONE * (
+		marker_display_size / maxf(marker_source_size.x, marker_source_size.y))
+	marker.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	marker.z_index = 12
+	# Sprite2D 不参与 HeroFrame 的 Container 排版，能稳定保持 16px 静态角标。
+	frame.add_child(marker)
+	return frame
+
+
+func _switch_frame_for_slot(hero_slot: int) -> HeroFrame:
+	var frame_index: int = p1_frame_slots.find(hero_slot)
+	if frame_index <= 0 or frame_index - 1 >= _switch_candidate_frames.size():
+		return null
+	return _switch_candidate_frames[frame_index - 1]
+
+
+func _make_command_art_from_source(source: Dictionary) -> Control:
+	match String(source.get("kind", "")):
+		"action", "modifier":
+			return _make_button_command_art(source.get("button") as Button)
+		"item":
+			var source_rect: Rect2 = _command_source_global_rect(source)
+			return _make_item_command_art(int(source.get("slot", -1)),
+				minf(source_rect.size.x, source_rect.size.y))
+		"switch_target":
+			var frame_index := int(source.get("frame_idx", -1)) - 1
+			return _make_hero_command_art(_switch_candidate_frames[frame_index] \
+				if frame_index >= 0 and frame_index < _switch_candidate_frames.size() else null)
+		_:
+			return Control.new()
+
+
+func _make_command_queue_art(entry: Dictionary) -> Control:
+	match String(entry.get("kind", "")):
+		"item":
+			return _make_item_command_art(int(entry.get("slot", -1)), ITEM_FRAME_SIZE, true)
+		"free_switch":
+			return _make_switch_command_art()
+		"action":
+			var ordinal := int(entry.get("ordinal", 0))
+			var action: int = selected_action if ordinal == 0 else selected_second_action
+			if action == A.SWITCH:
+				return _make_switch_command_art()
+			var button: Button = _action_button_for(action)
+			if ordinal == 0:
+				if _jianqi_attack_armed:
+					button = btn_jianqi_attack
+				elif _empowered_wave_armed:
+					button = btn_longyuji_branch
+				elif _split_big_wave_armed:
+					button = btn_split_big_wave
+				elif _energy_cap_discount_armed:
+					button = btn_h24_discount
+			return _make_button_command_art(button) if button != null else Control.new()
+		_:
+			return Control.new()
+
+
+func _put_art_in_command_slot(slot: Control, art: Control) -> void:
+	var holder := Control.new()
+	holder.name = "Visual"
+	holder.size = Vector2.ONE * COMMAND_SLOT_SIZE
+	holder.pivot_offset = holder.size * 0.5
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	slot.add_child(holder)
+	var available := COMMAND_SLOT_SIZE - COMMAND_SLOT_ART_INSET * 2.0
+	var source_size := art.size
+	if source_size.x <= 0.0 or source_size.y <= 0.0:
+		source_size = Vector2.ONE * available
+		art.size = source_size
+	var fit := minf(available / source_size.x, available / source_size.y)
+	art.scale = Vector2.ONE * fit
+	art.position = (Vector2.ONE * COMMAND_SLOT_SIZE - source_size * fit) * 0.5 \
+		+ Vector2(0.0, COMMAND_SLOT_ART_OFFSET_Y)
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	holder.add_child(art)
+
+
+func _command_cancel_style() -> StyleBoxEmpty:
+	# 撤销键独立于十字星底座：只保留双色切角粗体 x，不再与结构外框争夺右上角。
+	return StyleBoxEmpty.new()
+
+
+func _set_command_cancel_hovered(glyph: Control, hovered: bool) -> void:
+	if glyph != null:
+		glyph.call("set_hovered", hovered)
+
+
+func _add_command_cancel_button(slot: Control, queue_index: int) -> void:
+	var cancel_layer := Control.new()
+	cancel_layer.name = "CancelLayer"
+	cancel_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cancel_layer.z_index = 24
+	slot.add_child(cancel_layer)
+	var cancel := Button.new()
+	cancel.name = "Cancel"
+	cancel.text = ""
+	cancel.focus_mode = Control.FOCUS_NONE
+	cancel.mouse_filter = Control.MOUSE_FILTER_STOP
+	cancel.position = Vector2(COMMAND_SLOT_SIZE - 6.0, -15.0) \
+		+ command_sequence_cancel_preview.get("tuning_slot_offset")
+	cancel.size = Vector2.ONE * COMMAND_CANCEL_SIZE
+	cancel.z_index = 24
+	cancel.add_theme_stylebox_override("normal", _command_cancel_style())
+	cancel.add_theme_stylebox_override("hover", _command_cancel_style())
+	cancel.add_theme_stylebox_override("pressed", _command_cancel_style())
+	cancel.add_theme_stylebox_override("disabled", _command_cancel_style())
+	cancel.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	var glyph: Control = COMMAND_CANCEL_GLYPH.new()
+	glyph.name = "CancelGlyph"
+	glyph.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_configure_command_cancel_glyph(glyph)
+	cancel.add_child(glyph)
+	cancel.mouse_entered.connect(_set_command_cancel_hovered.bind(glyph, true))
+	cancel.mouse_exited.connect(_set_command_cancel_hovered.bind(glyph, false))
+	# pressed 栈内只登记请求；下一次空闲帧再重建整栏，避免释放正在发信号的 x。
+	cancel.pressed.connect(_request_command_cancel.bind(queue_index))
+	cancel_layer.add_child(cancel)
+
+
+func _refresh_command_order_strip() -> void:
+	if _command_order_row == null:
+		return
+	var next_signature := str(_turn_command_queue)
+	var animate_refresh := _command_strip_initialized \
+		and next_signature != _command_render_signature
+	var previous_count := _command_rendered_entry_count
+	for child: Node in _command_order_row.get_children():
+		_command_order_row.remove_child(child)
+		child.free()
+	_command_next_slot = null
+	_command_next_slot_skin = null
+	var slot_count := _turn_command_queue.size() + 1
+	var stride := COMMAND_SLOT_SIZE + COMMAND_SLOT_GAP
+	var total_width := COMMAND_SLOT_SIZE + float(slot_count - 1) * stride
+	var start_x := (COMMAND_STRIP_RECT.size.x - total_width) * 0.5
+	var start_y := (COMMAND_STRIP_RECT.size.y - COMMAND_SLOT_SIZE) * 0.5
+	var old_slot_count := previous_count + 1
+	var old_total_width := COMMAND_SLOT_SIZE + float(old_slot_count - 1) * stride
+	var old_start_x := (COMMAND_STRIP_RECT.size.x - old_total_width) * 0.5
+	for index: int in range(_turn_command_queue.size()):
+		var entry: Dictionary = _turn_command_queue[index]
+		var slot := _make_command_slot("Step%d" % index, false)
+		var target_position := Vector2(start_x + float(index) * stride, start_y)
+		slot.position = Vector2(old_start_x + float(mini(index, previous_count)) * stride, start_y)
+		_command_order_row.add_child(slot)
+		_put_art_in_command_slot(slot, _make_command_queue_art(entry))
+		_add_command_cancel_button(slot, index)
+		if not slot.position.is_equal_approx(target_position):
+			create_tween().tween_property(slot, "position", target_position, 0.14) \
+				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_command_next_slot = _make_command_slot("NextSlot", true)
+	_command_next_slot.position = Vector2(
+		start_x + float(_turn_command_queue.size()) * stride, start_y)
+	_command_order_row.add_child(_command_next_slot)
+	_command_rendered_entry_count = _turn_command_queue.size()
+	_command_render_signature = next_signature
+	_command_strip_initialized = true
+	_sync_command_strip_activity(state == State.PLAYER_SELECT, state != State.TURN_INTRO)
+	if animate_refresh:
+		_play_command_strip_refresh()
+	if state == State.PLAYER_SELECT and btn_confirm != null:
+		_set_confirm_active(not _turn_command_queue.is_empty())
+
+
+func _play_command_strip_refresh() -> void:
+	if _command_order_row == null:
+		return
+	if _command_refresh_tween != null and _command_refresh_tween.is_valid():
+		_command_refresh_tween.kill()
+	_command_order_row.position = Vector2(0.0, COMMAND_REFRESH_OFFSET_Y)
+	_command_order_row.modulate.a = COMMAND_REFRESH_START_ALPHA
+	_command_order_row.set_meta("command_refresh_duration", COMMAND_REFRESH_DURATION)
+	_command_refresh_tween = create_tween().set_parallel(true)
+	_command_refresh_tween.tween_property(
+		_command_order_row, "position", Vector2.ZERO, COMMAND_REFRESH_DURATION) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_command_refresh_tween.tween_property(
+		_command_order_row, "modulate:a", 1.0, COMMAND_REFRESH_DURATION) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
+func _sync_command_strip_activity(active: bool, dim_inactive: bool = true) -> void:
+	if _command_order_strip == null:
+		return
+	# 与底部 Buttons 采用同一状态语义：F6 开场、结算、换人和技能演出期间都保留，
+	# 即使队列为空也只降暗，不能像旧逻辑一样把末端空槽整个隐藏。
+	_command_order_strip.visible = true
+	var alpha := 1.0 if active or not dim_inactive else COMMAND_RESOLUTION_ALPHA
+	_command_order_strip.modulate = Color(1.0, 1.0, 1.0, alpha)
+	for cancel_node: Node in _command_order_row.find_children("Cancel", "Button", true, false):
+		(cancel_node as Button).disabled = not active
+
+
+func _on_command_cancel_pressed(queue_index: int) -> void:
+	if queue_index < 0 or queue_index >= _turn_command_queue.size():
+		return
+	var entry: Dictionary = _turn_command_queue[queue_index]
+	match String(entry.get("kind", "")):
+		"item":
+			var slot := int(entry.get("slot", -1))
+			_clear_item_selection_for_slot(slot)
+			_remove_command_entries("item", slot)
+			_update_all()
+		"action":
+			var ordinal := int(entry.get("ordinal", 0))
+			if ordinal == 1:
+				selected_second_action = -1
+				_second_enemy_target_pick = -1
+				_second_action_btn = null
+				_turn_command_queue.remove_at(queue_index)
+				_reset_button_styles()
+				if selected_btn != null:
+					_set_btn_selected(selected_btn, true)
+			else:
+				_remove_command_entries("action")
+				_clear_action_selection_full()
+				_disarm_switch()
+			_refresh_action_affordance()
+			_refresh_command_order_strip()
+		"free_switch":
+			var free_switch_ordinal := 0
+			for prior_index: int in range(queue_index):
+				if String(_turn_command_queue[prior_index].get("kind", "")) == "free_switch":
+					free_switch_ordinal += 1
+			# 当前规则每回合最多一次；仍只允许从逻辑预览栈尾撤销，避免未来扩容时破坏顺序。
+			if free_switch_ordinal == _free_switch_sequence.size() - 1 \
+					and battle.cancel_last_free_switch_preview(PLAYER):
+				_free_switch_sequence.remove_at(free_switch_ordinal)
+				_turn_command_queue.remove_at(queue_index)
+				_update_all()
+				_refresh_command_order_strip()
+		_:
+			return
+	_start_ai_think()
+
+
+func _request_command_cancel(queue_index: int) -> void:
+	call_deferred("_on_command_cancel_pressed", queue_index)
+
+
+func _remove_command_entries(kind: String, slot: int = -1) -> void:
+	for index: int in range(_turn_command_queue.size() - 1, -1, -1):
+		var entry: Dictionary = _turn_command_queue[index]
+		if String(entry.get("kind", "")) != kind:
+			continue
+		if slot >= 0 and int(entry.get("slot", -1)) != slot:
+			continue
+		_turn_command_queue.remove_at(index)
+
+
+func _queue_item_intent(slot: int) -> void:
+	for entry: Dictionary in _turn_command_queue:
+		if String(entry.get("kind", "")) == "item" and int(entry.get("slot", -1)) == slot:
+			return
+	_turn_command_queue.append({kind = "item", slot = slot})
+	_refresh_command_order_strip()
+
+
+func _sync_item_command_entries() -> void:
+	# 提交后清理 selected_item_slots 是逻辑状态收口，不应反向删除正在结算展示的顺序图标。
+	# 本轮序列一直冻结到下一次 _start_player_select() 统一清空。
+	if state != State.PLAYER_SELECT:
+		return
+	for index: int in range(_turn_command_queue.size() - 1, -1, -1):
+		var entry: Dictionary = _turn_command_queue[index]
+		if String(entry.get("kind", "")) == "item":
+			var slot: int = int(entry.get("slot", -1))
+			var pending: bool = slot in [
+				_pending_item_target_slot, _pending_item_hero_target_slot,
+				_pending_enemy_item_target_slot,
+			]
+			if not selected_item_slots.has(slot) and not pending \
+					and int(_pending_pointstone_offer.get("source", -1)) != slot:
+				_turn_command_queue.remove_at(index)
+	for slot: int in selected_item_slots:
+		_queue_item_intent(slot)
+	_refresh_command_order_strip()
+
+
+func _sync_action_commands_after_drop(previous_action: int,
+		_previous_second_action: int) -> void:
+	if selected_action < 0:
+		_remove_command_entries("action")
+		_refresh_command_order_strip()
+		return
+	if selected_action != previous_action:
+		_remove_command_entries("action")
+	if not _has_command_action_ordinal(0):
+		_turn_command_queue.append({kind = "action", ordinal = 0})
+	if selected_second_action < 0:
+		for index: int in range(_turn_command_queue.size() - 1, -1, -1):
+			var entry: Dictionary = _turn_command_queue[index]
+			if String(entry.get("kind", "")) == "action" \
+					and int(entry.get("ordinal", 0)) == 1:
+				_turn_command_queue.remove_at(index)
+	elif not _has_command_action_ordinal(1):
+		_turn_command_queue.append({kind = "action", ordinal = 1})
+	_refresh_command_order_strip()
+
+
+func _has_command_action_ordinal(ordinal: int) -> bool:
+	for entry: Dictionary in _turn_command_queue:
+		if String(entry.get("kind", "")) == "action" \
+				and int(entry.get("ordinal", 0)) == ordinal:
+			return true
+	return false
+
+
+func _command_entry_index(kind: String, slot: int = -1, ordinal: int = -1) -> int:
+	for index: int in range(_turn_command_queue.size()):
+		var entry: Dictionary = _turn_command_queue[index]
+		if String(entry.get("kind", "")) != kind:
+			continue
+		if slot >= 0 and int(entry.get("slot", -1)) != slot:
+			continue
+		if ordinal >= 0 and int(entry.get("ordinal", -1)) != ordinal:
+			continue
+		return index
+	return -1
+
+
+func _command_sequence_for_submit() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var included_items: Dictionary = {}
+	var included_actions: Dictionary = {}
+	var included_switches: int = 0
+	for entry: Dictionary in _turn_command_queue:
+		match String(entry.get("kind", "")):
+			"item":
+				var slot: int = int(entry.get("slot", -1))
+				if selected_item_slots.has(slot) and not included_items.has(slot):
+					included_items[slot] = true
+					result.append({
+						kind = "item", slot = slot,
+						target = int(selected_item_hero_targets.get(
+							slot, selected_item_targets.get(slot, -1))),
+						choice = int(selected_item_choices.get(slot, -1)),
+					})
+			"free_switch":
+				if included_switches < _free_switch_sequence.size():
+					result.append({kind = "free_switch", target = _free_switch_sequence[included_switches]})
+					included_switches += 1
+			"action":
+				var ordinal: int = int(entry.get("ordinal", 0))
+				var action: int = selected_action if ordinal == 0 else selected_second_action
+				if action >= 0 and not included_actions.has(ordinal):
+					included_actions[ordinal] = true
+					var target: int = _enemy_target_pick if ordinal == 0 else _second_enemy_target_pick
+					if not ActionDef.is_attack(action) and action != ACTIVE and action != A.SWITCH:
+						target = -1
+					elif action == A.SWITCH:
+						target = selected_switch
+					var action_step := {kind = "action", action = action, target = target}
+					if ordinal == 0:
+						action_step["empowered_wave"] = _empowered_wave_armed
+						action_step["split_big_wave"] = _split_big_wave_armed
+						action_step["jianqi_attack"] = _jianqi_attack_armed
+						action_step["blood_payment"] = _blood_payment_armed
+						action_step["energy_cap_discount"] = _energy_cap_discount_armed
+					result.append(action_step)
+	for slot: int in selected_item_slots:
+		if not included_items.has(slot):
+			result.append({kind = "item", slot = slot,
+				target = int(selected_item_hero_targets.get(slot, selected_item_targets.get(slot, -1))),
+				choice = int(selected_item_choices.get(slot, -1))})
+	while included_switches < _free_switch_sequence.size():
+		result.append({kind = "free_switch", target = _free_switch_sequence[included_switches]})
+		included_switches += 1
+	if not included_actions.has(0):
+		var fallback_action: int = selected_action if selected_action >= 0 else A.CHARGE
+		var fallback_target: int = selected_switch if fallback_action == A.SWITCH else (
+			_enemy_target_pick if fallback_action == ACTIVE or ActionDef.is_attack(fallback_action) else -1)
+		result.append({kind = "action", action = fallback_action, target = fallback_target,
+			empowered_wave = _empowered_wave_armed,
+			split_big_wave = _split_big_wave_armed,
+			jianqi_attack = _jianqi_attack_armed,
+			blood_payment = _blood_payment_armed,
+			energy_cap_discount = _energy_cap_discount_armed})
+	if selected_second_action >= 0 and not included_actions.has(1):
+		result.append({kind = "action", action = selected_second_action,
+			target = _second_enemy_target_pick})
+	return result
 
 
 # ============================================================
@@ -3404,6 +4682,8 @@ func _build_hover_tips() -> void:
 	_register_tip(btn_confirm, _end_turn_button_tip, TipFormat.S, true)
 	_register_tip(btn_special, _special_tip, TipFormat.ACTIVE, false, TipContentKind.SKILL)
 	_register_tip(btn_longyuji_branch, _longyuji_tip, TipFormat.ACTIVE, false,
+		TipContentKind.SKILL)
+	_register_tip(btn_jianqi_attack, _jianqi_attack_tip, TipFormat.ACTIVE, false,
 		TipContentKind.SKILL)
 	_register_tip(btn_split_big_wave, _split_big_wave_tip, TipFormat.ACTIVE, false,
 		TipContentKind.SKILL)
@@ -4159,14 +5439,12 @@ func _special_tip() -> String:
 	if h == null:
 		return ""
 	match h.hero_id:
-		"h10":
-			return tr("消耗全部剑气发动攻击；剑气越多，伤害与穿透越强")
 		"h14":
 			return tr("将本回合行动的能量消耗改为消耗生命")
 		"h17":
 			return tr("转变为敌方当前出战英雄")
 		"h21":
-			return tr("指定敌方一名未出战英雄登场，替换其当前出战英雄")
+			return tr("指定敌方一名队友，立即打断并替换敌方出战英雄。")
 		"h22":
 			return tr("下一回合结束时，双方失去全部能量")
 		"h24":
@@ -4177,6 +5455,10 @@ func _special_tip() -> String:
 
 func _longyuji_tip() -> String:
 	return tr("使「波」额外造成1点伤害")
+
+
+func _jianqi_attack_tip() -> String:
+	return tr("消耗全部剑气强化攻击。（2点穿防，4点穿大防）")
 
 
 func _split_big_wave_tip() -> String:
@@ -4203,13 +5485,23 @@ func _item_slot_tip(slot: int, p: int = PLAYER) -> String:
 			if shown_battle.can_draw_slot(p, slot):
 				return tr("点击抽取道具（3选1·免费）")
 			return tr("下回合可抽取道具")
-		BattleCore.SlotState.CHARGING:
+		BattleCore.SlotState.CHARGING, BattleCore.SlotState.DEPLETED_PENDING:
 			var item: ItemData = shown_battle.slot_item(p, slot)
 			if item == null:
 				return ""
+			if shown_battle.item_v2_enabled and item.is_prototype_v2():
+				var current: int = int(shown_battle.slots[p][slot].get(
+					"current_durability", item.max_durability))
+				return tr("%s\n%s\n使用消耗%d点能量，耐久%d/%d。") % [
+					tr(item.item_name), tr(item.description), item.use_cost,
+					current, item.max_durability]
 			return tr("%s\n%s") % [tr(item.item_name), tr(item.description)]
 		BattleCore.SlotState.EMPTY:
 			if not mine:
+				return tr("空槽")
+			if shown_battle.item_v2_enabled:
+				if shown_battle.can_item_v2_draw(p):
+					return tr("点击取得道具（3选1·免费）")
 				return tr("空槽")
 			if shown_battle.can_refill(p, slot):
 				return tr("点击补充道具（3选1·消耗%s点能量）") % _fmt_hp(BattleCore.ITEM_REFILL_COST / 2.0)
@@ -4222,7 +5514,8 @@ func _item_slot_tip_data(slot: int, p: int = PLAYER) -> ItemData:
 	if p != PLAYER and bool(battle.info_distortion[p].get("hide_item_bar", false)):
 		return null
 	var shown_battle: BattleCore = _battle_for_item_row() if p == PLAYER else battle
-	if shown_battle.slot_state(p, slot) != BattleCore.SlotState.CHARGING:
+	if shown_battle.slot_state(p, slot) not in [
+			BattleCore.SlotState.CHARGING, BattleCore.SlotState.DEPLETED_PENDING]:
 		return null
 	return shown_battle.slot_item(p, slot)
 
@@ -4249,7 +5542,17 @@ func _target_owner_for_slot(s: int) -> int:
 
 ## 保留玩家点选顺序。带槽目标的道具只提交来源槽；熔炉燃料会被一并消耗，点金石目标会锁定一回合。
 func _ordered_selected_item_slots() -> Array[int]:
-	return selected_item_slots.duplicate()
+	var ordered: Array[int] = []
+	for entry: Dictionary in _turn_command_queue:
+		if String(entry.get("kind", "")) != "item":
+			continue
+		var slot: int = int(entry.get("slot", -1))
+		if selected_item_slots.has(slot) and not ordered.has(slot):
+			ordered.append(slot)
+	for slot: int in selected_item_slots:
+		if not ordered.has(slot):
+			ordered.append(slot)
+	return ordered
 
 
 ## 槽目标规则只看本回合开始时真正就绪的道具。点金石产出的 T3 本回合锁定，不形成链式入口。
@@ -4411,6 +5714,8 @@ func _complete_item_choice(owner: int, target: int, choice: int,
 	if not selected_item_slots.has(owner):
 		selected_item_slots.append(owner)
 	_pending_item_target_slot = -1
+	_queue_item_intent(owner)
+	_sync_item_command_entries()
 	return true
 
 
@@ -4545,6 +5850,8 @@ func _complete_friendly_item_target(owner: int, hero_slot: int) -> bool:
 	if not selected_item_slots.has(owner):
 		selected_item_slots.append(owner)
 	_pending_item_hero_target_slot = -1
+	_queue_item_intent(owner)
+	_sync_item_command_entries()
 	return true
 
 
@@ -4563,6 +5870,8 @@ func _complete_enemy_item_slot_target(owner: int, target: int) -> bool:
 	if not selected_item_slots.has(owner):
 		selected_item_slots.append(owner)
 	_pending_enemy_item_target_slot = -1
+	_queue_item_intent(owner)
+	_sync_item_command_entries()
 	return true
 
 
@@ -4667,6 +5976,20 @@ func _request_item_choice_net(owner: int, target: int) -> void:
 func _on_p1_slot_clicked(s: int) -> void:
 	if state != State.PLAYER_SELECT or _drafting or not _pending_pointstone_offer.is_empty():
 		return
+	if battle.item_v2_enabled:
+		match battle.slot_state(PLAYER, s):
+			BattleCore.SlotState.EMPTY:
+				if battle.can_item_v2_draw(PLAYER):
+					var choice: int = await _show_draft(
+						s, battle.begin_item_v2_draw(PLAYER), tr("本回合取得道具（3选1）"))
+					if choice >= 0:
+						battle.pick_item_v2_draw(PLAYER, choice, s)
+					_update_all()
+			BattleCore.SlotState.CHARGING:
+				if battle.slot_ready(PLAYER, s) and _toggle_ready_item_selection(s):
+					_update_all()
+		_start_ai_think()
+		return
 	# 联机（M1）：抽/补=向服务器请求（选项服务器生成·draft_offer 回来经 _net_open_offer 弹窗）；
 	# 使用点选=纯本地暂存（提交时随 payload 上行），与本地同款 toggle。
 	if _net:
@@ -4767,6 +6090,7 @@ func _update_all() -> void:
 	_update_hp_labels()
 	if state == State.PLAYER_SELECT:
 		_update_button_states()
+	_sync_item_command_entries()
 
 
 func _update_character_displays() -> void:
@@ -4993,17 +6317,33 @@ func _update_energy_labels() -> void:
 func _update_hp_labels() -> void:
 	p1_char_display.visible = true
 	p2_char_display.visible = true
-	for p in [0, 1]:
-		var hp_now := battle.hp_display(battle.current_hp(p))
-		var hp_max := battle.hp_display(battle.current_max_hp(p))
-		var sh := battle.hp_display(battle.shield[p][battle.active_index[p]])
-		# 心形血珠：满+半+暗色空心到 max；护甲作青色额外心追加。
-		var row: HpSlantBarScript = p1_heart_row if p == 0 else p2_heart_row
-		row.set_value(hp_now, hp_max, sh)
-		# 数字重量(b)：HP 变化时心条 flinch 脉冲（掉血偏红 / 回血偏绿）。
-		if _prev_hp_disp[p] >= 0.0 and not is_equal_approx(hp_now, _prev_hp_disp[p]):
-			_fx._flinch_heart_row(row, hp_now < _prev_hp_disp[p])
-		_prev_hp_disp[p] = hp_now
+	for p: int in [PLAYER, AI]:
+		_update_hp_label(p)
+
+
+func _update_hp_labels_for_players(players: Array[int], animate_change: bool = false) -> void:
+	for player: int in players:
+		if player >= PLAYER and player <= AI:
+			_update_hp_label(player, animate_change)
+
+
+func _update_hp_label(player: int, animate_change: bool = true) -> void:
+	var slot: int = battle.active_index[player]
+	var value_override: Dictionary = _resolution_frame_value_overrides.get(
+		_resolution_frame_override_key(player, slot), {})
+	var hp_half: int = int(value_override.get("hp", battle.hp[player][slot]))
+	var shield_half: int = int(value_override.get("shield", battle.shield[player][slot]))
+	var hp_now := battle.hp_display(hp_half)
+	var hp_max := battle.hp_display(battle.max_hp[player][slot])
+	var sh := battle.hp_display(shield_half)
+	# 心形血珠：满+半+暗色空心到 max；护甲作青色额外心追加。
+	var row: HpSlantBarScript = p1_heart_row if player == PLAYER else p2_heart_row
+	row.set_value(hp_now, hp_max, sh)
+	# 换角色属于显示对象替换，不把两个英雄之间的血量差误播成受击/治疗。
+	if animate_change and _prev_hp_disp[player] >= 0.0 \
+			and not is_equal_approx(hp_now, _prev_hp_disp[player]):
+		_fx._flinch_heart_row(row, hp_now < _prev_hp_disp[player])
+	_prev_hp_disp[player] = hp_now
 
 
 func _fmt_hp(v: float) -> String:
@@ -5031,6 +6371,374 @@ func _unhandled_input(event: InputEvent) -> void:
 		_open_settings()
 
 
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mouse_button := event as InputEventMouseButton
+		if mouse_button.button_index != MOUSE_BUTTON_LEFT:
+			return
+		if mouse_button.pressed:
+			if state != State.PLAYER_SELECT or has_node("SettingsPanel") \
+					or _drafting or not _pending_pointstone_offer.is_empty():
+				return
+			var source: Dictionary = _command_source_at(mouse_button.position)
+			if source.is_empty():
+				return
+			_command_drag_candidate = source
+			_command_drag_origin = mouse_button.position
+			_command_dragging = false
+			get_viewport().set_input_as_handled()
+		elif not _command_drag_candidate.is_empty():
+			var accepted := false
+			if _command_dragging and _command_slot_accepts(mouse_button.position):
+				accepted = _dispatch_command_drop(_command_drag_candidate)
+			elif not _command_dragging:
+				_dispatch_command_click(_command_drag_candidate)
+			_finish_command_drag(mouse_button.position, accepted)
+			get_viewport().set_input_as_handled()
+	elif event is InputEventMouseMotion and not _command_drag_candidate.is_empty():
+		var motion := event as InputEventMouseMotion
+		if not _command_dragging and motion.position.distance_to(_command_drag_origin) \
+				>= COMMAND_DRAG_THRESHOLD:
+			_command_dragging = true
+			_show_command_drag(_command_drag_candidate, motion.position)
+		if _command_dragging:
+			_update_command_drag_visual(motion.position)
+		get_viewport().set_input_as_handled()
+
+
+func _dispatch_command_click(source: Dictionary) -> void:
+	# 单击只改变“准备拖哪个最终动作”的预选态；任何既有动作槽先失效，
+	# 防止玩家只是查看龙御极等分支，却在未拖入时悄悄改写最终提交。
+	match String(source.get("kind", "")):
+		"action":
+			_on_circle_pressed(int(source.get("action", -1)), source.get("button") as Button)
+			_remove_command_entries("action")
+			_refresh_command_order_strip()
+		"modifier":
+			var button := source.get("button") as Button
+			if button == btn_longyuji_branch:
+				_on_longyuji_branch_pressed()
+			elif button == btn_jianqi_attack:
+				_on_jianqi_attack_branch_pressed()
+			elif button == btn_split_big_wave:
+				_on_split_big_wave_pressed()
+			elif button == btn_h24_discount:
+				_on_h24_discount_pressed()
+			_remove_command_entries("action")
+			_refresh_command_order_strip()
+		_:
+			pass
+
+
+func _command_source_at(global_position: Vector2) -> Dictionary:
+	# 切换主按钮是候选层开关，不是指令本体。它与部分临时技能分支的布局矩形可能重叠，
+	# 因此必须最先截断，让 Button 自己收到点击并展开头像层。
+	if btn_switch != null and btn_switch.visible \
+			and btn_switch.get_global_rect().has_point(global_position):
+		return {}
+	for branch: Button in [btn_longyuji_branch, btn_jianqi_attack,
+			btn_split_big_wave, btn_h24_discount]:
+		if branch != null and branch.visible and not branch.disabled \
+				and branch.get_global_rect().has_point(global_position):
+			return {kind = "modifier", button = branch}
+	for action_index: int in range(action_btn_list.size()):
+		var button: Button = action_btn_list[action_index]
+		if button.visible and not button.disabled and button.get_global_rect().has_point(global_position):
+			var actions: Array[int] = [A.CHARGE, A.ATTACK, A.BIG_ATTACK, A.DEFEND, A.BIG_DEFEND, ACTIVE]
+			return {kind = "action", action = actions[action_index], button = button}
+	if _switch_tray_open:
+		for candidate_index: int in range(_switch_candidate_frames.size()):
+			var frame: HeroFrame = _switch_candidate_frames[candidate_index]
+			var frame_idx: int = candidate_index + 1
+			if frame.visible and _is_switchable_reserve(frame_idx) \
+					and frame.get_global_rect().has_point(global_position):
+				return {kind = "switch_target", frame_idx = frame_idx}
+	if p1_item_row != null:
+		for slot: int in range(BattleCore.SLOT_COUNT):
+			if not p1_item_row.slot_global_rect(slot).has_point(global_position):
+				continue
+			if _pending_item_target_slot >= 0:
+				return {}
+			if p1_item_row.slot_upgrade_badge_global_rect(slot).has_point(global_position):
+				return {}
+			if battle.slot_ready(PLAYER, slot):
+				return {kind = "item", slot = slot}
+	return {}
+
+
+func _command_source_global_rect(source: Dictionary) -> Rect2:
+	match String(source.get("kind", "")):
+		"action", "modifier":
+			var button := source.get("button") as Button
+			return button.get_global_rect() if button != null else Rect2()
+		"item":
+			return p1_item_row.slot_global_rect(int(source.get("slot", -1))) \
+				if p1_item_row != null else Rect2()
+		"switch_target":
+			var frame_index := int(source.get("frame_idx", -1)) - 1
+			return _switch_candidate_frames[frame_index].get_global_rect() \
+				if frame_index >= 0 and frame_index < _switch_candidate_frames.size() else Rect2()
+		_:
+			return Rect2()
+
+
+func _command_source_canvas_item(source: Dictionary) -> CanvasItem:
+	match String(source.get("kind", "")):
+		"action", "modifier":
+			return source.get("button") as Button
+		"switch_target":
+			var frame_index := int(source.get("frame_idx", -1)) - 1
+			return _switch_candidate_frames[frame_index] \
+				if frame_index >= 0 and frame_index < _switch_candidate_frames.size() else null
+		_:
+			return null
+
+
+func _command_next_slot_rect() -> Rect2:
+	return _command_next_slot.get_global_rect() if _command_next_slot != null else Rect2()
+
+
+func _command_slot_accepts(global_position: Vector2) -> bool:
+	var slot_rect := _command_next_slot_rect()
+	return slot_rect.has_area() and slot_rect.grow(COMMAND_SLOT_DROP_PADDING).has_point(global_position)
+
+
+func _set_command_next_slot_hot(hot: bool) -> void:
+	if _command_next_slot == null or _command_next_slot_skin == null:
+		return
+	_command_next_slot_skin.set_hot(hot)
+	_command_next_slot.scale = Vector2.ONE
+	_command_next_slot.modulate.a = 1.0
+
+
+func _play_command_slot_land(slot: Control) -> void:
+	if slot == null:
+		return
+	var skin := slot.get_node_or_null("SlotSkin") as Control
+	var visual := slot.get_node_or_null("Visual") as Control
+	if skin == null or visual == null:
+		return
+	var previous_tween: Tween = null
+	if slot.has_meta("command_land_tween"):
+		previous_tween = slot.get_meta("command_land_tween") as Tween
+	if previous_tween != null and previous_tween.is_valid():
+		previous_tween.kill()
+	var visual_base: Vector2 = visual.position
+	if slot.has_meta("command_visual_base_position"):
+		visual_base = slot.get_meta("command_visual_base_position")
+	slot.set_meta("command_visual_base_position", visual_base)
+	slot.set_meta("command_land_duration", COMMAND_SLOT_LAND_DURATION)
+	slot.scale = Vector2.ONE
+	# 行动素材轻落到十字星底座上；星臂同期展开，整格不做按钮式按压缩放。
+	skin.call("prepare_lock_animation")
+	visual.position = visual_base + Vector2(0.0, -2.0)
+	visual.scale = Vector2.ONE
+	visual.modulate.a = 0.70
+	var tween := create_tween().set_parallel(true)
+	slot.set_meta("command_land_tween", tween)
+	tween.tween_method(Callable(skin, "set_landing_progress"),
+		0.0, 1.0, COMMAND_SLOT_LAND_DURATION) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.tween_property(visual, "position", visual_base, COMMAND_SLOT_LAND_DURATION) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(visual, "modulate:a", 1.0, COMMAND_SLOT_LAND_DURATION) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
+func _make_command_source_dim(source_rect: Rect2) -> Panel:
+	var dim := Panel.new()
+	dim.name = "CommandSourceDim"
+	dim.position = source_rect.position
+	dim.size = source_rect.size
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dim.z_index = 109
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.025, 0.020, 0.015, 0.52)
+	style.corner_radius_top_left = 10
+	style.corner_radius_top_right = 10
+	style.corner_radius_bottom_left = 10
+	style.corner_radius_bottom_right = 10
+	dim.add_theme_stylebox_override("panel", style)
+	add_child(dim)
+	return dim
+
+
+func _show_command_drag(source: Dictionary, global_position: Vector2) -> void:
+	if _command_drag_preview != null:
+		remove_child(_command_drag_preview)
+		_command_drag_preview.free()
+	_command_drag_source_rect = _command_source_global_rect(source)
+	# 抓取点必须来自按下瞬间；若用越过阈值后的当前位置，虚影会被错误锁回来源处，
+	# 看上去像没有跟手，更无法进入顺序槽吸附半径。
+	_command_drag_grab_offset = _command_drag_origin - _command_drag_source_rect.position
+	var art := _make_command_art_from_source(source)
+	_command_drag_preview = Control.new()
+	_command_drag_preview.name = "CommandDragPreview"
+	_command_drag_preview.size = art.size
+	_command_drag_preview.pivot_offset = Vector2.ZERO
+	_command_drag_preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_command_drag_preview.modulate = Color(1.0, 1.0, 1.0, 0.94)
+	_command_drag_preview.z_index = 110
+	_command_drag_preview.set_meta("uses_source_art", true)
+	_command_drag_preview.add_child(art)
+	add_child(_command_drag_preview)
+	_command_drag_source_canvas = _command_source_canvas_item(source)
+	if _command_drag_source_canvas != null:
+		_command_drag_source_modulate = _command_drag_source_canvas.self_modulate
+		_command_drag_source_canvas.self_modulate = Color(0.46, 0.46, 0.46, 0.38)
+	else:
+		_command_drag_source_dim = _make_command_source_dim(_command_drag_source_rect)
+	_update_command_drag_visual(global_position)
+
+
+func _update_command_drag_visual(global_position: Vector2) -> void:
+	if _command_drag_preview != null:
+		var free_position := global_position - _command_drag_grab_offset
+		var preview_center := free_position + _command_drag_preview.size * 0.5
+		var slot_rect := _command_next_slot_rect()
+		var magnet_strength := 0.0
+		if slot_rect.has_area():
+			var distance := preview_center.distance_to(slot_rect.get_center())
+			magnet_strength = clampf(
+				1.0 - distance / COMMAND_SLOT_MAGNET_RADIUS, 0.0, 1.0)
+			magnet_strength = magnet_strength * magnet_strength * (3.0 - 2.0 * magnet_strength)
+			preview_center = preview_center.lerp(slot_rect.get_center(), magnet_strength * 0.82)
+		var fit_scale := minf(
+			(COMMAND_SLOT_SIZE - COMMAND_SLOT_ART_INSET * 2.0) / _command_drag_preview.size.x,
+			(COMMAND_SLOT_SIZE - COMMAND_SLOT_ART_INSET * 2.0) / _command_drag_preview.size.y)
+		var target_scale := lerpf(1.0, fit_scale, magnet_strength)
+		_command_drag_preview.scale = Vector2.ONE * target_scale
+		_command_drag_preview.position = preview_center - _command_drag_preview.size * target_scale * 0.5
+	var over_slot := _command_slot_accepts(global_position)
+	if over_slot != _command_drag_over_slot:
+		_command_drag_over_slot = over_slot
+		_set_command_next_slot_hot(over_slot)
+
+
+func _restore_command_drag_source() -> void:
+	if is_instance_valid(_command_drag_source_canvas):
+		_command_drag_source_canvas.self_modulate = _command_drag_source_modulate
+	_command_drag_source_canvas = null
+	if is_instance_valid(_command_drag_source_dim):
+		_command_drag_source_dim.queue_free()
+	_command_drag_source_dim = null
+
+
+func _finish_command_drag(global_position: Vector2, accepted: bool = false) -> void:
+	_set_command_next_slot_hot(false)
+	if _command_drag_preview != null:
+		var preview: Control = _command_drag_preview
+		_command_drag_preview = null
+		var tween := create_tween().set_parallel(true)
+		if accepted and not _turn_command_queue.is_empty():
+			var landing_index := clampi(
+				_command_drop_landing_index, 0, _turn_command_queue.size() - 1)
+			var step := _command_order_row.get_node_or_null(
+				"Step%d" % landing_index) as Control
+			_play_command_slot_land(step)
+			var target_rect := step.get_global_rect() if step != null else _command_next_slot_rect()
+			var fit_scale := minf(
+				(COMMAND_SLOT_SIZE - COMMAND_SLOT_ART_INSET * 2.0) / preview.size.x,
+				(COMMAND_SLOT_SIZE - COMMAND_SLOT_ART_INSET * 2.0) / preview.size.y)
+			var target_position := target_rect.get_center() \
+				- preview.size * fit_scale * 0.5 \
+				+ Vector2(0.0, COMMAND_SLOT_ART_OFFSET_Y)
+			tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			tween.tween_property(preview, "position", target_position, COMMAND_SLOT_LAND_DURATION)
+			tween.tween_property(preview, "scale", Vector2.ONE * fit_scale, COMMAND_SLOT_LAND_DURATION)
+			tween.tween_property(preview, "modulate:a", 0.12, COMMAND_SLOT_LAND_DURATION)
+		else:
+			tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			tween.tween_property(preview, "position", _command_drag_source_rect.position, 0.16)
+			tween.tween_property(preview, "scale", Vector2.ONE, 0.16)
+			tween.tween_property(preview, "modulate:a", 0.0, 0.16)
+		tween.chain().tween_callback(preview.queue_free)
+		tween.chain().tween_callback(_restore_command_drag_source)
+	else:
+		_restore_command_drag_source()
+	_command_drag_candidate.clear()
+	_command_dragging = false
+	_command_drag_over_slot = false
+	_command_drop_landing_index = -1
+
+
+func _dispatch_command_drop(source: Dictionary) -> bool:
+	var accepted := false
+	_command_drop_landing_index = -1
+	match String(source.get("kind", "")):
+		"action":
+			var previous_queue: String = str(_turn_command_queue)
+			var previous_action: int = selected_action
+			var previous_second: int = selected_second_action
+			var action := int(source["action"])
+			var button := source["button"] as Button
+			var already_preselected := (selected_action == action and selected_btn == button) \
+				or (selected_second_action == action and _second_action_btn == button)
+			if not already_preselected:
+				_on_circle_pressed(action, button)
+			_sync_action_commands_after_drop(previous_action, previous_second)
+			accepted = selected_action != previous_action \
+				or selected_second_action != previous_second \
+				or str(_turn_command_queue) != previous_queue
+			var ordinal := 1 if selected_second_action >= 0 \
+				and selected_second_action != previous_second else 0
+			_command_drop_landing_index = _command_entry_index("action", -1, ordinal)
+		"item":
+			var slot: int = int(source["slot"])
+			var previous_queue: String = str(_turn_command_queue)
+			_queue_item_intent(slot)
+			_on_p1_slot_clicked(slot)
+			_sync_item_command_entries()
+			accepted = str(_turn_command_queue) != previous_queue
+			_command_drop_landing_index = _command_entry_index("item", slot)
+		"switch_target":
+			var previous_action: int = selected_action
+			var previous_second: int = selected_second_action
+			var free_switch_count: int = _free_switch_sequence.size()
+			var frame_index := int(source["frame_idx"])
+			var target_slot: int = p1_frame_slots[frame_index] \
+				if frame_index >= 0 and frame_index < p1_frame_slots.size() else -1
+			_on_switch_candidate_pressed(frame_index)
+			if _free_switch_sequence.size() > free_switch_count:
+				_sync_action_commands_after_drop(previous_action, previous_second)
+				_turn_command_queue.append({kind = "free_switch", target = target_slot})
+				_refresh_command_order_strip()
+				accepted = true
+				_command_drop_landing_index = _turn_command_queue.size() - 1
+			else:
+				_sync_action_commands_after_drop(previous_action, previous_second)
+				accepted = selected_action == A.SWITCH and selected_switch == target_slot
+				_command_drop_landing_index = _command_entry_index("action", -1, 0)
+		"modifier":
+			var button := source["button"] as Button
+			var previous_action: int = selected_action
+			var previous_second: int = selected_second_action
+			if button == btn_longyuji_branch:
+				if not _empowered_wave_armed:
+					_on_longyuji_branch_pressed()
+				accepted = _empowered_wave_armed
+			elif button == btn_jianqi_attack:
+				if not _jianqi_attack_armed:
+					_on_jianqi_attack_branch_pressed()
+				accepted = _jianqi_attack_armed
+			elif button == btn_split_big_wave:
+				if not _split_big_wave_armed:
+					_on_split_big_wave_pressed()
+				accepted = _split_big_wave_armed
+			elif button == btn_h24_discount:
+				if not _energy_cap_discount_armed:
+					_on_h24_discount_pressed()
+				accepted = _energy_cap_discount_armed
+			if accepted:
+				_sync_action_commands_after_drop(previous_action, previous_second)
+			else:
+				_refresh_command_order_strip()
+			_command_drop_landing_index = _command_entry_index("action", -1, 0)
+		_:
+			accepted = false
+	return accepted
+
+
 # ============================================================
 # 调试测试按钮（左侧）—— DEBUG_BUTTONS 开关
 # ============================================================
@@ -5051,6 +6759,7 @@ func _build_debug_buttons() -> void:
 	_debug_panel.connect(&"state_changed", _on_debug_state_changed)
 	_debug_panel.connect(&"hit_fx", _on_debug_hit_fx)
 	_debug_panel.connect(&"overtime_requested", _on_debug_overtime)
+	_debug_panel.connect(&"enemy_switch_requested", _on_debug_enemy_switch_requested)
 	# 默认收起，避免左侧纵向测试面板压住新的道具轨；左下角只保留总开关。
 	_debug_panel.visible = false
 	_debug_buttons_toggle = Button.new()
@@ -5077,6 +6786,16 @@ func _on_debug_buttons_toggled(opened: bool) -> void:
 func _on_debug_state_changed() -> void:
 	_update_all()
 	_start_ai_think()   # 任务G：调试面板直改引擎状态 → 预想作废重想
+
+
+## 只在本地选择期接受调试强制换人；真正提交仍由 _on_confirm_pressed 完成。
+## 玩家当前已选动作会保留，未选动作仍按公共规则回退为“攒”。
+func _on_debug_enemy_switch_requested(target_slot: int) -> void:
+	if _net or state != State.PLAYER_SELECT or battle == null \
+			or not battle.is_living_reserve(AI, target_slot) or not battle.can_switch(AI):
+		return
+	_debug_forced_ai_switch_slot = target_slot
+	_on_confirm_pressed()
 
 
 ## debug 一键进加时赛：跳过平局判定与选人浮窗，双方各用当前出战英雄组白板 1v1
@@ -5108,7 +6827,19 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 	var h16_pursuits: Array[Dictionary] = []
 	for pursuit_variant: Variant in fx.get("h16_pursuits", []):
 		h16_pursuits.append((pursuit_variant as Dictionary).duplicate(true))
+	var h11_switch_chases: Array[Dictionary] = []
+	for chase_variant: Variant in fx.get("h11_switch_chases", []):
+		h11_switch_chases.append((chase_variant as Dictionary).duplicate(true))
+	var h19_transfers: Array[Dictionary] = []
+	for transfer_variant: Variant in fx.get("h19_transfers", []):
+		h19_transfers.append((transfer_variant as Dictionary).duplicate(true))
+	var h07_entry_impacts: Array[Dictionary] = []
+	for impact_variant: Variant in fx.get("h07_entry_impacts", []):
+		h07_entry_impacts.append((impact_variant as Dictionary).duplicate(true))
+	_resolution_frame_value_overrides.clear()
+	_prepare_switch_entry_value_overrides(fx.get("switch_entry_values", []))
 	_prepare_h16_frame_value_overrides(h16_pursuits)
+	_prepare_h19_frame_value_overrides(h19_transfers)
 	var reserve_hit: Array[bool] = [
 		not (reserve_hits[0] as Dictionary).is_empty(),
 		not (reserve_hits[1] as Dictionary).is_empty()]
@@ -5124,8 +6855,16 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 		if p < active_before.size() and int(active_before[p]) != battle.active_index[p] \
 				and not _h16_pursuit_has_player(h16_pursuits, p):
 			switched_players.append(p)
+	if not h11_switch_chases.is_empty():
+		var h11_handled_players: Array[int] = await _play_h11_switch_chases(
+			h11_switch_chases)
+		for handled_player: int in h11_handled_players:
+			switched_players.erase(handled_player)
 	if not switched_players.is_empty():
 		await _play_switch_handoff(switched_players, false)
+	# 星日的伤害严格跟在视觉换人完成之后，并复用战斗公共受击弧形。
+	if not h07_entry_impacts.is_empty():
+		await _play_h07_entry_impacts(h07_entry_impacts)
 	var transform_players: Array = fx.get("transform_players", [])
 	if not transform_players.is_empty():
 		await _play_h17_transformations(transform_players)
@@ -5140,7 +6879,7 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 	var fin_kill_p2 := bool(dead[1]) and not bool(strength_price_executed[1]) and p1_off
 	var fin_kill_p1 := bool(dead[0]) and not bool(strength_price_executed[0]) and p2_off
 	if fin_kill_p1 or fin_kill_p2:
-		await _play_finisher(dmg, fin_kill_p2, fin_kill_p1, fx)
+		await _play_finisher([a0, a1], dmg, fin_kill_p2, fin_kill_p1, fx)
 		if not h16_pursuits.is_empty():
 			await _play_h16_pursuits(h16_pursuits)
 		return
@@ -5148,10 +6887,16 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 	if p1_off != p2_off:
 		fdir = 1.0 if p1_off else -1.0
 	stage.set_focus(p1_off or p2_off, fdir)
-	# 飞洒天星本质是一次攻击：直接走公共“波”出招流程，统一获得攻击帧、前冲、
-	# 蹬地尘与回位；不能只孤立地补播 attack 帧。
-	_act_juice(0, _action_for_battle_juice(0, a0, fx))
-	_act_juice(1, _action_for_battle_juice(1, a1, fx))
+	# 所有基础攻击强化（含飞洒天星）都直接走公共“波 / 大波”流程，统一获得攻击帧、
+	# 前冲、蹬地尘与回位；强化层不能再伪造独立攻击结算。
+	for action_player: int in 2:
+		var resolved_action: int = a0 if action_player == PLAYER else a1
+		var juice_action: int = _action_for_battle_juice(
+				action_player, resolved_action, fx)
+		if not h11_switch_chases.is_empty() \
+				and juice_action >= A.CHARGE and juice_action <= A.BIG_DEFEND:
+			_resolution_phase_trace.append("primary_action_juice:%d" % action_player)
+		_act_juice(action_player, juice_action)
 	# A3b 出招拍注解：力竭/定身（解释"预期动作为何没发生"）+ 到期延迟伤害（结算在动作前·此刻掉的血）。
 	var pre_tags: Array = fx.get("pre_tags", [[], []])
 	for p in 2:
@@ -5173,18 +6918,22 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 	_resolution_phase_trace.append("primary_impact")
 
 	var pen: Array = fx.get("pen", [0, 0])
+	var damage_number_states: Array = fx.get(
+		"damage_number_states", [&"normal", &"normal"])
+	var h07_entry_deaths: Array = fx.get("h07_entry_deaths", [false, false])
 	var any := false
-	if int(dmg[1]) > 0 or bool(dead[1]):
-		_impact(1, int(dmg[1]), int(pen[1]))
+	if int(dmg[1]) > 0 or (bool(dead[1]) and not bool(h07_entry_deaths[1])):
+		_impact(1, int(dmg[1]), int(pen[1]), StringName(damage_number_states[1]))
 		any = true
-	if int(dmg[0]) > 0 or bool(dead[0]):
-		_impact(0, int(dmg[0]), int(pen[0]))
+	if int(dmg[0]) > 0 or (bool(dead[0]) and not bool(h07_entry_deaths[0])):
+		_impact(0, int(dmg[0]), int(pen[0]), StringName(damage_number_states[0]))
 		any = true
 	for p in 2:
 		for slot_variant in (reserve_hits[p] as Dictionary):
 			var hit_data: Dictionary = reserve_hits[p][slot_variant]
 			_impact_reserve_slot(p, int(slot_variant), int(hit_data.get("amount", 0)),
-				int(hit_data.get("pen", 0)))
+				int(hit_data.get("pen", 0)), false, false,
+				StringName(hit_data.get("special_state", &"normal")))
 			any = true
 	# ② 被挡拍（与命中同拍）：防守方盾感反馈——钢蓝火花+「被挡」飘字；大防挡大波更隆重。
 	var blocked: Array = fx.get("blocked", [false, false])
@@ -5224,6 +6973,9 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 			bool(blocked[1]) or not (reserve_blocks[1] as Dictionary).is_empty()]
 		var bkick := (1.0 if blocked_side[1] else 0.0) - (1.0 if blocked_side[0] else 0.0)
 		stage.shake(SHAKE_BLOCK, bkick)
+	# H19 独立于主命中拍：主目标数字、命中与震动先完整落下，随后才把余量送往替补。
+	if not h19_transfers.is_empty():
+		await _play_h19_transfers(h19_transfers)
 	# ①② 死亡节拍 v3（2026-07-18 Eddy 批 A 方案）：致命一击加重定格（盖过 _impact 常规档·
 	# token 后发覆盖），按真实时长等冻结放开 → 倒地独享一拍起播，不再被命中特效淹没。
 	if lethal:
@@ -5240,6 +6992,80 @@ func _play_battle_anims(a0: int, a1: int, dmg: Array, dead: Array, fx: Dictionar
 		await _play_h16_pursuits(h16_pursuits)
 
 
+## 影狩先让画面中仍未离场的旧英雄承受真伤，再完成正常换人交接；此处绝不
+## 额外伪造娄金攻击，真实选择的动作统一留给后续公共行动流程，避免两个 Tween
+## 同时争夺角色位置。返回已完成交接的玩家，防止公共换人段重复播放。
+func _play_h11_switch_chases(chases: Array[Dictionary]) -> Array[int]:
+	var damage_by_player: Dictionary = {}
+	var target_players: Array[int] = []
+	for chase: Dictionary in chases:
+		var target_player: int = int(chase.get("player", -1))
+		var amount: int = int(chase.get("amount", 0))
+		if target_player < PLAYER or target_player > AI or amount <= 0:
+			continue
+		damage_by_player[target_player] = int(
+				damage_by_player.get(target_player, 0)) + amount
+		if not target_players.has(target_player):
+			target_players.append(target_player)
+	if target_players.is_empty():
+		return []
+
+	var bite_effects: Array[Control] = []
+	for target_player: int in target_players:
+		_resolution_phase_trace.append("h11_bite:%d" % target_player)
+		var bite_effect: Control = _spawn_h11_bite_fx(target_player)
+		bite_effects.append(bite_effect)
+		bite_effect.call("play")
+	if not bite_effects.is_empty():
+		await bite_effects[0].bite_closed
+
+	for target_player: int in target_players:
+		_resolution_phase_trace.append("h11_damage:%d" % target_player)
+		_impact(target_player, int(damage_by_player[target_player]), ActionDef.Pen.TRUE_DMG)
+	var shake_direction: float = 0.0
+	if target_players.size() == 1:
+		shake_direction = 1.0 if target_players[0] == AI else -1.0
+	stage.shake(SHAKE_HIT, shake_direction)
+	await get_tree().create_timer(h11_pre_switch_damage_hold).timeout
+
+	for target_player: int in target_players:
+		_resolution_phase_trace.append("h11_switch_and_action:%d" % target_player)
+	await _play_switch_handoff(target_players, false)
+	return target_players
+
+
+func _spawn_h11_bite_fx(target_player: int) -> Control:
+	var effect: Control = H11BiteFxScript.new() as Control
+	effect.name = "H11BiteFx_P%d" % target_player
+	effect.size = h11_bite_size
+	effect.call("configure", h11_bite_close_duration, h11_bite_impact_hold,
+			h11_bite_release_duration)
+	add_child(effect)
+	var target_rect: Rect2 = _character_sprite_rect(_cd(target_player))
+	effect.position = (target_rect.get_center() - h11_bite_size * 0.5).round()
+	return effect
+
+
+func _play_h07_entry_impacts(specs: Array[Dictionary]) -> void:
+	var played := false
+	for spec: Dictionary in specs:
+		var target_player: int = int(spec.get("player", -1))
+		var target_slot: int = int(spec.get("slot", -1))
+		if target_player < PLAYER or target_player > AI \
+				or target_slot != battle.active_index[target_player]:
+			continue
+		var amount: int = int(spec.get("amount", 0))
+		_resolution_phase_trace.append("h07_entry_arc:%d" % target_player)
+		_fx._spawn_slash(target_player)
+		_fx._char_pop(target_player, 0.07)
+		if amount > 0:
+			_fx._pop_damage(target_player, float(amount) / 2.0,
+				ActionDef.Pen.PIERCE_BIGDEF)
+		played = true
+	if played:
+		await get_tree().create_timer(0.18, true, false, true).timeout
+
+
 func _h16_pursuit_has_player(pursuits: Array[Dictionary], player: int) -> bool:
 	for pursuit: Dictionary in pursuits:
 		if int(pursuit.get("player", -1)) == player:
@@ -5251,8 +7077,22 @@ func _resolution_frame_override_key(player: int, slot: int) -> String:
 	return "%d:%d" % [player, slot]
 
 
+func _prepare_switch_entry_value_overrides(specs: Array) -> void:
+	for spec_variant: Variant in specs:
+		var spec: Dictionary = spec_variant
+		var player: int = int(spec.get("player", -1))
+		var slot: int = int(spec.get("slot", -1))
+		if player < PLAYER or player > AI \
+				or slot < 0 or slot >= battle.hp[player].size():
+			continue
+		_resolution_frame_value_overrides[
+			_resolution_frame_override_key(player, slot)] = {
+				hp = int(spec.get("hp", battle.hp[player][slot])),
+				shield = int(spec.get("shield", battle.shield[player][slot])),
+			}
+
+
 func _prepare_h16_frame_value_overrides(pursuits: Array[Dictionary]) -> void:
-	_resolution_frame_value_overrides.clear()
 	for pursuit: Dictionary in pursuits:
 		var target_player := 1 - int(pursuit.get("player", -1))
 		var target_slot := int(pursuit.get("target", -1))
@@ -5266,6 +7106,122 @@ func _prepare_h16_frame_value_overrides(pursuits: Array[Dictionary]) -> void:
 				shield = battle.shield[target_player][target_slot]
 					+ int(pursuit.get("shield_damage", 0)),
 			}
+
+
+func _prepare_h19_frame_value_overrides(transfers: Array[Dictionary]) -> void:
+	for transfer: Dictionary in transfers:
+		var target_player := int(transfer.get("player", -1))
+		var target_slot := int(transfer.get("to", -1))
+		if target_player < PLAYER or target_player > AI \
+				or target_slot < 0 or target_slot >= battle.hp[target_player].size():
+			continue
+		_resolution_frame_value_overrides[
+			_resolution_frame_override_key(target_player, target_slot)] = {
+				hp = battle.hp[target_player][target_slot]
+					+ int(transfer.get("hp_damage", 0)),
+				shield = battle.shield[target_player][target_slot]
+					+ int(transfer.get("shield_damage", 0)),
+			}
+
+
+## 主目标已经盖下自己的伤害数字后，余量才沿单向像素轨迹抵达指定替补。
+## 数字不挂在轨迹上，避免玩家把“转移量”和“实际扣血量”误读成同一个值。
+func _play_h19_transfers(transfers: Array[Dictionary]) -> void:
+	var valid_transfers: Array[Dictionary] = []
+	for transfer: Dictionary in transfers:
+		var target_player := int(transfer.get("player", -1))
+		var target_slot := int(transfer.get("to", -1))
+		if target_player < PLAYER or target_player > AI \
+				or _h19_transfer_target_frame(target_player, target_slot) == null:
+			continue
+		valid_transfers.append(transfer)
+	if valid_transfers.is_empty():
+		return
+
+	await get_tree().create_timer(
+		maxf(0.0, h19_transfer_primary_hold_duration), true, false, true).timeout
+	var trails: Array[Control] = []
+	var tweens: Array[Tween] = []
+	for transfer: Dictionary in valid_transfers:
+		var target_player := int(transfer.get("player", -1))
+		var target_slot := int(transfer.get("to", -1))
+		_resolution_phase_trace.append(
+			"h19_transfer_start:%d:%d" % [target_player, target_slot])
+		var trail := DamageTransferTrailScript.new() as Control
+		trail.name = "H19DamageTransfer_P%d_S%d" % [target_player, target_slot]
+		add_child(trail)
+		trail.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		trail.z_index = 112
+		var target_frame := _h19_transfer_target_frame(target_player, target_slot)
+		var from_global := _cd(target_player).global_position \
+			+ _cd(target_player).size * Vector2(0.5, 0.30)
+		var to_global := target_frame.global_position + target_frame.size * 0.5
+		var canvas_inverse: Transform2D = trail.get_global_transform_with_canvas().affine_inverse()
+		trail.call("configure", canvas_inverse * from_global, canvas_inverse * to_global)
+		var tween := create_tween().set_ignore_time_scale(true)
+		tween.tween_property(trail, "gather_progress", 1.0,
+			maxf(0.01, h19_transfer_source_hold_duration)) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		tween.tween_property(trail, "progress", 1.0,
+			maxf(0.01, h19_transfer_duration)) \
+			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+		trails.append(trail)
+		tweens.append(tween)
+	if tweens.is_empty():
+		return
+	await tweens[0].finished
+
+	var impact_tweens: Array[Tween] = []
+	for index: int in valid_transfers.size():
+		var transfer: Dictionary = valid_transfers[index]
+		var target_player := int(transfer.get("player", -1))
+		var target_slot := int(transfer.get("to", -1))
+		var hp_damage := int(transfer.get("hp_damage", 0))
+		var shield_damage := int(transfer.get("shield_damage", 0))
+		var impact_state: StringName = &"transferred"
+		if hp_damage <= 0:
+			impact_state = &"transferred_absorbed" if shield_damage > 0 \
+				else &"transferred_immune"
+		_resolution_phase_trace.append(
+			"h19_reserve_impact:%d:%d" % [target_player, target_slot])
+		var impact_tween := create_tween().set_ignore_time_scale(true)
+		impact_tween.tween_property(
+			trails[index], "impact_progress", 1.0,
+			maxf(0.01, h19_transfer_impact_duration)) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		impact_tweens.append(impact_tween)
+		_impact_reserve_slot(target_player, target_slot, hp_damage,
+			ActionDef.Pen.NORMAL, false, false, impact_state)
+		_resolution_frame_value_overrides.erase(
+			_resolution_frame_override_key(target_player, target_slot))
+		_refresh_resolution_frame_slot(target_player, target_slot)
+	# 裂开的弧面与替补第一次最大位移、独立数字同时落下，随后再统一清理轨迹。
+	if not impact_tweens.is_empty():
+		await impact_tweens[0].finished
+	for trail: Control in trails:
+		trail.queue_free()
+
+
+func _h19_transfer_target_frame(target_player: int, target_slot: int) -> HeroFrame:
+	var frames: Array[HeroFrame] = p1_frames if target_player == PLAYER else p2_frames
+	var frame_slots: Array[int] = p1_frame_slots if target_player == PLAYER else p2_frame_slots
+	var frame_index := frame_slots.find(target_slot)
+	if frame_index < 0 or frame_index >= frames.size():
+		return null
+	var frame: HeroFrame = frames[frame_index]
+	return frame if frame.visible else null
+
+
+func _refresh_resolution_frame_slot(player: int, slot: int) -> void:
+	var frames: Array[HeroFrame] = p1_frames if player == PLAYER else p2_frames
+	var hp_rows: Array = p1_frame_hp_rows if player == PLAYER else p2_frame_hp_rows
+	var frame_slots: Array[int] = p1_frame_slots if player == PLAYER else p2_frame_slots
+	var frame_index := frame_slots.find(slot)
+	if frame_index < 0 or frame_index >= frames.size():
+		return
+	var pcolor := Color("#3f86c8") if player == PLAYER else Color("#d24a44")
+	_update_single_frame(frames[frame_index], hp_rows[frame_index], player, slot,
+		frame_index == 0, pcolor)
 
 
 func _play_h16_pursuits(pursuits: Array[Dictionary]) -> void:
@@ -5311,9 +7267,7 @@ func _play_h16_pursuits(pursuits: Array[Dictionary]) -> void:
 		stage.set_focus(false)
 
 
-func _action_for_battle_juice(player: int, resolved_action: int, fx: Dictionary) -> int:
-	if resolved_action == ACTIVE and fx.get("h10_active_players", []).has(player):
-		return A.ATTACK
+func _action_for_battle_juice(_player: int, resolved_action: int, _fx: Dictionary) -> int:
 	return resolved_action
 
 
@@ -5380,6 +7334,8 @@ func _play_switch_handoff(players: Array[int], refresh_status_rows: bool = true)
 	for player: int in players:
 		_update_character_display(player, true)
 	_update_hero_frames_for_players(players)
+	# 隐藏换装帧中角色身份已经切换；顶部主血条必须同拍改读新英雄的登场快照。
+	_update_hp_labels_for_players(players, false)
 	var in_tweens: Array[Tween] = []
 	for player: int in players:
 		var cd: CharacterDisplay = _cd(player)
@@ -5454,7 +7410,8 @@ func _big_attack_punch() -> void:
 ## 双死=居中对撞构图。后置条件与普通路径一致（阵亡变灰·镜头回正·time_scale=1）→ 换人流程照旧。
 ## 编排时钟全用 ignore_time_scale 真实时长（慢放期间 await 不被拉长）；视觉 tween 随 time_scale
 ## 自然慢放=演出本体。
-func _play_finisher(dmg: Array, kill_p2: bool, kill_p1: bool, fx: Dictionary = {}) -> void:
+func _play_finisher(actions: Array, dmg: Array, kill_p2: bool, kill_p1: bool,
+		fx: Dictionary = {}) -> void:
 	var killer := 0 if kill_p2 else 1
 	var both := kill_p2 and kill_p1
 	var fdir := 0.0 if both else (1.0 if killer == 0 else -1.0)
@@ -5479,19 +7436,23 @@ func _play_finisher(dmg: Array, kill_p2: bool, kill_p1: bool, fx: Dictionary = {
 	# ── 慢放出招（全场 0.45×·帧动画约 0.6s 真实展开·同步小前刺）──
 	_time_scale_base = FINISHER_SLOW
 	Engine.time_scale = FINISHER_SLOW
-	for p in 2:
-		if both or p == killer:
-			var cd := _cd(p)
-			cd.play_animation("attack")
-			var dirn := 1.0 if p == 0 else -1.0
-			var tw := create_tween()
-			tw.tween_property(cd, "position", _cd_home[p] + Vector2((FINISHER_SHIFT_KILLER + 120.0) * dirn, 0), 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	for p: int in [PLAYER, AI]:
+		if p >= actions.size():
+			continue
+		var action: int = _action_for_battle_juice(p, int(actions[p]), fx)
+		if action < A.CHARGE or action > A.BIG_DEFEND:
+			continue
+		_resolution_phase_trace.append("finisher_action:%d:%d" % [p, action])
+		# 黑白闪仍以胜者命中为主，但双方都先完成本回合真实动作；败者不再被强制留在 idle。
+		_act_juice(p, action, _cd(p).position)
 	await get_tree().create_timer(0.65, true, false, true).timeout
 	# ── 命中（慢放中·特效慢速展开）──
 	if kill_p2:
-		_finisher_impact(1, int(dmg[1]))
+		_finisher_impact(1, int(dmg[1]), StringName(
+			(fx.get("damage_number_states", [&"normal", &"normal"]) as Array)[1]))
 	if kill_p1:
-		_finisher_impact(0, int(dmg[0]))
+		_finisher_impact(0, int(dmg[0]), StringName(
+			(fx.get("damage_number_states", [&"normal", &"normal"]) as Array)[0]))
 	# ⑤ 方向性后坐：朝倒下一方踢（双杀=对撞不偏向）
 	stage.shake(SHAKE_BIG * 1.3, (1.0 if kill_p2 else 0.0) - (1.0 if kill_p1 else 0.0))
 	# A3b：终结拍也补事件注解（毒爆致死的"为什么死了"就在这拍）——tween 随慢放自然慢速展开。
@@ -5505,7 +7466,17 @@ func _play_finisher(dmg: Array, kill_p2: bool, kill_p1: bool, fx: Dictionary = {
 		bw_center = (vcd.global_position + vcd.size * 0.5) / get_viewport_rect().size
 	_fx._bw_flash(bw_center)
 	_hitstop(0.1)
-	await get_tree().create_timer(0.45, true, false, true).timeout
+	var finisher_h19_transfers: Array[Dictionary] = []
+	for transfer_variant: Variant in fx.get("h19_transfers", []):
+		finisher_h19_transfers.append((transfer_variant as Dictionary).duplicate(true))
+	if finisher_h19_transfers.is_empty():
+		await get_tree().create_timer(0.45, true, false, true).timeout
+	else:
+		await _play_h19_transfers(finisher_h19_transfers)
+		var finisher_tail_hold := maxf(
+			0.04, 0.45 - h19_transfer_primary_hold_duration
+				- h19_transfer_source_hold_duration - h19_transfer_duration)
+		await get_tree().create_timer(finisher_tail_hold, true, false, true).timeout
 	# ── 恢复：时间回正 → 杀掉命中残留 tween（慢放里跑不完·晚于归位结束会把 scale 写回放大值）
 	#    → 幕淡出关停 → 双雄归位（阵亡者保持灰·换人流程接手）──
 	_time_scale_base = 1.0
@@ -5536,14 +7507,16 @@ func _play_finisher(dmg: Array, kill_p2: bool, kill_p1: bool, fx: Dictionary = {
 
 ## 终结版命中表现：不用 _impact——其 _char_pop 会把拉出的 1.35 放大拽回 1.0、自带顿帧也与
 ## 终结统一顿帧冲突。改为放大基础上的小 punch + 阵亡变灰下沉。
-func _finisher_impact(target_player: int, dmg_half: int) -> void:
+func _finisher_impact(target_player: int, dmg_half: int,
+		special_state: StringName = &"normal") -> void:
 	var cd := _cd(target_player)
 	cd.flash_white(0.3)
 	cd.pulse_rim(1.0, 0.3)
 	_fx._spawn_slash(target_player)
 	_fx._spawn_spark(target_player, true)
 	if dmg_half > 0:
-		_fx._pop_damage(target_player, float(dmg_half) / 2.0)
+		_fx._pop_damage(target_player, float(dmg_half) / 2.0,
+			ActionDef.Pen.NORMAL, special_state)
 	var tw := create_tween()
 	tw.tween_property(cd, "scale", Vector2.ONE * (FINISHER_SCALE * 1.08), 0.06).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	tw.tween_property(cd, "scale", Vector2.ONE * FINISHER_SCALE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -5709,9 +7682,9 @@ func _cd(player: int) -> CharacterDisplay:
 
 
 ## 出招 juice。攻击=蓄力前冲复位；防御=蓝闪沉身；攒=上浮黄闪。
-func _act_juice(player: int, action: int) -> void:
+func _act_juice(player: int, action: int, home_override: Variant = null) -> void:
 	var cd := _cd(player)
-	var home: Vector2 = _cd_home[player]
+	var home: Vector2 = home_override if home_override is Vector2 else _cd_home[player]
 	var dir := 1.0 if player == 0 else -1.0
 	match action:
 		A.ATTACK, A.BIG_ATTACK:
@@ -5753,7 +7726,8 @@ func _act_juice(player: int, action: int) -> void:
 
 
 
-func _impact(target_player: int, dmg_half: int, pen: int = 0) -> void:
+func _impact(target_player: int, dmg_half: int, pen: int = 0,
+		special_state: StringName = &"normal") -> void:
 	var cd := _cd(target_player)
 	var big := dmg_half >= 4   # ≥2HP=重击：更强退弹/火花/定格
 	cd.flash_white(0.18)
@@ -5762,13 +7736,14 @@ func _impact(target_player: int, dmg_half: int, pen: int = 0) -> void:
 	_fx._spawn_slash(target_player)
 	_fx._spawn_spark(target_player, big)                  # c：命中火花
 	if dmg_half > 0:
-		_fx._pop_damage(target_player, float(dmg_half) / 2.0, pen)
+		_fx._pop_damage(target_player, float(dmg_half) / 2.0, pen, special_state)
 	_hitstop(0.075 if big else 0.045)                 # c：命中定格（不 await，自管恢复）
 
 
 ## 十方无次第命中或被挡时的替补局部反馈：只震对应头像框，不把结果错误演到中央出战角色身上。
 func _impact_reserve_slot(target_player: int, target_slot: int, dmg_half: int, pen: int = 0,
-		blocked: bool = false, blocked_big: bool = false) -> void:
+		blocked: bool = false, blocked_big: bool = false,
+		special_state: StringName = &"normal") -> void:
 	var frames: Array[HeroFrame] = p1_frames if target_player == PLAYER else p2_frames
 	var frame_slots: Array[int] = p1_frame_slots if target_player == PLAYER else p2_frame_slots
 	var frame_idx: int = frame_slots.find(target_slot)
@@ -5778,44 +7753,109 @@ func _impact_reserve_slot(target_player: int, target_slot: int, dmg_half: int, p
 	if not frame.visible:
 		return
 
+	var previous_pulse: Tween = null
+	if frame.has_meta(&"reserve_impact_tween"):
+		previous_pulse = frame.get_meta(&"reserve_impact_tween") as Tween
 	var base_modulate: Color = frame.modulate
 	var base_scale: Vector2 = frame.scale
 	var base_position: Vector2 = frame.position
+	if frame.has_meta(&"reserve_impact_base_modulate"):
+		base_modulate = frame.get_meta(&"reserve_impact_base_modulate")
+	if frame.has_meta(&"reserve_impact_base_scale"):
+		base_scale = frame.get_meta(&"reserve_impact_base_scale")
+	if frame.has_meta(&"reserve_impact_base_position"):
+		base_position = frame.get_meta(&"reserve_impact_base_position")
 	frame.pivot_offset = frame.size * 0.5
+	if previous_pulse != null and previous_pulse.is_valid():
+		previous_pulse.kill()
+	if frame.has_meta(&"reserve_impact_driver"):
+		var previous_driver: Node = frame.get_meta(&"reserve_impact_driver") as Node
+		if is_instance_valid(previous_driver):
+			previous_driver.queue_free()
+		frame.remove_meta(&"reserve_impact_driver")
+	frame.set_meta(&"reserve_impact_base_modulate", base_modulate)
+	frame.set_meta(&"reserve_impact_base_scale", base_scale)
+	frame.set_meta(&"reserve_impact_base_position", base_position)
+	frame.modulate = base_modulate
+	frame.scale = base_scale
+	frame.position = base_position
+	var transferred_hit := special_state == &"transferred" \
+		or special_state == &"transferred_absorbed" \
+		or special_state == &"transferred_immune"
+	if transferred_hit:
+		_play_h19_reserve_avatar_impact(frame, target_player, target_slot,
+			dmg_half, pen, special_state, base_modulate, base_scale, base_position)
+		return
 	var pulse := create_tween()
+	var absorbed_transfer := special_state == &"transferred_absorbed"
+	var immune_transfer := special_state == &"transferred_immune"
+	var pulse_color := Color(1.35, 1.13, 0.56) if immune_transfer else (\
+		Color(0.62, 0.86, 1.45) if blocked or absorbed_transfer \
+		else Color(1.55, 0.58, 0.50))
+	var recoil_distance := 9.0 if blocked_big else 7.0
+	var recoil_x := -recoil_distance if target_player == PLAYER else recoil_distance
+	frame.set_meta(&"reserve_impact_recoil_x", recoil_x)
+	frame.set_meta(&"reserve_impact_compress_scale", Vector2(0.93, 1.07))
 	pulse.set_parallel(true)
-	var pulse_color := Color(0.62, 0.86, 1.45) if blocked else Color(1.55, 0.58, 0.50)
-	var pulse_scale := 1.10 if blocked_big else 1.08
-	var recoil_x := -3.0 if target_player == PLAYER else 3.0
-	pulse.tween_property(frame, "modulate", pulse_color, 0.08)
-	pulse.tween_property(frame, "scale", base_scale * pulse_scale, 0.08).set_trans(Tween.TRANS_BACK)
-	pulse.tween_property(frame, "position", base_position + Vector2(recoil_x, 0.0), 0.08) \
+	pulse.tween_property(frame, "modulate", pulse_color, 0.07)
+	pulse.tween_property(frame, "scale",
+		base_scale * Vector2(0.93, 1.07), 0.07) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	pulse.tween_property(frame, "position",
+		base_position + Vector2(recoil_x, 1.0), 0.07) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	pulse.chain().set_parallel(true)
-	pulse.tween_property(frame, "modulate", base_modulate, 0.20)
-	pulse.tween_property(frame, "scale", base_scale, 0.20).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	pulse.tween_property(frame, "position", base_position, 0.20) \
+	pulse.tween_property(frame, "modulate", base_modulate, 0.09)
+	pulse.tween_property(frame, "scale",
+		base_scale * Vector2(1.055, 0.97), 0.09) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	pulse.tween_property(frame, "position",
+		base_position + Vector2(-recoil_x * 0.22, 0.0), 0.09) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	pulse.chain().set_parallel(true)
+	pulse.tween_property(frame, "modulate", base_modulate, 0.16)
+	pulse.tween_property(frame, "scale", base_scale, 0.16) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	pulse.tween_property(frame, "position", base_position, 0.16) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	pulse.chain().tween_callback(_finish_reserve_avatar_pulse.bind(frame, pulse))
+	frame.set_meta(&"reserve_impact_tween", pulse)
 
-	if dmg_half <= 0 and not blocked:
+	if not blocked:
+		var old_impact_fx := frame.get_node_or_null("ReserveAvatarImpactFx")
+		if old_impact_fx != null:
+			old_impact_fx.name = "ReserveAvatarImpactFxRetired"
+			old_impact_fx.queue_free()
+		var impact_fx := ReserveAvatarImpactFxScript.new() as Control
+		impact_fx.name = "ReserveAvatarImpactFx"
+		frame.add_child(impact_fx)
+		impact_fx.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		impact_fx.z_index = 120
+		var ring_color := Color("c9d6da") if absorbed_transfer else (\
+			Color("dcc178") if immune_transfer else Color("d8c8b2"))
+		impact_fx.call("configure", ring_color)
+		impact_fx.call("play", 0.34)
+
+	if dmg_half > 0:
+		_fx._pop_damage_on_control(
+			frame,
+			"reserve:%d:%d" % [target_player, target_slot],
+			float(dmg_half) / 2.0,
+			pen,
+			special_state)
+	if not blocked:
 		return
 	var damage_label := Label.new()
-	damage_label.name = "ReserveBlock" if blocked else "ReserveDamage"
+	damage_label.name = "ReserveBlock"
 	damage_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	damage_label.text = tr("挡") if blocked else "-%s" % _fmt_hp(float(dmg_half) / 2.0)
+	damage_label.text = tr("挡")
 	damage_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	damage_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	damage_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	damage_label.z_index = 100
 	FontManager.apply(damage_label, 24)
-	var damage_color := BattleFxScript.COL_BLOCK_TEXT if blocked \
-		else (BattleFxScript.COL_DMG_BIG if dmg_half >= 4 else BattleFxScript.COL_DMG_SMALL)
-	if not blocked and pen == ActionDef.Pen.TRUE_DMG:
-		damage_color = BattleFxScript.COL_DMG_TRUE
-	elif not blocked and pen in [ActionDef.Pen.PIERCE_DEF, ActionDef.Pen.PIERCE_BIGDEF]:
-		damage_color = BattleFxScript.COL_DMG_PIERCE
-	damage_label.add_theme_color_override("font_color", damage_color)
-	damage_label.add_theme_color_override("font_outline_color", Color(0.12, 0.03, 0.02, 0.95))
+	damage_label.add_theme_color_override("font_color", BattleFxScript.COL_BLOCK_TEXT)
+	damage_label.add_theme_color_override("font_outline_color", Color(0.06, 0.08, 0.12, 0.95))
 	damage_label.add_theme_constant_override("outline_size", 5)
 	frame.add_child(damage_label)
 	var float_up := create_tween()
@@ -5823,6 +7863,113 @@ func _impact_reserve_slot(target_player: int, target_slot: int, dmg_half: int, p
 	float_up.tween_property(damage_label, "position:y", -24.0, 0.42).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	float_up.tween_property(damage_label, "modulate:a", 0.0, 0.42).set_delay(0.12)
 	float_up.chain().tween_callback(damage_label.queue_free)
+
+
+## H19 的落点不再使用菱形方块冲击圈：以头像整体双色闪烁确认命中，
+## 再用固定的 16→-11→7→-4→0 衰减位移表达受力，避免随机抖动破坏像素边界。
+func _play_h19_reserve_avatar_impact(frame: HeroFrame, target_player: int,
+		target_slot: int, dmg_half: int, pen: int, special_state: StringName,
+		base_modulate: Color, base_scale: Vector2, base_position: Vector2) -> void:
+	var old_impact_fx := frame.get_node_or_null("ReserveAvatarImpactFx")
+	if old_impact_fx != null:
+		old_impact_fx.name = "ReserveAvatarImpactFxRetired"
+		old_impact_fx.queue_free()
+	var old_hit_glow := frame.get_node_or_null("ReserveAvatarHitGlow")
+	if old_hit_glow != null:
+		old_hit_glow.name = "ReserveAvatarHitGlowRetired"
+		old_hit_glow.queue_free()
+
+	var absorbed_transfer := special_state == &"transferred_absorbed"
+	var immune_transfer := special_state == &"transferred_immune"
+	var flash_color := Color(1.68, 0.62, 0.58)
+	var impact_tint := Color(1.15, 0.30, 0.32)
+	if absorbed_transfer:
+		flash_color = Color(1.34, 1.64, 1.82)
+		impact_tint = Color(0.20, 0.34, 0.48)
+	elif immune_transfer:
+		flash_color = Color(1.82, 1.58, 1.02)
+		impact_tint = Color(0.48, 0.34, 0.10)
+
+	var recoil_x := -18.0 if target_player == PLAYER else 18.0
+	var shake_offsets := PackedFloat32Array([
+		recoil_x, -recoil_x * 13.0 / 18.0, recoil_x * 9.0 / 18.0,
+		-recoil_x * 5.0 / 18.0, 0.0,
+	])
+	var shake_y_offsets := PackedFloat32Array([
+		-4.0, 3.0, -2.0, 1.0, 0.0,
+	])
+	frame.set_meta(&"reserve_impact_recoil_x", recoil_x)
+	frame.set_meta(&"reserve_impact_shake_offsets", shake_offsets)
+	frame.set_meta(&"reserve_impact_shake_y_offsets", shake_y_offsets)
+	frame.set_meta(&"reserve_impact_flash_colors", [flash_color, impact_tint])
+	frame.set_meta(&"reserve_impact_number_delay", 0.05)
+	frame.scale = base_scale
+
+	var hit_glow := ReserveAvatarHitGlowScript.new() as Control
+	hit_glow.name = "ReserveAvatarHitGlow"
+	hit_glow.process_mode = Node.PROCESS_MODE_ALWAYS
+	frame.add_child(hit_glow)
+	hit_glow.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	hit_glow.z_index = 121
+	hit_glow.set("strength", 0.0)
+	frame.set_meta(&"reserve_impact_visual_target", &"frame_and_diamond_glow")
+
+	# 由红光节点使用真实时钟驱动头像本体，绕开战斗顿帧和失效的Tween属性链。
+	hit_glow.call("play", frame, base_modulate, base_position, flash_color,
+		impact_tint, shake_offsets, shake_y_offsets, 0.35)
+	hit_glow.connect("finished",
+		_finish_h19_reserve_avatar_driver.bind(frame, hit_glow), CONNECT_ONE_SHOT)
+	frame.set_meta(&"reserve_impact_driver", hit_glow)
+
+	if dmg_half > 0:
+		var number_delay := create_tween().set_ignore_time_scale(true)
+		number_delay.tween_interval(0.05)
+		number_delay.tween_callback(_pop_delayed_reserve_damage.bind(
+			frame, target_player, target_slot, dmg_half, pen, special_state))
+
+
+func _finish_h19_reserve_avatar_driver(frame: HeroFrame, hit_glow: Control) -> void:
+	if not is_instance_valid(frame):
+		return
+	if frame.has_meta(&"reserve_impact_driver") \
+			and frame.get_meta(&"reserve_impact_driver") == hit_glow:
+		frame.remove_meta(&"reserve_impact_driver")
+		for meta_key: StringName in [
+			&"reserve_impact_base_modulate", &"reserve_impact_base_scale",
+			&"reserve_impact_base_position", &"reserve_impact_number_delay",
+			&"reserve_impact_shake_y_offsets",
+		]:
+			frame.remove_meta(meta_key)
+	if is_instance_valid(hit_glow):
+		hit_glow.queue_free()
+
+
+func _pop_delayed_reserve_damage(frame: HeroFrame, target_player: int,
+		target_slot: int, dmg_half: int, pen: int, special_state: StringName) -> void:
+	if not is_instance_valid(frame) or not frame.visible:
+		return
+	_fx._pop_damage_on_control(
+		frame,
+		"reserve:%d:%d" % [target_player, target_slot],
+		float(dmg_half) / 2.0,
+		pen,
+		special_state)
+
+
+func _finish_reserve_avatar_pulse(frame: HeroFrame, pulse: Tween) -> void:
+	if not is_instance_valid(frame) or not frame.has_meta(&"reserve_impact_tween"):
+		return
+	if frame.get_meta(&"reserve_impact_tween") as Tween != pulse:
+		return
+	for meta_key: StringName in [
+		&"reserve_impact_tween",
+		&"reserve_impact_base_modulate",
+		&"reserve_impact_base_scale",
+		&"reserve_impact_base_position",
+		&"reserve_impact_number_delay",
+		&"reserve_impact_shake_y_offsets",
+	]:
+		frame.remove_meta(meta_key)
 
 
 
@@ -6048,6 +8195,14 @@ func _active_skill_icon_path(player: int, action: int, events: Array) -> String:
 
 
 func _action_bubble_transform_spec(player: int, events: Array) -> Dictionary:
+	# 剑气是基础攻击上的主动强化，不再生成独立 ACTIVE 气泡；
+	# 结算揭示时把已选的「波 / 大波」图标翻成昴日技能图标即可。
+	for event_variant in events:
+		var event: Dictionary = event_variant
+		if int(event.get("player", -1)) == player \
+				and String(event.get("id", "")) == "h10_jianqi_attack":
+			return {icon_path = H10_SKILL_ICON.resource_path,
+				color = Color("d7a43d"), exit_direction = Vector2(-1.0, 1.0)}
 	for event_variant in events:
 		var event: Dictionary = event_variant
 		if int(event.get("player", -1)) != player:

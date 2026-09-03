@@ -20,6 +20,8 @@ const SCREEN_H := 1080.0
 
 const CARD_TEX := preload("res://assets/ui/item_draft_card.png")     # 纸卡衬纸（悬停框族语竖版）
 const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")  # 取消钮底板（全游戏导航一个语言）
+const ENERGY_COST_SHEET := preload("res://assets/ui/icons/energy_idle.png")
+const DURABILITY_BADGE_ICON := preload("res://assets/ui/icons/item_durability.png")
 const ITEM_FRAME_TEX := ItemFrameStyle.FRAME_TEXTURE
 # 兼容既有调用/测试的公开别名；真实值只在 ItemFrameStyle 中维护。
 const CELL_FILL := ItemFrameStyle.CELL_TOP
@@ -45,6 +47,24 @@ var _next_button: Button
 
 func _make_tier_frame_material(tier: int) -> ShaderMaterial:
 	return ItemFrameStyle.make_frame_material(tier)
+
+
+func _make_item_stat_badge(name_value: String, texture: Texture2D,
+		hframes_value: int, vframes_value: int, number: int,
+		badge_position: Vector2, badge_size: Vector2) -> IconBadge:
+	var badge := IconBadge.new()
+	badge.name = name_value
+	badge.position = badge_position
+	badge.size = badge_size
+	badge.z_index = 20
+	badge.set_icon(texture, hframes_value, vframes_value, 0)
+	badge.set_number(number)
+	badge.normalize_icon_visual = true
+	badge.icon_visual_ratio = 0.82
+	badge.font_size = 13
+	badge.outline_size = 4
+	badge.embolden = 0.7
+	return badge
 
 
 func setup(options: Array, can_cancel: bool = true, title_text: String = "抽取道具（3 选 1）") -> void:
@@ -223,14 +243,22 @@ func _build_card(item: ItemData, pos: Vector2, idx: int) -> Control:
 		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card.add_child(frame)
 		var icon := TextureRect.new()
+		icon.name = "ItemIcon"
 		icon.texture = tex
-		icon.position = icon_position
-		icon.size = icon_size
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST   # 像素清晰
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		ItemFrameStyle.configure_item_art(icon, tex, Rect2(icon_position, icon_size))
 		card.add_child(icon)
+		var badge_size := Vector2(40.0, 40.0)
+		var positions := ItemFrameStyle.stat_badge_positions(
+			Rect2(frame_position, frame_size), badge_size)
+		card.add_child(_make_item_stat_badge(
+			"UseCostBadge", ENERGY_COST_SHEET, 4, 4, item.use_cost,
+			positions["cost"], badge_size))
+		card.add_child(_make_item_stat_badge(
+			"DurabilityBadge", DURABILITY_BADGE_ICON, 1, 1, item.max_durability,
+			positions["durability"], badge_size))
 
 	# 分隔墨线（图鉴右页同手法）。
 	var divider := ColorRect.new()

@@ -44,6 +44,14 @@ func modify_battlefield_base_attack_damage(dmg: int, _action: int, _battle: Batt
 	return dmg
 
 
+## 战场基础值修正为公共伤害数字提供的纯表现语义。只有修正确实改变数值时，
+## 对应英雄才应返回非 normal；最终飘字仍显示完整伤害管线结算后的真实数值。
+func battlefield_damage_number_state(_before_damage: int, _after_damage: int, _action: int,
+		_battle: BattleCore, _attacker_player: int, _attacker_slot: int,
+		_self_player: int, _self_slot: int) -> StringName:
+	return &"normal"
+
+
 ## 基础攻击完成状态与减伤计算后，是否把超过阈值的最终伤害转移给主目标之外
 ## 当前生命最高的另一名存活敌方英雄。返回半点制阈值；<= 0 表示不启用。
 ## 无合法转移目标时，超过阈值的部分丢失。转移段不重复计算增伤/减伤，但单独经过其目标护甲。
@@ -90,24 +98,28 @@ func on_ally_death(_dead_slot: int, _battle: BattleCore, _player: int, _slot: in
 	pass
 
 
-## 致死拦截：本英雄本次将致死时调用。返回 true = 存活（实现内自行改写 HP / 清状态）。
+## 致死拦截：本英雄本次将致死时调用；目标在出战位或替补位都按“本英雄濒死”语义触发。
+## 返回 true = 存活（实现内自行改写 HP / 清状态）。
 ## 当前 12 生肖无人 override，留作扩展接口。默认 false（正常死亡）。
 func on_before_death(_battle: BattleCore, _player: int, _slot: int) -> bool:
 	return false
 
 
-## 本英雄登场（开局首发 + 每次切换上场）。星日 h07(登场冲撞)。（房日 h04 旧登场机制已于 2026-07-04 重做移除。）
-func on_switch_in(_battle: BattleCore, _player: int, _slot: int) -> void:
+## 本英雄登场（开局首发 + 每次切换上场）。仅实际登场时触发，替补位不提供此类能力。
+## 星日 h07(登场冲撞)。（房日 h04 旧登场机制已于 2026-07-04 重做移除。）
+func on_switch_in(_battle: BattleCore, _player: int, _slot: int, _events: Array = []) -> void:
 	pass
 
 
-## 本英雄切换下场。当前 12 生肖无人 override，留作扩展接口。
+## 本英雄切换下场。仅当前出战英雄实际离场时触发。
 func on_switch_out(_battle: BattleCore, _player: int, _slot: int) -> void:
 	pass
 
 
-## 对手出战英雄切换下场时（enemy_slot = 对手下场者槽位）。h11 穷追(追击 1 伤)。
-func on_enemy_switch_out(_enemy_slot: int, _battle: BattleCore, _player: int, _slot: int) -> void:
+## 对手出战英雄切换下场时（enemy_slot = 对手下场者槽位）。
+## events 用于把伤害等表现语义写入统一结算流，避免 UI 依靠最终血量反推时序。
+func on_enemy_switch_out(_enemy_slot: int, _battle: BattleCore, _player: int,
+		_slot: int, _events: Array) -> void:
 	pass
 
 
@@ -123,10 +135,12 @@ func attack_penetration(base_pen: int, _action: int, _battle: BattleCore, _playe
 	return base_pen
 
 
-## 双方均使用基础攻击时的对攻优先级。仅唯一较高值先结算；同值保持同步独立结算。
-## 优先攻击实际击杀敌方攻击英雄后，引擎取消敌方本次基础攻击。默认 0。
-func base_attack_clash_priority() -> int:
-	return 0
+## 一次基础攻击所在的统一序位完整结算后，是否令敌方在后续序列开始前自动等待一次。
+## context 是整次基础攻击的聚合结果；默认不改变序列。调度器只会影响尚未开始的节点，
+## 并在敌方已经没有后续节点时忽略请求。
+func shifts_enemy_sequence_after_base_attack(_battle: BattleCore, _player: int,
+		_slot: int, _context: Dictionary) -> bool:
+	return false
 
 
 ## 本英雄【出战、存活、未沉默】时，其基础「波 / 大波」是否可显式指定任一存活敌方英雄。
@@ -170,7 +184,8 @@ func on_block(_battle: BattleCore, _player: int, _slot: int, _attacker_player: i
 	pass
 
 
-## 本英雄受到伤害落 HP 后触发（dealt = 实际掉的半点血）。
+## 本英雄受到伤害落 HP 后触发（dealt = 实际掉的半点血）；只看受伤英雄本身，
+## 不要求其处于出战位，因此 h04 指向替补造成的伤害也会触发这类被动。
 ## 室火（纳福：受伤 → 己方能量 += 一半·1:2·2026-07-05 起）。
 func on_self_damaged(_battle: BattleCore, _player: int, _slot: int, _dealt: int, _attacker_player: int) -> void:
 	pass
@@ -220,6 +235,22 @@ func allows_split_big_wave() -> bool:
 	return false
 
 
+## 昴日 h10：本英雄出战时，是否可消耗全队剑气强化自己的基础攻击穿透。
+## 只声明能力；选择合法性、消费时点、快照与联机字段由 BattleCore 统一处理。
+func enables_jianqi_attack() -> bool:
+	return false
+
+
+## 昴日强化攻击的穿透档位。输入为选择时锁定的剑气数量，避免命中后新获得的剑气
+## 反向改写已经形成的攻击。
+func jianqi_attack_penetration(base_pen: int, jianqi: int) -> int:
+	if jianqi >= 4:
+		return maxi(base_pen, ActionDef.Pen.PIERCE_BIGDEF)
+	if jianqi >= 2:
+		return maxi(base_pen, ActionDef.Pen.PIERCE_DEF)
+	return base_pen
+
+
 ## 蚩尤 h14：本英雄出战时，是否可主动把本回合行动能量费用改为由自己支付等量生命。
 ## 这是“不占行动的主动强化”；选择与费用结算由 BattleCore 统一处理。
 func enables_blood_payment() -> bool:
@@ -263,13 +294,20 @@ func active_needs_enemy_target() -> bool:
 	return false
 
 
+## 本主动技是否在共享 0 拍中抢先结算，并只打断对手同拍的五种基础行动。
+## 默认 false；枭阳 h21【惊蛰】以此保留“立即打断并替换”的既有语义。
+## 双方行动费用仍先支付，切换与其他主动技不属于可打断目标。
+func active_preempts_enemy_basic_action() -> bool:
+	return false
+
+
 ## 执行主动技（即时效果型）。扣能 / cap 计数由引擎处理；此处只写效果。
 ## 注意：攻击型主动技（active_is_attack()=true）不走本方法，改走下方攻击接口。
 func execute_active(_battle: BattleCore, _player: int, _slot: int) -> void:
 	pass
 
 
-# --- 攻击型主动技（伤害走伤害管线，§D9）。昴日 h10 飞洒天星 = 当前唯一攻击型主动技 ---
+# --- 攻击型主动技（伤害走伤害管线，§D9）。当前无正式英雄占用，接口保留给后续设计。---
 
 ## 本主动技是否是一次"攻击"（造成伤害、走 _apply_damage 管线）。默认 false（即时型）。
 func active_is_attack() -> bool:

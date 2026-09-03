@@ -1,5 +1,8 @@
 extends Node
 
+const DamageNumberVerticalTideScript := preload(
+	"res://src/ui/components/damage_number_vertical_tide.gd")
+
 ## 战斗演出原语库（2026-07-17 battle_screen 拆分批①·从 battle_screen 原文迁入·零行为变化）。
 ## 职责=纯演出原语：飘字（伤害/治疗/被挡/事件注解）/斩击弧光/火花/脚下尘/能量飞粒/
 ## 冲击帧黑白闪/受击 scale-pop——全部池化（并发上限=常量区·复用前 kill 在飞 tween）。
@@ -18,11 +21,33 @@ const TAG_STAGGER := 0.14                     # A3b 同侧多条注解的逐条�
 const MOTE_POOL_SIZE := 8                     # 能量飞粒并发上限（双方同拍攒也够用）
 const DUST_POOL_SIZE := 4                     # ⑦ 尘土并发上限（双方同拍前冲=起步+落定×2 刚好）
 
-# —— 飘字/特效配色（伤害阶梯/治疗/格挡·编排层组 tag 时经 BattleFx.COL_* 静态取用）——
-const COL_DMG_BIG := Color(1.0, 0.82, 0.5)        # 重击（≥2HP）炽黄白
-const COL_DMG_SMALL := Color(1.0, 0.55, 0.42)     # 轻击橙红
-const COL_DMG_PIERCE := Color(0.8, 0.62, 1.0)     # ⑧ 穿防/穿大防伤害=靛紫（阶梯可读）
-const COL_DMG_TRUE := Color(1.0, 0.96, 0.88)      # ⑧ 真伤=白热字（配绯红描边·最凶一档）
+# —— 飘字/特效配色（伤害数字只回答“掉了多少血”，伤害性质由动作与命中特效表达）——
+const DAMAGE_NUMBER_COLOR := Color("d8c8b2")
+const DAMAGE_NUMBER_OUTLINE := Color("211b1a")
+const DAMAGE_NUMBER_SHADOW := Color(0.05, 0.04, 0.04, 0.52)
+const DAMAGE_NUMBER_SHADOW_OFFSET := Vector2i(2, 2)
+const DAMAGE_FONT_SIZE := 44
+const DAMAGE_HEAVY_FONT_SIZE := 51
+const DAMAGE_RESERVE_FONT_SIZE := 36
+const DAMAGE_RESERVE_HEAVY_FONT_SIZE := 41
+const DAMAGE_OUTLINE_SIZE := 6
+const DAMAGE_HEAVY_OUTLINE_SIZE := 7
+const DAMAGE_LANE_OFFSETS: Array[Vector2] = [
+	Vector2.ZERO,
+	Vector2(24.0, -14.0),
+	Vector2(-24.0, -14.0),
+]
+const DAMAGE_LIMIT_TIDE_COLOR := Color("17131d")
+const DAMAGE_LIMIT_TIDE_GRID := Vector2i(9, 7)
+const DAMAGE_LIMIT_TIDE_PADDING := Vector2(10.0, 7.0)
+const DAMAGE_LIMIT_TIDE_DURATION := 0.22
+const DAMAGE_LIMIT_REVEAL_DELAY := 0.10
+const DAMAGE_LIMIT_READ_HOLD := 0.42
+# 兼容编排层既有常量名；所有实际伤害统一成同一克制色。
+const COL_DMG_BIG := DAMAGE_NUMBER_COLOR
+const COL_DMG_SMALL := DAMAGE_NUMBER_COLOR
+const COL_DMG_PIERCE := DAMAGE_NUMBER_COLOR
+const COL_DMG_TRUE := DAMAGE_NUMBER_COLOR
 const COL_HEAL := Color(0.62, 0.92, 0.55)         # ③ 治疗绿
 const COL_BLOCK_TEXT := Color(0.78, 0.82, 0.88)   # ② 被挡=银灰（"没打进"的冷反馈）
 const COL_BLOCK_SPARK := Color(0.62, 0.78, 1.0)   # ② 格挡火花=钢蓝（与命中暖白火星区分）
@@ -32,6 +57,7 @@ var _h: Control = null                        # 宿主 battle_screen
 
 var _dmg_pool: Array[Label] = []              # 飘字池（伤害/治疗/被挡 共用·_pop_float 单一出口）
 var _dmg_pool_idx: int = 0
+var _damage_lane_usage: Dictionary = {}       # 锚点 key → 三条确定性轨道占用状态
 var _slash_pool: Array[SlashVFX] = []         # 斩击弧光池（pooled 模式·播完隐藏不自毁）
 var _slash_pool_idx: int = 0
 var _spark_pool_big: Array[CPUParticles2D] = []    # 重击火花池（amount 等参数固定=避免改 amount 重分配缓冲）
@@ -61,6 +87,11 @@ func _setup_fx_pools() -> void:
 		lbl.z_index = 100
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(lbl)
+		var tide: Control = DamageNumberVerticalTideScript.new() as Control
+		tide.name = "LimitPixelTide"
+		tide.visible = false
+		tide.z_index = 2
+		lbl.add_child(tide)
 		_dmg_pool.append(lbl)
 	for i in FX_POOL_SIZE:
 		var slash := SlashVFX.new()
@@ -206,25 +237,97 @@ func _spawn_slash(target_player: int) -> void:
 	slash.play()
 
 
-## 伤害飘字（数字重量 b）：受击处弹 -N，按伤害量缩放大小/配色 → punch-in 过冲 → 抛物上浮淡出。
-## 大伤(≥2HP)更大更炽、描边更粗；起点偏击退方向 + 小随机，防多发叠死。
-func _pop_damage(player: int, amount: float, pen: int = 0) -> void:
-	var big := amount >= 2.0
-	# ⑧ 伤害阶梯分级配色（Pen 枚举有序）：真伤=白热字+绯红描边（最凶·强制大字）/穿透=靛紫/普通=原两档。
-	var col := COL_DMG_BIG if big else COL_DMG_SMALL
-	var outline := Color(0.12, 0.02, 0.02, 0.95)
-	var outline_px := 9 if big else 6
-	match pen:
-		ActionDef.Pen.TRUE_DMG:
-			col = COL_DMG_TRUE
-			outline = Color(0.55, 0.05, 0.08, 0.98)
-			outline_px = 11
-			big = true
-		ActionDef.Pen.PIERCE_DEF, ActionDef.Pen.PIERCE_BIGDEF:
-			col = COL_DMG_PIERCE
-			outline = Color(0.16, 0.06, 0.28, 0.95)
-	_pop_float(player, "-%s" % _h._fmt_hp(amount), 60 if big else 44, col, outline, outline_px,
-		1.28 if big else 1.12, 104.0 if big else 78.0)
+## 公共伤害数字：固定贴住受击目标，以短促“盖章”代替长距离彩色抛物线。
+## 普通、重击、穿透和真伤共享色彩；重击仅增加约15%字号与一档描边。
+func _pop_damage(player: int, amount: float, pen: int = 0,
+		special_state: StringName = &"normal") -> void:
+	var cd: CharacterDisplay = _cd(player)
+	_pop_damage_at_anchor(
+		"character:%d" % player,
+		cd.global_position + cd.size * Vector2(0.5, 0.30),
+		amount, DAMAGE_FONT_SIZE, DAMAGE_HEAVY_FONT_SIZE, pen, special_state)
+
+
+## 替补、召唤物等小型锚点也必须走这一出口；只切换字号档位，不另造配色和动画。
+func _pop_damage_on_control(anchor: Control, anchor_key: String, amount: float,
+		pen: int = 0, special_state: StringName = &"transferred") -> void:
+	_pop_damage_at_anchor(anchor_key, anchor.global_position + anchor.size * 0.5,
+		amount, DAMAGE_RESERVE_FONT_SIZE, DAMAGE_RESERVE_HEAVY_FONT_SIZE,
+		pen, special_state)
+
+
+func _pop_damage_at_anchor(anchor_key: String, anchor_center: Vector2, amount: float,
+		normal_font_size: int, heavy_font_size: int, pen: int,
+		special_state: StringName) -> void:
+	var heavy: bool = amount >= 2.0
+	var font_size: int = heavy_font_size if heavy else normal_font_size
+	var outline_size: int = DAMAGE_HEAVY_OUTLINE_SIZE if heavy else DAMAGE_OUTLINE_SIZE
+	var label: Label = _take_float_label()
+	label.text = "-%s" % _h._fmt_hp(amount)
+	FontManager.apply(label, font_size)
+	label.add_theme_color_override("font_color", DAMAGE_NUMBER_COLOR)
+	label.add_theme_color_override("font_outline_color", DAMAGE_NUMBER_OUTLINE)
+	label.add_theme_constant_override("outline_size", outline_size)
+	label.add_theme_color_override("font_shadow_color", DAMAGE_NUMBER_SHADOW)
+	label.add_theme_constant_override("shadow_offset_x", DAMAGE_NUMBER_SHADOW_OFFSET.x)
+	label.add_theme_constant_override("shadow_offset_y", DAMAGE_NUMBER_SHADOW_OFFSET.y)
+	label.add_theme_constant_override("shadow_outline_size", 0)
+	label.visible = true
+	label.modulate = Color.WHITE
+	label.reset_size()
+	label.pivot_offset = label.size * 0.5
+
+	var lane: int = _claim_damage_lane(anchor_key)
+	var lane_offset: Vector2 = DAMAGE_LANE_OFFSETS[lane]
+	var start: Vector2 = (anchor_center - label.size * 0.5 + lane_offset).round()
+	label.global_position = start
+	label.scale = Vector2(0.8, 0.8)
+	var token: int = int(label.get_meta(&"damage_token", 0)) + 1
+	label.set_meta(&"damage_token", token)
+	label.set_meta(&"damage_lane_active", true)
+	label.set_meta(&"damage_anchor_key", anchor_key)
+	label.set_meta(&"damage_lane", lane)
+	label.set_meta(&"damage_lane_offset", lane_offset)
+	label.set_meta(&"damage_font_size", font_size)
+	label.set_meta(&"damage_pen", pen)
+	label.set_meta(&"damage_special_state", special_state)
+	var limit_tide: Variant = _prepare_damage_limit_tide(
+		label, special_state)
+
+	var stamp: Tween = create_tween()
+	if special_state == &"limited":
+		stamp.set_ignore_time_scale(true)
+		stamp.tween_interval(DAMAGE_LIMIT_REVEAL_DELAY)
+		stamp.tween_property(label, "scale", Vector2(1.10, 1.10), 0.06) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		stamp.tween_property(label, "scale", Vector2.ONE, 0.09) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	else:
+		stamp.tween_property(label, "scale", Vector2(1.10, 1.10), 0.06) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		stamp.tween_property(label, "scale", Vector2.ONE, 0.08) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	var release: Tween = create_tween()
+	release.tween_interval(DAMAGE_LIMIT_READ_HOLD if special_state == &"limited" else 0.30)
+	release.tween_property(label, "global_position", start + Vector2(0.0, -24.0), 0.25) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	release.parallel().tween_property(label, "modulate:a", 0.0, 0.25) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	release.tween_callback(_finish_damage_number.bind(label, token))
+	var fx_tweens: Array[Tween] = [stamp, release]
+	if special_state == &"limited":
+		var tide_tween: Tween = create_tween().set_ignore_time_scale(true)
+		tide_tween.tween_property(limit_tide, "progress", 0.5,
+			DAMAGE_LIMIT_REVEAL_DELAY).set_trans(Tween.TRANS_LINEAR)
+		tide_tween.tween_callback(
+			_reveal_limited_damage_number.bind(label, token))
+		tide_tween.tween_property(limit_tide, "progress", 1.0,
+			DAMAGE_LIMIT_TIDE_DURATION - DAMAGE_LIMIT_REVEAL_DELAY) \
+			.set_trans(Tween.TRANS_LINEAR)
+		tide_tween.tween_callback(_finish_damage_limit_tide.bind(label, token))
+		label.set_meta(&"damage_limit_tide_tween", tide_tween)
+		fx_tweens.append(tide_tween)
+	label.set_meta(&"fx_tweens", fx_tweens)
 
 
 ## ③ 治疗飘字：绿 +N。生成点比伤害字高一档且反向漂（同拍受伤+回血时两字不叠死）。
@@ -280,15 +383,16 @@ func _pop_tag(player: int, t: Dictionary) -> void:
 func _pop_float(player: int, text: String, font_size: int, col: Color, outline: Color,
 		outline_px: int, peak: float, rise: float, y_frac: float = 0.30, x_off: float = 0.0) -> void:
 	var cd := _cd(player)
-	# 池化取号：先 kill 该格在飞 tween，再重置全部会被动画改写的属性（透明度/缩放）。
-	var lbl := _dmg_pool[_dmg_pool_idx]
-	_dmg_pool_idx = (_dmg_pool_idx + 1) % FLOAT_POOL_SIZE
-	_fx_kill_tweens(lbl)
+	var lbl: Label = _take_float_label()
 	lbl.text = text
 	FontManager.apply(lbl, font_size)
 	lbl.add_theme_color_override("font_color", col)
 	lbl.add_theme_color_override("font_outline_color", outline)
 	lbl.add_theme_constant_override("outline_size", outline_px)
+	lbl.add_theme_color_override("font_shadow_color", Color.TRANSPARENT)
+	lbl.add_theme_constant_override("shadow_offset_x", 0)
+	lbl.add_theme_constant_override("shadow_offset_y", 0)
+	lbl.add_theme_constant_override("shadow_outline_size", 0)
 	lbl.visible = true
 	lbl.modulate.a = 1.0
 	lbl.reset_size()
@@ -309,6 +413,168 @@ func _pop_float(player: int, text: String, font_size: int, col: Color, outline: 
 	tw.tween_property(lbl, "modulate:a", 0.0, 0.40).set_delay(0.52)
 	tw.chain().tween_callback(lbl.hide)
 	lbl.set_meta(&"fx_tweens", [st, tw])
+
+
+func _take_float_label() -> Label:
+	var label: Label = _dmg_pool[_dmg_pool_idx]
+	_dmg_pool_idx = (_dmg_pool_idx + 1) % FLOAT_POOL_SIZE
+	_fx_kill_tweens(label)
+	_release_damage_lane(label)
+	_reset_damage_limit_tide(label)
+	return label
+
+
+func _damage_limit_tide(label: Label) -> Variant:
+	return label.get_node("LimitPixelTide")
+
+
+func _reset_damage_limit_tide(label: Label) -> void:
+	var tide: Variant = _damage_limit_tide(label)
+	tide.visible = false
+	tide.progress = 0.0
+	label.set_meta(&"damage_limit_tide_visible", false)
+	label.set_meta(&"damage_number_revealed", true)
+	label.remove_meta(&"damage_limit_tide_tween")
+
+
+func _prepare_damage_limit_tide(label: Label,
+		special_state: StringName) -> Variant:
+	var tide: Variant = _damage_limit_tide(label)
+	if special_state != &"limited":
+		return tide
+	tide.position = -DAMAGE_LIMIT_TIDE_PADDING
+	tide.size = label.size + DAMAGE_LIMIT_TIDE_PADDING * 2.0
+	tide.ink_color = DAMAGE_LIMIT_TIDE_COLOR
+	tide.progress = 0.0
+	tide.visible = true
+	label.add_theme_color_override("font_color", Color.TRANSPARENT)
+	label.add_theme_color_override("font_outline_color", Color.TRANSPARENT)
+	label.add_theme_color_override("font_shadow_color", Color.TRANSPARENT)
+	label.scale = Vector2(0.86, 0.86)
+	label.set_meta(&"damage_limit_tide_visible", true)
+	label.set_meta(&"damage_number_revealed", false)
+	return tide
+
+
+func _reveal_limited_damage_number(label: Label, token: int) -> void:
+	if not is_instance_valid(label) or int(label.get_meta(&"damage_token", -1)) != token:
+		return
+	label.add_theme_color_override("font_color", DAMAGE_NUMBER_COLOR)
+	label.add_theme_color_override("font_outline_color", DAMAGE_NUMBER_OUTLINE)
+	label.add_theme_color_override("font_shadow_color", DAMAGE_NUMBER_SHADOW)
+	label.set_meta(&"damage_number_revealed", true)
+
+
+func _finish_damage_limit_tide(label: Label, token: int) -> void:
+	if not is_instance_valid(label) or int(label.get_meta(&"damage_token", -1)) != token:
+		return
+	var tide: Variant = _damage_limit_tide(label)
+	tide.visible = false
+	label.set_meta(&"damage_limit_tide_visible", false)
+
+
+func _claim_damage_lane(anchor_key: String) -> int:
+	var occupied: Array = _damage_lane_usage.get(anchor_key, [false, false, false])
+	for lane: int in DAMAGE_LANE_OFFSETS.size():
+		if not bool(occupied[lane]):
+			occupied[lane] = true
+			_damage_lane_usage[anchor_key] = occupied
+			return lane
+	# 极端第四枚同目标数字复用中央轨道；正常结算最多使用三条。
+	return 0
+
+
+func _release_damage_lane(label: Label) -> void:
+	if not bool(label.get_meta(&"damage_lane_active", false)):
+		return
+	var anchor_key: String = String(label.get_meta(&"damage_anchor_key", ""))
+	var lane: int = int(label.get_meta(&"damage_lane", -1))
+	var occupied: Array = _damage_lane_usage.get(anchor_key, [])
+	if lane >= 0 and lane < occupied.size():
+		occupied[lane] = false
+		if occupied.any(func(active: Variant) -> bool: return bool(active)):
+			_damage_lane_usage[anchor_key] = occupied
+		else:
+			_damage_lane_usage.erase(anchor_key)
+	label.set_meta(&"damage_lane_active", false)
+
+
+func _finish_damage_number(label: Label, token: int) -> void:
+	if not is_instance_valid(label) or int(label.get_meta(&"damage_token", -1)) != token:
+		return
+	_release_damage_lane(label)
+	_reset_damage_limit_tide(label)
+	label.hide()
+
+
+func debug_damage_number_profile() -> Dictionary:
+	return {
+		font_path = FontManager.UI_FONT_PATH,
+		font_embolden = 0.28,
+		font_color = DAMAGE_NUMBER_COLOR,
+		outline_color = DAMAGE_NUMBER_OUTLINE,
+		shadow_color = DAMAGE_NUMBER_SHADOW,
+		shadow_offset = DAMAGE_NUMBER_SHADOW_OFFSET,
+		normal_font_size = DAMAGE_FONT_SIZE,
+		heavy_font_size = DAMAGE_HEAVY_FONT_SIZE,
+		reserve_font_size = DAMAGE_RESERVE_FONT_SIZE,
+		reserve_heavy_font_size = DAMAGE_RESERVE_HEAVY_FONT_SIZE,
+		limited_tide_duration = DAMAGE_LIMIT_TIDE_DURATION,
+		limited_reveal_delay = DAMAGE_LIMIT_REVEAL_DELAY,
+		limited_tide_color = DAMAGE_LIMIT_TIDE_COLOR,
+		limited_tide_grid = DAMAGE_LIMIT_TIDE_GRID,
+		damage_type_colors = {
+			normal = COL_DMG_SMALL,
+			heavy = COL_DMG_BIG,
+			pierce = COL_DMG_PIERCE,
+			true_damage = COL_DMG_TRUE,
+		},
+		random_spawn_offset = false,
+		lane_offsets = DAMAGE_LANE_OFFSETS.duplicate(),
+	}
+
+
+func debug_active_damage_numbers() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for label: Label in _dmg_pool:
+		if not label.visible or not bool(label.get_meta(&"damage_lane_active", false)):
+			continue
+		var tide: Variant = _damage_limit_tide(label)
+		result.append({
+			anchor_key = String(label.get_meta(&"damage_anchor_key", "")),
+			lane = int(label.get_meta(&"damage_lane", -1)),
+			lane_offset = label.get_meta(&"damage_lane_offset", Vector2.ZERO),
+			font_size = int(label.get_meta(&"damage_font_size", 0)),
+			font_color = label.get_theme_color("font_color"),
+			outline_color = label.get_theme_color("font_outline_color"),
+			shadow_offset = Vector2i(
+				label.get_theme_constant("shadow_offset_x"),
+				label.get_theme_constant("shadow_offset_y")),
+			pen = int(label.get_meta(&"damage_pen", ActionDef.Pen.NORMAL)),
+			special_state = label.get_meta(&"damage_special_state", &"normal"),
+			limit_tide_visible = bool(label.get_meta(
+				&"damage_limit_tide_visible", false)),
+			limit_tide_progress = tide.progress,
+			limit_tide_direction = &"bottom_up",
+			limit_tide_visible_blocks = int(tide.call(
+				"debug_visible_block_count")) if tide.visible else 0,
+			limit_tide_frontier_y = float(tide.call("_frontier_y")),
+			number_revealed = bool(label.get_meta(
+				&"damage_number_revealed", true)),
+		})
+	result.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return int(a["lane"]) < int(b["lane"]))
+	return result
+
+
+## 测试专用：精确推进 limited 黑潮，不依赖测试机帧率或全局 hitstop。
+func debug_step_active_damage_limit_tides(delta: float) -> void:
+	for label: Label in _dmg_pool:
+		if not label.visible or not bool(label.get_meta(&"damage_lane_active", false)):
+			continue
+		var tween: Tween = label.get_meta(&"damage_limit_tide_tween", null) as Tween
+		if tween != null and tween.is_valid():
+			tween.custom_step(delta)
 
 
 ## 数字重量(b)：HP 变化时给出战心条一个 modulate flinch（掉血偏红 / 回血偏绿），

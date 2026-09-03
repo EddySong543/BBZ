@@ -9,6 +9,8 @@ signal tier_changed(tier: int)
 
 const SELECTION_MARKER_SCRIPT := preload("res://src/ui/components/hero_gallery_selection_marker.gd")
 const EffectTextFormatterScript := preload("res://src/ui/effect_text_formatter.gd")
+const ENERGY_COST_SHEET := preload("res://assets/ui/icons/energy_idle.png")
+const DURABILITY_BADGE_ICON := preload("res://assets/ui/icons/item_durability.png")
 const ITEM_FRAME_TEX := ItemFrameStyle.FRAME_TEXTURE
 const TIER_LABEL := {1: "普通", 2: "稀有", 3: "传说"}
 const TIER_TAG_COLOR := {
@@ -82,6 +84,10 @@ var _d_frame_mat: ShaderMaterial    # 新 item_frame 明暗母版的蓝 / 紫 / 
 var _d_name: Label
 var _d_rarity_mark: Control
 var _d_rarity_label: Label
+var _d_use_cost_badge: IconBadge
+var _d_durability_badge: IconBadge
+var _d_shape_preview: Control
+var _d_price_label: Label
 var _d_desc: Label
 var _d_flavor: Label
 var _d_pop_tween: Tween             # 右页图标落位微弹（快速方向键换件时先 kill 再建）
@@ -107,7 +113,7 @@ var _sel_tweens: Array[Tween] = []  # 选中动效 tween（pop+呼吸·换选先
 
 func _ready() -> void:
 	for tier: int in range(1, 4):
-		_item_catalog.append_array(ItemCatalog.all_for_tier(tier))
+		_item_catalog.append_array(ItemCatalog.all_active_for_tier(tier))
 	_build_book()
 	_setup_top()
 	_build_detail_panel()
@@ -190,7 +196,7 @@ func _catalog_item_count() -> int:
 		return _items.size()
 	var total := 0
 	for tier: int in range(1, 4):
-		total += ItemCatalog.all_for_tier(tier).size()
+		total += ItemCatalog.all_active_for_tier(tier).size()
 	return total
 
 
@@ -199,7 +205,7 @@ func _global_item_index() -> int:
 		return maxi(_sel_idx, 0)
 	var index := maxi(_sel_idx, 0)
 	for tier: int in range(1, _tier):
-		index += ItemCatalog.all_for_tier(tier).size()
+		index += ItemCatalog.all_active_for_tier(tier).size()
 	return index
 
 
@@ -221,7 +227,7 @@ func _turn_detail(direction: int) -> void:
 		return
 	var target := clampi(_global_item_index() + direction, 0, total - 1)
 	for tier: int in range(1, 4):
-		var tier_items: Array[ItemData] = ItemCatalog.all_for_tier(tier)
+		var tier_items: Array[ItemData] = ItemCatalog.all_active_for_tier(tier)
 		if target < tier_items.size():
 			_load_tier_item(tier, target)
 			return
@@ -275,7 +281,7 @@ func search_result_count() -> int:
 
 func select_search_result(entry_id: StringName) -> void:
 	for tier: int in range(1, 4):
-		var tier_items: Array[ItemData] = ItemCatalog.all_for_tier(tier)
+		var tier_items: Array[ItemData] = ItemCatalog.all_active_for_tier(tier)
 		for index: int in tier_items.size():
 			if StringName(tier_items[index].item_id) == entry_id:
 				_load_tier_item(tier, index)
@@ -306,7 +312,7 @@ func _page_count() -> int:
 func _catalog_pages() -> Array[Vector2i]:
 	var pages: Array[Vector2i] = []
 	for tier: int in range(1, 4):
-		var tier_items: Array[ItemData] = ItemCatalog.all_for_tier(tier)
+		var tier_items: Array[ItemData] = ItemCatalog.all_active_for_tier(tier)
 		if tier_items.is_empty():
 			continue
 		var tier_page_count := ceili(tier_items.size() / float(_grid_page_size()))
@@ -364,7 +370,7 @@ func _turn_page(direction: int) -> void:
 	var page_size := _grid_page_size()
 	var local_slot := _sel_idx % page_size if _sel_idx >= 0 else 0
 	var target_page := pages[target_global]
-	var target_items: Array[ItemData] = ItemCatalog.all_for_tier(target_page.x)
+	var target_items: Array[ItemData] = ItemCatalog.all_active_for_tier(target_page.x)
 	var target_index := mini(target_page.y * page_size + local_slot, target_items.size() - 1)
 	if target_page.x == _tier:
 		_select(target_index)
@@ -403,7 +409,7 @@ func get_current_tier() -> int:
 
 func _load_tier_item(tier: int, item_index: int) -> void:
 	_tier = clampi(tier, 1, 3)
-	_items = ItemCatalog.all_for_tier(_tier)
+	_items = ItemCatalog.all_active_for_tier(_tier)
 	_sel_idx = -1
 	var safe_index := clampi(item_index, 0, maxi(_items.size() - 1, 0))
 	_current_page = floori(safe_index / float(_grid_page_size())) if not _items.is_empty() else 0
@@ -417,7 +423,7 @@ func _load_tier_item(tier: int, item_index: int) -> void:
 func _adjacent_nonempty_tier(direction: int) -> int:
 	var candidate := _tier + signi(direction)
 	while candidate >= 1 and candidate <= 3:
-		if not ItemCatalog.all_for_tier(candidate).is_empty():
+		if not ItemCatalog.all_active_for_tier(candidate).is_empty():
 			return candidate
 		candidate += signi(direction)
 	return 0
@@ -434,14 +440,14 @@ func _step_catalog_selection(step: int) -> void:
 			_select(_items.size() - 1)
 			return
 		var overflow := target_index - _items.size()
-		var next_items: Array[ItemData] = ItemCatalog.all_for_tier(next_tier)
+		var next_items: Array[ItemData] = ItemCatalog.all_active_for_tier(next_tier)
 		_load_tier_item(next_tier, mini(overflow, next_items.size() - 1))
 		return
 	var previous_tier := _adjacent_nonempty_tier(-1)
 	if previous_tier == 0:
 		_select(0)
 		return
-	var previous_items: Array[ItemData] = ItemCatalog.all_for_tier(previous_tier)
+	var previous_items: Array[ItemData] = ItemCatalog.all_active_for_tier(previous_tier)
 	_load_tier_item(previous_tier, maxi(previous_items.size() + target_index, 0))
 
 
@@ -486,6 +492,24 @@ func _make_selection_pointer(box: float) -> Control:
 	pointer.set("color", POINTER_COLOR)
 	pointer.set_meta("home_position", pointer.position)
 	return pointer
+
+
+func _make_item_stat_badge(
+		badge_name: String, texture: Texture2D, hframes: int, vframes: int,
+		number: int, position: Vector2, badge_size: Vector2,
+		font_size: int) -> IconBadge:
+	var badge := IconBadge.new()
+	badge.name = badge_name
+	badge.position = position
+	badge.size = badge_size
+	badge.z_index = 20
+	badge.set_icon(texture, hframes, vframes, 0)
+	badge.set_number(number)
+	badge.normalize_icon_visual = true
+	badge.icon_visual_ratio = 0.82
+	badge.font_size = font_size
+	badge.embolden = 0.7
+	return badge
 
 
 ## 单件道具卡。选中态与英雄图鉴一致：真实框转金，左侧显示单色粗像素三角箭头。
@@ -533,14 +557,23 @@ func _make_item_card(item: ItemData, idx: int) -> Button:
 	# 图标（居中于暗格）
 	if tex != null:
 		var icon := TextureRect.new()
+		icon.name = "ItemIcon"
 		icon.texture = tex
-		icon.position = icon_position
-		icon.size = icon_size
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		ItemFrameStyle.configure_item_art(icon, tex, Rect2(icon_position, icon_size))
 		card.add_child(icon)
+	# 两个角标以道具框中心轴对称：使用费在左，最大耐久在右；0费仍明确显示。
+	var badge_size := Vector2(44.0, 44.0)
+	var badge_positions := ItemFrameStyle.stat_badge_positions(
+		Rect2(frame_position, frame_size), badge_size)
+	card.add_child(_make_item_stat_badge(
+			"UseCostBadge", ENERGY_COST_SHEET, 4, 4, item.use_cost,
+			badge_positions["cost"], badge_size, 14))
+	card.add_child(_make_item_stat_badge(
+			"DurabilityBadge", DURABILITY_BADGE_ICON, 1, 1, item.max_durability,
+			badge_positions["durability"], badge_size, 14))
 	# 名字（框外下方·亮页墨字直读）
 	var name_lbl := Label.new()
 	name_lbl.name = "ItemName"
@@ -563,8 +596,8 @@ func _make_item_card(item: ItemData, idx: int) -> Button:
 
 # ============================================================
 # 右页：单列居中主轴。
-#   ①名字 → ②大号图鉴格 → ③效果描述 → ④风味文字
-#   稀有度只由左页阶级索引、框色和名字墨色表达；不再重复显示页内阶章或分隔线。
+#   ①名字 → ②大号图鉴格与费用/耐久 → ③稀有度 → ④占格图/价格 → ⑤效果 → ⑥风味。
+#   图鉴只展示目录中的初始占格方向；实际旋转态由背包视图负责。
 # ============================================================
 
 func _build_detail_panel() -> void:
@@ -581,6 +614,17 @@ func _build_detail_panel() -> void:
 	_d_icon_fallback = $DetailArea/ItemIconFallback as Label
 	_d_rarity_mark = $DetailArea/RarityBadge/TypeMark as Control
 	_d_rarity_label = $DetailArea/RarityBadge/BadgeLabel as Label
+	_d_use_cost_badge = $DetailArea/UseCostBadge as IconBadge
+	_d_durability_badge = $DetailArea/DurabilityBadge as IconBadge
+	for badge: IconBadge in [_d_use_cost_badge, _d_durability_badge]:
+		badge.normalize_icon_visual = true
+		badge.icon_visual_ratio = 0.82
+	var detail_badge_positions := ItemFrameStyle.stat_badge_positions(
+		Rect2(_d_frame.position, _d_frame.size), _d_use_cost_badge.size)
+	_d_use_cost_badge.position = detail_badge_positions["cost"]
+	_d_durability_badge.position = detail_badge_positions["durability"]
+	_d_shape_preview = $DetailArea/ItemFacts/ShapePreview as Control
+	_d_price_label = $DetailArea/ItemFacts/PriceLabel as Label
 	_d_desc = $DetailArea/Description as Label
 	_d_flavor = $DetailArea/Flavor as Label
 
@@ -615,8 +659,11 @@ func _select(idx: int) -> void:
 	var it := _items[idx]
 	var tex: Texture2D = ItemCatalog.load_icon(it.item_id)
 	if tex != null:
-		_d_icon.texture = tex
-		_d_icon_shadow.texture = tex
+		var detail_target: Rect2 = _d_icon.get_meta(
+			"item_art_target_rect", Rect2(_d_icon.position, _d_icon.size))
+		ItemFrameStyle.configure_item_art(_d_icon, tex, detail_target)
+		ItemFrameStyle.configure_item_art(_d_icon_shadow, tex, detail_target,
+			ItemFrameStyle.item_art_shadow_offset(detail_target.size))
 		_d_icon_shadow.visible = true
 		_d_icon.visible = true
 		_d_icon_fallback.visible = false
@@ -648,11 +695,28 @@ func _select(idx: int) -> void:
 	_d_rarity_mark.set("passive_color", tag_color)
 	_d_rarity_mark.set("active_color", tag_color)
 	_d_rarity_mark.call("set_passive", true)
+	_d_use_cost_badge.set_number(it.use_cost)
+	_d_durability_badge.set_number(it.max_durability)
+	_d_shape_preview.call("set_shape", it.shape_cells)
+	_d_price_label.text = tr("价格 %s 金币") % _format_grouped_integer(it.full_price)
 	# 与英雄说明一致从固定顶边起笔；垂直居中会让不同换行数的首行高度发生跳动。
 	_d_desc.text = EffectTextFormatterScript.protect_cjk_line_breaks(
 			tr(it.description).strip_edges())
 	_d_flavor.text = EffectTextFormatterScript.protect_cjk_line_breaks(tr(it.flavor))
 	_refresh_detail_navigation()
+
+
+func _format_grouped_integer(value: int) -> String:
+	var digits := str(maxi(value, 0))
+	var first_group_length: int = digits.length() % 3
+	if first_group_length == 0:
+		first_group_length = 3
+	var grouped := digits.substr(0, first_group_length)
+	var cursor := first_group_length
+	while cursor < digits.length():
+		grouped += "," + digits.substr(cursor, 3)
+		cursor += 3
+	return grouped
 
 
 ## 选中动效：真实框立即转金，英雄图鉴同款粗像素棕色箭头轻推入并静止。

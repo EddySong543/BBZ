@@ -51,6 +51,9 @@ func test_net_protocol_field_ranges_rejected() -> void:
 	var bad_split := NetProtocol.msg_submit_turn(0, 3, -1, [])
 	bad_split["split_big_wave"] = 1
 	assert_eq(NetProtocol.validate_c2s(bad_split), "bad_split_big_wave_flag")
+	var bad_jianqi := NetProtocol.msg_submit_turn(0, 1, -1, [])
+	bad_jianqi["jianqi_attack"] = 1
+	assert_eq(NetProtocol.validate_c2s(bad_jianqi), "bad_jianqi_attack_flag")
 	var bad_blood := NetProtocol.msg_submit_turn(0, 3, -1, [])
 	bad_blood["blood_payment"] = 1
 	assert_eq(NetProtocol.validate_c2s(bad_blood), "bad_blood_payment_flag")
@@ -113,6 +116,17 @@ func test_net_protocol_submit_turn_preserves_split_big_wave_flag() -> void:
 	assert_eq(NetProtocol.validate_c2s(wire), "")
 
 
+func test_net_protocol_submit_turn_preserves_jianqi_attack_flag() -> void:
+	var msg: Dictionary = NetProtocol.msg_submit_turn(
+		4, ActionDef.Action.ATTACK, -1, [], false, false, false, false,
+		[], -1, false, [], [], -1, -1, [], true)
+	assert_true(bool(msg["jianqi_attack"]))
+	assert_eq(NetProtocol.validate_c2s(msg), "")
+	var wire: Variant = JSON.parse_string(JSON.stringify(msg))
+	assert_true(bool(wire["jianqi_attack"]))
+	assert_eq(NetProtocol.validate_c2s(wire), "")
+
+
 func test_net_protocol_submit_turn_preserves_blood_payment_flag() -> void:
 	var msg: Dictionary = NetProtocol.msg_submit_turn(4, 3, -1, [], false, false, false, true)
 	assert_true(bool(msg["blood_payment"]))
@@ -159,6 +173,7 @@ func test_net_protocol_submit_turn_preserves_item_targets_choices_and_legacy_omi
 	var legacy: Dictionary = msg.duplicate(true)
 	legacy.erase("item_slot_targets")
 	legacy.erase("item_slot_choices")
+	legacy.erase("command_sequence")
 	assert_eq(NetProtocol.validate_c2s(legacy), "", "旧客户端缺省目标字段时应按全 -1 放行")
 
 
@@ -173,6 +188,37 @@ func test_net_protocol_submit_turn_preserves_lianhuan_second_action() -> void:
 	assert_eq(int(wire["second_action"]), ActionDef.Action.ATTACK)
 	assert_eq(int(wire["second_target"]), 2)
 	assert_eq(NetProtocol.validate_c2s(wire), "")
+
+
+func test_submit_turn_preserves_authoritative_command_sequence() -> void:
+	var sequence: Array[Dictionary] = [
+		{kind = "item", slot = 2, target = -1, choice = -1},
+		{kind = "action", action = ActionDef.Action.ATTACK, target = 1},
+	]
+	var msg: Dictionary = NetProtocol.msg_submit_turn(
+		4, ActionDef.Action.ATTACK, 1, [2], false, false, false, false, [], -1,
+		false, [-1], [-1], -1, -1, sequence)
+	assert_eq(msg.get("command_sequence", []), sequence)
+	assert_eq(NetProtocol.validate_c2s(msg), "")
+	var wire: Variant = JSON.parse_string(JSON.stringify(msg))
+	assert_eq(NetProtocol.validate_c2s(wire), "")
+	assert_eq(String(wire["command_sequence"][0]["kind"]), "item")
+	assert_eq(String(wire["command_sequence"][1]["kind"]), "action")
+
+
+func test_submit_turn_rejects_malformed_command_sequence() -> void:
+	var missing_action: Dictionary = NetProtocol.msg_submit_turn(
+		0, ActionDef.Action.CHARGE, -1, [])
+	missing_action["command_sequence"] = [{kind = "item", slot = 0, target = -1, choice = -1}]
+	assert_eq(NetProtocol.validate_c2s(missing_action), "bad_command_sequence")
+	var duplicate_item: Dictionary = NetProtocol.msg_submit_turn(
+		0, ActionDef.Action.CHARGE, -1, [0])
+	duplicate_item["command_sequence"] = [
+		{kind = "item", slot = 0, target = -1, choice = -1},
+		{kind = "item", slot = 0, target = -1, choice = -1},
+		{kind = "action", action = ActionDef.Action.CHARGE, target = -1},
+	]
+	assert_eq(NetProtocol.validate_c2s(duplicate_item), "bad_command_sequence")
 
 
 func test_net_protocol_hello_team_validation() -> void:

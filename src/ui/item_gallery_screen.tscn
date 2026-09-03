@@ -9,6 +9,10 @@
 [ext_resource type="Shader" uid="uid://bspwebgdg5hrs" path="res://assets/shaders/canvas_ui_item_frame_palette.gdshader" id="7_frame_shader"]
 [ext_resource type="Texture2D" uid="uid://84wmbgdlqwp1" path="res://assets/ui/item_frame.png" id="9_item_frame"]
 [ext_resource type="Script" uid="uid://bosrg5fr7rmtv" path="res://src/ui/components/hero_gallery_skill_type_mark.gd" id="10_type_mark"]
+[ext_resource type="Script" path="res://src/ui/components/icon_badge.gd" id="11_icon_badge"]
+[ext_resource type="Texture2D" path="res://assets/ui/icons/energy_idle.png" id="12_energy_cost"]
+[ext_resource type="Texture2D" path="res://assets/ui/icons/item_durability.png" id="13_durability"]
+[ext_resource type="Script" path="res://src/ui/components/item_shape_preview.gd" id="14_shape_preview"]
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_page"]
 
@@ -297,13 +301,47 @@ theme_override_font_sizes/font_size = 48
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="UseCostBadge" type="Control" parent="DetailArea"]
+z_index = 20
+layout_mode = 0
+offset_left = 1249.0
+offset_top = 282.0
+offset_right = 1313.0
+offset_bottom = 346.0
+mouse_filter = 2
+script = ExtResource("11_icon_badge")
+sheet = ExtResource("12_energy_cost")
+hframes = 4
+vframes = 4
+number = 1
+font_size = 18
+embolden = 0.7
+normalize_icon_visual = true
+icon_visual_ratio = 0.82
+
+[node name="DurabilityBadge" type="Control" parent="DetailArea"]
+z_index = 20
+layout_mode = 0
+offset_left = 1509.0
+offset_top = 282.0
+offset_right = 1573.0
+offset_bottom = 346.0
+mouse_filter = 2
+script = ExtResource("11_icon_badge")
+sheet = ExtResource("13_durability")
+number = 2
+font_size = 18
+embolden = 0.7
+normalize_icon_visual = true
+icon_visual_ratio = 0.82
+
 [node name="RarityBadge" type="Control" parent="DetailArea" unique_id=1195158543]
 editor_description = "可视化编辑：当前道具稀有度标签。与英雄图鉴主/被动标签同款，只展示普通、稀有或传说，不承担点击切换。"
 anchors_preset = 0
 offset_left = 1371.0
-offset_top = 620.0
+offset_top = 588.0
 offset_right = 1451.0
-offset_bottom = 654.0
+offset_bottom = 622.0
 mouse_filter = 2
 
 [node name="TypeMark" type="Control" parent="DetailArea/RarityBadge" unique_id=443764556]
@@ -332,13 +370,52 @@ text = "普通"
 horizontal_alignment = 1
 vertical_alignment = 1
 
+[node name="ItemFacts" type="Control" parent="DetailArea"]
+editor_description = "可视化编辑：左侧只显示初始占格手绘格，右侧显示满耐久金币价。"
+layout_mode = 0
+offset_left = 1071.0
+offset_top = 650.0
+offset_right = 1751.0
+offset_bottom = 706.0
+mouse_filter = 2
+
+[node name="ShapePreview" type="Control" parent="DetailArea/ItemFacts"]
+layout_mode = 0
+offset_left = 100.0
+offset_top = 2.0
+offset_right = 240.0
+offset_bottom = 54.0
+mouse_filter = 2
+script = ExtResource("14_shape_preview")
+
+[node name="Divider" type="ColorRect" parent="DetailArea/ItemFacts"]
+layout_mode = 0
+offset_left = 339.0
+offset_top = 10.0
+offset_right = 341.0
+offset_bottom = 46.0
+mouse_filter = 2
+color = Color(0.48, 0.41, 0.28, 0.28)
+
+[node name="PriceLabel" type="Label" parent="DetailArea/ItemFacts"]
+layout_mode = 0
+offset_left = 360.0
+offset_right = 650.0
+offset_bottom = 56.0
+theme_override_colors/font_color = Color(0.24, 0.19, 0.12, 0.92)
+theme_override_fonts/font = ExtResource("4_font")
+theme_override_font_sizes/font_size = 19
+text = "价格 24,000 金币"
+horizontal_alignment = 1
+vertical_alignment = 1
+
 [node name="Description" type="Label" parent="DetailArea" unique_id=1556647173]
 editor_description = "可视化编辑：右页效果描述。固定宽度、居中与智能换行；可直接调整区域和行距。"
 layout_mode = 0
 offset_left = 1028.0
-offset_top = 690.0
+offset_top = 742.0
 offset_right = 1794.0
-offset_bottom = 810.0
+offset_bottom = 818.0
 theme_override_colors/font_color = Color(0.24, 0.19, 0.12, 1)
 theme_override_constants/line_spacing = 6
 theme_override_fonts/font = ExtResource("4_font")
@@ -351,7 +428,7 @@ autowrap_mode = 3
 editor_description = "可视化编辑：右页风味文字。字号、墨色、行距和区域均可在 Inspector 直接调整。"
 layout_mode = 0
 offset_left = 1068.0
-offset_top = 822.0
+offset_top = 824.0
 offset_right = 1754.0
 offset_bottom = 900.0
 theme_override_colors/font_color = Color(0.427451, 0.356863, 0.231373, 0.86)

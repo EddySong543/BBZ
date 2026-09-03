@@ -8,6 +8,7 @@ extends Control
 ## ⚠ 装饰节点必须 mouse_filter=IGNORE——否则吞点击（图鉴家族踩过坑）。
 
 const ProfileStore := preload("res://src/core/player_profile.gd")
+const RuntimeFeatures := preload("res://src/core/runtime_features.gd")
 const HERO_FRAME_SCENE := preload("res://src/ui/components/hero_frame.tscn")   # 回纹头像框（选头像格）
 const AVATAR_FRAME_TEX := preload("res://assets/ui/hero_avatar_frame.png")     # 大展示格框（128px ×3 整数放大）
 const PLAQUE_TEX := preload("res://assets/ui/ui_plaque.png")                   # 悬挂牌匾（图鉴/设置同挂点）
@@ -89,7 +90,9 @@ func _ready() -> void:
 	_build_book()
 	_setup_top()
 	_build_identity_page()
-	_build_stats_page()
+	stats_area.visible = RuntimeFeatures.PVP_ENABLED
+	if RuntimeFeatures.PVP_ENABLED:
+		_build_stats_page()
 	_apply_avatar()
 	_play_intro()
 
@@ -310,10 +313,11 @@ func _build_identity_page() -> void:
 	_rename_btn.pressed.connect(_start_rename)
 	identity_area.add_child(_rename_btn)
 
-	# ── 段位占位（主菜单身份带同一占位文案）+ 建档日期 ──
-	var rank := _make_label(identity_area, Vector2(PAGE_L.position.x, 786), Vector2(PAGE_L.size.x, 26), 18, INK_DIM)
-	rank.text = tr("段位 · 未定级")
-	rank.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# ── PvP 开启时显示段位；建档日期始终保留 ──
+	if RuntimeFeatures.PVP_ENABLED:
+		var rank := _make_label(identity_area, Vector2(PAGE_L.position.x, 786), Vector2(PAGE_L.size.x, 26), 18, INK_DIM)
+		rank.text = tr("段位 · 未定级")
+		rank.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var created := _make_label(identity_area, Vector2(PAGE_L.position.x, 824), Vector2(PAGE_L.size.x, 24), 16, Color(INK_DIM, 0.85))
 	created.text = tr("建档 · %s") % ProfileStore.created_text()
 	created.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

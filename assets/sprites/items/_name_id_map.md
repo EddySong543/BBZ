@@ -3,7 +3,46 @@
 > 由 `tools/import_item_art.gd` 从 `ItemCatalog` 实时生成，**勿手改**（改了会被覆盖）。
 > **图标文件名 = 中文道具名**（与游戏内显示名一致·按名更新美术）；下表 id 仅代码内部用。
 > ⚠ id 拼音是历史化石、≠ 显示名（如 `t1_siyecao`=最后一箭）；命名美术只看「中文名」列。
-> 当前实装 114 件，表内各 tier 按显示名全拼排序（设计全集见 design/items-list.md）。
+> 当前启用新版 20 件归入 `v2/`；隐藏旧版 114 件归入 `legacy/`。
+
+# 新版 v2
+
+## T1
+
+| 中文名（= 图标文件名） | 代码 id（仅代码内部） | 维度 |
+|---|---|---|
+| 生锈的飞镖 | `v2_t1_whetstone` | 进攻 |
+| 银质护臂 | `v2_t1_cracked_shield` | 防御 |
+| 普通治疗药水 | `v2_t1_blood_medicine` | 防御 |
+| 瓶装能量 | `v2_t1_silver_coin` | 能量 |
+| 锋利的飞镖 | `v2_t1_salamander_oil` | 进攻 |
+| 银鳞甲 | `v2_t1_heart_guard` | 防御 |
+| 普通魔力药水 | `v2_t1_mana_potion` | 能量 |
+| 短柄铁钩 | `v2_t1_armor_hammer` | 进攻 |
+| 简易治愈法杖 | `v2_t1_healing_salve` | 防御 |
+| 袋装石灰粉 | `v2_t1_smoke_bottle` | 干扰 |
+| 荆棘护腕 | `v2_t1_thorn_bracer` | 防御 |
+| 炼金坩埚 | `v2_t1_alchemy_crucible` | 能量 |
+
+## T2
+
+| 中文名（= 图标文件名） | 代码 id（仅代码内部） | 维度 |
+|---|---|---|
+| 传送卷轴 | `v2_t2_teleport_scroll` | 节奏 |
+| 战争号角 | `v2_t2_war_horn` | 进攻 |
+| 猎鹰羽毛 | `v2_t2_falcon_feather` | 节奏 |
+| 连心结 | `v2_t2_heart_knot` | 节奏 |
+| 食铁虫 | `v2_t2_iron_eater` | 进攻 |
+
+## T3
+
+| 中文名（= 图标文件名） | 代码 id（仅代码内部） | 维度 |
+|---|---|---|
+| 酸液陶罐 | `v2_t3_acid_jar` | 干扰 |
+| 破魔铃 | `v2_t3_dispelling_bell` | 干扰 |
+| 复苏石 | `v2_t3_revive_stone` | 防御 |
+
+# 旧版 legacy
 
 ## T1
 

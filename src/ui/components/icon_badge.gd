@@ -36,6 +36,15 @@ extends Control
 		icon_modulate = v
 		if _icon:
 			_icon.modulate = v
+## 仅道具费用 / 耐久角标开启：按 alpha 轮廓归一化可见尺寸，不影响血量、公共行动等既有徽章。
+@export var normalize_icon_visual: bool = false:
+	set(v):
+		normalize_icon_visual = v
+		_layout_icon()
+@export_range(0.2, 1.0, 0.01) var icon_visual_ratio: float = 0.82:
+	set(v):
+		icon_visual_ratio = clampf(v, 0.2, 1.0)
+		_layout_icon()
 
 @export_group("数字")
 @export var number: int = 0:
@@ -83,6 +92,11 @@ func _ready() -> void:
 	_build()
 
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_RESIZED:
+		_layout_icon()
+
+
 func _build() -> void:
 	if _icon == null:
 		_icon = TextureRect.new()
@@ -105,6 +119,7 @@ func _build() -> void:
 	_style_number()
 	_refresh_number()
 	_num.position = number_offset
+	_layout_icon()
 
 
 func _refresh_icon() -> void:
@@ -122,6 +137,31 @@ func _refresh_icon() -> void:
 	at.region = Rect2(fcol * fw, frow * fh, fw, fh)
 	_icon.texture = at
 	_icon.modulate = icon_modulate
+	_layout_icon()
+
+
+func _layout_icon() -> void:
+	if _icon == null:
+		return
+	if not normalize_icon_visual:
+		_icon.anchor_left = 0.0
+		_icon.anchor_top = 0.0
+		_icon.anchor_right = 0.0
+		_icon.anchor_bottom = 0.0
+		_icon.position = Vector2.ZERO
+		_icon.size = size
+		_icon.pivot_offset = size * 0.5
+		_icon.rotation = 0.0
+		return
+	var target_size := size * icon_visual_ratio
+	var target_rect := Rect2((size - target_size) * 0.5, target_size)
+	ItemFrameStyle.configure_texture_visual(_icon, _icon.texture, target_rect, 0.0, 1.0)
+
+
+func debug_icon_visible_rect() -> Rect2:
+	if _icon == null:
+		return Rect2()
+	return _icon.get_meta("visible_alpha_rect", Rect2(_icon.position, _icon.size))
 
 
 func _style_number() -> void:

@@ -13,3 +13,9 @@ extends HeroSkill
 func modify_battlefield_base_attack_damage(dmg: int, action: int, _battle: BattleCore,
 		_attacker_player: int, _attacker_slot: int, _self_player: int, _self_slot: int) -> int:
 	return ActionDef.HP_UNIT if ActionDef.is_attack(action) else dmg
+
+
+func battlefield_damage_number_state(before_damage: int, after_damage: int, action: int,
+		_battle: BattleCore, _attacker_player: int, _attacker_slot: int,
+		_self_player: int, _self_slot: int) -> StringName:
+	return &"limited" if ActionDef.is_attack(action) and after_damage < before_damage else &"normal"

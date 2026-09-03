@@ -1,0 +1,104 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tools/h11_bite_stage1_lab.gd" id="1_script"]
+
+[node name="H11BiteStage1Lab" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.247, 0.22, 0.235, 1)
+
+[node name="Title" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 118.0
+offset_bottom = 166.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0.82, 0.77, 0.82, 1)
+theme_override_font_sizes/font_size = 24
+text = "H11 撕咬重构 · 第一阶段 · 正式尺寸 208px"
+horizontal_alignment = 1
+
+[node name="OpenLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -344.0
+offset_top = -160.0
+offset_right = -88.0
+offset_bottom = -124.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.75, 0.7, 0.77, 1)
+theme_override_font_sizes/font_size = 18
+text = "张开帧"
+horizontal_alignment = 1
+
+[node name="ClosedLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = 88.0
+offset_top = -160.0
+offset_right = 344.0
+offset_bottom = -124.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.75, 0.7, 0.77, 1)
+theme_override_font_sizes/font_size = 18
+text = "闭合帧"
+horizontal_alignment = 1
+
+[node name="OpenFrame" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -320.0
+offset_top = -104.0
+offset_right = -112.0
+offset_bottom = 104.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="ClosedFrame" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = 112.0
+offset_top = -104.0
+offset_right = 320.0
+offset_bottom = 104.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5

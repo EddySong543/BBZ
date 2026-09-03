@@ -4,7 +4,7 @@ extends Control
 
 ## 顶部替补英雄的紧凑生命显示：单个平行四边形血量符号 + 数字。
 ## 版式沿用英雄图鉴的「图标 + 数字」，只把心形换成战斗主血条同语汇的斜切血块。
-## 护甲存在时在血量正下方显示银灰斜切块 + 数字；两行各自按实际文本宽度居中。
+## 护甲存在时在血量正下方显示银灰斜切块 + 数字；两行共用血量行的水平起点。
 
 @export_group("斜切血量符号")
 @export var icon_w: float = 26.0:
@@ -37,7 +37,7 @@ extends Control
 	set(v):
 		hp_row_center_y = v
 		queue_redraw()
-@export var shield_row_gap: float = 8.0:
+@export var shield_row_gap: float = 12.0:
 	set(v):
 		shield_row_gap = maxf(v, 0.0)
 		queue_redraw()
@@ -126,6 +126,11 @@ func _seg_width(text: String) -> float:
 		text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 
 
+func _ensure_font() -> void:
+	if _font == null:
+		_font = _resolve_font()
+
+
 func debug_hp_center_y() -> float:
 	return hp_row_center_y
 
@@ -134,9 +139,21 @@ func debug_shield_center_y() -> float:
 	return hp_row_center_y + icon_h + shield_row_gap
 
 
+func _segment_origins(hp: float, _shield_value: float) -> PackedVector2Array:
+	_ensure_font()
+	var hp_x := (size.x - _seg_width(_fmt(hp))) * 0.5
+	return PackedVector2Array([
+		Vector2(hp_x, debug_hp_center_y()),
+		Vector2(hp_x, debug_shield_center_y()),
+	])
+
+
+func debug_segment_origins(hp: float, shield: float) -> PackedVector2Array:
+	return _segment_origins(hp, shield)
+
+
 func _draw() -> void:
-	if _font == null:
-		_font = _resolve_font()
+	_ensure_font()
 	var hp := _hp
 	var shield := _shield
 	if Engine.is_editor_hint() and hp <= 0.0 and shield <= 0.0:
@@ -146,12 +163,11 @@ func _draw() -> void:
 	var hp_txt := _fmt(hp)
 	var sh_txt := _fmt(shield)
 	var has_shield := shield > 0.0
-	var hp_x := (size.x - _seg_width(hp_txt)) * 0.5
-	_draw_segment(hp_x, debug_hp_center_y(), hp_txt,
+	var origins := _segment_origins(hp, shield)
+	_draw_segment(origins[0].x, origins[0].y, hp_txt,
 		hp_fill, hp_top, hp_bottom, hp_number_color)
 	if has_shield:
-		var shield_x := (size.x - _seg_width(sh_txt)) * 0.5
-		_draw_segment(shield_x, debug_shield_center_y(), sh_txt,
+		_draw_segment(origins[1].x, origins[1].y, sh_txt,
 			shield_fill, shield_top, shield_bottom, shield_number_color)
 
 

@@ -38,8 +38,8 @@ func test_h03_published_data_matches_approved_redesign() -> void:
 	assert_eq(h.max_hp, 5, "尾火生命应为 5")
 	assert_eq(h.skill_description, "白额雷音", "尾火应使用已定稿技能名")
 	assert_eq(h.skill_detail,
-		"双方同时攻击时，尾火【虎】的攻击优先结算。",
-		"尾火短文案应使用统一的攻击术语")
+		"尾火【虎】每回合首次攻击命中后，敌方行动序列中立刻获得一个空的行动位。",
+		"尾火发布文案应使用已批准的等待语义")
 
 
 func test_h04_published_data_matches_approved_redesign() -> void:

@@ -18,6 +18,9 @@ extends RefCounted
 ## 组件无状态 (§D2)：所有 per-hero 状态都在本引擎的容器里；HeroSkill 只读写传入的 self。
 
 const HP_UNIT := 2  # 必须与 ActionDef.HP_UNIT 一致
+const ITEM_V2_RULES := preload("res://src/battle/item_v2_rules.gd")
+const ITEM_V2_RESOLUTION := preload("res://src/battle/item_v2_resolution.gd")
+const RESOLUTION_TIMELINE := preload("res://src/battle/battle_resolution_timeline.gd")
 
 ## 英雄机制数值（从引擎逻辑里的裸魔数提出来，集中可调）
 const CHONGZHUANG_DAMAGE := 1    # 星日登场冲撞 = 0.5 HP（半点）
@@ -62,6 +65,7 @@ var pending_death_switch: Array[bool] = [false, false]  # 出战阵亡待玩家�
 var _death_processed: Array = [[], []]              # 每槽位死亡 hook 是否已触发（防重复）
 var _empowered_wave: Array[bool] = [false, false]   # 本回合各方是否为基础「波」启用龙御极强化（额外 1 能 / +1 伤）
 var _split_big_wave: Array[bool] = [false, false]   # 本回合玄冥是否把自己的「大波」改为连续两次「波」
+var _jianqi_attack: Array[bool] = [false, false]    # 本回合昴日是否消耗全队剑气强化自己的基础攻击穿透
 var _blood_payment: Array[bool] = [false, false]    # 本回合是否由已记录的蚩尤以等量血量支付英雄费用
 var _blood_payment_source: Array[int] = [-1, -1]    # 发动技能的蚩尤槽位；免费切换后仍由该槽付款
 var _energy_cap_discount: Array[bool] = [false, false] # 本回合是否降低 1 点能量上限，换取行动费用 -1
@@ -88,6 +92,18 @@ var battle_backpacks: Array = [[], []]       # 真实物件：{uid,item_id,tempo
 var used_item_history: Array = [[], []]      # 本场已实际消耗记录：{item_id,tier}
 var revealed_backpack_uids: Array = [{}, {}] # viewer -> {enemy item uid:true}，仅私有视图读取
 var _next_backpack_uid: int = 1
+## 权威序列事件与节点使用跨回合单调编号；重连快照必须保留，避免回放去重时撞号。
+var _next_sequence_event_id: int = 1
+var _next_sequence_step_id: int = 1
+
+# === 冻结20件道具的单机原型状态 ===
+var item_v2_enabled: bool = false
+var item_v2_pending: Array[Dictionary] = [{}, {}]
+var item_v2_command_sequences: Array = [[], []]
+var item_v2_draw_used_turn: Array[int] = [-1, -1]
+var item_v2_draw_candidate_uids: Array = [[], []]
+var item_v2_public_history: Array[Dictionary] = []
+var item_v2_minimum_uid_mode: int = 0
 
 var turn_number: int = 0
 var game_over: bool = false
@@ -175,6 +191,7 @@ func setup(p1_heroes: Array, p2_heroes: Array, seed_value: int = 0) -> void:
 	pending_death_switch = [false, false]
 	_empowered_wave = [false, false]
 	_split_big_wave = [false, false]
+	_jianqi_attack = [false, false]
 	_blood_payment = [false, false]
 	_blood_payment_source = [-1, -1]
 	_energy_cap_discount = [false, false]
@@ -198,6 +215,15 @@ func setup(p1_heroes: Array, p2_heroes: Array, seed_value: int = 0) -> void:
 	used_item_history = [[], []]
 	revealed_backpack_uids = [{}, {}]
 	_next_backpack_uid = 1
+	_next_sequence_event_id = 1
+	_next_sequence_step_id = 1
+	item_v2_enabled = false
+	item_v2_pending = [{}, {}]
+	item_v2_command_sequences = [[], []]
+	item_v2_draw_used_turn = [-1, -1]
+	item_v2_draw_candidate_uids = [[], []]
+	item_v2_public_history = []
+	item_v2_minimum_uid_mode = 0
 	turn_number = 0
 	game_over = false
 	winner = WINNER_UNDECIDED
@@ -608,11 +634,12 @@ func _locked_action_doable(player: int) -> bool:
 ## target = 房日基础攻击显式指定的敌方英雄槽；-1 保持标准“攻击结算时出战位”语义。
 ## empowered_wave = 亢金在队时为本次基础「波」额外支付 1 能并增加 1 点伤害。
 ## split_big_wave = 玄冥出战时把本次「大波」改为连续两次「波」。
+## jianqi_attack = 昴日出战时消耗全部剑气，只强化本次基础攻击的穿透。
 ## blood_payment = 蚩尤主动把本回合我方英雄费用改为消耗自己的血量。
 ## energy_cap_discount = 并封在队时降低 1 点能量上限，使本回合行动费用减少 1 点。
 func select_action(player: int, action: int, target: int = -1, empowered_wave: bool = false,
 		split_big_wave: bool = false, blood_payment: bool = false,
-		energy_cap_discount: bool = false) -> bool:
+		energy_cap_discount: bool = false, jianqi_attack: bool = false) -> bool:
 	if energy_cap_discount:
 		if not can_use_energy_cap_discount(player, action, empowered_wave, blood_payment):
 			return false
@@ -627,6 +654,9 @@ func select_action(player: int, action: int, target: int = -1, empowered_wave: b
 	if split_big_wave and not can_split_big_wave_action(
 			player, action, blood_payment, energy_cap_discount):
 		return false
+	if jianqi_attack and not can_jianqi_attack_action(
+			player, action, empowered_wave, blood_payment, energy_cap_discount):
+		return false
 	if target < -1:
 		return false
 	if target >= 0:
@@ -638,6 +668,7 @@ func select_action(player: int, action: int, target: int = -1, empowered_wave: b
 	selected_action[player] = action
 	_empowered_wave[player] = empowered_wave
 	_split_big_wave[player] = split_big_wave
+	_jianqi_attack[player] = jianqi_attack
 	_blood_payment[player] = blood_payment
 	_energy_cap_discount[player] = energy_cap_discount
 	if blood_payment and _blood_payment_source[player] < 0:
@@ -759,6 +790,11 @@ func can_target_any_enemy_with_base_attack(player: int,
 	var sk: HeroSkill = _eff_skill(player, slot)
 	if sk != null and sk.can_target_any_enemy_with_base_attack():
 		return true
+	# 猎鹰羽毛授权的是“下一次攻击”，同时覆盖波、大波以及玄冥拆分前选择的
+	# 大波按钮；实际结算时仍只由第一段攻击消费这次指定权。
+	if item_v2_enabled and ActionDef.is_attack(action) \
+			and ITEM_V2_RULES.has_any_target(self, player):
+		return true
 	if action != ActionDef.Action.ATTACK:
 		return false
 	if int(item_mod(player, "next_wave_any_target", 0)) > 0:
@@ -833,6 +869,7 @@ func select_active(player: int, target: int = -1, blood_payment: bool = false,
 	selected_action[player] = ActionDef.ACTIVE
 	_empowered_wave[player] = false
 	_split_big_wave[player] = false
+	_jianqi_attack[player] = false
 	_blood_payment[player] = blood_payment
 	_energy_cap_discount[player] = energy_cap_discount
 	_active_target[player] = target
@@ -854,6 +891,7 @@ func select_switch(player: int, target_slot: int) -> bool:
 	selected_action[player] = ActionDef.Action.SWITCH
 	_empowered_wave[player] = false
 	_split_big_wave[player] = false
+	_jianqi_attack[player] = false
 	_blood_payment[player] = false
 	_blood_payment_source[player] = -1
 	_energy_cap_discount[player] = false
@@ -963,6 +1001,57 @@ func select_split_big_wave(player: int, on: bool) -> bool:
 			_blood_payment[player], _energy_cap_discount[player]):
 		return false
 	_split_big_wave[player] = on
+	return true
+
+
+# === 昴日 h10【飞洒天星】：消耗剑气强化基础攻击穿透 ===
+
+## 只有当前出战、存活且未沉默的昴日能主动消费剑气。
+func has_jianqi_attack(player: int) -> bool:
+	var slot: int = active_index[player]
+	if slot < 0 or slot >= hp[player].size() or hp[player][slot] <= 0:
+		return false
+	var skill: HeroSkill = _eff_skill(player, slot)
+	return skill != null and skill.enables_jianqi_attack()
+
+
+func jianqi_attack_selected(player: int) -> bool:
+	return _jianqi_attack[player]
+
+
+## 2–3 点只对普通波产生穿防收益；4 点才可让波或大波穿大防。
+## 强化本身不另收费，但仍需连同龙御极、血量支付与并封折扣验证基础行动可支付。
+func can_jianqi_attack_action(player: int, action: int, empowered_wave: bool = false,
+		blood_payment: bool = false, energy_cap_discount: bool = false) -> bool:
+	if not has_jianqi_attack(player):
+		return false
+	var jianqi: int = int(get_team_status(player, "jianqi", 0))
+	if jianqi < 2:
+		return false
+	if action == ActionDef.Action.ATTACK:
+		# 2–3 点不能浪费在已经由玄金不动相升级为大波的波上；4 点仍有穿大防收益。
+		if jianqi < 4 and upgrade_next_wave[player]:
+			return false
+	elif action == ActionDef.Action.BIG_ATTACK:
+		if jianqi < 4:
+			return false
+	else:
+		return false
+	if empowered_wave:
+		return can_empower_wave_action(
+			player, action, blood_payment, energy_cap_discount)
+	if energy_cap_discount:
+		return can_use_energy_cap_discount(player, action, false, blood_payment)
+	if blood_payment:
+		return can_pay_action_with_blood(player, action)
+	return can_afford(player, action)
+
+
+func select_jianqi_attack(player: int, on: bool) -> bool:
+	if on and not can_jianqi_attack_action(player, selected_action[player],
+			_empowered_wave[player], _blood_payment[player], _energy_cap_discount[player]):
+		return false
+	_jianqi_attack[player] = on
 	return true
 
 
@@ -1217,6 +1306,8 @@ func _resolve_item_target(player: int, data: ItemData, target_override: int) -> 
 ## 需要玩家明确选择己方英雄的道具。联机/UI/AI 共用，避免把英雄槽误作道具槽。
 static func item_requires_friendly_hero_target(data: ItemData) -> bool:
 	return data != null and data.item_id in [
+		"v2_t2_teleport_scroll", "v2_t1_healing_salve",
+		"v2_t2_heart_knot", "v2_t3_revive_stone",
 		"t1_houzhen_qian",
 		"t2_yijia_huan", "t2_huzhen_ding", "t2_jieyin_pei", "t2_daishang_san",
 		"t2_xingjun_yaonang",
@@ -1227,6 +1318,7 @@ static func item_requires_friendly_hero_target(data: ItemData) -> bool:
 ## 只能选择我方存活未出战英雄的道具；UI 与 AI 共用本口径。
 static func item_requires_friendly_reserve_target(data: ItemData) -> bool:
 	return data != null and data.item_id in [
+		"v2_t2_teleport_scroll", "v2_t1_healing_salve", "v2_t2_heart_knot",
 		"t1_houzhen_qian",
 		"t2_huzhen_ding", "t2_jieyin_pei", "t2_daishang_san", "t2_xingjun_yaonang",
 		"t3_yiyuan_deng",
@@ -1235,7 +1327,7 @@ static func item_requires_friendly_reserve_target(data: ItemData) -> bool:
 
 ## 招魂幡只选死亡替补；它复用通用英雄目标字段，但不能套用“存活英雄”UI门。
 static func item_requires_friendly_dead_hero_target(data: ItemData) -> bool:
-	return data != null and data.item_id == "t3_zhaohun_fan"
+	return data != null and data.item_id in ["t3_zhaohun_fan", "v2_t3_revive_stone"]
 
 
 ## 需要明确选择敌方道具槽的道具；复用 item_slot_targets，不新增联机字段。
@@ -2102,6 +2194,7 @@ func _fallback_action_to_charge(player: int, actions: Array[int], events: Array)
 	actions[player] = ActionDef.Action.CHARGE
 	_empowered_wave[player] = false
 	_split_big_wave[player] = false
+	_jianqi_attack[player] = false
 	_blood_payment[player] = false
 	_blood_payment_source[player] = -1
 	_energy_cap_discount[player] = false
@@ -2156,6 +2249,10 @@ func _action_valid_after_tianluo(player: int, action: int) -> bool:
 		return false
 	if _split_big_wave[player] and not can_split_big_wave_action(
 			player, action, _blood_payment[player], _energy_cap_discount[player]):
+		return false
+	if _jianqi_attack[player] and not can_jianqi_attack_action(
+			player, action, _empowered_wave[player], _blood_payment[player],
+			_energy_cap_discount[player]):
 		return false
 	var target: int = _attack_target[player]
 	if target >= 0:
@@ -2337,7 +2434,7 @@ func _resolve_dianjiang_after_hit(player: int, context: Dictionary, events: Arra
 		active_index[victim] = target
 		var entering: HeroSkill = _skills[victim][target]
 		if entering != null:
-			entering.on_switch_in(self, victim, target)
+			entering.on_switch_in(self, victim, target, events)
 	events.append({id = "dianjiang_forced_entry", player = victim, source_player = player,
 		from = from_slot, to = target})
 
@@ -2368,11 +2465,135 @@ func _second_attack_context(action: int, source_slot: int) -> Dictionary:
 		blocked_by_big_defend = false, target_defeated = false, hit_effect_triggers = 1}
 
 
-## 连环鼓的第二行动是独立的公共行动阶段：双方第二行动同时处理，第一阶段的防御不会跨阶段。
+func _take_sequence_event_id() -> int:
+	var event_id: int = _next_sequence_event_id
+	_next_sequence_event_id += 1
+	return event_id
+
+
+func _take_sequence_step_id() -> String:
+	var step_id: String = "sequence_step_%d" % _next_sequence_step_id
+	_next_sequence_step_id += 1
+	return step_id
+
+
+## 当前基础行动序位全部完成后收集后移请求，再一次性写入，避免玩家编号影响镜像结果。
+## 现阶段连环鼓是基础行动之后唯一已经实装的额外行动节点；统一道具序列接入后，
+## 同一请求会由 BattleResolutionTimeline 对所有尚未开始的节点执行相同规则。
+func _base_attack_sequence_waits(actions: Array[int], contexts: Array,
+		remaining_actions: Array[int], primary_step_ids: Array[String], events: Array,
+		sequence_column: int = 0) -> Array:
+	var waits: Array = [{}, {}]
+	var requests: Array[Dictionary] = []
+	for source_player in [0, 1]:
+		if not ActionDef.is_attack(actions[source_player]):
+			continue
+		var context: Dictionary = contexts[source_player]
+		if not bool(context.get("connected", false)):
+			continue
+		var source_slot: int = int(context.get("source_slot", active_index[source_player]))
+		if source_slot < 0 or source_slot >= _skills[source_player].size():
+			continue
+		var source_skill: HeroSkill = _skills[source_player][source_slot]
+		if source_skill == null:
+			continue
+		if not source_skill.shifts_enemy_sequence_after_base_attack(
+				self, source_player, source_slot, context):
+			continue
+		var target_player: int = 1 - source_player
+		var remaining_action: int = remaining_actions[target_player]
+		if not bool(item_mod(target_player, "lianhuan_active", false)) \
+				or remaining_action < ActionDef.Action.CHARGE \
+				or remaining_action > ActionDef.Action.BIG_DEFEND \
+				or remaining_action == actions[target_player] \
+				or hp[target_player][active_index[target_player]] <= 0:
+			continue
+		requests.append({source_player = source_player, player = target_player})
+
+	for request in requests:
+		var target_player: int = int(request["player"])
+		var event_id: int = _take_sequence_event_id()
+		var cause_step_id: String = primary_step_ids[int(request["source_player"])]
+		var shift_event: Dictionary = {
+			id = "sequence_shifted",
+			event_id = event_id,
+			source_player = int(request["source_player"]),
+			player = target_player,
+			amount = 1,
+			column = sequence_column,
+			insert_at = sequence_column + 1,
+			cause_step_id = cause_step_id,
+			reason = "sequence_shift",
+		}
+		waits[target_player] = {
+			amount = 1,
+			source_player = int(request["source_player"]),
+			caused_by_event_id = event_id,
+			cause_step_id = cause_step_id,
+			source_column = sequence_column,
+		}
+		events.append(shift_event)
+	return waits
+
+
+## 连环鼓把第二行动加入统一序列。若一方在进入该节点前被白额雷音延后，
+## 另一方的第二行动先单独占一个序位；防御一旦执行，会持续保护到本回合结束。
 ## “下一次攻击”类道具若已在第一阶段攻击中兑现则已消费；力量代价、噬心钉、末日火种等
 ## 明写“本回合/所有攻击”的增益通过 turn_base_attack_total_bonus 保留到第二阶段。
 func _resolve_lianhuan_second_actions(first_actions: Array[int], requested: Array[int],
-		events: Array) -> void:
+		events: Array, leading_waits: Array = [{}, {}],
+		consume_primary_mods: bool = true, standing_defenses: Array[int] = [-1, -1],
+		sequence_step: int = 2) -> Array[int]:
+	if consume_primary_mods:
+		for player in [0, 1]:
+			if ActionDef.is_attack(first_actions[player]):
+				_consume_next_attack_item_mods(player)
+
+	var waits: Array[Dictionary] = [{}, {}]
+	for player in [0, 1]:
+		if leading_waits[player] is Dictionary:
+			waits[player] = (leading_waits[player] as Dictionary).duplicate(true)
+	if not waits[0].is_empty() or not waits[1].is_empty():
+		for waiting_player in [0, 1]:
+			if not waits[waiting_player].is_empty():
+				var wait_request: Dictionary = waits[waiting_player]
+				var wait_event_id: int = _take_sequence_event_id()
+				events.append({
+					id = "sequence_wait_executed",
+					event_id = wait_event_id,
+					step_id = _take_sequence_step_id(),
+					player = waiting_player,
+					source_player = int(wait_request.get("source_player", 1 - waiting_player)),
+					step = sequence_step,
+					column = int(wait_request.get("source_column", 0)) + 1,
+					cause_step_id = String(wait_request.get("cause_step_id", "")),
+					caused_by_event_id = int(wait_request.get("caused_by_event_id", -1)),
+					reason = "sequence_shift",
+				})
+		if not waits[0].is_empty() and not waits[1].is_empty():
+			return _resolve_lianhuan_second_actions(first_actions, requested, events,
+				[{}, {}], false, standing_defenses, sequence_step + 1)
+
+		var waiting_player: int = 0 if not waits[0].is_empty() else 1
+		var early_player: int = 1 - waiting_player
+		var early_requested: Array[int] = [-1, -1]
+		early_requested[early_player] = requested[early_player]
+		var early_actions: Array[int] = _resolve_lianhuan_second_actions(
+			first_actions, early_requested, events, [{}, {}], false,
+			standing_defenses, sequence_step)
+		var carried_defenses: Array[int] = standing_defenses.duplicate()
+		if early_actions[early_player] in ActionDef.DEFEND_ACTIONS:
+			carried_defenses[early_player] = early_actions[early_player]
+		var late_requested: Array[int] = [-1, -1]
+		late_requested[waiting_player] = requested[waiting_player]
+		var late_actions: Array[int] = _resolve_lianhuan_second_actions(
+			first_actions, late_requested, events, [{}, {}], false,
+			carried_defenses, sequence_step + 1)
+		var resolved_actions: Array[int] = [-1, -1]
+		resolved_actions[early_player] = early_actions[early_player]
+		resolved_actions[waiting_player] = late_actions[waiting_player]
+		return resolved_actions
+
 	var actions: Array[int] = [requested[0], requested[1]]
 	for player in [0, 1]:
 		if not bool(item_mod(player, "lianhuan_active", false)) \
@@ -2388,10 +2609,9 @@ func _resolve_lianhuan_second_actions(first_actions: Array[int], requested: Arra
 	var saved_targets: Array[int] = _attack_target.duplicate()
 	var exact_spend_refunds: Array[int] = [0, 0]
 	for player in [0, 1]:
-		if ActionDef.is_attack(first_actions[player]):
-			_consume_next_attack_item_mods(player)
-	for player in [0, 1]:
-		selected_action[player] = actions[player] if actions[player] >= 0 else ActionDef.Action.CHARGE
+		selected_action[player] = actions[player] if actions[player] >= 0 \
+			else (standing_defenses[player] if standing_defenses[player] in ActionDef.DEFEND_ACTIONS \
+			else ActionDef.Action.CHARGE)
 		_attack_target[player] = _second_attack_target[player]
 	for player in [0, 1]:
 		if actions[player] < 0:
@@ -2428,14 +2648,17 @@ func _resolve_lianhuan_second_actions(first_actions: Array[int], requested: Arra
 			var gained: int = _gain_energy(player, gain)
 			if gained > 0:
 				events.append({id = "charge_gain", player = player, amount = gained,
-					step = 2})
-		events.append({id = "lianhuan_second_action", player = player,
-			action = actions[player]})
+					step = sequence_step})
+		var action_event_id: int = _take_sequence_event_id()
+		events.append({id = "lianhuan_second_action", event_id = action_event_id,
+			step_id = _take_sequence_step_id(), player = player,
+			action = actions[player], step = sequence_step,
+			column = sequence_step - 1})
 
 	if actions[0] < 0 and actions[1] < 0:
 		selected_action = saved_selected
 		_attack_target = saved_targets
-		return
+		return actions
 	for player in [0, 1]:
 		if ActionDef.is_attack(actions[player]) \
 				and int(item_mod(player, "base_attack_damage_cap", -1)) >= 0:
@@ -2463,6 +2686,8 @@ func _resolve_lianhuan_second_actions(first_actions: Array[int], requested: Arra
 			continue
 		var wave_upgraded: bool = action == ActionDef.Action.ATTACK and upgrade_next_wave[player]
 		var damage_action: int = ActionDef.Action.BIG_ATTACK if wave_upgraded else action
+		var damage_number_state: StringName = _battlefield_damage_number_state(
+			damage_action, player, source_slot)
 		var damage: int = maxi(_calc_outgoing(player, damage_action), 0)
 		damage *= maxi(1, int(item_mod(player, "atk_mult", 1)))
 		damage += int(item_mod(player, "atk_bonus", 0)) \
@@ -2500,6 +2725,7 @@ func _resolve_lianhuan_second_actions(first_actions: Array[int], requested: Arra
 		hits[player] = {damage = damage, kind = kind, pen = pen,
 			riders = item_mod(player, "riders", []), action = true, active = false,
 			src_slot = source_slot, target_slot = target_slot,
+			damage_number_state = damage_number_state,
 			force_zero_damage = action == ActionDef.Action.ATTACK and bool(item_mod(
 				1 - player, "enemy_wave_no_damage", false)),
 			consume_true_damage = bool(item_mod(player, "next_base_attack_true_damage", false)),
@@ -2507,20 +2733,18 @@ func _resolve_lianhuan_second_actions(first_actions: Array[int], requested: Arra
 		if wave_upgraded:
 			upgrade_next_wave[player] = false
 
-	var order: Array[int] = [0, 1]
-	if hits[0] != null and hits[1] != null:
-		var p0_skill: HeroSkill = _skills[0][int(hits[0].get("src_slot", active_index[0]))]
-		var p1_skill: HeroSkill = _skills[1][int(hits[1].get("src_slot", active_index[1]))]
-		var p0_priority: int = p0_skill.base_attack_clash_priority() if p0_skill != null else 0
-		var p1_priority: int = p1_skill.base_attack_clash_priority() if p1_skill != null else 0
-		if p1_priority > p0_priority:
-			order = [1, 0]
-	for player in order:
+	# 同一序位开始时拍下可执行性；其中一击在本序位内致死对手，不会倒取消对手已经开始的攻击。
+	var executable: Array[bool] = [false, false]
+	for player in [0, 1]:
+		if hits[player] != null:
+			var source_slot: int = int(hits[player].get("src_slot", active_index[player]))
+			executable[player] = hp[player][source_slot] > 0
+	for player in [0, 1]:
 		if hits[player] == null:
 			continue
-		var source_slot: int = int(hits[player].get("src_slot", active_index[player]))
-		if hp[player][source_slot] <= 0:
-			events.append({id = "base_attack_cancelled", player = player, step = 2})
+		if not executable[player]:
+			events.append({id = "base_attack_cancelled", player = player,
+				step = sequence_step})
 			continue
 		_apply_resolve_hit(player, hits[player], selected_action, events, contexts[player])
 
@@ -2544,9 +2768,10 @@ func _resolve_lianhuan_second_actions(first_actions: Array[int], requested: Arra
 	for player in [0, 1]:
 		if exact_spend_refunds[player] > 0:
 			set_item_mod(player, "exact_spend_refund_pending", exact_spend_refunds[player])
-			_settle_exact_spend_refund(player, events, 2)
+			_settle_exact_spend_refund(player, events, sequence_step)
 	selected_action = saved_selected
 	_attack_target = saved_targets
+	return actions
 
 
 ## 兼容旧消耗式攻击印记：按英雄槽累计，首次命中的基础攻击消费全部层数。
@@ -2617,7 +2842,7 @@ func add_item_rider(player: int, data: ItemData) -> void:
 # 使用免费一次性，用后 EMPTY；补充(1能·T1 池 3 选 1)；升级 = 就绪件花 1 能从「下一级池」3 选 1。
 # 槽 dict：{state:int, item:ItemData|null, since:int(进入该态的回合), used:bool, draft:Array, upg_draft:Array}
 
-enum SlotState { SEALED, OPENED, CHARGING, EMPTY }   # SEALED = 未到解锁回合（到点自动 → OPENED）
+enum SlotState { SEALED, OPENED, CHARGING, EMPTY, DEPLETED_PENDING }   # 新版耗尽件在回合末统一清框
 const SLOT_COUNT := 3
 const SLOT_UNLOCK_TURN := [2, 3, 4]    # 0-indexed turn_number（= 显示回合 3/4/5·到点自动解锁）
 const ITEM_REFILL_COST := 2            # 补充 1 能（= 2 半能·T1 池 3 选 1）
@@ -2631,13 +2856,137 @@ const STARTER_ITEM_IDS := ["t1_feibiao", "t1_jiudun", "t1_lzhi_shengming"]  # sl
 func _empty_econ_slot() -> Dictionary:
 	return {state = SlotState.EMPTY, item = null, since = -1, used = false,
 		draft = [], upg_draft = [], draft_entry_uids = [], instance_uid = -1,
-		temporary = false}
+		temporary = false, current_durability = 0, max_durability = 0,
+		used_turn = -1, lifecycle = "REAL"}
 
 
 func _new_backpack_entry(item_id: String, temporary: bool = false) -> Dictionary:
-	var entry := {uid = _next_backpack_uid, item_id = item_id, temporary = temporary}
+	var data: ItemData = ItemCatalog.make(item_id)
+	var max_durability: int = data.max_durability if data != null \
+			and data.is_prototype_v2() else 1
+	var entry := {
+		uid = _next_backpack_uid,
+		item_id = item_id,
+		temporary = temporary,
+		current_durability = max_durability,
+		max_durability = max_durability,
+		lifecycle = "RUN_TEMPORARY" if temporary else "REAL",
+		owner = -1,
+		controller = -1,
+	}
 	_next_backpack_uid += 1
 	return entry
+
+
+## 启用冻结20件的本地PvE原型。空列表使用完整20件演示背包；minimum_uid_mode
+## 只用于0/6/9检索A/B，不改变目录内容或三框规则。
+func enable_item_v2(player0_ids: Array = [], player1_ids: Array = [],
+		minimum_uid_mode: int = 0) -> void:
+	item_v2_enabled = true
+	item_v2_minimum_uid_mode = minimum_uid_mode if minimum_uid_mode in [0, 6, 9] else 0
+	var default_ids: Array[String] = ItemCatalog.prototype_ids()
+	var p0: Array = player0_ids if not player0_ids.is_empty() else default_ids
+	var p1: Array = player1_ids if not player1_ids.is_empty() else default_ids
+	configure_item_v2_backpacks(p0, p1)
+
+
+func configure_item_v2_backpacks(player0_ids: Array, player1_ids: Array) -> void:
+	item_v2_enabled = true
+	battle_backpack_enabled = true
+	battle_backpacks = [[], []]
+	used_item_history = [[], []]
+	revealed_backpack_uids = [{}, {}]
+	_next_backpack_uid = 1
+	for player: int in [0, 1]:
+		var source: Array = player0_ids if player == 0 else player1_ids
+		var accepted: Array[String] = []
+		for id_variant: Variant in source:
+			var item_id: String = String(id_variant)
+			if ItemCatalog.is_prototype_id(item_id):
+				accepted.append(item_id)
+		var minimum: int = item_v2_minimum_uid_mode
+		var cursor: int = 0
+		while minimum > 0 and accepted.size() < minimum:
+			accepted.append(ItemCatalog.PROTOTYPE_IDS[cursor % ItemCatalog.PROTOTYPE_IDS.size()])
+			cursor += 1
+		for item_id: String in accepted:
+			var entry: Dictionary = _new_backpack_entry(item_id)
+			entry["owner"] = player
+			entry["controller"] = player
+			battle_backpacks[player].append(entry)
+	item_v2_draw_used_turn = [-1, -1]
+	item_v2_draw_candidate_uids = [[], []]
+	item_v2_command_sequences = [[], []]
+	item_v2_pending = [{}, {}]
+
+
+func can_item_v2_draw(player: int) -> bool:
+	if not item_v2_enabled or player < 0 or player > 1 \
+			or item_v2_draw_used_turn[player] == turn_number \
+			or battle_backpacks[player].is_empty():
+		return false
+	for slot: Dictionary in slots[player]:
+		if int(slot.get("state", SlotState.EMPTY)) == SlotState.EMPTY:
+			return true
+	return false
+
+
+func begin_item_v2_draw(player: int) -> Array[ItemData]:
+	var out: Array[ItemData] = []
+	if not can_item_v2_draw(player):
+		return out
+	if item_v2_draw_candidate_uids[player].is_empty():
+		var sampled: Array = _sample_bag_entries(battle_backpacks[player], 3)
+		for entry_variant: Variant in sampled:
+			item_v2_draw_candidate_uids[player].append(int(
+				(entry_variant as Dictionary).get("uid", -1)))
+	for uid_variant: Variant in item_v2_draw_candidate_uids[player]:
+		var index: int = _bag_entry_index(player, int(uid_variant))
+		if index >= 0:
+			var entry: Dictionary = battle_backpacks[player][index]
+			var data: ItemData = ItemCatalog.make(String(entry.get("item_id", "")))
+			if data != null:
+				out.append(data)
+	return out
+
+
+func pick_item_v2_draw(player: int, choice: int, requested_slot: int = -1) -> bool:
+	var options: Array[ItemData] = begin_item_v2_draw(player)
+	if choice < 0 or choice >= options.size() \
+			or choice >= item_v2_draw_candidate_uids[player].size():
+		return false
+	var target_slot: int = requested_slot
+	if target_slot >= 0:
+		if target_slot >= slots[player].size() \
+				or int(slots[player][target_slot].get("state", SlotState.EMPTY)) != SlotState.EMPTY:
+			return false
+	else:
+		for slot_index: int in range(slots[player].size()):
+			if int(slots[player][slot_index].get("state", SlotState.EMPTY)) == SlotState.EMPTY:
+				target_slot = slot_index
+				break
+	if target_slot < 0:
+		return false
+	var uid: int = int(item_v2_draw_candidate_uids[player][choice])
+	var entry: Dictionary = _take_bag_entry(player, uid)
+	if not _put_entry_in_slot(player, target_slot, entry, false):
+		return false
+	item_v2_draw_used_turn[player] = turn_number
+	item_v2_draw_candidate_uids[player] = []
+	item_v2_public_history.append({id = "item_v2_acquired", player = player,
+		item_id = options[choice].item_id, instance_uid = uid, slot = target_slot,
+		turn = turn_number})
+	return true
+
+
+func pass_item_v2_draw(player: int) -> bool:
+	if not can_item_v2_draw(player):
+		return false
+	item_v2_draw_used_turn[player] = turn_number
+	item_v2_draw_candidate_uids[player] = []
+	item_v2_public_history.append({id = "item_v2_draw_passed", player = player,
+		turn = turn_number})
+	return true
 
 
 func configure_battle_backpacks(player0_ids: Array, player1_ids: Array) -> void:
@@ -2701,6 +3050,10 @@ func _put_entry_in_slot(player: int, slot_index: int, entry: Dictionary,
 	slot["draft_entry_uids"] = []
 	slot["instance_uid"] = int(entry.get("uid", -1))
 	slot["temporary"] = bool(entry.get("temporary", false))
+	slot["current_durability"] = int(entry.get("current_durability", data.max_durability))
+	slot["max_durability"] = int(entry.get("max_durability", data.max_durability))
+	slot["used_turn"] = -1
+	slot["lifecycle"] = String(entry.get("lifecycle", "REAL"))
 	return true
 
 
@@ -2713,7 +3066,11 @@ func _return_slot_item_to_backpack(player: int, slot_index: int) -> Dictionary:
 		return {}
 	var uid: int = int(slot.get("instance_uid", -1))
 	var entry: Dictionary = {uid = uid, item_id = data.item_id,
-		temporary = bool(slot.get("temporary", false))}
+		temporary = bool(slot.get("temporary", false)),
+		current_durability = int(slot.get("current_durability", data.max_durability)),
+		max_durability = int(slot.get("max_durability", data.max_durability)),
+		lifecycle = String(slot.get("lifecycle", "REAL")), owner = player,
+		controller = player}
 	if uid < 0 or _bag_entry_index(player, uid) >= 0:
 		entry = _new_backpack_entry(data.item_id, bool(slot.get("temporary", false)))
 	battle_backpacks[player].append(entry)
@@ -2812,6 +3169,11 @@ static func _revealed_uid(reveals: Dictionary, uid: int) -> bool:
 ## 启用经济并初始化槽位（实战由 battle_screen 调；单元测试不调 → 槽空、不影响既有行为）。
 func econ_init() -> void:
 	slots = [[], []]
+	if item_v2_enabled:
+		for player: int in [0, 1]:
+			for _slot_index: int in range(SLOT_COUNT):
+				slots[player].append(_empty_econ_slot())
+		return
 	if battle_backpack_enabled:
 		for player in [0, 1]:
 			for _slot_index in range(SLOT_COUNT):
@@ -2876,11 +3238,18 @@ func slot_item(player: int, s: int) -> ItemData:
 ## 槽本回合是否可用（CHARGING + 部署锁已过 + 未用过）。
 func slot_ready(player: int, s: int) -> bool:
 	var sl: Dictionary = slots[player][s]
+	if item_v2_enabled:
+		return int(sl.get("state", SlotState.EMPTY)) == SlotState.CHARGING \
+			and int(sl.get("current_durability", 0)) > 0 \
+			and int(sl.get("used_turn", -1)) != turn_number \
+			and turn_number > int(sl.get("since", -1))
 	return int(sl["state"]) == SlotState.CHARGING and not bool(sl["used"]) and turn_number > int(sl["since"])
 
 
 ## 能否抽道具（OPENED·自动解锁当回合即可抽）。
 func can_draw_slot(player: int, s: int) -> bool:
+	if item_v2_enabled:
+		return false
 	return int(slots[player][s]["state"]) == SlotState.OPENED and turn_number > int(slots[player][s]["since"])
 
 
@@ -2947,6 +3316,8 @@ func _append_slot_item_use(player: int, data: ItemData, resolved_target: int,
 ## item_slot_target 供需要选择道具槽的效果使用：熔炉/点金石选己方槽，时滞枷锁选敌方槽。
 func use_slot(player: int, s: int, target_override: int = -1, item_slot_target: int = -1,
 		item_choice: int = -1) -> bool:
+	if item_v2_enabled:
+		return _use_item_v2_slot_preview(player, s, target_override)
 	if not slot_ready(player, s):
 		return false
 	var data: ItemData = slots[player][s]["item"]
@@ -3096,6 +3467,162 @@ func use_slot(player: int, s: int, target_override: int = -1, item_slot_target: 
 	return true
 
 
+## 新版道具的顺序预演入口。只在当前实例上推进资源、耐久和已建立的持续状态；
+## 提交校验始终在 clone() 上调用，因此失败不会污染权威战局。
+func _use_item_v2_slot_preview(player: int, slot_index: int, target: int = -1) -> bool:
+	if not item_v2_enabled or player < 0 or player > 1 \
+			or slot_index < 0 or slot_index >= slots[player].size() \
+			or not slot_ready(player, slot_index):
+		return false
+	var slot: Dictionary = slots[player][slot_index]
+	var data: ItemData = slot.get("item", null)
+	if data == null or not data.is_prototype_v2() \
+			or not ITEM_V2_RULES.submission_target_is_valid(self, player, data, target):
+		return false
+	var cost_units: int = ITEM_V2_RULES.item_cost_units(self, player, data, false)
+	var cost: int = cost_units * ActionDef.ENERGY_UNIT
+	if usable_energy(player) < cost:
+		return false
+	ITEM_V2_RULES.item_cost_units(self, player, data, true)
+	energy[player] -= cost
+	var operation: Dictionary = ITEM_V2_RULES.execution_operation(
+		clone(), player, data, target)
+	slot["current_durability"] = maxi(0,
+		int(slot.get("current_durability", data.max_durability)) - 1)
+	slot["used_turn"] = turn_number
+	if int(slot["current_durability"]) <= 0:
+		slot["state"] = SlotState.DEPLETED_PENDING
+	ITEM_V2_RULES.apply_column_operations(self, [operation], [], -1)
+	return true
+
+
+## 在一份权威克隆上按玩家提交顺序完整走费用与合法性。每件实体每回合只能出现一次，
+## 且每条序列恰好包含一个公共/英雄行动；敌方未知选择不参与本方提交合法性。
+func validate_item_v2_command_sequence(player: int, sequence: Array) -> bool:
+	if not item_v2_enabled or player < 0 or player > 1 or sequence.is_empty():
+		return false
+	var probe: BattleCore = clone()
+	var free_switch_intents: Array = probe._pending_free_switches[player].duplicate(true)
+	var free_switch_cursor: int = 0
+	if not free_switch_intents.is_empty():
+		probe.active_index[player] = int((free_switch_intents[0] as Dictionary).get(
+			"from", probe.active_index[player]))
+	probe._pending_free_switches[player] = []
+	var seen_uids: Dictionary = {}
+	var action_count: int = 0
+	for value: Variant in sequence:
+		if not value is Dictionary:
+			return false
+		var step: Dictionary = value
+		match String(step.get("kind", "")):
+			"item":
+				var slot_index: int = int(step.get("slot", -1))
+				if slot_index < 0 or slot_index >= probe.slots[player].size():
+					return false
+				var slot: Dictionary = probe.slots[player][slot_index]
+				var data: ItemData = slot.get("item", null)
+				var uid: int = int(slot.get("instance_uid", -1))
+				if data == null or not data.is_prototype_v2() or uid < 0 \
+						or seen_uids.has(uid):
+					return false
+				if step.has("instance_uid") and int(step["instance_uid"]) != uid:
+					return false
+				if step.has("item_id") and String(step["item_id"]) != data.item_id:
+					return false
+				var target: int = int(step.get("target", -1))
+				# 复苏石只允许锁定选择阶段已经阵亡的后备；不能靠前序行动预造尸体。
+				if data.effect_key == &"revive_teammate" \
+						and not ITEM_V2_RULES.submission_target_is_valid(
+							self, player, data, target):
+					return false
+				if not probe._use_item_v2_slot_preview(player, slot_index, target):
+					return false
+				seen_uids[uid] = true
+			"action":
+				action_count += 1
+				if action_count > 1 or not probe._preview_item_v2_action_step(player, step):
+					return false
+			"free_switch":
+				if free_switch_cursor >= free_switch_intents.size():
+					return false
+				var intent: Dictionary = free_switch_intents[free_switch_cursor]
+				var target: int = int(step.get("target", -1))
+				if target != int(intent.get("to", -2)):
+					return false
+				probe._perform_switch(player, int(intent.get("from", probe.active_index[player])),
+					target, [])
+				if probe.active_index[player] != target:
+					return false
+				free_switch_cursor += 1
+			_:
+				return false
+	return action_count == 1 and free_switch_cursor == free_switch_intents.size()
+
+
+func _preview_item_v2_action_step(player: int, step: Dictionary) -> bool:
+	var choice: Dictionary = step.duplicate(true)
+	if not choice.has("action") or not apply_choice(player, choice):
+		return false
+	var action: int = int(choice["action"])
+	var cost: int = action_cost(player, action)
+	if _empowered_wave[player]:
+		cost += EMPOWERED_WAVE_COST
+	if _energy_cap_discount[player] and cost > 0:
+		if reduce_energy_max(player, ENERGY_CAP_DISCOUNT_COST,
+				ENERGY_CAP_DISCOUNT_FLOOR) != ENERGY_CAP_DISCOUNT_COST:
+			return false
+		cost = maxi(0, cost - ENERGY_CAP_DISCOUNT_AMOUNT)
+	_pay_action_cost(player, cost, [])
+	if action == ActionDef.Action.CHARGE:
+		_gain_energy(player, int(ActionDef.BASE_ACTION_DEF[action]["energy_gain"]))
+	elif action == ActionDef.Action.SWITCH:
+		_perform_switch(player, active_index[player], int(choice.get("target", -1)), [])
+	elif action in ActionDef.DEFEND_ACTIONS:
+		ITEM_V2_RULES.take_defense_action(self, player, action)
+	elif ActionDef.is_attack(action):
+		if _split_big_wave[player] and action == ActionDef.Action.BIG_ATTACK:
+			ITEM_V2_RULES.take_attack_modifiers(
+				self, player, ActionDef.Action.ATTACK, int(choice.get("target", -1)))
+		else:
+			var actual: int = ActionDef.Action.BIG_ATTACK \
+				if action == ActionDef.Action.ATTACK and upgrade_next_wave[player] else action
+			ITEM_V2_RULES.take_attack_modifiers(
+				self, player, actual, int(choice.get("target", -1)))
+		if _jianqi_attack[player]:
+			set_team_status(player, "jianqi", 0)
+	elif action == ActionDef.ACTIVE:
+		var slot: int = active_index[player]
+		var skill: HeroSkill = _skills[player][slot]
+		if skill != null and not skill.active_is_attack():
+			skill.execute_active(self, player, slot)
+	return true
+
+
+func submit_item_v2_command_sequence(player: int, sequence: Array) -> bool:
+	if not validate_item_v2_command_sequence(player, sequence):
+		return false
+	var normalized: Array[Dictionary] = []
+	for value: Variant in sequence:
+		var step: Dictionary = (value as Dictionary).duplicate(true)
+		step["player"] = player
+		if String(step.get("step_id", "")).is_empty():
+			step["step_id"] = _take_sequence_step_id()
+		if String(step.get("kind", "")) == "item":
+			var slot_index: int = int(step.get("slot", -1))
+			var slot: Dictionary = slots[player][slot_index]
+			var data: ItemData = slot.get("item", null)
+			step["instance_uid"] = int(slot.get("instance_uid", -1))
+			step["item_id"] = data.item_id if data != null else ""
+		normalized.append(step)
+	item_v2_command_sequences[player] = normalized
+	return true
+
+
+func both_item_v2_sequences_ready() -> bool:
+	return item_v2_enabled and not item_v2_command_sequences[0].is_empty() \
+		and not item_v2_command_sequences[1].is_empty()
+
+
 ## 升级到下一级的能量成本（半能）：统一 1 能（T1→2 / T2→3 同价·2026-07-03 经济重做）。
 func upgrade_cost(player: int, s: int) -> int:
 	var item: ItemData = slots[player][s]["item"]
@@ -3108,7 +3635,7 @@ func upgrade_cost(player: int, s: int) -> int:
 ## 升级 = 花能量从「下一级 tier 池」3 选 1（不再要求预设 upgrade_to —— 多数道具没有升级款；
 ## 预设款只是「以后加权让它更易出现」的偏好·B2）。故 T1/T2 件均可升、T3 封顶。
 func can_upgrade(player: int, s: int) -> bool:
-	if pve_no_econ:
+	if item_v2_enabled or pve_no_econ:
 		return false   # 远征 PvE：装备件只用不升（无局内经济）
 	if not slot_ready(player, s):
 		return false
@@ -3169,7 +3696,7 @@ func pick_upgrade(player: int, s: int, choice: int) -> bool:
 
 
 func can_refill(player: int, s: int) -> bool:
-	if pve_no_econ:
+	if item_v2_enabled or pve_no_econ:
 		return false   # 远征 PvE：空槽不可花能补充（无局内经济）
 	return int(slots[player][s]["state"]) == SlotState.EMPTY \
 		and usable_energy(player) >= ITEM_REFILL_COST \
@@ -3260,6 +3787,13 @@ func _weighted_dim_pick_index(pool: Array, dims: Dictionary) -> int:
 
 ## 结算末：本回合用掉的槽置 EMPTY（一次性消耗）。在 resolve Phase 6 调。
 func _econ_after_resolve() -> void:
+	if item_v2_enabled:
+		for player: int in [0, 1]:
+			for slot: Dictionary in slots[player]:
+				if int(slot.get("state", SlotState.EMPTY)) != SlotState.DEPLETED_PENDING:
+					continue
+				slot.merge(_empty_econ_slot(), true)
+		return
 	for p in [0, 1]:
 		for sl in slots[p]:
 			if bool(sl["used"]):
@@ -3351,6 +3885,7 @@ func clone() -> BattleCore:
 	c.selected_action = selected_action.duplicate()
 	c._empowered_wave = _empowered_wave.duplicate()
 	c._split_big_wave = _split_big_wave.duplicate()
+	c._jianqi_attack = _jianqi_attack.duplicate()
 	c._blood_payment = _blood_payment.duplicate()
 	c._blood_payment_source = _blood_payment_source.duplicate()
 	c._energy_cap_discount = _energy_cap_discount.duplicate()
@@ -3380,6 +3915,15 @@ func clone() -> BattleCore:
 	c.used_item_history = used_item_history.duplicate(true)
 	c.revealed_backpack_uids = revealed_backpack_uids.duplicate(true)
 	c._next_backpack_uid = _next_backpack_uid
+	c._next_sequence_event_id = _next_sequence_event_id
+	c._next_sequence_step_id = _next_sequence_step_id
+	c.item_v2_enabled = item_v2_enabled
+	c.item_v2_pending = item_v2_pending.duplicate(true)
+	c.item_v2_command_sequences = item_v2_command_sequences.duplicate(true)
+	c.item_v2_draw_used_turn = item_v2_draw_used_turn.duplicate()
+	c.item_v2_draw_candidate_uids = item_v2_draw_candidate_uids.duplicate(true)
+	c.item_v2_public_history = item_v2_public_history.duplicate(true)
+	c.item_v2_minimum_uid_mode = item_v2_minimum_uid_mode
 	c.turn_number = turn_number
 	c.game_over = game_over
 	c.winner = winner
@@ -3422,15 +3966,18 @@ func clone() -> BattleCore:
 #       b.select_action(0, ...)                           # 恢复后战局含随机流逐位一致，直接续打
 # 行为锁定：tests/unit/battle/v4/test_battle_snapshot.gd
 
-const SNAPSHOT_VERSION := 20
+const SNAPSHOT_VERSION := 23
 const HERO_RES_DIR := "res://assets/data/heroes/"
 ## 快照必需键（2026-07-17 终审修复·schema 门）：⚠新增引擎状态字段的"三处同步"升级为四处——
 ## clone() / to_snapshot()+from_snapshot() / 本表 / 快照测试。
 const SNAP_REQUIRED_KEYS: Array[String] = ["v", "heroes", "active_index", "energy", "energy_max", "hp", "max_hp",
 	"shield", "pending_damage", "statuses", "team_statuses", "selected_action", "switch_to", "forced_pull",
-	"active_target", "attack_target", "second_action", "second_attack_target", "pending_death_switch", "death_processed", "empowered_wave", "split_big_wave", "blood_payment", "blood_payment_source", "energy_cap_discount", "free_switch_usage_turn", "free_switch_uses", "pending_free_switches", "killer",
+	"active_target", "attack_target", "second_action", "second_attack_target", "pending_death_switch", "death_processed", "empowered_wave", "split_big_wave", "jianqi_attack", "blood_payment", "blood_payment_source", "energy_cap_discount", "free_switch_usage_turn", "free_switch_uses", "pending_free_switches", "killer",
 	"last_action", "items", "item_uses", "info_distortion", "item_buffs", "timed_item_effects", "imod", "relics", "slots",
 	"battle_backpack_enabled", "battle_backpacks", "used_item_history", "revealed_backpack_uids", "next_backpack_uid",
+	"next_sequence_event_id", "next_sequence_step_id",
+	"item_v2_enabled", "item_v2_pending", "item_v2_command_sequences", "item_v2_draw_used_turn",
+	"item_v2_draw_candidate_uids", "item_v2_public_history", "item_v2_minimum_uid_mode",
 	"turn_number", "game_over", "winner", "overtime_mode", "action_lock_turn", "action_locked",
 	"energy_burn_turn", "upgrade_next_wave", "retained_big_defend", "retained_big_defend_until_turn",
 	"pve_no_econ", "rng_seed", "rng_state"]
@@ -3461,6 +4008,7 @@ func to_snapshot() -> Dictionary:
 		death_processed = _death_processed.duplicate(true),
 		empowered_wave = _empowered_wave.duplicate(),
 		split_big_wave = _split_big_wave.duplicate(),
+		jianqi_attack = _jianqi_attack.duplicate(),
 		blood_payment = _blood_payment.duplicate(),
 		blood_payment_source = _blood_payment_source.duplicate(),
 		energy_cap_discount = _energy_cap_discount.duplicate(),
@@ -3482,6 +4030,15 @@ func to_snapshot() -> Dictionary:
 		used_item_history = used_item_history.duplicate(true),
 		revealed_backpack_uids = revealed_backpack_uids.duplicate(true),
 		next_backpack_uid = _next_backpack_uid,
+		next_sequence_event_id = _next_sequence_event_id,
+		next_sequence_step_id = _next_sequence_step_id,
+		item_v2_enabled = item_v2_enabled,
+		item_v2_pending = item_v2_pending.duplicate(true),
+		item_v2_command_sequences = item_v2_command_sequences.duplicate(true),
+		item_v2_draw_used_turn = item_v2_draw_used_turn.duplicate(),
+		item_v2_draw_candidate_uids = item_v2_draw_candidate_uids.duplicate(true),
+		item_v2_public_history = item_v2_public_history.duplicate(true),
+		item_v2_minimum_uid_mode = item_v2_minimum_uid_mode,
 		turn_number = turn_number,
 		game_over = game_over,
 		winner = winner,
@@ -3535,6 +4092,7 @@ func from_snapshot(d: Dictionary) -> bool:
 	_death_processed = s["death_processed"]
 	_empowered_wave.assign(s["empowered_wave"])
 	_split_big_wave.assign(s["split_big_wave"])
+	_jianqi_attack.assign(s["jianqi_attack"])
 	_blood_payment.assign(s["blood_payment"])
 	_blood_payment_source.assign(s["blood_payment_source"])
 	_energy_cap_discount.assign(s["energy_cap_discount"])
@@ -3562,6 +4120,19 @@ func from_snapshot(d: Dictionary) -> bool:
 	reveals.assign(s["revealed_backpack_uids"])
 	revealed_backpack_uids = reveals
 	_next_backpack_uid = int(s["next_backpack_uid"])
+	_next_sequence_event_id = int(s["next_sequence_event_id"])
+	_next_sequence_step_id = int(s["next_sequence_step_id"])
+	item_v2_enabled = bool(s["item_v2_enabled"])
+	var restored_v2_pending: Array[Dictionary] = []
+	restored_v2_pending.assign(s["item_v2_pending"])
+	item_v2_pending = restored_v2_pending
+	item_v2_command_sequences = s["item_v2_command_sequences"]
+	item_v2_draw_used_turn.assign(s["item_v2_draw_used_turn"])
+	item_v2_draw_candidate_uids = s["item_v2_draw_candidate_uids"]
+	var restored_v2_history: Array[Dictionary] = []
+	restored_v2_history.assign(s["item_v2_public_history"])
+	item_v2_public_history = restored_v2_history
+	item_v2_minimum_uid_mode = int(s["item_v2_minimum_uid_mode"])
 	turn_number = int(s["turn_number"])
 	game_over = bool(s["game_over"])
 	winner = int(s["winner"])
@@ -3686,7 +4257,11 @@ func _snap_pack_slots(p: int) -> Array:
 			used = bool(sl.get("used", false)), draft = _snap_pack_items(sl.get("draft", [])),
 			upg_draft = _snap_pack_items(sl.get("upg_draft", [])),
 			draft_entry_uids = (sl.get("draft_entry_uids", []) as Array).duplicate(),
-			instance_uid = int(sl.get("instance_uid", -1)), temporary = bool(sl.get("temporary", false))})
+			instance_uid = int(sl.get("instance_uid", -1)), temporary = bool(sl.get("temporary", false)),
+			current_durability = int(sl.get("current_durability", 0)),
+			max_durability = int(sl.get("max_durability", 0)),
+			used_turn = int(sl.get("used_turn", -1)),
+			lifecycle = String(sl.get("lifecycle", "REAL"))})
 	return out
 
 
@@ -3698,12 +4273,17 @@ static func _snap_unpack_slots(arr: Array) -> Array:
 			used = bool(sl.get("used", false)), draft = _snap_unpack_items(sl.get("draft", [])),
 			upg_draft = _snap_unpack_items(sl.get("upg_draft", [])),
 			draft_entry_uids = (sl.get("draft_entry_uids", []) as Array).duplicate(),
-			instance_uid = int(sl.get("instance_uid", -1)), temporary = bool(sl.get("temporary", false))})
+			instance_uid = int(sl.get("instance_uid", -1)), temporary = bool(sl.get("temporary", false)),
+			current_durability = int(sl.get("current_durability", 0)),
+			max_durability = int(sl.get("max_durability", 0)),
+			used_turn = int(sl.get("used_turn", -1)),
+			lifecycle = String(sl.get("lifecycle", "REAL"))})
 	return out
 
 
 ## 枚举该玩家当前所有合法动作。返回
 ## Array[{action:int, target:int, empowered_wave?:bool, split_big_wave?:bool,
+##        jianqi_attack?:bool,
 ##        blood_payment?:bool, energy_cap_discount?:bool}]，
 ## target 于 SWITCH=己方替补槽、房日基础攻击=任一存活敌方槽、带目标 ACTIVE（枭阳 h21）=敌方替补槽，其余 -1。
 ## 亢金强化波、玄冥双波、蚩尤生命支付与并封减费均展开为显式 choice，供 AI/联机走同一白名单。
@@ -3713,6 +4293,7 @@ func legal_actions(player: int) -> Array:
 	var saved_selected: int = selected_action[player]
 	var saved_empowered: bool = _empowered_wave[player]
 	var saved_split: bool = _split_big_wave[player]
+	var saved_jianqi_attack: bool = _jianqi_attack[player]
 	var saved_blood: bool = _blood_payment[player]
 	var saved_blood_source: int = _blood_payment_source[player]
 	var saved_discount: bool = _energy_cap_discount[player]
@@ -3729,18 +4310,25 @@ func legal_actions(player: int) -> Array:
 				forms.append({empowered_wave = true})
 			if a == ActionDef.Action.BIG_ATTACK and has_split_big_wave(player):
 				forms.append({split_big_wave = true})
+			if ActionDef.is_attack(a) and has_jianqi_attack(player):
+				forms.append({jianqi_attack = true})
+				if a == ActionDef.Action.ATTACK and has_empowered_wave(player):
+					forms.append({empowered_wave = true, jianqi_attack = true})
 			for form: Dictionary in forms:
 				var empowered := bool(form.get("empowered_wave", false))
 				var split := bool(form.get("split_big_wave", false))
+				var jianqi_attack := bool(form.get("jianqi_attack", false))
 				for blood_payment in [false, true]:
 					for energy_cap_discount in [false, true]:
 						if select_action(player, a, target, empowered, split,
-								blood_payment, energy_cap_discount):
+								blood_payment, energy_cap_discount, jianqi_attack):
 							var choice := {action = a, target = target}
 							if empowered:
 								choice["empowered_wave"] = true
 							if split:
 								choice["split_big_wave"] = true
+							if jianqi_attack:
+								choice["jianqi_attack"] = true
 							if blood_payment:
 								choice["blood_payment"] = true
 							if energy_cap_discount:
@@ -3750,6 +4338,7 @@ func legal_actions(player: int) -> Array:
 	selected_action[player] = saved_selected
 	_empowered_wave[player] = saved_empowered
 	_split_big_wave[player] = saved_split
+	_jianqi_attack[player] = saved_jianqi_attack
 	_blood_payment[player] = saved_blood
 	_blood_payment_source[player] = saved_blood_source
 	_energy_cap_discount[player] = saved_discount
@@ -3777,7 +4366,7 @@ func legal_actions(player: int) -> Array:
 	return out
 
 
-## 按 {action,target,empowered_wave?,split_big_wave?,blood_payment?,energy_cap_discount?}
+## 按 {action,target,empowered_wave?,split_big_wave?,jianqi_attack?,blood_payment?,energy_cap_discount?}
 ## 提交该玩家动作（封装 select_* 分派）。
 func apply_choice(player: int, choice: Dictionary) -> bool:
 	if bool(choice.get("double", false)):
@@ -3793,7 +4382,8 @@ func apply_choice(player: int, choice: Dictionary) -> bool:
 	else:
 		primary_ok = select_action(player, a, int(choice.get("target", -1)),
 			bool(choice.get("empowered_wave", false)), bool(choice.get("split_big_wave", false)),
-			bool(choice.get("blood_payment", false)), bool(choice.get("energy_cap_discount", false)))
+			bool(choice.get("blood_payment", false)), bool(choice.get("energy_cap_discount", false)),
+			bool(choice.get("jianqi_attack", false)))
 	if not primary_ok:
 		return false
 	if int(choice.get("second_action", -1)) >= 0:
@@ -3816,6 +4406,8 @@ func apply_second_choice(player: int, choice: Dictionary) -> bool:
 #   攻击打到换【上来】的新英雄 → 切换 = 可垫刀/调度的防御工具。
 
 func resolve() -> Dictionary:
+	if item_v2_enabled:
+		return ITEM_V2_RESOLUTION.resolve(self)
 	var events: Array = []
 	_pending_reserve_pursuit_source = [-1, -1]
 	_pending_reserve_pursuit_target = [-1, -1]
@@ -3867,6 +4459,7 @@ func resolve() -> Dictionary:
 			selected_action[p] = ActionDef.Action.CHARGE
 			_empowered_wave[p] = false
 			_split_big_wave[p] = false
+			_jianqi_attack[p] = false
 			_blood_payment[p] = false
 			_blood_payment_source[p] = -1
 			_energy_cap_discount[p] = false
@@ -3881,17 +4474,31 @@ func resolve() -> Dictionary:
 			selected_action[p] = ActionDef.Action.CHARGE
 			_empowered_wave[p] = false
 			_split_big_wave[p] = false
+			_jianqi_attack[p] = false
 			_blood_payment[p] = false
 			_blood_payment_source[p] = -1
 			_energy_cap_discount[p] = false
 
 	var a: Array[int] = [selected_action[0], selected_action[1]]
 	var second_actions: Array[int] = [_second_action[0], _second_action[1]]
+	# 结果与动作气泡仍展示玩家提交内容；h21 只改写后续“实际结算动作”。
+	var submitted_actions: Array[int] = a.duplicate()
+	var submitted_second_actions: Array[int] = second_actions.duplicate()
+	# 攒通常在资源相位立即结算。若对面本拍提交 h21 主动技，先暂存该次得能，
+	# 等强制登场是否真正成功后再落账，避免先播放得能再被“行动取消”倒扣。
+	var deferred_h21_charge_gain: Array[int] = [0, 0]
+	# 真实行动节点使用不含阵营语义的 opaque ID；换视角只交换数组位置，不改 ID 本身。
+	var primary_step_ids: Array[String] = [
+		_take_sequence_step_id(), _take_sequence_step_id(),
+	]
+	var resolved_second_actions: Array[int] = [-1, -1]
 	for p in [0, 1]:
 		if a[p] != ActionDef.Action.ATTACK:
 			_empowered_wave[p] = false
 		if a[p] != ActionDef.Action.BIG_ATTACK:
 			_split_big_wave[p] = false
+		if not ActionDef.is_attack(a[p]):
+			_jianqi_attack[p] = false
 		if blood_payment_source(p) < 0:
 			_blood_payment[p] = false
 	_retained_big_defend_in_use = [false, false]
@@ -3989,9 +4596,19 @@ func resolve() -> Dictionary:
 		if a[p] == ActionDef.Action.CHARGE:
 			var gain: int = ActionDef.BASE_ACTION_DEF[ActionDef.Action.CHARGE]["energy_gain"]
 			gain = maxi(0, gain - int(item_mod(p, "charge_penalty", 0)))
-			var gained: int = _gain_energy(p, gain)
-			if gained > 0:
-				events.append({id = "charge_gain", player = p, amount = gained})
+			var opponent: int = 1 - p
+			var opponent_hero: HeroData = heroes[opponent][active_index[opponent]]
+			var may_be_pulled_by_h21: bool = a[opponent] == ActionDef.ACTIVE \
+				and opponent_hero != null and opponent_hero.hero_id == "h21"
+			if may_be_pulled_by_h21:
+				var source_skill: HeroSkill = _skills[p][active_index[p]]
+				if source_skill != null:
+					gain += source_skill.energy_gain_bonus(self, p, active_index[p])
+				deferred_h21_charge_gain[p] = gain
+			else:
+				var gained: int = _gain_energy(p, gain)
+				if gained > 0:
+					events.append({id = "charge_gain", player = p, amount = gained})
 		elif a[p] == ActionDef.ACTIVE:
 			# 扣能由上面的 _get_cost 完成；cap 计数 + 事件在此；effect 执行延后到 Phase 2.6（切换之后）。
 			var slot: int = active_index[p]
@@ -4057,15 +4674,41 @@ func resolve() -> Dictionary:
 			to_hero_id = (heroes[p][source_slot] as HeroData).hero_id,
 		})
 
-	# Phase 2.7: 枭阳 h21【调虎离山】强制揪人 —— execute_active 设的 _forced_pull[受害方]
-	#   在此执行（切换之后、伤害之前）→ 被揪英雄成为对手出战、本回合攻击落它身上、原出战下场触发
+	# Phase 2.7: 枭阳 h21【惊蛰】强制揪人 —— execute_active 设的 _forced_pull[受害方]
+	#   在此执行（切换之后、伤害之前）→ 被揪英雄成为对手出战；若受害方的基础行动尚未进入
+	#   Phase 3，则整项取消。费用已在 Phase 2 支付，不做技能内退款。
 	#   当前出战技能仍会收到 on_enemy_switch_out；枭阳施法时娄金不在场，因此不触发影狩。
+	var h21_cancelled_actions: Array[bool] = [false, false]
 	for p in [0, 1]:
 		var pull: int = _forced_pull[p]
 		if pull >= 0 and not _turn_switch_locked(p) and pull < hp[p].size() \
 				and hp[p][pull] > 0 and pull != active_index[p]:
-			_perform_switch(p, active_index[p], pull, events)
+			var replaced_slot: int = active_index[p]
+			_perform_switch(p, replaced_slot, pull, events)
+			if active_index[p] == pull and submitted_actions[p] in [
+					ActionDef.Action.CHARGE, ActionDef.Action.ATTACK,
+					ActionDef.Action.DEFEND, ActionDef.Action.BIG_ATTACK,
+					ActionDef.Action.BIG_DEFEND]:
+				h21_cancelled_actions[p] = true
+				a[p] = -1
+				selected_action[p] = -1
+				second_actions[p] = -1
+				_retain_big_defend_candidate[p] = false
+				events.append({
+					id = "h21_action_cancelled",
+					player = p,
+					source_player = 1 - p,
+					slot = replaced_slot,
+					action = submitted_actions[p],
+				})
 		_forced_pull[p] = -1
+	# 未被成功揪走时，暂存的“攒”仍按原出战英雄在资源相位计算出的加成正常落账。
+	for p in [0, 1]:
+		if deferred_h21_charge_gain[p] <= 0 or h21_cancelled_actions[p]:
+			continue
+		var gained: int = _gain_energy(p, deferred_h21_charge_gain[p], false)
+		if gained > 0:
+			events.append({id = "charge_gain", player = p, amount = gained})
 
 	# Phase 3+4: 同时独立结算（含道具伤害 hit·ADR-003 D3）。先把双方完整出伤 hit-list 对快照
 	# 算好（动作前道具 hit → 动作攻击 → 动作后道具 hit），再一起施加 → 保持 B-001/2/3 跨玩家同时。
@@ -4086,7 +4729,7 @@ func resolve() -> Dictionary:
 	for p in [0, 1]:
 		var aslot: int = active_index[p]
 		if ActionDef.is_attack(a[p]):
-			# 即使攻击随后被草人落空或对攻优先级取消，仍保留“本回合用了这次攻击”的来源槽；
+			# 即使攻击随后被草人落空，仍保留“本回合用了这次攻击”的来源槽；
 			# 命中类回调会自行检查 connected，未击败类代价则仍需结算。
 			base_attack_contexts[p]["source_slot"] = aslot
 			base_attack_contexts[p]["original_action"] = a[p]
@@ -4109,6 +4752,18 @@ func resolve() -> Dictionary:
 		var nullified: bool = bool(item_mod(p, "atk_nullify", false))
 		var true_damage_attack: bool = bool(item_mod(p, "next_base_attack_true_damage", false))
 		var wave_upgraded: bool = a[p] == ActionDef.Action.ATTACK and upgrade_next_wave[p]
+		var jianqi_spent: int = 0
+		var action_skill: HeroSkill = _skills[p][aslot]
+		if _jianqi_attack[p] and ActionDef.is_attack(a[p]) \
+				and action_skill != null and action_skill.enables_jianqi_attack():
+			jianqi_spent = int(get_team_status(p, "jianqi", 0))
+			if jianqi_spent >= 2:
+				# 攻击在此已经形成：先消费旧剑气，随后命中回调才能自然积累新的一点。
+				set_team_status(p, "jianqi", 0)
+				events.append({id = "h10_jianqi_attack", player = p,
+					amount = jianqi_spent, action = a[p]})
+			else:
+				jianqi_spent = 0
 		if nullified and wave_upgraded:
 			upgrade_next_wave[p] = false
 		if nullified and ActionDef.is_attack(a[p]) and true_damage_attack:
@@ -4121,6 +4776,8 @@ func resolve() -> Dictionary:
 			var split_big_wave: bool = _split_big_wave[p] and a[p] == ActionDef.Action.BIG_ATTACK
 			var damage_action: int = ActionDef.Action.ATTACK if split_big_wave \
 				else (ActionDef.Action.BIG_ATTACK if wave_upgraded else a[p])
+			var damage_number_state: StringName = _battlefield_damage_number_state(
+				damage_action, p, aslot)
 			var empowered_damage: int = EMPOWERED_WAVE_DAMAGE if _empowered_wave[p] else 0
 			var per_hit_damage: int = maxi(_calc_outgoing(p, damage_action) + empowered_damage, 0)
 			per_hit_damage *= maxi(1, int(item_mod(p, "atk_mult", 1)))
@@ -4148,7 +4805,7 @@ func resolve() -> Dictionary:
 					if remaining_penalty <= 0:
 						break
 			var kind: int = ActionDef.Action.ATTACK if split_big_wave else a[p]
-			var ksk: HeroSkill = _skills[p][aslot]
+			var ksk: HeroSkill = action_skill
 			if ksk != null and not split_big_wave:
 				kind = ksk.override_attack_kind(a[p], self, p, aslot)
 			if wave_upgraded:
@@ -4162,6 +4819,8 @@ func resolve() -> Dictionary:
 			if wave_upgraded:
 				pen = maxi(pen, ActionDef.Pen.PIERCE_DEF)
 				upgrade_next_wave[p] = false
+			if jianqi_spent > 0 and ksk != null:
+				pen = ksk.jianqi_attack_penetration(pen, jianqi_spent)
 			if true_damage_attack:
 				pen = ActionDef.Pen.TRUE_DMG
 			# 十方无次第：目标只在出手者此刻仍是有效房日时生效；被沉默/动作前被换下则回到标准出战位。
@@ -4175,6 +4834,7 @@ func resolve() -> Dictionary:
 				hitlists[p].append({damage = hit_damage, kind = kind, pen = pen,
 					riders = item_mod(p, "riders", []), action = true, active = false,
 					src_slot = aslot, target_slot = target_slot,
+					damage_number_state = damage_number_state,
 					force_zero_damage = a[p] == ActionDef.Action.ATTACK and bool(item_mod(
 						1 - p, "enemy_wave_no_damage", false)),
 					consume_true_damage = true_damage_attack and damage_index == 0,
@@ -4197,65 +4857,12 @@ func resolve() -> Dictionary:
 			if int(use_h2["when"]) == ItemData.Seq.POST:
 				for ih2 in use_h2["data"].effect.hits(self, p, int(use_h2["target"]), use_h2["data"]):
 					hitlists[p].append(ih2)
-	# 施加：值已对快照算好 → 跨玩家同时；己方 hit-list 按序施加（动作前道具 → 动作 → 动作后道具）。
-	# 白额雷音：仅双方原选招均为基础攻击、且仅一方对攻优先级更高时，拆出双方基础 action hit：
-	#   动作前道具照常 → 优先基础攻击 → 若实际击杀敌方攻击英雄则跳过其全部基础 action hit → 动作后道具照常。
-	# 同优先级（含 h03 镜像）回退原同步独立结算；攻击型主动技/道具不参与，也永不被断招。
-	var clash_groups: Array = [
-		{pre = [], action = [], post = []},
-		{pre = [], action = [], post = []},
-	]
+	# 施加：双方本序位的节点都已经开始，故任何一方在本序位内阵亡都不能倒取消另一方节点。
+	# hit 值在施加前已对同一快照算好；玩家编号只决定事件写入顺序，不改变本序位是否执行。
+	# 己方 hit-list 仍按提交顺序施加（道具 → 英雄行动 → 后续道具）。
 	for p in [0, 1]:
-		var seen_base_action := false
 		for hit in hitlists[p]:
-			if bool(hit.get("action", false)) and not bool(hit.get("active", false)):
-				clash_groups[p]["action"].append(hit)
-				seen_base_action = true
-			elif not seen_base_action:
-				clash_groups[p]["pre"].append(hit)
-			else:
-				clash_groups[p]["post"].append(hit)
-
-	var clash_first := -1
-	if ActionDef.is_attack(a[0]) and ActionDef.is_attack(a[1]) \
-			and not clash_groups[0]["action"].is_empty() and not clash_groups[1]["action"].is_empty():
-		var clash_priority: Array[int] = [0, 0]
-		for p in [0, 1]:
-			var source_slot: int = int(clash_groups[p]["action"][0].get("src_slot", active_index[p]))
-			var source_skill: HeroSkill = _skills[p][source_slot]
-			if source_skill != null:
-				clash_priority[p] = source_skill.base_attack_clash_priority()
-		if clash_priority[0] != clash_priority[1]:
-			clash_first = 0 if clash_priority[0] > clash_priority[1] else 1
-
-	if clash_first >= 0:
-		for p in [0, 1]:
-			for hit in clash_groups[p]["pre"]:
-				_apply_resolve_hit(p, hit, a, events, base_attack_contexts[p])
-
-		var clash_other: int = 1 - clash_first
-		var other_source_slot: int = int(clash_groups[clash_other]["action"][0].get(
-			"src_slot", active_index[clash_other]))
-		var other_was_alive: bool = hp[clash_other][other_source_slot] > 0
-		for hit in clash_groups[clash_first]["action"]:
-			_apply_resolve_hit(clash_first, hit, a, events, base_attack_contexts[clash_first])
-
-		var other_attack_cancelled: bool = other_was_alive and hp[clash_other][other_source_slot] <= 0
-		if other_attack_cancelled:
-			events.append({id = "base_attack_cancelled", player = clash_other})
-		else:
-			for hit in clash_groups[clash_other]["action"]:
-				_apply_resolve_hit(clash_other, hit, a, events, base_attack_contexts[clash_other])
-
-		for p in [0, 1]:
-			for hit in clash_groups[p]["post"]:
-				_apply_resolve_hit(p, hit, a, events, base_attack_contexts[p])
-	else:
-		# 归因钉快照槽（src_slot·2026-07-17 审计修复）：即使结算中 active_index 发生变化，
-		# on-hit/主动技回调也必须归给生成 hit 的出招英雄，否则先后手不对称。
-		for p in [0, 1]:
-			for hit in hitlists[p]:
-				_apply_resolve_hit(p, hit, a, events, base_attack_contexts[p])
+			_apply_resolve_hit(p, hit, a, events, base_attack_contexts[p])
 
 	# Phase 4.6: 广寒替补追击。双方主攻击已全部完成，故登场不会改写本回合既定攻击目标。
 	_resolve_reserve_pursuits(events)
@@ -4297,9 +4904,12 @@ func resolve() -> Dictionary:
 	for p in [0, 1]:
 		_settle_exact_spend_refund(p, events)
 
-	# 连环鼓第二行动在第一行动完整结算后执行；第二行动只读取自身阶段的攻防，
-	# 因此第一阶段的「防」不会跨阶段挡第二阶段的「波」。
-	_resolve_lianhuan_second_actions(a, second_actions, events)
+	# 当前序位完整结束后才收集白额雷音请求；同序位已经开始的敌方行动不会被取消。
+	# 连环鼓第二行动是当前运行时已有的后续节点，后移时由显式等待节点占据下一序位。
+	var sequence_waits: Array = _base_attack_sequence_waits(
+		a, base_attack_contexts, second_actions, primary_step_ids, events)
+	resolved_second_actions = _resolve_lianhuan_second_actions(
+		a, second_actions, events, sequence_waits)
 	# 「后手」等整回合存活奖励必须等两个行动阶段都结束；否则只在第二行动攻击时会提前给盾。
 	for p in [0, 1]:
 		var after_shield: int = int(item_mod(p, "survive_attack_shield", 0))
@@ -4450,8 +5060,13 @@ func resolve() -> Dictionary:
 	var result := {
 		p1_hp = current_hp(0), p2_hp = current_hp(1),
 		p1_energy = energy[0], p2_energy = energy[1],
-		p1_action = a[0], p2_action = a[1],
-		p1_second_action = second_actions[0], p2_second_action = second_actions[1],
+		p1_action = submitted_actions[0] if h21_cancelled_actions[0] else a[0],
+		p2_action = submitted_actions[1] if h21_cancelled_actions[1] else a[1],
+		action_step_ids = primary_step_ids.duplicate(),
+		p1_second_action = resolved_second_actions[0],
+		p2_second_action = resolved_second_actions[1],
+		p1_submitted_second_action = submitted_second_actions[0],
+		p2_submitted_second_action = submitted_second_actions[1],
 		events = events, game_over = game_over, winner = winner,
 		turn = turn_number,
 	}
@@ -4463,6 +5078,7 @@ func resolve() -> Dictionary:
 	_second_attack_target = [-1, -1]
 	_empowered_wave = [false, false]
 	_split_big_wave = [false, false]
+	_jianqi_attack = [false, false]
 	_blood_payment = [false, false]
 	_blood_payment_source = [-1, -1]
 	_energy_cap_discount = [false, false]
@@ -4596,15 +5212,21 @@ func _perform_switch(player: int, from_slot: int, to_slot: int, events: Array,
 	var opp: int = 1 - player
 	var opp_active: HeroSkill = _skills[opp][active_index[opp]]
 	if opp_active != null:
-		opp_active.on_enemy_switch_out(from_slot, self, opp, active_index[opp])
+		opp_active.on_enemy_switch_out(from_slot, self, opp, active_index[opp], events)
 
 	active_index[player] = to_slot
 	clear_vulnerability(player, from_slot)   # 脆弱随出战英雄换下场清除，并同步清理罪已昭期限
+	var switch_event_index: int = events.size()
 	events.append({id = "switch", player = player, from_to = [from_slot, to_slot]})
 	var switches: Array = item_buffs[player].get("actual_switches_this_turn", [])
 	switches.append({from = from_slot, to = to_slot})
 	item_buffs[player]["actual_switches_this_turn"] = switches
 	_resolve_switch_item_effects(player, from_slot, to_slot, events)
+	# BattleCore 在 UI 开始演出前已经完成整轮结算。把“刚登场这一拍”的值钉在
+	# switch 事件上，避免 UI 只能在旧英雄血条和动作后的最终血条之间二选一。
+	var switch_event: Dictionary = events[switch_event_index]
+	switch_event["to_hp"] = hp[player][to_slot]
+	switch_event["to_shield"] = shield[player][to_slot]
 
 	# 回马枪只认实际完成的「切换」：被定身取消的切换不触发；免费/强制/追击切换均触发。
 	var return_spear_bonus: int = int(item_mod(player, "switch_next_atk_total_bonus", 0))
@@ -4619,7 +5241,7 @@ func _perform_switch(player: int, from_slot: int, to_slot: int, events: Array,
 
 	var entering: HeroSkill = _skills[player][to_slot]
 	if entering != null:
-		entering.on_switch_in(self, player, to_slot)
+		entering.on_switch_in(self, player, to_slot, events)
 
 	# 遗物·登场 hook：本方遗物在此响应"切换登场"（夜明珠 = 登场者攻击加成 + 登场冲撞）。A4：由 core 硬编码搬入遗物 effect。
 	if trigger_item_relics:
@@ -4661,10 +5283,10 @@ func _resolve_retroactive_switch_items(events: Array) -> void:
 				int(switch_data.get("to", -1)), events)
 
 
-## h07 千里自在风：每回合一次免费切换（不占动作槽）。在【选择阶段】调用。
+## h07 千里自在风：每回合一次，任一端为 h07 的主动切换免费（不占动作槽）。在【选择阶段】调用。
 ## 选择期只登记 from→to 意图并更新 active_index 供 UI/动作合法性预览，不执行任何切换 hook；
 ## 双方保护性道具揭示后，未被天罗锁住才由 _settle_pending_free_switches 原子提交全部副作用。
-## 二元设计："涉及马的切换"都免动作槽 = 起点（马在场→重定位下场）或终点（顶马上场）任一为星日即免费。
+## 双向共用同一次数：本回合先切入 h07 后，不能再免费切出，反之亦然。
 
 ## 指定槽位的英雄当前能否提供免费切换（has_free_switch + 该英雄 cap 未满）。
 func _grants_free_switch(player: int, slot: int) -> bool:
@@ -4679,19 +5301,20 @@ func _grants_free_switch(player: int, slot: int) -> bool:
 	return true
 
 
-## 切换到 target 是否免动作槽：起点（出战）或终点（target）任一英雄提供免费切换 → true 走 free_switch。
+## 切换到 target 是否免动作槽：起点或终点任一英雄提供资格即可，次数仍按本方回合共享。
 func is_free_switch_target(player: int, target: int) -> bool:
 	if not _can_switch(player):
 		return false
 	if target < 0 or target >= hp[player].size() or target == active_index[player] or hp[player][target] <= 0:
 		return false
-	return _grants_free_switch(player, active_index[player]) or _grants_free_switch(player, target)
+	return _grants_free_switch(player, active_index[player]) \
+		or _grants_free_switch(player, target)
 
 
 func free_switch(player: int, target: int) -> bool:
 	if not is_free_switch_target(player, target):
 		return false
-	# cap 由提供免费切换的英雄决定，但次数记在本方回合状态上，避免多个复制体绕过“每回合一次”。
+	# cap 由本次涉及的 h07 提供，但次数记在本方回合状态上，避免切入后再切出绕过上限。
 	var from_slot: int = active_index[player]
 	var grantor: int = from_slot if _grants_free_switch(player, from_slot) else target
 	var usage_turn_before: int = free_switch_usage_turn[player]
@@ -4713,14 +5336,46 @@ func free_switch(player: int, target: int) -> bool:
 	return true
 
 
+## 选择阶段撤销最近一次免费切换预览；只回滚 free_switch() 登记的临时字段，
+## 不触发切换 hook、登场伤害或道具副作用，因为这些本就尚未在权威结算中发生。
+func cancel_last_free_switch_preview(player: int) -> bool:
+	if player < 0 or player >= _pending_free_switches.size():
+		return false
+	var intents: Array = _pending_free_switches[player]
+	if intents.is_empty():
+		return false
+	var intent: Dictionary = intents.pop_back()
+	_pending_free_switches[player] = intents
+	active_index[player] = int(intent.get("from", active_index[player]))
+	free_switch_usage_turn[player] = int(intent.get(
+		"usage_turn_before", free_switch_usage_turn[player]))
+	free_switch_uses[player] = int(intent.get("uses_before", free_switch_uses[player]))
+	_blood_payment_source[player] = int(intent.get(
+		"blood_payment_source_before", _blood_payment_source[player]))
+	return true
+
+
 ## 星日登场冲撞：对敌方出战造成 0.5 独立伤害；走护甲/受伤管线，但不算命中。
-## 用 PIERCE_BIGDEF 让冲撞无视防御直接连接（登场突袭）；事件用本地数组（不并入 resolve 事件流）。
-func chongzhuang(attacker_player: int) -> void:
+## 用 PIERCE_BIGDEF 让冲撞无视防御直接连接（登场突袭）；事件并入切换所在的权威事件流，
+## 因而录像/UI 可锁定“switch 完成后才出现伤害”。死亡补位没有 resolve 事件流时可省略参数。
+func chongzhuang(attacker_player: int, events: Array = []) -> void:
 	var opp: int = 1 - attacker_player
 	if hp[opp][active_index[opp]] <= 0:
 		return
-	var ev: Array = []
-	_apply_damage(opp, CHONGZHUANG_DAMAGE, attacker_player, ActionDef.Action.ATTACK, ActionDef.Pen.PIERCE_BIGDEF, ActionDef.Action.CHARGE, ev)
+	var target_slot: int = active_index[opp]
+	var outcome: Dictionary = {}
+	var dealt: int = _apply_damage(opp, CHONGZHUANG_DAMAGE, attacker_player,
+		ActionDef.Action.ATTACK, ActionDef.Pen.PIERCE_BIGDEF,
+		ActionDef.Action.CHARGE, events, [], "h07_entry", -1, -1, false, outcome)
+	events.append({
+		id = "h07_entry_impact",
+		player = opp,
+		source_player = attacker_player,
+		slot = target_slot,
+		amount = dealt,
+		shield_damage = maxi(0, int(outcome.get("damage_total", 0)) - dealt),
+		defeated = bool(outcome.get("defeated", false)),
+	})
 
 
 ## 返回除 excluded_slot 外当前生命最高的存活英雄。并列时保留槽位较小者，避免随机数导致
@@ -4740,7 +5395,10 @@ func _highest_hp_living_other(player: int, excluded_slot: int) -> int:
 ## 施加一段已经完成增伤/减伤计算的转移伤害。它不再进入伤害修正管线，避免凭空增伤；
 ## 但仍单独经过目标护甲、致死免疫与受伤回调。
 func _apply_exact_transferred_damage(target_player: int, target_slot: int, amount: int,
-		attacker_player: int, events: Array, src: String) -> int:
+		attacker_player: int, events: Array, src: String,
+		outcome: Dictionary = {}) -> int:
+	outcome["hp_damage"] = 0
+	outcome["shield_damage"] = 0
 	if amount <= 0 or target_slot < 0 or target_slot >= hp[target_player].size() \
 			or hp[target_player][target_slot] <= 0:
 		return 0
@@ -4754,6 +5412,7 @@ func _apply_exact_transferred_damage(target_player: int, target_slot: int, amoun
 		shield[target_player][target_slot] -= absorbed
 		remaining -= absorbed
 		total_dealt += absorbed
+		outcome["shield_damage"] = absorbed
 		events.append({id = "shield_absorb", player = target_player, slot = target_slot,
 			amount = absorbed})
 	# 兼容仍在旧快照中的旧还魂状态；与主伤害段保持同一结算语义。
@@ -4768,6 +5427,7 @@ func _apply_exact_transferred_damage(target_player: int, target_slot: int, amoun
 		return total_dealt
 	hp[target_player][target_slot] -= remaining
 	total_dealt += remaining
+	outcome["hp_damage"] = remaining
 	events.append({id = "damage_taken", player = target_player, slot = target_slot,
 		amount = remaining, src = src, pen = ActionDef.Pen.NORMAL})
 	var skill: HeroSkill = _skills[target_player][target_slot]
@@ -4808,7 +5468,8 @@ func _apply_resolve_hit(attacker_player: int, hit: Dictionary, actions: Array[in
 		is_base_attack,
 		outcome,
 		int(hit.get("whole_attack_extra_hits", 0)),
-		bool(hit.get("force_zero_damage", false)))
+		bool(hit.get("force_zero_damage", false)),
+		StringName(hit.get("damage_number_state", &"normal")))
 	if is_base_attack:
 		base_context["target_slot"] = int(outcome.get("target_slot", target_slot))
 		base_context["connected"] = bool(base_context.get("connected", false)) \
@@ -4859,6 +5520,28 @@ func _apply_battlefield_base_attack_damage(dmg: int, action: int,
 	return dmg
 
 
+## 与基础值修正走完全相同的当前出战快照，只额外采集公共数字的表现语义。
+## 重新执行的 hook 均为无状态纯计算；不把脆弱、强化、护甲等后续数值误当作“被限制”。
+func _battlefield_damage_number_state(action: int, attacker_player: int,
+		attacker_slot: int) -> StringName:
+	var dmg: int = ActionDef.get_base_damage(action)
+	var state: StringName = &"normal"
+	for field_player: int in [0, 1]:
+		var field_slot: int = active_index[field_player]
+		var field_skill: HeroSkill = _skills[field_player][field_slot]
+		if field_skill == null or hp[field_player][field_slot] <= 0:
+			continue
+		var modified: int = field_skill.modify_battlefield_base_attack_damage(
+			dmg, action, self, attacker_player, attacker_slot, field_player, field_slot)
+		var proposed: StringName = field_skill.battlefield_damage_number_state(
+			dmg, modified, action, self, attacker_player, attacker_slot,
+			field_player, field_slot)
+		if proposed != &"normal":
+			state = proposed
+		dmg = modified
+	return state
+
+
 ## 团队层出伤修正：扫攻击方全队（含替补），让团队 buff 源生效（modify_team_outgoing_damage hook）。
 ## 基础攻击与攻击型主动技命中前都会过本管线。attacker_slot = 发起攻击的出战英雄槽。
 func _apply_team_outgoing(dmg: int, action: int, player: int, attacker_slot: int) -> int:
@@ -4906,7 +5589,8 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		def_action: int, events: Array, item_riders: Array = [], src: String = "action",
 		attacker_slot: int = -1, target_slot: int = -1, is_base_attack: bool = false,
 		outcome: Dictionary = {}, whole_attack_extra_hits: int = 0,
-		force_zero_damage: bool = false) -> int:
+		force_zero_damage: bool = false,
+		damage_number_state: StringName = &"normal") -> int:
 	outcome["connected"] = false
 	outcome["defeated"] = false
 	outcome["damage_total"] = 0
@@ -5090,7 +5774,8 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 		and bool(item_mod(target_player, "share_next_base_attack", false))
 	if share_attack and dmg > 0:
 		var shared: Dictionary = _apply_shared_attack_damage(
-			target_player, dmg, attacker_player, pen, events, src, slot)
+			target_player, dmg, attacker_player, pen, events, src, slot,
+			damage_number_state)
 		shield_damage = int(shared.get("shield_damage", 0))
 		dealt = int(shared.get("hp_damage", 0))
 		outcome["defeated"] = bool(shared.get("primary_defeated", false))
@@ -5120,7 +5805,8 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 			hp[target_player][slot] -= dmg
 			dealt = dmg
 			events.append({id = "damage_taken", player = target_player, slot = slot,
-				amount = dmg, src = src, pen = pen})
+				amount = dmg, src = src, pen = pen,
+				damage_number_state = damage_number_state})
 			var dsk2: HeroSkill = _skills[target_player][slot]
 			if dsk2 != null:
 				dsk2.on_self_damaged(self, target_player, slot, dealt, attacker_player)
@@ -5129,13 +5815,16 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 				outcome["defeated"] = was_alive
 	outcome["damage_total"] = shield_damage + dealt
 	if excess_transfer_damage > 0 and excess_transfer_target >= 0:
+		var transfer_outcome: Dictionary = {}
 		var transferred_dealt: int = _apply_exact_transferred_damage(
 			target_player, excess_transfer_target, excess_transfer_damage,
-			attacker_player, events, "h19_transfer")
+			attacker_player, events, "h19_transfer", transfer_outcome)
 		outcome["damage_total"] = int(outcome["damage_total"]) + transferred_dealt
 		events.append({id = "h19_damage_transferred", player = target_player, from = slot,
 			to = excess_transfer_target, amount = excess_transfer_damage,
-			actual = transferred_dealt})
+			actual = transferred_dealt,
+			hp_damage = int(transfer_outcome.get("hp_damage", 0)),
+			shield_damage = int(transfer_outcome.get("shield_damage", 0))})
 	if redirected_damage > 0 and hp[target_player][redirect_target] > 0:
 		var redirected_outcome: Dictionary = {}
 		_apply_damage(target_player, redirected_damage, attacker_player, atk_action, pen,
@@ -5175,7 +5864,8 @@ func _apply_damage(target_player: int, raw: int, attacker_player: int, atk_actio
 ## 连心锁：把一段已经穿过防御、完成状态/减伤计算的基础攻击伤害，按半点轮流分给存活英雄。
 ## 双段攻击共用 cursor，故不可整除的半点会继续轮转，不会每段都偏向出战位。
 func _apply_shared_attack_damage(target_player: int, total: int, attacker_player: int,
-		pen: int, events: Array, src: String, primary_slot: int) -> Dictionary:
+		pen: int, events: Array, src: String, primary_slot: int,
+		damage_number_state: StringName = &"normal") -> Dictionary:
 	var living: Array[int] = living_heroes(target_player)
 	if living.is_empty() or total <= 0:
 		return {shield_damage = 0, hp_damage = 0, primary_defeated = false}
@@ -5209,7 +5899,8 @@ func _apply_shared_attack_damage(target_player: int, total: int, attacker_player
 		hp[target_player][slot] -= amount
 		hp_total += amount
 		events.append({id = "damage_taken", player = target_player, slot = slot,
-			amount = amount, src = src, pen = pen})
+			amount = amount, src = src, pen = pen,
+			damage_number_state = damage_number_state})
 		var skill: HeroSkill = _skills[target_player][slot]
 		if skill != null:
 			skill.on_self_damaged(self, target_player, slot, amount, attacker_player)
