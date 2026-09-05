@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Execute these tasks inline and verify each contract before completion.
 
-**Goal:** Block the four portal cells with readable feedback, turn the stones into the PVP/PVE connection indicator, and replace dark expedition fog with animated warm fog.
+**Goal:** Block the four portal cells with readable feedback, turn the stones into a readable expedition-entry indicator, and replace dark expedition fog with animated warm fog.
 
 **Architecture:** Keep pathfinding and keyboard movement in `GridMovementController`; `MainMenuWorld` only supplies walkability and presentation feedback. Store connection level per stone so the ordered state is independent from the shader's continuous energy motion. Keep permanent exploration data unchanged and alter only the terrain overlay's fog rendering.
 
@@ -12,8 +12,8 @@
 
 - Do not generate, read, or save screenshots.
 - Preserve the shared main-menu/expedition movement controller.
-- PVE activation lasts exactly 2 seconds and orders stones top-left, top-right, bottom-left, bottom-right.
-- Four colored stones mean connected; PVP may complete all stones immediately when a fast match succeeds.
+- Expedition activation lasts exactly 2 seconds and orders stones top-left, top-right, bottom-left, bottom-right.
+- Four colored stones mean the expedition entry is ready.
 - Unknown expedition space uses animated warm light fog, never a dark shadow.
 
 ---
@@ -45,9 +45,9 @@
 - Produces: `play_portal_activation(color, duration)`, `begin_portal_search(color)`, `complete_portal_connection(color)`, and `reset_portal_energy()`.
 - Shader consumes: `energy_color`, per-stone `energy_mix`, `energy_phase`, `activation_flash`, `impact_flash`, and `anim_time`.
 
-- [x] Replace the old simultaneous-color test with ordered PVE and incomplete/complete PVP state tests.
-- [x] Set `PORTAL_ACTIVATION_DURATION` to `2.0`; light the four stones in row-major corner order for PVE.
-- [x] During PVP search, charge only the first three; on match success, color all four immediately and emit a short energy surge.
+- [x] Replace the old simultaneous-color test with ordered activation and incomplete/complete state tests.
+- [x] Set `PORTAL_ACTIVATION_DURATION` to `2.0`; light the four stones in row-major corner order for expedition entry.
+- [x] When the expedition entry completes, color all four immediately and emit a short energy surge.
 - [x] Upgrade the shader from flat tint to upward energy bands, irregular internal sparkle, a bright core pulse, and activation/impact flashes constrained to the source alpha.
 - [x] Run the main-menu unit test and the non-saving world probe.
 

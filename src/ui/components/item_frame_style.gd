@@ -8,6 +8,7 @@ const FRAME_TEXTURE := preload("res://assets/ui/item_frame.png")
 const CELL_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_item_frame_palette.gdshader")
 const ItemCatalogScript := preload("res://src/battle/item_catalog.gd")
+const TUNING: ItemFrameTuning = preload("res://src/ui/components/item_frame_tuning.tres")
 
 # 方案 2：三档统一使用高识别完整纵向渐变；框体只做同色相的明暗分层，不压成暗底。
 const CELL_TOP := {
@@ -120,12 +121,28 @@ static func make_item_art_shadow(texture: Texture2D, art_position: Vector2,
 	return shadow
 
 
+## 调参台已经单独给出了投影矩形；正式共用道具框走此入口，不再二次追加经验偏移。
+static func make_item_art_shadow_exact(texture: Texture2D, target_rect: Rect2,
+		node_name: String = "ItemArtShadow") -> TextureRect:
+	var shadow := TextureRect.new()
+	shadow.name = node_name
+	shadow.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	shadow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	shadow.stretch_mode = TextureRect.STRETCH_SCALE
+	shadow.self_modulate = ITEM_ART_SHADOW_COLOR
+	shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	configure_item_art(shadow, texture, target_rect, Vector2.ZERO)
+	return shadow
+
+
 ## 用纹理真实 alpha 轮廓做光学归一化：透明留白不参与尺寸，可见包围盒始终留在框内。
 ## 所有“道具框内”美术都必须走此入口；背包格仍由实际占格方向单独处理。
 static func configure_item_art(node: TextureRect, texture: Texture2D,
-		target_rect: Rect2, optical_offset: Vector2 = Vector2.ZERO) -> void:
+		target_rect: Rect2, optical_offset: Vector2 = Vector2.ZERO,
+		fill_ratio: float = -1.0) -> void:
+	var resolved_fill := TUNING.item_art_fill_ratio if fill_ratio < 0.0 else fill_ratio
 	configure_texture_visual(
-		node, texture, target_rect, ITEM_ART_ROTATION, ITEM_ART_FILL_RATIO, optical_offset)
+		node, texture, target_rect, ITEM_ART_ROTATION, resolved_fill, optical_offset)
 	node.set_meta("item_art_target_rect", target_rect)
 
 
@@ -161,6 +178,8 @@ static func configure_texture_visual(node: TextureRect, texture: Texture2D,
 	var node_size := texture_size * scale_factor
 	var visible_pivot := (alpha_bounds.position + alpha_bounds.size * 0.5) * scale_factor
 	var visible_size := rotated_size * scale_factor
+	# 满框比例 1.0 时浮点乘除可能多出约 1e-5px；约束调试几何不越过目标框。
+	visible_size = visible_size.min(target_rect.size)
 	var visible_center := target_rect.get_center() + optical_offset
 	node.position = visible_center - visible_pivot
 	node.size = node_size
@@ -199,15 +218,41 @@ static func texture_alpha_bounds(texture: Texture2D) -> Rect2:
 	return result
 
 
-## 费用 / 耐久固定贴在同一外框的左右上角，中心轴严格对称且不再漂到框外。
-static func stat_badge_positions(frame_rect: Rect2, badge_size: Vector2) -> Dictionary:
-	var inset := badge_size * STAT_BADGE_INSET_RATIO
+## 兼容旧调用：从当前框矩形反推槽原点，再读取调参台保存的两枚角标独立位置。
+static func stat_badge_positions(frame_rect: Rect2, _badge_size: Vector2) -> Dictionary:
+	var scale_factor := frame_rect.size.x / maxf(TUNING.frame_size.x, 1.0)
+	var slot_origin := frame_rect.position - TUNING.frame_offset * scale_factor
 	return {
-		"cost": frame_rect.position + inset,
-		"durability": Vector2(
-			frame_rect.end.x - badge_size.x - inset.x,
-			frame_rect.position.y + inset.y),
+		"cost": slot_origin + TUNING.energy_badge_position * scale_factor,
+		"durability": slot_origin + TUNING.durability_badge_position * scale_factor,
 	}
+
+
+static func item_frame_layout(profile: StringName, slot_origin: Vector2 = Vector2.ZERO,
+		slot_size_override: float = -1.0) -> Dictionary:
+	return TUNING.layout(profile, slot_origin, slot_size_override)
+
+
+## 把调参台的角标根节点、内部图标与数字盒作为一个整体复刻到正式 UI。
+## kind 只接受 energy / durability；所有使用面只改变 layout 中的整体 scale。
+static func configure_item_stat_badge(badge: Control, kind: StringName,
+		layout: Dictionary) -> void:
+	var is_durability := kind == &"durability"
+	badge.position = layout["durability_position"] if is_durability \
+			else layout["cost_position"]
+	badge.size = layout["badge_size"]
+	badge.scale = layout["badge_scale"]
+	badge.set("normalize_icon_visual", false)
+	badge.set("use_icon_rect_override", true)
+	badge.set("icon_rect_override", layout[
+		"durability_icon_rect" if is_durability else "energy_icon_rect"])
+	badge.set("font_size", int(layout["font_size"]))
+	badge.set("outline_size", int(layout["outline_size"]))
+	badge.set("embolden", float(layout["embolden"]))
+	badge.set("number_box_scale", Vector2.ONE)
+	badge.set("use_number_rect_override", true)
+	badge.set("number_rect_override", layout[
+		"durability_number_rect" if is_durability else "energy_number_rect"])
 
 
 static func apply_cell_palette(material: ShaderMaterial, tier: int, tint_multiplier: Color = Color.WHITE) -> void:

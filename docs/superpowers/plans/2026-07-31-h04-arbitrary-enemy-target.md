@@ -1,12 +1,12 @@
 # h04「十方无次第」Implementation Plan
 
-> ⚠️ **H03 交互为历史记录。**本计划中的 H04 自由选敌设计仍可溯源，但“H03 对攻先制 / 击杀断招”边界已于 2026-08-30 退役；当前 H03 规则见 [`2026-08-30-h03-sequence-shift-design.md`](../specs/2026-08-30-h03-sequence-shift-design.md)。
+> ⚠️ **H03 交互为历史记录。**本计划中的 H04 自由选敌设计仍可溯源，但“H03 对攻先制 / 击杀断招”边界已退役；当前 H03 规则见 [`heroes.md`](../../../design/heroes.md) 与 [`2026-09-03-action-anchor-sequence-design.md`](../specs/2026-09-03-action-anchor-sequence-design.md)。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 将 h04 房日重做为 5 HP 的进攻英雄：其「波」和「大波」可指定任一存活敌方英雄，并完整退役旧版“敌方重复动作产能”。
 
-**Architecture:** 在 `HeroSkill` 增加无状态的基础攻击自由选敌 hook；`BattleCore` 为双方各保存本回合基础攻击目标槽，并将该槽写入动作 hit，伤害管线据此结算目标英雄的防御、状态、护甲、受伤、命中与死亡。`legal_actions()` 为 AI 和联机枚举每个存活敌方英雄；本地 UI 复用敌方头像框点选，中央出战位与两个替补位均可选。事件携带目标槽，中央角色只播放自身受击，替补受击反馈落到对应头像框。
+**Architecture:** 在 `HeroSkill` 增加无状态的基础攻击自由选敌 hook；`BattleCore` 为双方各保存本回合基础攻击目标槽，并将该槽写入动作 hit，伤害管线据此结算目标英雄的防御、状态、护甲、受伤、命中与死亡。`legal_actions()` 为 AI 枚举每个存活敌方英雄；本地 UI 复用敌方头像框点选，中央出战位与两个替补位均可选。事件携带目标槽，中央角色只播放自身受击，替补受击反馈落到对应头像框。
 
 **Tech Stack:** Godot 4、GDScript、GUT、Resource `.tres`、CSV i18n。
 
@@ -16,7 +16,7 @@
 - 玩家可见说明固定为：`房日【兔】的「波」和「大波」可以指定任一敌方英雄。`
 - 仅 h04 出战、存活、未沉默时开放自由目标；h04 在替补席不提供团队效果。
 - 自由目标仅作用于基础「波 / 大波」；主动技、道具 hit、反击与其他英雄的基础攻击保持原目标规则。
-- 未显式传目标的旧调用兼容为攻击敌方当前出战英雄；AI 和联机合法集必须使用显式目标。
+- 未显式传目标的旧调用兼容为攻击敌方当前出战英雄；AI 合法集必须使用显式目标。
 - 目标在提交后按英雄槽位锁定；敌方同拍切换不改变目标。若目标在动作 hit 前已阵亡，该 hit 落空，不自动改打别人。
 - 对指定目标使用的防 / 大防仍按敌方本回合动作统一生效；破甲、护甲、毒、印记、易伤、on-hit 与死亡结算都落在实际目标槽。
 - 替补受到致命伤时正常阵亡，但不触发出战位死亡换人；天狗护主与还魂等“出战将死”保护不替替补承伤。
@@ -31,7 +31,7 @@
 ### Task 1: 用失败测试锁定发布数据与目标结算契约
 
 **Files:**
-- Modify: `tests/unit/battle/v4/test_hero_team_role.gd`
+- Modify: `tests/unit/battle/v4/test_heroes_zodiac_v4.gd`
 - Modify: `tests/unit/battle/v4/test_heroes_zodiac_v4.gd`
 - Modify: `tests/unit/battle/ai/test_battle_clone_ai.gd`
 - Modify: `tests/unit/battle/v4/test_battle_snapshot.gd`
@@ -99,7 +99,7 @@ h04 覆写为 `true`；删除旧 `enemy_repeat_energy()` hook。
 
 ---
 
-### Task 3: 接入本地/联机 UI 与替补受击反馈
+### Task 3: 接入本地 UI 与替补受击反馈
 
 **Files:**
 - Modify: `src/ui/battle_screen.gd`
@@ -108,9 +108,9 @@ h04 覆写为 `true`；删除旧 `enemy_repeat_energy()` hook。
 
 复用 `_enemy_target_pick`，记录当前是 h21 主动技还是 h04 基础攻击。h21 仍只允许点存活替补并显示“揪”；h04 允许点三个敌方头像框中的任一存活英雄并显示“攻”。切换到其他动作或离开选择阶段时完整清理。
 
-- [ ] **Step 2: 本地与联机提交携带攻击目标**
+- [ ] **Step 2: 本地提交携带攻击目标**
 
-本地调用 `battle.select_action(PLAYER, selected_action, _enemy_target_pick)`；联机 payload 的基础攻击同样携带目标。h04 未点目标时默认选择敌方当前出战位，避免联机提交不在合法集中。
+本地调用 `battle.select_action(PLAYER, selected_action, _enemy_target_pick)`。h04 未点目标时默认选择敌方当前出战位，避免提交不在合法集中。
 
 - [ ] **Step 3: 让事件演出落到正确英雄**
 

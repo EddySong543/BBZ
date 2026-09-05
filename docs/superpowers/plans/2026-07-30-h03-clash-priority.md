@@ -1,6 +1,6 @@
 # h03「白额雷音」Implementation Plan
 
-> ⚠️ **历史实施计划，2026-08-30 已被取代。**正文保留旧“对攻先制 / 击杀断招”实现过程，仅供溯源，不得继续执行；当前规则见 [`2026-08-30-h03-sequence-shift-design.md`](../specs/2026-08-30-h03-sequence-shift-design.md)。
+> ⚠️ **历史实施计划，已被取代。**正文保留旧“对攻先制 / 击杀断招”实现过程，仅供溯源，不得继续执行；当前规则见 [`2026-09-03-action-anchor-sequence-design.md`](../specs/2026-09-03-action-anchor-sequence-design.md)。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -27,7 +27,7 @@
 ### Task 1: 先用失败测试锁定发布数据与结算边界
 
 **Files:**
-- Modify: `tests/unit/battle/v4/test_hero_team_role.gd`
+- Modify: `tests/unit/battle/v4/test_heroes_zodiac_v4.gd`
 - Modify: `tests/unit/battle/v4/test_heroes_zodiac_v4.gd`
 - Modify: `tests/unit/battle/v4/test_heroes_dark_v4.gd`
 

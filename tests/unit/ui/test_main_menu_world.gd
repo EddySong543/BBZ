@@ -82,7 +82,7 @@ func test_main_menu_uses_presentation_only_qingfeng_world() -> void:
 	assert_eq(world._cell_from_view_position(Vector2(1919.5, 1079.5)), Vector2i(27, 15),
 			"右下边缘必须以完整格结束")
 	assert_eq(int(contract["destination_count"]), 0,
-			"匹配与远征改为直接按钮后，展示地图不得残留目的地格")
+			"模式入口改为直接按钮后，展示地图不得残留旧目的地格")
 	assert_eq(int(contract["ground_cell_count"]), 32 * 18)
 	assert_gt(int(contract["hero_frame_count"]), 0, "主界面角色必须使用真实英雄 idle 帧")
 	assert_eq(Vector2(contract["hero_foot_anchor"]), Vector2(104.0, 156.0))
@@ -314,7 +314,6 @@ func test_mode_entry_uses_portal_only_bottom_up_wave_curtain() -> void:
 	assert_true(source.contains("wait_for_portal_beams"))
 	assert_true(source.contains("TransitionManager.portal_transition_to("))
 	assert_false(source.contains("get_tree().change_scene_to_file(EXPEDITION_SCENE)"))
-	assert_false(source.contains("get_tree().change_scene_to_file(BP_SCENE)"))
 
 
 func test_main_menu_left_click_moves_character_across_multiple_cells() -> void:
@@ -437,17 +436,12 @@ func test_main_menu_uses_single_banner_and_pre_anchor_bottom_dock() -> void:
 	var menu: Control = _make_menu()
 	await get_tree().create_timer(1.1).timeout
 	var expected_banner_rect := Rect2(Vector2(788.0, 916.0), Vector2(344.0, 108.0))
-	var expected_switch_rect := Rect2(Vector2(1156.0, 934.0), Vector2(72.0, 72.0))
 	assert_null(menu.get_node_or_null("UI/ModeMatch"))
 	assert_null(menu.get_node_or_null("UI/ModeTower"))
 	var banner_button := menu.get_node("UI/ModeBanner") as Button
-	var switch_button := menu.get_node("UI/ModeSwitch") as Button
 	assert_true(Rect2(banner_button.position, banner_button.size).is_equal_approx(
 			expected_banner_rect), "中央Banner恢复到格子锚定式实施前的位置")
-	assert_true(Rect2(switch_button.position, switch_button.size).is_equal_approx(
-			expected_switch_rect), "模式切换钮恢复到Banner右侧的独立位置")
 	assert_eq(banner_button.text, "")
-	assert_eq(switch_button.text, "")
 	var banner_art := banner_button.get_node("Banner") as TextureRect
 	assert_eq(banner_art.texture.resource_path,
 			"res://assets/ui/main_menu/expedition_banner.png")
@@ -486,17 +480,6 @@ func test_main_menu_uses_single_banner_and_pre_anchor_bottom_dock() -> void:
 			frame_overlay, "像素外框必须覆盖在Banner画面之上")
 	assert_null(banner_button.get_node_or_null("BannerShadow"),
 			"不再复制Banner图片模拟投影")
-	assert_null(switch_button.get_node_or_null("Icon"),
-			"模式切换不得继续使用语义含混的通用switch图标")
-	var carousel_glyph := switch_button.get_node("CarouselGlyph") as Control
-	assert_eq(int(carousel_glyph.get("selected_index")), 1)
-	assert_false(switch_button.visible, "PvP 休眠时不显示模式切换入口")
-	assert_true(switch_button.disabled, "隐藏入口仍须禁用，防旧信号触发")
-	var switch_bg := switch_button.get_node("Bg") as ColorRect
-	assert_eq((switch_bg.material as ShaderMaterial).shader.resource_path,
-			"res://assets/shaders/canvas_button_jelly.gdshader")
-	assert_almost_eq(float((switch_bg.material as ShaderMaterial).get_shader_parameter(
-			"aspect")), 1.0, 0.001)
 	assert_null(banner_button.get_node_or_null("GridAnchor"),
 			"屏幕层UI不得继续描亮地面格子")
 	var layout_contract: Dictionary = menu.call("get_bottom_ui_layout_contract")
@@ -505,27 +488,20 @@ func test_main_menu_uses_single_banner_and_pre_anchor_bottom_dock() -> void:
 	assert_true(bool(layout_contract["uses_separate_ui_islands"]))
 	assert_false(bool(layout_contract["secondary_tabs_partially_offscreen"]))
 	assert_true(bool(layout_contract["reuses_battle_ui_palette"]))
-	assert_false(bool(layout_contract["switch_overlaps_banner_edge"]))
 	assert_eq(banner_button.find_children("Banner", "TextureRect", true, false).size(), 1,
 			"两个模式只能交换同一张Banner，不得同时挂两张图")
-	switch_button.pressed.emit()
-	assert_eq(banner_art.texture.resource_path,
-			"res://assets/ui/main_menu/expedition_banner.png")
-	assert_eq(int(carousel_glyph.get("selected_index")), 1,
-			"PvP 休眠时不得从远征切回匹配")
 	assert_eq((menu.get_node("UI/NavHeroes") as Button).position, Vector2(48.0, 916.0))
 	assert_eq((menu.get_node("UI/NavBackpack") as Button).position, Vector2(1640.0, 916.0))
 	assert_eq((menu.get_node("UI/NavWarehouse") as Button).position, Vector2(1772.0, 916.0))
-	assert_null(menu.get_node_or_null("UI/NetLobbyButton"),
-			"PvP 休眠时不创建局域网大厅入口")
-	assert_false((menu.get_node("UI/IdentityButton/RankLabel") as Label).visible,
-			"PvP 休眠时不展示段位占位")
+	assert_null(menu.get_node_or_null("UI/IdentityButton"),
+			"主界面不再展示个人头像框或个人资料入口")
+	assert_null(menu.get_node_or_null("UI/QuitButton"),
+			"主界面退出按钮及其点击入口已经移除")
 
 
 func test_main_menu_merges_hero_and_item_codex_entry() -> void:
 	var menu: Control = _make_menu()
 	for path: String in [
-		"UI/IdentityButton", "UI/SettingsButton", "UI/QuitButton",
 		"UI/NavHeroes", "UI/NavBackpack", "UI/NavWarehouse",
 	]:
 		var button := menu.get_node(path) as Button
@@ -564,7 +540,25 @@ func test_main_menu_merges_hero_and_item_codex_entry() -> void:
 	assert_not_null(warehouse_overlay,
 			"仓库入口必须打开真实浮层，不再保留占位点击")
 	assert_false(warehouse_overlay.visible)
-	assert_not_null(menu.get_node_or_null("UI/IdentityButton/AvatarFrame"))
+	assert_null(menu.get_node_or_null("UI/IdentityButton"))
+	assert_null(menu.get_node_or_null("UI/QuitButton"))
+	assert_null(menu.get_node_or_null("UI/SettingsButton"),
+			"主界面不再显示设置齿轮入口")
+
+
+func test_main_menu_escape_opens_the_shared_pause_menu() -> void:
+	var menu: Control = _make_menu()
+	var escape := InputEventAction.new()
+	escape.action = "ui_cancel"
+	escape.pressed = true
+	menu._unhandled_input(escape)
+	var pause := menu.get_node_or_null("PauseMenu") as CanvasLayer
+	assert_not_null(pause)
+	assert_gt(pause.layer, TransitionManager.layer,
+			"主界面暂停层必须覆盖角色、传送石与全局过场画布")
+	assert_true(get_tree().paused, "主界面 ESC 一级菜单应暂停世界动画")
+	(pause as PauseMenuOverlay)._close()
+	assert_false(get_tree().paused)
 
 
 func test_pre_anchor_shortcut_stays_fully_visible_on_hover() -> void:
@@ -591,23 +585,3 @@ func test_world_focus_only_changes_presentation_state() -> void:
 	assert_true(bool(world.get_visual_contract()["presentation_only"]))
 	world.focus_destination("")
 	assert_eq(String(world.get("_focused_destination")), "")
-
-
-func test_pvp_match_calls_are_inert_while_runtime_gate_is_closed() -> void:
-	var menu: Control = _make_menu()
-	var match_entry := menu.get_node("UI/ModeBanner") as Button
-	var world := menu.get_node("MenuWorld") as MainMenuWorld
-	menu.call("_start_search")
-	menu.call("_on_match_found")
-	await get_tree().process_frame
-	assert_null(match_entry.get_node_or_null("Caption"))
-	assert_null(match_entry.get_node_or_null("Status"))
-	assert_eq(match_entry.tooltip_text, "远征")
-	assert_eq((match_entry.get_node("Banner") as TextureRect).self_modulate,
-			Color.WHITE)
-	assert_eq(int(menu.get("_match_state")), 0)
-	assert_null(menu.get_node_or_null("UI/CancelMatchButton"))
-	for stone: TextureRect in world.portal_stones:
-		assert_almost_eq(float((stone.material as ShaderMaterial)
-				.get_shader_parameter("energy_mix")), 0.0, 0.001)
-	assert_false(bool(world.get_visual_contract()["portal_connection_complete"]))

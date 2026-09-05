@@ -1,6 +1,6 @@
 extends GutTest
 
-## PvE 只保留会话适配；英雄、AI、道具和结算继续使用当前本地对战实现。
+## PvE 只保留会话适配；英雄、AI、道具和结算继续使用当前本地战斗实现。
 
 const BattlePve := preload("res://src/ui/components/battle_pve.gd")
 const BATTLE_SCENE := preload("res://src/ui/battle_screen1.tscn")
@@ -71,14 +71,14 @@ func test_pve_battle_scene_uses_current_heroes_ai_and_item_economy() -> void:
 	assert_eq(screen.battle.hp[1], [7])
 	assert_eq(screen.battle.slots[0].size(), BattleCore.SLOT_COUNT)
 	assert_eq(screen.battle.slots[1].size(), BattleCore.SLOT_COUNT)
-	assert_false(screen.battle.pve_no_econ, "PvE 不再锁死旧装备槽，沿用本地 PvP 道具经济")
+	assert_false(screen.battle.pve_no_econ, "PvE 不再锁死旧装备槽，沿用当前道具经济")
 	assert_eq(screen._pved.get_child_count(), 0,
 		"PvE 适配层不再生成旧概率表或手算脱战按钮")
 	var legal: Array = screen.battle.legal_actions(screen.AI)
 	var choice: Dictionary = screen._ai.choose_action(screen.battle, screen.AI)
 	assert_has(legal, choice, "PvE 对手必须从当前 BattleCore.legal_actions 中选择")
 	assert_true(screen.battle.apply_choice(screen.AI, choice),
-		"PvE 对手选择必须经过与本地 PvP 相同的 apply_choice 入口")
+		"PvE 对手选择必须经过与玩家相同的 apply_choice 入口")
 
 
 func test_pve_result_keeps_each_opponent_hp() -> void:

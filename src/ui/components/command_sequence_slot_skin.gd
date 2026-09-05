@@ -102,7 +102,8 @@ func _ready() -> void:
 	_ensure_supersampled_material()
 	_sync_supersampled_material()
 	_update_editor_preview_state()
-	set_process(empty and (not editor_preview or Engine.is_editor_hint()))
+	# 任务5：空槽只保留稳定低亮 / 待放入稳定高亮，不再运行循环呼吸。
+	set_process(false)
 	queue_redraw()
 
 
@@ -119,7 +120,7 @@ func _update_editor_preview_state() -> void:
 		return
 	empty = true
 	visible = Engine.is_editor_hint()
-	set_process(Engine.is_editor_hint())
+	set_process(false)
 
 
 func configure(is_empty: bool, normal_color: Color = STAR_COLOR,
@@ -152,22 +153,15 @@ func configure(is_empty: bool, normal_color: Color = STAR_COLOR,
 	flash_peak = 0.0
 	pulse_phase = 0.0
 	pulse_strength = 0.0
-	set_process(empty)
+	set_process(false)
 
 
 func set_hot(value: bool) -> void:
-	hot = value
-	if hot:
-		pulse_strength = 1.0
-	queue_redraw()
-
-
-func _process(delta: float) -> void:
-	if not empty or hot:
+	if hot == value:
 		return
-	pulse_phase = fmod(pulse_phase + delta / tuning_pulse_duration, 1.0)
-	# 余弦缓入缓出比三角波自然；呼吸只改变微小尺寸与亮度，不产生闪屏。
-	pulse_strength = 0.5 - 0.5 * cos(pulse_phase * TAU)
+	hot = value
+	pulse_strength = 1.0 if hot else 0.0
+	set_process(false)
 	queue_redraw()
 
 
@@ -217,8 +211,8 @@ func _active_star_color() -> Color:
 	var base: Color = ornament_color.lerp(STAMP_COLOR, hot_mix)
 	base = base.lerp(STAMP_COLOR, flash_strength)
 	if empty and not hot:
-		# 峰值必须与已有行动底座同色同亮；暗部只承担等待提示，不再压暗高光。
-		base.a *= lerpf(tuning_idle_alpha, 1.0, pulse_strength)
+		# 没有待放入内容时维持稳定低亮；点击动作后 hot=true，立即稳定满亮。
+		base.a *= tuning_idle_alpha
 	return base
 
 
@@ -275,7 +269,7 @@ func _sync_supersampled_material() -> void:
 	var radii: Vector2 = _star_radii()
 	var shadow_alpha: float = 1.0
 	if empty and not hot:
-		shadow_alpha = lerpf(tuning_idle_alpha, 1.0, pulse_strength)
+		shadow_alpha = tuning_idle_alpha
 	var active_shadow := tuning_shadow_color
 	active_shadow.a *= shadow_alpha
 	var center: Vector2 = DEFAULT_STAR_CENTER + tuning_center_offset

@@ -45,11 +45,25 @@ extends Control
 	set(v):
 		icon_visual_ratio = clampf(v, 0.2, 1.0)
 		_layout_icon()
+## 道具框调参台允许图标在徽章内部拥有独立矩形；其余徽章保持既有自动布局。
+@export var use_icon_rect_override: bool = false:
+	set(v):
+		use_icon_rect_override = v
+		_layout_icon()
+@export var icon_rect_override := Rect2():
+	set(v):
+		icon_rect_override = v
+		_layout_icon()
 
 @export_group("数字")
 @export var number: int = 0:
 	set(v):
 		number = v
+		_refresh_number()
+## 非空时覆盖整数文本；供耐久消耗提示等仍需复用同一角标几何的短状态文案。
+@export var number_text_override: String = "":
+	set(v):
+		number_text_override = v
 		_refresh_number()
 @export var show_number: bool = true:
 	set(v):
@@ -80,8 +94,21 @@ extends Control
 @export var number_offset: Vector2 = Vector2(0, 1):
 	set(v):
 		number_offset = v
-		if _num:
-			_num.position = v
+		_layout_number()
+## 仅缩放数字字形盒，不改变图标与徽章占位；道具框调参台用它核对真实字形轮廓。
+@export var number_box_scale: Vector2 = Vector2.ONE:
+	set(v):
+		number_box_scale = v
+		_layout_number()
+## 与图标矩形相同：仅正式道具角标使用，精确复刻调参台数字盒。
+@export var use_number_rect_override: bool = false:
+	set(v):
+		use_number_rect_override = v
+		_layout_number()
+@export var number_rect_override := Rect2():
+	set(v):
+		number_rect_override = v
+		_layout_number()
 
 var _icon: TextureRect
 var _num: Label
@@ -95,6 +122,7 @@ func _ready() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED:
 		_layout_icon()
+		_layout_number()
 
 
 func _build() -> void:
@@ -118,8 +146,26 @@ func _build() -> void:
 	_refresh_icon()
 	_style_number()
 	_refresh_number()
-	_num.position = number_offset
+	_layout_number()
 	_layout_icon()
+
+
+func _layout_number() -> void:
+	if _num == null:
+		return
+	if use_number_rect_override:
+		_num.anchor_left = 0.0
+		_num.anchor_top = 0.0
+		_num.anchor_right = 0.0
+		_num.anchor_bottom = 0.0
+		_num.position = number_rect_override.position
+		_num.size = number_rect_override.size
+		_num.pivot_offset = number_rect_override.size * 0.5
+	else:
+		_num.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		_num.position = number_offset
+		_num.pivot_offset = size * 0.5
+	_num.scale = number_box_scale
 
 
 func _refresh_icon() -> void:
@@ -142,6 +188,19 @@ func _refresh_icon() -> void:
 
 func _layout_icon() -> void:
 	if _icon == null:
+		return
+	if use_icon_rect_override:
+		_icon.anchor_left = 0.0
+		_icon.anchor_top = 0.0
+		_icon.anchor_right = 0.0
+		_icon.anchor_bottom = 0.0
+		_icon.position = icon_rect_override.position
+		_icon.size = icon_rect_override.size
+		_icon.pivot_offset = icon_rect_override.size * 0.5
+		_icon.rotation = 0.0
+		_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		_icon.stretch_mode = TextureRect.STRETCH_SCALE
+		_icon.set_meta("visible_alpha_rect", icon_rect_override)
 		return
 	if not normalize_icon_visual:
 		_icon.anchor_left = 0.0
@@ -187,11 +246,15 @@ func _refresh_number() -> void:
 	if _num == null:
 		return
 	_num.visible = show_number
-	_num.text = str(number)
+	_num.text = number_text_override if not number_text_override.is_empty() else str(number)
 
 
 func set_number(n: int) -> void:
 	number = n
+
+
+func set_number_text_override(value: String) -> void:
+	number_text_override = value
 
 
 func set_icon(s: Texture2D, hf: int, vf: int, fr: int = 0) -> void:

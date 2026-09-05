@@ -1,8 +1,7 @@
 extends VBoxContainer
 
 ## 战斗调试面板（DEBUG 专用·左侧竖排测试按钮）：数值、换英雄、Buff 与加时巡检。
-## ⚠ 全项目【唯一】直接改写 BattleCore 状态的 UI —— 有意隔离于此，让 battle_screen 保持「只读引擎状态」
-##   （联机防作弊边界·可 grep 断言 battle_screen 不写 hp/energy/shield）。
+## ⚠ 全项目【唯一】直接改写 BattleCore 状态的 UI —— 有意隔离于此，让 battle_screen 保持「只读引擎状态」。
 ## ⚠ 不走正常结算管线：debug 致死不触发强制换人浮窗（要测死亡流程请打真实战斗）。
 ## 表现回接 battle_screen 走信号（面板不碰 juice / 刷新，保持职责单一）：
 ##   state_changed → 请 battle_screen _update_all 刷新；hit_fx → 请 battle_screen 播打击 juice。

@@ -1,6 +1,6 @@
 extends GutTest
 
-## 战局快照序列化 行为锁定测试（联机准备批②·2026-07-12）。
+## 战局快照序列化行为锁定测试（持久化准备批②·2026-07-12）。
 ## 锁四条契约：①快照→恢复→再快照 逐位一致 ②恢复局与原局续打（同输入）事件流/状态逐位一致
 ## ③JSON.stringify→parse_string 线上往返后仍满足①②（int/float 归一 + rng 64 位字符串精度）
 ## ④版本不符拒绝恢复。白板英雄（无 .tres）与经济槽/状态/道具/遗物全部入样。
@@ -435,10 +435,10 @@ func test_snapshot_malformed_rejected_without_mutation() -> void:
 	assert_false(b.from_snapshot(missing_h24_state), "缺并封减费选择状态应拒")
 	var missing_h07_turn: Dictionary = before.duplicate(true)
 	missing_h07_turn.erase("free_switch_usage_turn")
-	assert_false(b.from_snapshot(missing_h07_turn), "缺千里自在风计数回合应拒")
+	assert_false(b.from_snapshot(missing_h07_turn), "缺千里快哉风计数回合应拒")
 	var missing_h07_uses: Dictionary = before.duplicate(true)
 	missing_h07_uses.erase("free_switch_uses")
-	assert_false(b.from_snapshot(missing_h07_uses), "缺千里自在风本回合使用次数应拒")
+	assert_false(b.from_snapshot(missing_h07_uses), "缺千里快哉风本回合使用次数应拒")
 	var missing_h04_state: Dictionary = before.duplicate(true)
 	missing_h04_state.erase("attack_target")
 	assert_false(b.from_snapshot(missing_h04_state), "缺房日基础攻击目标状态应拒")

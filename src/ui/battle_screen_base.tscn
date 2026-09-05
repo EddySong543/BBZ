@@ -471,13 +471,17 @@ offset_right = 110.0
 offset_bottom = 126.0
 theme_override_colors/font_color = Color(0.95, 0.91, 0.8, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 0.7)
+theme_override_colors/font_shadow_color = Color(0.02, 0.012, 0.008, 0.58)
 theme_override_constants/outline_size = 3
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 3
 theme_override_fonts/font = SubResource("PixelBold16")
 theme_override_font_sizes/font_size = 16
 horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="P1PlayerId" type="Label" parent="P1Hud" unique_id=1930000002]
+visible = false
 layout_mode = 0
 offset_left = 138.0
 offset_top = 100.0
@@ -617,13 +621,17 @@ offset_right = 1898.0
 offset_bottom = 126.0
 theme_override_colors/font_color = Color(0.95, 0.91, 0.8, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 0.7)
+theme_override_colors/font_shadow_color = Color(0.02, 0.012, 0.008, 0.58)
 theme_override_constants/outline_size = 3
+theme_override_constants/shadow_offset_x = 2
+theme_override_constants/shadow_offset_y = 3
 theme_override_fonts/font = SubResource("PixelBold16")
 theme_override_font_sizes/font_size = 16
 horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="P2PlayerId" type="Label" parent="P2Hud" unique_id=1930000004]
+visible = false
 layout_mode = 0
 offset_left = 1527.505
 offset_top = 100.0

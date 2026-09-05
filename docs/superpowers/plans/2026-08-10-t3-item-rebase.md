@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use the available multi-agent workflow to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 按 Eddy 已确认的 17 件传说道具机制一次性更新正式数据、结算、联机、AI、UI、测试与设计文档。
+**Goal:** 按 Eddy 已确认的 17 件传说道具机制一次性更新正式数据、结算、AI、UI、测试与设计文档。
 
 **Architecture:** 保留 `ItemCatalog -> ItemEffect -> BattleCore` 的成熟分层。一次性效果继续进入 `item_uses`；跨回合效果统一登记到 `relics`，同名件通过状态合并延长次数而不在同一次触发中重复乘算。所有“攻击”只认一次完整的基础「波/大波」，持久状态由权威快照同步并复用英雄头像悬停提示。
 
-**Tech Stack:** Godot 4.x、GDScript、GUT、现有 MatchRoom 权威联机协议、`tools/run_godot.ps1`。
+**Tech Stack:** Godot 4.x、GDScript、GUT、现有 BattleCore 本地权威规则、`tools/run_godot.ps1`。
 
 ## Global Constraints
 
@@ -114,9 +114,7 @@ func relic_on_defense_resolved(_battle: BattleCore, _player: int,
 **Files:**
 - Modify: `src/battle/battle_core.gd`
 - Modify: `src/battle/items/t3_tianluodiwang.gd`
-- Modify: `src/net/match_room.gd`
 - Test: `tests/unit/battle/v4/test_items_t3_rebase_core.gd`
-- Test: `tests/unit/net/test_match_room.gd`
 
 **Interfaces:**
 - Produces: 同回合道具提交事务快照与 `_resolve_tianluo_requests(events)`；对手已提交道具照常消耗，但所有效果（即时能量、燃料、升级、遗物登记、排队 hit）均回滚。
@@ -125,10 +123,10 @@ func relic_on_defense_resolved(_battle: BattleCore, _player: int,
 - [ ] 首件道具提交前保存本方能量、item_buffs、slots、relics、item_uses；记录本回合提交来源槽。
 - [ ] 天罗在 `setup_pre` 只登记请求；双方保护性 setup 完成后统一解析，避免玩家序号决定胜负。
 - [ ] 未被圣贤书抵消时恢复受害者提交前快照，再把其所有来源槽标为已使用，并锁死本回合主动、免费、强制切换；不留下未来 `item_lock`。
-- [ ] 若取消的即时资源使已选行动不再付得起，权威核心将该行动回退为「攒」，且本地与联机走相同分支。
-- [ ] MatchRoom 测试覆盖两种提交顺序、双方同时天罗、天罗对即时上等法力药水/点金石/熔炉/遗物、圣贤书反制和快照无污染。
+- [ ] 若取消的即时资源使已选行动不再付得起，权威核心将该行动回退为「攒」，并覆盖相同分支。
+- [ ] 核心测试覆盖两种提交顺序、双方同时天罗、天罗对即时上等法力药水/点金石/熔炉/遗物、圣贤书反制和快照无污染。
 
-### Task 5: AI、模拟、联机快照与玩家可见状态
+### Task 5: AI、模拟、快照与玩家可见状态
 
 **Files:**
 - Modify: `src/battle/ai/battle_ai.gd`
@@ -161,6 +159,6 @@ func relic_on_defense_resolved(_battle: BattleCore, _player: int,
 
 - [ ] 逐件自检：新基准、真实英雄 combo、反制、失败成本、三复制最坏情况、UI 负担、术语边界、历史撞车。
 - [ ] 运行 `& .\tools\run_godot.ps1 -Mode Import`，要求无 SCRIPT/Parse 错误。
-- [ ] 运行 T3/AI/网络/UI 定向 GUT，再运行 `& .\tools\run_godot.ps1 -Mode Test`，记录新鲜通过数与日志。
+- [ ] 运行 T3/AI/UI 定向 GUT，再运行 `& .\tools\run_godot.ps1 -Mode Test`，记录新鲜通过数与日志。
 - [ ] 用 wrapper 运行 1920×1080 Battle Screen probe，实际检查悬停状态、三格道具、切换和结算后刷新，不修改已通过布局。
 - [ ] 运行 `git diff --check` 并复核仅报告本批道具相关改动；确认无仍在运行的子智能体。

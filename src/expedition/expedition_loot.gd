@@ -3,9 +3,9 @@
 ## 物品字典 schema：
 ##   {id:String, name:String, cat:String(gold|consumable|combat|rare),
 ##    tier:int(战斗道具 1-3·其余 0), shape:Array[Vector2i], gold:int, note:String,
-##    icon:String(expedition_pixel_art 图签 id), combat_id:String(仅战斗道具·=PvP ItemCatalog id)}
+##    icon:String(expedition_pixel_art 图签 id), combat_id:String(仅战斗道具·=ItemCatalog id)}
 ##
-## 战斗道具 = 真 PvP 道具（按 tier 随机抽 ItemCatalog·名字图标同源·为局外闭环 F 铺路）。
+## 战斗道具按 tier 随机抽取当前 ItemCatalog·名字与图标同源·用于远征战斗和撤离闭环。
 ##
 ## 用法示例：
 ##   const Loot := preload("res://src/expedition/expedition_loot.gd")
@@ -58,7 +58,7 @@ static func make_consumable(rng: RandomNumberGenerator) -> Dictionary:
 		"shape": d["shape"], "gold": 0, "note": String(d.get("note", "")), "icon": d["icon"]}
 
 
-## 生成一件战斗道具 = 按 tier 随机抽一件真 PvP 道具（名字/图标同源·撤离带出即入 PvP 池的伏笔）。
+## 生成一件战斗道具 = 按 tier 随机抽取当前 ItemCatalog 道具（名字/图标同源）。
 static func make_combat(rng: RandomNumberGenerator, tier: int) -> Dictionary:
 	var shape: Array = SHAPE_1X1
 	var pool: Array[ItemData] = ItemCatalog.all_active_for_tier(tier)

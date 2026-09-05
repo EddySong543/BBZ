@@ -4,7 +4,7 @@
 
 **Goal:** 按 Eddy 已确认的方案同步优化暖玉、还魂丹、鹤顶红、天罗地网、尾后针、心脏掌握魔法和血魔的獠牙，并清理过期文本。
 
-**Architecture:** 保留现有 `ItemData -> ItemEffect -> BattleCore` 结构。单件效果继续由道具脚本登记，跨伤害类型的致命保险、整次攻击触发次数、成功防御团队治疗及天罗首件事务裁决由 `BattleCore` 统一收口；网络仍提交原有槽位数组，权威端通过可快照的道具事务日志重放首件之后的提交，不新增协议字段。
+**Architecture:** 保留现有 `ItemData -> ItemEffect -> BattleCore` 结构。单件效果继续由道具脚本登记，跨伤害类型的致命保险、整次攻击触发次数、成功防御团队治疗及天罗首件事务裁决由 `BattleCore` 统一收口；本地核心通过可快照的道具事务日志重放首件之后的提交，不新增额外字段。
 
 **Tech Stack:** Godot 4.x、GDScript、GUT、现有 `tools/run_godot.ps1` 启动器。
 
@@ -82,7 +82,6 @@ Expected: 三组全部通过。
 - Test: `tests/unit/battle/v4/test_items_t2_rebase_core.gd`
 - Test: `tests/unit/battle/v4/test_items_t3_rebase_core.gd`
 - Test: `tests/unit/battle/v4/test_battle_snapshot.gd`
-- Test: `tests/unit/net/test_match_room.gd`
 
 **Interfaces:**
 - Consumes: `ItemEffect.can_use`；现有选择期事务快照、槽位 pack/unpack 与 `request_tianluo`。
@@ -125,9 +124,9 @@ if amount >= hp[player][slot] and _consume_fatal_damage_immunity(player, slot, a
 
 该判断接入伤害、`lose_life`、h14 生命支付、力量的代价处决、妖火/延期直扣和娄金直接真伤；保险阻止死亡后不进入尾后针。
 
-- [ ] **Step 4: 运行核心、快照与联机测试**
+- [ ] **Step 4: 运行核心、快照与本地回放测试**
 
-Run: `& .\tools\run_godot.ps1 -Mode Test -TestPaths 'res://tests/unit/battle/v4/test_items_t2_rebase_core.gd,res://tests/unit/battle/v4/test_items_t3_rebase_core.gd,res://tests/unit/battle/v4/test_battle_snapshot.gd,res://tests/unit/net/test_match_room.gd'`
+Run: `& .\tools\run_godot.ps1 -Mode Test -TestPaths 'res://tests/unit/battle/v4/test_items_t2_rebase_core.gd,res://tests/unit/battle/v4/test_items_t3_rebase_core.gd,res://tests/unit/battle/v4/test_battle_snapshot.gd'`
 
 Expected: 全部通过，且天罗结果与玩家编号、提交顺序和快照恢复无关。
 
@@ -207,4 +206,4 @@ Expected: 模拟完成；差异无空白错误。
 
 - [ ] **Step 4: 逐条规格自检**
 
-核对七件机制、还魂与尾后针优先级、天罗首件重放、AI/联机/快照、正式文案、i18n、延后加权记录和未新增状态图标；存在任何缺口时继续修复，不提交。
+核对七件机制、还魂与尾后针优先级、天罗首件重放、AI/快照、正式文案、i18n、延后加权记录和未新增状态图标；存在任何缺口时继续修复，不提交。

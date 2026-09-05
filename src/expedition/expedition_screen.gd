@@ -35,7 +35,7 @@ const ATMOSPHERE_SHADER := preload("res://assets/shaders/canvas_ui_qingfeng_atmo
 const VISION_SHADOW_SHADER := preload(
 		"res://assets/shaders/canvas_ui_pve_vision_shadow.gdshader")
 const JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")           # 按钮果冻底（与战斗/道具弹窗同语言）
-const ITEM_CELL_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")    # 道具格底（与 PvP 道具格同源·圆角径向渐变）
+const ITEM_CELL_SHADER := preload("res://assets/shaders/canvas_ui_item_cell_bg.gdshader")    # 道具格底（与战斗道具格同源·圆角径向渐变）
 const GOLDEN_WAVE_GROUND_TEXTURE := preload("res://assets/tilesets/qingfeng_ricefield/golden_wave_ground_v1.png")
 const QINGFENG_VISUAL_MAP_SCENE := preload("res://src/expedition/maps/qingfeng_ricefield_visual_map.tscn")
 
@@ -191,7 +191,7 @@ var insure_btn: Button
 var dialog: PopupPanel
 var dialog_box: VBoxContainer
 var bp_overlay: Control            # 背包整理浮层（B 唤出）
-var bp_cells: Control              # 背包格底容器（PvP 道具格同源 shader·扩容时重建）
+var bp_cells: Control              # 背包格底容器（战斗道具格同源 shader·扩容时重建）
 var _cell_mat: ShaderMaterial      # 格底共享材质（全格同参·一份即可）
 var select_overlay: Control        # 选初始英雄浮层（进图前）
 var test_controls: Control         # 屏幕空间美术测试按钮，不随地图镜头移动
@@ -657,7 +657,7 @@ func _build_backpack_overlay() -> void:
 	_make_panel(OV_PANEL, bp_overlay)
 	_label(OV_PANEL.position + Vector2(24, 16), 24, "整理行囊（B 关闭）", bp_overlay).modulate = COL_PLAYER
 	_label(Vector2(BP_ORIGIN.x, OV_PANEL.position.y + 66), 16, "―― 背包（撤离只带走包里的）――", bp_overlay).modulate = COL_BONE
-	bp_cells = Control.new()   # 格底容器（PvP 道具格同源 shader·_sync_bp_cells 填充）
+	bp_cells = Control.new()   # 格底容器（战斗道具格同源 shader·_sync_bp_cells 填充）
 	bp_cells.name = "BackpackCells"
 	bp_cells.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bp_overlay.add_child(bp_cells)
@@ -937,7 +937,7 @@ func _jelly_button(b: Button, base: Color) -> void:
 	b.add_child(jelly)
 
 
-## 背包格底同步（E 任务·PvP 道具格同源 shader）：格数变化（扩容）时重建节点。
+## 背包格底同步（E 任务·战斗道具格同源 shader）：格数变化（扩容）时重建节点。
 func _sync_bp_cells() -> void:
 	if bp == null or bp_cells == null:
 		return
@@ -1823,7 +1823,7 @@ func _draw_backpack_canvas() -> void:
 
 
 ## 背包浮层绘制（放置块/手上幽灵）。
-## 空格底=bp_cells 节点（PvP 道具格同源 shader）；放置块内缩 3px 避开格底圆角。
+## 空格底=bp_cells 节点（战斗道具格同源 shader）；放置块内缩 3px 避开格底圆角。
 func _draw_backpack_layer(f16: Font) -> void:
 	for p: Dictionary in bp.placements:
 		var it: Dictionary = p["item"]
@@ -1866,7 +1866,7 @@ func _backpack_shape_bounds(anchor: Vector2i, shape: Array) -> Rect2:
 			Vector2(shape_size) * float(BP_CELL))
 
 
-## 物品图标：战斗道具优先用真 PvP 图标（ItemCatalog·60 张现役素材），缺图/其余回退像素图签。
+## 物品图标：战斗道具优先用 ItemCatalog 图标，缺图/其余回退像素图签。
 func _item_texture(it: Dictionary) -> Texture2D:
 	if String(it.get("combat_id", "")) != "":
 		var t: Texture2D = ItemCatalog.load_icon(String(it["combat_id"]))

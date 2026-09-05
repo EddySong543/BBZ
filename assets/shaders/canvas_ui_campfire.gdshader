@@ -4,7 +4,7 @@ shader_type canvas_item;
 // canvas_ui_campfire.gdshader
 // 作者: Claude (Game Studios) ｜ 用途: 故事卡「炉火夜话」ModeCard 程序篝火母题（2026-06-24·B 路线）。
 //   暗暖炉边氛围 + 噪声火舌 + 上升火星 + 暖色呼吸。零贴图，全程序生成。
-//   像素语言与 wave_clash（对波卡）统一：格点量化 + Bayer 4x4 dither + levels 档位 + 像素台阶圆角自切。
+//   像素语言与波流 shader 统一：格点量化 + Bayer 4x4 dither + levels 档位 + 像素台阶圆角自切。
 //   ⚠ Godot clip_children 不执行父节点自定义 shader → 圆角必须本层自切（corner_radius/corner_grid）。
 //
 //   2026-06-24 二改（Eddy F6 看 res/fire.png：右侧明显竖直亮带）。根因＝去 banding 失败：

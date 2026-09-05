@@ -3,7 +3,7 @@ extends RefCounted
 
 ## Pure two-player sequence scheduler for authoritative battle resolution.
 ## Submitted steps stay immutable. Each side's single public action is aligned to
-## the shared beat 0; pre/post steps keep their distance from that action. Server
+## the shared beat 0; pre/post steps keep their distance from that action. Core
 ## effects may schedule a synthetic wait after a completed column without
 ## advancing that player's execution-step cursor.
 
@@ -17,6 +17,8 @@ const WAIT_REASON_ACTION_ALIGNMENT: String = "action_alignment"
 const WAIT_REASON_SEQUENCE_SHIFT: String = "sequence_shift"
 const EVENT_SEQUENCE_SHIFTED: String = "sequence_shifted"
 const EVENT_SEQUENCE_WAIT_EXECUTED: String = "sequence_wait_executed"
+const EVENT_SEQUENCE_TRUNCATED: String = "sequence_truncated"
+const EVENT_SEQUENCE_STEP_CANCELLED: String = "sequence_step_cancelled"
 
 var _submitted_sequences: Array[Array] = [[], []]
 var _execution_sequences: Array[Array] = [[], []]
@@ -143,6 +145,58 @@ func request_wait(source_player: int, target_player: int, cause_step_id: String)
 	_events.append(shift_event.duplicate(true))
 	_append_event_to_resolved_column(source_column_index, shift_event)
 	return true
+
+
+## 在两拍之间终止整条时间线。已经完成的列和原始提交保持不变；只有尚未开始的
+## 玩家真实步骤会写入取消事件，BattleCore 生成的对齐/延后等待不会伪装成玩家损失。
+func cancel_remaining(reason: String, affected_players: Array = []) -> Array[Dictionary]:
+	if _column_open:
+		push_error("BattleResolutionTimeline can only be truncated between columns")
+		return []
+
+	var cancelled: Array[Dictionary] = []
+	for player: int in range(PLAYER_COUNT):
+		var sequence: Array = _execution_sequences[player]
+		for index: int in range(_cursors[player], sequence.size()):
+			var step: Dictionary = sequence[index]
+			if String(step.get("kind", "")) == STEP_WAIT:
+				continue
+			cancelled.append({
+				"id": EVENT_SEQUENCE_STEP_CANCELLED,
+				"column": _resolved_columns.size() - 1,
+				"player": player,
+				"step_id": String(step.get("step_id", "")),
+				"kind": String(step.get("kind", "")),
+				"item_id": String(step.get("item_id", "")),
+				"slot": int(step.get("slot", -1)),
+				"reason": reason,
+			})
+		_cursors[player] = sequence.size()
+		_pending_waits[player].clear()
+	_accepting_wait_requests = false
+
+	if cancelled.is_empty():
+		return []
+	var source_column: int = _resolved_columns.size() - 1
+	var truncated_event: Dictionary = {
+		"id": EVENT_SEQUENCE_TRUNCATED,
+		"event_id": _take_event_id(),
+		"column": source_column,
+		"reason": reason,
+		"affected_players": affected_players.duplicate(),
+		"cancelled_count": cancelled.size(),
+	}
+	if source_column >= 0:
+		truncated_event["beat"] = source_column - _action_anchor_column
+	_events.append(truncated_event.duplicate(true))
+	if source_column >= 0:
+		_append_event_to_resolved_column(source_column, truncated_event)
+	for event: Dictionary in cancelled:
+		event["event_id"] = _take_event_id()
+		_events.append(event.duplicate(true))
+		if source_column >= 0:
+			_append_event_to_resolved_column(source_column, event)
+	return cancelled.duplicate(true)
 
 
 func to_result() -> Dictionary:

@@ -39,7 +39,7 @@
 [ext_resource type="FontVariation" path="res://assets/font/zlabs_pixel_ui.tres" id="38_boot_font"]
 [ext_resource type="Script" uid="uid://cmaj2bifx78ew" path="res://src/ui/components/boot_icon_base.gd" id="39_icon_base"]
 [ext_resource type="Script" uid="uid://buodh8wwm1upt" path="res://src/ui/components/boot_menu_button_motion.gd" id="40_button_motion"]
-[ext_resource type="Script" path="res://src/ui/components/boot_menu_focus_mark.gd" id="41_focus_mark"]
+[ext_resource type="Script" uid="uid://brj76huxxyqm3" path="res://src/ui/components/boot_menu_focus_mark.gd" id="41_focus_mark"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_paper"]
 shader = ExtResource("15_paper_shader")
@@ -858,11 +858,12 @@ scale = Vector2(0.75, 0.75)
 mouse_filter = 2
 texture = ExtResource("31_shuo_title")
 
-[node name="InterfaceLayer" type="CanvasLayer" parent="."]
+[node name="InterfaceLayer" type="CanvasLayer" parent="." unique_id=941892717]
 layer = 10
 
 [node name="BootMenu" type="Control" parent="InterfaceLayer" unique_id=773836705]
 z_index = 20
+layout_mode = 3
 anchors_preset = 0
 offset_left = 166.0
 offset_top = 598.0
@@ -886,7 +887,7 @@ layout_mode = 2
 theme_type_variation = &"BootMainButton"
 text = "开始游戏"
 
-[node name="FocusMark" type="Control" parent="InterfaceLayer/BootMenu/MainButtons/StartGame"]
+[node name="FocusMark" type="Control" parent="InterfaceLayer/BootMenu/MainButtons/StartGame" unique_id=81456485]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -907,7 +908,7 @@ tooltip_text = "完整进度存档系统接入后启用"
 theme_type_variation = &"BootMainButton"
 text = "读取存档"
 
-[node name="FocusMark" type="Control" parent="InterfaceLayer/BootMenu/MainButtons/LoadGame"]
+[node name="FocusMark" type="Control" parent="InterfaceLayer/BootMenu/MainButtons/LoadGame" unique_id=482918141]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -928,7 +929,7 @@ tooltip_text = "愿望单链接待配置"
 theme_type_variation = &"BootMainButton"
 text = "加入愿望单"
 
-[node name="FocusMark" type="Control" parent="InterfaceLayer/BootMenu/MainButtons/Wishlist"]
+[node name="FocusMark" type="Control" parent="InterfaceLayer/BootMenu/MainButtons/Wishlist" unique_id=400723869]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -948,7 +949,7 @@ layout_mode = 2
 theme_type_variation = &"BootMainButton"
 text = "退出游戏"
 
-[node name="FocusMark" type="Control" parent="InterfaceLayer/BootMenu/MainButtons/QuitGame"]
+[node name="FocusMark" type="Control" parent="InterfaceLayer/BootMenu/MainButtons/QuitGame" unique_id=621599663]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -991,12 +992,13 @@ anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -33.0
-offset_top = -53.0
-offset_right = 33.0
-offset_bottom = 13.0
+offset_left = -20.0
+offset_top = -30.0
+offset_right = 46.0
+offset_bottom = 36.0
 grow_horizontal = 2
 grow_vertical = 0
+scale = Vector2(0.6, 0.6)
 mouse_filter = 2
 script = ExtResource("39_icon_base")
 tuning_center_offset = Vector2(0.5, 0)
@@ -1031,12 +1033,13 @@ anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -33.0
-offset_top = -53.0
-offset_right = 33.0
-offset_bottom = 13.0
+offset_left = -20.0
+offset_top = -30.0
+offset_right = 46.0
+offset_bottom = 36.0
 grow_horizontal = 2
 grow_vertical = 0
+scale = Vector2(0.6, 0.6)
 mouse_filter = 2
 script = ExtResource("39_icon_base")
 tuning_center_offset = Vector2(0.5, 0)
@@ -1072,12 +1075,13 @@ anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -33.0
-offset_top = -53.0
-offset_right = 33.0
-offset_bottom = 13.0
+offset_left = -20.0
+offset_top = -30.0
+offset_right = 46.0
+offset_bottom = 36.0
 grow_horizontal = 2
 grow_vertical = 0
+scale = Vector2(0.6, 0.6)
 mouse_filter = 2
 script = ExtResource("39_icon_base")
 tuning_center_offset = Vector2(0.5, 0)
@@ -1094,9 +1098,9 @@ icon_base_path = NodePath("../Base")
 [node name="Feedback" type="Button" parent="InterfaceLayer/BootMenu/SmallButtons" unique_id=1163516338]
 layout_mode = 0
 offset_left = -211.0
-offset_top = 156.0
+offset_top = 137.68
 offset_right = -163.0
-offset_bottom = 222.0
+offset_bottom = 225.68
 tooltip_text = "问题反馈链接待配置"
 theme_type_variation = &"BootIconButton"
 icon = ExtResource("37_feedback_icon")
@@ -1113,12 +1117,13 @@ anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -33.0
-offset_top = -71.0
-offset_right = 33.0
-offset_bottom = -5.0
+offset_left = -20.0
+offset_top = -58.0
+offset_right = 46.0
+offset_bottom = 8.0
 grow_horizontal = 2
 grow_vertical = 0
+scale = Vector2(0.6, 0.6)
 mouse_filter = 2
 script = ExtResource("39_icon_base")
 tuning_center_offset = Vector2(0.5, 0)

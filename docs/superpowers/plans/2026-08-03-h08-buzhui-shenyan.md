@@ -118,11 +118,11 @@ func retains_unused_big_defend() -> bool:
 - Modify: `assets/i18n/strings_zh.csv`
 - Modify: `design/heroes.md`
 - Modify: `design/heroes-redesign.md`
-- Modify: `design/heroes-dark-h21-h24.md`
+- Modify: `design/heroes.md`（暗批局部内容已并入主英雄文档）
 - Modify: `design/heroes-schools.md`
 - Modify: `design/gdd/game-concept.md`
 - Modify: `design/naming-bank.md`
-- Modify: `src/battle/skills/h14_tianbuzang.gd`
+- Modify: `src/battle/skills/h14_xuezhutumi.gd`
 - Modify: `src/battle/skills/h23_huzhu.gd`
 
 **Interfaces:**

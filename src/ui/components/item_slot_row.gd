@@ -3,7 +3,7 @@ extends Control
 
 ## 道具栏组件（2026-07-13 无文字状态语言重做·同日二版按 Eddy 反馈修）：3 格，可横排或纵排。
 ## 状态语言=回纹框（全状态统一·有道具=阶框/无道具=暖骨中性框）+ 小配饰 + 动效，状态文字全退役：
-##   未解锁=斜贴封条（圆点=剩余回合·到点撕落+框弹亮）；锁中=阶框压暗+角上小封条（单圆点=1回合）；
+##   未解锁=斜贴封条（圆点=剩余回合·到点撕落+框弹亮）；锁中=整组压暗+中央封条（单圆点=1回合）；
 ##   可抽/可补=同语言（锦囊轻浮+框金呼吸=本回合可点）；待抽=锦囊压暗静止；
 ##   就绪=全彩；可升级=右上金升箭角标（点击/右键=升级）+框向下一阶色呼吸；
 ##   点选=金晕外环+框身提金+图标下沉（回纹框保留不清除）；空=纯暗格。
@@ -105,6 +105,8 @@ const RING_PAD := 4.0                           # 金晕外环外扩像素（外
 const TXT_BRIGHT := Color(0.98, 0.96, 0.9)      # 可抽/可补/就绪/✓用（可操作·亮米白）
 const TXT_DIM := Color(0.78, 0.74, 0.66)        # 锁/待抽/锁中（静默电报·暖灰退后）
 const TXT_FAINT := Color(0.62, 0.58, 0.50)      # 空格（最弱）
+const LOCKED_VISUAL_MODULATE := Color(0.60, 0.60, 0.60, 1.0)
+const DURABILITY_USED_COLOR := Color("ff4b4b")
 
 @export_group("Battle HUD 定向阴影")
 @export var bottom_shadow_enabled := false
@@ -142,6 +144,7 @@ func _apply_mouse_filter() -> void:
 const ICON_INSET := 9.0                          # 图标内缩（露出框·与图鉴 17/138≈12% 同比例·落在内框里不溢出）
 
 var _cells: Array[ColorRect] = []              # 每槽暗格底（cell_bg：稀有度暗底 + 中心高亮 + 传说金底图）
+var _visual_groups: Array[Control] = []        # 框/格底/图案/能量/耐久统一锁定调制链
 var _cell_mats: Array[ShaderMaterial] = []     # refresh 重设 fill_color / center_glow / use_tex
 var _frames: Array[ColorRect] = []             # 每槽点选金晕外环（pixel_frame·外扩金边·仅点选显示）
 var _frame_mats: Array[ShaderMaterial] = []    # 金晕材质（金色在 _ready 一次性设定）
@@ -158,7 +161,7 @@ var _buttons: Array[Button] = []
 # ── 无文字状态语言部件（2026-07-13·同日二版：升条/▲pip 撤销→右键+费用章·Eddy 反馈）──
 var _seals: Array[Control] = []                # 未解锁=斜贴封条（挂锁图标+剩余回合圆点）
 var _seal_pips: Array[Array] = []              # 每封条 3 圆点
-var _mini_seals: Array[Control] = []           # 锁中=角上半张小封条（带小挂锁）
+var _mini_seals: Array[Control] = []           # 锁中=框中央短封条
 var _pouches: Array[Control] = []              # 可抽/待抽/可补=锦囊（抽补同语言）
 var _up_badges: Array[Button] = []             # 右上升箭角标（可点=升级·可升级且未点选时显示）
 var _up_chevs: Array[Control] = []             # 角标内双升箭容器（跳动动效对象）
@@ -210,19 +213,13 @@ func _set_texture_frame_palette(m: ShaderMaterial, tier: int) -> void:
 
 
 func _make_item_stat_badge(name_value: String, texture: Texture2D,
-		hframes_value: int, vframes_value: int, badge_position: Vector2,
-		badge_size: Vector2) -> IconBadge:
+		hframes_value: int, vframes_value: int, kind: StringName,
+		layout: Dictionary) -> IconBadge:
 	var badge := IconBadge.new()
 	badge.name = name_value
-	badge.position = badge_position
-	badge.size = badge_size
 	badge.z_index = 20
 	badge.set_icon(texture, hframes_value, vframes_value, 0)
-	badge.normalize_icon_visual = true
-	badge.icon_visual_ratio = 0.82
-	badge.font_size = 11
-	badge.outline_size = 3
-	badge.embolden = 0.7
+	ItemFrameStyle.configure_item_stat_badge(badge, kind, layout)
 	badge.visible = false
 	return badge
 
@@ -234,27 +231,35 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	for i in range(3):
 		var base := _slot_base(i)
+		var visual_group := Control.new()
+		visual_group.name = "ItemVisualGroup%d" % i
+		visual_group.size = custom_minimum_size
+		visual_group.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(visual_group)
+		var item_layout := ItemFrameStyle.item_frame_layout(&"battle", base, SLOT_W)
+		var frame_rect: Rect2 = item_layout["frame_rect"]
+		var frame_shadow_rect: Rect2 = item_layout["frame_shadow_rect"]
+		var cell_rect: Rect2 = item_layout["cell_rect"]
+		var art_rect: Rect2 = item_layout["item_art_rect"]
 		# 与回纹框完全同 alpha 轮廓的定向阴影；先于格底和框体加入，不产生矩形黑底。
 		var bottom_shadow := ItemFrameStyle.make_frame_shadow(
-				base + FRAME_ART_OFFSET, FRAME_ART_SIZE, "BottomShadow%d" % i,
-				bottom_shadow_offset, bottom_shadow_color)
+				frame_shadow_rect.position, frame_shadow_rect.size,
+				"BottomShadow%d" % i, Vector2.ZERO, bottom_shadow_color)
 		bottom_shadow.visible = bottom_shadow_enabled
-		add_child(bottom_shadow)
+		visual_group.add_child(bottom_shadow)
 		# 暗格底（cell_bg）：稀有度暗底 + 中心高亮 + 传说金底图；颜色由 refresh 设。
 		var cell := ColorRect.new()
 		cell.color = Color.WHITE   # shader 乘 COLOR，须白
-		cell.position = base + Vector2(CELL_INSET, CELL_INSET)
-		cell.size = Vector2(SLOT_W - CELL_INSET * 2.0, SLOT_H - CELL_INSET * 2.0)
+		cell.position = cell_rect.position
+		cell.size = cell_rect.size
 		var cmat := _make_cell_material()
 		cell.material = cmat
 		cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		add_child(cell)
-		var icon_position := base + Vector2(ICON_INSET, ICON_INSET)
-		var icon_size := Vector2(SLOT_W - ICON_INSET * 2.0, SLOT_H - ICON_INSET * 2.0)
-		var icon_shadow := ItemFrameStyle.make_item_art_shadow(
-				null, icon_position, icon_size, "ItemArtShadow%d" % i)
+		visual_group.add_child(cell)
+		var icon_shadow := ItemFrameStyle.make_item_art_shadow_exact(
+				null, item_layout["item_art_shadow_rect"], "ItemArtShadow%d" % i)
 		icon_shadow.visible = false
-		add_child(icon_shadow)
+		visual_group.add_child(icon_shadow)
 		# 点选金晕外环（pixel_frame shader·金边·外扩 RING_PAD）：仅点选显示·衬在回纹框后（不再换框）。
 		var frame := ColorRect.new()
 		frame.color = Color.WHITE
@@ -267,18 +272,18 @@ func _ready() -> void:
 		frame.material = fmat
 		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		frame.visible = false
-		add_child(frame)
+		visual_group.add_child(frame)
 		# 回纹阶框贴图（有道具时显示·替换 shader 框·与图鉴同款素材）。
 		var tframe := TextureRect.new()
 		tframe.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		tframe.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		tframe.position = base + FRAME_ART_OFFSET
-		tframe.size = FRAME_ART_SIZE
+		tframe.position = frame_rect.position
+		tframe.size = frame_rect.size
 		var tfmat := _make_texture_frame_material()
 		tframe.material = tfmat
 		tframe.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		tframe.visible = false
-		add_child(tframe)
+		visual_group.add_child(tframe)
 		# 道具图标层（铺在框之上、文字之下；缺图隐藏 → 回退文字）。
 		var icon := TextureRect.new()
 		icon.name = "ItemIcon%d" % i
@@ -286,19 +291,16 @@ func _ready() -> void:
 		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST   # 像素清晰
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		icon.visible = false
-		ItemFrameStyle.configure_item_art(icon, null, Rect2(icon_position, icon_size))
-		add_child(icon)
-		var stat_badge_size := Vector2(30.0, 30.0)
-		var stat_positions := ItemFrameStyle.stat_badge_positions(
-			Rect2(base + FRAME_ART_OFFSET, FRAME_ART_SIZE), stat_badge_size)
+		ItemFrameStyle.configure_item_art(icon, null, art_rect)
+		visual_group.add_child(icon)
 		var cost_badge := _make_item_stat_badge(
 			"UseCostBadge%d" % i, ENERGY_COST_SHEET, 4, 4,
-			stat_positions["cost"], stat_badge_size)
+			&"energy", item_layout)
 		var durability_badge := _make_item_stat_badge(
 			"DurabilityBadge%d" % i, DURABILITY_BADGE_ICON, 1, 1,
-			stat_positions["durability"], stat_badge_size)
-		add_child(cost_badge)
-		add_child(durability_badge)
+			&"durability", item_layout)
+		visual_group.add_child(cost_badge)
+		visual_group.add_child(durability_badge)
 		var lbl := Label.new()
 		lbl.position = base
 		lbl.size = Vector2(SLOT_W, SLOT_H)
@@ -311,7 +313,7 @@ func _ready() -> void:
 		lbl.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.03, 0.85))
 		lbl.add_theme_constant_override("outline_size", 4)
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		add_child(lbl)
+		visual_group.add_child(lbl)
 		# 点击层（透明 flat 按钮，铺满整格）：仅 interactive 时吃点击。
 		# ── 无文字状态语言部件（封条/小封条/锦囊·全 IGNORE·refresh 控显）──
 		# 锦囊是槽内的常驻物件，封印态只在它上方贴封条，不能把锦囊整个替换掉。
@@ -347,6 +349,7 @@ func _ready() -> void:
 		var chev := _make_chevrons()
 		badge.add_child(chev)
 		add_child(badge)
+		_visual_groups.append(visual_group)
 		_cells.append(cell)
 		_cell_mats.append(cmat)
 		_frames.append(frame)
@@ -401,17 +404,23 @@ func _make_seal(base: Vector2) -> Control:
 	return root
 
 
-## 角上半张小封条（锁中·冷却 1 回合）：短条斜贴左上角·单圆点=剩 1 回合。
+## 中央短封条（锁中·冷却 1 回合）：压在完整道具框中心·单圆点=剩 1 回合。
 ## 斜度与大封条完全同角（-0.30·Eddy 2026-07-13：视觉一致优先——同为横条同角即同斜）。
 func _make_mini_seal(base: Vector2) -> Control:
 	var root := Control.new()
-	root.position = base + Vector2(SLOT_W - 15.0, 13.0) if mirror_seals \
-			else base + Vector2(15.0, 13.0)
-	root.rotation = 0.30 if mirror_seals else -0.30
+	var item_layout := ItemFrameStyle.item_frame_layout(&"battle", base, SLOT_W)
+	var seal_center: Vector2 = item_layout["seal_center"]
+	if mirror_seals:
+		seal_center.x = base.x + SLOT_W - (seal_center.x - base.x)
+	root.position = seal_center
+	root.rotation = -float(item_layout["seal_rotation"]) if mirror_seals \
+			else float(item_layout["seal_rotation"])
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.z_index = 30
 	root.visible = false
-	var w := 44.0
-	var h := 13.0
+	var seal_size: Vector2 = item_layout["seal_size"]
+	var w := seal_size.x
+	var h := seal_size.y
 	var edge := ColorRect.new()
 	edge.color = SEAL_EDGE_INK
 	edge.position = Vector2(-w * 0.5 - 1.0, -h * 0.5 - 1.0)
@@ -550,6 +559,7 @@ func refresh(battle: BattleCore, player: int, staged: Array = [], concealed: boo
 		var cur_tier := 1                  # 当前道具阶（upN 动效键用）
 		var frame_tex: Texture2D = ITEM_FRAME_TEX   # 全状态统一框母版；无道具=暖骨中性
 		var frame_mod := Color.WHITE
+		_visual_groups[i].modulate = Color.WHITE
 		_seals[i].visible = false
 		_mini_seals[i].visible = false
 		_pouches[i].visible = false
@@ -594,14 +604,11 @@ func refresh(battle: BattleCore, player: int, staged: Array = [], concealed: boo
 				if battle.slot_ready(player, i):
 					fb = c_out
 					cell_inner = c_in
-					icon.modulate = Color.WHITE
 				else:
-					# 锁中 = 阶色压暗 + 图标去饱和 + 角上半张小封条。
+					# 锁中 = 整个正式视觉组统一压暗，中央封条留在组外保持辨识度。
 					locked_item = true
-					fb = c_out.darkened(0.32)
-					cell_inner = c_in.darkened(0.32)
-					frame_mod = Color(0.65, 0.65, 0.68)
-					icon.modulate = Color(0.62, 0.62, 0.66)
+					fb = c_out
+					cell_inner = c_in
 					_mini_seals[i].visible = true
 			BattleCore.SlotState.EMPTY:
 				# 新版空框承载本回合免费取得入口；旧版空框继续承载付费补充入口。
@@ -624,28 +631,36 @@ func refresh(battle: BattleCore, player: int, staged: Array = [], concealed: boo
 		var staged_now: bool = staged.has(i)
 		if has_item and icon.texture != null:
 			var runtime_item: ItemData = battle.slot_item(player, i)
-			var art_target := Rect2(
-				_slot_base(i) + Vector2(ICON_INSET, ICON_INSET + (3.0 if staged_now else 0.0)),
-				Vector2(SLOT_W - ICON_INSET * 2.0, SLOT_H - ICON_INSET * 2.0))
+			var runtime_layout := ItemFrameStyle.item_frame_layout(
+				&"battle", _slot_base(i), SLOT_W)
+			var art_target: Rect2 = runtime_layout["item_art_rect"]
+			var shadow_target: Rect2 = runtime_layout["item_art_shadow_rect"]
+			if staged_now:
+				art_target.position.y += 3.0
+				shadow_target.position.y += 3.0
 			ItemFrameStyle.configure_item_art(icon, icon.texture, art_target)
-			ItemFrameStyle.configure_item_art(icon_shadow, icon.texture, art_target,
-				ItemFrameStyle.item_art_shadow_offset(art_target.size))
+			ItemFrameStyle.configure_item_art(icon_shadow, icon.texture, shadow_target)
 			_cost_badges[i].set_number(int(runtime_item.use_cost))
-			_durability_badges[i].set_number(int(
-				battle.slots[player][i].get("current_durability", runtime_item.max_durability)))
+			var durability_badge := _durability_badges[i] as IconBadge
+			var current_durability := int(battle.slots[player][i].get(
+				"current_durability", runtime_item.max_durability))
+			var maximum_durability := int(battle.slots[player][i].get(
+				"max_durability", runtime_item.max_durability))
+			var durability_loss := maxi(maximum_durability - current_durability, 0)
+			durability_badge.set_number(current_durability)
+			durability_badge.set_number_text_override(
+				"x-%d" % durability_loss if durability_loss > 0 else "")
+			durability_badge.number_color = DURABILITY_USED_COLOR \
+				if durability_loss > 0 else Color.WHITE
 			_cost_badges[i].visible = true
 			_durability_badges[i].visible = true
-		icon_shadow.self_modulate = Color(
-				ItemFrameStyle.ITEM_ART_SHADOW_COLOR.r,
-				ItemFrameStyle.ITEM_ART_SHADOW_COLOR.g,
-				ItemFrameStyle.ITEM_ART_SHADOW_COLOR.b,
-				ItemFrameStyle.ITEM_ART_SHADOW_COLOR.a * (0.65 if locked_item else 1.0))
+		icon.modulate = Color.WHITE
+		icon_shadow.self_modulate = ItemFrameStyle.ITEM_ART_SHADOW_COLOR
 		# 格底应用
 		var cmat: ShaderMaterial = _cell_mats[i]
 		if has_item:
 			# 统一样式负责三档阶色与纵向渐变；战斗状态只附加锁定压暗。
-			var state_tint := Color(0.68, 0.68, 0.68, 1.0) if locked_item else Color.WHITE
-			ItemFrameStyle.apply_cell_palette(cmat, cur_tier, state_tint)
+			ItemFrameStyle.apply_cell_palette(cmat, cur_tier, Color.WHITE)
 		else:
 			# 空槽保留战斗 HUD 原有的柔和中心高光，避免改变状态语言。
 			cmat.set_shader_parameter("fill_color", fb)
@@ -660,6 +675,8 @@ func refresh(battle: BattleCore, player: int, staged: Array = [], concealed: boo
 		_tex_frames[i].texture = frame_tex
 		_set_texture_frame_palette(_tex_frame_mats[i], cur_tier)
 		_tex_frames[i].modulate = STAGED_TINT if staged_now else frame_mod
+		_visual_groups[i].modulate = LOCKED_VISUAL_MODULATE \
+			if locked_item else Color.WHITE
 		_frames[i].visible = staged_now
 		if staged_now and _prev_staged[i] != true:
 			_play_stage_pop(i)

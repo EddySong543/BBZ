@@ -2,7 +2,7 @@ class_name BattleCore
 extends RefCounted
 
 ## Battle 战斗核心引擎 —— ADR-002 架构（v4 重写，已转正为唯一核心）。
-## 纯逻辑、无 UI 依赖、可 headless（联机服务器权威前提，延续 ADR-001 §D5）。
+## 纯逻辑、无 UI 依赖、可 headless（本地战斗与测试共用，延续 ADR-001 §D5）。
 ##
 ## 进度：
 ##   Step 2.1 ✅ 状态模型 + setup + 只读视图 + HeroSkill 契约。
@@ -69,8 +69,8 @@ var _jianqi_attack: Array[bool] = [false, false]    # 本回合昴日是否消�
 var _blood_payment: Array[bool] = [false, false]    # 本回合是否由已记录的蚩尤以等量血量支付英雄费用
 var _blood_payment_source: Array[int] = [-1, -1]    # 发动技能的蚩尤槽位；免费切换后仍由该槽付款
 var _energy_cap_discount: Array[bool] = [false, false] # 本回合是否降低 1 点能量上限，换取行动费用 -1
-var free_switch_usage_turn: Array[int] = [-1, -1]   # 千里自在风：各方免费切换计数所属的 turn_number
-var free_switch_uses: Array[int] = [0, 0]           # 千里自在风：各方在 usage_turn 内已免费切换次数
+var free_switch_usage_turn: Array[int] = [-1, -1]   # 千里快哉风：各方免费切换计数所属的 turn_number
+var free_switch_uses: Array[int] = [0, 0]           # 千里快哉风：各方在 usage_turn 内已免费切换次数
 var _pending_free_switches: Array = [[], []]         # 选择期免费切换意图；active_index 仅预览，揭示后才原子提交 hook
 var _pending_reserve_pursuit_source: Array[int] = [-1, -1] # resolve 临时态：触发广寒追击的出手槽；不跨回合/快照
 var _pending_reserve_pursuit_target: Array[int] = [-1, -1] # resolve 临时态：广寒待追击的敌方槽；不跨回合/快照
@@ -118,7 +118,7 @@ var retained_big_defend_until_turn: Array[int] = [-1, -1] # 保留大防最后�
 var _retain_big_defend_candidate: Array[bool] = [false, false]  # resolve 原子相位临时态：本回合哪方由鬼金打出了待判定的大防
 var _retained_big_defend_in_use: Array[bool] = [false, false]   # resolve 临时态：已消费的后备大防继续挡完同一次多段基础攻击
 
-var rng := RandomNumberGenerator.new()    # 可 seed (§D7)：联机/录像/测试可复现
+var rng := RandomNumberGenerator.new()    # 可 seed (§D7)：录像/测试可复现
 var _skills: Array = [[], []]             # _skills[player][slot]: HeroSkill 或 null
 
 ## 英雄技能组件注册表：hero_id → 组件脚本。未列入者 = 无技能（_skills 为 null）。
@@ -130,15 +130,15 @@ const _HERO_SKILL_SCRIPTS := {
 	"h04": preload("res://src/battle/skills/h04_wucidi.gd"),
 	"h05": preload("res://src/battle/skills/h05_longyuji.gd"),
 	"h06": preload("res://src/battle/skills/h06_shenda.gd"),
-	"h07": preload("res://src/battle/skills/h07_qianlizizaifeng.gd"),
+	"h07": preload("res://src/battle/skills/h07_qianlikuaizaifeng.gd"),
 	"h08": preload("res://src/battle/skills/h08_buzhuishenyan.gd"),
 	"h09": preload("res://src/battle/skills/h09_liuzhaoyanluo.gd"),
 	"h10": preload("res://src/battle/skills/h10_taichuwanfa.gd"),
 	"h11": preload("res://src/battle/skills/h11_yingshou.gd"),
 	"h12": preload("res://src/battle/skills/h12_nafu.gd"),
 	"h13": preload("res://src/battle/skills/h13_anchao.gd"),
-	"h14": preload("res://src/battle/skills/h14_tianbuzang.gd"),
-	"h15": preload("res://src/battle/skills/h15_qishazhangui.gd"),
+	"h14": preload("res://src/battle/skills/h14_xuezhutumi.gd"),
+	"h15": preload("res://src/battle/skills/h15_yanzhenbaji.gd"),
 	"h16": preload("res://src/battle/skills/h16_baihong.gd"),
 	"h17": preload("res://src/battle/skills/h17_zhenya.gd"),
 	"h18": preload("res://src/battle/skills/h18_base_damage_field.gd"),
@@ -154,7 +154,7 @@ const _HERO_SKILL_SCRIPTS := {
 static var _registry_validated := false
 
 
-## seed_value = 0 时用随机 seed（单机）；联机/测试传入确定 seed。
+## seed_value = 0 时用随机 seed；测试或复盘场景可传入确定 seed。
 func setup(p1_heroes: Array, p2_heroes: Array, seed_value: int = 0) -> void:
 	heroes = [p1_heroes, p2_heroes]
 	rng.seed = seed_value if seed_value != 0 else randi()
@@ -254,7 +254,7 @@ func _make_skill(hero_id: String) -> HeroSkill:
 	return script.new() if script != null else null
 
 
-## 校验技能装配，及早暴露注册表 id 拼写/漏注册（联机准备）。
+## 校验技能装配，及早暴露注册表 id 拼写/漏注册。
 ## 注册表整体只校验一次：key 须 hXX 格式、value 须 HeroSkill 子类。
 ## 本局阵容每次 setup 都查：数据有技能描述却装配出 null = 多半 key 拼错/漏注册。
 func _validate_skills() -> void:
@@ -499,7 +499,7 @@ func living_heroes(player: int) -> Array[int]:
 	return result
 
 
-## 返回当前生命最低的存活英雄；exclude_slot>=0 时排除该槽。平手取较小槽位，保证联机确定性。
+## 返回当前生命最低的存活英雄；exclude_slot>=0 时排除该槽。平手取较小槽位，保证复盘确定性。
 func lowest_hp_living_hero(player: int, exclude_slot: int = -1) -> int:
 	var best_slot: int = -1
 	var best_hp: int = 0x7FFFFFFF
@@ -559,7 +559,7 @@ func _eff_skill(player: int, slot: int) -> HeroSkill:
 	return _skills[player][slot]
 
 
-## 出战英雄是否可用防/大防（穷奇 h15【七杀战鬼】= 不可）。下场即恢复（按出战英雄判定）。
+## 出战英雄是否可用防/大防（穷奇 h15【魇镇八极】= 不可）。下场即恢复（按出战英雄判定）。
 func _can_defend(player: int) -> bool:
 	var sk: HeroSkill = _eff_skill(player, active_index[player])
 	return sk == null or sk.can_defend()
@@ -590,7 +590,7 @@ func _can_afford_with_cost(player: int, action: int, cost: int) -> bool:
 		elif action != ActionDef.Action.CHARGE:
 			return false
 	if action in ActionDef.DEFEND_ACTIONS and not _can_defend(player):
-		return false   # 七杀战鬼：嗜杀红温·防/大防不合法（单一收口，legal_actions/UI/AI 全走此）
+		return false   # 魇镇八极：嗜杀红温·防/大防不合法（单一收口，legal_actions/UI/AI 全走此）
 	if action == ActionDef.Action.SWITCH and not _can_switch(player):
 		return false
 	return usable_energy(player) >= maxi(0, cost)
@@ -1088,7 +1088,7 @@ func blood_payment_source(player: int) -> int:
 	return slot
 
 
-## 选择动作时允许直接按 blood_payment=true 发动（AI / 联机旧入口），
+## 选择动作时允许直接按 blood_payment=true 发动（AI / 旧入口），
 ## 也允许先在选择阶段发动再经星日免费切换；后者读取已记录的原蚩尤槽位。
 func _candidate_blood_payment_source(player: int) -> int:
 	var recorded: int = blood_payment_source(player)
@@ -1303,7 +1303,7 @@ func _resolve_item_target(player: int, data: ItemData, target_override: int) -> 
 	return active_index[1 - player]
 
 
-## 需要玩家明确选择己方英雄的道具。联机/UI/AI 共用，避免把英雄槽误作道具槽。
+## 需要玩家明确选择己方英雄的道具。UI/AI 共用，避免把英雄槽误作道具槽。
 static func item_requires_friendly_hero_target(data: ItemData) -> bool:
 	return data != null and data.item_id in [
 		"v2_t2_teleport_scroll", "v2_t1_healing_salve",
@@ -1330,7 +1330,7 @@ static func item_requires_friendly_dead_hero_target(data: ItemData) -> bool:
 	return data != null and data.item_id in ["t3_zhaohun_fan", "v2_t3_revive_stone"]
 
 
-## 需要明确选择敌方道具槽的道具；复用 item_slot_targets，不新增联机字段。
+## 需要明确选择敌方道具槽的道具；复用 item_slot_targets，不新增额外字段。
 static func item_requires_enemy_item_slot_target(data: ItemData) -> bool:
 	return data != null and data.item_id in [
 		"t2_shizhi_jiasuo", "t2_yawu_piao", "t2_cuiyong_pai",
@@ -1591,7 +1591,7 @@ const _PENDING_ITEM_EVENTS := "_pending_item_events"
 
 
 ## 本回合第一件道具真正提交前拍下可被天罗撤销的选择期事务状态。
-## 使用现有快照 packer，令该临时快照仍可随 clone/联机快照安全往返。
+## 使用现有快照 packer，令该临时快照仍可随 clone/持久化快照安全往返。
 func _begin_item_transaction(player: int) -> void:
 	if item_buffs[player].has(_ITEM_TX_SNAPSHOT):
 		return
@@ -2206,7 +2206,7 @@ func _fallback_action_to_charge(player: int, actions: Array[int], events: Array)
 
 func _settle_pending_free_switches(affected: Array[bool], events: Array) -> void:
 	# 先同时撤回双方逻辑预览，再按固定玩家序提交或取消；任何一方的离/入场 hook
-	# 都不会读到对手仍停留在选择期预览位，且网络消息到达顺序不影响权威结果。
+	# 都不会读到对手仍停留在选择期预览位，且内部遍历顺序不影响权威结果。
 	for player in [0, 1]:
 		var intents: Array = _pending_free_switches[player]
 		if not intents.is_empty():
@@ -2536,7 +2536,7 @@ func _base_attack_sequence_waits(actions: Array[int], contexts: Array,
 	return waits
 
 
-## 连环鼓把第二行动加入统一序列。若一方在进入该节点前被白额雷音延后，
+## 连环鼓把第二行动加入统一序列。若未来的权威效果在该节点前插入等待，
 ## 另一方的第二行动先单独占一个序位；防御一旦执行，会持续保护到本回合结束。
 ## “下一次攻击”类道具若已在第一阶段攻击中兑现则已消费；力量代价、噬心钉、末日火种等
 ## 明写“本回合/所有攻击”的增益通过 turn_base_attack_total_bonus 保留到第二阶段。
@@ -3204,7 +3204,7 @@ var pve_no_econ: bool = false   # 远征 PvE：锁死局内道具经济（补充
 ## 远征 PvE（任务 D·2026-07-06）：装备栏道具直接入槽·不走经济状态机。
 ## 玩家(P0)前 N 槽 = 装备道具（CHARGING·since=-1 开局即就绪）；其余与怪物(P1)全 EMPTY
 ## （⚠ 用 EMPTY 非 SEALED——SEALED 会被 _econ_unlock 到点解锁触发 3 选 1 draft·PvE 无局内经济）；
-## 同时置 pve_no_econ：EMPTY 槽在 PvP 语义下可花能补充 → PvE 一并锁死（can_refill/can_upgrade 收口）。
+## 同时置 pve_no_econ：远征 EMPTY 槽不可花能补充 → PvE 一并锁死（can_refill/can_upgrade 收口）。
 func pve_equip_init(equipped_ids: Array) -> void:
 	pve_no_econ = true
 	slots = [[], []]
@@ -3599,6 +3599,10 @@ func _preview_item_v2_action_step(player: int, step: Dictionary) -> bool:
 
 
 func submit_item_v2_command_sequence(player: int, sequence: Array) -> bool:
+	# 提交即锁定到本回合结算；PvE 敌方必须在玩家规划前先走同一个不可覆写入口。
+	if player < 0 or player >= item_v2_command_sequences.size() \
+			or not item_v2_command_sequences[player].is_empty():
+		return false
 	if not validate_item_v2_command_sequence(player, sequence):
 		return false
 	var normalized: Array[Dictionary] = []
@@ -3615,6 +3619,14 @@ func submit_item_v2_command_sequence(player: int, sequence: Array) -> bool:
 			step["item_id"] = data.item_id if data != null else ""
 		normalized.append(step)
 	item_v2_command_sequences[player] = normalized
+	return true
+
+
+## 仅供本地调试器在显式改写战局后重新生成公开敌方意图；正式规划流程提交后不可解锁。
+func debug_clear_item_v2_command_sequence(player: int) -> bool:
+	if not item_v2_enabled or player < 0 or player >= item_v2_command_sequences.size():
+		return false
+	item_v2_command_sequences[player] = []
 	return true
 
 
@@ -3946,21 +3958,21 @@ func clone() -> BattleCore:
 	return c
 
 
-# === 联机/持久化快照（联机准备批②·2026-07-12）===
+# === 持久化快照（准备批②·2026-07-12）===
 #
 # to_snapshot()/from_snapshot()：全量战局 ↔ 纯数据 Dictionary。
-# 用途：联机断线重连/观战入场/服务端持久化/录像。设计约束：
+# 用途：本地续局/存档/录像。设计约束：
 #   - 资源引用全部降为可重建数据：HeroData→{id,name,max_hp,skill_type}（恢复优先加载
 #     assets/data/heroes/<id>.tres·无资源文件=白板重建 → 测试/PvE 白板英雄同样可快照）；
 #     ItemData→item_id（ItemCatalog.make 重建独立实例）。
-#   - JSON 安全（网络消息可直接走文本）：数字经 JSON 往返会 int→float，恢复端 _snap_norm 归一；
+#   - JSON 安全：数字经 JSON 往返会 int→float，恢复端 _snap_norm 归一；
 #     rng seed/state 是 64 位整数 → 存字符串（JSON double 在 2^53 以上丢精度）。
-#   - 版本化（网络代码规则：所有消息版本化）：SNAPSHOT_VERSION 不符拒绝恢复。
+#   - 版本化：SNAPSHOT_VERSION 不符拒绝恢复。
 #   - 单线程使用；非热路径（仅重连/落盘时调用，允许分配）。
 #   - ⚠ 新增引擎状态字段必须三处同步：clone() / 本快照对 / test_battle_snapshot.gd（ADR-004）。
 #
 # 用法：
-#   var wire := JSON.stringify(battle.to_snapshot())      # 服务端落盘 / 发给重连客户端
+#   var snapshot_json := JSON.stringify(battle.to_snapshot())  # 保存或回放用快照
 #   var b := BattleCore.new()
 #   if b.from_snapshot(JSON.parse_string(wire)):
 #       b.select_action(0, ...)                           # 恢复后战局含随机流逐位一致，直接续打
@@ -4286,7 +4298,7 @@ static func _snap_unpack_slots(arr: Array) -> Array:
 ##        jianqi_attack?:bool,
 ##        blood_payment?:bool, energy_cap_discount?:bool}]，
 ## target 于 SWITCH=己方替补槽、房日基础攻击=任一存活敌方槽、带目标 ACTIVE（枭阳 h21）=敌方替补槽，其余 -1。
-## 亢金强化波、玄冥双波、蚩尤生命支付与并封减费均展开为显式 choice，供 AI/联机走同一白名单。
+## 亢金强化波、玄冥双波、蚩尤生命支付与并封减费均展开为显式 choice，供玩家与 AI 走同一白名单。
 ## CHARGE 恒合法 → 列表非空。
 func legal_actions(player: int) -> Array:
 	var out: Array = []
@@ -4370,7 +4382,7 @@ func legal_actions(player: int) -> Array:
 ## 提交该玩家动作（封装 select_* 分派）。
 func apply_choice(player: int, choice: Dictionary) -> bool:
 	if bool(choice.get("double", false)):
-		return false   # 旧 h16 双动作字段已退役；联机协议暂保留该字段但 true 必须拒绝
+		return false   # 旧 h16 双动作字段已退役；历史输入若带该字段也必须拒绝
 	var a: int = int(choice["action"])
 	var primary_ok: bool = false
 	if a == ActionDef.ACTIVE:
@@ -5283,7 +5295,7 @@ func _resolve_retroactive_switch_items(events: Array) -> void:
 				int(switch_data.get("to", -1)), events)
 
 
-## h07 千里自在风：每回合一次，任一端为 h07 的主动切换免费（不占动作槽）。在【选择阶段】调用。
+## h07 千里快哉风：每回合一次，任一端为 h07 的主动切换免费（不占动作槽）。在【选择阶段】调用。
 ## 选择期只登记 from→to 意图并更新 active_index 供 UI/动作合法性预览，不执行任何切换 hook；
 ## 双方保护性道具揭示后，未被天罗锁住才由 _settle_pending_free_switches 原子提交全部副作用。
 ## 双向共用同一次数：本回合先切入 h07 后，不能再免费切出，反之亦然。
@@ -5379,7 +5391,7 @@ func chongzhuang(attacker_player: int, events: Array = []) -> void:
 
 
 ## 返回除 excluded_slot 外当前生命最高的存活英雄。并列时保留槽位较小者，避免随机数导致
-## 联机、录像与 AI 推演分歧。
+## 录像与 AI 推演分歧。
 func _highest_hp_living_other(player: int, excluded_slot: int) -> int:
 	var target: int = -1
 	var highest_hp: int = -1
@@ -5999,7 +6011,8 @@ func _resolve_deaths(_a: Array[int], events: Array) -> void:
 
 	# 出战位阵亡 → 待玩家选替补（甲死亡换人）
 	for p in [0, 1]:
-		if hp[p][active_index[p]] <= 0 and living_reserves(p).size() > 0:
+		if hp[p][active_index[p]] <= 0 and living_reserves(p).size() > 0 \
+				and not pending_death_switch[p]:
 			var replacement_armor: int = int(item_mod(p, "death_replacement_shield", 0))
 			if replacement_armor > 0:
 				item_buffs[p]["pending_death_replacement_shield"] = int(

@@ -3,35 +3,21 @@ extends Control
 ## 主菜单 = 晴风驿站功能大厅。远征地表与英雄只承担世界呈现；所有入口仍可直接点击。
 ## 左键点格可让角色在纯展示地图中逐格行走；入口按钮仍是主操作，不创建远征背包或结算状态。
 
-const BP_SCENE := "res://src/ui/bp_screen.tscn"
 const EXPEDITION_SCENE := "res://src/expedition/expedition_screen.tscn"
-const PROFILE_SCENE := "res://src/ui/profile_screen.tscn"
 const BACKPACK_OVERLAY_SCENE := preload("res://src/ui/backpack_screen.tscn")
 const WAREHOUSE_OVERLAY_SCENE := preload("res://src/ui/warehouse_screen.tscn")
 const CODEX_OVERLAY_SCRIPT := preload("res://src/ui/components/battle_codex_overlay.gd")
-const ProfileStore := preload("res://src/core/player_profile.gd")   # 个人资料存档（headless 安全走 preload）
-const RuntimeFeatures := preload("res://src/core/runtime_features.gd")
+const PauseMenuOverlayScript := preload(
+	"res://src/ui/components/pause_menu_overlay.gd")
 
-# ---- 匹配状态机：IDLE 点入口=开始；SEARCHING 再点/ESC/取消钮=取消；FOUND 锁输入。----
-# 本地用 mock_match_seconds 定时模拟匹配成功；联机时把定时器换成真匹配回调，状态机原样复用。
-enum MatchState { IDLE, SEARCHING, FOUND }
-enum PrimaryMode { MATCH, EXPEDITION }
+var _transitioning: bool = false
 
-## 本地测试模拟匹配时长（秒）。联机接入后弃用。
-@export var mock_match_seconds: float = 3.0
-
-var _match_state: int = MatchState.IDLE
-var _search_elapsed: float = 0.0
-var _last_secs: int = -1     # 匹配中 tooltip 计时秒数（变化时才更新）
-var _cancel_btn: Button   # 匹配中才出现的「✕ 取消匹配」（_setup_modes 建·常态隐藏）
-
-## 小件像素底板（设置/退出/底坞导航/段位徽章用）。
+## 小件像素底板（底坞导航用）。
 ## 2026-06-13 Eddy 选 B「典籍朱印」全局铺；2026-07-13 换 GPT 导航钮贴图
 ## （米金纸面+角上回纹折·9-slice 中段平铺·jelly 程序板/STEEL 色组退役）。
 const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")   # 235×55·v14 净面版（2026-07-16 Eddy 定内饰多余·img_inner_clear 去回纹钩+内线·只留深咖外框+净纸面）
 const CODEX_ICON_TEX := preload("res://assets/ui/icons/codex_book.png")
 const BACKPACK_ICON_TEX := preload("res://assets/ui/icons/backpack.png")
-const BATTLE_BANNER_TEX := preload("res://assets/ui/main_menu/battle_banner.png")
 const EXPEDITION_BANNER_TEX := preload("res://assets/ui/main_menu/expedition_banner.png")
 const CODEX_JELLY_SHADER := preload("res://assets/shaders/canvas_button_jelly.gdshader")
 const MODE_BANNER_FRAME_SHADER := preload(
@@ -43,84 +29,30 @@ const BATTLE_UI_FILL_BOTTOM := Color(0.76, 0.68, 0.50)
 const BATTLE_UI_EDGE_INNER := Color(1.0, 0.95, 0.80)
 const BATTLE_UI_EDGE_OUTER := Color(0.1, 0.09, 0.11)
 const DOCK_BUTTON_SIZE := Vector2(108.0, 108.0)
-const MODE_SWITCH_SIZE := Vector2(72.0, 72.0)
-const PIXEL_FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")   # 身份带悬停金晕外环
 const NAV_PLATE_MARGIN_X := 22.0   # 9-slice 边距（v14 净面后内里全纸·任意≥框厚均可·沿用实钩期数值）
 const NAV_PLATE_MARGIN_Y := 20.0
 const INK := Color(0.20, 0.14, 0.08)        # 墨（羊皮上的字/图标）
 const CREAM := Color(0.95, 0.91, 0.80)      # 暖米白（直接压在暗波上的字·非羊皮上）
 
 
-## 单Banner模式选择采用轮播语义：大块箭头指向下一个模式，双页码显示当前位置。
-## 箭头由整数坐标块组成，不依赖外部switch图标，也不会引入平滑矢量观感。
-class ModeCarouselGlyph extends Control:
-	const GLYPH_INK := Color(0.20, 0.14, 0.08)
-	const GLYPH_ACTIVE := Color(0.78, 0.53, 0.18)
-	const GLYPH_MUTED := Color(0.20, 0.14, 0.08, 0.28)
-
-	var selected_index: int = 0
-
-	func _ready() -> void:
-		mouse_filter = Control.MOUSE_FILTER_IGNORE
-		resized.connect(queue_redraw)
-
-	func set_selected_index(value: int) -> void:
-		selected_index = clampi(value, 0, 1)
-		queue_redraw()
-
-	func _draw() -> void:
-		if size.x <= 0.0 or size.y <= 0.0:
-			return
-		var glyph_offset := (size - Vector2(56.0, 56.0)) * 0.5
-		var arrow := PackedVector2Array([
-			Vector2(9.0, 20.0), Vector2(27.0, 20.0),
-			Vector2(27.0, 15.0), Vector2(34.0, 15.0),
-			Vector2(34.0, 18.0), Vector2(41.0, 18.0),
-			Vector2(41.0, 21.0), Vector2(49.0, 21.0),
-			Vector2(49.0, 33.0), Vector2(41.0, 33.0),
-			Vector2(41.0, 36.0), Vector2(34.0, 36.0),
-			Vector2(34.0, 39.0), Vector2(27.0, 39.0),
-			Vector2(27.0, 34.0), Vector2(9.0, 34.0),
-		])
-		for index: int in arrow.size():
-			arrow[index] += glyph_offset
-		if selected_index == 1:
-			for index: int in arrow.size():
-				arrow[index].x = size.x - arrow[index].x
-		draw_colored_polygon(arrow, GLYPH_INK)
-		for index: int in 2:
-			var pip_color := GLYPH_ACTIVE if index == selected_index else GLYPH_MUTED
-			draw_rect(Rect2(glyph_offset + Vector2(18.0 + index * 15.0, 46.0),
-					Vector2(8.0, 5.0)), pip_color)
-
-@onready var _match_entry: Button = $UI/ModeBanner
-@onready var _mode_switch: Button = $UI/ModeSwitch
+@onready var _expedition_entry: Button = $UI/ModeBanner
 @onready var _menu_world: MainMenuWorld = $MenuWorld
 
 var _backpack_overlay: BackpackScreen
 var _warehouse_overlay: WarehouseScreen
 var _codex_overlay: Control
-var _primary_mode: int = PrimaryMode.MATCH if RuntimeFeatures.PVP_ENABLED \
-		else PrimaryMode.EXPEDITION
-
-
 func _ready() -> void:
-	if not RuntimeFeatures.PVP_ENABLED:
-		BattleSetup.close_net_session()
 	_build_vignette()
-	_setup_identity()
-	_setup_settings()
+	_setup_version_label()
 	_setup_modes()
 	_setup_dock()
 	_setup_backpack_overlay()
 	_setup_warehouse_overlay()
 	_setup_codex_overlay()
-	# 设置面板仍通过既有广播刷新主界面颜色，世界组件只重绘视觉层。
-	add_to_group("wave_flow_bg")
 	_play_intro()
 
 
-## 设置面板翻转界面主色时由既有广播触发。
+## 重绘主界面世界层的状态相关颜色。
 func refresh_colors() -> void:
 	_menu_world.refresh_colors()
 
@@ -156,130 +88,26 @@ func _build_vignette() -> void:
 	move_child(vig, 1)   # MenuWorld(0) < Vignette(1) < UI(2)
 
 
-## 顶左身份带：新版 item_frame 头像+名字+段位占位，整体=资料入口。
-## 可点性三重反馈（Eddy 反馈"分不清能不能点"）：整带 ButtonJuice（悬停轻放大+手型金晕指针）
-## + 悬停头像金晕外环（全游戏点选同语言·暗波底=淡金档）。
-func _setup_identity() -> void:
-	var btn: Button = $UI/IdentityButton
-	for s in ["normal", "hover", "pressed", "focus", "disabled"]:
-		btn.add_theme_stylebox_override(s, StyleBoxEmpty.new())
-	var avatar := $UI/IdentityButton/AvatarFrame as ItemAvatarFrame
-	avatar.portrait_path = ProfileStore.avatar_portrait_path()   # 资料存档选的头像英雄（缺图回落 h01）
-	# ItemAvatarFrame 默认独立接收输入；身份带由父 Button 统一响应，故显式放行。
-	avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var name_lbl: Label = $UI/IdentityButton/NameLabel
-	FontManager.apply(name_lbl, 26)
-	name_lbl.add_theme_color_override("font_color", CREAM)   # 直接压暗波上→暖米白
-	name_lbl.text = ProfileStore.get_player_name()
-	# 悬停金晕外环：衬在头像框外圈（暗波底=淡金 fff0a0·图鉴亮纸才用深金 dca12e）
-	var ring := ColorRect.new()
-	ring.name = "HoverRing"
-	ring.color = Color.WHITE
-	ring.position = avatar.position - Vector2(5, 5)
-	ring.size = avatar.frame_size + Vector2(10, 10)
-	var rm := ShaderMaterial.new()
-	rm.shader = PIXEL_FRAME_SHADER
-	var gold := Color("fff0a0")
-	rm.set_shader_parameter("edge_outer", gold.darkened(0.1))   # 外露带整条是金（深咖会读成黑圈）
-	rm.set_shader_parameter("edge_mid", gold)
-	rm.set_shader_parameter("edge_inner", gold.darkened(0.5))
-	rm.set_shader_parameter("pixel_grid", (avatar.frame_size.x + 10.0) / 6.0)
-	rm.set_shader_parameter("border_px", 2.0)
-	rm.set_shader_parameter("noise_amt", 0.05)
-	rm.set_shader_parameter("light_amount", 0.18)
-	rm.set_shader_parameter("aspect", 1.0)
-	rm.set_shader_parameter("corner_radius", 0.18)
-	ring.material = rm
-	ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	ring.visible = false
-	btn.add_child(ring)
-	btn.move_child(ring, 0)   # 环衬在头像框之后（只露外扩带）
-	btn.mouse_entered.connect(func() -> void: ring.visible = true)
-	btn.mouse_exited.connect(func() -> void: ring.visible = false)
-	_attach_juice(btn)   # 悬停轻放大+按压反馈+手型金晕指针（导航钮同手感）
-	var rank_lbl: Label = $UI/IdentityButton/RankLabel
-	rank_lbl.visible = RuntimeFeatures.PVP_ENABLED
-	if RuntimeFeatures.PVP_ENABLED:
-		FontManager.apply(rank_lbl, 16)
-		rank_lbl.add_theme_color_override("font_color", INK)     # 段位章在羊皮板上→墨字
-		_add_plate_bg(rank_lbl)
-		# 段位盾徽（icon 排查清单·先程序绘制占位）
-		var shield := TextureRect.new()
-		shield.name = "RankIcon"
-		shield.texture = PixelGlyphs.icon_texture("shield")
-		shield.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		shield.stretch_mode = TextureRect.STRETCH_SCALE
-		shield.position = Vector2(6, 9)
-		shield.size = Vector2(16, 16)
-		shield.modulate = INK
-		shield.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		rank_lbl.add_child(shield)
-	btn.pressed.connect(_on_profile_pressed)
-
-
-## 个人资料入口：波幕转场（menu↔profile 同图鉴语言）。匹配中不离队。
-func _on_profile_pressed() -> void:
-	if _match_state != MatchState.IDLE:
-		return
-	TransitionManager.transition_to(PROFILE_SCENE)
-
-
-func _setup_settings() -> void:
-	var btn: Button = $UI/SettingsButton
-	FontManager.apply_btn(btn, 22)
-	btn.add_theme_color_override("font_color", INK)   # 羊皮板上→墨字
-	_apply_plate(btn)
-	_set_btn_left_margin(btn, 36.0)   # 文字让出左侧 icon
-	_add_icon(btn, Rect2(14, 11, 32, 32), "gear")
-	btn.pressed.connect(_open_settings)
-	_attach_juice(btn)
-
-	# 退出游戏（PC 必备·2026-06-11 icon 排查补缺）
-	var quit_btn: Button = $UI/QuitButton
-	FontManager.apply_btn(quit_btn, 22)
-	quit_btn.add_theme_color_override("font_color", INK)
-	_apply_plate(quit_btn)
-	_set_btn_left_margin(quit_btn, 32.0)
-	_add_icon(quit_btn, Rect2(10, 11, 32, 32), "exit")
-	quit_btn.pressed.connect(func() -> void: get_tree().quit())
-	_attach_juice(quit_btn)
-
+func _setup_version_label() -> void:
 	# 版本号（角落惯例·报 bug 定位用）·压暗波上→暖灰
 	var ver: Label = $UI/VersionLabel
 	FontManager.apply(ver, 14)
 	ver.add_theme_color_override("font_color", Color(0.74, 0.66, 0.52, 0.6))
 
 
-## 打开设置弹框（单例·已开则忽略）。改动即时应用 + 持久化，颜色翻转实时刷新背景。
-func _open_settings() -> void:
-	if has_node("SettingsPanel"):
-		return
-	var panel := SettingsPanel.new()
-	panel.name = "SettingsPanel"
-	add_child(panel)
-
-
-## 匹配与远征共用一个Banner主入口；右侧小钮只切换当前模式，不直接启动。
+## 当前产品只保留远征主入口；图鉴、背包和仓库仍是底部独立入口。
 func _setup_modes() -> void:
 	_setup_mode_banner_button()
-	_setup_mode_carousel_button()
-	_match_entry.pressed.connect(_on_mode_banner_pressed)
-	_mode_switch.visible = RuntimeFeatures.PVP_ENABLED
-	_mode_switch.disabled = not RuntimeFeatures.PVP_ENABLED
-	if RuntimeFeatures.PVP_ENABLED:
-		_mode_switch.pressed.connect(_on_mode_switch_pressed)
-	_refresh_mode_banner()
-	if RuntimeFeatures.PVP_ENABLED:
-		_build_cancel_button()
-		_build_net_button()
-	_match_entry.grab_focus()
+	_expedition_entry.pressed.connect(_on_expedition_pressed)
+	_expedition_entry.tooltip_text = tr("远征")
+	_expedition_entry.grab_focus()
 
 
 func _setup_mode_banner_button() -> void:
-	_match_entry.text = ""
-	_match_entry.clip_contents = false
+	_expedition_entry.text = ""
+	_expedition_entry.clip_contents = false
 	for state: String in ["normal", "hover", "pressed", "focus", "disabled"]:
-		_match_entry.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+		_expedition_entry.add_theme_stylebox_override(state, StyleBoxEmpty.new())
 
 	var bg := ColorRect.new()
 	bg.name = "Bg"
@@ -294,7 +122,7 @@ func _setup_mode_banner_button() -> void:
 	material.set_shader_parameter("pixel_grid", 38.0)
 	material.set_shader_parameter("corner", 0.08)
 	material.set_shader_parameter("edge_px", 2.0)
-	material.set_shader_parameter("aspect", _match_entry.size.x / _match_entry.size.y)
+	material.set_shader_parameter("aspect", _expedition_entry.size.x / _expedition_entry.size.y)
 	material.set_shader_parameter("noise_amt", 0.08)
 	material.set_shader_parameter("wear", 0.24)
 	material.set_shader_parameter("solid_rim", true)
@@ -303,12 +131,13 @@ func _setup_mode_banner_button() -> void:
 	bg.show_behind_parent = true
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_match_entry.add_child(bg)
-	_attach_bottom_shadow(_match_entry)
+	_expedition_entry.add_child(bg)
+	_attach_bottom_shadow(_expedition_entry)
 	bg.visible = false
 
 	var banner := TextureRect.new()
 	banner.name = "Banner"
+	banner.texture = EXPEDITION_BANNER_TEX
 	banner.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	banner.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	banner.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
@@ -317,11 +146,11 @@ func _setup_mode_banner_button() -> void:
 	image_material.shader = MODE_BANNER_FRAME_SHADER
 	image_material.set_shader_parameter("pixel_grid", 38.0)
 	image_material.set_shader_parameter("corner", 0.08)
-	image_material.set_shader_parameter("aspect", _match_entry.size.x / _match_entry.size.y)
+	image_material.set_shader_parameter("aspect", _expedition_entry.size.x / _expedition_entry.size.y)
 	banner.material = image_material
 	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_match_entry.add_child(banner)
-	_attach_juice(_match_entry)
+	_expedition_entry.add_child(banner)
+	_attach_juice(_expedition_entry)
 
 	var frame_overlay := ColorRect.new()
 	frame_overlay.name = "FrameOverlay"
@@ -336,7 +165,7 @@ func _setup_mode_banner_button() -> void:
 	overlay_material.set_shader_parameter("pixel_grid", 38.0)
 	overlay_material.set_shader_parameter("corner", 0.08)
 	overlay_material.set_shader_parameter("edge_px", 2.0)
-	overlay_material.set_shader_parameter("aspect", _match_entry.size.x / _match_entry.size.y)
+	overlay_material.set_shader_parameter("aspect", _expedition_entry.size.x / _expedition_entry.size.y)
 	overlay_material.set_shader_parameter("noise_amt", 0.0)
 	overlay_material.set_shader_parameter("wear", 0.0)
 	overlay_material.set_shader_parameter("solid_rim", true)
@@ -344,104 +173,14 @@ func _setup_mode_banner_button() -> void:
 	frame_overlay.material = overlay_material
 	frame_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	frame_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_match_entry.add_child(frame_overlay)
+	_expedition_entry.add_child(frame_overlay)
 
 
-func _setup_mode_carousel_button() -> void:
-	_mode_switch.text = ""
-	_mode_switch.clip_contents = false
-	for state: String in ["normal", "hover", "pressed", "focus", "disabled"]:
-		_mode_switch.add_theme_stylebox_override(state, StyleBoxEmpty.new())
-
-	var bg := ColorRect.new()
-	bg.name = "Bg"
-	bg.color = Color.WHITE
-	var material := ShaderMaterial.new()
-	material.shader = CODEX_JELLY_SHADER
-	material.set_shader_parameter("fill_top", BATTLE_UI_FILL_TOP)
-	material.set_shader_parameter("fill_bottom", BATTLE_UI_FILL_BOTTOM)
-	material.set_shader_parameter("edge_inner", BATTLE_UI_EDGE_INNER)
-	material.set_shader_parameter("edge_outer", BATTLE_UI_EDGE_OUTER)
-	material.set_shader_parameter("fill_alpha", 1.0)
-	material.set_shader_parameter("pixel_grid", 38.0)
-	material.set_shader_parameter("corner", 0.16)
-	material.set_shader_parameter("edge_px", 2.0)
-	material.set_shader_parameter("aspect", _mode_switch.size.x / _mode_switch.size.y)
-	material.set_shader_parameter("noise_amt", 0.08)
-	material.set_shader_parameter("wear", 0.24)
-	material.set_shader_parameter("solid_rim", true)
-	material.set_shader_parameter("rim_px", 1.5)
-	bg.material = material
-	bg.show_behind_parent = true
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_mode_switch.add_child(bg)
-
-	var glyph := ModeCarouselGlyph.new()
-	glyph.name = "CarouselGlyph"
-	glyph.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_mode_switch.add_child(glyph)
-	_attach_juice(_mode_switch)
-	_attach_bottom_shadow(_mode_switch)
-
-
-func _refresh_mode_banner() -> void:
-	if not RuntimeFeatures.PVP_ENABLED:
-		_primary_mode = PrimaryMode.EXPEDITION
-	var is_match: bool = _primary_mode == PrimaryMode.MATCH
-	var texture: Texture2D = BATTLE_BANNER_TEX if is_match else EXPEDITION_BANNER_TEX
-	(_match_entry.get_node("Banner") as TextureRect).texture = texture
-	(_mode_switch.get_node("CarouselGlyph") as ModeCarouselGlyph).set_selected_index(
-			0 if is_match else 1)
-	_match_entry.tooltip_text = tr("匹配") if is_match else tr("远征")
-	_mode_switch.tooltip_text = tr("切换至远征") if is_match else tr("切换至匹配")
-
-
-func _on_mode_banner_pressed() -> void:
-	if not RuntimeFeatures.PVP_ENABLED:
-		_on_expedition_pressed()
-		return
-	if _primary_mode == PrimaryMode.MATCH:
-		_on_match_pressed()
-	else:
-		_on_expedition_pressed()
-
-
-func _on_mode_switch_pressed() -> void:
-	if not RuntimeFeatures.PVP_ENABLED:
-		return
-	if _match_state != MatchState.IDLE:
-		return
-	_primary_mode = PrimaryMode.EXPEDITION \
-			if _primary_mode == PrimaryMode.MATCH else PrimaryMode.MATCH
-	_refresh_mode_banner()
-
-
-## M1：局域网对战入口移至右上设置下方，不与中央模式Banner抢层级。
-func _build_net_button() -> void:
-	if not RuntimeFeatures.PVP_ENABLED:
-		return
-	var b := Button.new()
-	b.name = "NetLobbyButton"
-	b.text = tr("联机对战·局域网")
-	b.position = Vector2(1652, 108)
-	b.size = Vector2(220, 52)
-	FontManager.apply_btn(b, 16)
-	b.add_theme_color_override("font_color", INK)
-	_apply_plate(b)
-	_set_btn_left_margin(b, 38.0)
-	_add_icon(b, Rect2(12, 12, 28, 28), "duel")
-	_attach_juice(b)
-	b.pressed.connect(func() -> void:
-		if _match_state == MatchState.IDLE:
-			TransitionManager.transition_to("res://src/ui/net_lobby_screen.tscn"))
-	$UI.add_child(b)
-
-
-## 远征模式入口：四石依次发光并维持各自光柱，随后底部波幕上涌。匹配中不离队。
+## 远征入口：四石依次发光并维持各自光柱，随后底部波幕上涌。
 func _on_expedition_pressed() -> void:
-	if _match_state != MatchState.IDLE:
+	if _transitioning:
 		return
+	_transitioning = true
 	_set_mode_entries_enabled(false)
 	await _menu_world.play_portal_activation(
 			MainMenuWorld.PORTAL_ENERGY_GOLD, MainMenuWorld.PORTAL_ACTIVATION_DURATION)
@@ -451,68 +190,6 @@ func _on_expedition_pressed() -> void:
 	if is_instance_valid(self):
 		await TransitionManager.portal_transition_to(
 				EXPEDITION_SCENE, MainMenuWorld.PORTAL_ENERGY_GOLD)
-
-
-## 「✕ 取消匹配」独立小钮（匹配中才出现·匹配入口正下方居中）。
-## 不再挤在副标小字里（2026-06-12 Eddy："取消匹配感觉不明显"根修）。
-func _build_cancel_button() -> void:
-	var card := $UI/ModeBanner as Control
-	_cancel_btn = Button.new()
-	_cancel_btn.name = "CancelMatchButton"
-	_cancel_btn.text = tr("✕ 取消匹配")
-	var btn_size := Vector2(220, 52)
-	_cancel_btn.position = Vector2(
-		card.position.x + (card.size.x - btn_size.x) * 0.5,
-		card.position.y - 68.0)
-	_cancel_btn.size = btn_size
-	for s in ["normal", "hover", "pressed", "focus", "disabled"]:
-		_cancel_btn.add_theme_stylebox_override(s, StyleBoxEmpty.new())
-	FontManager.apply_btn(_cancel_btn, 22)
-	_cancel_btn.add_theme_color_override("font_color", Color("#e86060"))
-	_cancel_btn.add_theme_color_override("font_hover_color", Color("#ff8a7a"))
-	# 红描边 + 深底（图鉴返回钮同范式·装饰必须 IGNORE 防吞点击）
-	var edge := ColorRect.new()
-	edge.color = Color(0.83, 0.30, 0.27, 0.65)
-	edge.show_behind_parent = true
-	edge.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	edge.offset_left = -2
-	edge.offset_top = -2
-	edge.offset_right = 2
-	edge.offset_bottom = 2
-	edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_cancel_btn.add_child(edge)
-	var backing := ColorRect.new()
-	backing.color = Color(0.08, 0.05, 0.06, 0.94)
-	backing.show_behind_parent = true
-	backing.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_cancel_btn.add_child(backing)
-	_cancel_btn.visible = false
-	_cancel_btn.pressed.connect(_on_cancel_btn_pressed)
-	_attach_juice(_cancel_btn)
-	$UI.add_child(_cancel_btn)
-
-
-func _on_cancel_btn_pressed() -> void:
-	if _match_state == MatchState.SEARCHING:
-		_cancel_search()
-
-
-## 取消钮显隐：出现=淡入上浮；收起=即时隐藏（取消瞬间不该有残影挡点击）。
-func _show_cancel_button(on: bool) -> void:
-	var home_y: float = ($UI/ModeBanner as Control).position.y - 68.0
-	if not on:
-		_cancel_btn.visible = false
-		_cancel_btn.position.y = home_y
-		return
-	_cancel_btn.visible = true
-	_cancel_btn.modulate.a = 0.0
-	_cancel_btn.position.y = home_y + 14.0
-	var tw := create_tween().set_parallel(true)
-	tw.tween_property(_cancel_btn, "modulate:a", 1.0, 0.25)
-	tw.tween_property(_cancel_btn, "position:y", home_y, 0.3)\
-		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-
 
 ## 图鉴、背包与仓库保持为屏幕底部的独立直接入口。
 func _setup_dock() -> void:
@@ -536,12 +213,8 @@ func get_bottom_ui_layout_contract() -> Dictionary:
 		"secondary_tabs_partially_offscreen": false,
 		"reuses_battle_ui_palette": true,
 		"uses_grid_anchor_outline": false,
-		"banner_rect": Rect2(_match_entry.position, _match_entry.size),
-		"switch_rect": Rect2(_mode_switch.position, _mode_switch.size),
-		"switch_overlaps_banner_edge": _mode_switch.position.x \
-				< _match_entry.position.x + _match_entry.size.x,
+		"banner_rect": Rect2(_expedition_entry.position, _expedition_entry.size),
 		"shortcut_size": DOCK_BUTTON_SIZE,
-		"switch_size": MODE_SWITCH_SIZE,
 		"frame_fill_top": BATTLE_UI_FILL_TOP,
 		"frame_fill_bottom": BATTLE_UI_FILL_BOTTOM,
 		"frame_edge_inner": BATTLE_UI_EDGE_INNER,
@@ -654,9 +327,9 @@ func _attach_bottom_shadow(btn: Button) -> void:
 	btn.move_child(shadow, 0)
 
 
-## 统一图鉴入口：与背包一致地覆盖在当前主界面上；匹配中不打开。
+## 统一图鉴入口：与背包一致地覆盖在当前主界面上；转场中不打开。
 func _on_codex_pressed() -> void:
-	if _match_state != MatchState.IDLE:
+	if _transitioning:
 		return
 	if _backpack_overlay.visible:
 		_backpack_overlay.close()
@@ -669,7 +342,7 @@ func _on_codex_pressed() -> void:
 
 
 func _on_backpack_pressed() -> void:
-	if _match_state != MatchState.IDLE:
+	if _transitioning:
 		return
 	if _codex_overlay.visible:
 		_codex_overlay.call("close")
@@ -679,7 +352,7 @@ func _on_backpack_pressed() -> void:
 
 
 func _on_warehouse_pressed() -> void:
-	if _match_state != MatchState.IDLE:
+	if _transitioning:
 		return
 	if _codex_overlay.visible:
 		_codex_overlay.call("close")
@@ -705,8 +378,7 @@ func _play_intro() -> void:
 ## 入口入场：远征主入口先出现，其余入口与边缘件跟进。
 func _animate_in() -> void:
 	var order: Array = [
-		$UI/ModeBanner, $UI/ModeSwitch,
-		$UI/IdentityButton, $UI/QuitButton, $UI/SettingsButton,
+		$UI/ModeBanner,
 		$UI/NavHeroes, $UI/NavBackpack, $UI/NavWarehouse,
 	]
 	var step := 0.0
@@ -725,121 +397,20 @@ func _animate_in() -> void:
 		tp.tween_interval(delay)
 		tp.tween_property(b, "position", home, 0.44).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		step += 0.07
-
-
-func _on_match_pressed() -> void:
-	if not RuntimeFeatures.PVP_ENABLED:
-		return
-	match _match_state:
-		MatchState.IDLE:
-			_begin_match_entry()
-		MatchState.SEARCHING:
-			_cancel_search()   # 点卡仍可取消（取消钮是主把手，这是顺手路径）
-		MatchState.FOUND:
-			pass
-
-
-func _begin_match_entry() -> void:
-	if not RuntimeFeatures.PVP_ENABLED:
-		return
-	_start_search()
-
-
-## ESC 取消匹配（与取消钮/再点入口等价）。
 func _unhandled_input(event: InputEvent) -> void:
-	if _match_state == MatchState.SEARCHING and event.is_action_pressed("ui_cancel"):
-		_cancel_search()
-
-
-# ============================================================
-# 匹配状态机：正计时 → 四石连接完成 → 四束光柱 → 底部波幕传送
-# ============================================================
-
-func _start_search() -> void:
-	if not RuntimeFeatures.PVP_ENABLED:
+	if not event.is_action_pressed("ui_cancel") or has_node("PauseMenu"):
 		return
-	_match_state = MatchState.SEARCHING
-	_search_elapsed = 0.0
-	_last_secs = -1
-	_set_mode_entries_enabled(true)
-	_set_side_cards_enabled(false)
-	_set_match_button_emphasized(true)
-	_set_match_button_status("匹配中", "0:00")
-	_menu_world.begin_portal_search(MainMenuWorld.PORTAL_ENERGY_BLUE)
-	_show_cancel_button(true)
-
-
-func _cancel_search() -> void:
-	_match_state = MatchState.IDLE
-	_set_match_button_emphasized(false)
-	_set_match_button_status("匹配", "")
-	_menu_world.reset_portal_energy()
-	_show_cancel_button(false)
-	_set_side_cards_enabled(true)
-	_menu_world.reset_home()
-
-
-## 匹配中每帧只维护状态计时；底栏保持纯图标，计时写入悬停提示。
-func _process(delta: float) -> void:
-	if _match_state != MatchState.SEARCHING:
+	if _backpack_overlay.visible or _warehouse_overlay.visible or _codex_overlay.visible:
 		return
-	_search_elapsed += delta
-	var secs := int(_search_elapsed)
-	if secs != _last_secs:
-		_last_secs = secs
-		_set_match_button_status("匹配中",
-				"%d:%02d" % [floori(secs / 60.0), secs % 60])
-	if _search_elapsed >= mock_match_seconds:
-		_on_match_found()
-
-
-## 匹配成功：第四石接入并与前三束共同维持，再由底部波幕传送进备战。
-func _on_match_found() -> void:
-	if not RuntimeFeatures.PVP_ENABLED:
-		return
-	_match_state = MatchState.FOUND
-	_menu_world.complete_portal_connection(MainMenuWorld.PORTAL_ENERGY_BLUE)
-	_set_match_button_status("已找到", "")
-	_show_cancel_button(false)
-	_flash_dock_button(_match_entry)
-	await _menu_world.wait_for_portal_beams()
-	if is_instance_valid(self):
-		await TransitionManager.portal_transition_to(
-				BP_SCENE, MainMenuWorld.PORTAL_ENERGY_BLUE)
-
-
-## 匹配中远征入口压暗禁点；底栏与设置保持可用。
-func _set_side_cards_enabled(on: bool) -> void:
-	_mode_switch.disabled = not on
-	var tw := create_tween()
-	tw.tween_property(_mode_switch, "modulate",
-		Color.WHITE if on else Color(0.55, 0.55, 0.55), 0.25)\
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	get_viewport().set_input_as_handled()
+	var pause_menu := PauseMenuOverlayScript.new() as CanvasLayer
+	pause_menu.name = "PauseMenu"
+	add_child(pause_menu)
 
 
 func _set_mode_entries_enabled(on: bool) -> void:
-	for entry: Button in [
-		$UI/ModeBanner as Button,
-		$UI/ModeSwitch as Button,
-	]:
-		entry.disabled = not on
+	_expedition_entry.disabled = not on
 
-
-func _set_match_button_status(title: String, timer_text: String) -> void:
-	_match_entry.tooltip_text = tr(title) if timer_text.is_empty() \
-			else "%s %s" % [tr(title), timer_text]
-
-
-func _set_match_button_emphasized(on: bool) -> void:
-	var banner := _match_entry.get_node_or_null("Banner") as TextureRect
-	if banner != null:
-		banner.self_modulate = Color("FFD4B8") if on else Color.WHITE
-
-
-func _flash_dock_button(button: Button) -> void:
-	var tween := create_tween().bind_node(button)
-	tween.tween_property(button, "modulate", Color(1.0, 0.82, 0.58), 0.08)
-	tween.tween_property(button, "modulate", Color.WHITE, 0.14)
 
 # ============================================================
 # 小件样式辅助
@@ -852,7 +423,7 @@ func _apply_plate(btn: Button) -> void:
 	btn.add_child(_make_plate_bg())
 
 
-## 给任意 Control（如段位 Label）衬导航钮贴图底板。
+## 给任意 Control（如副标题 Label）衬导航钮贴图底板。
 func _add_plate_bg(ctrl: Control) -> void:
 	ctrl.add_child(_make_plate_bg())
 

@@ -7,7 +7,7 @@ shader_type canvas_item;
 //   ── 冷暖双版（warm uniform，由 mode_card 据背景胜方色绑定）──
 //     warm=0 冷夜版：深蓝紫夜空 + 明月 + 散星 + 月光冷云 —— 配【蓝色】对波背景。
 //     warm=1 暖日版：暖金黎明天 + 暖阳 + 无星 + 暖金云 ——     配【红色】对波背景。
-//   像素语言与 wave_clash（对波卡）统一：格点量化 + Bayer 4x4 dither + 像素台阶圆角自切。
+//   像素语言与波流 shader 统一：格点量化 + Bayer 4x4 dither + 像素台阶圆角自切。
 //   ⚠ Godot clip_children 不执行父节点自定义 shader → 圆角必须本层自切（corner_radius/corner_grid）。
 //   片元无动态分支：山脊覆盖用 step()/mix()（4 层固定循环）。
 // 时间驱动: mode_card.gd 每帧把 anim_time 累加 → 各层视差横移（近快远慢）+ 云气漂移 + 星辰闪烁。

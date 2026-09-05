@@ -1,9 +1,9 @@
 extends GutTest
 
-## UI 只读边界守卫（联机准备批③·2026-07-12）：src/ui 不得对引擎战局状态做字段赋值
+## UI 只读边界守卫（2026-07-12）：src/ui 不得对引擎战局状态做字段赋值
 ## （含 +=/-= 等复合赋值），状态变更一律走 BattleCore 命令面（select_action/use_slot/
-## pick_draft/execute_death_switch/...）。联机后 UI=纯展示端，此边界即"客户端不可信"的本地版。
-## 白名单：src/ui/debug/（开发调试面·体检 A2 拆出·联机时整体禁用）。
+## pick_draft/execute_death_switch/...）。UI 只通过命令与信号请求状态变化。
+## 白名单：src/ui/debug/（开发调试面·体检 A2 拆出）。
 ## 规则源=.claude/rules/ui-code.md + 体检 A2「拆出后 UI 只读可一条 grep 断言」——本测试即那条断言。
 ## 已知盲区：嵌套下标写法（battle.hp[battle.active_index[p]] = x）不在简式正则覆盖内·守卫是绊索非证明。
 

@@ -25,7 +25,6 @@ func _ready() -> void:
 	BattleSetup.p2_heroes = [_hero("h03"), _hero("h05"), _hero("h06")]
 	BattleSetup.overtime = false
 	BattleSetup.pve_mode = false
-	BattleSetup.net_session = null
 
 	var screen: Node = load("res://src/ui/battle_screen1.tscn").instantiate()
 	add_child(screen)

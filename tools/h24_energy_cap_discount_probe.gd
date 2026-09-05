@@ -21,7 +21,6 @@ func _ready() -> void:
 	BattleSetup.p2_heroes = [_hero("h02"), _hero("h08"), _hero("h12")]
 	BattleSetup.overtime = false
 	BattleSetup.pve_mode = false
-	BattleSetup.net_session = null
 
 	var screen: Node = load("res://src/ui/battle_screen1.tscn").instantiate()
 	add_child(screen)
@@ -111,7 +110,7 @@ func _ready() -> void:
 	get_viewport().get_texture().get_image().save_png(
 		ProbeOutput.path("h24_h05_stacked_branches.png"))
 
-	# 蚩尤与并封叠加后，若行动已无法改回能量支付，关闭天不葬必须被阻止。
+	# 蚩尤与并封叠加后，若行动已无法改回能量支付，关闭血铸荼蘼必须被阻止。
 	screen.btn_attack.pressed.emit()
 	await get_tree().process_frame
 	screen.battle.energy[screen.PLAYER] = 0

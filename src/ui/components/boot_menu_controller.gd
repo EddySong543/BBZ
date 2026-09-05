@@ -3,7 +3,6 @@ extends Control
 
 signal start_game_requested
 signal load_game_requested
-signal settings_requested
 signal quit_requested
 
 @export_group("External Links")
@@ -20,8 +19,6 @@ signal quit_requested
 @onready var _steam_button: Button = $SmallButtons/Steam
 @onready var _discord_button: Button = $SmallButtons/Discord
 @onready var _qq_button: Button = $SmallButtons/QQ
-@onready var _settings_button: Button = get_node_or_null(
-	"SmallButtons/Settings") as Button
 @onready var _feedback_button: Button = $SmallButtons/Feedback
 @onready var _status_label: Label = $StatusLabel
 
@@ -89,8 +86,6 @@ func _connect_actions() -> void:
 		func() -> void: _open_external("Discord", discord_url))
 	_qq_button.pressed.connect(
 		func() -> void: _open_external("QQ", qq_url))
-	if _settings_button != null:
-		_settings_button.pressed.connect(settings_requested.emit)
 	_feedback_button.pressed.connect(
 		func() -> void: _open_external("问题反馈", feedback_url))
 
@@ -146,12 +141,9 @@ func _configure_focus() -> void:
 
 
 func _small_buttons() -> Array[Button]:
-	var buttons: Array[Button] = [
+	return [
 		_steam_button,
 		_discord_button,
 		_qq_button,
 		_feedback_button,
 	]
-	if _settings_button != null:
-		buttons.insert(3, _settings_button)
-	return buttons

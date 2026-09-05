@@ -496,19 +496,13 @@ func _make_selection_pointer(box: float) -> Control:
 
 func _make_item_stat_badge(
 		badge_name: String, texture: Texture2D, hframes: int, vframes: int,
-		number: int, position: Vector2, badge_size: Vector2,
-		font_size: int) -> IconBadge:
+		number: int, kind: StringName, layout: Dictionary) -> IconBadge:
 	var badge := IconBadge.new()
 	badge.name = badge_name
-	badge.position = position
-	badge.size = badge_size
 	badge.z_index = 20
 	badge.set_icon(texture, hframes, vframes, 0)
 	badge.set_number(number)
-	badge.normalize_icon_visual = true
-	badge.icon_visual_ratio = 0.82
-	badge.font_size = font_size
-	badge.embolden = 0.7
+	ItemFrameStyle.configure_item_stat_badge(badge, kind, layout)
 	return badge
 
 
@@ -523,34 +517,36 @@ func _make_item_card(item: ItemData, idx: int) -> Button:
 		card.add_theme_stylebox_override(s, StyleBoxEmpty.new())
 	card.add_child(_make_selection_pointer(box))
 	# 格底：三档均使用稀有度整格纵向渐变填充。
-	var slot_rect := Rect2(Vector2.ZERO, Vector2(box, box))
-	var frame_position := slot_rect.position + slot_rect.size * FRAME_OFFSET_RATIO
-	var frame_size := slot_rect.size * FRAME_ART_SCALE
-	var cell_inset := box * CELL_INSET_RATIO
+	var layout := ItemFrameStyle.item_frame_layout(&"gallery_left", Vector2.ZERO, box)
+	var slot_rect: Rect2 = layout["slot_rect"]
+	var frame_rect: Rect2 = layout["frame_rect"]
+	var cell_rect: Rect2 = layout["cell_rect"]
+	var frame_shadow_rect: Rect2 = layout["frame_shadow_rect"]
+	card.add_child(ItemFrameStyle.make_frame_shadow(
+		frame_shadow_rect.position, frame_shadow_rect.size, "FrameDropShadow",
+		Vector2.ZERO))
 	var cell := ColorRect.new()
 	cell.name = "Cell"
 	cell.color = Color.WHITE
-	cell.position = slot_rect.position + Vector2.ONE * cell_inset
-	cell.size = slot_rect.size - Vector2.ONE * cell_inset * 2.0
+	cell.position = cell_rect.position
+	cell.size = cell_rect.size
 	cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var cm := ItemFrameStyle.make_cell_material(item.tier, box / 6.0)
 	cell.material = cm
 	card.add_child(cell)
 	var tex: Texture2D = ItemCatalog.load_icon(item.item_id)
-	var isz := box * (70.0 / 92.0)
-	var icon_position := Vector2((box - isz) * 0.5, (box - isz) * 0.5)
-	var icon_size := Vector2(isz, isz)
+	var art_rect: Rect2 = layout["item_art_rect"]
 	if tex != null:
-		card.add_child(ItemFrameStyle.make_item_art_shadow(
-				tex, icon_position, icon_size))
+		card.add_child(ItemFrameStyle.make_item_art_shadow_exact(
+				tex, layout["item_art_shadow_rect"]))
 	# 回纹阶框（2026-07-13 换皮：头像框素材同源换色三阶变体·原稀有度像素框 shader 退役）
 	var frame := TextureRect.new()
 	frame.name = "Frame"   # 选中提亮要取（2026-07-14）
 	frame.texture = ITEM_FRAME_TEX
 	frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	frame.position = frame_position
-	frame.size = frame_size
+	frame.position = frame_rect.position
+	frame.size = frame_rect.size
 	frame.material = _make_tier_frame_material(item.tier)
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(frame)
@@ -562,18 +558,15 @@ func _make_item_card(item: ItemData, idx: int) -> Button:
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		ItemFrameStyle.configure_item_art(icon, tex, Rect2(icon_position, icon_size))
+		ItemFrameStyle.configure_item_art(icon, tex, art_rect)
 		card.add_child(icon)
-	# 两个角标以道具框中心轴对称：使用费在左，最大耐久在右；0费仍明确显示。
-	var badge_size := Vector2(44.0, 44.0)
-	var badge_positions := ItemFrameStyle.stat_badge_positions(
-		Rect2(frame_position, frame_size), badge_size)
+	# 使用费与耐久严格复刻调参台各自的根节点、图标盒和数字盒。
 	card.add_child(_make_item_stat_badge(
 			"UseCostBadge", ENERGY_COST_SHEET, 4, 4, item.use_cost,
-			badge_positions["cost"], badge_size, 14))
+			&"energy", layout))
 	card.add_child(_make_item_stat_badge(
 			"DurabilityBadge", DURABILITY_BADGE_ICON, 1, 1, item.max_durability,
-			badge_positions["durability"], badge_size, 14))
+			&"durability", layout))
 	# 名字（框外下方·亮页墨字直读）
 	var name_lbl := Label.new()
 	name_lbl.name = "ItemName"
@@ -616,13 +609,31 @@ func _build_detail_panel() -> void:
 	_d_rarity_label = $DetailArea/RarityBadge/BadgeLabel as Label
 	_d_use_cost_badge = $DetailArea/UseCostBadge as IconBadge
 	_d_durability_badge = $DetailArea/DurabilityBadge as IconBadge
-	for badge: IconBadge in [_d_use_cost_badge, _d_durability_badge]:
-		badge.normalize_icon_visual = true
-		badge.icon_visual_ratio = 0.82
-	var detail_badge_positions := ItemFrameStyle.stat_badge_positions(
-		Rect2(_d_frame.position, _d_frame.size), _d_use_cost_badge.size)
-	_d_use_cost_badge.position = detail_badge_positions["cost"]
-	_d_durability_badge.position = detail_badge_positions["durability"]
+	var frame_center := _d_frame.position + _d_frame.size * 0.5
+	var local_layout := ItemFrameStyle.item_frame_layout(&"gallery_right")
+	var local_frame: Rect2 = local_layout["frame_rect"]
+	var detail_origin := frame_center - local_frame.get_center()
+	var detail_layout := ItemFrameStyle.item_frame_layout(&"gallery_right", detail_origin)
+	var detail_cell_rect: Rect2 = detail_layout["cell_rect"]
+	var detail_frame_rect: Rect2 = detail_layout["frame_rect"]
+	var detail_art_rect: Rect2 = detail_layout["item_art_rect"]
+	var detail_shadow_rect: Rect2 = detail_layout["frame_shadow_rect"]
+	var frame_shadow := ItemFrameStyle.make_frame_shadow(
+		detail_shadow_rect.position, detail_shadow_rect.size, "FrameDropShadow",
+		Vector2.ZERO)
+	$DetailArea.add_child(frame_shadow)
+	$DetailArea.move_child(frame_shadow, detail_cell.get_index())
+	detail_cell.position = detail_cell_rect.position
+	detail_cell.size = detail_cell_rect.size
+	_d_frame.position = detail_frame_rect.position
+	_d_frame.size = detail_frame_rect.size
+	ItemFrameStyle.configure_item_art(
+		_d_icon_shadow, null, detail_layout["item_art_shadow_rect"])
+	ItemFrameStyle.configure_item_art(_d_icon, null, detail_art_rect)
+	ItemFrameStyle.configure_item_stat_badge(
+		_d_use_cost_badge, &"energy", detail_layout)
+	ItemFrameStyle.configure_item_stat_badge(
+		_d_durability_badge, &"durability", detail_layout)
 	_d_shape_preview = $DetailArea/ItemFacts/ShapePreview as Control
 	_d_price_label = $DetailArea/ItemFacts/PriceLabel as Label
 	_d_desc = $DetailArea/Description as Label
@@ -662,8 +673,9 @@ func _select(idx: int) -> void:
 		var detail_target: Rect2 = _d_icon.get_meta(
 			"item_art_target_rect", Rect2(_d_icon.position, _d_icon.size))
 		ItemFrameStyle.configure_item_art(_d_icon, tex, detail_target)
-		ItemFrameStyle.configure_item_art(_d_icon_shadow, tex, detail_target,
-			ItemFrameStyle.item_art_shadow_offset(detail_target.size))
+		var shadow_target: Rect2 = _d_icon_shadow.get_meta(
+			"item_art_target_rect", Rect2(_d_icon_shadow.position, _d_icon_shadow.size))
+		ItemFrameStyle.configure_item_art(_d_icon_shadow, tex, shadow_target)
 		_d_icon_shadow.visible = true
 		_d_icon.visible = true
 		_d_icon_fallback.visible = false

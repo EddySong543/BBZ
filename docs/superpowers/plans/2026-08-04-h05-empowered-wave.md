@@ -2,7 +2,7 @@
 
 **Goal:** 将 h05 重做为团队可选的「波」强化：亢金在队时，我方可为本次「波」额外支付 1 能，使伤害增加 1 点；旧「破绽」机制完整退役。
 
-**Architecture:** 保留 `ActionDef.Action.ATTACK` 作为唯一「波」动作，在 `BattleCore` 增加逐方布尔选择态 `empowered_wave`。合法动作枚举把普通波与强化波作为两个 choice 暴露；玩家 UI、AI 与联机 payload 传递同一个 `empowered_wave` 标记。结算时额外扣 2 半能并给该次波增加 2 半点伤害，不改变动作类型与穿透等级；h02 若把这次波升级为大波，则在大波伤害上继续叠加 1 点。
+**Architecture:** 保留 `ActionDef.Action.ATTACK` 作为唯一「波」动作，在 `BattleCore` 增加逐方布尔选择态 `empowered_wave`。合法动作枚举把普通波与强化波作为两个 choice 暴露；玩家 UI 与 AI 传递同一个 `empowered_wave` 标记。结算时额外扣 2 半能并给该次波增加 2 半点伤害，不改变动作类型与穿透等级；h02 若把这次波升级为大波，则在大波伤害上继续叠加 1 点。
 
 **Tech Stack:** Godot 4、GDScript、GUT、`.tres` 英雄资源、CSV i18n。
 
@@ -21,15 +21,12 @@
 - Modify: `tests/unit/battle/v4/test_heroes_zodiac_v4.gd`
 - Modify: `tests/unit/battle/ai/test_battle_clone_ai.gd`
 - Modify: `tests/unit/battle/v4/test_battle_snapshot.gd`
-- Modify: `tests/unit/net/test_net_protocol.gd`
-- Modify: `tests/unit/net/test_match_room.gd`
 
 - [x] 普通波与强化波同时进入合法 choice；不足 2 能时只有普通波。
 - [x] 强化波额外扣 1 能、加 1 伤，仍被普通防挡住。
 - [x] 替补 h05 同样授权；无 h05、大波或错误标记提交均拒绝。
 - [x] h02 升级与 h05 强化同时生效；h04 目标和 h16 双段不丢选择态。
 - [x] clone、快照与 JSON 往返保留已提交的强化波。
-- [x] 联机协议校验并由权威房间精确匹配 `empowered_wave`。
 
 ## Task 2: 实现统一选择与结算
 
@@ -47,17 +44,14 @@
 - [x] Phase 2 额外扣费；hit 生成时额外加伤，动作身份和穿透保持不变。
 - [x] 删除 `opening` 状态消费、被挡钩子及 AI 资产权重。
 
-## Task 3: 接通玩家 UI 与联机
+## Task 3: 接通玩家 UI 与本地提交
 
 **Files:**
 - Modify: `src/ui/battle_screen.gd`
-- Modify: `src/net/net_protocol.gd`
-- Modify: `src/net/match_client.gd`
-- Modify: `src/net/match_room.gd`
+- 旧同步分支已废弃；当前只保留本地 BattleCore 逻辑。
 
 - [x] 仿照「疾风」建立 `龙御极 +1能` 开关，仅选中波且付得起时可启用。
-- [x] 本地提交、重置、超时和联机提交均正确清理或传递选择。
-- [x] C2S `submit_turn` 增加严格布尔字段，服务端合法集同时匹配动作、目标和强化标记。
+- [x] 本地提交、重置和超时均正确清理或传递选择。
 
 ## Task 4: 同步玩家数据与当前设计文档
 

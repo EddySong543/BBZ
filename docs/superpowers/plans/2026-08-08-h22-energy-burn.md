@@ -88,7 +88,7 @@
 - Modify: `assets/i18n/strings_zh.csv`
 - Modify: `src/ui/battle_screen.gd`
 - Modify: `design/heroes.md`
-- Modify: `design/heroes-dark-h21-h24.md`
+- Modify: `design/heroes.md`（暗批局部内容已并入主英雄文档）
 - Modify: `design/heroes-schools.md`
 - Modify: `design/heroes-redesign.md`
 - Modify: `design/skill-design-reference.md`

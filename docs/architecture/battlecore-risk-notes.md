@@ -15,9 +15,9 @@
 | H1 | `resolve()` 6 phase 顺序固定，phase 间通过私有 state 通信 | `battle_core.gd:258-486` | 技能组件化时 hook 必须落在正确的 phase |
 | H2 | `_calc_attack_raw` → `_apply_defense` → `_route_damage` 必须依次调用（中间 `_raw_dmg_to[p]` 被设置供反戈读取） | `battle_core.gd:566-595` | 拆函数会破坏反戈反弹链 |
 | H3 | `selected_target` 索引到 shuffle 后的 `clone_order` | `battle_core.gd:209,517` | UI 显示位置必须与 `clone_order` 同步；shuffle 不 deterministic |
-| H4 | `selected_action[p]` 在 phase 1 被英雄技能改值 | `battle_core.gd:278-283` | UI 拿不到玩家原始选择；网络同步要小心 |
+| H4 | `selected_action[p]` 在 phase 1 被英雄技能改值 | `battle_core.gd:278-283` | UI 拿不到玩家原始选择；回放与调试记录要小心 |
 | H5 | `shield[p][slot]` 按 slot 索引而非 active hero | `battle_core.gd:391,400` | 切换后 shield 在新 slot 上才生效；无 `current_shield(p)` getter |
-| H6 | `randi_range` 直接调用，无 RNG 注入 | `battle_core.gd:89,280,348,522` | 联网/录像无法重放 |
+| H6 | `randi_range` 直接调用，无 RNG 注入 | `battle_core.gd:89,280,348,522` | 回放与确定性测试无法重放 |
 
 ---
 
@@ -53,7 +53,7 @@
 |------|---------|-----------|
 | `on_attack_calc(raw_dmg, action, battle, player, energy_before) -> int` | `_calc_attack_raw` 内 | 当时的 h05 龙威（首批） |
 
-> **历史说明（2026-08-04）**：上表记录 v3 评估窗口，不是现行 hook 清单。h05 现行「龙御极」实现位于 `src/battle/skills/h05_longyuji.gd`，组件只声明 `enables_empowered_wave()` 能力；可选强化波的合法 choice、费用、伤害、AI、联机与快照由 `BattleCore` 统一收口。
+> **历史说明（2026-08-04）**：上表记录 v3 评估窗口，不是现行 hook 清单。h05 现行「龙御极」实现位于 `src/battle/skills/h05_longyuji.gd`，组件只声明 `enables_empowered_wave()` 能力；可选强化波的合法 choice、费用、伤害、AI 与快照由 `BattleCore` 统一收口。
 
 ### 何时该加新 hook
 

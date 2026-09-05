@@ -6,9 +6,9 @@
 
 **Goal:** 建立不破坏旧经济模式的最小战斗背包运行时，并完整实装寄存牌、押物票、回购券、保价封、应急箱、换签筒、听匣筒、承露盏和纳盈葫芦。
 
-**Architecture:** `BattleCore` 持有双方背包物件、使用史和私有揭示记录；槽位保留物件唯一编号及临时标记。背包模式的普通抽取复用现有三选一流程，旧模式继续使用全局 T1 池并过滤背包专属道具。道具选择沿用 `item_slot_targets` 与 `item_slot_choices`，服务器生成所有私有候选。
+**Architecture:** `BattleCore` 持有双方背包物件、使用史和私有揭示记录；槽位保留物件唯一编号及临时标记。背包模式的普通抽取复用现有三选一流程，旧模式继续使用全局 T1 池并过滤背包专属道具。道具选择沿用 `item_slot_targets` 与 `item_slot_choices`，核心生成所有私有候选。
 
-**Tech Stack:** Godot 4、GDScript、GUT、现有 MatchRoom/MatchClient 权威联机结构。
+**Tech Stack:** Godot 4、GDScript、GUT、现有 BattleCore 本地权威结构。
 
 ## Global Constraints
 
@@ -35,7 +35,7 @@
 - [x] 在 `_heal`、`_gain_energy` 增加本回合溢出转换钩子并阻止相互递归。
 - [x] 运行定向 GUT，确认核心行为全部通过。
 
-### Task 2: 目录、脚本、交互和联机
+### Task 2: 目录、脚本与交互
 
 **Files:**
 - Modify: `src/battle/item_catalog.gd`
@@ -50,15 +50,12 @@
 - Create: `src/battle/items/t2_naying_hulu.gd`
 - Modify: `src/ui/battle_screen.gd`
 - Modify: `src/battle/ai/battle_ai.gd`
-- Modify: `src/net/net_protocol.gd`
-- Modify: `src/net/match_client.gd`
-- Modify: `src/net/match_room.gd`
 
 - [x] 将九件正式数据加入目录并按完整无声调拼音排序。
 - [x] 编写无状态 ItemEffect 脚本，只通过 BattleCore 公共接口结算。
 - [x] 扩展己方槽、敌方槽和私有三选一目标流程；取消时不得污染真实战局。
-- [x] 让联机服务器权威生成回购和换签候选，快照按接收者隐藏对方背包真相。
-- [x] 为 AI 增加目标、候选与防浪费规则，并运行 UI/AI/网络定向测试。
+- [x] 让本地核心权威生成回购和换签候选，并按玩家视角隐藏对方背包真相。
+- [x] 为 AI 增加目标、候选与防浪费规则，并运行 UI/AI 定向测试。
 
 ### Task 3: 真相源、资产与验证
 
@@ -66,14 +63,14 @@
 - Modify: `design/items-firstrelease.md`
 - Modify: `design/items-list.md`
 - Modify: `design/items.md`
-- Modify: `design/reference-game-item-predesign.md`
-- Modify: `design/pvp-backpack-run.md`
+- 历史参考游戏道具预设计已合并进当前道具标准，本计划不再修改独立来源文件。
+- 历史背包规则文档已随当前产品路线清理；本计划不再修改该文件。
 - Modify: `assets/i18n/strings_zh.csv`
 - Modify: `assets/sprites/items/_name_id_map.md`
 - Create: `assets/sprites/items/<九件占位图>.png`
 
 - [x] 同步正式文案、计数、通过状态、运行边界和存疑项评审结论。
 - [x] 生成九张独立可替换的占位图并执行 Godot Import。
-- [x] 运行目录、核心、AI、UI、联机定向 GUT，再运行全量 GUT。
+- [x] 运行目录、核心、AI、UI 定向 GUT，再运行全量 GUT。
 - [x] 对涉及三选一与槽目标的 UI 做 1920×1080 实际交互验证。
 - [x] 执行 `git diff --check`，确认不覆盖当前工作区其他任务改动且不 commit/push。

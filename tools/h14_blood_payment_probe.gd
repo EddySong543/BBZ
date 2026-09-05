@@ -20,7 +20,6 @@ func _ready() -> void:
 	BattleSetup.p2_heroes = [_hero("h02"), _hero("h08"), _hero("h12")]
 	BattleSetup.overtime = false
 	BattleSetup.pve_mode = false
-	BattleSetup.net_session = null
 
 	var screen: Node = load("res://src/ui/battle_screen1.tscn").instantiate()
 	add_child(screen)
@@ -57,7 +56,7 @@ func _ready() -> void:
 	if not bool(screen._blood_payment_armed):
 		failures.append("免费切到星日后不应取消已开启的血量支付")
 	if screen.battle.is_free_switch_target(screen.PLAYER, 2):
-		failures.append("千里自在风同回合不应允许第二次免费切换")
+		failures.append("千里快哉风同回合不应允许第二次免费切换")
 	if int(screen.battle.blood_payment_source(screen.PLAYER)) != 0:
 		failures.append("免费切换后付款者没有保留为原槽蚩尤")
 	if not bool(screen._blood_payment_armed):

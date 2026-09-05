@@ -2,7 +2,6 @@
 
 [ext_resource type="Script" uid="uid://hq4i5dkrj42d" path="res://src/ui/main_menu.gd" id="1_menu"]
 [ext_resource type="PackedScene" path="res://src/ui/components/main_menu_world.tscn" id="2_world"]
-[ext_resource type="PackedScene" path="res://src/ui/components/item_avatar_frame.tscn" id="4_avatarframe"]
 
 [node name="MainMenu" type="Control"]
 layout_mode = 3
@@ -27,57 +26,6 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="IdentityButton" type="Button" parent="UI"]
-layout_mode = 0
-offset_left = 48.0
-offset_top = 32.0
-offset_right = 340.0
-offset_bottom = 124.0
-flat = true
-
-[node name="AvatarFrame" parent="UI/IdentityButton" instance=ExtResource("4_avatarframe")]
-offset_right = 84.0
-offset_bottom = 84.0
-mouse_filter = 2
-portrait_path = "res://assets/sprites/heroes/h01/h01_portrait.png"
-frame_size = Vector2(84, 84)
-
-[node name="NameLabel" type="Label" parent="UI/IdentityButton"]
-layout_mode = 0
-offset_left = 102.0
-offset_top = 10.0
-offset_right = 292.0
-offset_bottom = 46.0
-text = "Eddy"
-mouse_filter = 2
-
-[node name="RankLabel" type="Label" parent="UI/IdentityButton"]
-layout_mode = 0
-offset_left = 102.0
-offset_top = 50.0
-offset_right = 270.0
-offset_bottom = 82.0
-text = "段位 · 未定级"
-horizontal_alignment = 1
-vertical_alignment = 1
-mouse_filter = 2
-
-[node name="SettingsButton" type="Button" parent="UI"]
-layout_mode = 0
-offset_left = 1732.0
-offset_top = 36.0
-offset_right = 1872.0
-offset_bottom = 90.0
-text = "设置"
-
-[node name="QuitButton" type="Button" parent="UI"]
-layout_mode = 0
-offset_left = 1592.0
-offset_top = 36.0
-offset_right = 1712.0
-offset_bottom = 90.0
-text = "退出"
-
 [node name="VersionLabel" type="Label" parent="UI"]
 layout_mode = 0
 offset_left = 1700.0
@@ -94,13 +42,6 @@ offset_left = 788.0
 offset_top = 916.0
 offset_right = 1132.0
 offset_bottom = 1024.0
-
-[node name="ModeSwitch" type="Button" parent="UI"]
-layout_mode = 0
-offset_left = 1156.0
-offset_top = 934.0
-offset_right = 1228.0
-offset_bottom = 1006.0
 
 [node name="NavHeroes" type="Button" parent="UI"]
 layout_mode = 0

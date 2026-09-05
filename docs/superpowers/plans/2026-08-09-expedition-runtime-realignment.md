@@ -2,16 +2,16 @@
 
 > **For agentic workers:** Implement each task with precise patches. Preserve unrelated dirty work and do not commit or push unless the user explicitly requests it.
 
-**Goal:** Remove the obsolete expedition monster prototype, implement smooth always-centered map following, and make expedition battles consume the same current combat rules and hero definitions as PvP.
+**Goal:** Remove the obsolete expedition monster prototype, implement smooth always-centered map following, and make expedition battles consume the same current combat rules and hero definitions as the unified battle container.
 
-**Architecture:** Keep the 18×14 expedition simulation and current battle scene. Strip concrete legacy monster content while retaining generic encounter seams. Drive map and token rendering from one critically damped visual position over a non-interactive fog padding layer. Pass complete hero identities into one shared battle setup; keep PvE-specific code limited to opponent choice and result routing.
+**Architecture:** Keep the 18×14 expedition simulation and current battle scene. Strip concrete legacy monster content while retaining generic encounter seams. Drive map and token rendering from one critically damped visual position over a non-interactive fog padding layer. Pass complete hero identities into one shared battle setup; keep expedition-specific code limited to opponent choice and result routing.
 
 **Tech Stack:** Godot 4.x, typed GDScript, GUT, project-native `tools/run_godot.ps1` probes.
 
 ## Global Constraints
 
 - Preserve the already approved 107px Ref37 grid, grass variants, rice foliage, object/marker layers and unrelated expedition visual work.
-- Do not modify `BattleCore` or network protocol unless a failing current contract proves it unavoidable.
+- Do not modify `BattleCore` unless a failing current contract proves it unavoidable.
 - Do not replace removed legacy monsters with placeholders.
 - Use `apply_patch` for code and documentation edits.
 

@@ -4,11 +4,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use bounded subagents by file ownership; shared worktree edits must not overlap.
 
-**Goal:** 将用户在 2026-08-10 确认的 21 件正式 T2 机制完整同步到运行时、UI、联机、AI、测试、i18n和设计真相源。
+**Goal:** 将用户在 2026-08-10 确认的 21 件正式 T2 机制完整同步到运行时、UI、AI、测试、i18n和设计真相源。
 
 **Architecture:** BattleCore 继续作为唯一权威状态机。一次性脚本只登记效果；跨回合定身、英雄绑定致命免疫和点金石候选缓存进入可快照的核心容器。点金石复用既有三选一弹窗和私有候选传输，但在提交回合中增加来源槽、目标槽和选择索引的权威校验。
 
-**Tech Stack:** Godot 4.x、GDScript、GUT、现有 MatchClient/MatchRoom/NetProtocol。
+**Tech Stack:** Godot 4.x、GDScript、GUT、现有 BattleCore 与本地测试工具。
 
 ## Global Constraints
 
@@ -49,14 +49,14 @@
 - [ ] 力量的代价在统一死亡结算前把当时出战英雄置0，`killer=-1`。
 - [ ] 猎物印记改为累计 `vuln += 3`；心脏掌握魔法设置基础攻击 `TRUE_DMG`；其余数值按最终稿修改。
 
-### Task 3: UI、联机与AI
+### Task 3: UI 与 AI
 
-**Files:** `src/ui/battle_screen.gd`、`src/net/net_protocol.gd`、`src/net/match_client.gd`、`src/net/match_room.gd`、`src/battle/ai/*.gd`、`tools/sim/run_sim.gd`及对应测试。
+**Files:** `src/ui/battle_screen.gd`、`src/battle/ai/*.gd`、`tools/sim/run_sim.gd`及对应本地测试。
 
 **Interfaces:** 提交包为每个 `item_slots[i]` 同步 `item_slot_targets[i]` 与 `item_slot_choices[i]`；缺省选择索引为 `-1`。
 
 - [ ] 点金石配对后在确认提交前显示一次T3三选一；取消保留来源槽候选，防止重抽。
-- [ ] 联机由服务器生成并私发点金石候选；提交时服务器复核来源、目标、候选索引和槽位就绪状态。
+- [ ] 本地核心生成并保存点金石候选；提交时复核来源、目标、候选索引和槽位就绪状态。
 - [ ] AI只选择可用T1目标，并在三个T3候选中按现有评估器选择最高价值项。
 - [ ] 删除三件道具的AI权重、模拟统计和旧UI目标语义。
 - [ ] 保留熔炉“消耗目标”与点金石“变换目标”的互斥高亮和原有战斗布局。

@@ -129,6 +129,10 @@ func _apply_seed(node_name: String, s: float) -> void:
 ## 触发一次命中抖动；amp 为像素幅度（取较大值，不打断更强的抖动）。
 ## kick_dir_x：受击方向（-1=向左踢/+1=向右踢/0=无方向纯抖·双方同拍受击=对撞不偏向）。
 func shake(amp: float, kick_dir_x: float = 0.0) -> void:
+	if not bool(GameSettings.get_value("screen_shake_enabled")):
+		_shake_amp = 0.0
+		_shake_kick = 0.0
+		return
 	_shake_amp = maxf(_shake_amp, amp)
 	if kick_dir_x != 0.0:
 		_shake_kick = clampf(kick_dir_x, -1.0, 1.0) * amp * shake_kick_scale

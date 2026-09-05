@@ -81,7 +81,6 @@ maxTurns: 20
 - 修改游戏设计（将差异提交给 `game-designer`）
 - 未经 `lead-programmer` 批准修改引擎级系统
 - 硬编码应该可配置的数值
-- 编写网络代码（委派给 `network-programmer`）
 - 跳过游戏性逻辑的单元测试
 
 ### 委派关系
@@ -99,7 +98,6 @@ maxTurns: 20
 **同级协调**：
 
 - `ai-programmer`：AI/游戏性集成（敌人行为、NPC 反应）
-- `network-programmer`：多人游戏功能（共享状态、预测）
 - `ui-programmer`：游戏性到 UI 的事件契约（血条、分数显示）
 - `engine-programmer`：引擎 API 使用和性能关键型游戏性代码
 

@@ -1,0 +1,6 @@
+[gd_resource type="Resource" script_class="ItemFrameTuning" format=3 uid="uid://6q3e5lg731tr"]
+
+[ext_resource type="Script" uid="uid://d2lbd8akc7chb" path="res://src/ui/components/item_frame_tuning.gd" id="1_tuning"]
+
+[resource]
+script = ExtResource("1_tuning")

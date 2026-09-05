@@ -4,7 +4,7 @@
 
 **Goal:** 实装两件已批准T2道具，并同步全部运行时、玩家表层与真相源。
 
-**Architecture:** 锁泉塞使用 `item_buffs` 保存目标回合，由统一 `_gain_energy` 入口判定；回照镜通过 ItemEffect 的纯查询充能接口，在天罗裁定后由核心按敌方提交顺序过滤敌向道具。复用现有快照、克隆与联机权威提交结构，不扩展协议字段。
+**Architecture:** 锁泉塞使用 `item_buffs` 保存目标回合，由统一 `_gain_energy` 入口判定；回照镜通过 ItemEffect 的纯查询充能接口，在天罗裁定后由核心按敌方提交顺序过滤敌向道具。复用现有快照、克隆与本地权威提交结构，不扩展额外字段。
 
 **Tech Stack:** Godot 4.7、GDScript、GUT、现有 BattleCore/ItemEffect/ItemCatalog。
 
@@ -91,7 +91,6 @@
 **Files:**
 - Test: `tests/unit/battle/v4/test_items_t2_expansion.gd`
 - Test: `tests/unit/battle/ai/test_battle_ai_items.gd`
-- Test: `tests/unit/net/test_match_room.gd`
 - Test: `tests/unit/ui/test_battle_item_target_selection.gd`
 
 - [ ] 运行Godot Import并检查无Parse Error。

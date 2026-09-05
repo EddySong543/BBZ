@@ -1,0 +1,35 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/ui/main_hub/main_hub_character.gd" id="1_character"]
+[ext_resource type="Script" path="res://src/ui/main_hub/main_hub_character_shadow.gd" id="2_shadow"]
+
+[node name="PlayerCharacter" type="Control"]
+custom_minimum_size = Vector2(208, 208)
+offset_right = 208.0
+offset_bottom = 208.0
+pivot_offset = Vector2(104, 156)
+mouse_filter = 2
+script = ExtResource("1_character")
+sprite_frames_path = "res://assets/sprites/heroes/h01/h01_idle.tres"
+walk_frames_path = "res://assets/sprites/heroes/h01/h01_walk.tres"
+movement_style = 1
+
+[node name="PlayerShadow" type="Control" parent="."]
+layout_mode = 0
+offset_left = 104.0
+offset_top = 158.0
+offset_right = 104.0
+offset_bottom = 158.0
+mouse_filter = 2
+script = ExtResource("2_shadow")
+display_scale = 1.5
+
+[node name="Visual" type="TextureRect" parent="."]
+texture_filter = 1
+layout_mode = 0
+offset_right = 208.0
+offset_bottom = 208.0
+pivot_offset = Vector2(104, 156)
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5

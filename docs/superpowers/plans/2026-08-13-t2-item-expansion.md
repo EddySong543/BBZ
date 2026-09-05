@@ -2,9 +2,9 @@
 
 > **For agentic workers:** Execute inline in this task. The user has already approved all nine mechanics; do not reopen design or rebalance them.
 
-**Goal:** Add nine approved Tier-2 items as complete, playable items across BattleCore, UI, AI, multiplayer, catalog, art placeholders, localization, documentation, and regression tests.
+**Goal:** Add nine approved Tier-2 items as complete, playable items across BattleCore, UI, AI, catalog, art placeholders, localization, documentation, and regression tests.
 
-**Architecture:** Each item keeps its own stateless `ItemEffect` script. BattleCore gains only the reusable hooks required by the approved mechanics: a post-Tianluo rule-preparation pass, friendly-hero item targeting, whole-attack damage capping, team damage sharing, healing conversion/blocking, bound attack targeting, and hero-hit-hook suppression. Existing `item_slot_targets` network values are generalized to “item secondary target”; the authoritative room routes the integer to either an item slot or a friendly hero slot according to the source item.
+**Architecture:** Each item keeps its own stateless `ItemEffect` script. BattleCore gains only the reusable hooks required by the approved mechanics: a post-Tianluo rule-preparation pass, friendly-hero item targeting, whole-attack damage capping, team damage sharing, healing conversion/blocking, bound attack targeting, and hero-hit-hook suppression. The existing item secondary-target value is routed to either an item slot or a friendly hero slot according to the source item.
 
 **Tech Stack:** Godot 4, typed GDScript, GUT, existing `tools/run_godot.ps1` launcher.
 
@@ -75,22 +75,18 @@
 - [ ] Copy the established placeholder icon source, run Godot import, rebuild the item-name map, and rescan i18n.
 - [ ] Update current-pool and all-candidate counts without rewriting historical rejected entries.
 
-### Task 4: Complete friendly-target UI and multiplayer authority
+### Task 4: Complete friendly-target UI and local authority
 
 **Files:**
 - Modify: `src/ui/battle_screen.gd`
-- Modify: `src/net/net_protocol.gd`
-- Modify: `src/net/match_room.gd`
 - Modify: `tests/unit/ui/test_battle_item_target_selection.gd`
-- Modify: `tests/unit/net/test_net_protocol.gd`
-- Modify: `tests/unit/net/test_match_room.gd`
 
 **Interfaces:**
-- Produces: friendly portrait selection for 移甲环/护阵钉 and server-side validation of the selected hero slot.
+- Produces: friendly portrait selection for 移甲环/护阵钉 and BattleCore validation of the selected hero slot.
 
 - [ ] Keep item-slot targets and hero targets in separate local dictionaries so item-slot dependency highlighting remains correct.
-- [ ] Reuse the existing per-item secondary-target array on the wire; validate `-1..2` and route by the source item ID in MatchRoom.
-- [ ] Add local and authoritative network tests for valid reserve/any-living targets, invalid active/dead targets, cancellation, and preview parity.
+- [ ] Reuse the existing per-item secondary-target array in the local submission; validate `-1..2` and route by the source item ID in BattleCore.
+- [ ] Add local-core tests for valid reserve/any-living targets, invalid active/dead targets, cancellation, and preview parity.
 - [ ] Run a 1920x1080 interaction probe: select item, select friendly portrait, cancel, and submit.
 
 ### Task 5: Teach AI and evaluators not to waste the items

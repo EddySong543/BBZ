@@ -7,7 +7,6 @@
 | `gameplay-code.md` | `src/gameplay/**` | 数据驱动值、增量时间 (delta time)、无 UI 引用 |
 | `engine-code.md` | `src/core/**` | 热路径零分配、线程安全、API 稳定性 |
 | `ai-code.md` | `src/ai/**` | 性能预算、可调试性、数据驱动参数 |
-| `network-code.md` | `src/networking/**` | 服务端权威 (server-authoritative)、版本化消息、安全性 |
 | `ui-code.md` | `src/ui/**` | 不持有游戏状态所有权、本地化就绪、无障碍访问 (accessibility) |
 | `design-docs.md` | `design/gdd/**` | 必须包含 8 个章节、公式格式、边界情况 (edge cases) |
 | `narrative.md` | `design/narrative/**` | 世界观一致性、角色语调、正典层级 (canon levels) |

@@ -20,9 +20,9 @@ func _hero(id: String, hp: int, skill_desc: String = "") -> HeroData:
 
 
 func test_overtime_is_fullhp_vanilla_1v1() -> void:
-	# Arrange：两个有技能的英雄（h01 步虚无有乡 / h15 七杀战鬼）
+	# Arrange：两个有技能的英雄（h01 步虚无有乡 / h15 魇镇八极）
 	var a := _hero("h01", 5, "步虚无有乡")
-	var x := _hero("h15", 6, "七杀战鬼")
+	var x := _hero("h15", 6, "魇镇八极")
 	# Act
 	var d := BattleCore.create_overtime(a, x, 42)
 	# Assert：1v1、满血、白板、无道具经济
@@ -37,11 +37,11 @@ func test_overtime_is_fullhp_vanilla_1v1() -> void:
 
 
 func test_overtime_strips_skill_gates() -> void:
-	# 七杀战鬼（h15）正常局禁防；加时白板后防/大防恢复合法。
-	var d := BattleCore.create_overtime(_hero("h15", 6, "七杀战鬼"), _hero("h01", 5, "步虚无有乡"), 42)
+	# 魇镇八极（h15）正常局禁防；加时白板后防/大防恢复合法。
+	var d := BattleCore.create_overtime(_hero("h15", 6, "魇镇八极"), _hero("h01", 5, "步虚无有乡"), 42)
 	d.energy = [10, 10]
-	assert_true(d.can_afford(0, A.DEFEND), "白板后七杀战鬼也能防")
-	assert_true(d.can_afford(0, A.BIG_DEFEND), "白板后七杀战鬼也能大防")
+	assert_true(d.can_afford(0, A.DEFEND), "白板后魇镇八极也能防")
+	assert_true(d.can_afford(0, A.BIG_DEFEND), "白板后魇镇八极也能大防")
 
 
 func test_overtime_passive_energy_same_as_normal() -> void:

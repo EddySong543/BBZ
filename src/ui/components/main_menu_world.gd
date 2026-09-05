@@ -77,7 +77,7 @@ const TOKEN_IDLE_REF_FRAMES: float = 6.0
 const TOKEN_ASPECT_COMPENSATION := Vector2(
 		MAP_RENDER_SCALE.y / MAP_RENDER_SCALE.x, 1.0)
 
-# 匹配与远征已经改为底部直接入口；展示地图不再绘制或保留对应目的地格。
+# 当前模式入口已经改为底部直接入口；展示地图不再绘制或保留旧目的地格。
 const DESTINATION_CELLS: Dictionary = {}
 const DESTINATION_COLORS: Dictionary = {}
 
@@ -374,14 +374,7 @@ func play_portal_activation(color: Color,
 	_refresh_portal_connection_complete()
 
 
-## PVP 等待是未知时长：前三颗依次锁定，第四颗保留白色直到服务器确认成功。
-func begin_portal_search(color: Color) -> void:
-	_prepare_portal_energy(color)
-	for index: int in mini(3, portal_stones.size()):
-		_schedule_portal_ignite(index, 0.04 + PORTAL_SEARCH_STEP_DELAY * float(index))
-
-
-## 快速匹配允许直接完成四颗；已有进度则由当前状态汇聚为同一拍能量闪光。
+## 直接完成四颗；已有进度则由当前状态汇聚为同一拍能量闪光。
 func complete_portal_connection(color: Color) -> void:
 	_kill_portal_energy_tweens()
 	_portal_energy_color = color

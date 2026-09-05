@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="BattleStatusNumberTuning" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/ui/components/battle_status_number_tuning.gd" id="1_tuning"]
+
+[resource]
+script = ExtResource("1_tuning")
+count_offset = Vector2(7, 37)
+count_box_size = Vector2(26, 18)
+count_font_size = 18
+count_embolden = 0.6
+count_symbol_gap = 2.0
+count_outline_size = 2
+count_text_color = Color(0.94902, 0.909804, 0.8, 1)
+count_outline_color = Color(0, 0, 0, 1)
+count_shadow_color = Color(0, 0, 0, 0.32)
+count_shadow_offset = Vector2i(1, 1)
+count_shadow_outline_size = 0
+count_pop_duration = 0.14
+count_increase_lift = 2.0
+count_increase_scale = 0.9
+use_per_icon_count_offsets = true
+poison_count_offset = Vector2(7, 37)
+vulnerable_count_offset = Vector2(7, 37)
+sword_qi_count_offset = Vector2(7, 37)

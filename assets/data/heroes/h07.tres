@@ -5,11 +5,10 @@
 [resource]
 script = ExtResource("1_mh0ti")
 hero_id = "h07"
-team_role = "进攻"
 dimension = "节奏"
 hero_name = "星日【马】"
 max_hp = 6
-skill_description = "千里自在风"
+skill_description = "千里快哉风"
 skill_detail = "每回合一次，星日【马】的切换不占用行动，且登场时对敌方造成0.5点伤害。"
 portrait_path = "res://assets/sprites/heroes/h07/h07_portrait.png"
 skill_icon_path = "res://assets/sprites/heroes/h07/h07_skill.png"

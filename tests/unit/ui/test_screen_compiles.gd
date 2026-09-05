@@ -3,7 +3,6 @@ extends GutTest
 const HeroGalleryScreen := preload("res://src/ui/hero_gallery_screen.gd")
 const ItemGalleryScreen := preload("res://src/ui/item_gallery_screen.gd")
 const ItemGalleryGridPreview := preload("res://src/ui/components/item_gallery_grid_preview.gd")
-const ItemAvatarFrameScript := preload("res://src/ui/components/item_avatar_frame.gd")
 const BattleCodexOverlay := preload("res://src/ui/components/battle_codex_overlay.gd")
 const ItemFrameStyle := preload("res://src/ui/components/item_frame_style.gd")
 const UnifiedCodexScreen := preload("res://src/ui/codex_screen.gd")
@@ -12,12 +11,6 @@ const BASE_FONT_PATH := "res://assets/font/ZLabsPixel_12px_M_CN.ttf"
 
 ## 回归守卫：关键 screen 脚本在含 autoload 的 GUT 环境能编译。
 ## （裸 --check-only 无 autoload（FontManager 等）会误报，故用 GUT 环境 load 触发编译。）
-## bp_screen：2026-07-03 任务#5 接入 DraftAI 后的引用解析守卫。
-
-func test_bp_screen_compiles() -> void:
-	assert_not_null(load("res://src/ui/bp_screen.gd"), "bp_screen.gd 编译通过（DraftAI 接线）")
-
-
 func test_hero_gallery_screen_compiles() -> void:
 	assert_not_null(load("res://src/ui/hero_gallery_screen.gd"), "hero_gallery_screen.gd 编译通过")
 
@@ -218,7 +211,10 @@ func test_item_gallery_third_batch_uses_clean_right_page_hierarchy() -> void:
 	var page_center_x: float = ItemGalleryScreen.PAGE_R.position.x \
 			+ ItemGalleryScreen.PAGE_R.size.x * 0.5
 	for node: Control in [name_label, frame, icon, rarity_badge, description, flavor]:
-		assert_almost_eq(node.position.x + node.size.x * 0.5, page_center_x, 0.01,
+		var visual_center_x := node.position.x + node.size.x * 0.5
+		if node == icon:
+			visual_center_x = (node.get_meta("visible_alpha_rect") as Rect2).get_center().x
+		assert_almost_eq(visual_center_x, page_center_x, 0.01,
 				"右页主轴节点保持居中: %s" % node.name)
 	assert_eq(description.horizontal_alignment, HORIZONTAL_ALIGNMENT_CENTER,
 			"效果描述居中")
@@ -393,22 +389,19 @@ func test_item_gallery_shows_cost_durability_shape_and_full_price() -> void:
 		var item: ItemData = screen._items[index]
 		var cost_badge := screen._cards[index].get_node("UseCostBadge") as IconBadge
 		var durability_badge := screen._cards[index].get_node("DurabilityBadge") as IconBadge
+		var card_layout := ItemFrameStyle.item_frame_layout(
+			&"gallery_left", Vector2.ZERO, screen._grid_box_size())
 		assert_eq(cost_badge.number, item.use_cost, "%s使用费角标读取目录" % item.item_id)
 		assert_eq(durability_badge.number, item.max_durability,
 				"%s耐久角标读取目录" % item.item_id)
-		var badge_axis_center: float = (
-				cost_badge.position.x + cost_badge.size.x * 0.5
-				+ durability_badge.position.x + durability_badge.size.x * 0.5) * 0.5
-		var card_frame := screen._cards[index].get_node("Frame") as TextureRect
-		assert_almost_eq(badge_axis_center,
-				card_frame.position.x + card_frame.size.x * 0.5, 0.01,
-				"左右角标关于实际金属道具框中心对称")
-		assert_almost_eq(
-			maxf(cost_badge.debug_icon_visible_rect().size.x,
-				cost_badge.debug_icon_visible_rect().size.y),
-			maxf(durability_badge.debug_icon_visible_rect().size.x,
-				durability_badge.debug_icon_visible_rect().size.y), 0.01,
-			"能量与耐久图标按真实alpha轮廓显示为同一尺度")
+		assert_eq(cost_badge.position, card_layout["cost_position"])
+		assert_eq(durability_badge.position, card_layout["durability_position"])
+		assert_eq(cost_badge.scale, card_layout["badge_scale"])
+		assert_eq(durability_badge.scale, card_layout["badge_scale"])
+		assert_eq(cost_badge.debug_icon_visible_rect(), card_layout["energy_icon_rect"])
+		assert_eq(durability_badge.debug_icon_visible_rect(),
+			card_layout["durability_icon_rect"],
+			"能量与耐久保留调参台中各自独立的图标矩形")
 
 	var detail_cost := screen.get_node_or_null("DetailArea/UseCostBadge") as IconBadge
 	var detail_durability := screen.get_node_or_null("DetailArea/DurabilityBadge") as IconBadge
@@ -428,19 +421,13 @@ func test_item_gallery_shows_cost_durability_shape_and_full_price() -> void:
 		return
 	assert_eq(detail_cost.number, 1)
 	assert_eq(detail_durability.number, 2)
-	assert_almost_eq(
-		maxf(detail_cost.debug_icon_visible_rect().size.x,
-			detail_cost.debug_icon_visible_rect().size.y),
-		maxf(detail_durability.debug_icon_visible_rect().size.x,
-			detail_durability.debug_icon_visible_rect().size.y), 0.01,
-		"右页能量与耐久图标也使用同一可见尺度")
+	var detail_layout := ItemFrameStyle.item_frame_layout(&"gallery_right")
+	assert_eq(detail_cost.scale, detail_layout["badge_scale"])
+	assert_eq(detail_durability.scale, detail_layout["badge_scale"])
+	assert_eq(detail_cost.debug_icon_visible_rect(), detail_layout["energy_icon_rect"])
+	assert_eq(detail_durability.debug_icon_visible_rect(),
+		detail_layout["durability_icon_rect"])
 	assert_eq(facts.owner, screen, "稳定属性条保存在tscn中，便于编辑器调整")
-	var detail_badge_axis_center: float = (
-			detail_cost.position.x + detail_cost.size.x * 0.5
-			+ detail_durability.position.x + detail_durability.size.x * 0.5) * 0.5
-	assert_almost_eq(detail_badge_axis_center,
-			ItemGalleryScreen.PAGE_R.position.x + ItemGalleryScreen.PAGE_R.size.x * 0.5,
-			0.01, "右页大图角标关于书页中心对称")
 	assert_eq(shape_preview.get("shape_cells"),
 			[Vector2i(0, 0), Vector2i(1, 0)], "图鉴只显示初始横2格")
 	var shape_script_source := FileAccess.get_file_as_string(
@@ -600,10 +587,10 @@ func test_battle_switch_module_expands_right_and_owns_active_switch() -> void:
 			"新模块继续复用成熟的切换动作提交语义")
 	assert_true(screen._switch_tray.visible, "选定候选后保持展开层，避免选择反馈瞬间消失")
 	assert_false(first_candidate.is_selected, "切换选择状态改由顺序槽表达，来源候选不持续高亮")
-	assert_null(screen._command_order_row.get_node_or_null("Step0/Visual/Art/Portrait"),
-			"候选层负责英雄身份，顺序槽不再重复头像框")
-	assert_not_null(screen._command_order_row.get_node_or_null("Step0/Visual/Art/SwitchIcon"),
-			"顺序槽使用与基础行动一致的纯切换图标")
+	assert_not_null(screen._command_order_row.get_node_or_null("Step0/Visual/Art/Portrait"),
+			"顺序槽只显示本次切换的目标英雄头像框")
+	assert_null(screen._command_order_row.get_node_or_null("Step0/Visual/Art/SwitchIcon"),
+			"顺序槽不再叠加切换按钮或切换 icon")
 	assert_eq(screen.btn_switch.text, "", "切换主按钮不再残留文字")
 	var switch_icon := screen.btn_switch.get_node_or_null("SwitchIcon") as HoverIcon
 	assert_not_null(switch_icon, "切换主按钮使用正式图标")
@@ -771,16 +758,31 @@ func test_reserve_shield_uses_a_second_row_without_moving_hp() -> void:
 			"护盾位数变化时也必须和血量图标、数字列保持对齐")
 
 
-func test_main_menu_profile_avatar_uses_item_frame() -> void:
+func test_main_menu_removes_profile_and_quit_entries() -> void:
 	var packed := load("res://src/ui/main_menu.tscn") as PackedScene
 	var menu := packed.instantiate()
 	add_child_autofree(menu)
-	var avatar := menu.get_node("UI/IdentityButton/AvatarFrame")
-	assert_eq(avatar.get_script(), ItemAvatarFrameScript,
-			"主菜单个人资料头像使用新版 item_frame 组件")
-	assert_null(avatar.get_node_or_null("Bg"), "主菜单头像不存在旧 HeroFrame 边框层")
-	assert_eq(avatar.mouse_filter, Control.MOUSE_FILTER_IGNORE,
-			"头像区域继续把点击交给个人资料入口按钮")
+	assert_null(menu.get_node_or_null("UI/IdentityButton"))
+	assert_null(menu.get_node_or_null("UI/QuitButton"))
+
+
+func test_battle_header_hides_player_ids_and_shadows_hero_names() -> void:
+	var packed := load("res://src/ui/battle_screen_base.tscn") as PackedScene
+	var screen := packed.instantiate()
+	add_child_autofree(screen)
+	for hud_name: String in ["P1Hud", "P2Hud"]:
+		var player_id := screen.get_node("%s/%sPlayerId" % [hud_name, hud_name.left(2)]) as Label
+		var hero_name := screen.get_node("%s/%sActiveName" % [hud_name, hud_name.left(2)]) as Label
+		assert_false(player_id.visible, "%s 玩家名暂时隐藏" % hud_name)
+		assert_gt(hero_name.get_theme_constant("shadow_offset_x"), 0)
+		assert_gt(hero_name.get_theme_constant("shadow_offset_y"), 0)
+		assert_gt(hero_name.get_theme_color("font_shadow_color").a, 0.0)
+
+
+func test_battle_no_longer_builds_item_resolution_sequence_text() -> void:
+	var source := FileAccess.get_file_as_string("res://src/ui/battle_screen.gd")
+	assert_false(source.contains("结算序列："),
+			"道具结算继续按动画播放，但不再额外显示结算序列文字")
 
 
 func test_hero_gallery_uses_new_item_frame_geometry() -> void:

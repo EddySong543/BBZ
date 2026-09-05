@@ -96,7 +96,7 @@
 ### B-004 `select_action` 拒绝后 `selected_action=-1` 会让 `resolve()` 崩溃
 
 - **Status**：✅ Resolved (Code Fixed) — 2026-05-18 by Eddy. resolve() 开头加 guard：若 selected_action[p] < 0，push_warning 并 fallback 到 CHARGE
-- **Impact**：低（UI 当前兜底）/ 高（网络/AI 接入后）
+- **Impact**：低（UI 当前兜底）/ 高（未来 AI 或工具接入后）
 - **位置**：`battle_core.gd:202 select_action` + `resolve()` Phase 1 cost lookup
 - **Design Intent**：`§5 边界情况`："能量不足时选择消耗动作 → 动作不可选择（按钮置灰）"。设计假设 UI 会阻止这种状态进入 resolve()
 - **Current Behavior**：BattleCore 自身没有防御 — 若 `selected_action[p] = -1`，`resolve()` Phase 1 会调 `_get_action_cost(p, -1)` → 查 `BASE_ACTION_DEF[-1]` → KeyError 崩溃
@@ -108,7 +108,7 @@
 ### B-005 `_get_action_cost(BAI_SHOU)` 未 clamp 到 `BAI_SHOU_DAMAGE_CAP`
 
 - **Status**：✅ Resolved (Code Fixed) — 2026-05-18 by Eddy. `_get_action_cost(BAI_SHOU)` 改为 `clampi(energy, BAI_SHOU_MIN_COST, BAI_SHOU_DAMAGE_CAP)`，与 resolve() 内一致
-- **Impact**：低（当前无调用方读取，UI 不基于此值显示）；中（未来 AI / 网络 / UI 显示真实成本时会偏离）
+- **Impact**：低（当前无调用方读取，UI 不基于此值显示）；中（未来 AI / UI 显示真实成本时会偏离）
 - **位置**：`battle_core.gd:137 _get_action_cost` vs `battle_core.gd:294 resolve()` Phase 1 内 `spent = clampi(energy[p], 1, BAI_SHOU_DAMAGE_CAP)`
 - **Design Intent**：`design/heroes.md` h03 尾火："**百兽**（消耗全部能量(上限6)），造成等量次数的1点伤害"
 - **Current Behavior**：两处 cost 计算不一致：

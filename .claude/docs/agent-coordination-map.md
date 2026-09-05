@@ -25,7 +25,7 @@
     release-manager         -- 发布管线、版本管理、部署
     localization-lead       -- 国际化（i18n）、字符串表、翻译管线
     prototyper              -- 快速可丢弃原型、概念验证
-    security-engineer       -- 反作弊、漏洞利用、数据隐私、网络安全
+    security-engineer       -- 漏洞利用、数据隐私、存档安全
     accessibility-specialist -- WCAG、色盲模式、按键重映射、文本缩放
     live-ops-designer       -- 赛季、活动、战斗通行证、留存、实时经济
     community-manager       -- 补丁说明、玩家反馈、危机沟通
@@ -34,7 +34,6 @@
     unreal-specialist  -- UE5 负责人：Blueprint/C++、GAS 总览、UE 子系统
       ue-gas-specialist         -- GAS：技能、效果、属性、标签、预测
       ue-blueprint-specialist   -- Blueprint：BP/C++ 边界、图表规范、优化
-      ue-replication-specialist -- 联网：复制、RPC、预测、带宽
       ue-umg-specialist         -- UI：UMG、CommonUI、控件层级、数据绑定
 
     unity-specialist   -- Unity 负责人：MonoBehaviour/DOTS、Addressables、URP/HDRP
@@ -54,7 +53,7 @@
 sys  = systems-designer       gp  = gameplay-programmer
 lvl  = level-designer         ep  = engine-programmer
 eco  = economy-designer       ai  = ai-programmer
-ta   = technical-artist       net = network-programmer
+ta   = technical-artist
 wrt  = writer                 tl  = tools-programmer
 wrld = world-builder          ui  = ui-programmer
 snd  = sound-designer         qa-t = qa-tester
@@ -72,7 +71,7 @@ art-dir = art-director
 | technical-director | lead-programmer、devops-engineer、performance-analyst、technical-artist（技术决策） |
 | producer | 任意代理（仅限其领域内的任务分配） |
 | game-designer | systems-designer、level-designer、economy-designer |
-| lead-programmer | gameplay-programmer、engine-programmer、ai-programmer、network-programmer、tools-programmer、ui-programmer |
+| lead-programmer | gameplay-programmer、engine-programmer、ai-programmer、tools-programmer、ui-programmer |
 | art-director | technical-artist、ux-designer |
 | audio-director | sound-designer |
 | narrative-director | writer、world-builder |
@@ -80,7 +79,7 @@ art-dir = art-director
 | release-manager | devops-engineer（发布构建）、qa-lead（发布测试） |
 | localization-lead | writer（字符串审查）、ui-programmer（文本适配） |
 | prototyper | （独立工作，向 producer 和相关负责人汇报发现） |
-| security-engineer | network-programmer（安全审查）、lead-programmer（安全模式） |
+| security-engineer | lead-programmer（安全模式） |
 | accessibility-specialist | ux-designer（无障碍模式）、ui-programmer（实现）、qa-tester（无障碍测试） |
 | [engine]-specialist | 引擎子专家（委派子系统特定工作） |
 | [engine] 子专家 | （为所有程序员提供引擎子系统模式和优化建议） |

@@ -3,9 +3,6 @@ extends Control
 
 ## 编辑器专用的道具网格占位预览。运行时由 item_gallery_screen.gd 填入真实道具卡。
 const ITEM_FRAME_TEX := ItemFrameStyle.FRAME_TEXTURE
-const FRAME_ART_SCALE := ItemFrameStyle.FRAME_ART_SCALE
-const FRAME_OFFSET_RATIO := ItemFrameStyle.FRAME_OFFSET_RATIO
-const CELL_INSET_RATIO := ItemFrameStyle.CELL_INSET_RATIO
 const PREVIEW_CELL_TOP := ItemFrameStyle.CELL_TOP[1]
 const PREVIEW_CELL_BOTTOM := ItemFrameStyle.CELL_BOTTOM[1]
 # 兼容旧测试/编辑器工具命名。
@@ -53,19 +50,19 @@ func _draw() -> void:
 		return
 	for index in cards_per_page:
 		var origin := preview_card_position(index)
-		var inset := box_size * CELL_INSET_RATIO
-		var cell_rect := Rect2(origin + Vector2.ONE * inset, Vector2.ONE * (box_size - inset * 2.0))
+		var layout := ItemFrameStyle.item_frame_layout(
+			&"gallery_left", origin, box_size)
+		var cell_rect: Rect2 = layout["cell_rect"]
 		for band in range(12):
 			var band_t := float(band) / 11.0
 			var band_rect := Rect2(
 				cell_rect.position + Vector2(0.0, floorf(cell_rect.size.y * band_t)),
 				Vector2(cell_rect.size.x, ceilf(cell_rect.size.y / 11.0) + 1.0))
 			draw_rect(band_rect, PREVIEW_CELL_TOP.lerp(PREVIEW_CELL_BOTTOM, band_t))
-		var frame_rect := Rect2(
-			origin + Vector2.ONE * box_size * FRAME_OFFSET_RATIO,
-			Vector2.ONE * box_size * FRAME_ART_SCALE)
+		var frame_rect: Rect2 = layout["frame_rect"]
+		var frame_shadow_rect: Rect2 = layout["frame_shadow_rect"]
 		draw_texture_rect(ITEM_FRAME_TEX,
-			Rect2(frame_rect.position + ItemFrameStyle.DROP_SHADOW_OFFSET, frame_rect.size),
+			frame_shadow_rect,
 			false, ItemFrameStyle.DROP_SHADOW_COLOR)
 		draw_texture_rect(ITEM_FRAME_TEX, frame_rect, false)
 		draw_line(

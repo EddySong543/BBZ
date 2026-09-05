@@ -228,3 +228,39 @@ func test_shift_event_is_attached_to_source_column_and_wait_event_to_wait_column
 	assert_eq(columns[1]["events"][0]["id"], Timeline.EVENT_SEQUENCE_SHIFTED)
 	assert_eq(columns[2]["events"].size(), 1)
 	assert_eq(columns[2]["events"][0]["id"], Timeline.EVENT_SEQUENCE_WAIT_EXECUTED)
+
+
+func test_cancel_remaining_keeps_completed_columns_and_skips_alignment_waits() -> void:
+	var p0: Array[Dictionary] = [
+		_item("p0_setup", "item_a"),
+		_action("p0_action", "attack"),
+		_item("p0_after", "item_b"),
+	]
+	var p1: Array[Dictionary] = [
+		_action("p1_action", "charge"),
+		_item("p1_after", "item_c"),
+	]
+	var timeline: Timeline = _timeline(p0, p1)
+
+	_complete_next_column(timeline)
+	_complete_next_column(timeline)
+	var cancelled: Array[Dictionary] = timeline.cancel_remaining(
+		"active_hero_died", [1])
+	var result: Dictionary = timeline.to_result()
+
+	assert_false(timeline.has_next_column())
+	assert_eq(result["resolved_columns"].size(), 2)
+	assert_eq(cancelled.map(
+		func(event: Dictionary) -> String:
+			return String(event.get("step_id", ""))
+	), ["p0_after", "p1_after"])
+	assert_eq((result["events"] as Array).filter(
+		func(event: Dictionary) -> bool:
+			return String(event.get("id", "")) == Timeline.EVENT_SEQUENCE_TRUNCATED
+	).size(), 1)
+	assert_false((result["events"] as Array).any(
+		func(event: Dictionary) -> bool:
+			return String(event.get("reason", "")) == Timeline.WAIT_REASON_ACTION_ALIGNMENT
+	), "系统补齐的对齐等待不属于被取消的玩家步骤")
+	assert_eq(result["submitted_sequences"][0][2]["step_id"], "p0_after",
+		"截断不能改写玩家原始提交")

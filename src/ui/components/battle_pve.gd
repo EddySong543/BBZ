@@ -3,7 +3,7 @@ extends Node
 ## 远征 PvE 的窄适配层。
 ##
 ## 战斗规则、英雄技能、敌方决策和道具经济均由当前 BattleCore / BattleAI
-## 提供，与本地 PvP 共用。本组件只做三件事：复制完整 HeroData、应用跨战 HP、
+## 提供。本组件只做三件事：复制完整 HeroData、应用跨战 HP、
 ## 将战斗结果封装后返回远征。它不构造白板角色，不决定出招，也不手算脱战伤害。
 
 const PveBattleSession := preload("res://src/battle/pve_battle_session.gd")
@@ -35,7 +35,7 @@ func capture_result(outcome: String) -> Dictionary:
 	return PveBattleSession.capture_result(_host.battle if _host != null else null, outcome)
 
 
-## 终局是 PvE 唯一与本地 PvP 不同的流程出口：保存远征状态并返回地图。
+## 终局是 PvE 唯一的流程出口：保存远征状态并返回地图。
 func finish(outcome: String) -> void:
 	if _ending:
 		return

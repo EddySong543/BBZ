@@ -26,9 +26,16 @@ func test_frozen_prototype_pool_has_exactly_twenty_complete_items() -> void:
 		total_cells += item.cell_count()
 		total_price += item.full_price
 	assert_eq(costs, {0: 4, 1: 11, 2: 3, 3: 2})
-	assert_eq(durabilities, {1: 11, 2: 7, 3: 2})
+	assert_eq(durabilities, {1: 12, 2: 6, 3: 2})
 	assert_eq(total_cells, 39)
-	assert_eq(total_price, 530_000)
+	assert_eq(total_price, 526_000)
+
+
+func test_thorn_bracer_uses_approved_single_use_value() -> void:
+	var item: ItemData = ItemCatalog.make("v2_t1_thorn_bracer")
+	assert_eq(item.max_durability, 1)
+	assert_eq(item.full_price, 24_000)
+	assert_true(item.damaged_prices.is_empty())
 
 
 func test_legacy_items_remain_directly_loadable_but_are_not_active() -> void:

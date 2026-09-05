@@ -35,7 +35,7 @@
 
 ### 沉淀这份 ADR 的动机
 
-P0-1 / P0-2 / P0-3 是密集做出的架构级决策，但之前散落在 commit message / memory / risk-notes。本 ADR **第一次**把 BattleCore 的对外契约边界总览固化下来，作为未来 P1+ 任务（UI 拆分、联网、i18n）的参照锚。
+P0-1 / P0-2 / P0-3 是密集做出的架构级决策，但之前散落在 commit message / memory / risk-notes。本 ADR **第一次**把 BattleCore 的对外契约边界总览固化下来，作为未来 P1+ 任务（UI 拆分、回放、i18n）的参照锚。
 
 ---
 
@@ -69,7 +69,7 @@ P0-1 / P0-2 / P0-3 是密集做出的架构级决策，但之前散落在 commit
 
 **Rationale**:
 - 解锁 i18n（远期 P2-8）：翻译只需替换 EventFormatter
-- 解锁联网（远期 P3）：客户端直接读结构化事件做特效 / 飘字，不必反向 parse 字符串
+- 解锁稳定回放与无障碍表现层：UI 直接读结构化事件做特效 / 飘字，不必反向 parse 字符串
 - 解锁测试稳定性：测试断言 `events[0].id`，不再受文案改动影响
 
 ---
@@ -140,7 +140,7 @@ P0-1 / P0-2 / P0-3 是密集做出的架构级决策，但之前散落在 commit
 - 在 P1-5 完成前，新加 UI 代码**应优先使用 getter**（如已有 `active_hero(p)`、`current_hp(p)`、`get_living_reserves(p)` 等），不要新增直读私有字段
 
 **Rationale**:
-- 联网（P3）要求 BattleCore 可以在服务端独立运行，不能依赖 UI
+- 回放与工具（P3）要求 BattleCore 可以在无 UI 环境独立运行
 - 单向依赖让 BattleCore 的单元测试不需要 mock 任何 UI
 - Partial 状态是务实选择 —— 完全严格会推迟 P1-5
 
@@ -151,7 +151,7 @@ P0-1 / P0-2 / P0-3 是密集做出的架构级决策，但之前散落在 commit
 ### 解锁的事
 
 - **i18n（P2-8）**：D2 + D3 让翻译聚焦于 EventFormatter 一个文件；HeroData.skill_description 等 i18n key 化也具备前提
-- **联网（P3）**：D2 + D3 + D5 让 BattleCore 可在服务端独立运行；结构化事件可直接做协议
+- **回放与工具（P3）**：D2 + D3 + D5 让 BattleCore 可在无 UI 环境独立运行；结构化事件可直接驱动表现层
 - **新英雄无代码协作**：D1 让美术 / 策划在 Inspector 直改 `.tres`
 - **战斗逻辑测试稳定**：D2 让测试断言 event_id 而非字符串
 

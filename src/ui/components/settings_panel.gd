@@ -1,390 +1,607 @@
 class_name SettingsPanel
 extends Control
 
-## 设置弹框（主菜单/战斗共用·GameSettings 即时应用+持久化·点遮罩/关闭钮/ESC 关闭）。
-## 2026-07-15 换装（Epic 项⑦·Eddy 选 A）：程序占位羊皮板退役→家族语言全套——
-## 面板身=抽卡纸卡 item_draft_card ×2 整数放大（263×355→526×710·像素无损）+贴形投影；
-## 标题=牌匾 9-slice 骑缝悬挂+墨字（图鉴同配方）；切换钮/底钮=导航钮皮（全游戏导航一语言）；
-## 滑块=深巧克力轨+实心金方滑柄（纹样"粗笔+实心芯"同语）；主色 swatch=近黑描边框。
-## 显示模式/分辨率链路 2026-07-15 实测 6 项 PASS（tools/display_probe·⚠编辑器内嵌运行不生效属正常）。
+## 完整纯文字设置页：分类、设置值、恢复默认与返回均不引用外部 UI 美术资产。
 
 signal closed
 
-const CARD_TEX := preload("res://assets/ui/item_draft_card.png")
-const PLAQUE_TEX := preload("res://assets/ui/ui_plaque.png")
-const NAV_PLATE_TEX := preload("res://assets/ui/ui_nav_button.png")
-const NAV_PLATE_MARGIN_X := 22   # v14 净面（main_menu/图鉴同值）
-const NAV_PLATE_MARGIN_Y := 20
-
-const INK := Color(0.24, 0.19, 0.12)           # 墨（纸面主文字·图鉴同值）
-const INK_DIM := Color(0.48, 0.41, 0.28)       # 淡墨（次级字/分隔线·图鉴同值）
-const NEAR_BLACK := Color("130c08")            # 近黑（家族描边色·资产实测）
-const GOLD := Color("d4a94e")                  # 平头金（滑柄/填充带）
-const CHOCO := Color("4f2b14")                 # 深巧克力（滑轨·家族纹线色）
-const SHADOW_TINT := Color(0.10, 0.07, 0.05, 0.38)   # 贴形投影暖黑（图鉴牌匾同值）
-
-const CARD_SIZE := Vector2(526.0, 710.0)       # item_draft_card 263×355 ×2 整数放大
-const PLAQUE_SIZE := Vector2(240.0, 62.0)
-
-## 显示模式选项（键=GameSettings 值·序=循环切换顺序）。
+const CONTENT_SIZE := Vector2(1040.0, 760.0)
+const CATEGORY_KEYS: Array[String] = ["display", "audio", "gameplay"]
+const CATEGORY_LABELS: Array[String] = ["显示", "声音", "游戏"]
+const PAGE_RECT := Rect2(344.0, 148.0, 630.0, 430.0)
+const CATEGORY_GROUP_TOP: float = 265.0
+const CATEGORY_RECTS: Array[Rect2] = [
+	Rect2(54.0, CATEGORY_GROUP_TOP, 224.0, 52.0),
+	Rect2(54.0, CATEGORY_GROUP_TOP + 72.0, 224.0, 52.0),
+	Rect2(54.0, CATEGORY_GROUP_TOP + 144.0, 224.0, 52.0),
+]
+const MARKER_SIZE := Vector2(30.0, 52.0)
+const MARKER_GAP: float = 12.0
+const ROW_HEIGHT: float = 54.0
+const ROW_GAP: float = 18.0
+const VOLUME_STEP: float = 0.05
 const WINDOW_MODES: Array[String] = ["windowed", "borderless", "fullscreen"]
-const WINDOW_MODE_NAMES := {
+const WINDOW_MODE_LABELS := {
 	"windowed": "窗口化",
 	"borderless": "全屏窗口化",
-	"fullscreen": "全屏(独占)",
+	"fullscreen": "独占全屏",
 }
+const TEXT_TITLE := Color("e4d8c5")
+const TEXT_PRIMARY := Color("b8aea1")
+const TEXT_SELECTED := Color("ffe0a0")
+const TEXT_SECONDARY := Color("91887d")
+const TEXT_DISABLED := Color("6f6860")
 
-var _swatch_sb: StyleBoxFlat
-var _res_button: Button
-var _grabber_tex: ImageTexture
+## 测试可关闭实际应用与落盘，生产默认始终即时应用并保存。
+var persist_changes: bool = true
+
+var _content: Control
+var _page_content: Control
+var _category_buttons: Array[Button] = []
+var _category_marker: Label
+var _selected_index: int = 0
+var _hovered_index: int = -1
+var _focused_index: int = -1
+var _value_labels: Dictionary = {}
+var _selector_rows: Dictionary = {}
+var _editing_volume_key: String = ""
+var _editing_volume_original: String = ""
+var _normalizing_volume_text: bool = false
 
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	mouse_filter = Control.MOUSE_FILTER_STOP   # 吞住背后输入
+	mouse_filter = Control.MOUSE_FILTER_STOP
 	_build()
-	modulate.a = 0.0
-	create_tween().tween_property(self, "modulate:a", 1.0, 0.18)
 
-
-# ============================================================
-# 构建
-# ============================================================
 
 func _build() -> void:
-	# 半透暖黑遮罩（点击空白关闭）
-	var dim := ColorRect.new()
-	dim.color = Color(0.05, 0.03, 0.02, 0.58)
-	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	dim.mouse_filter = Control.MOUSE_FILTER_STOP
-	dim.gui_input.connect(_on_dim_input)
-	add_child(dim)
+	_content = Control.new()
+	_content.name = "SettingsContent"
+	_content.set_anchors_preset(Control.PRESET_CENTER)
+	_content.offset_left = -CONTENT_SIZE.x * 0.5
+	_content.offset_top = -CONTENT_SIZE.y * 0.5
+	_content.offset_right = CONTENT_SIZE.x * 0.5
+	_content.offset_bottom = CONTENT_SIZE.y * 0.5
+	_content.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(_content)
 
-	# 中央纸卡（贴形投影+卡身·入场轻收拢 pop）
-	var card := Control.new()
-	card.set_anchors_preset(Control.PRESET_CENTER)
-	card.offset_left = -CARD_SIZE.x * 0.5
-	card.offset_top = -CARD_SIZE.y * 0.5
-	card.offset_right = CARD_SIZE.x * 0.5
-	card.offset_bottom = CARD_SIZE.y * 0.5
-	card.pivot_offset = CARD_SIZE * 0.5
-	add_child(card)
-	card.scale = Vector2(0.96, 0.96)
-	create_tween().tween_property(card, "scale", Vector2.ONE, 0.14) \
-		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-
-	var cshadow := _card_tex_rect()
-	cshadow.position = Vector2(6.0, 8.0)
-	cshadow.modulate = SHADOW_TINT
-	card.add_child(cshadow)
-	var body := _card_tex_rect()
-	body.mouse_filter = Control.MOUSE_FILTER_STOP   # 面板身吞点击（防漏到遮罩关闭）
-	card.add_child(body)
-
-	# 牌匾标题（骑缝悬挂在卡顶·贴形投影——图鉴同配方）
-	var px := (CARD_SIZE.x - PLAQUE_SIZE.x) * 0.5
-	var py := -PLAQUE_SIZE.y * 0.5
-	var pshadow := _plaque_rect()
-	pshadow.position = Vector2(px + 6.0, py + 8.0)
-	pshadow.modulate = SHADOW_TINT
-	card.add_child(pshadow)
-	var plaque := _plaque_rect()
-	plaque.position = Vector2(px, py)
-	card.add_child(plaque)
-	var title := Label.new()
-	title.text = tr("设置")
-	title.position = Vector2(px, py - 4.0)
-	title.size = PLAQUE_SIZE
+	var title := _label("设置", 40, TEXT_TITLE)
+	title.name = "SettingsTitle"
+	title.position = Vector2(0.0, 38.0)
+	title.size = Vector2(CONTENT_SIZE.x, 64.0)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	FontManager.apply(title, 36)
-	title.add_theme_color_override("font_color", INK)
-	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(title)
+	_content.add_child(title)
 
-	# 内容（卡内线以内·顶部让开牌匾下半）
-	var margin := MarginContainer.new()
-	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 58)
-	margin.add_theme_constant_override("margin_right", 58)
-	margin.add_theme_constant_override("margin_top", 68)
-	margin.add_theme_constant_override("margin_bottom", 48)
-	card.add_child(margin)
+	var category_nav := Control.new()
+	category_nav.name = "CategoryNav"
+	category_nav.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	category_nav.mouse_filter = Control.MOUSE_FILTER_PASS
+	_content.add_child(category_nav)
 
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 26)
-	margin.add_child(vbox)
+	for index: int in CATEGORY_LABELS.size():
+		var button := _category_button(CATEGORY_LABELS[index], index)
+		button.name = "%sButton" % CATEGORY_KEYS[index].capitalize()
+		_category_buttons.append(button)
+		category_nav.add_child(button)
 
-	# —— 界面主色 翻转 ——
-	vbox.add_child(_color_row())
-	# —— 显示（模式循环切换 + 窗口化分辨率）——
-	vbox.add_child(_window_mode_row())
-	vbox.add_child(_resolution_row())
-	_refresh_res_enabled()
-	vbox.add_child(_separator())
-	# —— 音量 ——
-	vbox.add_child(_slider_row("总音量", "master_volume"))
-	vbox.add_child(_slider_row("音乐", "music_volume"))
-	vbox.add_child(_slider_row("音效", "sfx_volume"))
-	vbox.add_child(_separator())
+	_category_marker = _label(">", 28, TEXT_SELECTED)
+	_category_marker.name = "CategoryMarker"
+	_category_marker.size = MARKER_SIZE
+	_category_marker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_category_marker.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	category_nav.add_child(_category_marker)
 
-	# 弹性撑挡：把底钮压到卡底（内容组靠上·卡下部不留大片空白纸）
-	var spacer := Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vbox.add_child(spacer)
+	_page_content = Control.new()
+	_page_content.name = "PageContent"
+	_page_content.position = PAGE_RECT.position
+	_page_content.size = PAGE_RECT.size
+	_page_content.mouse_filter = Control.MOUSE_FILTER_PASS
+	_content.add_child(_page_content)
 
-	# —— 底部按钮 ——
-	var btn_row := HBoxContainer.new()
-	btn_row.add_theme_constant_override("separation", 22)
-	btn_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	var reset := _make_button("恢复默认")
-	reset.pressed.connect(_on_reset)
-	btn_row.add_child(reset)
-	var close := _make_button("关闭")
-	close.pressed.connect(_close)
-	btn_row.add_child(close)
-	vbox.add_child(btn_row)
+	var reset := _plain_button("恢复默认", 22, TEXT_SECONDARY)
+	reset.name = "ResetButton"
+	reset.position = Vector2(292.0, 654.0)
+	reset.size = Vector2(210.0, 48.0)
+	reset.pressed.connect(_reset_defaults)
+	_content.add_child(reset)
+
+	var back := _plain_button("返回", 24, TEXT_PRIMARY)
+	back.name = "BackButton"
+	back.position = Vector2(538.0, 654.0)
+	back.size = Vector2(210.0, 48.0)
+	back.pressed.connect(_close)
+	_content.add_child(back)
+
+	_refresh_category_visuals()
+	_build_current_page()
+	_category_buttons[0].call_deferred("grab_focus")
 
 
-func _card_tex_rect() -> TextureRect:
-	var t := TextureRect.new()
-	t.texture = CARD_TEX
-	t.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	t.stretch_mode = TextureRect.STRETCH_SCALE
-	t.size = CARD_SIZE
-	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	return t
+func _category_button(label_text: String, index: int) -> Button:
+	var button := _plain_button(label_text, 30, TEXT_PRIMARY)
+	button.position = CATEGORY_RECTS[index].position
+	button.size = CATEGORY_RECTS[index].size
+	button.pressed.connect(_select_category.bind(index))
+	button.mouse_entered.connect(_preview_category.bind(index))
+	button.mouse_exited.connect(_clear_category_preview.bind(index))
+	button.focus_entered.connect(_focus_category.bind(index))
+	button.focus_exited.connect(_unfocus_category.bind(index))
+	return button
 
 
-func _plaque_rect() -> NinePatchRect:
-	var p := NinePatchRect.new()
-	p.texture = PLAQUE_TEX
-	p.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	p.patch_margin_left = 26   # 新牌匾（265×63）角钩区实量（图鉴同值）
-	p.patch_margin_right = 26
-	p.patch_margin_top = 23
-	p.patch_margin_bottom = 23
-	p.size = PLAQUE_SIZE
-	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	return p
+func _plain_button(label_text: String, font_size: int, color: Color) -> Button:
+	var button := Button.new()
+	button.text = tr(label_text)
+	button.focus_mode = Control.FOCUS_ALL
+	button.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	FontManager.apply_btn(button, font_size)
+	_set_button_color(button, color)
+	var empty := StyleBoxEmpty.new()
+	button.add_theme_stylebox_override("normal", empty)
+	button.add_theme_stylebox_override("hover", empty)
+	button.add_theme_stylebox_override("pressed", empty)
+	button.add_theme_stylebox_override("focus", empty)
+	button.add_theme_stylebox_override("disabled", empty)
+	return button
 
 
-# ============================================================
-# 行构件
-# ============================================================
-
-func _separator() -> Control:
-	var line := ColorRect.new()
-	line.color = Color(INK_DIM, 0.5)
-	line.custom_minimum_size = Vector2(0.0, 2.0)
-	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	return line
-
-
-func _row_label(text: String) -> Label:
-	var l := Label.new()
-	l.text = tr(text)
-	FontManager.apply(l, 24)
-	l.add_theme_color_override("font_color", INK)
-	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	return l
+func _label(text_value: String, font_size: int, color: Color) -> Label:
+	var label := Label.new()
+	label.text = tr(text_value)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_shadow_color", Color(0.05, 0.04, 0.04, 0.82))
+	label.add_theme_constant_override("shadow_offset_x", 2)
+	label.add_theme_constant_override("shadow_offset_y", 2)
+	FontManager.apply(label, font_size)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return label
 
 
-## 导航钮皮按钮（图鉴返回钮同配方：文字钮空样式+背后 9-slice 签牌+ButtonJuice）。
-func _make_button(text: String, min_size := Vector2(150.0, 46.0)) -> Button:
-	var b := Button.new()
-	b.text = tr(text)
-	FontManager.apply_btn(b, 22)
-	b.add_theme_color_override("font_color", INK)
-	b.add_theme_color_override("font_hover_color", INK)
-	b.add_theme_color_override("font_pressed_color", INK)
-	b.add_theme_color_override("font_focus_color", INK)
-	b.add_theme_color_override("font_disabled_color", Color(INK, 0.55))
-	for s in ["normal", "hover", "pressed", "focus", "disabled"]:
-		b.add_theme_stylebox_override(s, StyleBoxEmpty.new())
-	b.custom_minimum_size = min_size
-	var plate := NinePatchRect.new()
-	plate.name = "Plate"
-	plate.texture = NAV_PLATE_TEX
-	plate.patch_margin_left = NAV_PLATE_MARGIN_X
-	plate.patch_margin_right = NAV_PLATE_MARGIN_X
-	plate.patch_margin_top = NAV_PLATE_MARGIN_Y
-	plate.patch_margin_bottom = NAV_PLATE_MARGIN_Y
-	plate.axis_stretch_horizontal = NinePatchRect.AXIS_STRETCH_MODE_TILE
-	plate.axis_stretch_vertical = NinePatchRect.AXIS_STRETCH_MODE_TILE
-	plate.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	plate.show_behind_parent = true
-	plate.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE   # ⚠ 缺这行=吞点击
-	b.add_child(plate)
-	var bj := ButtonJuice.new()
-	bj.name = "ButtonJuice"
-	b.add_child(bj)
-	return b
+func _select_category(index: int) -> void:
+	_selected_index = clampi(index, 0, CATEGORY_KEYS.size() - 1)
+	_focused_index = _selected_index
+	_category_buttons[_selected_index].grab_focus()
+	_refresh_category_visuals()
+	_build_current_page()
 
 
-## 显示模式行：标签 + 循环切换钮（窗口化 → 全屏窗口化 → 全屏独占 → 循环）。
-func _window_mode_row() -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.add_child(_row_label("显示模式"))
-	var btn := _make_button(String(WINDOW_MODE_NAMES.get(String(GameSettings.get_value("window_mode")), "窗口化")), Vector2(216.0, 46.0))
-	btn.pressed.connect(func() -> void:
-		var cur: int = WINDOW_MODES.find(String(GameSettings.get_value("window_mode")))
-		var next: String = WINDOW_MODES[(cur + 1) % WINDOW_MODES.size()]
-		GameSettings.set_value("window_mode", next)
-		btn.text = tr(String(WINDOW_MODE_NAMES[next]))
-		_refresh_res_enabled())
-	row.add_child(btn)
-	return row
+func _preview_category(index: int) -> void:
+	_hovered_index = clampi(index, 0, CATEGORY_KEYS.size() - 1)
+	_refresh_category_visuals()
 
 
-## 分辨率行（仅窗口化模式可用）：标签 + 循环切换钮（预设按屏幕大小过滤）。
-func _resolution_row() -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.add_child(_row_label("分辨率"))
-	_res_button = _make_button(String(GameSettings.get_value("resolution")), Vector2(216.0, 46.0))
-	_res_button.pressed.connect(func() -> void:
-		var opts: Array[String] = _available_resolutions()
-		var cur: int = opts.find(String(GameSettings.get_value("resolution")))
-		var next: String = opts[(cur + 1) % opts.size()]
-		GameSettings.set_value("resolution", next)
-		_res_button.text = next)
-	row.add_child(_res_button)
-	return row
+func _clear_category_preview(index: int) -> void:
+	if _hovered_index == index:
+		_hovered_index = -1
+		_refresh_category_visuals()
 
 
-## 预设分辨率按当前屏幕过滤（不给出比屏幕还大的选项）；全被滤掉时保底设计画布档。
-func _available_resolutions() -> Array[String]:
-	var scr := DisplayServer.screen_get_size()
-	var out: Array[String] = []
-	for r in GameSettings.RESOLUTION_PRESETS:
-		var sz := GameSettings.parse_resolution(r)
-		if sz.x <= scr.x and sz.y <= scr.y:
-			out.append(r)
-	if out.is_empty():
-		out.append("1920x1080")
-	return out
+func _focus_category(index: int) -> void:
+	_focused_index = clampi(index, 0, CATEGORY_KEYS.size() - 1)
+	_refresh_category_visuals()
 
 
-## 分辨率行仅窗口化模式可点（全屏两档尺寸由系统接管）。
-func _refresh_res_enabled() -> void:
-	if _res_button == null:
+func _unfocus_category(index: int) -> void:
+	if _focused_index == index:
+		_focused_index = -1
+		_refresh_category_visuals()
+
+
+func _refresh_category_visuals() -> void:
+	if _category_buttons.is_empty() or not is_instance_valid(_category_marker):
 		return
-	var windowed: bool = String(GameSettings.get_value("window_mode")) == "windowed"
-	_res_button.disabled = not windowed
-	_res_button.modulate.a = 1.0 if windowed else 0.45
+	var visual_index: int = _selected_index
+	if _focused_index >= 0:
+		visual_index = _focused_index
+	if _hovered_index >= 0:
+		visual_index = _hovered_index
+	for index: int in _category_buttons.size():
+		var color: Color = TEXT_SELECTED if index == visual_index else TEXT_PRIMARY
+		_set_button_color(_category_buttons[index], color)
+	_move_marker(visual_index)
 
 
-## 滑块行（音量）：标签 + 族色 HSlider（深巧克力轨+金填充+实心金方滑柄）+ 百分比。
-func _slider_row(label_text: String, key: String) -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 14)
-	row.add_child(_row_label(label_text))
-	var slider := HSlider.new()
-	slider.min_value = 0.0
-	slider.max_value = 1.0
-	slider.step = 0.05
-	slider.value = float(GameSettings.get_value(key))
-	slider.custom_minimum_size = Vector2(230.0, 36.0)
-	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_style_slider(slider)
-	var pct := Label.new()
-	pct.custom_minimum_size = Vector2(70.0, 0.0)
-	FontManager.apply(pct, 20)
-	pct.add_theme_color_override("font_color", INK_DIM)
-	pct.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	pct.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	pct.text = "%d%%" % roundi(slider.value * 100.0)
-	slider.value_changed.connect(func(v: float) -> void:
-		GameSettings.set_value(key, v)
-		pct.text = "%d%%" % roundi(v * 100.0))
-	row.add_child(slider)
-	row.add_child(pct)
-	return row
+func _set_button_color(button: Button, color: Color) -> void:
+	button.add_theme_color_override("font_color", color)
+	button.add_theme_color_override("font_hover_color", TEXT_SELECTED)
+	button.add_theme_color_override("font_pressed_color", TEXT_SELECTED)
+	button.add_theme_color_override("font_focus_color", TEXT_SELECTED)
+	button.add_theme_color_override("font_disabled_color", TEXT_DISABLED)
+	button.add_theme_color_override("font_shadow_color", Color(0.05, 0.04, 0.04, 0.82))
+	button.add_theme_constant_override("shadow_offset_x", 2)
+	button.add_theme_constant_override("shadow_offset_y", 2)
 
 
-## 滑块族色化：轨=深巧克力细条·已填带=金·滑柄=实心金方块+近黑描边（程序生成一次复用）。
-func _style_slider(slider: HSlider) -> void:
-	var track := StyleBoxFlat.new()
-	track.bg_color = CHOCO
-	track.content_margin_top = 3.0
-	track.content_margin_bottom = 3.0
-	slider.add_theme_stylebox_override("slider", track)
-	var filled := StyleBoxFlat.new()
-	filled.bg_color = GOLD
-	filled.content_margin_top = 3.0
-	filled.content_margin_bottom = 3.0
-	slider.add_theme_stylebox_override("grabber_area", filled)
-	slider.add_theme_stylebox_override("grabber_area_highlight", filled)
-	if _grabber_tex == null:
-		var img := Image.create(18, 18, false, Image.FORMAT_RGBA8)
-		img.fill(NEAR_BLACK)
-		img.fill_rect(Rect2i(2, 2, 14, 14), GOLD)
-		_grabber_tex = ImageTexture.create_from_image(img)
-	slider.add_theme_icon_override("grabber", _grabber_tex)
-	slider.add_theme_icon_override("grabber_highlight", _grabber_tex)
-	slider.add_theme_icon_override("grabber_disabled", _grabber_tex)
+func _move_marker(index: int) -> void:
+	var button: Button = _category_buttons[index]
+	var font: Font = button.get_theme_font("font")
+	var font_size: int = button.get_theme_font_size("font_size")
+	var text_width: float = font.get_string_size(button.text,
+			HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x
+	var rect: Rect2 = CATEGORY_RECTS[index]
+	_category_marker.position = Vector2(
+			rect.get_center().x - text_width * 0.5 - MARKER_SIZE.x - MARKER_GAP,
+			rect.position.y).round()
 
 
-## 界面主色 翻转行：标签 + 当前主色色块（近黑描边框）+ 「翻转颜色」钮。
-## 点钮 → invert_colors 取反 → 实时刷新菜单/BP 波流背景 + 色块（红↔蓝即时可见）。
-func _color_row() -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 14)
-	row.add_child(_row_label("界面主色"))
-	var swatch := Panel.new()
-	_swatch_sb = StyleBoxFlat.new()
-	_swatch_sb.bg_color = BootResult.dip_color()
-	_swatch_sb.border_color = NEAR_BLACK
-	for side in ["border_width_left", "border_width_right", "border_width_top", "border_width_bottom"]:
-		_swatch_sb.set(side, 2)
-	swatch.add_theme_stylebox_override("panel", _swatch_sb)
-	swatch.custom_minimum_size = Vector2(48.0, 36.0)
-	swatch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	swatch.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_child(swatch)
-	var flip := _make_button("翻转颜色")
-	flip.pressed.connect(_on_flip_color)
-	row.add_child(flip)
-	return row
+func _build_current_page() -> void:
+	for child: Node in _page_content.get_children():
+		_page_content.remove_child(child)
+		child.queue_free()
+	_value_labels.clear()
+	_selector_rows.clear()
+	_editing_volume_key = ""
+	_editing_volume_original = ""
+
+	match CATEGORY_KEYS[_selected_index]:
+		"audio":
+			_build_audio_page()
+		"display":
+			_build_display_page()
+		"gameplay":
+			_build_gameplay_page()
+		_:
+			return
+	_refresh_page_values()
 
 
-# ============================================================
-# 行为
-# ============================================================
-
-func _on_flip_color() -> void:
-	GameSettings.set_value("invert_colors", not bool(GameSettings.get_value("invert_colors")))
-	get_tree().call_group("wave_flow_bg", "refresh_colors")   # 实时刷新菜单/BP 背景
-	if _swatch_sb != null:
-		_swatch_sb.bg_color = BootResult.dip_color()
-
-
-func _on_reset() -> void:
-	GameSettings.reset_defaults()
-	get_tree().call_group("wave_flow_bg", "refresh_colors")
-	# 重建面板以反映默认值
-	for c in get_children():
-		c.queue_free()
-	_build()
+func _build_audio_page() -> void:
+	_add_selector_row("MasterVolumeRow", "总音量", "master_volume", 0, 3,
+			_change_volume.bind("master_volume", -VOLUME_STEP),
+			_change_volume.bind("master_volume", VOLUME_STEP))
+	_add_selector_row("MusicVolumeRow", "音乐", "music_volume", 1, 3,
+			_change_volume.bind("music_volume", -VOLUME_STEP),
+			_change_volume.bind("music_volume", VOLUME_STEP))
+	_add_selector_row("SfxVolumeRow", "音效", "sfx_volume", 2, 3,
+			_change_volume.bind("sfx_volume", -VOLUME_STEP),
+			_change_volume.bind("sfx_volume", VOLUME_STEP))
 
 
-func _on_dim_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed \
-			and event.button_index == MOUSE_BUTTON_LEFT:
-		_close()
+func _build_display_page() -> void:
+	_add_selector_row("WindowModeRow", "显示模式", "window_mode", 0, 4,
+			_cycle_setting.bind("window_mode", WINDOW_MODES, -1),
+			_cycle_setting.bind("window_mode", WINDOW_MODES, 1))
+	var resolutions: Array[String] = _available_resolutions()
+	_add_selector_row("ResolutionRow", "分辨率", "resolution", 1, 4,
+			_cycle_setting.bind("resolution", resolutions, -1),
+			_cycle_setting.bind("resolution", resolutions, 1))
+	_add_selector_row("VsyncRow", "垂直同步", "vsync_enabled", 2, 4,
+			_toggle_setting.bind("vsync_enabled"),
+			_toggle_setting.bind("vsync_enabled"))
+	_add_selector_row("FrameLimitRow", "帧率上限", "frame_limit", 3, 4,
+			_cycle_setting.bind("frame_limit", GameSettings.FRAME_LIMIT_PRESETS, -1),
+			_cycle_setting.bind("frame_limit", GameSettings.FRAME_LIMIT_PRESETS, 1))
+
+
+func _build_gameplay_page() -> void:
+	_add_selector_row("ScreenShakeRow", "画面震动", "screen_shake_enabled", 0, 1,
+			_toggle_setting.bind("screen_shake_enabled"),
+			_toggle_setting.bind("screen_shake_enabled"))
+
+
+func _add_selector_row(node_name: String, label_text: String, key: String,
+		row_index: int, row_count: int,
+		previous_action: Callable, next_action: Callable) -> void:
+	var row := Control.new()
+	row.name = node_name
+	var group_height: float = row_count * ROW_HEIGHT + (row_count - 1) * ROW_GAP
+	var group_top: float = (PAGE_RECT.size.y - group_height) * 0.5
+	row.position = Vector2(0.0, group_top + row_index * (ROW_HEIGHT + ROW_GAP)).round()
+	row.size = Vector2(PAGE_RECT.size.x, ROW_HEIGHT)
+	row.mouse_filter = Control.MOUSE_FILTER_PASS
+	_page_content.add_child(row)
+
+	var setting_label := _label(label_text, 24, TEXT_PRIMARY)
+	setting_label.name = "SettingLabel"
+	setting_label.position = Vector2(0.0, 0.0)
+	setting_label.size = Vector2(210.0, ROW_HEIGHT)
+	setting_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(setting_label)
+
+	var previous := _plain_button("<", 24, TEXT_PRIMARY)
+	previous.name = "PreviousButton"
+	previous.position = Vector2(250.0, 0.0)
+	previous.size = Vector2(52.0, ROW_HEIGHT)
+	previous.pressed.connect(previous_action)
+	row.add_child(previous)
+
+	var value: Control
+	if key in ["master_volume", "music_volume", "sfx_volume"]:
+		value = _volume_editor(key)
+	else:
+		var value_label := _label("", 23, TEXT_TITLE)
+		value_label.name = "ValueLabel"
+		value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		value_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		value = value_label
+	value.position = Vector2(304.0, 0.0)
+	value.size = Vector2(220.0, ROW_HEIGHT)
+	row.add_child(value)
+
+	var next := _plain_button(">", 24, TEXT_PRIMARY)
+	next.name = "NextButton"
+	next.position = Vector2(526.0, 0.0)
+	next.size = Vector2(52.0, ROW_HEIGHT)
+	next.pressed.connect(next_action)
+	row.add_child(next)
+
+	_value_labels[key] = value
+	_selector_rows[key] = {
+		"row": row,
+		"previous": previous,
+		"next": next,
+	}
+
+
+func _volume_editor(key: String) -> LineEdit:
+	var editor := LineEdit.new()
+	editor.name = "ValueInput"
+	editor.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	editor.editable = false
+	editor.max_length = 4
+	editor.placeholder_text = "0–100"
+	editor.select_all_on_focus = false
+	editor.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER
+	editor.add_theme_font_override("font", FontManager._best_font(23))
+	editor.add_theme_font_size_override("font_size", 23)
+	editor.add_theme_color_override("font_color", TEXT_TITLE)
+	editor.add_theme_color_override("font_uneditable_color", TEXT_TITLE)
+	editor.add_theme_color_override("caret_color", TEXT_SELECTED)
+	editor.add_theme_color_override("selection_color", Color(0.58, 0.43, 0.24, 0.72))
+	for state: String in ["normal", "focus", "read_only"]:
+		editor.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+	editor.gui_input.connect(_on_volume_editor_gui_input.bind(key, editor))
+	editor.text_changed.connect(_on_volume_editor_text_changed.bind(editor))
+	editor.text_submitted.connect(_commit_volume_edit.bind(key, editor))
+	editor.focus_exited.connect(_on_volume_editor_focus_exited.bind(key, editor))
+	editor.mouse_entered.connect(_set_volume_editor_emphasis.bind(editor, true))
+	editor.mouse_exited.connect(_set_volume_editor_emphasis.bind(editor, false))
+	return editor
+
+
+func _on_volume_editor_gui_input(event: InputEvent, key: String,
+		editor: LineEdit) -> void:
+	if event is InputEventMouseButton:
+		var mouse_event := event as InputEventMouseButton
+		if not mouse_event.pressed:
+			return
+		match mouse_event.button_index:
+			MOUSE_BUTTON_LEFT:
+				if not editor.editable:
+					_begin_volume_edit(key, editor)
+					editor.accept_event()
+				elif mouse_event.double_click:
+					editor.select_all()
+					editor.accept_event()
+			MOUSE_BUTTON_WHEEL_UP:
+				_step_volume(key, 1, editor)
+				editor.accept_event()
+			MOUSE_BUTTON_WHEEL_DOWN:
+				_step_volume(key, -1, editor)
+				editor.accept_event()
+		return
+	if event is not InputEventKey:
+		return
+	var key_event := event as InputEventKey
+	if not key_event.pressed or key_event.echo:
+		return
+	match key_event.keycode:
+		KEY_UP:
+			_step_volume(key, 1, editor)
+			editor.accept_event()
+		KEY_DOWN:
+			_step_volume(key, -1, editor)
+			editor.accept_event()
+
+
+func _on_volume_editor_text_changed(text_value: String, editor: LineEdit) -> void:
+	if _normalizing_volume_text or not editor.editable:
+		return
+	var digits := ""
+	for character: String in text_value:
+		var codepoint: int = character.unicode_at(0)
+		if codepoint >= 48 and codepoint <= 57:
+			digits += character
+	if digits.length() > 3:
+		digits = digits.left(3)
+	if digits == text_value:
+		return
+	_normalizing_volume_text = true
+	editor.text = digits
+	editor.caret_column = digits.length()
+	_normalizing_volume_text = false
+
+
+func _set_volume_editor_emphasis(editor: LineEdit, emphasized: bool) -> void:
+	var color: Color = TEXT_SELECTED if emphasized or editor.editable else TEXT_TITLE
+	editor.add_theme_color_override("font_color", color)
+	editor.add_theme_color_override("font_uneditable_color", color)
+
+
+func _step_volume(key: String, direction: int, editor: LineEdit) -> void:
+	var current_percent: int = roundi(float(GameSettings.get_value(key)) * 100.0)
+	if editor.editable and editor.text.is_valid_int():
+		current_percent = editor.text.to_int()
+	var next_percent: int = clampi(
+			current_percent + direction * roundi(VOLUME_STEP * 100.0), 0, 100)
+	_write_setting(key, float(next_percent) / 100.0)
+	if editor.editable:
+		editor.text = str(next_percent)
+		editor.call_deferred("select_all")
+	else:
+		_refresh_page_values()
+
+
+func _begin_volume_edit(key: String, editor: LineEdit) -> void:
+	if not _editing_volume_key.is_empty() and _editing_volume_key != key:
+		var active_editor := _value_labels.get(_editing_volume_key) as LineEdit
+		if is_instance_valid(active_editor):
+			_commit_volume_edit(active_editor.text, _editing_volume_key, active_editor)
+	if _editing_volume_key.is_empty():
+		_editing_volume_original = _setting_text(key)
+	_editing_volume_key = key
+	editor.editable = true
+	editor.text = str(roundi(float(GameSettings.get_value(key)) * 100.0))
+	_set_volume_editor_emphasis(editor, true)
+	editor.grab_focus()
+	editor.edit()
+	editor.call_deferred("select_all")
+
+
+func _commit_volume_edit(text_value: String, key: String, editor: LineEdit) -> void:
+	if _editing_volume_key != key:
+		return
+	var cleaned := text_value.strip_edges()
+	if cleaned.is_valid_int():
+		var percent: int = clampi(cleaned.to_int(), 0, 100)
+		_write_setting(key, float(percent) / 100.0)
+	_finish_volume_edit(editor)
+
+
+func _on_volume_editor_focus_exited(key: String, editor: LineEdit) -> void:
+	_commit_volume_edit(editor.text, key, editor)
+
+
+func _cancel_volume_edit() -> void:
+	if _editing_volume_key.is_empty():
+		return
+	var editor := _value_labels.get(_editing_volume_key) as LineEdit
+	if is_instance_valid(editor):
+		var original_number := _editing_volume_original.trim_suffix("%")
+		if original_number.is_valid_int():
+			_write_setting(_editing_volume_key,
+					float(original_number.to_int()) / 100.0)
+		editor.text = _editing_volume_original
+		_finish_volume_edit(editor)
+
+
+func _finish_volume_edit(editor: LineEdit) -> void:
+	editor.editable = false
+	editor.unedit()
+	_set_volume_editor_emphasis(editor, false)
+	_editing_volume_key = ""
+	_editing_volume_original = ""
+	editor.release_focus()
+	_refresh_page_values()
+
+
+func _change_volume(key: String, delta: float) -> void:
+	var current: float = float(GameSettings.get_value(key))
+	_write_setting(key, snappedf(clampf(current + delta, 0.0, 1.0), VOLUME_STEP))
+	_refresh_page_values()
+
+
+func _cycle_setting(key: String, options: Array, direction: int) -> void:
+	if options.is_empty():
+		return
+	var current: Variant = GameSettings.get_value(key)
+	var index: int = options.find(current)
+	if index < 0:
+		index = 0
+	index = posmod(index + direction, options.size())
+	_write_setting(key, options[index])
+	_refresh_page_values()
+
+
+func _toggle_setting(key: String) -> void:
+	_write_setting(key, not bool(GameSettings.get_value(key)))
+	_refresh_page_values()
+
+
+func _write_setting(key: String, value: Variant) -> void:
+	if persist_changes:
+		GameSettings.set_value(key, value)
+		return
+	GameSettings._loaded = true
+	GameSettings._data[key] = GameSettings.sanitize(key, value)
+
+
+func _refresh_page_values() -> void:
+	for key: String in _value_labels.keys():
+		var value_control := _value_labels[key] as Control
+		if value_control is LineEdit:
+			var editor := value_control as LineEdit
+			if _editing_volume_key != key:
+				editor.text = _setting_text(key)
+		elif value_control is Label:
+			(value_control as Label).text = _setting_text(key)
+	if _selector_rows.has("resolution"):
+		var enabled: bool = String(GameSettings.get_value("window_mode")) == "windowed"
+		var row_data: Dictionary = _selector_rows["resolution"]
+		var row := row_data["row"] as Control
+		var previous := row_data["previous"] as Button
+		var next := row_data["next"] as Button
+		row.modulate.a = 1.0 if enabled else 0.42
+		previous.disabled = not enabled
+		next.disabled = not enabled
+
+
+func _setting_text(key: String) -> String:
+	match key:
+		"master_volume", "music_volume", "sfx_volume":
+			return "%d%%" % roundi(float(GameSettings.get_value(key)) * 100.0)
+		"window_mode":
+			return tr(String(WINDOW_MODE_LABELS.get(
+					String(GameSettings.get_value(key)), "窗口化")))
+		"resolution":
+			return String(GameSettings.get_value(key)).replace("x", " × ")
+		"vsync_enabled", "screen_shake_enabled":
+			return tr("开启" if bool(GameSettings.get_value(key)) else "关闭")
+		"frame_limit":
+			var limit: int = int(GameSettings.get_value(key))
+			return tr("不限制") if limit == 0 else "%d FPS" % limit
+		_:
+			return ""
+
+
+func _available_resolutions() -> Array[String]:
+	var screen_size: Vector2i = DisplayServer.screen_get_size()
+	if screen_size.x <= 0 or screen_size.y <= 0:
+		return GameSettings.RESOLUTION_PRESETS.duplicate()
+	var available: Array[String] = []
+	for resolution: String in GameSettings.RESOLUTION_PRESETS:
+		var size: Vector2i = GameSettings.parse_resolution(resolution)
+		if size.x <= screen_size.x and size.y <= screen_size.y:
+			available.append(resolution)
+	if available.is_empty():
+		available.append("1920x1080")
+	return available
+
+
+func _reset_defaults() -> void:
+	if persist_changes:
+		GameSettings.reset_defaults()
+	else:
+		GameSettings._data = GameSettings.DEFAULTS.duplicate(true)
+		GameSettings._loaded = true
+	_build_current_page()
+	_refresh_category_visuals()
+
+
+func get_selected_category() -> String:
+	return CATEGORY_KEYS[_selected_index]
 
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mouse_event := event as InputEventMouseButton
+		if mouse_event.pressed and mouse_event.button_index == MOUSE_BUTTON_LEFT \
+				and not _editing_volume_key.is_empty():
+			var editor := _value_labels.get(_editing_volume_key) as LineEdit
+			if is_instance_valid(editor) \
+					and not editor.get_global_rect().has_point(mouse_event.position):
+				_commit_volume_edit(editor.text, _editing_volume_key, editor)
+		return
 	if event.is_action_pressed("ui_cancel"):
-		get_viewport().set_input_as_handled()   # 拦下 ESC，别让主菜单也响应
+		get_viewport().set_input_as_handled()
+		if not _editing_volume_key.is_empty():
+			_cancel_volume_edit()
+			return
 		_close()
 
 
 func _close() -> void:
-	GameSettings.save()
 	closed.emit()
 	queue_free()

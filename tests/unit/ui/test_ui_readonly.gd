@@ -1,8 +1,8 @@
 extends GutTest
 
 ## 架构护栏：UI 层【只读】引擎状态 —— 绝不直接改写 BattleCore 的 hp / energy / shield / max_hp / heroes。
-## UI 只能通过命令 / 信号请求引擎改状态；直写 = 联机时的作弊面。
-## 唯一允许改写处 = src/ui/debug/battle_debug_panel.gd（DEBUG 作弊面板·联机不启用·本测试排除）。
+## UI 只能通过命令 / 信号请求引擎改状态；直写会破坏单一状态源。
+## 唯一允许改写处 = src/ui/debug/battle_debug_panel.gd（DEBUG 调试面板·本测试排除）。
 ## 体检 A2（2026-07-02）：debug 块从 battle_screen 拆出后立此断言防回归（之前 battle_screen 有 8 处直写）。
 
 const UI_ROOT := "res://src/ui"

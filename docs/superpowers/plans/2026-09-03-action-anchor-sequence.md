@@ -4,7 +4,7 @@
 
 **Goal:** Replace left-aligned cross-player resolution with a shared action anchor so defense and attack always meet at beat zero without changing each player's submitted order.
 
-**Architecture:** `BattleResolutionTimeline` retains immutable submitted sequences and builds a separate execution sequence padded with server-owned alignment waits. `ItemV2Resolution` consumes those columns unchanged, with one narrow pre-resolution exception that preserves H21's approved interruption contract at the shared action beat.
+**Architecture:** `BattleResolutionTimeline` retains immutable submitted sequences and builds a separate execution sequence padded with core-owned alignment waits. `ItemV2Resolution` consumes those columns unchanged, with one narrow pre-resolution exception that preserves H21's approved interruption contract at the shared action beat.
 
 **Tech Stack:** Godot 4.7, statically typed GDScript, GUT, Markdown design truth sources.
 
@@ -56,11 +56,10 @@
 **Files:**
 - Modify: `docs/superpowers/specs/2026-08-28-item-sequence-interaction-design.md`
 - Modify: `docs/superpowers/specs/2026-08-30-item-system-current-standard.md`
-- Modify: `docs/superpowers/specs/2026-08-30-h03-sequence-shift-design.md`
 - Modify: `design/build-design-framework.md`
 - Modify: `docs/reports/2026-08-31-item-design-complete-retrospective-and-handoff.md`
 
 - [x] **Step 1: Replace current-rule references to left alignment with the action-anchor truth source.**
-- [x] **Step 2: Mark the old H03 sequence-shift design as superseded and pending redesign.**
-- [x] **Step 3: Run targeted sequence, item, hero, network, and compile tests through `tools/run_godot.ps1`.**
+- [x] **Step 2: Remove the obsolete H03 sequence-shift design; the current H03 rule is recorded in the hero truth source.**
+- [x] **Step 3: Run targeted sequence, item, hero, local-core, and compile tests through `tools/run_godot.ps1`.**
 - [x] **Step 4: Run `git diff --check` and inspect only task-scoped diffs.**

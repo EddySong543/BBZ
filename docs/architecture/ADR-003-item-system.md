@@ -2,7 +2,7 @@
 
 > 🔴 **当前目标已由 2026-08-30 标准取代：**本 ADR 的自动解锁、固定 1 能补充 / 升级、T1-only 抽取、通用升阶、使用免费与使用即清槽全部只作旧架构溯源。当前通用规则为：有空公开框时每回合一次手动免费真实背包三选一，选中结果公开并锁定本回合；每件道具每次使用支付自身 `0–4` 能费用并扣 1 耐久；T1/T2/T3 成品同池准入，不设通用升金。唯一当前入口见 [`2026-08-30-item-system-current-standard.md`](../superpowers/specs/2026-08-30-item-system-current-standard.md)，五维平衡见 [`2026-08-30-item-four-axis-balance-design.md`](../superpowers/specs/2026-08-30-item-four-axis-balance-design.md)。现有运行时尚未迁移，不得把下文旧 `ItemData` / 槽状态当成新实现说明。
 >
-> 🔶 **状态更新（2026-08-28·有序施放交互）**：采用“本地编排、最终整体提交”。按住左键拖出但未松手只作预览；在合法区域松手才视为释放、播放本地动画并追加有序步骤。最终确认后，服务器原子校验并权威重放完整序列。下文 `pre_items` / `post_items` 与 `ANY 默认入 PRE` 是早期数据结构方案，不再是交互和协议真相源；实施时应升级为能表达 `[道具, 动作, 道具]` 的统一步骤序列。详见 [`2026-08-28-item-sequence-interaction-design.md`](../superpowers/specs/2026-08-28-item-sequence-interaction-design.md)。
+> 🔶 **状态更新（2026-08-28·有序施放交互）**：采用“本地编排、最终整体提交”。按住左键拖出但未松手只作预览；在合法区域松手才视为释放、播放本地动画并追加有序步骤。最终确认后，BattleCore 原子校验并权威重放完整序列。下文 `pre_items` / `post_items` 与 `ANY 默认入 PRE` 是早期数据结构方案，不再是交互真相源；实施时应升级为能表达 `[道具, 动作, 道具]` 的统一步骤序列。详见 [`2026-08-28-item-sequence-interaction-design.md`](../superpowers/specs/2026-08-28-item-sequence-interaction-design.md)。
 >
 > ◻ **历史状态（2026-08-16·普通/稀有/传说连接件扩充）**：当时首发池为 **96 件（T1 31 / T2 39 / T3 26）**，审批全集池为 **145 件**，并曾使用 T2/T3 固定目录估值 4/6。该数值与池数量不是 2026-08-30 后的新设计真相。
 >
@@ -61,7 +61,7 @@
 ### 必须保留的不变量
 
 - **同时独立结算**（B-001/2/3）：跨玩家无先后手、对攻不抵消、可同时死=平局。道具的「顺序」只作用于**己方回合内**（§D4），**绝不在两玩家间制造先后手**。
-- **纯 RefCounted、无 UI 依赖、`resolve()` 返回结构化 events、可 seed RNG、可 `clone()`**（联机服务器权威 headless 的前提，ADR-001/002 延续）。
+- **纯 RefCounted、无 UI 依赖、`resolve()` 返回结构化 events、可 seed RNG、可 `clone()`**（本地权威 headless 与可复现测试的前提，ADR-001/002 延续）。
 - **二元防御铁则**（[[defense-armor-absorption-model]]）：道具的护甲/护甲 = 额外血量层（`shield`），**禁临时护甲吸收模型**；穿甲 = 无视护甲层但仍受「挡不挡」约束。
 - **能量总闸门**：道具不引入新资源；获取/升级/refill 全从 `energy[]` 团队池支出。
 
@@ -96,7 +96,7 @@
 - **地板池加载**：`ItemData.create_floor_pool()` 扫 `assets/data/items/*.tres`（同 `HeroData.create_pool_heroes`）；养成特色件后续叠加（§2 池子模型）。
 
 **Migration Risks**：新增两个类 + 一棵 `items/` 组件树（91 件最终各一文件，但增量实装、互不耦合）。
-**Rationale**：与英雄系统范式一致 → 同样可序列化（联机/录像/存档只序列化容器）、editor 数据驱动、一件一文件改动局部化。无状态组件是服务器权威硬需求。
+**Rationale**：与英雄系统范式一致 → 同样可序列化（快照/录像/存档只序列化容器）、editor 数据驱动、一件一文件改动局部化。无状态组件是可复现状态的硬需求。
 
 ---
 
@@ -196,12 +196,12 @@ turn_plan[player] = {
   - 升级已持有道具同样锁 1 回合。`ready_on_turn` 记可用回合。
   - **卯兔例外**：道具锁 −1 回合（破电报，见 `heroes-redesign.md`）。
 - **能量闸门**（全从团队池 `energy[]`）：点亮新槽 1 能 / refill 1 能 / 升级 1→2 花 1 能、2→3 花 2 能（升级锁 1 回合）。在 **E 相位**最前扣（§D4）。
-- **局内 3 选 1 draft**：抽道具/refill/点亮时，引擎用 **seed RNG**（ADR-002 D7）从（地板池 + 玩家收藏）加权生成 3 个 `draft_options`；玩家选 1（`economy_op = {kind:DRAFT, slot, chosen_index}`）。引擎校验所选 index 合法（防客户端伪造，联机权威）。
+- **局内 3 选 1 draft**：抽道具/refill/点亮时，引擎用 **seed RNG**（ADR-002 D7）从（地板池 + 玩家收藏）加权生成 3 个 `draft_options`；玩家选 1（`economy_op = {kind:DRAFT, slot, chosen_index}`）。引擎校验所选 index 合法，防止非法输入。
 - **开局带 1**：`setup()` 入参带玩家预选的 1 件（唯一轻构筑动作，§D3）；slot① 仍走三步电报 → `ready_on_turn = 3`（从属框架 §D3 表，Q2 已裁）。
 - **升级**：`economy_op = {kind:UPGRADE, slot}` → 若 `ItemData.upgrade_to` 非空且能量够 → 置 `UPGRADING` + `ready_on_turn`，到期换 `item_id`/`tier`。
 - **遗物（T3·充能制）**：充能计数进 `statuses` 或槽内字段（如「3 充后碎」）；遗物=永久被动只允许 T3（§2 骨架）。
 
-**Migration Risks**：状态机是新子系统，UI 要可视化槽状态/锁/draft 弹窗；`clone()` 要深拷槽状态 + draft_options。PvP draft 必须 seed 确定（否则不同步）。
+**Migration Risks**：状态机是新子系统，UI 要可视化槽状态/锁/draft 弹窗；`clone()` 要深拷槽状态 + draft_options。draft 必须 seed 确定，保证测试与回放可复现。
 **Rationale**：能量在「大波/大防/点亮(广度)/升级(深度)/refill」间四向分配 = 全局机会成本中枢（§2），是道具不超模的结构性闸门；电报制让「公开道具」产生 yomi 预判窗、杜绝突袭抽取即爆发。
 
 ---
@@ -229,7 +229,7 @@ turn_plan[player] = {
 
 **7-2 假·隐藏道具**（幻影/迷雾/隐身斗篷）
 - 机制：操纵**己方道具栏对对手的公开视图**——幻影 +1 假件、迷雾藏 1 件、隐身斗篷全藏；**持续到你下次用道具**。
-- 落点：新状态 `info_distortion[player] = {fake_count, hidden_slots, until_next_item:true}`；纯信息层（无战斗数值），但**必须进可序列化状态**（联机/录像）。公开视图 = `public_inventory_view(viewer, owner)` 应用扭曲。下次该玩家用任意道具时清除。
+- 落点：新状态 `info_distortion[player] = {fake_count, hidden_slots, until_next_item:true}`；纯信息层（无战斗数值），但**必须进可序列化状态**（录像/存档）。公开视图 = `public_inventory_view(viewer, owner)` 应用扭曲。下次该玩家用任意道具时清除。
 - 新增（信息层结构本作独有）。
 
 **7-3 条件改穿透 / 防御等级**（破盾咒/魔法气泡/闪电/魔法箭/酸液瓶/腐朽咒/巨人的铁锤）
@@ -250,7 +250,7 @@ turn_plan[player] = {
   - 费能 +1（贪婪）→ 结算 `_get_cost` 对对手费能动作加价。
   - 强制切换（驱逐）→ 结算期改对手 active（偏 PvE）。
   - 隐藏操作栏/偷道具（迷魂/窃贼）→ 重口、偏 PvE（§3D）。
-- 部分复用（禁动作链已有），部分新增（封槽/费能加价/强制切换）。**PvP 放带 counterplay 版，无解版标 PvE**。
+- 部分复用（禁动作链已有），部分新增（封槽/费能加价/强制切换）。当前只保留带可反制出口的候选；无解版本不进入远征。
 
 **7-6 共鸣同回合配对**（双生星/回响的咒/应和的钟，§0.9）
 - 机制：〔共鸣〕件单出=弱/无；同回合与另一〔共鸣〕件（道具+道具）或指定动作（道具+动作）一起打出 → 触发强效果。
@@ -266,14 +266,14 @@ turn_plan[player] = {
 
 ---
 
-### D8：公开信息 + 序列化 / clone / 联机
+### D8：公开信息 + 序列化 / clone
 
 **Decision**：
 - **道具公开**（§2）：`public_inventory_view(viewer, owner)` 暴露对手槽内容（state/item_id/tier/lock），经 D7-2 信息扭曲过滤。UI 据此画对手道具栏 + 锁电报。
 - **`clone()` 扩展**：深拷 `turn_plan` / `item_slots`（含 `draft_options`）/ `info_distortion`；`ItemEffect` **无状态**→`clone()` 重建实例（同 `_build_skills`，§D2 锁死零共享）。
-- **确定性**：draft 3 选 1 用 seed RNG（D5）；道具数值半点整数（无浮点漂移）。联机服务器权威：经济操作/道具使用都经引擎校验（槽状态合法、能量够、draft index 合法）。
+- **确定性**：draft 3 选 1 用 seed RNG（D5）；道具数值半点整数（无浮点漂移）。本地权威引擎统一校验经济操作 / 道具使用（槽状态合法、能量够、draft index 合法）。
 
-**Rationale**：道具公开 + 锁电报是 yomi 的信息基础；序列化/确定性是联机硬需求，与英雄系统同标准。
+**Rationale**：道具公开 + 锁电报是 yomi 的信息基础；序列化/确定性是测试、回放和存档的共同需求，与英雄系统同标准。
 
 ---
 
@@ -335,7 +335,7 @@ turn_plan[player] = {
 
 ## Consequences
 
-**解锁**：道具 build 深度层（§3 浅而广的主体）；yomi 博弈加变量层；连携/导出/共鸣/元件层干扰（本作独有玩法）；PvP 掉落养成的内容钩子。
+**解锁**：道具 build 深度层（§3 浅而广的主体）；yomi 博弈加变量层；连携/导出/共鸣/元件层干扰（本作独有玩法）；远征掉落养成的内容钩子。
 **成本**：一次性建 `turn_plan` 模型 + 经济状态机 + 七类新能力 + 道具组件树（91 件增量）；UI 要画道具栏/锁电报/draft 弹窗/多段飘字；AI 道具逻辑后补。
 **不变**：纯 RefCounted、无 UI 依赖、结构化 events、同时独立结算、二元防御铁则、能量团队池、可 seed/clone（ADR-001/002 延续）。
 
@@ -362,7 +362,7 @@ turn_plan[player] = {
 | **Q2** | 开局自带第 1 件道具的可用时机 | ✅ **从属框架 §D3 表 = 回合 3 可用**（走「开格→抽→可用」三步电报；Eddy 撤回口头「回合 2」、以框架为准） |
 | **Q3** | 元件层干扰（7-5）被禁动作的盲选冲突 | ✅ **被禁动作直接无效**（不执行·无效果·不转攒·能量不扣）。**Edge case**：你用封道具槽件、对手正要用被封的道具 → 对方该次使用取消、**道具保留不消耗**；你的封槽件照常消耗 |
 | **Q4** | 共鸣「道具+动作」配对，动作被禁后是否成立 | ✅ **不成立**（配合的动作没打出，共鸣不触发，只剩单出弱效果） |
-| **Q5** | 局内 3 选 1 draft 选项来源 | ✅ **引擎 seed 生成 + 玩家选 index**（联机权威防伪造） |
+| **Q5** | 局内 3 选 1 draft 选项来源 | ✅ **引擎 seed 生成 + 玩家选 index**（引擎校验防伪造） |
 
 
 ---

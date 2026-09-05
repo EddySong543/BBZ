@@ -7,7 +7,7 @@ extends RefCounted
 ##
 ## 【组件无状态】：所有 per-hero 运行时状态（毒层 / 剑意 / 护甲 / 破甲标记…）
 ##   存在 BattleCore 的容器里（statuses 等）。组件只是纯逻辑，
-##   读写传入的 battle。→ 可序列化、利联机复制 / 录像 / 存档 (§D2)。
+##   读写传入的 battle。→ 可序列化，便于录像 / 存档 / 调试 (§D2)。
 ##
 ## 【两类接口】
 ##   ① 被动 hook —— 全部 no-op 默认，子类按需 override。
@@ -31,7 +31,7 @@ func on_setup(_battle: BattleCore, _player: int, _slot: int) -> void:
 
 
 ## 出伤计算：修改本英雄【造成】的伤害（半点）。返回修改后的值。
-## 当前 12 生肖无人 override（造成伤害的调整改走 on-hit / 团队 hook / 主动技），留作扩展接口。
+## 尾火 h03【白额雷音】用此接口按当前生命缺口强化自己的基础「波 / 大波」。
 func modify_outgoing_damage(dmg: int, _action: int, _battle: BattleCore, _player: int, _slot: int) -> int:
 	return dmg
 
@@ -203,13 +203,13 @@ func retains_unused_big_defend() -> bool:
 	return false
 
 
-## 每回合免费切换次数上限（仅 has_free_switch()=true 时有意义）；-1 = 无限。星日【千里自在风】= 1。
+## 每回合免费切换次数上限（仅 has_free_switch()=true 时有意义）；-1 = 无限。星日【千里快哉风】= 1。
 func free_switch_cap() -> int:
 	return -1
 
 
 ## 本英雄（出战时）是否可以使用「防 / 大防」。默认 true。
-## 穷奇 h15【七杀战鬼】= false（嗜杀红温·有进无退·彻底放弃防御）。
+## 穷奇 h15【魇镇八极】= false（嗜杀红温·有进无退·彻底放弃防御）。
 ## 引擎在 can_afford() 统一 gate：返 false 时防/大防变不合法（legal_actions 不列、UI 按钮禁用、AI 不选）。
 func can_defend() -> bool:
 	return true
@@ -223,20 +223,20 @@ func reserve_pursuit_damage() -> int:
 
 
 ## 「龙御极」型（亢金 h05）：本英雄在队时，为己方开放可选强化波。
-## 玩家可让本次基础「波」额外支付 1 能并增加 1 点伤害；选择、费用和联机状态由 BattleCore 统一处理。
+## 玩家可让本次基础「波」额外支付 1 能并增加 1 点伤害；选择与费用由 BattleCore 统一处理。
 ## 默认 false；亢金返回 true。
 func enables_empowered_wave() -> bool:
 	return false
 
 
 ## 玄冥 h13：本英雄出战时，是否可把自己选择的「大波」改为连续两次「波」。
-## 只声明能力；合法 choice、结算形态、AI、联机与快照由 BattleCore 统一处理。
+## 只声明能力；合法 choice、结算形态、AI 与快照由 BattleCore 统一处理。
 func allows_split_big_wave() -> bool:
 	return false
 
 
 ## 昴日 h10：本英雄出战时，是否可消耗全队剑气强化自己的基础攻击穿透。
-## 只声明能力；选择合法性、消费时点、快照与联机字段由 BattleCore 统一处理。
+## 只声明能力；选择合法性、消费时点与快照字段由 BattleCore 统一处理。
 func enables_jianqi_attack() -> bool:
 	return false
 
@@ -258,7 +258,7 @@ func enables_blood_payment() -> bool:
 
 
 ## 并封 h24：本英雄在队时，是否为我方开放“降低 1 点能量上限，令本回合行动少消耗 1 点能量”的可选变体。
-## 这里只声明能力；资格、费用、上限底线、AI、联机与快照由 BattleCore 统一处理。
+## 这里只声明能力；资格、费用、上限底线、AI 与快照由 BattleCore 统一处理。
 func enables_energy_cap_discount() -> bool:
 	return false
 
@@ -327,7 +327,7 @@ func on_active_attack_resolved(_battle: BattleCore, _player: int, _slot: int, _d
 	pass
 
 
-## 本英雄是否拥有"免费切换（不占动作槽）"能力。默认 false。h07【千里自在风】返回 true。
+## 本英雄是否拥有"免费切换（不占动作槽）"能力。默认 false。h07【千里快哉风】返回 true。
 ## 引擎通过 free_switch() 处理；cap 由团队级回合状态统一计数。
 func has_free_switch() -> bool:
 	return false

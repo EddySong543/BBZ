@@ -47,7 +47,6 @@ var pool_first := 1
 var pool_last := 34
 var max_turns := 120
 var out_dir := "res://tools/sim/out/"
-var use_draft := true   # true=DraftAI 选人 / false=随机阵容
 var depth := 2          # 对战 AI 搜索深度
 var profile := 0        # 对战 AI 评估档：0=v1 基础 / 1=v2 进阶(牌感·熟练优秀玩家)
 var ab_variant := ""    # A/B 校准：非空=A(默认权重) vs B(此变体) 头对头（见 AB_VARIANTS）
@@ -62,7 +61,6 @@ var panel_merge := false # --panel-merge 1：读三份 part_metrics.json 合并�
 var games_set := false   # --games 是否显式给出（panel 默认 50/50/60；显式则三份同 N·冒烟用）
 
 var _hero_data := {}    # hero_id → HeroData（加载一次复用）
-var _pool_hd: Array = []  # Array[HeroData]，与 ids 平行（drafter 用，返回索引）
 
 
 func _initialize() -> void:
@@ -88,9 +86,9 @@ func _initialize() -> void:
 ## 跑一批对局（按当前实例参数），完整报表写入 out_dir；返回关键指标字典（panel 汇总对照用）。
 func _run_batch(pool: Array, label: String = "") -> Dictionary:
 	print("=== AI 自对弈模拟 %s ===" % label)
-	print("对局=%d  种子=%d  池=h%02d–h%02d(%d)  回合上限=%d  选人=%s  AI深度=%d  评估=%s" % [
+	print("对局=%d  种子=%d  池=h%02d–h%02d(%d)  回合上限=%d  阵容=%s  AI深度=%d  评估=%s" % [
 		games, base_seed, pool_first, pool_last, pool.size(), max_turns,
-		("drafter" if use_draft else "随机"), depth, ("v2进阶" if profile == 1 else "v1基础")])
+		"随机", depth, ("v2进阶" if profile == 1 else "v1基础")])
 
 	# 聚合容器
 	var csv_rows: Array = []
@@ -128,24 +126,8 @@ func _run_batch(pool: Array, label: String = "") -> Dictionary:
 
 	for g in range(games):
 		var seed_g: int = base_seed + g * 7919
-		var r0: Array = []
-		var r1: Array = []
-		if use_draft:
-			var d0 := DraftAI.new(seed_g + 11)
-			var d1 := DraftAI.new(seed_g + 12)
-			var ban0: Array = d0.choose_bans(_pool_hd, 3)
-			var ban1: Array = d1.choose_bans(_pool_hd, 3)
-			var banned: Array = ban0.duplicate()
-			for bx in ban1:
-				if not bx in banned:
-					banned.append(bx)
-			for idx in d0.choose_picks(_pool_hd, banned, 3):
-				r0.append(pool[idx])
-			for idx in d1.choose_picks(_pool_hd, banned, 3):
-				r1.append(pool[idx])
-		else:
-			r0 = _pick_roster(pool, setup_rng)
-			r1 = _pick_roster(pool, setup_rng)
+		var r0: Array = _pick_roster(pool, setup_rng)
+		var r1: Array = _pick_roster(pool, setup_rng)
 
 		var b := BattleCore.new()
 		b.setup(_to_heroes(r0), _to_heroes(r1), seed_g)
@@ -654,7 +636,6 @@ func _load_pool() -> Array:
 		if hd == null:
 			continue
 		_hero_data[id] = hd
-		_pool_hd.append(hd)
 		ids.append(id)
 	return ids
 
@@ -684,8 +665,8 @@ func _write_outputs(csv_rows: Array, win: Dictionary, turns_list: Array,
 	var total: int = csv_rows.size()
 	md.store_line("# AI 自对弈模拟汇总\n")
 	md.store_line("- 对局数：**%d**" % total)
-	md.store_line("- 基础种子：%d ｜ 英雄池：h%02d–h%02d ｜ 回合上限：%d ｜ 选人：%s ｜ AI深度：%d ｜ 评估：%s\n" % [
-		base_seed, pool_first, pool_last, max_turns, ("drafter" if use_draft else "随机"), depth,
+	md.store_line("- 基础种子：%d ｜ 英雄池：h%02d–h%02d ｜ 回合上限：%d ｜ 阵容：随机 ｜ AI深度：%d ｜ 评估：%s\n" % [
+		base_seed, pool_first, pool_last, max_turns, depth,
 		("v2进阶" if profile == 1 else "v1基础")])
 
 	md.store_line("## 胜负分布")
@@ -849,7 +830,6 @@ func _parse_args() -> void:
 			"--max-turns": max_turns = int(val)
 			"--depth": depth = int(val)
 			"--profile": profile = int(val)
-			"--draft": use_draft = int(val) != 0
 			"--ab": ab_variant = val
 			"--w":
 				for pair in val.split(","):

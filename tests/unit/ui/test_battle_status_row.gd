@@ -1,7 +1,9 @@
 extends GutTest
 
 const BATTLE1_PATH := "res://src/ui/battle_screen1.tscn"
+const BATTLE8_PATH := "res://src/ui/battle_screen8.tscn"
 const TUNING_LAB_PATH := "res://src/ui/debug/buff_tuning_lab.tscn"
+const NUMBER_TUNING_PATH := "res://src/ui/components/battle_status_number_tuning.tres"
 const BattleStatusRowScript := preload("res://src/ui/components/battle_status_row.gd")
 
 
@@ -15,13 +17,13 @@ func test_status_row_reflows_around_the_same_center_when_count_changes() -> void
 	var row: Control = BattleStatusRowScript.new()
 	add_child_autofree(row)
 	assert_eq(row.slot_size, Vector2(52.0, 42.0))
-	assert_eq(row.count_font_size, 18)
-	assert_eq(row.count_symbol_gap, 2.0)
-	assert_true(row.use_per_icon_count_offsets)
-	assert_eq(row.poison_count_offset, Vector2(7.0, 36.0))
-	assert_eq(row.vulnerable_count_offset, Vector2(7.0, 36.0))
-	assert_eq(row.sword_qi_count_offset, Vector2(7.0, 36.0),
-			"正式组件默认值必须复刻临时场景的最终手调参数")
+	assert_eq(row.number_tuning.count_font_size, 18)
+	assert_eq(row.number_tuning.count_symbol_gap, 2.0)
+	assert_true(row.number_tuning.use_per_icon_count_offsets)
+	assert_eq(row.number_tuning.poison_count_offset, Vector2(7.0, 37.0))
+	assert_eq(row.number_tuning.vulnerable_count_offset, Vector2(7.0, 37.0))
+	assert_eq(row.number_tuning.sword_qi_count_offset, Vector2(7.0, 37.0),
+			"正式组件必须读取临时场景编辑的共用数字资源")
 	row.call("refresh", [_entry(&"poison", 1)])
 	var one_rects: Array[Rect2] = row.call("debug_slot_rects")
 	assert_eq(one_rects.size(), 1)
@@ -110,7 +112,8 @@ func test_status_row_reflows_around_the_same_center_when_count_changes() -> void
 		assert_eq(prefix.text, "x", "可计数 buff 使用小写 x 前缀")
 		assert_eq(value_label.text, expected_values[effect_id])
 		assert_almost_eq(value_label.position.x - prefix.get_rect().end.x,
-				row.count_symbol_gap, 0.01, "x 与数字使用可调像素间距")
+				row.number_tuning.count_symbol_gap, 0.01,
+				"x 与数字使用可调像素间距")
 		assert_true(prefix.get_theme_font("font") is FontVariation)
 		assert_almost_eq(
 				(prefix.get_theme_font("font") as FontVariation).variation_embolden,
@@ -128,28 +131,32 @@ func test_status_row_reflows_around_the_same_center_when_count_changes() -> void
 	assert_lt(poison_count.scale.x, 1.0,
 			"上涨数字从略小尺寸开始收稳")
 	assert_almost_eq(poison_count.position.y,
-			row.poison_count_offset.y + row.count_increase_lift, 0.01,
+			row.number_tuning.poison_count_offset.y
+					+ row.number_tuning.count_increase_lift, 0.01,
 			"上涨数字从下方轻抬，不推动图标或整行")
 	await get_tree().create_timer(0.18).timeout
 	assert_almost_eq(poison_count.scale.x, 1.0, 0.01,
 			"层数反馈在 0.14 秒后稳定回到原尺寸")
-	assert_almost_eq(poison_count.position.y, row.poison_count_offset.y, 0.01)
+	assert_almost_eq(poison_count.position.y,
+			row.number_tuning.poison_count_offset.y, 0.01)
 	row.call("refresh", [_entry(&"poison", 2), _entry(&"vulnerable", 1),
 			_entry(&"sword_qi", 4)])
 	poison_count = row.get_node("Status_poison/Count") as Control
 	assert_false(bool(poison_count.get_meta("count_increase_motion_played", false)),
 			"数值下降只更新结果，不播放误导性的上涨动画")
 	assert_eq(poison_count.scale, Vector2.ONE)
-	assert_almost_eq(poison_count.position.y, row.poison_count_offset.y, 0.01)
+	assert_almost_eq(poison_count.position.y,
+			row.number_tuning.poison_count_offset.y, 0.01)
 	row.call("refresh", [_entry(&"poison", 12)])
 	poison_count = row.get_node("Status_poison/Count") as Control
 	var double_digit_value := poison_count.get_node("Value") as Label
 	var double_digit_visible_end := poison_count.position.x \
 			+ double_digit_value.get_rect().end.x \
-			+ float(row.count_outline_size + maxi(row.count_shadow_offset.x, 0))
+			+ float(row.number_tuning.count_outline_size
+					+ maxi(row.number_tuning.count_shadow_offset.x, 0))
 	assert_lt(double_digit_visible_end, row.slot_size.x,
 			"x12 等两位数层数自动向左收，不能伸进下一固定槽")
-	assert_eq(row.size, Vector2(52.0, 55.0),
+	assert_eq(row.size, Vector2(52.0, 56.0),
 			"正下方数字扩展固定行高，但层数位数不得改变 Buff 行宽高")
 
 	var three_entries: Array[Dictionary] = [
@@ -270,7 +277,8 @@ func test_every_buff_uses_the_same_fixed_icon_slot_without_hidden_placeholders()
 	var poison_count := poison_slot.get_node("Count") as Control
 	var poison_value := poison_count.get_node("Value") as Label
 	var count_visible_end := poison_count.position.x + poison_value.get_rect().end.x \
-			+ float(row.count_outline_size + maxi(row.count_shadow_offset.x, 0))
+			+ float(row.number_tuning.count_outline_size
+					+ maxi(row.number_tuning.count_shadow_offset.x, 0))
 	assert_lt(count_visible_end, row.slot_size.x,
 			"xN 锁在本图标正下方，不得伸进下一图标槽")
 	assert_lt(poison_count.position.x, poison_icon.get_rect().end.x,
@@ -307,7 +315,7 @@ func test_single_row_fixed_slots_fit_current_five_and_one_future_buff() -> void:
 		_entry(&"h08_retained_big_defend", 1),
 	]
 	row.call("refresh", entries)
-	assert_eq(row.size, Vector2(260.0, 55.0),
+	assert_eq(row.size, Vector2(260.0, 56.0),
 			"当前五种 Buff 固定为五个 52px 槽；正下方数字只扩展统一行高")
 	var five_icons: Array[TextureRect] = row.call("debug_icons")
 	for index: int in range(1, five_icons.size()):
@@ -322,7 +330,7 @@ func test_single_row_fixed_slots_fit_current_five_and_one_future_buff() -> void:
 	sixth["instance_key"] = &"future_sixth_buff"
 	entries.append(sixth)
 	row.call("refresh", entries)
-	assert_eq(row.size, Vector2(312.0, 55.0),
+	assert_eq(row.size, Vector2(312.0, 56.0),
 			"不换行状态下仍为第六种 Buff 预留一个完整槽位")
 	assert_lte((row.call("debug_icon_alignment_rect") as Rect2).size.x, 338.0,
 			"六枚 Buff 的图标联合边界仍位于当前 HUD 安全宽度内")
@@ -428,29 +436,33 @@ func test_buff_tuning_lab_uses_the_real_component_and_live_tuning_geometry() -> 
 	await get_tree().process_frame
 	var preview := lab.get_node("BuffPreview") as BattleStatusRow
 	assert_true(preview.preview_enabled)
+	assert_eq(preview.number_tuning.resource_path, NUMBER_TUNING_PATH,
+			"临时场景必须直接编辑正式战斗使用的 Buff 数字资源")
 	assert_eq(preview.slot_size, Vector2(52.0, 42.0))
-	assert_eq(preview.count_font_size, 18)
-	assert_eq(preview.poison_count_offset, Vector2(7.0, 36.0))
-	assert_eq(preview.vulnerable_count_offset, Vector2(7.0, 36.0))
-	assert_eq(preview.sword_qi_count_offset, Vector2(7.0, 36.0),
-			"临时场景保留用户在 Inspector 中保存的独立数字偏移")
-	assert_eq(preview.count_symbol_gap, 2.0)
-	assert_eq(preview.count_shadow_color, Color(0.0, 0.0, 0.0, 0.32))
+	assert_eq(preview.number_tuning.count_font_size, 18)
+	assert_eq(preview.number_tuning.poison_count_offset, Vector2(7.0, 37.0))
+	assert_eq(preview.number_tuning.vulnerable_count_offset, Vector2(7.0, 37.0))
+	assert_eq(preview.number_tuning.sword_qi_count_offset, Vector2(7.0, 37.0),
+			"共用资源保留用户在 Inspector 中保存的独立数字偏移")
+	assert_eq(preview.number_tuning.count_symbol_gap, 2.0)
+	assert_eq(preview.number_tuning.count_shadow_color,
+			Color(0.0, 0.0, 0.0, 0.32))
 	assert_eq(preview.effect_ids(), [&"poison", &"vulnerable", &"sword_qi"],
 			"调试场景直接预览正式毒素、脆弱、剑气组件")
 	assert_almost_eq(preview.position.x + float(preview.call(
 			"icon_alignment_center_x")), lab.preview_center.x, 0.51,
 			"临时场景与正式战斗都忽略数字，只用图标联合边界居中")
 	preview.icon_box_size = Vector2(42.0, 38.0)
-	preview.count_offset = Vector2(5.0, 12.0)
-	preview.use_per_icon_count_offsets = true
-	preview.poison_count_offset = Vector2(2.0, 14.0)
-	preview.vulnerable_count_offset = Vector2(1.0, 13.0)
-	preview.sword_qi_count_offset = Vector2(-4.0, 11.0)
-	preview.count_font_size = 17
-	preview.count_symbol_gap = 6.0
+	preview.number_tuning = preview.number_tuning.duplicate(true)
+	preview.number_tuning.count_offset = Vector2(5.0, 12.0)
+	preview.number_tuning.use_per_icon_count_offsets = true
+	preview.number_tuning.poison_count_offset = Vector2(2.0, 14.0)
+	preview.number_tuning.vulnerable_count_offset = Vector2(1.0, 13.0)
+	preview.number_tuning.sword_qi_count_offset = Vector2(-4.0, 11.0)
+	preview.number_tuning.count_font_size = 17
+	preview.number_tuning.count_symbol_gap = 6.0
 	preview.sword_qi_icon_scale = 1.25
-	preview.call("_refresh_editor_preview")
+	await get_tree().process_frame
 	var poison_icon := preview.get_node("Status_poison/Icon") as TextureRect
 	assert_eq(poison_icon.size, Vector2(42.0, 38.0),
 			"Inspector 调整图标框后真实组件立即重建")
@@ -479,6 +491,52 @@ func test_buff_tuning_lab_uses_the_real_component_and_live_tuning_geometry() -> 
 	assert_eq(sword_font.base_font.resource_path,
 			"res://assets/font/zlabs_pixel_ui.tres",
 			"编辑器预览直接加载正式字体资源，不再依赖运行时 Autoload")
+
+
+func test_battle_screen8_runtime_counts_share_the_lab_tuning_source() -> void:
+	BattleSetup.reset()
+	var lab := (load(TUNING_LAB_PATH) as PackedScene).instantiate() as Control
+	add_child_autofree(lab)
+	var screen := (load(BATTLE8_PATH) as PackedScene).instantiate()
+	add_child_autofree(screen)
+	await get_tree().process_frame
+	var preview := lab.get_node("BuffPreview") as BattleStatusRow
+	for player: int in 2:
+		var slot: int = screen.battle.active_index[player]
+		screen.battle.set_status(player, slot, "poison", 3)
+		screen.battle.set_status(player, slot, "vuln", 2)
+		screen.battle.set_team_status(player, "jianqi", 4)
+	screen._refresh_battle_status_rows()
+	await get_tree().process_frame
+	for player: int in 2:
+		var runtime_row := screen._battle_status_rows[player] as BattleStatusRow
+		assert_eq(runtime_row.number_tuning.resource_path, NUMBER_TUNING_PATH,
+				"battle_screen8 双方运行时不得退回脚本默认值或另一份手抄坐标")
+		assert_eq(runtime_row.number_tuning, preview.number_tuning,
+				"调校场景与真实 F6 场景双方必须持有同一个只读 Resource 实例")
+		for effect_id: StringName in [&"poison", &"vulnerable", &"sword_qi"]:
+			var preview_count := preview.get_node(
+					"Status_%s/Count" % effect_id) as Control
+			var runtime_count := runtime_row.get_node(
+					"Status_%s/Count" % effect_id) as Control
+			assert_eq(runtime_count.position, preview_count.position,
+					"P%d %s 的战斗数字位置必须直接复用 lab 参数" % [
+						player + 1, effect_id])
+			assert_eq(runtime_count.size, preview_count.size,
+					"P%d %s 的战斗数字尺寸必须直接复用 lab 参数" % [
+						player + 1, effect_id])
+			for glyph_name: String in ["Prefix", "Value"]:
+				var preview_glyph := preview_count.get_node(glyph_name) as Label
+				var runtime_glyph := runtime_count.get_node(glyph_name) as Label
+				assert_eq(runtime_glyph.position, preview_glyph.position)
+				assert_eq(runtime_glyph.size, preview_glyph.size)
+				assert_eq(runtime_glyph.get_theme_font_size("font_size"),
+						preview_glyph.get_theme_font_size("font_size"))
+				assert_eq(runtime_glyph.get_theme_color("font_color"),
+						preview_glyph.get_theme_color("font_color"))
+				assert_eq(runtime_glyph.get_theme_constant("outline_size"),
+						preview_glyph.get_theme_constant("outline_size"))
+	BattleSetup.reset()
 
 
 func test_core_status_keys_map_to_catalog_ids_in_a_stable_order() -> void:

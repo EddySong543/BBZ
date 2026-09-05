@@ -169,6 +169,70 @@ func test_item_slot_row_refreshes() -> void:
 	assert_eq(shown, remain, "封条圆点数 = 剩余解锁回合数")
 
 
+func test_used_item_locks_one_complete_visual_group_with_centered_seal() -> void:
+	var b := _battle_ready(20)
+	b.item_v2_enabled = true
+	var item := ItemCatalog.make("v2_t1_whetstone")
+	b.slots[0][0] = {
+		state = SS.CHARGING,
+		item = item,
+		since = b.turn_number - 1,
+		used = false,
+		draft = [],
+		upg_draft = [],
+		draft_entry_uids = [],
+		instance_uid = 1001,
+		temporary = false,
+		current_durability = 1,
+		max_durability = 2,
+		used_turn = b.turn_number,
+		lifecycle = "REAL",
+	}
+	var row := ItemSlotRow.new()
+	add_child_autofree(row)
+	row.refresh(b, 0)
+
+	var group := row._visual_groups[0] as Control
+	var cost := row._cost_badges[0] as IconBadge
+	var durability := row._durability_badges[0] as IconBadge
+	for node: CanvasItem in [row._cells[0], row._tex_frames[0], row._icon_shadows[0],
+			row._icons[0], cost, durability]:
+		assert_true(group.is_ancestor_of(node),
+			"框、格底、图案、投影及两枚角标必须处于同一锁定调制链")
+	assert_eq(group.modulate, ItemSlotRow.LOCKED_VISUAL_MODULATE,
+		"锁定只在共同父节点施加一次，不再分散补偿")
+	assert_eq((row._icons[0] as CanvasItem).modulate, Color.WHITE)
+	assert_eq((row._tex_frames[0] as CanvasItem).modulate, Color.WHITE)
+	assert_eq(cost.modulate, Color.WHITE)
+	assert_eq(durability.modulate, Color.WHITE)
+	assert_true(row._mini_seals[0].visible)
+	assert_false(group.is_ancestor_of(row._mini_seals[0]),
+		"封条留在灰态组外，不能随道具一起失去辨识度")
+	assert_almost_eq(row._mini_seals[0].position.x, ItemSlotRow.SLOT_W * 0.5, 0.001)
+	assert_almost_eq(row._mini_seals[0].position.y, ItemSlotRow.SLOT_H * 0.5, 0.001,
+		"锁定封条必须压在道具框中央")
+	var durability_number := durability.get_node("Num") as Label
+	assert_eq(durability_number.text, "x-1")
+	assert_eq(durability_number.get_theme_color("font_color"),
+		ItemSlotRow.DURABILITY_USED_COLOR,
+		"用过一次后的耐久提示必须明确使用红色 x-1")
+
+	b.turn_number += 1
+	row.refresh(b, 0)
+	assert_eq(group.modulate, Color.WHITE)
+	assert_false(row._mini_seals[0].visible)
+	assert_eq(durability_number.text, "x-1",
+		"回合推进后仍须按持久耐久损耗显示，而不能依赖瞬时 used_turn")
+	assert_eq(durability_number.get_theme_color("font_color"),
+		ItemSlotRow.DURABILITY_USED_COLOR)
+
+	b.slots[0][0]["current_durability"] = 2
+	row.refresh(b, 0)
+	assert_eq(durability_number.text, "2")
+	assert_eq(durability_number.get_theme_color("font_color"), Color.WHITE,
+		"无耐久损耗时恢复普通数字与白色")
+
+
 # === M3：道具栏交互层 ===
 
 func test_full_deploy_cycle_unlock_draw_use_empty() -> void:
@@ -214,8 +278,10 @@ func test_slot_row_staged_highlight() -> void:
 	assert_eq(row._tex_frames[0].modulate, ItemSlotRow.STAGED_TINT, "点选 = 框身提金")
 	assert_false(row._up_badges[0].visible, "点选时升箭角标让位金晕")
 	var staged_visible_rect: Rect2 = row._icons[0].get_meta("visible_alpha_rect")
+	var shared_art_rect: Rect2 = ItemFrameStyle.item_frame_layout(
+		&"battle", Vector2.ZERO, ItemSlotRow.SLOT_W)["item_art_rect"]
 	assert_almost_eq(staged_visible_rect.get_center().y,
-			ItemSlotRow.SLOT_H * 0.5 + 3.0, 0.01, "点选 = 图标下沉（按下感）")
+			shared_art_rect.get_center().y + 3.0, 0.01, "点选 = 图标下沉（按下感）")
 	assert_eq(row._labels[0].text, "", "状态文字全退役")
 	# 取消点选 → 金晕隐藏 + 图标回弹，回纹阶框一直在。
 	row.refresh(b, 0, [])
@@ -224,26 +290,27 @@ func test_slot_row_staged_highlight() -> void:
 	assert_false(row._frames[0].visible, "金晕外环隐藏")
 	var resting_visible_rect: Rect2 = row._icons[0].get_meta("visible_alpha_rect")
 	assert_almost_eq(resting_visible_rect.get_center().y,
-			ItemSlotRow.SLOT_H * 0.5, 0.01, "取消点选 = 图标回弹")
+			shared_art_rect.get_center().y, 0.01, "取消点选 = 图标回弹")
 
 
 func test_slot_row_new_frame_palette_and_inner_mask_fit() -> void:
 	var b := _battle_ready(20)
 	var row := ItemSlotRow.new()
 	add_child_autofree(row)
-	assert_eq(row._tex_frames[0].position, ItemSlotRow.FRAME_ART_OFFSET,
+	var shared_layout := ItemFrameStyle.item_frame_layout(
+		&"battle", Vector2.ZERO, ItemSlotRow.SLOT_W)
+	assert_almost_eq(row._tex_frames[0].position.x,
+		(shared_layout["frame_rect"] as Rect2).position.x, 0.001,
 			"新外框透明边补偿后贴合槽位")
-	assert_eq(row._tex_frames[0].size, ItemSlotRow.FRAME_ART_SIZE,
+	assert_almost_eq(row._tex_frames[0].position.y,
+		(shared_layout["frame_rect"] as Rect2).position.y, 0.001)
+	assert_almost_eq(row._tex_frames[0].size.x,
+		(shared_layout["frame_rect"] as Rect2).size.x, 0.001,
 			"新外框按素材实际外沿放大")
-	assert_eq(row._cells[0].position, Vector2.ONE * ItemSlotRow.CELL_INSET,
+	assert_almost_eq(row._tex_frames[0].size.y,
+		(shared_layout["frame_rect"] as Rect2).size.y, 0.001)
+	assert_eq(row._cells[0].get_rect(), shared_layout["cell_rect"],
 			"格底从新框内孔起点开始")
-	assert_eq(row._cells[0].size,
-			Vector2(ItemSlotRow.SLOT_W, ItemSlotRow.SLOT_H) - Vector2.ONE * ItemSlotRow.CELL_INSET * 2.0,
-			"格底尺寸覆盖新框内孔并压进边框收边")
-	assert_eq(ItemSlotRow.CELL_INSET, 4.0,
-			"战斗小框使用整数 4px 内缩，消除左侧半像素接缝")
-	assert_eq(row._cells[0].position, row._cells[0].position.round(),
-			"战斗格底边缘必须落在整数像素")
 	var tier_items := ["t1_feibiao", "t2_feibiao", "t3_longxi"]
 	for tier in range(1, 4):
 		b.slots[0][0]["item"] = ItemCatalog.make(tier_items[tier - 1])
@@ -293,26 +360,30 @@ func test_draft_popup_new_frame_size_position_and_palette() -> void:
 	var art_shadow := popup.find_child("ItemArtShadow", true, false) as TextureRect
 	var slot_pos := Vector2(ItemDraftPopup.CARD_W * 0.5 - 64.0, 92.0)
 	var slot_size := Vector2(128.0, 128.0)
-	var inset := slot_size.x * ItemDraftPopup.CELL_INSET_RATIO
-	assert_eq(frame.position, slot_pos + slot_size * ItemDraftPopup.FRAME_OFFSET_RATIO,
+	var shared_layout := ItemFrameStyle.item_frame_layout(
+		&"gallery_left", slot_pos, slot_size.x)
+	assert_almost_eq(frame.position.x,
+		(shared_layout["frame_rect"] as Rect2).position.x, 0.001,
 			"升级三选一外框位置补偿透明边")
-	assert_eq(frame.size, slot_size * ItemDraftPopup.FRAME_ART_SCALE,
+	assert_almost_eq(frame.position.y,
+		(shared_layout["frame_rect"] as Rect2).position.y, 0.001)
+	assert_almost_eq(frame.size.x,
+		(shared_layout["frame_rect"] as Rect2).size.x, 0.001,
 			"升级三选一外框按新素材放大")
+	assert_almost_eq(frame.size.y,
+		(shared_layout["frame_rect"] as Rect2).size.y, 0.001)
 	assert_not_null(shadow, "升级三选一道具框补上共享右下阴影")
-	assert_eq(shadow.position, frame.position + ItemFrameStyle.DROP_SHADOW_OFFSET,
+	assert_eq(shadow.get_rect(), shared_layout["frame_shadow_rect"],
 			"升级三选一阴影与战斗道具栏同向偏移")
-	assert_eq(shadow.size, frame.size, "阴影严格沿用外框 alpha 轮廓")
 	assert_not_null(art_shadow, "升级三选一道具美术补上右下 alpha 投影")
 	assert_lt(art_shadow.get_index(), frame.get_index(),
 			"升级三选一图案投影落在格底上且由外框收边")
-	assert_eq(cell.position, slot_pos + Vector2.ONE * inset,
-			"升级三选一格底限制在内孔起点")
-	assert_almost_eq(cell.size.x, slot_size.x - inset * 2.0, 0.001,
-			"升级三选一格底宽度限制在内孔尺寸")
-	assert_almost_eq(cell.size.y, slot_size.y - inset * 2.0, 0.001,
-			"升级三选一格底高度限制在内孔尺寸")
-	assert_eq(ItemDraftPopup.CELL_INSET_RATIO, ItemFrameStyle.CELL_INSET_RATIO,
-			"升级三选一与图鉴/战斗栏共用填充内边距，避免格底水平偏移")
+	var expected_cell: Rect2 = shared_layout["cell_rect"]
+	assert_almost_eq(cell.position.x, expected_cell.position.x, 0.001,
+			"升级三选一格底读取与图鉴/战斗栏相同的单一排版")
+	assert_almost_eq(cell.position.y, expected_cell.position.y, 0.001)
+	assert_almost_eq(cell.size.x, expected_cell.size.x, 0.001)
+	assert_almost_eq(cell.size.y, expected_cell.size.y, 0.001)
 	assert_eq((cell.material as ShaderMaterial).get_shader_parameter("corner_radius"), 0.0,
 			"升级三选一格底取消旧圆角，填充色覆盖四角")
 	assert_eq((cell.material as ShaderMaterial).get_shader_parameter("vertical_gradient"), 1.0,

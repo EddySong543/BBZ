@@ -286,7 +286,24 @@ func test_boot_menu_uses_text_and_imported_icons_without_plates() -> void:
 	assert_eq(
 		steam_button.icon.resource_path,
 		"res://assets/ui/boot/menu_icons/steam.png")
+	assert_null(menu.get_node_or_null("SmallButtons/Settings"),
+			"Boot Screen 不再显示设置齿轮入口")
 	assert_null(boot.get_node_or_null("EnterPrompt"))
+
+
+func test_boot_escape_opens_the_shared_pause_menu() -> void:
+	var boot := await _instantiate_boot()
+	var escape := InputEventAction.new()
+	escape.action = "ui_cancel"
+	escape.pressed = true
+	boot._unhandled_input(escape)
+	var pause := boot.get_node_or_null("PauseMenu") as CanvasLayer
+	assert_not_null(pause)
+	assert_gt(pause.layer, TransitionManager.layer,
+			"Boot 暂停层必须覆盖角色、图标与全局过场画布")
+	assert_true(get_tree().paused, "Boot 的 ESC 一级菜单应暂停背景动画")
+	(pause as PauseMenuOverlay)._close()
+	assert_false(get_tree().paused)
 
 
 func test_boot_exit_energy_builds_one_way_without_intro_pulse_falloff() -> void:

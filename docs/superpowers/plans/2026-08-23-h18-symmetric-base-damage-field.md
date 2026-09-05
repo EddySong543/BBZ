@@ -4,7 +4,7 @@
 
 **Goal:** Replace h18's retired HP redistribution active with an active-only symmetric battlefield passive that makes both sides' Wave and Big Wave base damage equal 1 HP.
 
-**Architecture:** Add one stateless battlefield-level base-attack hook to `HeroSkill`, invoked by `BattleCore._calc_outgoing()` before existing attacker and team modifiers. H18 overrides only that hook; no runtime state, timers, networking fields, or action-flow changes are introduced.
+**Architecture:** Add one stateless battlefield-level base-attack hook to `HeroSkill`, invoked by `BattleCore._calc_outgoing()` before existing attacker and team modifiers. H18 overrides only that hook; no runtime state, timers, or action-flow changes are introduced.
 
 **Tech Stack:** Godot 4 GDScript, BattleCore v4, GUT.
 
@@ -24,7 +24,7 @@
 
 **Files:**
 - Modify: `tests/unit/battle/v4/test_heroes_dark_v4.gd`
-- Modify: `tests/unit/battle/v4/test_hero_team_role.gd`
+- Modify: `tests/unit/battle/v4/test_heroes_zodiac_v4.gd`
 
 **Interfaces:**
 - Consumes: `BattleCore.select_action()`, `BattleCore.select_active()`, `BattleCore.resolve()`, `BattleCore.set_status()`.
@@ -94,7 +94,7 @@ Run:
 
 ```powershell
 & .\tools\run_godot.ps1 -Mode Test -Target 'res://tests/unit/battle/v4/test_heroes_dark_v4.gd'
-& .\tools\run_godot.ps1 -Mode Test -Target 'res://tests/unit/battle/v4/test_hero_team_role.gd'
+& .\tools\run_godot.ps1 -Mode Test -Target 'res://tests/unit/battle/v4/test_heroes_zodiac_v4.gd'
 ```
 
 Expected: failures reference the missing battlefield normalization and old h18 data.
@@ -191,7 +191,7 @@ Delete the `h18` branch from `BattleScreen._special_tip()` because the redesigne
 Run:
 
 ```powershell
-& .\tools\run_godot.ps1 -Mode Test -Target 'res://tests/unit/battle/v4/test_hero_team_role.gd'
+& .\tools\run_godot.ps1 -Mode Test -Target 'res://tests/unit/battle/v4/test_heroes_zodiac_v4.gd'
 ```
 
 Expected: all published-data contracts pass.
@@ -209,7 +209,7 @@ Expected: all published-data contracts pass.
 
 ```powershell
 & .\tools\run_godot.ps1 -Mode Test -Target 'res://tests/unit/battle/v4/test_heroes_dark_v4.gd'
-& .\tools\run_godot.ps1 -Mode Test -Target 'res://tests/unit/battle/v4/test_hero_team_role.gd'
+& .\tools\run_godot.ps1 -Mode Test -Target 'res://tests/unit/battle/v4/test_heroes_zodiac_v4.gd'
 ```
 
 - [x] **Step 2: Run the full GUT suite**
@@ -222,7 +222,7 @@ Expected: all published-data contracts pass.
 
 ```powershell
 git -c safe.directory=$Repo -C $Repo diff --check
-git -c safe.directory=$Repo -C $Repo diff -- src/battle/hero_skill.gd src/battle/battle_core.gd src/battle/skills/h18_base_damage_field.gd assets/data/heroes/h18.tres tests/unit/battle/v4/test_heroes_dark_v4.gd tests/unit/battle/v4/test_hero_team_role.gd design/heroes.md design/heroes-redesign.md design/heroes-schools.md
+git -c safe.directory=$Repo -C $Repo diff -- src/battle/hero_skill.gd src/battle/battle_core.gd src/battle/skills/h18_base_damage_field.gd assets/data/heroes/h18.tres tests/unit/battle/v4/test_heroes_dark_v4.gd tests/unit/battle/v4/test_heroes_zodiac_v4.gd design/heroes.md design/heroes-redesign.md design/heroes-schools.md
 ```
 
 Expected: no whitespace errors and no unrelated files in the feature diff.

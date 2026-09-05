@@ -17,7 +17,7 @@ extends SceneTree
 ##   5. src/ui/**/*.tscn 的 text / tooltip_text / placeholder_text / card_* 属性
 ## 排除面：注释、push_*/printerr/assert（dev 向）、@export_group/enum（编辑器向）、
 ##   作字典键的维度色表（"进攻": Color(...)）、src/ui/debug、title_logo/pixel_glyphs（字形美术）、
-##   src/expedition（占位内容·缓办，见 active.md 联机后续）。
+##   src/expedition（占位内容·缓办，见 active.md 后续）。
 
 const OUT_CSV := "res://assets/i18n/strings_zh.csv"
 const LINE_EXCLUDE := "push_error|push_warning|printerr|assert\\(|@export_group|@export_enum"

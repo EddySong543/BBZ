@@ -192,7 +192,7 @@ func _run() -> void:
 		if switch_button.get_node_or_null("Icon") != null or carousel_glyph == null \
 				or int(carousel_glyph.get("selected_index")) != 1 \
 				or switch_button.visible or not switch_button.disabled:
-			failures.append("dormant PvP carousel is not hidden and locked to expedition")
+			failures.append("legacy mode carousel is not hidden and locked to expedition")
 	if menu.get_node_or_null("UI/NavShop") != null:
 		failures.append("shop placeholder still exists")
 	var backpack_button := menu.get_node_or_null("UI/NavBackpack") as Button
@@ -213,9 +213,6 @@ func _run() -> void:
 		failures.append("warehouse placeholder is not the rightmost bottom entry")
 	if codex_button != null and codex_button.position.y + codex_button.size.y > view_size.y:
 		failures.append("pre-grid-anchor codex button is not fully visible")
-	var net_button := menu.get_node_or_null("UI/NetLobbyButton") as Button
-	if net_button != null:
-		failures.append("dormant online battle entry is still visible")
 	for path: String in ["UI/ModeBanner", "UI/ModeSwitch", "UI/NavHeroes",
 			"UI/NavBackpack", "UI/NavWarehouse"]:
 		var dock_button := menu.get_node(path) as Button

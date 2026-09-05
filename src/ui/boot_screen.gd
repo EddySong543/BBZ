@@ -4,6 +4,8 @@ extends Control
 
 const NEXT_SCENE := "res://src/ui/main_menu.tscn"
 const AudioEventsBoot := preload("res://src/core/audio_events.gd")
+const PauseMenuOverlayScript := preload(
+	"res://src/ui/components/pause_menu_overlay.gd")
 
 var _entering: bool = false
 var _intro_finished: bool = false
@@ -18,7 +20,6 @@ func _ready() -> void:
 	GameSettings.load_and_apply()
 	_menu.start_game_requested.connect(_request_enter)
 	_menu.load_game_requested.connect(_on_load_game_requested)
-	_menu.settings_requested.connect(_open_settings)
 	_menu.quit_requested.connect(_quit_game)
 	_intro_controller.intro_finished.connect(_on_intro_finished)
 	_intro_controller.play_intro()
@@ -47,12 +48,12 @@ func _on_load_game_requested() -> void:
 	_menu.show_status("读取存档功能待接入")
 
 
-func _open_settings() -> void:
-	if has_node("SettingsPanel"):
-		return
-	var panel := SettingsPanel.new()
-	panel.name = "SettingsPanel"
-	add_child(panel)
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel") and not has_node("PauseMenu"):
+		get_viewport().set_input_as_handled()
+		var pause_menu := PauseMenuOverlayScript.new() as CanvasLayer
+		pause_menu.name = "PauseMenu"
+		add_child(pause_menu)
 
 
 func _quit_game() -> void:

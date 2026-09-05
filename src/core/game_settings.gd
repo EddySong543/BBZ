@@ -15,7 +15,8 @@ extends RefCounted
 ##     （2026-07-09 取代旧 fullscreen 布尔键·旧 cfg 自动迁移）
 ##   - resolution："宽x高" 字符串，仅窗口化模式生效（全屏两档跟随屏幕）。
 ##     设计画布恒 1920×1080，窗口尺寸变化由 content_scale 等比缩放（工程未配 stretch·运行时接管）。
-##   - invert_colors：界面主色 红↔蓝 翻转（写入 BootResult，过场幕 + 菜单/BP 波流背景全链路生效）。
+##   - vsync_enabled / frame_limit：垂直同步与帧率上限（0=不限制）。
+##   - screen_shake_enabled：是否允许战斗舞台震屏。
 
 const _PATH := "user://bobozan_settings.cfg"
 const _SECTION := "game"
@@ -33,8 +34,12 @@ const DEFAULTS := {
 	"sfx_volume": 1.0,
 	"window_mode": "windowed",
 	"resolution": "1920x1080",
-	"invert_colors": false,
+	"vsync_enabled": true,
+	"frame_limit": 0,
+	"screen_shake_enabled": true,
 }
+
+const FRAME_LIMIT_PRESETS: Array[int] = [0, 30, 60, 120, 144]
 
 static var _data: Dictionary = {}
 static var _loaded: bool = false
@@ -100,9 +105,12 @@ static func sanitize(key: String, v: Variant) -> Variant:
 		"resolution":
 			if v is String and String(v) in RESOLUTION_PRESETS:
 				return v
-		"invert_colors":
+		"vsync_enabled", "screen_shake_enabled":
 			if v is bool:
 				return v
+		"frame_limit":
+			if (v is int or v is float) and int(v) in FRAME_LIMIT_PRESETS:
+				return int(v)
 	return DEFAULTS.get(key)
 
 
@@ -129,7 +137,7 @@ static func apply_all() -> void:
 		_apply_one(k)
 
 
-## 仅重应用三个音量键（AudioEvents.ensure_buses 建完总线后回调·不碰窗口/主色）。
+## 仅重应用三个音量键（AudioEvents.ensure_buses 建完总线后回调，不碰窗口设置）。
 static func apply_volumes() -> void:
 	for k: String in ["master_volume", "music_volume", "sfx_volume"]:
 		_apply_one(k)
@@ -157,8 +165,12 @@ static func _apply_one(key: String) -> void:
 			_apply_bus_volume("SFX", float(get_value("sfx_volume")))
 		"window_mode", "resolution":
 			_apply_display()
-		"invert_colors":
-			BootResult.invert_colors = bool(get_value("invert_colors"))
+		"vsync_enabled":
+			_apply_vsync()
+		"frame_limit":
+			Engine.max_fps = int(get_value("frame_limit"))
+		"screen_shake_enabled":
+			pass
 
 
 ## 设音量总线。总线尚未建时静默跳过（值已持久化·AudioEvents.ensure_buses 建完会回灌）。
@@ -195,6 +207,14 @@ static func _apply_display() -> void:
 				var scr_pos := DisplayServer.screen_get_position()
 				var scr_sz := DisplayServer.screen_get_size()
 				DisplayServer.window_set_position(scr_pos + (scr_sz - sz) / 2)
+
+
+static func _apply_vsync() -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	DisplayServer.window_set_vsync_mode(
+			DisplayServer.VSYNC_ENABLED if bool(get_value("vsync_enabled"))
+			else DisplayServer.VSYNC_DISABLED)
 
 
 ## "1920x1080" → Vector2i；非法值回退设计画布。

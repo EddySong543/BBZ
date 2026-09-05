@@ -1,6 +1,6 @@
 # Combat Copy Terminology Implementation Plan
 
-> ⚠️ **历史实施计划。**其中 H03“攻击优先结算”文案与机制已于 2026-08-30 退役，正文只作当时术语迁移记录；当前 H03 规则见 [`2026-08-30-h03-sequence-shift-design.md`](../specs/2026-08-30-h03-sequence-shift-design.md)。
+> ⚠️ **历史实施计划。**其中 H03“攻击优先结算”文案与机制已退役，正文只作当时术语迁移记录；当前 H03 规则见 [`heroes.md`](../../../design/heroes.md) 与 [`2026-09-03-action-anchor-sequence-design.md`](../specs/2026-09-03-action-anchor-sequence-design.md)。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -39,7 +39,7 @@
 ### Task 2: 同步发布文案
 
 **Files:**
-- Modify: `tests/unit/battle/v4/test_hero_team_role.gd`
+- Modify: `tests/unit/battle/v4/test_heroes_zodiac_v4.gd`
 - Modify: `assets/data/heroes/h02.tres`
 - Modify: `assets/data/heroes/h03.tres`
 - Modify: `assets/data/heroes/h04.tres`

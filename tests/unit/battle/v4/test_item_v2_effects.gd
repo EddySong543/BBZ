@@ -115,6 +115,8 @@ func test_thorn_bracer_retaliates_only_after_a_later_connected_attack() -> void:
 		[_item(0), _action(A.ATTACK)])
 	assert_eq(battle.hp[1][0], attacker_hp - 2)
 	assert_false(battle.item_v2_pending[0].has("hit_thorns"))
+	assert_eq(battle.slot_state(0, 0), BattleCore.SlotState.EMPTY,
+			"荆棘护腕触发一次后耗尽")
 
 
 func test_heart_knot_swaps_armor_and_crucible_can_spend_new_armor() -> void:

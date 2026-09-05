@@ -106,8 +106,8 @@ const _V2_DEF := {
 		price = 17000, damaged = {}, effect = &"next_attack_any_target", target = &"none"},
 	"v2_t1_thorn_bracer": {
 		name = "荆棘护腕", tier = 1, dim = "防御", desc = "敌方下一次攻击命中我方时，攻击者受到1点伤害。",
-		cost = 1, durability = 2, shape = [Vector2i(0, 0), Vector2i(1, 0)],
-		price = 28000, damaged = {1: 14000}, effect = &"next_hit_thorns", target = &"none"},
+		cost = 1, durability = 1, shape = [Vector2i(0, 0), Vector2i(1, 0)],
+		price = 24000, damaged = {}, effect = &"next_hit_thorns", target = &"none"},
 	"v2_t2_heart_knot": {
 		name = "连心结", tier = 2, dim = "节奏", desc = "选择我方一名队友，与出战英雄交换护甲。",
 		cost = 0, durability = 3, shape = [Vector2i(0, 0), Vector2i(1, 0)],

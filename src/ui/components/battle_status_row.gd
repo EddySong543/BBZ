@@ -9,6 +9,8 @@ signal status_hovered(effect_id: StringName, value: int, target_rect: Rect2)
 signal status_unhovered
 
 const COUNT_BASE_FONT: Font = preload("res://assets/font/zlabs_pixel_ui.tres")
+const DEFAULT_NUMBER_TUNING: BattleStatusNumberTuning = preload(
+		"res://src/ui/components/battle_status_number_tuning.tres")
 const ALPHA_SILHOUETTE_SHADER_CODE := """
 shader_type canvas_item;
 
@@ -66,30 +68,14 @@ void fragment() {
 @export_range(0.5, 1.0, 0.01) var enter_count_scale := 0.85
 @export var enter_stamp_flash_color := Color(1.0, 0.86, 0.58, 0.88)
 
-@export_group("Stack Number")
-## 相对固定槽位左上角的位置；xN 位于图标正下方，不参与横向图标对齐。
-@export var count_offset := Vector2(7.0, 36.0)
-@export var count_box_size := Vector2(26.0, 18.0)
-@export_range(8, 32, 1) var count_font_size := 18
-@export_range(0.0, 1.5, 0.05) var count_embolden := 0.6
-## 小写 x 与数值之间的像素间距；Inspector 滑杆可实时调整。
-@export_range(0.0, 12.0, 1.0, "suffix:px") var count_symbol_gap := 2.0
-@export_range(0, 8, 1) var count_outline_size := 2
-@export var count_text_color := Color("F2E8CC")
-@export var count_outline_color := Color.BLACK
-@export var count_shadow_color := Color(0.0, 0.0, 0.0, 0.32)
-@export var count_shadow_offset := Vector2i(1, 1)
-@export_range(0, 4, 1) var count_shadow_outline_size := 0
-@export_range(0.0, 1.0, 0.01) var count_pop_duration := 0.14
-@export_range(-4.0, 4.0, 1.0, "suffix:px") var count_increase_lift := 2.0
-@export_range(0.5, 1.0, 0.01) var count_increase_scale := 0.9
-
-@export_group("Per Icon Count Offset")
-## 开启后毒素、脆弱与剑气直接使用各自坐标；适合在临时场景中做光学对齐。
-@export var use_per_icon_count_offsets := true
-@export var poison_count_offset := Vector2(7.0, 36.0)
-@export var vulnerable_count_offset := Vector2(7.0, 36.0)
-@export var sword_qi_count_offset := Vector2(7.0, 36.0)
+@export_group("Stack Number Source")
+## 在 buff_tuning_lab 中展开此 Resource 调整；正式战斗读取同一份资源，禁止再手抄参数。
+@export var number_tuning: BattleStatusNumberTuning = DEFAULT_NUMBER_TUNING:
+	set(value):
+		_disconnect_number_tuning()
+		number_tuning = value if value != null else DEFAULT_NUMBER_TUNING
+		_connect_number_tuning()
+		_on_number_tuning_changed()
 
 @export_group("Editor Preview")
 ## 正式战斗运行时保持关闭；调试场景实例会打开并展示真实毒素/脆弱/剑气组件。
@@ -117,10 +103,12 @@ var _editor_preview_signature := ""
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_connect_number_tuning()
 	if Engine.is_editor_hint():
 		set_process(true)
 		_refresh_editor_preview()
 	elif preview_enabled:
+		set_process(true)
 		refresh(_preview_entries())
 	else:
 		set_process(false)
@@ -128,8 +116,32 @@ func _ready() -> void:
 		size = Vector2.ZERO
 
 
-func _process(_delta: float) -> void:
+func _connect_number_tuning() -> void:
+	if number_tuning == null:
+		return
+	if not number_tuning.changed.is_connected(_on_number_tuning_changed):
+		number_tuning.changed.connect(_on_number_tuning_changed)
+
+
+func _disconnect_number_tuning() -> void:
+	if number_tuning == null:
+		return
+	if number_tuning.changed.is_connected(_on_number_tuning_changed):
+		number_tuning.changed.disconnect(_on_number_tuning_changed)
+
+
+func _on_number_tuning_changed() -> void:
+	_editor_preview_signature = ""
+	if not is_node_ready():
+		return
 	if Engine.is_editor_hint():
+		_refresh_editor_preview()
+	elif preview_enabled:
+		refresh(_preview_entries())
+
+
+func _process(_delta: float) -> void:
+	if Engine.is_editor_hint() or preview_enabled:
 		_refresh_editor_preview()
 
 
@@ -368,7 +380,7 @@ func _build_slot(entry: Dictionary, slot_x: float, slot_width: float,
 	var resolved_count_offset := _resolved_count_position(
 			effect_id, count_width)
 	count_control.position = resolved_count_offset
-	count_control.size = Vector2(count_width, count_box_size.y)
+	count_control.size = Vector2(count_width, number_tuning.count_box_size.y)
 	count_control.visible = show_stack_count
 	count_control.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	count_control.set_meta("formatted_text", "x%d" % value)
@@ -378,33 +390,36 @@ func _build_slot(entry: Dictionary, slot_x: float, slot_width: float,
 	# 让视窗预览与 F6 都能绘制数字，同时正式战斗字形保持完全一致。
 	var count_font := FontVariation.new()
 	count_font.base_font = COUNT_BASE_FONT
-	count_font.variation_embolden = count_embolden
+	count_font.variation_embolden = number_tuning.count_embolden
 	var prefix_label := _build_count_glyph("Prefix", "x", count_font)
 	count_control.add_child(prefix_label)
 	var prefix_width := ceilf(prefix_label.get_combined_minimum_size().x)
 	prefix_label.position = Vector2.ZERO
-	prefix_label.size = Vector2(prefix_width, count_box_size.y)
+	prefix_label.size = Vector2(prefix_width, number_tuning.count_box_size.y)
 	var value_text := str(value)
 	var value_label := _build_count_glyph("Value", value_text, count_font)
 	count_control.add_child(value_label)
 	var value_width := ceilf(value_label.get_combined_minimum_size().x)
-	value_label.position = Vector2(prefix_width + count_symbol_gap, 0.0)
-	value_label.size = Vector2(value_width, count_box_size.y)
+	value_label.position = Vector2(prefix_width + number_tuning.count_symbol_gap, 0.0)
+	value_label.size = Vector2(value_width, number_tuning.count_box_size.y)
 	count_control.size.x = maxf(
-			count_box_size.x, value_label.position.x + value_width)
+			number_tuning.count_box_size.x, value_label.position.x + value_width)
 	if show_stack_count and had_same_instance and previous_values.has(effect_id) \
 			and int(previous_values[effect_id]) < value:
 		var resting_position := count_control.position
 		count_control.set_meta("count_increase_motion_played", true)
 		count_control.pivot_offset = count_control.size * 0.5
-		count_control.position = resting_position + Vector2(0.0, count_increase_lift)
-		count_control.scale = Vector2.ONE * count_increase_scale
+		count_control.position = resting_position + Vector2(
+				0.0, number_tuning.count_increase_lift)
+		count_control.scale = Vector2.ONE * number_tuning.count_increase_scale
 		var count_tween := create_tween().set_parallel(true)
 		count_tween.tween_property(
-				count_control, "position", resting_position, count_pop_duration) \
+				count_control, "position", resting_position,
+				number_tuning.count_pop_duration) \
 				.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		count_tween.tween_property(
-				count_control, "scale", Vector2.ONE, count_pop_duration) \
+				count_control, "scale", Vector2.ONE,
+				number_tuning.count_pop_duration) \
 				.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	if enter_motion_enabled and not Engine.is_editor_hint() \
 			and not had_same_instance:
@@ -530,22 +545,27 @@ func _build_count_glyph(node_name: String, text: String,
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.add_theme_font_override("font", font)
-	label.add_theme_font_size_override("font_size", count_font_size)
-	label.add_theme_color_override("font_color", count_text_color)
-	label.add_theme_color_override("font_outline_color", count_outline_color)
-	label.add_theme_constant_override("outline_size", count_outline_size)
-	label.add_theme_color_override("font_shadow_color", count_shadow_color)
-	label.add_theme_constant_override("shadow_offset_x", count_shadow_offset.x)
-	label.add_theme_constant_override("shadow_offset_y", count_shadow_offset.y)
+	label.add_theme_font_size_override("font_size", number_tuning.count_font_size)
+	label.add_theme_color_override("font_color", number_tuning.count_text_color)
+	label.add_theme_color_override(
+			"font_outline_color", number_tuning.count_outline_color)
 	label.add_theme_constant_override(
-			"shadow_outline_size", count_shadow_outline_size)
+			"outline_size", number_tuning.count_outline_size)
+	label.add_theme_color_override(
+			"font_shadow_color", number_tuning.count_shadow_color)
+	label.add_theme_constant_override(
+			"shadow_offset_x", number_tuning.count_shadow_offset.x)
+	label.add_theme_constant_override(
+			"shadow_offset_y", number_tuning.count_shadow_offset.y)
+	label.add_theme_constant_override(
+			"shadow_outline_size", number_tuning.count_shadow_outline_size)
 	return label
 
 
 func _count_content_width(value: int) -> float:
 	var font := FontVariation.new()
 	font.base_font = COUNT_BASE_FONT
-	font.variation_embolden = count_embolden
+	font.variation_embolden = number_tuning.count_embolden
 	var prefix_label := _build_count_glyph("MeasurePrefix", "x", font)
 	var value_label := _build_count_glyph("MeasureValue", str(value), font)
 	add_child(prefix_label)
@@ -554,8 +574,8 @@ func _count_content_width(value: int) -> float:
 	var value_width := ceilf(value_label.get_combined_minimum_size().x)
 	prefix_label.free()
 	value_label.free()
-	return maxf(count_box_size.x,
-			prefix_width + count_symbol_gap + value_width)
+	return maxf(number_tuning.count_box_size.x,
+			prefix_width + number_tuning.count_symbol_gap + value_width)
 
 
 func _slot_width(_show_stack_count: bool, _effect_id: StringName = &"",
@@ -579,44 +599,49 @@ func _visible_layout_bounds(entry: Dictionary) -> Rect2:
 		return result
 	var count_width := _count_content_width(value)
 	var count_position := _resolved_count_position(effect_id, count_width)
-	var count_size := Vector2(count_width, count_box_size.y)
-	var count_bounds := Rect2(count_position, count_size).grow(float(count_outline_size))
-	if count_shadow_color.a > 0.0:
-		var shadow_grow := float(count_outline_size + count_shadow_outline_size)
+	var count_size := Vector2(count_width, number_tuning.count_box_size.y)
+	var count_bounds := Rect2(count_position, count_size).grow(
+			float(number_tuning.count_outline_size))
+	if number_tuning.count_shadow_color.a > 0.0:
+		var shadow_grow := float(number_tuning.count_outline_size \
+				+ number_tuning.count_shadow_outline_size)
 		count_bounds = count_bounds.merge(Rect2(
-				count_position + Vector2(count_shadow_offset), count_size).grow(shadow_grow))
+				count_position + Vector2(number_tuning.count_shadow_offset),
+				count_size).grow(shadow_grow))
 	return result.merge(count_bounds)
 
 
 func _slot_height() -> float:
-	var lowest_count_y := count_offset.y
-	if use_per_icon_count_offsets:
+	var lowest_count_y := number_tuning.count_offset.y
+	if number_tuning.use_per_icon_count_offsets:
 		lowest_count_y = maxf(
-				poison_count_offset.y,
-				maxf(vulnerable_count_offset.y, sword_qi_count_offset.y))
+				number_tuning.poison_count_offset.y,
+				maxf(number_tuning.vulnerable_count_offset.y,
+						number_tuning.sword_qi_count_offset.y))
 	return maxf(slot_size.y, maxf(icon_box_size.y,
-			lowest_count_y + count_box_size.y
-					+ maxf(float(count_shadow_offset.y), 0.0)))
+			lowest_count_y + number_tuning.count_box_size.y
+					+ maxf(float(number_tuning.count_shadow_offset.y), 0.0)))
 
 
 func _count_offset_for(effect_id: StringName) -> Vector2:
-	if not use_per_icon_count_offsets:
-		return count_offset
+	if not number_tuning.use_per_icon_count_offsets:
+		return number_tuning.count_offset
 	match effect_id:
 		&"poison":
-			return poison_count_offset
+			return number_tuning.poison_count_offset
 		&"vulnerable":
-			return vulnerable_count_offset
+			return number_tuning.vulnerable_count_offset
 		&"sword_qi":
-			return sword_qi_count_offset
+			return number_tuning.sword_qi_count_offset
 		_:
-			return count_offset
+			return number_tuning.count_offset
 
 
 func _resolved_count_position(effect_id: StringName, count_width: float) -> Vector2:
 	var optical_position := _count_offset_for(effect_id)
-	var right_effect_margin := float(count_outline_size \
-			+ count_shadow_outline_size + maxi(count_shadow_offset.x, 0) + 1)
+	var right_effect_margin := float(number_tuning.count_outline_size \
+			+ number_tuning.count_shadow_outline_size \
+			+ maxi(number_tuning.count_shadow_offset.x, 0) + 1)
 	var latest_safe_x := slot_size.x - count_width - right_effect_margin
 	return Vector2(minf(optical_position.x, latest_safe_x), optical_position.y)
 
@@ -669,14 +694,22 @@ func _refresh_editor_preview() -> void:
 			str(enter_scale), str(enter_stamp_scale), str(enter_stagger),
 			str(enter_count_delay), str(enter_count_scale),
 			str(enter_stamp_flash_color),
-			str(count_offset), str(count_box_size), str(count_font_size),
-			str(count_embolden), str(count_symbol_gap), str(count_outline_size),
-			str(count_text_color), str(count_outline_color), str(count_shadow_color),
-			str(count_shadow_offset), str(count_shadow_outline_size),
-			str(count_pop_duration), str(count_increase_lift),
-			str(count_increase_scale),
-			str(use_per_icon_count_offsets), str(poison_count_offset),
-			str(vulnerable_count_offset), str(sword_qi_count_offset),
+			str(number_tuning.count_offset), str(number_tuning.count_box_size),
+			str(number_tuning.count_font_size), str(number_tuning.count_embolden),
+			str(number_tuning.count_symbol_gap),
+			str(number_tuning.count_outline_size),
+			str(number_tuning.count_text_color),
+			str(number_tuning.count_outline_color),
+			str(number_tuning.count_shadow_color),
+			str(number_tuning.count_shadow_offset),
+			str(number_tuning.count_shadow_outline_size),
+			str(number_tuning.count_pop_duration),
+			str(number_tuning.count_increase_lift),
+			str(number_tuning.count_increase_scale),
+			str(number_tuning.use_per_icon_count_offsets),
+			str(number_tuning.poison_count_offset),
+			str(number_tuning.vulnerable_count_offset),
+			str(number_tuning.sword_qi_count_offset),
 			str(preview_poison_count), str(preview_vulnerable_count),
 			str(preview_sword_qi_count)])
 	var next_signature := "|".join(signature_parts)

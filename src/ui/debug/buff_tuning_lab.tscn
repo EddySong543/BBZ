@@ -1,7 +1,8 @@
-[gd_scene format=3 uid="uid://ddflvx2yd4pvj"]
+[gd_scene load_steps=4 format=3 uid="uid://ddflvx2yd4pvj"]
 
 [ext_resource type="Script" uid="uid://vqykhaj703qa" path="res://src/ui/debug/buff_tuning_lab.gd" id="1_lab"]
 [ext_resource type="Script" uid="uid://c6es6wondtdwj" path="res://src/ui/components/battle_status_row.gd" id="2_buff"]
+[ext_resource type="Resource" path="res://src/ui/components/battle_status_number_tuning.tres" id="3_number"]
 
 [node name="BuffTuningLab" type="Control" unique_id=1364530060]
 layout_mode = 3
@@ -50,7 +51,5 @@ offset_right = 1045.0
 offset_bottom = 568.0
 mouse_filter = 2
 script = ExtResource("2_buff")
-poison_count_offset = Vector2(7, 36)
-vulnerable_count_offset = Vector2(7, 36)
-sword_qi_count_offset = Vector2(7, 36)
+number_tuning = ExtResource("3_number")
 preview_enabled = true

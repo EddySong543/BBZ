@@ -215,12 +215,29 @@ func test_item_drag_uses_only_item_art_without_frame_or_fill() -> void:
 	if settled_cost != null and settled_durability != null:
 		assert_eq(settled_cost.number, 0)
 		assert_eq(settled_durability.number, 1)
-		assert_almost_eq(
-			maxf(settled_cost.debug_icon_visible_rect().size.x,
-				settled_cost.debug_icon_visible_rect().size.y),
-			maxf(settled_durability.debug_icon_visible_rect().size.x,
-				settled_durability.debug_icon_visible_rect().size.y), 0.01,
-			"战斗顺序槽两枚属性图标保持同一可见尺度")
+		var sequence_layout := ItemFrameStyle.item_frame_layout(&"sequence")
+		assert_eq(settled_cost.debug_icon_visible_rect(),
+			sequence_layout["energy_icon_rect"])
+		assert_eq(settled_durability.debug_icon_visible_rect(),
+			sequence_layout["durability_icon_rect"],
+			"战斗顺序槽保留调参台中两枚属性图标各自的矩形")
+		var row_frame := screen.p1_item_row._tex_frames[0] as TextureRect
+		var row_cost := screen.p1_item_row._cost_badges[0] as IconBadge
+		var row_durability := screen.p1_item_row._durability_badges[0] as IconBadge
+		var sequence_frame := screen._command_order_row.get_node(
+			"Step0/Visual/Art/ItemFrame") as TextureRect
+		var row_cost_anchor := (row_cost.position - row_frame.position) / row_frame.size.x
+		var row_durability_anchor := (
+			row_durability.position - row_frame.position) / row_frame.size.x
+		var sequence_cost_anchor := (
+			settled_cost.position - sequence_frame.position) / sequence_frame.size.x
+		var sequence_durability_anchor := (
+			settled_durability.position - sequence_frame.position) / sequence_frame.size.x
+		assert_almost_eq(sequence_cost_anchor.x, row_cost_anchor.x, 0.0001)
+		assert_almost_eq(sequence_cost_anchor.y, row_cost_anchor.y, 0.0001)
+		assert_almost_eq(sequence_durability_anchor.x, row_durability_anchor.x, 0.0001)
+		assert_almost_eq(sequence_durability_anchor.y, row_durability_anchor.y, 0.0001,
+			"道具进入顺序槽后，能量与耐久角标只能随完整框等比缩放，不能相对漂移")
 	screen._discard_ai_precomputed()
 
 
@@ -304,15 +321,13 @@ func test_command_slots_use_one_cross_star_without_any_wrapper() -> void:
 		original_vertical + 2.0, 0.01,
 		"Remote Inspector 修改预览参数后，窗口内已生成的底座必须同步刷新")
 	preview.set("tuning_vertical_radius", original_vertical)
-	skin.set("pulse_strength", 0.0)
-	preview.set("pulse_strength", 0.0)
 	var runtime_points: PackedVector2Array = skin.debug_geometry()["star_points"]
 	var preview_points: PackedVector2Array = preview.debug_geometry()["star_points"]
 	assert_eq(runtime_points, preview_points,
-		"Base 与正式战斗槽必须共享同一组局部顶点，横向拉伸不得被二次放大")
+		"Base 与正式战斗槽必须共享同一组局部顶点，整体只允许统一等比放大")
 	assert_eq(skin.size, preview.size)
-	assert_eq(skin.scale, Vector2.ONE,
-		"正式绘制节点必须锁定 1:1 变换，禁止 PanelContainer 二次拉伸")
+	assert_eq(skin.scale, Vector2.ONE * screen.COMMAND_SLOT_SCALE,
+		"任务5只允许统一等比放大十字星，不能改变横纵比例")
 	var runtime_transform: Transform2D = skin.get_global_transform_with_canvas()
 	var preview_transform: Transform2D = preview.get_global_transform_with_canvas()
 	var runtime_center: Vector2 = skin.debug_geometry()["star_center"]
@@ -325,9 +340,9 @@ func test_command_slots_use_one_cross_star_without_any_wrapper() -> void:
 		var runtime_vector: Vector2 = runtime_transform.basis_xform(
 			runtime_points[point_index] - runtime_center)
 		var preview_vector: Vector2 = preview_transform.basis_xform(
-			preview_points[point_index] - preview_center)
+			preview_points[point_index] - preview_center) * screen.COMMAND_SLOT_SCALE
 		assert_lt(runtime_vector.distance_to(preview_vector), 0.001,
-			"正式场景的屏幕轮廓必须逐点复刻 Base，不能只保证局部参数相同")
+			"正式场景必须逐点等比放大 Base 轮廓，不能独立改写横纵轴")
 	var star_color: Color = geometry["star_color"]
 	assert_almost_eq(star_color.r, screen.countdown_ornament_color.r, 0.001)
 	assert_almost_eq(star_color.g, screen.countdown_ornament_color.g, 0.001)
@@ -336,21 +351,20 @@ func test_command_slots_use_one_cross_star_without_any_wrapper() -> void:
 	assert_false(bool(geometry["outline_enabled"]), "十字星不得再绘制近黑环绕描边")
 	assert_eq(geometry["underlay_color"], Color.TRANSPARENT)
 	assert_almost_eq(float(geometry["underlay_width"]), 0.0, 0.001)
-	assert_true(bool(geometry["processing"]), "末端空槽必须持续运行轻柔闪烁提示")
-	skin.set("pulse_phase", 0.0)
-	skin._process(3.0)
-	var pulse_peak: Dictionary = skin.debug_geometry()
-	assert_almost_eq(float(pulse_peak["pulse_strength"]), 1.0, 0.01)
-	assert_almost_eq(float(pulse_peak["star_radius"]),
+	assert_false(bool(geometry["processing"]),
+		"任务5移除空槽循环呼吸，空闲与高亮都必须是稳定状态")
+	var static_empty: Dictionary = skin.debug_geometry()
+	assert_almost_eq(float(static_empty["pulse_strength"]), 0.0, 0.01)
+	assert_almost_eq(float(static_empty["star_radius"]),
 		maxf(configured_radii.x, configured_radii.y), 0.01,
-		"6 秒慢闪只改变亮度，峰值也必须保持 Base 的精确宽高")
-	assert_eq(pulse_peak["star_points"], runtime_points,
-		"慢闪峰值不得让正式十字星相对 Base 发生任何几何变形")
-	assert_eq(pulse_peak["star_color"], screen.countdown_ornament_color,
-		"闪烁峰值必须达到有按钮时的完整米白色，不能再被空槽父透明度压暗")
-	assert_eq(pulse_peak["bottom_shadow_offset"], preview.get("tuning_shadow_offset"))
-	assert_eq(pulse_peak["bottom_shadow_color"], preview.get("tuning_shadow_color"))
-	assert_almost_eq(float(pulse_peak["bottom_shadow_expand"]),
+		"稳定明暗状态不能改变 Base 的精确宽高")
+	assert_eq(static_empty["star_points"], runtime_points,
+		"移除呼吸后不得改变十字星局部几何")
+	assert_lt((static_empty["star_color"] as Color).a, 1.0,
+		"没有待放入内容时空槽保持稳定低亮")
+	assert_eq(static_empty["bottom_shadow_offset"], preview.get("tuning_shadow_offset"))
+	assert_eq(static_empty["bottom_shadow_color"], preview.get("tuning_shadow_color"))
+	assert_almost_eq(float(static_empty["bottom_shadow_expand"]),
 		float(preview.get("tuning_shadow_expand")), 0.001,
 		"十字星投影位置、颜色和扩张必须全部来自 Inspector")
 	assert_null(screen._command_order_row.get_node_or_null("RailSkin"),
@@ -368,7 +382,7 @@ func test_command_slots_use_one_cross_star_without_any_wrapper() -> void:
 	assert_gt(screen._command_order_strip.position.y, 790.0, "顺序栏需要比上一版稍向下")
 
 
-func test_all_battle_variants_keep_command_star_at_one_to_one_transform() -> void:
+func test_all_battle_variants_keep_command_star_at_one_uniform_scale() -> void:
 	for scene_path: String in BATTLE_VARIANT_PATHS:
 		BattleSetup.reset()
 		var packed := load(scene_path) as PackedScene
@@ -387,10 +401,12 @@ func test_all_battle_variants_keep_command_star_at_one_to_one_transform() -> voi
 		assert_almost_eq(fposmod(global_center.x, 1.0),
 			fposmod(global_center.y, 1.0), 0.001,
 			"%s 十字星横纵轴必须共享同一半像素相位" % scene_path)
-		assert_lt(runtime_transform.x.distance_to(preview_transform.x), 0.001,
-			"%s 正式十字星的横轴不得被场景变体二次拉伸" % scene_path)
-		assert_lt(runtime_transform.y.distance_to(preview_transform.y), 0.001,
-			"%s 正式十字星的纵轴不得被场景变体二次拉伸" % scene_path)
+		assert_lt(runtime_transform.x.distance_to(
+				preview_transform.x * screen.COMMAND_SLOT_SCALE), 0.001,
+			"%s 正式十字星横轴必须只做统一等比放大" % scene_path)
+		assert_lt(runtime_transform.y.distance_to(
+				preview_transform.y * screen.COMMAND_SLOT_SCALE), 0.001,
+			"%s 正式十字星纵轴必须只做统一等比放大" % scene_path)
 		assert_eq(skin.size, preview.size,
 			"%s 必须逐值复用 Base 预览绘制尺寸" % scene_path)
 		remove_child(screen)
@@ -456,50 +472,78 @@ func test_filled_slot_lands_on_the_cross_star_with_a_short_stamp() -> void:
 	var art := slot.get_node("Visual/Art") as Control
 	var art_bottom: float = art.position.y + art.size.y * art.scale.y
 	var settled_geometry: Dictionary = skin.debug_geometry()
-	var star_top: float = (settled_geometry["star_center"] as Vector2).y \
-		- (settled_geometry["star_radii"] as Vector2).y
+	var star_top: float = skin.position.y + (
+		(settled_geometry["star_center"] as Vector2).y
+		- (settled_geometry["star_radii"] as Vector2).y) * skin.scale.y
 	assert_lte(art_bottom, star_top,
 		"放大的行动素材必须停在十字星上方，不能再轻微盖住星尖")
 	assert_eq(slot.scale, Vector2.ONE)
 
 
-func test_empty_slot_uses_internal_slow_pulse_and_filled_slot_stays_opaque() -> void:
+func test_next_slot_is_static_dim_then_stays_hot_while_waiting_for_a_drop() -> void:
 	var screen: Control = _screen()
 	screen._refresh_command_order_strip()
 	assert_almost_eq(screen._command_next_slot.modulate.a, 1.0, 0.001,
-		"空槽父节点保持全亮，避免把慢闪峰值二次压暗")
+		"空槽父节点保持全亮，明暗只由十字星自身表达")
 	var empty_skin := screen._command_next_slot.get_node("SlotSkin") as Control
+	assert_false(bool(empty_skin.get("hot")))
+	assert_false(bool(empty_skin.debug_geometry()["processing"]),
+		"空闲槽不再运行循环呼吸")
 	assert_lt((empty_skin.debug_geometry()["star_color"] as Color).a, 1.0,
-		"等待状态的暗部仍由十字星自身透明度表达")
-	screen._dispatch_command_drop({
+		"没有预选内容时维持稳定低亮")
+	screen._dispatch_command_click({
 		kind = "action", action = ActionDef.Action.CHARGE, button = screen.btn_charge,
 	})
+	empty_skin = screen._command_next_slot.get_node("SlotSkin") as Control
+	assert_true(bool(empty_skin.get("hot")),
+		"点击底部行动按钮后，下一个空十字星槽必须持续高亮")
+	assert_eq((empty_skin.debug_geometry()["star_color"] as Color).a, 1.0)
+	assert_false(bool(empty_skin.debug_geometry()["processing"]),
+		"持续高亮是稳定状态，不得换成循环呼吸")
+	assert_true(screen._dispatch_command_drop({
+		kind = "action", action = ActionDef.Action.CHARGE, button = screen.btn_charge,
+	}))
 	var filled := screen._command_order_row.get_node("Step0") as Control
 	assert_almost_eq(filled.modulate.a, 1.0, 0.001, "落位后的当前格恢复完全不透明")
+	var next_skin := screen._command_next_slot.get_node("SlotSkin") as Control
+	assert_false(bool(next_skin.get("hot")), "动作放入后解除下一空槽高亮")
 	assert_almost_eq(screen._command_next_slot.modulate.a, 1.0, 0.001,
-		"新衍生空槽同样保留完整高光上限")
+		"新衍生空槽保持正常父透明度")
 
 
-func test_changed_command_sequence_refreshes_with_one_subtle_settle() -> void:
+func test_switch_choice_opens_and_closes_the_same_steady_slot_highlight() -> void:
 	var screen: Control = _screen()
-	screen._dispatch_command_drop({
+	screen._on_switch_main_pressed()
+	var skin := screen._command_next_slot.get_node("SlotSkin") as Control
+	assert_true(screen._switch_tray_open)
+	assert_true(bool(skin.get("hot")),
+		"点击底部切换按钮进入候选态时也要提示下一空槽")
+	screen._on_switch_main_pressed()
+	assert_false(screen._switch_tray_open)
+	assert_false(bool(skin.get("hot")), "取消切换候选后解除高亮")
+
+
+func test_unchanged_refresh_reuses_nodes_and_only_landing_owns_feedback() -> void:
+	var screen: Control = _screen()
+	var original_next: Control = screen._command_next_slot
+	screen._refresh_command_order_strip()
+	assert_same(screen._command_next_slot, original_next,
+		"队列内容未变化时必须复用整排节点，禁止强制重建")
+	assert_true(screen._dispatch_command_drop({
 		kind = "action", action = ActionDef.Action.CHARGE, button = screen.btn_charge,
-	})
-	var refresh_tween := screen._command_refresh_tween as Tween
-	assert_not_null(refresh_tween, "队列内容变化后需要一次简约刷新缓动")
-	assert_almost_eq(screen._command_order_row.position.y,
-		screen.COMMAND_REFRESH_OFFSET_Y, 0.01)
-	assert_lt(screen._command_order_row.modulate.a, 1.0,
-		"刷新首帧只做轻淡入，不能硬切完整亮度")
-	assert_almost_eq(float(screen._command_order_row.get_meta("command_refresh_duration")),
-		screen.COMMAND_REFRESH_DURATION, 0.001)
-	await refresh_tween.finished
+	}))
 	assert_almost_eq(screen._command_order_row.position.y, 0.0, 0.01)
 	assert_almost_eq(screen._command_order_row.modulate.a, 1.0, 0.01)
-	var completed_tween: Tween = screen._command_refresh_tween
+	assert_false(screen._command_order_row.has_meta("command_refresh_duration"),
+		"整排不再叠加下落淡入，落槽只由单格反馈承担")
+	var step := screen._command_order_row.get_node("Step0") as Control
+	screen._play_command_slot_land(step)
+	assert_true(step.has_meta("command_land_tween"),
+		"序列真正变化后只允许一次克制的单槽落位反馈")
+	var rebuilt_next: Control = screen._command_next_slot
 	screen._refresh_command_order_strip()
-	assert_eq(screen._command_refresh_tween, completed_tween,
-		"队列内容未变化时不得重复播放刷新动画")
+	assert_same(screen._command_next_slot, rebuilt_next,
+		"落位后的常规刷新不得再次替换节点或重播动画")
 
 
 func test_command_strip_matches_bottom_button_dimming_during_resolution() -> void:
@@ -563,7 +607,7 @@ func test_each_filled_slot_has_engraved_line_cancel_glyph_that_removes_the_step(
 		"撤销 x 的投影位置、颜色和粗度必须由 Inspector 独立调整")
 	assert_false(bool(glyph_geometry["antialiased"]),
 		"小 x 保留双斜线形状，但不能再因三层抗锯齿叠加而发糊")
-	assert_eq(cancel.position, Vector2(60.0, -15.0) \
+	assert_eq(cancel.position, Vector2(screen.COMMAND_SLOT_SIZE - 6.0, -15.0) \
 		+ cancel_preview.get("tuning_slot_offset"),
 		"撤销键向右上移开按钮角部，避免几乎碰上行动素材")
 	var original_length := float(cancel_preview.get("tuning_line_length"))
@@ -625,6 +669,98 @@ func test_next_slot_is_the_only_drop_target_and_stays_clear_of_buttons() -> void
 		"末端空槽只显示一个十字星底座，不出现任何包裹轮廓")
 
 
+func test_insufficient_energy_uses_the_execution_phase_whole_button_gray() -> void:
+	var screen: Control = _screen()
+	screen.battle.energy[screen.PLAYER] = 0
+	screen._refresh_action_affordance()
+	var badge := screen.btn_attack.get_node("CostPips") as IconBadge
+	assert_true(screen.btn_attack.disabled)
+	assert_eq(screen.btn_attack.modulate, screen.ACTION_DISABLED_BUTTON_MODULATE,
+		"能量不足必须从按钮根节点统一压暗，边框与角标不能分裂")
+	assert_eq(badge.modulate, Color.WHITE,
+		"费用角标不得额外叠加第二层灰度")
+	assert_true(badge.is_ancestor_of(badge.get_node("Icon")))
+	assert_true(screen.btn_attack.is_ancestor_of(badge),
+		"费用角标必须留在整按钮调制链内")
+	screen.battle.energy[screen.PLAYER] = ActionDef.BASE_ACTION_DEF[
+		ActionDef.Action.ATTACK]["cost"]
+	screen._refresh_action_affordance()
+	assert_false(screen.btn_attack.disabled)
+	assert_eq(screen.btn_attack.modulate, Color.WHITE,
+		"重新具备能量后按钮边框和内容一起恢复原色")
+	assert_eq(badge.modulate, Color.WHITE,
+		"重新具备能量后费用角标必须与按钮同步恢复原色")
+
+
+func test_queued_charge_cannot_overwrite_other_disabled_action_visuals() -> void:
+	var screen: Control = _screen()
+	screen.battle.energy[screen.PLAYER] = 0
+	screen._refresh_action_affordance()
+	var disabled_buttons: Array[Button] = [
+		screen.btn_attack,
+		screen.btn_big_attack,
+		screen.btn_big_defend,
+	]
+	for button: Button in disabled_buttons:
+		assert_true(button.disabled)
+		assert_eq(button.modulate, screen.ACTION_DISABLED_BUTTON_MODULATE)
+
+	assert_true(screen._dispatch_command_drop({
+		kind = "action",
+		action = ActionDef.Action.CHARGE,
+		button = screen.btn_charge,
+	}), "0能量时攒仍可正常进入顺序序列")
+	assert_eq(screen._turn_command_queue.size(), 1)
+	for button: Button in disabled_buttons:
+		var badge := button.get_node("CostPips") as IconBadge
+		assert_true(button.disabled, "攒入槽后不可支付动作仍须保持禁用")
+		assert_eq(button.modulate, screen.ACTION_DISABLED_BUTTON_MODULATE,
+			"队列刷新和选中态重置不得覆盖整按钮灰态")
+		assert_eq(badge.modulate, Color.WHITE,
+			"费用角标只继承按钮根节点灰态，不能叠加或脱离")
+
+	# 直接覆盖曾触发回归的公共重置入口，防止后续新路径再次写回旧白色。
+	screen._reset_button_styles()
+	for button: Button in disabled_buttons:
+		assert_eq(button.modulate, screen.ACTION_DISABLED_BUTTON_MODULATE)
+
+	screen._on_command_cancel_pressed(0)
+	assert_true(screen._turn_command_queue.is_empty())
+	for button: Button in disabled_buttons:
+		assert_eq(button.modulate, screen.ACTION_DISABLED_BUTTON_MODULATE,
+			"取消入槽动作后也必须由同一状态合成入口恢复灰态")
+
+
+func test_task5_enlarges_slots_content_and_spacing_as_one_system() -> void:
+	var screen: Control = _screen()
+	assert_eq(screen.COMMAND_SLOT_SIZE, 76.0)
+	assert_eq(screen.COMMAND_SLOT_GAP, 16.0)
+	assert_eq(screen.COMMAND_STRIP_RECT.size, Vector2(880.0, 104.0))
+	assert_true(screen._dispatch_command_drop({
+		kind = "action", action = ActionDef.Action.CHARGE, button = screen.btn_charge,
+	}))
+	var first := screen._command_order_row.get_node("Step0") as Control
+	var art := first.get_node("Visual/Art") as Control
+	var rendered_size := art.size * art.scale
+	var available: float = screen.COMMAND_SLOT_SIZE \
+		- screen.COMMAND_SLOT_ART_INSET * 2.0
+	assert_almost_eq(maxf(rendered_size.x, rendered_size.y), available, 0.01,
+		"行动按钮内容必须随槽位净区统一放大到 68px")
+	var skin := first.get_node("SlotSkin") as Control
+	assert_eq(skin.scale, Vector2.ONE * screen.COMMAND_SLOT_SCALE,
+		"底座只做与槽位一致的等比放大")
+	screen.battle.slots[0][0] = _ready_item_slot("v2_t1_silver_coin")
+	screen._update_all()
+	assert_true(screen._dispatch_command_drop({kind = "item", slot = 0}))
+	first = screen._command_order_row.get_node("Step0") as Control
+	var second := screen._command_order_row.get_node("Step1") as Control
+	assert_almost_eq(second.position.x - first.position.x - first.size.x,
+		screen.COMMAND_SLOT_GAP, 0.01,
+		"放大后的槽间距必须统一为 16px")
+	assert_true(screen.COMMAND_STRIP_RECT.end.y < screen.btn_charge.get_global_rect().position.y,
+		"放大后的顺序栏仍不得压到下方行动按钮")
+
+
 func test_long_command_row_stays_centered_on_one_line() -> void:
 	var screen: Control = _screen()
 	for index: int in range(7):
@@ -654,34 +790,64 @@ func test_switch_button_opens_targets_and_target_drop_queues_switch() -> void:
 		"切换主按钮只负责点击展开，不再作为可拖入指令；实际命中=%s" % str(switch_source))
 	var source: Vector2 = screen._switch_candidate_frames[0].get_global_rect().get_center()
 	var target: Vector2 = screen._command_next_slot.get_global_rect().get_center()
+	var expected_target_frame: HeroFrame = screen._switch_candidate_frames[0]
 	_drag(screen, source, target, func() -> void:
 		assert_not_null(screen._command_drag_preview.find_child("Portrait", true, false),
 			"切换拖动实体必须是实际英雄头像框")
+		assert_null(screen._command_drag_preview.find_child("SwitchMarker", true, false),
+			"拖动阶段只显示目标头像框，右下角不得额外叠加切换标记")
+		assert_null(screen._command_drag_preview.find_child("SwitchIcon", true, false),
+			"拖动阶段不得提前带入落槽后才出现的切换按钮")
 	)
 	assert_eq(screen.selected_action, ActionDef.Action.SWITCH)
 	assert_eq(screen._turn_command_queue.size(), 1)
 	assert_eq(String(screen._turn_command_queue[0]["kind"]), "action")
-	var switch_icon := screen._command_order_row.find_child("SwitchIcon", true, false) as HoverIcon
 	var art := screen._command_order_row.get_node("Step0/Visual/Art") as Control
-	var queued_bg := art.get_node_or_null("Bg") as ColorRect
-	var source_bg := screen.btn_switch.get_node("Bg") as ColorRect
-	assert_not_null(switch_icon, "切换顺序条目应直接显示与基础按钮同级的切换 icon")
-	assert_not_null(queued_bg, "切换顺序条目必须带上正式按钮的蓝色填充与外框")
-	assert_eq((queued_bg.material as ShaderMaterial).shader,
-		(source_bg.material as ShaderMaterial).shader,
-		"顺序条切换按钮与正式切换按钮复用同一果冻边框 shader")
-	assert_eq((queued_bg.material as ShaderMaterial).get_shader_parameter("fill_top"),
-		(source_bg.material as ShaderMaterial).get_shader_parameter("fill_top"),
-		"蓝色填充不得在顺序条中另配一套近似色")
-	assert_null(art.find_child("Portrait", true, false),
-		"切换落入顺序条后不得继续携带英雄头像框")
+	var target_frame := art as HeroFrame
+	assert_not_null(target_frame, "切换落槽后必须只保留目标英雄头像框")
+	assert_eq(target_frame.portrait_path, expected_target_frame.portrait_path,
+		"顺序槽上方头像必须对应实际选中的目标英雄")
+	assert_null(art.find_child("SwitchButton", true, false),
+		"补充方案要求顺序槽不再显示下方切换按钮")
+	assert_null(art.find_child("SwitchIcon", true, false),
+		"顺序槽只显示头像框，不得混入切换 icon")
 	assert_null(art.find_child("SwitchMarker", true, false),
-		"纯 icon 方案不再使用头像右下角的小标记")
-	assert_eq(art.size, screen.btn_switch.size,
-		"切换 icon 与其他基础按钮使用同一来源按钮画布比例")
+		"头像框右下角不得恢复小切换标记")
+	assert_eq(int(art.get_meta("switch_target_slot", -1)), screen.selected_switch,
+		"落槽视觉必须记录并跟随本次实际切换目标")
+	assert_false(art.has_meta("command_slot_anchor_rect"),
+		"切换头像必须走与其他按钮相同的通用槽位定位，不得再使用向下锚点")
+	var visual_center := art.position + art.size * art.scale * 0.5
+	var expected_center: Vector2 = Vector2.ONE * (screen.COMMAND_SLOT_SIZE * 0.5) \
+		+ Vector2(0.0, screen.COMMAND_SLOT_ART_OFFSET_Y)
+	var rendered_avatar_size := art.size * art.scale
+	var available: float = screen.COMMAND_SLOT_SIZE \
+		- screen.COMMAND_SLOT_ART_INSET * 2.0
+	assert_almost_eq(maxf(rendered_avatar_size.x, rendered_avatar_size.y), available, 0.01,
+		"切换头像也必须服从 68px 通用内容净区，不能保留旧尺寸")
+	assert_almost_eq(visual_center.x, expected_center.x, 0.01,
+		"切换头像与其他按钮使用同一水平槽位中心")
+	assert_almost_eq(visual_center.y, expected_center.y, 0.01,
+		"切换头像与其他按钮使用同一纵向槽位中心")
 	var sequence: Array[Dictionary] = screen._command_sequence_for_submit()
 	assert_eq(int(sequence[0]["action"]), ActionDef.Action.SWITCH)
 	assert_eq(int(sequence[0]["target"]), screen.selected_switch)
+
+
+func test_free_switch_queue_art_keeps_target_portrait_after_target_becomes_active() -> void:
+	var screen: Control = _screen()
+	var active_slot: int = screen.battle.active_index[screen.PLAYER]
+	var active_source := screen.p1_frames[screen.p1_frame_slots.find(active_slot)] as HeroFrame
+	var art: Control = screen._make_command_queue_art({
+		kind = "free_switch",
+		target = active_slot,
+	})
+	add_child_autofree(art)
+	var target_frame := art as HeroFrame
+	assert_not_null(target_frame,
+		"免费切换完成预览换位后，顺序槽仍须从当前出战框解析目标头像")
+	assert_eq(target_frame.portrait_path, active_source.portrait_path)
+	assert_eq(int(art.get_meta("switch_target_slot", -1)), active_slot)
 
 
 func test_targeted_item_keeps_its_original_queue_position_until_target_is_chosen() -> void:

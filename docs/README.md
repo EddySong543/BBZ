@@ -4,7 +4,7 @@
 >
 > **项目阶段**：轻量个人项目，文档从简、随玩法迭代更新（不为治理冻结开发）。
 >
-> **当前快照（2026-08-31）**：产品进入 PvE 单机优先阶段。正式入口只保留远征；本地匹配、BP、局域网大厅、段位与 PvP 战绩已休眠。共享 `BattleCore`、联机源码和测试仍保留，但不再同步开发 PvP。
+> **当前快照（2026-09-05）**：产品只推进单机 PvE。当前工程只保留远征、战斗、英雄、道具、AI 与本地 UI。
 
 ---
 
@@ -15,11 +15,10 @@
 | **战斗核心** | `src/battle/battle_core.gd` | `design/gdd/game-concept.md` §3-5（规则/公式/边界） | `ADR-002`（v4 架构）· `ADR-001`（边界·v3 史）· `battlecore-risk-notes.md` |
 | **英雄技能** | `src/battle/skills/*.gd`（24）· `hero_skill.gd` | `design/heroes.md`（逐英雄）· `design/heroes-schools.md`（框架/原语） | — |
 | **英雄数据** | `assets/data/heroes/hXX.tres`（24） | `design/heroes.md` | — |
-| **选人（BP·休眠）** | `src/ui/bp_screen.{gd,tscn}` | `game-concept.md` §3.4 · `heroes-schools.md` §8.3 | 未来好友对战参考；当前产品不可达 |
 | **战斗 UI / juice** | `src/ui/battle_screen.*` · `src/ui/components/` | `game-concept.md` §3 | `prototypes/juice_test/README.md`（juice 来源） |
 | **美术管线** | `tools/import_hero_art.gd` · `assets/sprites/heroes/` | `design/art-pipeline-hero-animation.md`（A 方案） | — |
 | **数值框架** | `assets/data/heroes/` · `battle_core.gd` 常量 | `heroes-schools.md` §8 · `game-concept.md` §4/§7 | — |
-| **道具系统** | `src/battle/item_*.gd` · `src/battle/items/*.gd`（旧运行池） | [`道具系统当前设计标准`](superpowers/specs/2026-08-30-item-system-current-standard.md) · [`PvP 取得与实例边界`](superpowers/specs/2026-08-30-pvp-item-acquisition-instance-boundaries.md) · `build-design-framework.md` §2 | 五维基准 · 有序施放 · 图标管线 `tools/import_item_art.gd` |
+| **道具系统** | `src/battle/item_*.gd` · `src/battle/items/*.gd`（迁移中旧运行池） | [`道具系统当前设计标准`](superpowers/specs/2026-08-30-item-system-current-standard.md) · `build-design-framework.md` §2 | 五维基准 · 有序施放 · 图标管线 `tools/import_item_art.gd` |
 
 ---
 
@@ -36,11 +35,10 @@
 | [`build-design-framework.md`](../design/build-design-framework.md) | **设计纲领** — 资源三层 / 道具骨架 §2 / 标准值 §4 / 连携主定理 §6 / 元件类型 §7 / 反固化 §8 / 判据 §14 / 系统操作层 §15 |
 | [`item-system-current-standard.md`](superpowers/specs/2026-08-30-item-system-current-standard.md) | **道具系统当前唯一入口** — 免费真实背包三选一 / 公开锁一回合 / 逐次 `0–4` 能使用费 / 五维与后续任务 |
 | [`2026-08-30-item-energy-retrieval-baseline.md`](superpowers/specs/2026-08-30-item-energy-retrieval-baseline.md) | **P1 能量与检索基线** — `0–4` 费曲线 / 两件三件链预算 / 真实背包检索模型 / 缩包警戒 / 50–100 件覆盖目标 |
-| [`2026-08-30-pvp-item-acquisition-instance-boundaries.md`](superpowers/specs/2026-08-30-pvp-item-acquisition-instance-boundaries.md) | **任务 1 边界真相源** — 开局 / 同步抽取 / 候选 / 腾框 / 断线 / 交换与复制实例 |
 | [`2026-08-31-item-design-complete-retrospective-and-handoff.md`](reports/2026-08-31-item-design-complete-retrospective-and-handoff.md) | **本轮完整复盘与新对话交接** — 历史演进 / 失败教训 / 定稿原则 / 后续顺序 |
 | [`items-firstrelease.md`](../design/items-firstrelease.md) | **旧运行池快照** — 114 件，与迁移前代码对齐；不是新版 Demo 通过池 |
 | [`items-list.md`](../design/items-list.md) | **旧审批全集与储备池** — 供重设计审计，不代表新版 Demo 通过 |
-| [`items.md`](../design/items.md) | **历史快照 · 已被取代**（2026-06-17 旧奇幻命名版，仅作溯源） |
+| [`items.md`](../design/items.md) | **旧版道具设计归档** — 新版 20 件已完成纸面冻结；运行时与目录交接完成后删除 |
 
 ### 技术 / 架构（`docs/architecture/`）
 
@@ -49,7 +47,6 @@
 | [`ADR-002-battle-core-v4-architecture.md`](architecture/ADR-002-battle-core-v4-architecture.md) | **v4 战斗核心架构决议**（英雄重写，已全部落地） |
 | [`ADR-001-battlecore-boundary.md`](architecture/ADR-001-battlecore-boundary.md) | BattleCore 职责边界（v3 时代历史决策，边界原则由 v4 延续） |
 | [`ADR-003-item-system.md`](architecture/ADR-003-item-system.md) | 旧道具架构溯源；现行目标规则见道具系统当前设计标准 |
-| [`ADR-004-online-pvp-readiness.md`](architecture/ADR-004-online-pvp-readiness.md) | **联机 PvP 真相源**（权威模型 / 里程碑 M1-M2f / 迁移路线） |
 | [`battlecore-risk-notes.md`](architecture/battlecore-risk-notes.md) | 短文档 — 关键隐式规则与未来重构原则 |
 
 ### 流程 / 协作（`docs/`）
@@ -69,7 +66,7 @@
 
 | 位置 | 定位 |
 |------|------|
-| `tests/unit/{battle,net,core,ui,expedition}/**/*.gd` | **当前行为的真相源**（GUT·精确数以实跑为准） |
+| `tests/unit/{battle,core,ui,expedition}/**/*.gd` | **当前行为的真相源**（GUT·精确数以实跑为准） |
 | `tests/BEHAVIOR_NOTES.md` | 行为锁定笔记（含 v3 历史溯源） |
 
 ---

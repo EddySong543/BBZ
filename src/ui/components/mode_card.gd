@@ -11,7 +11,6 @@ extends Button
 ## 用法：Button 节点挂本脚本，设置 card_title/card_subtitle/card_caption + emblem_char 或 use_crown。
 
 const FRAME_SHADER := preload("res://assets/shaders/canvas_ui_pixel_frame.gdshader")
-const WAVE_CLASH_SHADER := preload("res://assets/shaders/wave_clash.gdshader")
 const CAMPFIRE_SHADER := preload("res://assets/shaders/canvas_ui_campfire.gdshader")
 const RIDGES_SHADER := preload("res://assets/shaders/canvas_ui_mountain_ridges.gdshader")
 const ROUNDED_FILL_SHADER := preload("res://assets/shaders/canvas_ui_rounded_fill.gdshader")
@@ -67,10 +66,10 @@ const EMBLEM_COL := Color(0.86, 0.76, 0.58, 0.85)
 		if _emblem:
 			_emblem.text = v
 @export var use_crown: bool = false
-## 牌面程序美术母题（全 shader 生成·零贴图·三卡动效语言统一·2026-06-24 B 路线）：
-##   WAVE_CLASH 活的蓝红对波（匹配卡）/ CAMPFIRE 炉火夜话暖篝火（故事卡）/
-##   RIDGES 登天关冷山脊纵深（远征卡）。母题层垫在框线之下、名牌带文字加描边压住保可读。
-enum ArtKind { NONE, WAVE_CLASH, CAMPFIRE, RIDGES }
+## 牌面程序美术母题（全 shader 生成·零贴图·故事/远征两卡动效语言统一·2026-06-24 B 路线）：
+##   CAMPFIRE 炉火夜话暖篝火（故事卡）/ RIDGES 登天关冷山脊纵深（远征卡）。
+##   母题层垫在框线之下、名牌带文字加描边压住保可读。
+enum ArtKind { NONE, CAMPFIRE, RIDGES }
 @export var art_kind: ArtKind = ArtKind.NONE
 @export var title_font_size: int = 32
 ## 悬停/焦点放大倍率（高亮+放大=悬停专属效果）。
@@ -84,14 +83,10 @@ var _backing: ColorRect
 var _backing_mat: ShaderMaterial     # 圆角遮罩（外层·full rect）
 var _fill: ColorRect
 var _fill_mat: ShaderMaterial        # 圆角遮罩（内层·inset 4px 同心弧）
-var _art: ColorRect = null           # 对波美术层（_fill 之上 / 框线之下）
+var _art: ColorRect = null           # 程序美术层（_fill 之上 / 框线之下）
 var _art_mat: ShaderMaterial = null
-var _art_phase_l: float = 0.0
-var _art_phase_r: float = 0.37       # 错相起步：左右波不同步更像两军各自涌
 var _art_time: float = 0.0
-var _art_speed: float = 1.0          # 对波速率倍率（匹配中"临战升温"渐升至 READY 档）
 var _art_warm: float = 0.0           # 山脊母题冷暖（0=冷夜配蓝背景 / 1=暖日配红背景·main_menu 据胜方色设）
-var _ready_tw: Tween                 # 升温/回落渐变
 var _frame: ColorRect
 var _frame_mat: ShaderMaterial
 var _inner_lines: Array[ColorRect] = []
@@ -109,16 +104,7 @@ var _hot: bool = false
 var _tw: Tween
 var _shadow_tw: Tween
 
-# ---- 牌背模式（盖牌+王冠呼吸）----
-# ⚠ 2026-06-12 起主菜单匹配不再翻面（改 set_battle_ready 临战升温——对波卡面
-# 翻成静态王冠=出戏）。API 保留给未来联机场景（断线重连/观战盖牌等）。
-var _face_down: bool = false
-var _gold_locked: bool = false       # 牌背期间金框常驻（不随鼠标进出变化）
-var _crown_scale: float = 6.0        # 王冠纹章倍率：正面 ×6 / 牌背 ×4
-var _flip_tw: Tween
-var _breath_tw: Tween                # 牌背王冠呼吸
-var _float_tw: Tween                 # 牌背轻浮动
-var _float_home_y: float = 0.0
+var _crown_scale: float = 6.0        # 王冠纹章倍率
 
 
 func _ready() -> void:
@@ -138,7 +124,7 @@ func _ready() -> void:
 
 
 func _build() -> void:
-	# 圆角=三层各自按像素台阶自切（backing/fill 用 rounded_fill、art 用 wave_clash
+	# 圆角=三层各自按像素台阶自切（backing/fill 用 rounded_fill、art 用对应母题 shader
 	# 内置遮罩、框线在 frame shader 内沿弧重算）。⚠ 不能用 clip_children 统一裁：
 	# Godot 的 clip mask 不执行父节点自定义 shader → 子层直角会从弧外露出（实测踩坑）。
 	# 投影必须最先建 → 子节点序最底 → 画在 _backing 之下；ColorRect 自身白色，
@@ -157,25 +143,12 @@ func _build() -> void:
 	_fill_mat = ShaderMaterial.new()
 	_fill_mat.shader = ROUNDED_FILL_SHADER
 	_fill.material = _fill_mat
-	# 程序美术母题层（框线之下·名牌带之上）。三卡同走 shader 语言、零贴图。
-	# WAVE_CLASH=低速常燃对波（无大波推进/无爆发，双侧小波涌入 + 中央僵持微光柱）；
+	# 程序美术母题层（框线之下·名牌带之上）。两卡同走 shader 语言、零贴图。
 	# CAMPFIRE=暗暖炉火 + 上升火星 + 呼吸；RIDGES=冷色多层山脊纵深 + 视差 + 山谷雾。
 	if art_kind != ArtKind.NONE and not Engine.is_editor_hint():
 		_art = _rect(Color.WHITE)
 		_art_mat = ShaderMaterial.new()
 		match art_kind:
-			ArtKind.WAVE_CLASH:
-				_art_mat.shader = WAVE_CLASH_SHADER
-				_art_mat.set_shader_parameter("clash_pos", 0.5)
-				_art_mat.set_shader_parameter("cells_x", 48.0)
-				_art_mat.set_shader_parameter("intensity", 0.85)
-				_art_mat.set_shader_parameter("pulse_amp", 0.0)
-				_art_mat.set_shader_parameter("center_amp", 0.30)
-				# v3 对波解剖后回调（2026-07-17 波家族同步）：芯/鞘增益比旧亮度带高一截，
-				# 0.42 会顶到爆白——0.20 与 boot 稳态 0.18 同档。
-				_art_mat.set_shader_parameter("wave_amp", 0.20)
-				_art_mat.set_shader_parameter("levels", 40)
-				_art_mat.set_shader_parameter("dither_amt", 1.0)
 			ArtKind.CAMPFIRE:
 				_art_mat.shader = CAMPFIRE_SHADER
 				_art_mat.set_shader_parameter("cells_x", 54.0)
@@ -227,8 +200,7 @@ func _build() -> void:
 		_crown.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		_crown.stretch_mode = TextureRect.STRETCH_SCALE
 		_crown.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		# 正面不放王冠（2026-06-12 Eddy：对波卡面自明，王冠多余）——
-		# 王冠只在牌背出现（盖牌图记+匹配中呼吸+found_flash 闪金）。
+		# 正面默认不放王冠；需要时由具体模式调用方控制。
 		_crown.visible = false
 		add_child(_crown)
 
@@ -237,7 +209,7 @@ func _build() -> void:
 		FontManager.apply(_title, title_font_size)
 		FontManager.apply(_sub, 16)
 		FontManager.apply(_emblem, 96)
-	# 对波美术上的文字需描边压亮浪；名牌带加深保住标题可读
+	# 场景卡美术上的文字需描边压亮背景；名牌带加深保住标题可读
 	if _art:
 		for lbl: Label in [_cap, _title, _sub]:
 			lbl.add_theme_constant_override("outline_size", 2)
@@ -358,7 +330,7 @@ func _layout() -> void:
 
 ## 银/金两套牌面（金=悬停/焦点专属；牌背模式金框常驻）。
 func _apply_palette() -> void:
-	var hot := _hot or _gold_locked
+	var hot := _hot
 	var mid := GOLD_MID if hot else SILVER_MID
 	var inner := GOLD_INNER if hot else SILVER_INNER
 	_frame_mat.set_shader_parameter("edge_outer", EDGE_OUTER)
@@ -380,69 +352,23 @@ func _apply_palette() -> void:
 		cs.color = Color(inner, 0.90)
 
 
-## 对波美术驱动：双侧小波各自累积相位（速率微差→不同步）+ 纵向漂浮。
-## 仅 art_wave_clash 卡开 process；牌背期间美术隐藏但相位继续走（翻回不跳变）。
-## _art_speed=临战升温倍率（set_battle_ready 渐变驱动，常态 1.0）。
+## 故事/远征母题统一使用单一 anim_time 驱动。
 func _process(delta: float) -> void:
 	if _art_mat == null:
 		return
-	if art_kind == ArtKind.WAVE_CLASH:
-		_art_phase_l += delta * 0.085 * _art_speed
-		_art_phase_r += delta * 0.097 * _art_speed
-		_art_time += delta * 1.2 * _art_speed
-		_art_mat.set_shader_parameter("phase_l", _art_phase_l)
-		_art_mat.set_shader_parameter("phase_r", _art_phase_r)
-		_art_mat.set_shader_parameter("wave_time", _art_time)
-	else:
-		# 篝火/山脊：单一 anim_time 驱动（火焰演化/火星上升/呼吸 与 山脊视差/雾气漂移同源）
-		_art_time += delta
-		_art_mat.set_shader_parameter("anim_time", _art_time)
+	_art_time += delta
+	_art_mat.set_shader_parameter("anim_time", _art_time)
 
 
-## 山脊母题冷暖切换（0=冷夜配蓝背景 / 1=暖日配红背景）。main_menu 据 boot 胜方色调用，
-## 设置面板翻转界面主色时也会重调，使远征卡始终与背景对波色协调。仅 RIDGES 母题生效。
+## 山脊母题冷暖切换（0=冷夜配蓝背景 / 1=暖日配红背景）。仅 RIDGES 母题生效。
 func set_art_warm(w: float) -> void:
 	_art_warm = w
 	if _art_mat != null and art_kind == ArtKind.RIDGES:
 		_art_mat.set_shader_parameter("warm", w)
 
 
-## 临战升温（匹配中状态·2026-06-12 取代翻面盖牌——把全场最活的卡翻成静态王冠=出戏）：
-## on=波速渐升 ×3 + 中央僵持光柱上探 + 整卡亮度微升 + 金框常驻 ——"两军开始集结"；
-## off=各参数缓落回常燃档。文案切换由调用方（main_menu）负责。
-func set_battle_ready(on: bool) -> void:
-	if _art_mat == null or art_kind != ArtKind.WAVE_CLASH:
-		return
-	_gold_locked = on
-	# 升温期间抑制悬停缩放（金框已常驻·放大会盖住下方取消钮）：归位并复位 hot 态
-	if on:
-		_hot = false
-		z_index = 0
-		if _tw and _tw.is_valid():
-			_tw.kill()
-		_tw = create_tween()
-		_tw.tween_property(self, "scale", Vector2.ONE, 0.18)\
-			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	_apply_palette()
-	if _ready_tw and _ready_tw.is_valid():
-		_ready_tw.kill()
-	_ready_tw = create_tween().set_parallel(true)
-	_ready_tw.tween_property(self, "_art_speed", 3.0 if on else 1.0, 1.2)\
-		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	_tween_art_param("center_amp", 0.55 if on else 0.30, 1.2)
-	_tween_art_param("intensity", 1.0 if on else 0.85, 1.2)
-	_tween_art_param("wave_amp", 0.50 if on else 0.42, 1.2)
-
-
-func _tween_art_param(param: String, to: float, dur: float) -> void:
-	var from: float = _art_mat.get_shader_parameter(param)
-	_ready_tw.tween_method(
-		func(v: float) -> void: _art_mat.set_shader_parameter(param, v),
-		from, to, dur).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-
-
 func _set_hot(hot: bool) -> void:
-	if disabled or _face_down or _gold_locked:
+	if disabled:
 		return
 	if _hot == hot:
 		return
@@ -490,107 +416,6 @@ func _set_pressed_rebound() -> void:
 	_tw = create_tween()
 	_tw.tween_property(self, "scale", Vector2.ONE * (hover_grow if _hot else 1.0), 0.14)\
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-
-
-# ── 牌背模式（匹配中=盖牌等对手）──
-
-## 翻面（横向压缩→中点换面→回弹展开·BP REVEAL 同语言）。await 可等动画完成。
-## down=true 进牌背：隐藏正面信息（小注/字印），王冠缩小+呼吸+牌体轻浮动，金框常驻；
-## down=false 翻回正面恢复一切。牌名/副标文字由调用方（main_menu）通过 card_title/card_subtitle 改。
-func flip_face(down: bool) -> void:
-	if _face_down == down:
-		return
-	if _tw and _tw.is_valid():
-		_tw.kill()
-	if _flip_tw and _flip_tw.is_valid():
-		_flip_tw.kill()
-	if not down:
-		_stop_back_anims()
-	# 压缩（顺带把 hover 缩放归一，防止翻完后 x/y 不一致）
-	_flip_tw = create_tween().set_parallel(true)
-	_flip_tw.tween_property(self, "scale:x", 0.0, 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	_flip_tw.tween_property(self, "scale:y", 1.0, 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	await _flip_tw.finished
-	_face_down = down
-	_gold_locked = down
-	_apply_face()
-	_apply_palette()
-	_flip_tw = create_tween()
-	_flip_tw.tween_property(self, "scale:x", 1.0, 0.14).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	await _flip_tw.finished
-	if down:
-		_start_back_anims()
-
-
-## 匹配成功一拍：对波真撞一次（撞闪 + 竖直涟漪荡开 + 波速尖峰）+ 牌体弹震
-## （屏幕轻震由 main_menu 负责）。卡里的战争打响 → 波幕转场进 BP 叙事连贯。
-func found_flash() -> void:
-	_stop_back_anims()
-	if _ready_tw and _ready_tw.is_valid():
-		_ready_tw.kill()
-	if _art_mat and art_kind == ArtKind.WAVE_CLASH:
-		var t := create_tween().set_parallel(true)
-		t.tween_method(
-			func(v: float) -> void: _art_mat.set_shader_parameter("hit_flash", v),
-			1.0, 0.0, 0.4)
-		# 初撞涟漪：两道竖直亮带自中央荡开（boot 同语言）
-		t.tween_method(
-			func(v: float) -> void: _art_mat.set_shader_parameter("ripple", v),
-			0.0, 1.0, 0.5)
-		# 波速尖峰后缓落（撞击的余势）
-		_art_speed = 5.0
-		t.tween_property(self, "_art_speed", 1.0, 0.8)\
-			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	if _crown:
-		_crown.modulate = Color(2.2, 2.2, 1.5)
-		var tc := create_tween()
-		tc.tween_property(_crown, "modulate", Color.WHITE, 0.35)\
-			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	if _tw and _tw.is_valid():
-		_tw.kill()
-	_tw = create_tween()
-	_tw.tween_property(self, "scale", Vector2(1.08, 1.08), 0.08)\
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	_tw.tween_property(self, "scale", Vector2.ONE, 0.25)\
-		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-
-
-## 牌背内容切换：正面信息收起 / 王冠倍率切换（_layout 复用 _crown_scale）。
-func _apply_face() -> void:
-	_cap.visible = not _face_down and card_caption != ""
-	_emblem.visible = not _face_down and emblem_char != ""
-	if _art:
-		_art.visible = not _face_down   # 牌背=安静深色面（呼吸王冠是主角）
-	if _crown:
-		_crown.visible = _face_down     # 王冠=牌背专属（正面已撤 2026-06-12）
-	_crown_scale = 4.0 if _face_down else 6.0
-	_layout()
-
-
-## 牌背待机：王冠呼吸（明暗 1.5s 周期）+ 牌体轻浮动（±3px 正弦）——"盖着的牌在等待中活着"。
-func _start_back_anims() -> void:
-	if _crown:
-		_breath_tw = create_tween().set_loops()
-		_breath_tw.tween_property(_crown, "modulate:a", 0.55, 0.75)\
-			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		_breath_tw.tween_property(_crown, "modulate:a", 1.0, 0.75)\
-			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_float_home_y = position.y
-	_float_tw = create_tween().set_loops()
-	_float_tw.tween_property(self, "position:y", _float_home_y - 3.0, 0.9)\
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_float_tw.tween_property(self, "position:y", _float_home_y + 3.0, 0.9)\
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-
-
-func _stop_back_anims() -> void:
-	if _breath_tw and _breath_tw.is_valid():
-		_breath_tw.kill()
-	if _float_tw and _float_tw.is_valid():
-		_float_tw.kill()
-		position.y = _float_home_y
-	if _crown:
-		_crown.modulate.a = 1.0
 
 
 # ── 节点工厂 ──

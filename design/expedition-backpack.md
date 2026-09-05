@@ -2,7 +2,7 @@
 
 > **状态：规则复审中。** 背包形态与保险槽保留；死亡保底金币已于任务8重置中作废，其余数值继续等待复审。
 > 上级：`design/gdd/expedition-mode.md` §3.4/§3.6。背包形态=**B 形状拼图**（Eddy 拍板）。
-> **2026-08-31 同步：**战斗道具的五维、实例与战末归还以 [`2026-08-30-item-four-axis-balance-design.md`](../docs/superpowers/specs/2026-08-30-item-four-axis-balance-design.md) 为准；主动免费三选一、取得后锁定本回合和逐次使用费见 [`2026-08-30-item-system-current-standard.md`](../docs/superpowers/specs/2026-08-30-item-system-current-standard.md)，并已确认为 PvE / PvP 通用规则。
+> **2026-08-31 同步：**战斗道具的五维、实例与战末归还以 [`2026-08-30-item-four-axis-balance-design.md`](../docs/superpowers/specs/2026-08-30-item-four-axis-balance-design.md) 为准；主动免费三选一、取得后锁定本回合和逐次使用费见 [`2026-08-30-item-system-current-standard.md`](../docs/superpowers/specs/2026-08-30-item-system-current-standard.md)，当前仅服务单机 PvE 远征。
 
 ---
 
@@ -62,7 +62,7 @@
 - 保险槽换入大于 2×2 的物品：禁止（UI 置灰并说明）。
 - 保险槽为空时死亡：本局背包与装备栏物品全部失去；已达成的成就因不属于背包物品而不受影响。
 - 扩容到 6×6 后再遇修补匠：改为给药瓶×2。
-- 带出 T3 战斗道具：按当前耐久入仓库，可以直接进入之后的 PvE/PvP 战备；是否能放保险格只看尺寸，不看稀有度。
+- 带出 T3 战斗道具：按当前耐久入仓库，可以直接进入之后的 PvE 战备；是否能放保险格只看尺寸，不看稀有度。
 - 战斗结束前不能用公开框规避死亡结算；剩余实例先返回原背包或保险格，再按撤离/死亡规则处理。
 - 宠物蛋带出后：孵化规则→ 经济子文档 D（宠物定位待拍板）。
 

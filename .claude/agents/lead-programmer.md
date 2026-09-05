@@ -91,7 +91,6 @@ skills: [code-review, architecture-decision, tech-debt]
 - `gameplay-programmer`（游戏性程序员）：游戏性功能实现
 - `engine-programmer`（引擎程序员）：核心引擎系统
 - `ai-programmer`（AI 程序员）：AI 和行为系统
-- `network-programmer`（网络程序员）：网络功能
 - `tools-programmer`（工具程序员）：开发工具
 - `ui-programmer`（UI 程序员）：UI 系统实现
 

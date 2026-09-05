@@ -53,7 +53,7 @@
 - [x] Add beam geometry, dynamic-connected-state, and old-transition-removal assertions.
 - [x] Add visible irregular connected flicker without changing connection state.
 - [x] Build a bottom-to-top pixel energy column and animate it only after all four stones connect.
-- [x] Directly change to PVE/BP at beam peak instead of calling `TransitionManager.transition_to`.
+- [x] Directly change to the expedition entry at beam peak instead of calling `TransitionManager.transition_to`.
 - [x] Run the non-saving main-menu probe.
 
 ### Task 3: Interim expedition viewport

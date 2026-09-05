@@ -30,7 +30,6 @@
 | `gameplay-programmer` | 游戏逻辑代码 | Sonnet | 功能实现、游戏系统代码 |
 | `engine-programmer` | 引擎系统 | Sonnet | 核心引擎、渲染、物理、内存管理 |
 | `ai-programmer` | AI 系统 | Sonnet | 行为树 (Behavior Tree)、寻路、NPC 逻辑、状态机 |
-| `network-programmer` | 网络同步 | Sonnet | 网络代码 (Netcode)、状态复制、延迟补偿、匹配 |
 | `tools-programmer` | 开发工具 | Sonnet | 编辑器扩展、管线工具、调试工具 |
 | `ui-programmer` | UI 实现 | Sonnet | UI 框架、屏幕、控件、数据绑定 |
 | `technical-artist` | 技术美术 (Tech Art) | Sonnet | 着色器、视觉特效 (VFX)、性能优化、美术管线工具 |
@@ -43,7 +42,7 @@
 | `analytics-engineer` | 遥测分析 (Telemetry) | Sonnet | 事件追踪、数据看板、A/B 测试设计 |
 | `ux-designer` | 用户体验流程 | Sonnet | 用户流程、线框图、无障碍、输入处理 |
 | `prototyper` | 快速原型 | Sonnet | 可丢弃原型、机制测试、可行性验证 |
-| `security-engineer` | 安全 | Sonnet | 反作弊、漏洞防护、存档加密、网络安全 |
+| `security-engineer` | 安全 | Sonnet | 漏洞防护、存档加密、数据安全 |
 | `accessibility-specialist` | 无障碍 (Accessibility) | Haiku | WCAG 合规、色盲模式、按键重映射、文本缩放 |
 | `live-ops-designer` | 运营活动 (Live Ops) | Sonnet | 赛季、活动、战斗通行证 (Battle Pass)、留存、实时经济 |
 | `community-manager` | 社区运营 | Haiku | 补丁说明、玩家反馈、危机沟通、社区健康 |
@@ -64,7 +63,6 @@
 | ---- | ---- | ---- | ---- |
 | `ue-gas-specialist` | Gameplay Ability System | Sonnet | 能力、游戏效果、属性集、标签、预测 |
 | `ue-blueprint-specialist` | Blueprint 架构 | Sonnet | BP/C++ 边界、图表规范、命名、BP 优化 |
-| `ue-replication-specialist` | 网络/复制 | Sonnet | 属性复制、RPC、预测、相关性、带宽 |
 | `ue-umg-specialist` | UMG/CommonUI | Sonnet | 控件层级、数据绑定、CommonUI 输入、UI 性能 |
 
 ### Unity 子专家

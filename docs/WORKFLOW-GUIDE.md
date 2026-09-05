@@ -108,7 +108,6 @@ src/                  # 游戏源代码
   core/               # 引擎/框架代码
   gameplay/           # 游戏系统
   ai/                 # AI 系统
-  networking/         # 多人游戏代码
   ui/                 # UI 代码
   tools/              # 开发工具
 assets/               # 游戏资源
@@ -1634,7 +1633,6 @@ git push origin main --tags
 | 实现游戏代码 | `gameplay-programmer` | 3 |
 | 实现核心引擎系统 | `engine-programmer` | 3 |
 | 实现 AI 行为 | `ai-programmer` | 3 |
-| 实现多人游戏 | `network-programmer` | 3 |
 | 实现 UI | `ui-programmer` | 3 |
 | 构建开发工具 | `tools-programmer` | 3 |
 | 审查代码架构 | `lead-programmer` | 2 |

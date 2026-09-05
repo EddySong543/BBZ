@@ -54,7 +54,7 @@
 ### Task 3: 花草叠层预览
 
 **Files:**
-- Create: `design/previews/qingfeng_flower_overlays_preview_v1.png`
+- 旧预览产物已清理；正式 overlay 资产位于 `assets/tilesets/qingfeng_ricefield/overlays/`。
 
 **Interfaces:**
 - Consumes: 当前普通/深色草地的正式资产和实机粗像素尺度。

@@ -1,8 +1,6 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene format=3 uid="uid://bsqh2mny8a7w6"]
 
-[ext_resource type="Script" path="res://src/ui/main_hub/main_hub_teleport.gd" id="1_stage"]
-[ext_resource type="PackedScene" path="res://src/ui/main_hub/main_hub_portal_rig.tscn" id="2_portal"]
-[ext_resource type="PackedScene" path="res://src/ui/components/character_display.tscn" id="3_character"]
+[ext_resource type="Script" uid="uid://bedhhduu4tpka" path="res://src/ui/main_hub/main_hub_teleport.gd" id="1_stage"]
 
 [node name="MainHubTeleport" type="Control"]
 layout_mode = 3
@@ -16,97 +14,3 @@ script = ExtResource("1_stage")
 idle_drift = false
 pointer_parallax = true
 demo_click_shake = false
-
-[node name="Backdrop" type="ColorRect" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-color = Color(0.047, 0.059, 0.075, 1)
-metadata/parallax_factor = 0.0
-
-[node name="FarEnvironment" type="Control" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-metadata/parallax_factor = 0.14
-
-[node name="MidEnvironment" type="Control" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-metadata/parallax_factor = 0.48
-
-[node name="GroundEnvironment" type="Control" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-metadata/parallax_factor = 1.0
-
-[node name="PortalLayer" type="Control" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-metadata/parallax_factor = 1.0
-
-[node name="PortalRig" parent="PortalLayer" instance=ExtResource("2_portal")]
-layout_mode = 1
-
-[node name="CharacterLayer" type="Control" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-metadata/parallax_factor = 1.0
-
-[node name="PlayerCharacter" parent="CharacterLayer" instance=ExtResource("3_character")]
-layout_mode = 0
-offset_left = 576.0
-offset_top = 258.0
-offset_right = 1344.0
-offset_bottom = 1026.0
-mouse_filter = 2
-sprite_scale = Vector2(2, 2)
-rim_strength = 0.0
-backlight = 0.0
-warmth_amount = 0.0
-
-[node name="ForegroundEnvironment" type="Control" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-metadata/parallax_factor = 1.18
-
-[node name="ExitLeftAnchor" type="Marker2D" parent="."]
-position = Vector2(64, 780)
-metadata/target_district = &"team_prep"
-
-[node name="ExitRightAnchor" type="Marker2D" parent="."]
-position = Vector2(1856, 780)
-metadata/target_district = &"shop"

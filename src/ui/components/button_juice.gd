@@ -28,7 +28,7 @@ extends Node
 @export var settle_time: float = 0.08
 ## 按下缩小的时长（秒，要快、干脆）。
 @export var press_time: float = 0.05
-## 基准缩放：父按钮常驻缩放 ≠ 1 时设置（如 BP 牌库卡 0.846），所有反馈倍率在其上相乘。
+## 基准缩放：父按钮常驻缩放 ≠ 1 时设置（如旧卡片 0.846），所有反馈倍率在其上相乘。
 @export var base_scale: float = 1.0
 
 var _btn: BaseButton

@@ -1,9 +1,20 @@
 extends HeroSkill
 
 ## h03 尾火【白额雷音】被动 · 进攻 · HP5
-## 每回合首次基础攻击命中后，在敌方尚未开始的后续序列前生成一个空行动位。
-## 当前行动位已经开始的双方节点都照常完成；敌方原有后续顺序不变。
+## 每失去2点生命，自己结算「波 / 大波」时增加1点伤害。
+## 只读取攻击形成时的当前生命；不强化道具、主动技、追击或反击。
 
-func shifts_enemy_sequence_after_base_attack(_battle: BattleCore, _player: int,
-		_slot: int, context: Dictionary) -> bool:
-	return bool(context.get("connected", false))
+const HP_POINT := 2
+const LOST_HEALTH_PER_BONUS := 2 * HP_POINT
+const DAMAGE_PER_BONUS := HP_POINT
+
+
+func modify_outgoing_damage(dmg: int, action: int, battle: BattleCore,
+		player: int, slot: int) -> int:
+	if not ActionDef.is_attack(action):
+		return dmg
+	var lost_health: int = maxi(
+		int(battle.max_hp[player][slot]) - int(battle.hp[player][slot]), 0)
+	var bonus_steps: int = floori(
+		float(lost_health) / float(LOST_HEALTH_PER_BONUS))
+	return dmg + bonus_steps * DAMAGE_PER_BONUS

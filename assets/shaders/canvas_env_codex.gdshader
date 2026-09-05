@@ -3,7 +3,7 @@ shader_type canvas_item;
 // =============================================================
 // canvas_env_codex.gdshader
 // 作者: Claude (Game Studios) ｜ 用途: 图鉴「书房典籍」背景 —— 暖墨胡桃竖向渐变 + 极淡纸纹 + 暗角。
-//   取代旧蓝色水波(canvas_env_wave_flow)做图鉴底。静态(无 TIME)→ 计算极廉、观感安定，
+//   取代旧动态蓝色水波做图鉴底。静态(无 TIME)→ 计算极廉、观感安定，
 //   让英雄/道具内容与暖金框跳出。蓝色普通卡贴在暖暗底上不再「蓝叠蓝」。
 //   纸纹仅「提亮」不压暗(避免中低明度区脏成污渍)，并向底部淡出。posterize+dither 杀 banding。
 // 目标平台: PC (Windows D3D12 / Forward+)。复杂度: 1 个 hash、无纹理采样 → 极低。

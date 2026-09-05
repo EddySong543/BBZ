@@ -6,6 +6,7 @@ extends GutTest
 ## 显示链路（窗口模式/分辨率应用）由 tools/display_probe 真窗口 6 项覆盖，不在单测面。
 
 const Settings := preload("res://src/core/game_settings.gd")
+const BattleStageScript := preload("res://src/ui/components/battle_stage.gd")
 
 
 func before_each() -> void:
@@ -67,6 +68,25 @@ func test_game_settings_sanitize_rejects_malformed_values() -> void:
 	assert_eq(String(Settings.sanitize("window_mode", 42)), String(Settings.DEFAULTS["window_mode"]))
 	assert_eq(String(Settings.sanitize("resolution", "999999999x999999999")),
 		String(Settings.DEFAULTS["resolution"]), "天价分辨率回默认（预设白名单）")
-	assert_eq(Settings.sanitize("invert_colors", [1, 2]), Settings.DEFAULTS["invert_colors"],
-		"数组布尔回默认（防 bool() 构造炸）")
-	assert_eq(Settings.sanitize("invert_colors", true), true, "合法值原样通过")
+	assert_eq(Settings.sanitize("vsync_enabled", false), false)
+	assert_eq(Settings.sanitize("screen_shake_enabled", false), false)
+	assert_eq(int(Settings.sanitize("frame_limit", 120)), 120)
+	assert_eq(int(Settings.sanitize("frame_limit", 999)),
+			int(Settings.DEFAULTS["frame_limit"]), "帧率上限只接受预设档位")
+
+
+func test_game_settings_exposes_display_runtime_defaults() -> void:
+	assert_true(Settings.DEFAULTS.has("vsync_enabled"))
+	assert_true(Settings.DEFAULTS.has("frame_limit"))
+	assert_true(Settings.DEFAULTS.has("screen_shake_enabled"))
+	assert_false(Settings.DEFAULTS.has("invert_colors"), "过期的界面主色功能不得继续暴露为设置项")
+	assert_eq(Settings.FRAME_LIMIT_PRESETS, [0, 30, 60, 120, 144])
+
+
+func test_disabling_screen_shake_blocks_stage_camera_motion() -> void:
+	Settings._data["screen_shake_enabled"] = false
+	var stage := BattleStageScript.new() as BattleStage
+	add_child_autofree(stage)
+	stage.shake(18.0, 1.0)
+	assert_eq(stage._shake_amp, 0.0)
+	assert_eq(stage._shake_kick, 0.0)

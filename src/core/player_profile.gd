@@ -6,22 +6,15 @@ extends RefCounted
 ## 持久化到 user://player_profile.cfg（Godot ConfigFile）。
 ## 身份：player_name（改名走 set_player_name·截 8 字）/ avatar_hero（头像=英雄 id·h01-h24）/
 ##       created_ts（建档 unix 秒·首次落盘时盖章）。
-## 战绩：record_result(mode, outcome) 纯计数器——
-##       mode = "match"（本地匹配对战·含 AI）/ "net"（联机对战）；
-##       outcome = "win" / "lose" / "draw"。battle_screen 两处终局各挂一行。
-##       远征有独立进度存档，不进这里；将来要合并生涯页再扩 mode。
+## 远征进度与战斗结果由各自系统管理，不把已移除的对战统计写进身份档案。
 ## UI（主菜单身份带 / profile_screen）只经此类读写，不自持状态（ui-code 规）。
 
 const _PATH := "user://player_profile.cfg"
 const _SEC_ID := "identity"
-const _SEC_STATS := "stats"
 
 const NAME_MAX_CHARS := 8
 const DEFAULT_NAME := "无名"
 const DEFAULT_AVATAR := "h01"
-
-const MODES: Array[String] = ["match", "net"]
-const OUTCOMES: Array[String] = ["win", "lose", "draw"]
 
 ## 测试/探针关闭落盘用（内存态照常工作·GUT 单测禁碰文件系统）。
 static var save_enabled: bool = true
@@ -85,44 +78,6 @@ static func created_text() -> String:
 
 
 # ============================================================
-# 战绩
-# ============================================================
-
-## 记一场终局。mode/outcome 不在白名单 = 警告忽略（防手滑串键污染存档）。
-static func record_result(mode: String, outcome: String) -> void:
-	if not MODES.has(mode) or not OUTCOMES.has(outcome):
-		push_warning("PlayerProfile: 未知战绩键 '%s/%s'" % [mode, outcome])
-		return
-	_ensure_loaded()
-	var key := _stat_key(mode, outcome)
-	_data[key] = int(_data[key]) + 1
-	_save()
-
-
-static func get_stat(mode: String, outcome: String) -> int:
-	if not MODES.has(mode) or not OUTCOMES.has(outcome):
-		return 0
-	_ensure_loaded()
-	return int(_data[_stat_key(mode, outcome)])
-
-
-## 某模式总场次。
-static func mode_total(mode: String) -> int:
-	var total := 0
-	for o: String in OUTCOMES:
-		total += get_stat(mode, o)
-	return total
-
-
-## 某模式胜率（0-100 整数百分比）；没打过 = -1（UI 显示 "—" 用）。
-static func win_rate_pct(mode: String) -> int:
-	var total := mode_total(mode)
-	if total <= 0:
-		return -1
-	return int(roundf(float(get_stat(mode, "win")) * 100.0 / float(total)))
-
-
-# ============================================================
 # 持久化
 # ============================================================
 
@@ -132,14 +87,7 @@ static func _defaults() -> Dictionary:
 		"avatar_hero": DEFAULT_AVATAR,
 		"created_ts": 0,
 	}
-	for m: String in MODES:
-		for o: String in OUTCOMES:
-			d[_stat_key(m, o)] = 0
 	return d
-
-
-static func _stat_key(mode: String, outcome: String) -> String:
-	return "%s_%s" % [mode, outcome]
 
 
 static func _ensure_loaded() -> void:
@@ -158,13 +106,6 @@ static func load_from_disk() -> void:
 				if (k == "created_ts" and (raw is int or raw is float)) \
 						or (k != "created_ts" and raw is String):
 					_data[k] = raw
-		for m: String in MODES:
-			for o: String in OUTCOMES:
-				var key := _stat_key(m, o)
-				if cfg.has_section_key(_SEC_STATS, key):
-					var rv: Variant = cfg.get_value(_SEC_STATS, key, 0)
-					# 战绩钳制（终审修复）：负数/非数值=本地篡改或坏档 → 归零（计数只增不减）
-					_data[key] = maxi(0, int(rv)) if (rv is int or rv is float) else 0
 	_loaded = true
 	# 首次建档：盖建档时间戳并落盘（生成存档文件）。
 	if int(_data["created_ts"]) <= 0 and save_enabled:
@@ -180,10 +121,6 @@ static func _save() -> void:
 	var cfg := ConfigFile.new()
 	for k: String in ["player_name", "avatar_hero", "created_ts"]:
 		cfg.set_value(_SEC_ID, k, _data[k])
-	for m: String in MODES:
-		for o: String in OUTCOMES:
-			var key := _stat_key(m, o)
-			cfg.set_value(_SEC_STATS, key, int(_data[key]))
 	if cfg.save(_PATH) != OK:
 		push_warning("PlayerProfile: 资料保存失败（%s·磁盘只读/占用?）——本次改动仅内存生效" % _PATH)   # 终审修复：保存失败不再静默
 

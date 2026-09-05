@@ -25,6 +25,7 @@ static func resolve(battle) -> Dictionary:
 	for player: int in [0, 1]:
 		battle.item_buffs[player]["actual_switches_this_turn"] = []
 
+	var submitted_actions: Array[int] = [-1, -1]
 	var silenced_swaps: Array = _apply_skill_silence(battle)
 	_resolve_due_damage(battle, events)
 
@@ -41,12 +42,17 @@ static func resolve(battle) -> Dictionary:
 	var timeline = TIMELINE.new()
 	timeline.setup(battle.item_v2_command_sequences)
 	var standing_defenses: Array[int] = [-1, -1]
-	var submitted_actions: Array[int] = [-1, -1]
 	var action_executed: Array[bool] = [false, false]
 	var action_step_ids: Array[String] = ["", ""]
 	var action_contexts_by_column: Array = []
 
-	while timeline.has_next_column():
+	# 到期伤害发生在序列第一拍之前；若它令出战位真正阵亡，本回合没有任何玩家步骤启动。
+	battle._resolve_deaths(submitted_actions, events)
+	var active_deaths: Array[int] = _dead_active_players(battle)
+	if not active_deaths.is_empty():
+		timeline.cancel_remaining("active_hero_died", active_deaths)
+
+	while active_deaths.is_empty() and timeline.has_next_column():
 		var column: Dictionary = timeline.begin_next_column()
 		if column.is_empty():
 			break
@@ -81,6 +87,13 @@ static func resolve(battle) -> Dictionary:
 			free_switch_cursors, events, column_index)
 		action_contexts_by_column.append(contexts.duplicate(true))
 		timeline.complete_current_column()
+		# 死亡只在整拍双方步骤都完成后确认。替补阵亡会走死亡 hook，但不会截断；
+		# 任一出战位确认阵亡时，双方尚未开始的步骤一起取消。
+		battle._resolve_deaths(submitted_actions, events)
+		active_deaths = _dead_active_players(battle)
+		if not active_deaths.is_empty():
+			timeline.cancel_remaining("active_hero_died", active_deaths)
+			break
 		_request_sequence_shifts(battle, timeline, contexts, action_steps, events)
 
 	var timeline_result: Dictionary = timeline.to_result()
@@ -108,6 +121,15 @@ static func resolve(battle) -> Dictionary:
 		"item_v2_public_history": battle.item_v2_public_history.duplicate(true),
 	}
 	_reset_after_turn(battle)
+	return result
+
+
+static func _dead_active_players(battle) -> Array[int]:
+	var result: Array[int] = []
+	for player: int in [0, 1]:
+		var slot: int = battle.active_index[player]
+		if battle.hp[player][slot] <= 0:
+			result.append(player)
 	return result
 
 

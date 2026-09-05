@@ -5,12 +5,11 @@
 [resource]
 script = ExtResource("1_682cf")
 hero_id = "h03"
-team_role = "进攻"
 dimension = "进攻"
 hero_name = "尾火【虎】"
 max_hp = 5
 skill_description = "白额雷音"
-skill_detail = "尾火【虎】每回合首次攻击命中后，敌方行动序列中立刻获得一个空的行动位。"
+skill_detail = "尾火【虎】每失去2点生命，攻击伤害增加1点。"
 portrait_path = "res://assets/sprites/heroes/h03/h03_portrait.png"
 skill_icon_path = "res://assets/sprites/heroes/h03/h03_skill.png"
 sprite_frames_path = "res://assets/sprites/heroes/h03/h03_idle.tres"

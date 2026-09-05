@@ -83,8 +83,8 @@ const FRAME_TEX_ENEMY := preload("res://assets/ui/hero_avatar_frame_enemy.png") 
 				_layout_diamond_portrait()
 
 # ── 菱形模式（2026-07-18 Eddy·ref10 左侧头像语言）────────────────────
-# **opt-in**：默认 false = 回纹方框原样。本组件同时被 BP 牌池 / 阵亡替补浮窗 /
-# 英雄图鉴共用，默认行为绝不能动（同 hero_card 类型框模式的 opt-in 先例）。
+# **opt-in**：默认 false = 回纹方框原样。本组件被阵亡替补浮窗 / 英雄图鉴共用，
+# 默认行为绝不能动。
 # 开启后：回纹框/内阴影/底色三层隐藏 → 菱形外框（暗底+描边）+ 头像只收下半。
 @export var diamond_mode: bool = false:
 	set(v):
@@ -103,7 +103,7 @@ const FRAME_TEX_ENEMY := preload("res://assets/ui/hero_avatar_frame_enemy.png") 
 
 ## 菱形模式下头像的**绝对**高度（成品像素）。>0 时压过 diamond_portrait_zoom，
 ## 让「框尺寸」与「头像大小」彻底解耦 —— 框放大时头像原地不动（Eddy 2026-07-18 二轮点名：
-## 「只放大头像框，不放大内部头像」）。0 = 退回 frame_size × zoom 的联动老档（BP/图鉴等沿用）。
+## 「只放大头像框，不放大内部头像」）。0 = 退回 frame_size × zoom 的联动老档（图鉴等沿用）。
 @export var diamond_portrait_px: float = 0.0:
 	set(v):
 		diamond_portrait_px = v
@@ -162,7 +162,7 @@ const FRAME_TEX_ENEMY := preload("res://assets/ui/hero_avatar_frame_enemy.png") 
 		if is_node_ready() and diamond_mode:
 			_layout_diamond_portrait()
 
-## 战斗 HUD 可选的定向下投影。默认关闭，避免影响 BP、图鉴和换人浮窗等复用场景。
+## 战斗 HUD 可选的定向下投影。默认关闭，避免影响图鉴和换人浮窗等复用场景。
 @export_group("Bottom Shadow")
 @export var bottom_shadow_enabled := false:
 	set(v):
@@ -330,7 +330,7 @@ func _sync_diamond_geometry() -> void:
 	_layout_diamond_portrait()
 
 ## 切换菱形/方框两套外观。方框三层（回纹框 Bg / 内阴影 InnerFX / 底色 BgFill）整组隐藏，
-## 换上菱形外框；头像换遮罩材质并重新摆位。关掉即完全复原（BP/浮窗/图鉴走的就是这条）。
+## 换上菱形外框；头像换遮罩材质并重新摆位。关掉即完全复原（浮窗/图鉴走的就是这条）。
 func _apply_diamond_mode() -> void:
 	for n in [_bg, _inner_fx, _bg_fill]:
 		if n != null:
@@ -513,7 +513,7 @@ func set_switch_prompt(on: bool, label_text: String = "切换",
 
 ## 当前出战菱形框的三点护角：在左/右/下尖端外侧各画一枚独立 V 形角饰。
 ## 角饰与原框留缝，不覆盖或替换原有描边；顶部不画，保留立绘越框的开放轮廓。
-## 纯绘制子节点，不引入贴图，也不会影响复用 HeroFrame 的 BP/图鉴等非 diamond_mode 场景。
+## 纯绘制子节点，不引入贴图，也不会影响复用 HeroFrame 的图鉴等非 diamond_mode 场景。
 class ActiveCornerOrnaments extends Control:
 	const DARK := Color("#2a170d")
 	const GOLD := Color("#e1aa42")

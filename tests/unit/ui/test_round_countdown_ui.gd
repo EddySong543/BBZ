@@ -265,9 +265,11 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 	assert_true(screen.p2_item_row.mirror_seals)
 	assert_gt((screen.p2_item_row._seals[0] as Control).rotation, 0.0,
 			"右侧大封条朝右倾斜")
-	assert_gt((screen.p2_item_row._mini_seals[0] as Control).position.x,
-			ItemSlotRowScript.SLOT_W * 0.5,
-			"右侧小封条固定在右上角")
+	assert_almost_eq((screen.p2_item_row._mini_seals[0] as Control).position.x,
+			ItemSlotRowScript.SLOT_W * 0.5, 0.001,
+			"镜像侧锁定封条也必须保持道具框正中央")
+	assert_almost_eq((screen.p2_item_row._mini_seals[0] as Control).position.y,
+			ItemSlotRowScript.SLOT_H * 0.5, 0.001)
 	assert_lt((screen.p1_item_row._pouches[0] as Control).get_index(),
 			(screen.p1_item_row._seals[0] as Control).get_index(),
 			"封印态锦囊绘制在底，封条绘制在上")
@@ -299,10 +301,14 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 	esc.action = "ui_cancel"
 	esc.pressed = true
 	screen._unhandled_input(esc)
-	assert_not_null(screen.get_node_or_null("SettingsPanel"),
-			"取消可见按钮后 ESC 仍能打开设置")
-	screen.get_node("SettingsPanel").queue_free()
-	screen.game_timer.paused = false
+	var pause := screen.get_node_or_null("PauseMenu") as CanvasLayer
+	assert_not_null(pause,
+			"取消可见按钮后 ESC 应先打开一级暂停菜单")
+	assert_gt(pause.layer, TransitionManager.layer,
+			"战斗暂停层必须覆盖能量、耐久与全局过场画布")
+	assert_true(get_tree().paused, "一级菜单暂停整局，而不只暂停倒计时")
+	(pause as PauseMenuOverlay)._close()
+	assert_false(get_tree().paused)
 
 	screen._on_hero_skill_tip(screen.PLAYER, 0)
 	assert_true(screen._tip_panel.visible,
@@ -370,6 +376,8 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 	var item_tip: String = screen._item_slot_tip(0)
 	assert_false(item_tip.begins_with("【") or item_tip.contains("】\n"),
 			"已有道具名称不再显示书名括号")
+	assert_false(item_tip.contains("使用消耗") or item_tip.contains("耐久"),
+			"道具说明框只保留名称和能力介绍，不重复角标中的消耗或耐久")
 	screen._on_item_slot_hovered(0)
 	await get_tree().process_frame
 	assert_true(screen._tip_item_header.visible,
@@ -449,12 +457,13 @@ func test_battle_utility_relayout_and_avatar_skill_tip_contract() -> void:
 	assert_eq(battle_cost.number, screen.battle.slot_item(screen.PLAYER, 0).use_cost)
 	assert_eq(battle_durability.number,
 			int(screen.battle.slots[screen.PLAYER][0]["current_durability"]))
-	assert_almost_eq(
-		maxf(battle_cost.debug_icon_visible_rect().size.x,
-			battle_cost.debug_icon_visible_rect().size.y),
-		maxf(battle_durability.debug_icon_visible_rect().size.x,
-			battle_durability.debug_icon_visible_rect().size.y), 0.01,
-		"战斗框中的能量与耐久图标可见尺度一致")
+	var battle_item_layout := ItemFrameStyle.item_frame_layout(
+		&"battle", Vector2.ZERO, ItemSlotRow.SLOT_W)
+	assert_eq(battle_cost.debug_icon_visible_rect(),
+		battle_item_layout["energy_icon_rect"])
+	assert_eq(battle_durability.debug_icon_visible_rect(),
+		battle_item_layout["durability_icon_rect"],
+		"战斗框保留调参台中能量与耐久各自的图标矩形")
 	assert_almost_eq(screen._tip_item_icon.size.x, 32.0, 0.01,
 			"顶部只保留整像素尺寸的道具图标，避免缩放边框破损")
 	assert_eq(screen._tip_item_icon.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST,

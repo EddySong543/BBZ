@@ -4,8 +4,8 @@ extends GutTest
 ## 黑暗面英雄（h13 玄冥 / h14 蚩尤 / h15 穷奇）技能测试 —— 锁定【当前代码行为】。
 ##
 ## h13【暗潮】= 进攻：玄冥出战时，可将「大波」改为连续两次「波」；防 / 大防都能挡住两次。
-## h14【天不葬】= 经济·主动：按下后，本回合行动费用由出战蚩尤以等量生命支付。
-## h15【七杀战鬼】= 进攻：出战时无法用防/大防（can_afford gate·下场即解）+ 波穿防（attack_penetration）。
+## h14【血铸荼蘼】= 经济·主动：按下后，本回合行动费用由出战蚩尤以等量生命支付。
+## h15【魇镇八极】= 进攻：出战时无法用防/大防（can_afford gate·下场即解）+ 波穿防（attack_penetration）。
 ## h16【白虹】= 调度/进攻：队友基础攻击命中时，替补广寒登场并对同一目标追击 1 点伤害。
 ## h17【无我亦无穷】= 主动技：占动作+费2能，转变为敌方当前出战英雄；复制英雄本体状态，不复制团队能量。
 ## h18【游丝引】= 控制·被动：出战时，双方「波 / 大波」的基础伤害均视为 1 点；后续强化与独立伤害照常。
@@ -203,45 +203,45 @@ func test_h14_blood_payment_cannot_extend_h07_into_second_free_switch() -> void:
 	assert_eq(b.hp[0][1], 6, "蚩尤大波消耗3点能量，应扣自身3点生命")
 
 
-# ---- h15 穷奇 七杀战鬼（出战不能防御 + 波穿防）----
+# ---- h15 穷奇 魇镇八极（出战不能防御 + 波穿防）----
 
-func test_h15_qishazhangui_cannot_defend() -> void:
+func test_h15_yanzhenbaji_cannot_defend() -> void:
 	var b := _battle("h15", 7, 8)   # 暗虎出战；8 半能（够大防/大波）
-	assert_false(b.can_afford(0, ActionDef.Action.DEFEND), "七杀战鬼：防不合法")
-	assert_false(b.can_afford(0, ActionDef.Action.BIG_DEFEND), "七杀战鬼：大防不合法")
-	assert_false(b.select_action(0, ActionDef.Action.DEFEND), "七杀战鬼：选防被拒")
+	assert_false(b.can_afford(0, ActionDef.Action.DEFEND), "魇镇八极：防不合法")
+	assert_false(b.can_afford(0, ActionDef.Action.BIG_DEFEND), "魇镇八极：大防不合法")
+	assert_false(b.select_action(0, ActionDef.Action.DEFEND), "魇镇八极：选防被拒")
 	var acts: Array = []
 	for c in b.legal_actions(0):
 		acts.append(int(c["action"]))
 	assert_does_not_have(acts, ActionDef.Action.DEFEND, "legal_actions 不含防")
 	assert_does_not_have(acts, ActionDef.Action.BIG_DEFEND, "legal_actions 不含大防")
-	assert_true(b.can_afford(0, ActionDef.Action.ATTACK), "七杀战鬼：波仍合法")
-	assert_true(b.can_afford(0, ActionDef.Action.BIG_ATTACK), "七杀战鬼：大波仍合法")
+	assert_true(b.can_afford(0, ActionDef.Action.ATTACK), "魇镇八极：波仍合法")
+	assert_true(b.can_afford(0, ActionDef.Action.BIG_ATTACK), "魇镇八极：大波仍合法")
 
 
-func test_h15_qishazhangui_only_disables_while_active() -> void:
+func test_h15_yanzhenbaji_only_disables_while_active() -> void:
 	# 暗虎在替补(slot1)、出战是 plain → 出战队友能正常防（下场即恢复）
 	var b := _battle_team(["test_p0_0", "h15", "test_p0_2"], 5, 8)
 	assert_true(b.can_afford(0, ActionDef.Action.DEFEND), "暗虎在替补 → 出战队友能防")
 	assert_true(b.can_afford(0, ActionDef.Action.BIG_DEFEND), "暗虎在替补 → 出战队友能大防")
 
 
-func test_h15_qishazhangui_wave_pierces_defend() -> void:
+func test_h15_yanzhenbaji_wave_pierces_defend() -> void:
 	# 暗虎(P0)波 vs plain(P1)防 → 穿防，plain 仍吃 2 半点
 	var b := _battle("h15", 7, 8)
 	b.select_action(0, ActionDef.Action.ATTACK)
 	b.select_action(1, ActionDef.Action.DEFEND)
 	b.resolve()
-	assert_eq(b.hp[1][0], 10 - 2, "七杀战鬼波穿防：plain 出防仍吃 2 半点(1.0 HP)")
+	assert_eq(b.hp[1][0], 10 - 2, "魇镇八极波穿防：plain 出防仍吃 2 半点(1.0 HP)")
 
 
-func test_h15_qishazhangui_wave_blocked_by_big_defend() -> void:
-	# 大防仍挡得下七杀战鬼的波（穿防只穿到大防为止）
+func test_h15_yanzhenbaji_wave_blocked_by_big_defend() -> void:
+	# 大防仍挡得下魇镇八极的波（穿防只穿到大防为止）
 	var b := _battle("h15", 7, 8)
 	b.select_action(0, ActionDef.Action.ATTACK)
 	b.select_action(1, ActionDef.Action.BIG_DEFEND)
 	b.resolve()
-	assert_eq(b.hp[1][0], 10, "七杀战鬼的波被大防挡下：plain 无伤")
+	assert_eq(b.hp[1][0], 10, "魇镇八极的波被大防挡下：plain 无伤")
 
 
 # ---- h16 广寒 白虹（替补席响应队友基础攻击命中）----

@@ -198,22 +198,33 @@ func test_revive_target_must_already_be_dead_when_sequence_is_submitted() -> voi
 	assert_eq(battle.hp[0][1], 2)
 
 
-func test_h03_inserts_a_visible_wait_only_before_unstarted_enemy_steps() -> void:
-	var battle := _battle("h03")
-	_equip(battle, 0, ["v2_t1_silver_coin"])
-	_equip(battle, 1, ["v2_t1_whetstone", "v2_t1_silver_coin"])
-	var result: Dictionary = _submit_both(battle,
+func test_h03_healing_order_changes_missing_health_attack_bonus() -> void:
+	var before := _battle("h03")
+	before.max_hp[0][0] = 10
+	before.hp[0][0] = 2
+	_equip(before, 0, ["v2_t1_blood_medicine"])
+	var enemy_hp: int = before.hp[1][0]
+	var before_result: Dictionary = _submit_both(before,
+		[_item(0), _action(A.ATTACK)],
+		[_action(A.CHARGE)])
+	assert_eq(enemy_hp - before.hp[1][0], 4,
+		"先回复到3点生命再攻击时，尾火只获得1点负伤加成")
+
+	var after := _battle("h03")
+	after.max_hp[0][0] = 10
+	after.hp[0][0] = 2
+	_equip(after, 0, ["v2_t1_blood_medicine"])
+	enemy_hp = after.hp[1][0]
+	var after_result: Dictionary = _submit_both(after,
 		[_action(A.ATTACK), _item(0)],
-		[_item(0), _action(A.CHARGE), _item(1)])
-	var columns: Array = result["resolved_columns"]
-	assert_eq(columns.size(), 4)
-	assert_eq(int(columns[1]["steps"][1]["action"]), A.CHARGE,
-		"旧白额雷音不得推走已经对齐到0拍的敌方主行动")
-	assert_eq(String(columns[2]["steps"][1]["kind"]), "wait")
-	assert_eq(String(columns[3]["steps"][1]["item_id"]), "v2_t1_silver_coin")
-	assert_eq((result["sequence_events"] as Array).filter(
-		func(event: Dictionary) -> bool:
-			return String(event.get("id", "")) == "sequence_shifted").size(), 1)
+		[_action(A.CHARGE)])
+	assert_eq(enemy_hp - after.hp[1][0], 6,
+		"先以1点生命攻击时，尾火获得完整2点负伤加成，后续治疗不能追溯修改")
+	for result in [before_result, after_result]:
+		assert_false((result["sequence_events"] as Array).any(
+			func(event: Dictionary) -> bool:
+				return String(event.get("id", "")) == "sequence_shifted"),
+			"H03旧序列延后事件必须退出新版道具结算")
 
 
 func test_h21_still_interrupts_the_enemy_basic_action_at_the_shared_anchor() -> void:

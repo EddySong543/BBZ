@@ -2,13 +2,11 @@ extends Control
 
 ## 个人资料界面（2026-07-16 地基版·UI 重构 Epic 项⑥）。
 ## 外壳=图鉴家族模板（hero_gallery 同配方：宣纸山水衬底+墨云带+整屏手卷+牌匾贴形投影+返回导航皮）。
-## 左页=身份：384 大展示格（头像英雄 idle·点击→纸卡浮层选 24 英雄换头像）+ 名字/改名 + 段位占位 + 建档。
-## 右页=战绩：匹配对战 / 联机对战 / 生涯合计 三块（场次·胜·负·平·胜率）。
+## 身份页：384 大展示格（头像英雄 idle·点击→纸卡浮层选 24 英雄换头像）+ 名字/改名 + 建档。
 ## 数据只经 PlayerProfile 静态存档类读写（UI 不自持状态）；主菜单顶左身份带=本屏入口。
 ## ⚠ 装饰节点必须 mouse_filter=IGNORE——否则吞点击（图鉴家族踩过坑）。
 
 const ProfileStore := preload("res://src/core/player_profile.gd")
-const RuntimeFeatures := preload("res://src/core/runtime_features.gd")
 const HERO_FRAME_SCENE := preload("res://src/ui/components/hero_frame.tscn")   # 回纹头像框（选头像格）
 const AVATAR_FRAME_TEX := preload("res://assets/ui/hero_avatar_frame.png")     # 大展示格框（128px ×3 整数放大）
 const PLAQUE_TEX := preload("res://assets/ui/ui_plaque.png")                   # 悬挂牌匾（图鉴/设置同挂点）
@@ -51,14 +49,6 @@ const PICK_BOX := 72.0
 const PICK_STEP := 80.0
 const PICK_RING_PAD := 4.0
 
-## 右页战绩三块（mode=""=生涯合计行·由两模式求和）。
-const STAT_BLOCKS: Array = [
-	["匹配对战", "match"],
-	["联机对战", "net"],
-	["生涯合计", ""],
-]
-const STAT_HEADS: Array[String] = ["场次", "胜", "负", "平", "胜率"]
-
 var all_heroes: Array[HeroData] = []
 var _hero_by_id: Dictionary = {}       # hero_id → HeroData（头像换装查询）
 
@@ -78,7 +68,6 @@ var _picker_rings: Array[ColorRect] = []
 var _picker_frames: Array[HeroFrame] = []
 
 @onready var identity_area: Control = $IdentityArea
-@onready var stats_area: Control = $StatsArea
 @onready var back_btn: Button = $TopBand/BackButton
 @onready var title_lbl: Label = $TopBand/Title
 
@@ -90,9 +79,6 @@ func _ready() -> void:
 	_build_book()
 	_setup_top()
 	_build_identity_page()
-	stats_area.visible = RuntimeFeatures.PVP_ENABLED
-	if RuntimeFeatures.PVP_ENABLED:
-		_build_stats_page()
 	_apply_avatar()
 	_play_intro()
 
@@ -223,7 +209,7 @@ func _apply_nav_plate(btn: Button) -> void:
 
 
 # ============================================================
-# 左页：身份（大展示格=头像英雄 idle·可点换头像 + 名字/改名 + 段位占位 + 建档）
+# 左页：身份（大展示格=头像英雄 idle·可点换头像 + 名字/改名 + 建档）
 # ============================================================
 
 func _build_identity_page() -> void:
@@ -313,11 +299,6 @@ func _build_identity_page() -> void:
 	_rename_btn.pressed.connect(_start_rename)
 	identity_area.add_child(_rename_btn)
 
-	# ── PvP 开启时显示段位；建档日期始终保留 ──
-	if RuntimeFeatures.PVP_ENABLED:
-		var rank := _make_label(identity_area, Vector2(PAGE_L.position.x, 786), Vector2(PAGE_L.size.x, 26), 18, INK_DIM)
-		rank.text = tr("段位 · 未定级")
-		rank.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var created := _make_label(identity_area, Vector2(PAGE_L.position.x, 824), Vector2(PAGE_L.size.x, 24), 16, Color(INK_DIM, 0.85))
 	created.text = tr("建档 · %s") % ProfileStore.created_text()
 	created.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -375,50 +356,6 @@ func _apply_avatar() -> void:
 		_avatar_anim.visible = false
 		_avatar_fallback.texture = load(h.portrait_path) if ResourceLoader.exists(h.portrait_path) else null
 		_avatar_fallback.visible = true
-
-
-# ============================================================
-# 右页：战绩（匹配 / 联机 / 生涯合计·数据源=PlayerProfile 计数器）
-# ============================================================
-
-func _build_stats_page() -> void:
-	_chapter_head(stats_area, tr("战绩"), PAGE_R.position.x + 42.0)
-	var x0 := PAGE_R.position.x + 42.0
-	var block_y: Array[float] = [246.0, 434.0, 622.0]
-	for bi in STAT_BLOCKS.size():
-		var title: String = STAT_BLOCKS[bi][0]
-		var mode: String = STAT_BLOCKS[bi][1]
-		var y := block_y[bi]
-		var sub := _make_label(stats_area, Vector2(x0, y), Vector2(300, 32), 24, INK)
-		sub.text = tr(title)
-		var vals := _block_values(mode)
-		for ci in STAT_HEADS.size():
-			var cx := x0 + ci * 127.0
-			var v := _make_label(stats_area, Vector2(cx, y + 52.0), Vector2(120, 36), 32, INK)
-			v.text = vals[ci]
-			v.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			var head := _make_label(stats_area, Vector2(cx, y + 94.0), Vector2(120, 22), 16, INK_DIM)
-			head.text = tr(STAT_HEADS[ci])
-			head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-
-
-## 一块战绩的 5 列文本：场次/胜/负/平/胜率。mode=""=生涯合计（两模式求和）。
-func _block_values(mode: String) -> Array[String]:
-	var win := 0
-	var lose := 0
-	var draw := 0
-	if mode == "":
-		for m: String in ProfileStore.MODES:
-			win += ProfileStore.get_stat(m, "win")
-			lose += ProfileStore.get_stat(m, "lose")
-			draw += ProfileStore.get_stat(m, "draw")
-	else:
-		win = ProfileStore.get_stat(mode, "win")
-		lose = ProfileStore.get_stat(mode, "lose")
-		draw = ProfileStore.get_stat(mode, "draw")
-	var total := win + lose + draw
-	var rate := "—" if total <= 0 else "%d%%" % int(roundf(float(win) * 100.0 / float(total)))
-	return ["%d" % total, "%d" % win, "%d" % lose, "%d" % draw, rate]
 
 
 # ============================================================
@@ -602,11 +539,10 @@ func _play_intro() -> void:
 	tb.tween_property(_book_layer, "position:y", 0.0, 0.35)\
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tb.tween_property(_book_layer, "modulate:a", 1.0, 0.25)
-	for area: Control in [identity_area, stats_area]:
-		area.modulate.a = 0.0
-		var ta := create_tween()
-		ta.tween_interval(0.2)
-		ta.tween_property(area, "modulate:a", 1.0, 0.35)
+	identity_area.modulate.a = 0.0
+	var ta := create_tween()
+	ta.tween_interval(0.2)
+	ta.tween_property(identity_area, "modulate:a", 1.0, 0.35)
 
 
 # ============================================================

@@ -51,19 +51,13 @@ func _make_tier_frame_material(tier: int) -> ShaderMaterial:
 
 func _make_item_stat_badge(name_value: String, texture: Texture2D,
 		hframes_value: int, vframes_value: int, number: int,
-		badge_position: Vector2, badge_size: Vector2) -> IconBadge:
+		kind: StringName, layout: Dictionary) -> IconBadge:
 	var badge := IconBadge.new()
 	badge.name = name_value
-	badge.position = badge_position
-	badge.size = badge_size
 	badge.z_index = 20
 	badge.set_icon(texture, hframes_value, vframes_value, 0)
 	badge.set_number(number)
-	badge.normalize_icon_visual = true
-	badge.icon_visual_ratio = 0.82
-	badge.font_size = 13
-	badge.outline_size = 4
-	badge.embolden = 0.7
+	ItemFrameStyle.configure_item_stat_badge(badge, kind, layout)
 	return badge
 
 
@@ -211,33 +205,35 @@ func _build_card(item: ItemData, pos: Vector2, idx: int) -> Control:
 	if tex != null:
 		# 格底（图鉴格同配方：三档完整上深下亮渐变）——铺在阶框下。
 		var slot_rect := Rect2(Vector2(CARD_W * 0.5 - 64.0, 92.0), Vector2(128.0, 128.0))
-		var frame_position := slot_rect.position + slot_rect.size * FRAME_OFFSET_RATIO
-		var frame_size := slot_rect.size * FRAME_ART_SCALE
+		var layout := ItemFrameStyle.item_frame_layout(
+			&"gallery_left", slot_rect.position, slot_rect.size.x)
+		var frame_rect: Rect2 = layout["frame_rect"]
+		var frame_shadow_rect: Rect2 = layout["frame_shadow_rect"]
 		card.add_child(ItemFrameStyle.make_frame_shadow(
-				frame_position, frame_size, "BottomShadow"))
-		var cell_inset := slot_rect.size.x * CELL_INSET_RATIO
+				frame_shadow_rect.position, frame_shadow_rect.size,
+				"BottomShadow", Vector2.ZERO))
+		var cell_rect: Rect2 = layout["cell_rect"]
 		var cell := ColorRect.new()
 		cell.name = "ItemCell"
 		cell.color = Color.WHITE
-		cell.position = slot_rect.position + Vector2.ONE * cell_inset
-		cell.size = slot_rect.size - Vector2.ONE * cell_inset * 2.0
+		cell.position = cell_rect.position
+		cell.size = cell_rect.size
 		cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		# 与图鉴/战斗栏共用纵向渐变、传说贴图与统一内孔比例。
 		var cm := ItemFrameStyle.make_cell_material(tier, 128.0 / 6.0)
 		cell.material = cm
 		card.add_child(cell)
-		var icon_position := Vector2(CARD_W * 0.5 - 48.0, 108.0)
-		var icon_size := Vector2(96.0, 96.0)
-		card.add_child(ItemFrameStyle.make_item_art_shadow(
-				tex, icon_position, icon_size))
+		var art_rect: Rect2 = layout["item_art_rect"]
+		card.add_child(ItemFrameStyle.make_item_art_shadow_exact(
+				tex, layout["item_art_shadow_rect"]))
 		# 阶框+图标：补偿新素材透明边，使金属外沿仍与 128px 图标槽对齐。
 		var frame := TextureRect.new()
 		frame.name = "ItemFrame"
 		frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		frame.stretch_mode = TextureRect.STRETCH_SCALE
 		frame.texture = ITEM_FRAME_TEX
-		frame.position = frame_position
-		frame.size = frame_size
+		frame.position = frame_rect.position
+		frame.size = frame_rect.size
 		frame.material = _make_tier_frame_material(tier)
 		frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -248,17 +244,14 @@ func _build_card(item: ItemData, pos: Vector2, idx: int) -> Control:
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST   # 像素清晰
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		ItemFrameStyle.configure_item_art(icon, tex, Rect2(icon_position, icon_size))
+		ItemFrameStyle.configure_item_art(icon, tex, art_rect)
 		card.add_child(icon)
-		var badge_size := Vector2(40.0, 40.0)
-		var positions := ItemFrameStyle.stat_badge_positions(
-			Rect2(frame_position, frame_size), badge_size)
 		card.add_child(_make_item_stat_badge(
 			"UseCostBadge", ENERGY_COST_SHEET, 4, 4, item.use_cost,
-			positions["cost"], badge_size))
+			&"energy", layout))
 		card.add_child(_make_item_stat_badge(
 			"DurabilityBadge", DURABILITY_BADGE_ICON, 1, 1, item.max_durability,
-			positions["durability"], badge_size))
+			&"durability", layout))
 
 	# 分隔墨线（图鉴右页同手法）。
 	var divider := ColorRect.new()

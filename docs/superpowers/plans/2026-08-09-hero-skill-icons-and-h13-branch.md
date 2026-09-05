@@ -4,7 +4,7 @@
 
 **Goal:** Replace the newly supplied hero skill icons, mark h05/h13 as active enhancements in the Hero Gallery, and move h13's split-big-wave choice from above End to an icon branch above Big Wave.
 
-**Architecture:** Keep each hero resource path stable by replacing only `hXX_skill.png` at its existing destination. Store skill classification in `HeroData.skill_type`; preserve the approved Hero Gallery layout. Reuse h05's runtime branch-button structure for h13 while keeping h13's existing BattleCore choice flag and network protocol unchanged.
+**Architecture:** Keep each hero resource path stable by replacing only `hXX_skill.png` at its existing destination. Store skill classification in `HeroData.skill_type`; preserve the approved Hero Gallery layout. Reuse h05's runtime branch-button structure for h13 while keeping h13's existing BattleCore choice flag unchanged.
 
 **Tech Stack:** Godot 4, GDScript, `.tres` resources, GUT, PNG texture import.
 

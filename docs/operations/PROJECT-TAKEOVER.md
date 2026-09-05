@@ -78,7 +78,6 @@ PowerShell 全量测试命令：
 - GUT：40 个脚本、438 个测试全部通过，1607 条断言通过。
 - 视觉探针：`cursor_preview` 成功生成 PNG。
 - 故事探针：4 张阶段截图生成，`STORY_PROBE: PASS`，隔离存档运行后不存在。
-- 联机探针：本机 ENet `NET_PROBE: PASS`。
 
 Codex 自动验证时使用 `Start-Process -Wait -WindowStyle Hidden` 启动 Godot，以便可靠等待独立进程并取得退出码和日志；手动运行仍可使用前述 PowerShell `&` 模板。
 

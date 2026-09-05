@@ -8,7 +8,6 @@ hero_id = "h10"
 hero_name = "昴日【鸡】"
 max_hp = 5
 dimension = "状态"
-team_role = "进攻"
 skill_type = 2
 skill_description = "飞洒天星"
 skill_detail = "我方每次攻击命中，积累1点剑气。可消耗全部剑气强化攻击。（2点穿防，4点穿大防）"
